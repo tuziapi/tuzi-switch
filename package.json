@@ -1,7 +1,7 @@
 {
-  "name": "cc-switch",
+  "name": "tuzi-switch",
   "version": "3.12.3",
-  "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI",
+  "description": "Tuzi business assistant for Claude Code, Codex & OpenClaw",
   "type": "module",
   "scripts": {
     "dev": "pnpm tauri dev",

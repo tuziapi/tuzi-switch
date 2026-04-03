@@ -42,6 +42,7 @@ import { isTextEditableTarget } from "@/utils/domUtils";
 import { cn } from "@/lib/utils";
 import { isWindows, isLinux } from "@/lib/platform";
 import { AppSwitcher } from "@/components/AppSwitcher";
+import { BusinessQuickAccess } from "@/components/BusinessQuickAccess";
 import { ProviderList } from "@/components/providers/ProviderList";
 import { AddProviderDialog } from "@/components/providers/AddProviderDialog";
 import { EditProviderDialog } from "@/components/providers/EditProviderDialog";
@@ -805,6 +806,7 @@ function App() {
                     transition={{ duration: 0.15 }}
                     className="space-y-4"
                   >
+                    <BusinessQuickAccess appId={activeApp} providers={providers} />
                     <ProviderList
                       providers={providers}
                       currentProviderId={currentProviderId}
@@ -976,7 +978,7 @@ function App() {
                         : "text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300",
                     )}
                   >
-                    CC Switch
+                    tuzi-switch
                   </a>
                 </div>
                 <Button
@@ -990,6 +992,15 @@ function App() {
                   className="hover:bg-black/5 dark:hover:bg-white/5"
                 >
                   <Settings className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setCurrentView("mcp")}
+                  title={t("mcp.title")}
+                  className="hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <McpIcon size={16} />
                 </Button>
                 <UpdateBadge
                   onClick={() => {
@@ -1251,15 +1262,6 @@ function App() {
                                 title={t("sessionManager.title")}
                               >
                                 <History className="flex-shrink-0 w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setCurrentView("mcp")}
-                                className="text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
-                                title={t("mcp.title")}
-                              >
-                                <McpIcon size={16} />
                               </Button>
                             </>
                           )}

@@ -17,6 +17,7 @@ mod mcp;
 mod openclaw_config;
 mod opencode_config;
 mod panic_hook;
+mod product_installer;
 mod prompt;
 mod prompt_files;
 mod provider;
@@ -928,6 +929,12 @@ pub fn run() {
             commands::open_file_dialog,
             commands::open_zip_file_dialog,
             commands::create_db_backup,
+            product_installer::get_claudecode_status,
+            product_installer::install_claudecode,
+            product_installer::upgrade_claudecode,
+            product_installer::get_codex_status,
+            product_installer::install_codex,
+            product_installer::upgrade_codex,
             commands::list_db_backups,
             commands::restore_db_backup,
             commands::rename_db_backup,

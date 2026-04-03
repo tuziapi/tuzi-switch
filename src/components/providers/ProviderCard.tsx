@@ -261,12 +261,12 @@ export function ProviderCard({
             <GripVertical className="h-4 w-4" />
           </button>
 
-          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center border border-border group-hover:scale-105 transition-transform duration-300">
+          <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center border border-border group-hover:scale-105 transition-transform duration-300">
             <ProviderIcon
               icon={provider.icon}
               name={provider.name}
               color={provider.iconColor}
-              size={20}
+              size={25}
             />
           </div>
 

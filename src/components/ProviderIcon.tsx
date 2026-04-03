@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { getIcon, hasIcon, getIconMetadata } from "@/icons/extracted";
 import { cn } from "@/lib/utils";
+import { TuziIcon } from "@/components/BrandIcons";
 
 interface ProviderIconProps {
   icon?: string; // 图标名称
@@ -21,6 +22,9 @@ export const ProviderIcon: React.FC<ProviderIconProps> = ({
 }) => {
   // 获取图标 SVG
   const iconSvg = useMemo(() => {
+    if (icon === "tuzi") {
+      return "";
+    }
     if (icon && hasIcon(icon)) {
       return getIcon(icon);
     }
@@ -41,6 +45,9 @@ export const ProviderIcon: React.FC<ProviderIconProps> = ({
 
   // 获取有效颜色：优先使用传入的有效 color，否则从元数据获取 defaultColor
   const effectiveColor = useMemo(() => {
+    if (icon === "tuzi") {
+      return undefined;
+    }
     // 只有当 color 是有效的非空字符串时才使用
     if (color && typeof color === "string" && color.trim() !== "") {
       return color;
@@ -55,6 +62,26 @@ export const ProviderIcon: React.FC<ProviderIconProps> = ({
     }
     return undefined;
   }, [color, icon]);
+
+  const shouldRenderTuziIcon =
+    icon === "tuzi" || /兔子|tuzi/i.test(name);
+
+  if (shouldRenderTuziIcon) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center justify-center flex-shrink-0",
+          className,
+        )}
+        style={sizeStyle}
+      >
+        <TuziIcon
+          size={typeof size === "number" ? size : 32}
+          className="rounded-full"
+        />
+      </span>
+    );
+  }
 
   // 如果有图标，显示图标
   if (iconSvg) {

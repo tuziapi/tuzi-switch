@@ -8,6 +8,7 @@ import ClaudeSvg from "@/icons/extracted/claude.svg?url";
 import OpenAISvg from "@/icons/extracted/openai.svg?url";
 import GeminiSvg from "@/icons/extracted/gemini.svg?url";
 import OpenClawSvg from "@/icons/extracted/claw.svg?url";
+import TuziRabbitIconImg from "@/assets/icons/tuzi-rabbit-icon.jpg";
 
 export function ClaudeIcon({ size = 16, className = "" }: IconProps) {
   return (
@@ -58,6 +59,32 @@ export function OpenClawIcon({ size = 16, className = "" }: IconProps) {
       alt="OpenClaw"
       loading="lazy"
     />
+  );
+}
+
+export function TuziIcon({ size = 16, className = "" }: IconProps) {
+  return (
+    <span
+      className={`inline-flex items-center justify-center overflow-hidden rounded-[10px] ring-1 ring-sky-200/80 shadow-[0_0_0_1px_rgba(255,255,255,0.45)_inset] ${className}`}
+      style={{ width: size, height: size }}
+      aria-label="Tuzi"
+    >
+      <img
+        src={TuziRabbitIconImg}
+        width={size}
+        height={size}
+        className="h-full w-full object-cover"
+        alt="Tuzi"
+        loading="lazy"
+        style={{
+          width: "116%",
+          height: "116%",
+          maxWidth: "none",
+          maxHeight: "none",
+          objectPosition: "52% 50%",
+        }}
+      />
+    </span>
   );
 }
 
