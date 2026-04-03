@@ -13,6 +13,19 @@
 
 </div>
 
+## 下载
+
+最新安装包请前往 [GitHub Releases](https://github.com/tuziapi/tuzi-switch/releases)。
+
+推荐下载方式：
+
+- Windows：下载 `.msi` 安装版
+- Windows 绿色版：下载 `Windows-Portable.zip`
+- Linux：根据发行版选择 `.AppImage`、`.deb` 或 `.rpm`
+- macOS：当前公开版本暂未提供安装包
+
+目前公开 Release 已支持 Windows 和 Linux 用户下载使用。macOS 安装包会在 Apple 签名凭据配置完成后补上。
+
 ## tuzi-switch 是什么
 
 tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟的多工具桌面管理基础能力，同时把产品重点放在兔子客户更容易上手的接入流程上。

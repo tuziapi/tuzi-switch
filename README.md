@@ -13,6 +13,19 @@ English | [中文](README_ZH.md) | [日本語](README_JA.md) | [Releases](https:
 
 </div>
 
+## Download
+
+Get the latest build from [GitHub Releases](https://github.com/tuziapi/tuzi-switch/releases).
+
+Recommended packages:
+
+- Windows: download the `.msi` installer
+- Windows portable: download `Windows-Portable.zip`
+- Linux: download `.AppImage`, `.deb`, or `.rpm` based on your distro
+- macOS: not available yet in the current public release
+
+Current public releases are ready for Windows and Linux users. macOS packages will be added after Apple signing credentials are configured.
+
 ## What Is tuzi-switch?
 
 tuzi-switch is a Tuzi-branded business edition built on top of CC Switch. It keeps the mature multi-tool desktop foundation, then focuses the product around a simpler customer onboarding path for Tuzi services.
