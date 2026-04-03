@@ -58,9 +58,17 @@ Compared with the original upstream project, this edition focuses more on busine
 
 ## Screenshots
 
-| Main Interface | Add Provider |
-| :--: | :--: |
-| ![Main Interface](assets/screenshots/main-en.png) | ![Add Provider](assets/screenshots/add-en.png) |
+### Claude
+
+![Claude Tuzi Flow](assets/screenshots/claude-tuzi.png)
+
+### Codex
+
+![Codex Tuzi Flow](assets/screenshots/codex-tuzi.png)
+
+### OpenClaw
+
+![OpenClaw Tuzi Flow](assets/screenshots/openclaw-tuzi.png)
 
 ## Quick Start
 

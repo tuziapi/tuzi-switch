@@ -58,9 +58,17 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 界面预览
 
-| 主界面 | 添加供应商 |
-| :--: | :--: |
-| ![主界面](assets/screenshots/main-zh.png) | ![添加供应商](assets/screenshots/add-zh.png) |
+### Claude
+
+![Claude 兔子接入](assets/screenshots/claude-tuzi.png)
+
+### Codex
+
+![Codex 兔子接入](assets/screenshots/codex-tuzi.png)
+
+### OpenClaw
+
+![OpenClaw 兔子接入](assets/screenshots/openclaw-tuzi.png)
 
 ## 快速开始
 
