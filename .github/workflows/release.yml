@@ -174,6 +174,24 @@ jobs:
           fi
           echo "✅ Tauri signing key prepared"
 
+      - name: Disable updater artifacts for unsigned release
+        if: steps.capabilities.outputs.has_updater_signing != 'true'
+        shell: bash
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const path = 'src-tauri/tauri.conf.json';
+          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (config.bundle) {
+            config.bundle.createUpdaterArtifacts = false;
+          }
+          if (config.plugins && config.plugins.updater) {
+            delete config.plugins.updater.pubkey;
+          }
+          fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+          EOF
+          echo "Updater artifacts disabled for this unsigned release build"
+
       - name: Import Apple signing certificate
         if: runner.os == 'macOS' && steps.capabilities.outputs.has_macos_signing == 'true'
         shell: bash
