@@ -1,8 +1,8 @@
 <div align="center">
 
-# CC Switch
+# tuzi-switch
 
-### The All-in-One Manager for Claude Code, Codex, Gemini CLI, OpenCode & OpenClaw
+### Tuzi business edition for Claude Code, Codex, and OpenClaw onboarding
 
 [![Version](https://img.shields.io/github/v/release/farion1231/cc-switch?color=blue&label=version)](https://github.com/farion1231/cc-switch/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/farion1231/cc-switch/releases)
@@ -109,15 +109,15 @@ Claude Code / Codex / Gemini official channels at 38% / 2% / 9% of original pric
 
 </details>
 
-## Why CC Switch?
+## Why tuzi-switch?
 
-Modern AI-powered coding relies on CLI tools like Claude Code, Codex, Gemini CLI, OpenCode, and OpenClaw — but each has its own configuration format. Switching API providers means manually editing JSON, TOML, or `.env` files, and there is no unified way to manage MCP and Skills across multiple tools.
+tuzi-switch is a business-focused fork built on top of CC Switch. Instead of presenting a generic multi-provider toolkit, this edition is tailored for Tuzi's customer onboarding flow around Claude Code, Codex, and OpenClaw.
 
-**CC Switch** gives you a single desktop app to manage all five CLI tools. Instead of editing config files by hand, you get a visual interface to import providers with one click, switch between them instantly, with 50+ built-in provider presets, unified MCP and Skills management, and system tray quick switching — all backed by a reliable SQLite database with atomic writes that protect your configs from corruption.
+The current customization focuses on one-click Tuzi route setup, business-friendly quick access cards, and a smoother path for customers to input a key once and start using Tuzi services without hand-editing config files.
 
-- **One App, Five CLI Tools** — Manage Claude Code, Codex, Gemini CLI, OpenCode, and OpenClaw from a single interface
-- **No More Manual Editing** — 50+ provider presets including AWS Bedrock, NVIDIA NIM, and community relays; just pick and switch
-- **Unified MCP & Skills Management** — One panel to manage MCP servers and Skills across four apps with bidirectional sync
+- **Tuzi-first onboarding** — Quick access flows for Claude Code, Codex, and OpenClaw
+- **Business route setup** — Customers can enter a key once and complete route configuration faster
+- **Customized product UI** — Tuzi branding, provider icons, and business-oriented entry points
 - **System Tray Quick Switch** — Switch providers instantly from the tray menu, no need to open the full app
 - **Cloud Sync** — Sync provider data across devices via Dropbox, OneDrive, iCloud, or WebDAV servers
 - **Cross-Platform** — Native desktop app for Windows, macOS, and Linux, built with Tauri 2
