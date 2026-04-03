@@ -16,6 +16,7 @@ jobs:
   release:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-2022
@@ -94,7 +95,30 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Detect release capabilities
+        id: capabilities
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+            echo "has_updater_signing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_updater_signing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ] \
+            && [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] \
+            && [ -n "${{ secrets.KEYCHAIN_PASSWORD }}" ] \
+            && [ -n "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" ] \
+            && [ -n "${{ secrets.APPLE_ID }}" ] \
+            && [ -n "${{ secrets.APPLE_PASSWORD }}" ] \
+            && [ -n "${{ secrets.APPLE_TEAM_ID }}" ]; then
+            echo "has_macos_signing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_macos_signing=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Prepare Tauri signing key
+        if: steps.capabilities.outputs.has_updater_signing == 'true'
         shell: bash
         run: |
           # 调试：检查 Secret 是否存在
@@ -151,7 +175,7 @@ jobs:
           echo "✅ Tauri signing key prepared"
 
       - name: Import Apple signing certificate
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.capabilities.outputs.has_macos_signing == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -193,7 +217,7 @@ jobs:
           rm -f "$CERT_PATH"
 
       - name: Build Tauri App (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.capabilities.outputs.has_macos_signing == 'true'
         shell: bash
         timeout-minutes: 60
         env:
@@ -229,8 +253,14 @@ jobs:
         if: runner.os == 'Linux'
         run: pnpm tauri build --bundles appimage,deb,rpm
 
+      - name: Skip macOS release build
+        if: runner.os == 'macOS' && steps.capabilities.outputs.has_macos_signing != 'true'
+        shell: bash
+        run: |
+          echo "Skipping macOS build because signing/notarization secrets are not configured in this repository."
+
       - name: Prepare macOS Assets
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.capabilities.outputs.has_macos_signing == 'true'
         shell: bash
         run: |
           set -euxo pipefail
@@ -305,7 +335,7 @@ jobs:
           echo "✅ Styled DMG created: $NEW_DMG"
 
       - name: Notarize macOS DMG
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.capabilities.outputs.has_macos_signing == 'true'
         shell: bash
         timeout-minutes: 30
         env:
@@ -347,7 +377,7 @@ jobs:
           done
 
       - name: Verify macOS code signing and notarization
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.capabilities.outputs.has_macos_signing == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -494,7 +524,7 @@ jobs:
         with:
           name: release-assets-${{ runner.os }}-${{ matrix.arch || runner.arch }}
           path: release-assets/*
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: List generated bundles (debug)
         if: always()
@@ -504,7 +534,7 @@ jobs:
           find src-tauri/target -maxdepth 4 -type f -name "*.*" 2>/dev/null || true
 
       - name: Clean up Apple signing keychain
-        if: runner.os == 'macOS' && always()
+        if: runner.os == 'macOS' && steps.capabilities.outputs.has_macos_signing == 'true' && always()
         shell: bash
         run: |
           if [ -n "${ORIGINAL_DEFAULT_KEYCHAIN:-}" ]; then
@@ -547,7 +577,7 @@ jobs:
 
             ### 下载
 
-            - **macOS**: `tuzi-switch-${{ github.ref_name }}-macOS.dmg`（推荐）或 `tuzi-switch-${{ github.ref_name }}-macOS.zip`（解压即用）
+            - **macOS**: 配置 Apple 签名与公证凭据后可发布 `.dmg` / `.zip`
             - **Windows**: `tuzi-switch-${{ github.ref_name }}-Windows.msi`（安装版）或 `tuzi-switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
             - **Linux (x86_64)**: `tuzi-switch-${{ github.ref_name }}-Linux-x86_64.AppImage` / `.deb` / `.rpm`
             - **Linux (ARM64)**: `tuzi-switch-${{ github.ref_name }}-Linux-arm64.AppImage` / `.deb` / `.rpm`
@@ -555,7 +585,7 @@ jobs:
             > `.tar.gz` 为 Tauri updater 自动更新专用，无需手动下载。
 
             ---
-            macOS 版本已通过 Apple 代码签名和公证，可直接安装使用。
+            当前仓库会优先发布可直接下载使用的 Windows 与 Linux 安装包。macOS 包将在签名凭据配置完成后恢复自动发布。
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
