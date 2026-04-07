@@ -22,9 +22,23 @@
 - Windows：下载 `.msi` 安装版
 - Windows 绿色版：下载 `Windows-Portable.zip`
 - Linux：根据发行版选择 `.AppImage`、`.deb` 或 `.rpm`
-- macOS：当前公开版本暂未提供安装包
+- macOS：下载 `macOS-unsigned.dmg` 或 `macOS-unsigned.zip`
 
-目前公开 Release 已支持 Windows 和 Linux 用户下载使用。macOS 安装包会在 Apple 签名凭据配置完成后补上。
+目前公开 Release 已支持 Windows 和 Linux 用户下载使用。macOS 当前提供的是未签名测试包。
+
+### macOS 未签名包打开方式
+
+如果第一次打开时被系统拦截，可以用下面两种方式之一：
+
+1. 对应用点右键，选择“打开”，然后在弹窗里再次确认“打开”
+2. 或在终端执行：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/tuzi-switch.app"
+open "/Applications/tuzi-switch.app"
+```
+
+如果你不是把应用放在 `/Applications`，把命令里的路径改成你自己的实际路径即可。
 
 ## tuzi-switch 是什么
 

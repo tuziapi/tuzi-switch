@@ -22,9 +22,23 @@ Recommended packages:
 - Windows: download the `.msi` installer
 - Windows portable: download `Windows-Portable.zip`
 - Linux: download `.AppImage`, `.deb`, or `.rpm` based on your distro
-- macOS: not available yet in the current public release
+- macOS: download `macOS-unsigned.dmg` or `macOS-unsigned.zip`
 
-Current public releases are ready for Windows and Linux users. macOS packages will be added after Apple signing credentials are configured.
+Current public releases are ready for Windows and Linux users. macOS is currently shipped as an unsigned test build.
+
+### macOS Unsigned Build
+
+If macOS blocks the app on first launch, use either of these methods:
+
+1. Right-click the app and choose `Open`, then confirm `Open` again.
+2. Or run:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/tuzi-switch.app"
+open "/Applications/tuzi-switch.app"
+```
+
+If the app was launched from an extracted folder instead of `/Applications`, replace the path accordingly.
 
 ## What Is tuzi-switch?
 
