@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **兔子 Codex 订阅线路**: 为 Codex 快速接入新增 `兔子Codex订阅线路` 选项，内置 `https://coding.tu-zi.com` 路由并在状态卡片中显示对应线路名称
+
 ---
 
 ## [3.12.3] - 2026-03-24
