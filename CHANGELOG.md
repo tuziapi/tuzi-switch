@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.12.7] - 2026-04-07
+## [3.12.8] - 2026-04-07
 
 Patch release adding a dedicated Tuzi Codex subscription route for the business onboarding flow.
 
