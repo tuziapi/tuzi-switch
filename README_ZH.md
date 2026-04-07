@@ -26,6 +26,14 @@
 
 目前公开 Release 已支持 Windows 和 Linux 用户下载使用。macOS 当前提供的是未签名测试包。
 
+### 一键安装
+
+直接从 GitHub 安装最新版：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
+```
+
 ### macOS 未签名包打开方式
 
 如果第一次打开时被系统拦截，可以用下面两种方式之一：

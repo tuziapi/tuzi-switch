@@ -26,6 +26,14 @@ Recommended packages:
 
 Current public releases are ready for Windows and Linux users. macOS is currently shipped as an unsigned test build.
 
+### One-Command Install
+
+Install the latest public release directly from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
+```
+
 ### macOS Unsigned Build
 
 If macOS blocks the app on first launch, use either of these methods:
