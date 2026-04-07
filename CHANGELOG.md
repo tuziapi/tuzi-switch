@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [3.12.7] - 2026-04-07
+
+Patch release adding a dedicated Tuzi Codex subscription route for the business onboarding flow.
+
+**Stats**: 2 commits | 5 files changed | +42 insertions | -9 deletions
+
 ### Added
 
-- **兔子 Codex 订阅线路**: 为 Codex 快速接入新增 `兔子Codex订阅线路` 选项，内置 `https://coding.tu-zi.com` 路由并在状态卡片中显示对应线路名称
+- **兔子 Codex 订阅线路**: 为 Codex 快速接入新增 `兔子Codex订阅线路` 选项，内置 `https://coding.tu-zi.com` 路由，并在状态卡片中显示对应线路名称与实际选中的接入线路
 
 ---
 
