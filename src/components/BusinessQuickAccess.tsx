@@ -21,6 +21,7 @@ import type { OpenClawModel, Provider } from "@/types";
 
 type OpenClawRoute = "claude" | "codex";
 type ClaudeBusinessRoute = "gaccode" | "tu-zi";
+type CodexBusinessRoute = "gac" | "tuzi" | "tuzi-codex-sub";
 
 const OPENCLAW_ROUTE_CONFIG: Record<
   OpenClawRoute,
@@ -100,6 +101,22 @@ const CLAUDE_ROUTE_CONFIG: Record<
   },
 };
 
+const CODEX_ROUTE_OPTIONS: Array<{
+  value: CodexBusinessRoute;
+  label: string;
+}> = [
+  { value: "gac", label: "gac 线路" },
+  { value: "tuzi", label: "兔子 API 线路" },
+  { value: "tuzi-codex-sub", label: "兔子Codex订阅线路" },
+];
+
+function getCodexRouteLabel(route: string | null | undefined) {
+  if (!route) return "--";
+  return (
+    CODEX_ROUTE_OPTIONS.find((option) => option.value === route)?.label || route
+  );
+}
+
 function Stat({
   label,
   value,
@@ -136,7 +153,7 @@ export function BusinessQuickAccess({
   const [codexStatus, setCodexStatus] = useState<CodexInstallerStatus | null>(null);
   const [claudeGacKey, setClaudeGacKey] = useState("");
   const [claudeTuziKey, setClaudeTuziKey] = useState("");
-  const [codexRoute, setCodexRoute] = useState<"gac" | "tuzi">("gac");
+  const [codexRoute, setCodexRoute] = useState<CodexBusinessRoute>("gac");
   const [codexApiKey, setCodexApiKey] = useState("");
   const [codexModel, setCodexModel] = useState("gpt-5.4");
   const [codexReasoning, setCodexReasoning] = useState("medium");
@@ -595,7 +612,10 @@ export function BusinessQuickAccess({
                 value={codexStatus.installed ? "已安装" : "未安装"}
               />
               <Stat label="版本" value={codexStatus.version || "--"} />
-              <Stat label="当前线路" value={codexStatus.current_route || "--"} />
+              <Stat
+                label="当前线路"
+                value={getCodexRouteLabel(codexStatus.current_route)}
+              />
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr_auto]">
@@ -607,14 +627,19 @@ export function BusinessQuickAccess({
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <Select
                     value={codexRoute}
-                    onValueChange={(value: "gac" | "tuzi") => setCodexRoute(value)}
+                    onValueChange={(value: CodexBusinessRoute) =>
+                      setCodexRoute(value)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="选择线路" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gac">gac 线路</SelectItem>
-                      <SelectItem value="tuzi">兔子 API 线路</SelectItem>
+                      {CODEX_ROUTE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Input

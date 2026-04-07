@@ -685,13 +685,14 @@ fn normalize_route_input(value: &str) -> Option<String> {
         return None;
     }
     match s.as_str() {
-        "gac" | "tuzi" => Some(s),
+        "gac" | "tuzi" | "tuzi-codex-sub" => Some(s),
         "none" => None,
         _ if !s.is_empty()
             && s.len() <= 48
             && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
             && s != "gac"
             && s != "tuzi"
+            && s != "tuzi-codex-sub"
             && s != "none" =>
         {
             Some(s)
@@ -704,6 +705,7 @@ fn route_base_url(route: &str) -> Option<&'static str> {
     match route {
         "gac" => Some("https://gaccode.com/codex/v1"),
         "tuzi" => Some("https://api.tu-zi.com/v1"),
+        "tuzi-codex-sub" => Some("https://coding.tu-zi.com"),
         _ => None,
     }
 }
@@ -813,6 +815,7 @@ fn collect_strip_route_names(merged: &ParsedCodexConfig, existing: &str) -> BTre
     }
     strip.insert("gac".to_string());
     strip.insert("tuzi".to_string());
+    strip.insert("tuzi-codex-sub".to_string());
     strip
 }
 
@@ -966,7 +969,7 @@ fn configure_openai_route(
         entry.base_url = route_base_url(&normalized_route).map(|v| v.to_string());
     }
     if entry.base_url.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true) {
-        return Err("当前仅支持内置 gac / tuzi 线路".to_string());
+        return Err("当前仅支持内置 gac / tuzi / tuzi-codex-sub 线路".to_string());
     }
     entry.model = Some(settings.model.clone());
     entry.model_reasoning_effort = Some(settings.model_reasoning_effort.clone());
@@ -1010,6 +1013,7 @@ fn build_codex_routes(current_route: Option<&str>, config: &ParsedCodexConfig, e
     let mut names = BTreeSet::new();
     names.insert("gac".to_string());
     names.insert("tuzi".to_string());
+    names.insert("tuzi-codex-sub".to_string());
     for key in config.routes.keys() {
         names.insert(key.clone());
     }

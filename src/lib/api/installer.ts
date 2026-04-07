@@ -75,7 +75,7 @@ export const installerApi = {
 
   async installCodex(options: {
     variant: "openai" | "gac";
-    route?: "gac" | "tuzi";
+    route?: "gac" | "tuzi" | "tuzi-codex-sub";
     apiKey?: string;
     model?: string;
     modelReasoningEffort?: string;
