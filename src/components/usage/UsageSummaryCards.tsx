@@ -19,6 +19,13 @@ export function UsageSummaryCards({
   refreshIntervalMs,
 }: UsageSummaryCardsProps) {
   const { t } = useTranslation();
+  const rangeLabel = days === 1 ? "今天" : days === 7 ? "近 7 天" : "近 30 天";
+  const businessLineLabel =
+    businessLine === "all"
+      ? "全部业务线路"
+      : businessLine === "tuzi"
+        ? "兔子线路"
+        : "gac 线路";
 
   const { data: summary, isLoading } = useUsageSummary(days, businessLine, {
     refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
@@ -43,6 +50,7 @@ export function UsageSummaryCards({
         icon: Activity,
         color: "text-blue-500",
         bg: "bg-blue-500/10",
+        hint: `${rangeLabel}请求总量`,
         subValue: null,
       },
       {
@@ -51,6 +59,7 @@ export function UsageSummaryCards({
         icon: DollarSign,
         color: "text-green-500",
         bg: "bg-green-500/10",
+        hint: `${businessLineLabel}累计成本`,
         subValue: null,
       },
       {
@@ -59,6 +68,7 @@ export function UsageSummaryCards({
         icon: Layers,
         color: "text-purple-500",
         bg: "bg-purple-500/10",
+        hint: "输入与输出合计",
         subValue: (
           <div className="flex flex-col gap-1 text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
             <div className="flex justify-between items-center">
@@ -82,6 +92,7 @@ export function UsageSummaryCards({
         icon: Database,
         color: "text-orange-500",
         bg: "bg-orange-500/10",
+        hint: "缓存读写合计",
         subValue: (
           <div className="flex flex-col gap-1 text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
             <div className="flex justify-between items-center">
@@ -100,7 +111,7 @@ export function UsageSummaryCards({
         ),
       },
     ];
-  }, [summary, t]);
+  }, [businessLineLabel, rangeLabel, summary, t]);
 
   const container = {
     hidden: { opacity: 0 },
@@ -158,6 +169,7 @@ export function UsageSummaryCards({
                 <h3 className="text-2xl font-bold truncate" title={stat.value}>
                   {stat.value}
                 </h3>
+                <p className="text-xs text-muted-foreground">{stat.hint}</p>
               </div>
 
               {stat.subValue || (

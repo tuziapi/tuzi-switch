@@ -15,6 +15,9 @@ import {
   Activity,
   RefreshCw,
   Coins,
+  Clock3,
+  Radar,
+  Waypoints,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
@@ -48,6 +51,16 @@ export function UsageDashboard() {
   };
 
   const days = timeRange === "1d" ? 1 : timeRange === "7d" ? 7 : 30;
+  const timeRangeLabel =
+    timeRange === "1d" ? "今天" : timeRange === "7d" ? "近 7 天" : "近 30 天";
+  const businessLineLabel =
+    businessLine === "all"
+      ? "全部业务线路"
+      : businessLine === "tuzi"
+        ? "兔子线路"
+        : "gac 线路";
+  const refreshLabel =
+    refreshIntervalMs > 0 ? `${refreshIntervalMs / 1000} 秒自动刷新` : "手动刷新";
 
   return (
     <motion.div
@@ -139,11 +152,61 @@ export function UsageDashboard() {
         </TabsContent>
 
         <TabsContent value="proxy-stats" className="mt-6 space-y-8">
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr_0.8fr]">
+            <div className="rounded-3xl border border-border/60 bg-[linear-gradient(135deg,rgba(14,165,233,0.08),rgba(255,255,255,0.94))] p-6 shadow-sm">
+              <div className="inline-flex items-center gap-2 rounded-full border border-sky-200/70 bg-white/80 px-3 py-1 text-xs font-medium text-sky-700">
+                <Radar className="h-3.5 w-3.5" />
+                本地代理统计
+              </div>
+              <h3 className="mt-4 text-xl font-semibold">先看整体，再看细项</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                这里聚合本地代理采集到的请求、成本与 Token
+                数据，适合先快速确认整体消耗，再下钻到供应商、模型和请求明细。
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-border/60 bg-card/60 p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Clock3 className="h-4 w-4 text-sky-500" />
+                当前统计范围
+              </div>
+              <div className="mt-4 text-2xl font-semibold">{timeRangeLabel}</div>
+              <div className="mt-2 text-sm text-muted-foreground">
+                当前查看 {businessLineLabel} 的代理记录
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-border/60 bg-card/60 p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Waypoints className="h-4 w-4 text-orange-500" />
+                数据刷新方式
+              </div>
+              <div className="mt-4 text-2xl font-semibold">{refreshLabel}</div>
+              <div className="mt-2 text-sm text-muted-foreground">
+                适合在排查波动或观察近期消耗时使用
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">核心指标概览</h3>
+            <p className="text-sm text-muted-foreground">
+              先快速看请求量、成本、Tokens 和缓存命中情况，再决定是否进入明细排查。
+            </p>
+          </div>
+
           <UsageSummaryCards
             days={days}
             businessLine={businessLine}
             refreshIntervalMs={refreshIntervalMs}
           />
+
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">趋势变化</h3>
+            <p className="text-sm text-muted-foreground">
+              用趋势图判断最近的请求高峰、Token 消耗变化和成本波动。
+            </p>
+          </div>
 
           <UsageTrendChart
             days={days}
@@ -152,6 +215,13 @@ export function UsageDashboard() {
           />
 
           <div className="space-y-4">
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">明细与分布</h3>
+              <p className="text-sm text-muted-foreground">
+                继续查看具体请求日志，以及供应商和模型层面的使用结构。
+              </p>
+            </div>
+
             <Tabs defaultValue="logs" className="w-full">
               <div className="flex items-center justify-between mb-4">
                 <TabsList className="bg-muted/50">

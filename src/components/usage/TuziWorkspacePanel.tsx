@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useProvidersQuery } from "@/lib/query/queries";
 import { useTuziKeyUsage } from "@/lib/query/usage";
 import {
@@ -134,6 +133,16 @@ function formatCount(value?: number) {
   return new Intl.NumberFormat("zh-CN").format(value);
 }
 
+function formatDateTime(timestampSeconds?: number) {
+  if (!timestampSeconds || Number.isNaN(timestampSeconds)) return "--";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestampSeconds * 1000));
+}
+
 export function TuziWorkspacePanel({
   refreshIntervalMs,
 }: {
@@ -243,6 +252,10 @@ export function TuziWorkspacePanel({
       ? "当前已检测到兔子 API Key，优先同步可公开查询的额度数据。"
       : "当前还没有检测到可用的兔子 API Key，所以这里只展示接入状态。");
   const statusTone = tuziUsage?.success ? "已同步部分真实数据" : "当前以接入状态为主";
+  const quotaNote =
+    tuziUsage?.quotaPerUnit && tuziUsage?.quotaDisplayType
+      ? `换算规则：1 ${tuziUsage.quotaDisplayType} = ${tuziUsage.quotaPerUnit}`
+      : null;
 
   return (
     <div className="space-y-6">
@@ -408,6 +421,14 @@ export function TuziWorkspacePanel({
                     当前查询 Key：{tuziUsage.keyMasked}
                   </div>
                 ) : null}
+                {tuziUsage?.expiresAt ? (
+                  <div className="mt-2 text-orange-800/70">
+                    到期时间：{formatDateTime(tuziUsage.expiresAt)}
+                  </div>
+                ) : null}
+                {quotaNote ? (
+                  <div className="mt-2 text-orange-800/70">{quotaNote}</div>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -504,17 +525,22 @@ export function TuziWorkspacePanel({
       </div>
 
       <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-        <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
+        <CardContent className="grid gap-4 p-6 md:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <h3 className="text-lg font-semibold">更多能力将陆续补充</h3>
+            <h3 className="text-lg font-semibold">下一步建议</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              后续会继续补充更完整的消耗趋势和账户信息，让你在这里看到更全面的使用情况。
+              如果你已经完成入口接入，接下来更适合从本地代理统计里观察真实请求，再逐步补齐账户趋势和业务维度数据。
             </p>
           </div>
-          <Button variant="outline" disabled className="gap-2 self-start md:self-auto">
-            更多内容敬请期待
-            <ArrowUpRight className="h-4 w-4" />
-          </Button>
+          <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-4">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <ArrowUpRight className="h-4 w-4 text-orange-500" />
+              推荐动作
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              先确认三类入口都已接入，再切到“本地代理统计”查看近 1 天或近 7 天的请求变化，定位最常用的供应商和模型。
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

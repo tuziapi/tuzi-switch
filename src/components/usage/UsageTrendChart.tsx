@@ -10,7 +10,7 @@ import {
   Legend,
 } from "recharts";
 import { useUsageTrends } from "@/lib/query/usage";
-import { Loader2 } from "lucide-react";
+import { Loader2, TrendingUp } from "lucide-react";
 import {
   fmtInt,
   fmtUsd,
@@ -73,6 +73,49 @@ export function UsageTrendChart({
     }) || [];
 
   const displayData = chartData;
+  const peakPoint = chartData.reduce<(typeof chartData)[number] | null>(
+    (currentPeak, item) => {
+      const currentTokens =
+        item.inputTokens +
+        item.outputTokens +
+        item.cacheCreationTokens +
+        item.cacheReadTokens;
+      const peakTokens = currentPeak
+        ? currentPeak.inputTokens +
+          currentPeak.outputTokens +
+          currentPeak.cacheCreationTokens +
+          currentPeak.cacheReadTokens
+        : -1;
+      return currentTokens > peakTokens ? item : currentPeak;
+    },
+    null,
+  );
+  const highestCostPoint = chartData.reduce<(typeof chartData)[number] | null>(
+    (currentPeak, item) => {
+      const currentCost = item.cost ?? -1;
+      const peakCost = currentPeak?.cost ?? -1;
+      return currentCost > peakCost ? item : currentPeak;
+    },
+    null,
+  );
+
+  if (displayData.length === 0) {
+    return (
+      <div className="rounded-3xl border border-border/50 bg-card/40 p-8 backdrop-blur-sm">
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <div className="rounded-2xl bg-muted/60 p-3">
+            <TrendingUp className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold">
+            {t("usage.trends", "使用趋势")}
+          </h3>
+          <p className="max-w-md text-sm text-muted-foreground">
+            当前时间范围内还没有可展示的趋势数据。先发起一些请求，或切换业务线路和统计区间后再查看。
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -106,16 +149,34 @@ export function UsageTrendChart({
   return (
     <div className="rounded-xl border border-border/50 bg-card/40 p-6 backdrop-blur-sm">
       <div className="mb-6 flex items-center justify-between">
-        <h3 className="text-lg font-semibold">
-          {t("usage.trends", "使用趋势")}
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          {isToday
-            ? t("usage.rangeToday", "今天 (按小时)")
-            : days === 7
-              ? t("usage.rangeLast7Days", "过去 7 天")
-              : t("usage.rangeLast30Days", "过去 30 天")}
-        </p>
+        <div>
+          <h3 className="text-lg font-semibold">
+            {t("usage.trends", "使用趋势")}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {isToday
+              ? t("usage.rangeToday", "今天 (按小时)")
+              : days === 7
+                ? t("usage.rangeLast7Days", "过去 7 天")
+                : t("usage.rangeLast30Days", "过去 30 天")}
+          </p>
+        </div>
+        <div className="hidden gap-3 md:flex">
+          <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
+            <div className="text-xs text-muted-foreground">最高 Tokens</div>
+            <div className="mt-1 text-sm font-medium">
+              {peakPoint ? peakPoint.label : "--"}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
+            <div className="text-xs text-muted-foreground">最高成本</div>
+            <div className="mt-1 text-sm font-medium">
+              {highestCostPoint?.cost != null
+                ? `${highestCostPoint.label} · ${fmtUsd(highestCostPoint.cost, 4)}`
+                : "--"}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="h-[350px] w-full">
