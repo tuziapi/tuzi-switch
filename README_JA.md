@@ -20,7 +20,7 @@
 推奨パッケージ:
 
 - Windows: `.msi`
-- Windows ポータブル版: `Windows-Portable.zip`
+- Windows ポータブル版: 現在の Release に含まれる場合は `Windows-Portable.zip`
 - Linux: `.AppImage`、`.deb`、`.rpm`
 - macOS: `macOS-unsigned.dmg` または `macOS-unsigned.zip`
 
@@ -28,11 +28,17 @@
 
 ### ワンコマンドインストール
 
-最新版を GitHub から直接インストール:
+GitHub から最新の正式版を直接インストール:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
 ```
+
+補足:
+
+- 現在のスクリプトは GitHub の `releases/latest` を参照します
+- 最新版が `prerelease` として公開されている場合、その最新プレリリース版を取得できないことがあります
+- 最新のテスト版が必要な場合は、Releases ページから対象 tag のパッケージを直接ダウンロードしてください
 
 ### macOS 未署名ビルド
 
@@ -136,14 +142,14 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 開発計画 / TODO
 
-- 現在の Key ベース表示に加えて、Tuzi ワークスペースの実データ連携をさらに拡張する
-- 安定した認証方式が確定した後、Tuzi パネルの認証付き API を接続する
-- 当日消費、月次消費、トレンド表示を Tuzi ワークスペースに追加する
+- Claude Code、Codex、OpenClaw のルート管理型 UI 改修は 1 ラウンド完了し、今後も状態表示とフィードバック表現を磨く
+- 「Tuzi ワークスペース + ローカルプロキシ統計」の情報構造見直しは 1 ラウンド完了し、今後は可読性とテーブル UX を改善する
+- 次の優先事項は、残高・使用量・リクエスト回数以外も含めた Tuzi ワークスペース実データ連携の拡張
+- 安定した認証方式が確定した後、日次消費・月次消費・トレンド・分布表示のために Tuzi バックエンドの集約 API を接続する
 - OpenClaw における Tuzi / GAC 業務ルートの接入体験をさらに改善する
 - セッション管理を再整理し、OpenClaw の会話復元方針を明確化または実装する
-- Claude Code、Codex、OpenClaw の案内文、状態表示、接入フィードバックを継続改善する
-- 設定画面と統計画面をさらに整理し、顧客に不要な技術情報を減らす
-- Tuzi 版スクリーンショット、リリースノート、対外向け製品ドキュメントを拡充する
+- Tuzi 版スクリーンショット、リリースノート、対外向け製品ドキュメントを継続的に拡充し、文書や互換パスに残る上流由来の命名も徐々に減らす
+- ワンコマンドインストールと現在の `prerelease` 公開方針のずれを解消するため、インストール案内とリリースフローを引き続き調整する
 
 ## 補足
 

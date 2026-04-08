@@ -20,7 +20,7 @@
 推荐下载方式：
 
 - Windows：下载 `.msi` 安装版
-- Windows 绿色版：下载 `Windows-Portable.zip`
+- Windows 便携版：如当前版本提供，再下载对应的 `Windows-Portable.zip`
 - Linux：根据发行版选择 `.AppImage`、`.deb` 或 `.rpm`
 - macOS：下载 `macOS-unsigned.dmg` 或 `macOS-unsigned.zip`
 
@@ -28,11 +28,17 @@
 
 ### 一键安装
 
-直接从 GitHub 安装最新版：
+直接从 GitHub 安装最新正式版：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
 ```
+
+补充说明：
+
+- 当前脚本默认跟随 GitHub `releases/latest`
+- 如果最新版本仍以 `prerelease` 方式发布，脚本可能不会拿到最新预发布版本
+- 需要安装最新测试版时，建议直接前往 Releases 页面手动下载对应 tag 的安装包
 
 ### macOS 未签名包打开方式
 
@@ -136,14 +142,14 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 开发计划 / TODO List
 
-- 完善兔子工作台真实数据接入，优先补齐余额、已用额度、请求次数之外的业务统计
-- 在拿到稳定鉴权方案后，对接兔子面板接口，同步今日消耗、月度消耗与趋势图
+- 已完成一轮 Claude Code、Codex、OpenClaw 三个入口的路线管理器改版，后续继续补状态样式与细节反馈
+- 已完成一轮“兔子工作台 + 本地代理统计”的信息结构重做，后续继续提升统计可读性与表格体验
+- 下一阶段优先完善兔子工作台真实数据接入，补齐余额、已用额度、请求次数之外的业务统计
+- 在拿到稳定鉴权方案后，对接兔子后端聚合接口，同步今日消耗、月度消耗、趋势和分布数据
 - 继续优化 OpenClaw 的业务接入体验，补强与兔子 / gac 线路的联动能力
 - 重新梳理会话管理能力，明确 OpenClaw 会话恢复的产品边界或补齐可恢复方案
-- 持续打磨 Claude Code、Codex、OpenClaw 三个入口的引导文案与状态反馈
-- 优化设置与统计页面的信息层级，减少对客户无价值的技术细节暴露
-- 补充更多兔子版说明图、发布说明和对外产品文档
-- 在后续版本中逐步减少 README 与内部兼容路径里残留的上游命名
+- 持续补充兔子版说明图、发布说明和对外产品文档，并逐步减少文档与兼容路径里残留的上游命名
+- 继续优化安装说明与发布流程，解决一键安装脚本和 `prerelease` 发布策略之间的不一致
 
 ## 说明
 

@@ -20,7 +20,7 @@ Get the latest build from [GitHub Releases](https://github.com/tuziapi/tuzi-swit
 Recommended packages:
 
 - Windows: download the `.msi` installer
-- Windows portable: download `Windows-Portable.zip`
+- Windows portable: download `Windows-Portable.zip` when the current release includes it
 - Linux: download `.AppImage`, `.deb`, or `.rpm` based on your distro
 - macOS: download `macOS-unsigned.dmg` or `macOS-unsigned.zip`
 
@@ -28,11 +28,17 @@ Current public releases are ready for Windows and Linux users. macOS is currentl
 
 ### One-Command Install
 
-Install the latest public release directly from GitHub:
+Install the latest stable public release directly from GitHub:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
 ```
+
+Notes:
+
+- The script currently follows GitHub `releases/latest`
+- If the newest build is published as a `prerelease`, the script may not resolve to that newest prerelease build
+- If you need the newest testing build, download the package for the exact tag from the Releases page instead
 
 ### macOS Unsigned Build
 
@@ -136,14 +142,14 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 
 ## Development Plan / TODO
 
-- Continue wiring real Tuzi workspace data beyond the current key-based account metrics
-- Integrate authenticated Tuzi panel APIs once a stable auth contract is available
-- Add daily spend, monthly spend, and trend sync for the Tuzi workspace dashboard
+- One round of the route-manager redesign for Claude Code, Codex, and OpenClaw is complete, with more state polish and feedback details still planned
+- One round of the "Tuzi workspace + local proxy stats" information architecture refresh is complete, with more readability and table UX improvements next
+- The next priority is deeper Tuzi workspace data coverage beyond balance, used quota, and request count
+- Once a stable auth contract is available, integrate Tuzi backend aggregation APIs for daily spend, monthly spend, trends, and distribution views
 - Further improve OpenClaw onboarding around Tuzi and GAC business routes
 - Revisit session manager behavior and either clarify or implement a real OpenClaw resume flow
-- Keep refining Claude Code, Codex, and OpenClaw onboarding copy, feedback states, and business guidance
-- Simplify settings and statistics pages further so customer-facing flows stay focused
-- Expand Tuzi-specific screenshots, release notes, and external-facing product documentation
+- Keep expanding Tuzi-specific screenshots, release notes, and public-facing product documentation while reducing leftover upstream naming in docs and compatibility paths
+- Continue aligning install documentation and release workflow so the one-command installer matches the current `prerelease` strategy
 
 ## Notes
 
