@@ -1010,6 +1010,7 @@ pub fn run() {
             commands::set_auto_failover_enabled,
             // Usage statistics
             commands::get_usage_summary,
+            commands::get_tuzi_key_usage,
             commands::get_usage_trends,
             commands::get_provider_stats,
             commands::get_model_stats,

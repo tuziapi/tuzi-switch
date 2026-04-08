@@ -67,6 +67,7 @@ pub struct ModelStats {
 #[serde(rename_all = "camelCase")]
 pub struct LogFilters {
     pub app_type: Option<String>,
+    pub business_line: Option<String>,
     pub provider_name: Option<String>,
     pub model: Option<String>,
     pub status_code: Option<u16>,
@@ -116,25 +117,61 @@ pub struct RequestLogDetail {
 }
 
 impl Database {
+    fn business_line_sql(log_alias: &str, provider_alias: &str) -> String {
+        format!(
+            "COALESCE(
+                json_extract({provider_alias}.meta, '$.businessLine'),
+                CASE
+                    WHEN {log_alias}.provider_id LIKE 'gac-%' OR LOWER(COALESCE({provider_alias}.name, '')) LIKE '%gac%' THEN 'gac'
+                    WHEN {log_alias}.provider_id LIKE 'tuzi-%'
+                      OR {log_alias}.provider_id LIKE 'tu-zi-%'
+                      OR COALESCE({provider_alias}.name, '') LIKE '%兔子%' THEN 'tuzi'
+                    ELSE NULL
+                END
+            )"
+        )
+    }
+
+    fn business_line_condition(
+        business_line: Option<&str>,
+        log_alias: &str,
+        provider_alias: &str,
+    ) -> Option<String> {
+        business_line.map(|line| {
+            format!(
+                "{} = '{}'",
+                Self::business_line_sql(log_alias, provider_alias),
+                line.replace('\'', "''")
+            )
+        })
+    }
+
     /// 获取使用量汇总
     pub fn get_usage_summary(
         &self,
         start_date: Option<i64>,
         end_date: Option<i64>,
+        business_line: Option<&str>,
     ) -> Result<UsageSummary, AppError> {
         let conn = lock_conn!(self.conn);
 
-        let (where_clause, params_vec) = if start_date.is_some() || end_date.is_some() {
-            let mut conditions = Vec::new();
+        let (where_clause, params_vec) = if start_date.is_some()
+            || end_date.is_some()
+            || business_line.is_some()
+        {
+            let mut conditions: Vec<String> = Vec::new();
             let mut params = Vec::new();
 
             if let Some(start) = start_date {
-                conditions.push("created_at >= ?");
+                conditions.push("l.created_at >= ?".to_string());
                 params.push(start);
             }
             if let Some(end) = end_date {
-                conditions.push("created_at <= ?");
+                conditions.push("l.created_at <= ?".to_string());
                 params.push(end);
+            }
+            if let Some(condition) = Self::business_line_condition(business_line, "l", "p") {
+                conditions.push(condition);
             }
 
             (format!("WHERE {}", conditions.join(" AND ")), params)
@@ -143,7 +180,10 @@ impl Database {
         };
 
         // Build rollup WHERE clause using date strings (use ? for sequential binding)
-        let (rollup_where, rollup_params) = if start_date.is_some() || end_date.is_some() {
+        let (rollup_where, rollup_params) = if start_date.is_some()
+            || end_date.is_some()
+            || business_line.is_some()
+        {
             let mut conditions: Vec<String> = Vec::new();
             let mut params = Vec::new();
 
@@ -154,6 +194,9 @@ impl Database {
             if let Some(end) = end_date {
                 conditions.push("date <= date(?, 'unixepoch', 'localtime')".to_string());
                 params.push(end);
+            }
+            if let Some(condition) = Self::business_line_condition(business_line, "r", "p2") {
+                conditions.push(condition);
             }
 
             (format!("WHERE {}", conditions.join(" AND ")), params)
@@ -179,7 +222,9 @@ impl Database {
                     COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
                     COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens,
                     COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0) as success_count
-                 FROM proxy_request_logs {where_clause}) d,
+                 FROM proxy_request_logs l
+                 LEFT JOIN providers p ON l.provider_id = p.id AND l.app_type = p.app_type
+                 {where_clause}) d,
                 (SELECT
                     COALESCE(SUM(request_count), 0) as total_requests,
                     COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0) as total_cost,
@@ -188,7 +233,9 @@ impl Database {
                     COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
                     COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens,
                     COALESCE(SUM(success_count), 0) as success_count
-                 FROM usage_daily_rollups {rollup_where}) r"
+                 FROM usage_daily_rollups r
+                 LEFT JOIN providers p2 ON r.provider_id = p2.id AND r.app_type = p2.app_type
+                 {rollup_where}) r"
         );
 
         // Combine params: detail params first, then rollup params
@@ -229,6 +276,7 @@ impl Database {
         &self,
         start_date: Option<i64>,
         end_date: Option<i64>,
+        business_line: Option<&str>,
     ) -> Result<Vec<DailyStats>, AppError> {
         let conn = lock_conn!(self.conn);
 
@@ -261,7 +309,12 @@ impl Database {
         }
 
         // Query detail logs
-        let sql = "
+        let detail_business_filter = Self::business_line_condition(business_line, "l", "p")
+            .map(|condition| format!(" AND {condition}"))
+            .unwrap_or_default();
+
+        let sql = format!(
+            "
             SELECT
                 CAST((created_at - ?1) / ?3 AS INTEGER) as bucket_idx,
                 COUNT(*) as request_count,
@@ -271,12 +324,14 @@ impl Database {
                 COALESCE(SUM(output_tokens), 0) as total_output_tokens,
                 COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
                 COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens
-            FROM proxy_request_logs
-            WHERE created_at >= ?1 AND created_at <= ?2
+            FROM proxy_request_logs l
+            LEFT JOIN providers p ON l.provider_id = p.id AND l.app_type = p.app_type
+            WHERE created_at >= ?1 AND created_at <= ?2{detail_business_filter}
             GROUP BY bucket_idx
-            ORDER BY bucket_idx ASC";
+            ORDER BY bucket_idx ASC"
+        );
 
-        let mut stmt = conn.prepare(sql)?;
+        let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(params![start_ts, end_ts, bucket_seconds], |row| {
             Ok((
                 row.get::<_, i64>(0)?,
@@ -307,7 +362,11 @@ impl Database {
 
         // Also query rollup data (daily granularity, only useful for daily buckets)
         if bucket_seconds >= 86400 {
-            let rollup_sql = "
+            let rollup_business_filter = Self::business_line_condition(business_line, "r", "p2")
+                .map(|condition| format!(" AND {condition}"))
+                .unwrap_or_default();
+            let rollup_sql = format!(
+                "
                 SELECT
                     CAST((CAST(strftime('%s', date) AS INTEGER) - ?1) / ?3 AS INTEGER) as bucket_idx,
                     COALESCE(SUM(request_count), 0),
@@ -317,12 +376,14 @@ impl Database {
                     COALESCE(SUM(output_tokens), 0),
                     COALESCE(SUM(cache_creation_tokens), 0),
                     COALESCE(SUM(cache_read_tokens), 0)
-                FROM usage_daily_rollups
-                WHERE date >= date(?1, 'unixepoch', 'localtime') AND date <= date(?2, 'unixepoch', 'localtime')
+                FROM usage_daily_rollups r
+                LEFT JOIN providers p2 ON r.provider_id = p2.id AND r.app_type = p2.app_type
+                WHERE date >= date(?1, 'unixepoch', 'localtime') AND date <= date(?2, 'unixepoch', 'localtime'){rollup_business_filter}
                 GROUP BY bucket_idx
-                ORDER BY bucket_idx ASC";
+                ORDER BY bucket_idx ASC"
+            );
 
-            let mut rstmt = conn.prepare(rollup_sql)?;
+            let mut rstmt = conn.prepare(&rollup_sql)?;
             let rrows = rstmt.query_map(params![start_ts, end_ts, bucket_seconds], |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
@@ -398,11 +459,17 @@ impl Database {
     }
 
     /// 获取 Provider 统计
-    pub fn get_provider_stats(&self) -> Result<Vec<ProviderStats>, AppError> {
+    pub fn get_provider_stats(&self, business_line: Option<&str>) -> Result<Vec<ProviderStats>, AppError> {
         let conn = lock_conn!(self.conn);
+        let detail_filter = Self::business_line_condition(business_line, "l", "p")
+            .map(|condition| format!("WHERE {condition}"))
+            .unwrap_or_default();
+        let rollup_filter = Self::business_line_condition(business_line, "r", "p2")
+            .map(|condition| format!("WHERE {condition}"))
+            .unwrap_or_default();
 
         // UNION detail logs + rollup data, then aggregate
-        let sql = "SELECT
+        let sql = format!("SELECT
                 provider_id, app_type, provider_name,
                 SUM(request_count) as request_count,
                 SUM(total_tokens) as total_tokens,
@@ -421,6 +488,7 @@ impl Database {
                     COALESCE(SUM(l.latency_ms), 0) as latency_sum
                 FROM proxy_request_logs l
                 LEFT JOIN providers p ON l.provider_id = p.id AND l.app_type = p.app_type
+                {detail_filter}
                 GROUP BY l.provider_id, l.app_type
                 UNION ALL
                 SELECT r.provider_id, r.app_type,
@@ -432,12 +500,13 @@ impl Database {
                     COALESCE(SUM(r.avg_latency_ms * r.request_count), 0)
                 FROM usage_daily_rollups r
                 LEFT JOIN providers p2 ON r.provider_id = p2.id AND r.app_type = p2.app_type
+                {rollup_filter}
                 GROUP BY r.provider_id, r.app_type
             )
             GROUP BY provider_id, app_type
-            ORDER BY total_cost DESC";
+            ORDER BY total_cost DESC");
 
-        let mut stmt = conn.prepare(sql)?;
+        let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {
             let request_count: i64 = row.get(3)?;
             let success_count: i64 = row.get(6)?;
@@ -469,11 +538,17 @@ impl Database {
     }
 
     /// 获取模型统计
-    pub fn get_model_stats(&self) -> Result<Vec<ModelStats>, AppError> {
+    pub fn get_model_stats(&self, business_line: Option<&str>) -> Result<Vec<ModelStats>, AppError> {
         let conn = lock_conn!(self.conn);
+        let detail_filter = Self::business_line_condition(business_line, "l", "p")
+            .map(|condition| format!("WHERE {condition}"))
+            .unwrap_or_default();
+        let rollup_filter = Self::business_line_condition(business_line, "r", "p2")
+            .map(|condition| format!("WHERE {condition}"))
+            .unwrap_or_default();
 
         // UNION detail logs + rollup data
-        let sql = "SELECT
+        let sql = format!("SELECT
                 model,
                 SUM(request_count) as request_count,
                 SUM(total_tokens) as total_tokens,
@@ -483,20 +558,24 @@ impl Database {
                     COUNT(*) as request_count,
                     COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
                     COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0) as total_cost
-                FROM proxy_request_logs
+                FROM proxy_request_logs l
+                LEFT JOIN providers p ON l.provider_id = p.id AND l.app_type = p.app_type
+                {detail_filter}
                 GROUP BY model
                 UNION ALL
                 SELECT model,
                     COALESCE(SUM(request_count), 0),
                     COALESCE(SUM(input_tokens + output_tokens), 0),
                     COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0)
-                FROM usage_daily_rollups
+                FROM usage_daily_rollups r
+                LEFT JOIN providers p2 ON r.provider_id = p2.id AND r.app_type = p2.app_type
+                {rollup_filter}
                 GROUP BY model
             )
             GROUP BY model
-            ORDER BY total_cost DESC";
+            ORDER BY total_cost DESC");
 
-        let mut stmt = conn.prepare(sql)?;
+        let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {
             let request_count: i64 = row.get(1)?;
             let total_cost: f64 = row.get(3)?;
@@ -532,31 +611,38 @@ impl Database {
     ) -> Result<PaginatedLogs, AppError> {
         let conn = lock_conn!(self.conn);
 
-        let mut conditions = Vec::new();
+        let mut conditions: Vec<String> = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
         if let Some(ref app_type) = filters.app_type {
-            conditions.push("l.app_type = ?");
+            conditions.push("l.app_type = ?".to_string());
             params.push(Box::new(app_type.clone()));
         }
+        if let Some(ref business_line) = filters.business_line {
+            if let Some(condition) =
+                Self::business_line_condition(Some(business_line.as_str()), "l", "p")
+            {
+                conditions.push(condition);
+            }
+        }
         if let Some(ref provider_name) = filters.provider_name {
-            conditions.push("p.name LIKE ?");
+            conditions.push("p.name LIKE ?".to_string());
             params.push(Box::new(format!("%{provider_name}%")));
         }
         if let Some(ref model) = filters.model {
-            conditions.push("l.model LIKE ?");
+            conditions.push("l.model LIKE ?".to_string());
             params.push(Box::new(format!("%{model}%")));
         }
         if let Some(status) = filters.status_code {
-            conditions.push("l.status_code = ?");
+            conditions.push("l.status_code = ?".to_string());
             params.push(Box::new(status as i64));
         }
         if let Some(start) = filters.start_date {
-            conditions.push("l.created_at >= ?");
+            conditions.push("l.created_at >= ?".to_string());
             params.push(Box::new(start));
         }
         if let Some(end) = filters.end_date {
-            conditions.push("l.created_at <= ?");
+            conditions.push("l.created_at <= ?".to_string());
             params.push(Box::new(end));
         }
 

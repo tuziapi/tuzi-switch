@@ -6,6 +6,7 @@ import { UsageTrendChart } from "./UsageTrendChart";
 import { RequestLogTable } from "./RequestLogTable";
 import { ProviderStatsTable } from "./ProviderStatsTable";
 import { ModelStatsTable } from "./ModelStatsTable";
+import { TuziWorkspacePanel } from "./TuziWorkspacePanel";
 import type { TimeRange } from "@/types/usage";
 import { motion } from "framer-motion";
 import {
@@ -18,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { usageKeys } from "@/lib/query/usage";
+import type { BusinessLineFilter } from "@/types/usage";
 import {
   Accordion,
   AccordionContent,
@@ -30,6 +32,7 @@ export function UsageDashboard() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [timeRange, setTimeRange] = useState<TimeRange>("1d");
+  const [businessLine, setBusinessLine] = useState<BusinessLineFilter>("all");
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(30000);
 
   const refreshIntervalOptionsMs = [0, 5000, 10000, 30000, 60000] as const;
@@ -100,48 +103,103 @@ export function UsageDashboard() {
         </Tabs>
       </div>
 
-      <UsageSummaryCards days={days} refreshIntervalMs={refreshIntervalMs} />
+      <Tabs defaultValue="tuzi-workspace" className="w-full">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList className="bg-card/60 border border-border/50 backdrop-blur-sm shadow-sm">
+            <TabsTrigger value="tuzi-workspace" className="gap-2">
+              <Coins className="h-4 w-4" />
+              兔子工作台
+            </TabsTrigger>
+            <TabsTrigger value="proxy-stats" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              本地代理统计
+            </TabsTrigger>
+          </TabsList>
 
-      <UsageTrendChart days={days} refreshIntervalMs={refreshIntervalMs} />
-
-      <div className="space-y-4">
-        <Tabs defaultValue="logs" className="w-full">
-          <div className="flex items-center justify-between mb-4">
-            <TabsList className="bg-muted/50">
-              <TabsTrigger value="logs" className="gap-2">
-                <ListFilter className="h-4 w-4" />
-                {t("usage.requestLogs")}
-              </TabsTrigger>
-              <TabsTrigger value="providers" className="gap-2">
-                <Activity className="h-4 w-4" />
-                {t("usage.providerStats")}
-              </TabsTrigger>
-              <TabsTrigger value="models" className="gap-2">
-                <BarChart3 className="h-4 w-4" />
-                {t("usage.modelStats")}
-              </TabsTrigger>
-            </TabsList>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-muted-foreground">业务线路</span>
+            <Tabs
+              value={businessLine}
+              onValueChange={(value) =>
+                setBusinessLine(value as BusinessLineFilter)
+              }
+              className="w-auto"
+            >
+              <TabsList className="bg-card/60 border border-border/50 backdrop-blur-sm shadow-sm h-10 p-1">
+                <TabsTrigger value="all">全部</TabsTrigger>
+                <TabsTrigger value="tuzi">兔子</TabsTrigger>
+                <TabsTrigger value="gac">gac</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
+        </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <TabsContent value="logs" className="mt-0">
-              <RequestLogTable refreshIntervalMs={refreshIntervalMs} />
-            </TabsContent>
+        <TabsContent value="tuzi-workspace" className="mt-6">
+          <TuziWorkspacePanel refreshIntervalMs={refreshIntervalMs} />
+        </TabsContent>
 
-            <TabsContent value="providers" className="mt-0">
-              <ProviderStatsTable refreshIntervalMs={refreshIntervalMs} />
-            </TabsContent>
+        <TabsContent value="proxy-stats" className="mt-6 space-y-8">
+          <UsageSummaryCards
+            days={days}
+            businessLine={businessLine}
+            refreshIntervalMs={refreshIntervalMs}
+          />
 
-            <TabsContent value="models" className="mt-0">
-              <ModelStatsTable refreshIntervalMs={refreshIntervalMs} />
-            </TabsContent>
-          </motion.div>
-        </Tabs>
-      </div>
+          <UsageTrendChart
+            days={days}
+            businessLine={businessLine}
+            refreshIntervalMs={refreshIntervalMs}
+          />
+
+          <div className="space-y-4">
+            <Tabs defaultValue="logs" className="w-full">
+              <div className="flex items-center justify-between mb-4">
+                <TabsList className="bg-muted/50">
+                  <TabsTrigger value="logs" className="gap-2">
+                    <ListFilter className="h-4 w-4" />
+                    {t("usage.requestLogs")}
+                  </TabsTrigger>
+                  <TabsTrigger value="providers" className="gap-2">
+                    <Activity className="h-4 w-4" />
+                    {t("usage.providerStats")}
+                  </TabsTrigger>
+                  <TabsTrigger value="models" className="gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    {t("usage.modelStats")}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <TabsContent value="logs" className="mt-0">
+                  <RequestLogTable
+                    businessLine={businessLine}
+                    refreshIntervalMs={refreshIntervalMs}
+                  />
+                </TabsContent>
+
+                <TabsContent value="providers" className="mt-0">
+                  <ProviderStatsTable
+                    businessLine={businessLine}
+                    refreshIntervalMs={refreshIntervalMs}
+                  />
+                </TabsContent>
+
+                <TabsContent value="models" className="mt-0">
+                  <ModelStatsTable
+                    businessLine={businessLine}
+                    refreshIntervalMs={refreshIntervalMs}
+                  />
+                </TabsContent>
+              </motion.div>
+            </Tabs>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Pricing Configuration */}
       <Accordion type="multiple" defaultValue={[]} className="w-full space-y-4">

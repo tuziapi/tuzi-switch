@@ -9,6 +9,7 @@ import type {
   ModelPricing,
   ProviderLimitStatus,
   PaginatedLogs,
+  TuziKeyUsage,
 } from "@/types/usage";
 import type { UsageResult } from "@/types";
 import type { AppId } from "./types";
@@ -48,23 +49,29 @@ export const usageApi = {
   getUsageSummary: async (
     startDate?: number,
     endDate?: number,
+    businessLine?: "tuzi" | "gac",
   ): Promise<UsageSummary> => {
-    return invoke("get_usage_summary", { startDate, endDate });
+    return invoke("get_usage_summary", { startDate, endDate, businessLine });
   },
 
   getUsageTrends: async (
     startDate?: number,
     endDate?: number,
+    businessLine?: "tuzi" | "gac",
   ): Promise<DailyStats[]> => {
-    return invoke("get_usage_trends", { startDate, endDate });
+    return invoke("get_usage_trends", { startDate, endDate, businessLine });
   },
 
-  getProviderStats: async (): Promise<ProviderStats[]> => {
-    return invoke("get_provider_stats");
+  getProviderStats: async (
+    businessLine?: "tuzi" | "gac",
+  ): Promise<ProviderStats[]> => {
+    return invoke("get_provider_stats", { businessLine });
   },
 
-  getModelStats: async (): Promise<ModelStats[]> => {
-    return invoke("get_model_stats");
+  getModelStats: async (
+    businessLine?: "tuzi" | "gac",
+  ): Promise<ModelStats[]> => {
+    return invoke("get_model_stats", { businessLine });
   },
 
   getRequestLogs: async (
@@ -114,5 +121,9 @@ export const usageApi = {
     appType: string,
   ): Promise<ProviderLimitStatus> => {
     return invoke("check_provider_limits", { providerId, appType });
+  },
+
+  getTuziKeyUsage: async (apiKey: string): Promise<TuziKeyUsage> => {
+    return invoke("get_tuzi_key_usage", { apiKey });
   },
 };

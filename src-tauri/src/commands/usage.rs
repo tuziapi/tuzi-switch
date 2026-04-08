@@ -3,6 +3,7 @@
 use crate::error::AppError;
 use crate::services::usage_stats::*;
 use crate::store::AppState;
+use serde_json::Value;
 use tauri::State;
 
 /// 获取使用量汇总
@@ -11,8 +12,11 @@ pub fn get_usage_summary(
     state: State<'_, AppState>,
     start_date: Option<i64>,
     end_date: Option<i64>,
+    business_line: Option<String>,
 ) -> Result<UsageSummary, AppError> {
-    state.db.get_usage_summary(start_date, end_date)
+    state
+        .db
+        .get_usage_summary(start_date, end_date, business_line.as_deref())
 }
 
 /// 获取每日趋势
@@ -21,20 +25,29 @@ pub fn get_usage_trends(
     state: State<'_, AppState>,
     start_date: Option<i64>,
     end_date: Option<i64>,
+    business_line: Option<String>,
 ) -> Result<Vec<DailyStats>, AppError> {
-    state.db.get_daily_trends(start_date, end_date)
+    state
+        .db
+        .get_daily_trends(start_date, end_date, business_line.as_deref())
 }
 
 /// 获取 Provider 统计
 #[tauri::command]
-pub fn get_provider_stats(state: State<'_, AppState>) -> Result<Vec<ProviderStats>, AppError> {
-    state.db.get_provider_stats()
+pub fn get_provider_stats(
+    state: State<'_, AppState>,
+    business_line: Option<String>,
+) -> Result<Vec<ProviderStats>, AppError> {
+    state.db.get_provider_stats(business_line.as_deref())
 }
 
 /// 获取模型统计
 #[tauri::command]
-pub fn get_model_stats(state: State<'_, AppState>) -> Result<Vec<ModelStats>, AppError> {
-    state.db.get_model_stats()
+pub fn get_model_stats(
+    state: State<'_, AppState>,
+    business_line: Option<String>,
+) -> Result<Vec<ModelStats>, AppError> {
+    state.db.get_model_stats(business_line.as_deref())
 }
 
 /// 获取请求日志列表
@@ -150,6 +163,135 @@ pub fn check_provider_limits(
     state.db.check_provider_limits(&provider_id, &app_type)
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TuziKeyUsage {
+    pub success: bool,
+    pub source: String,
+    pub key_masked: Option<String>,
+    pub balance: Option<f64>,
+    pub balance_raw_quota: Option<f64>,
+    pub used_amount: Option<f64>,
+    pub used_raw_quota: Option<f64>,
+    pub request_count: Option<u64>,
+    pub currency_symbol: Option<String>,
+    pub quota_per_unit: Option<f64>,
+    pub quota_display_type: Option<String>,
+    pub expires_at: Option<i64>,
+    pub note: Option<String>,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn get_tuzi_key_usage(api_key: String) -> Result<TuziKeyUsage, AppError> {
+    let trimmed = api_key.trim();
+    if trimmed.is_empty() {
+        return Ok(TuziKeyUsage {
+            success: false,
+            source: "token-key".to_string(),
+            key_masked: None,
+            balance: None,
+            balance_raw_quota: None,
+            used_amount: None,
+            used_raw_quota: None,
+            request_count: None,
+            currency_symbol: None,
+            quota_per_unit: None,
+            quota_display_type: None,
+            expires_at: None,
+            note: Some("当前未检测到可用的兔子 API Key".to_string()),
+            error: Some("MISSING_API_KEY".to_string()),
+        });
+    }
+
+    let client = reqwest::Client::new();
+    let encoded_key: String = url::form_urlencoded::byte_serialize(trimmed.as_bytes()).collect();
+    let endpoint = format!("https://api.tu-zi.com/api/token/key/{encoded_key}");
+
+    let token_response = client
+        .get(&endpoint)
+        .header("accept", "application/json")
+        .header("Rix-Api-User", "1001")
+        .send()
+        .await
+        .map_err(|e| AppError::Message(format!("请求兔子 Key 信息失败: {e}")))?;
+
+    let token_json: Value = token_response
+        .json()
+        .await
+        .map_err(|e| AppError::Message(format!("解析兔子 Key 信息失败: {e}")))?;
+
+    if !token_json
+        .get("success")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(true)
+    {
+        let message = extract_message(&token_json)
+            .unwrap_or_else(|| "兔子 Key 查询失败，请检查 Key 是否有效".to_string());
+        return Ok(TuziKeyUsage {
+            success: false,
+            source: "token-key".to_string(),
+            key_masked: Some(mask_key(trimmed)),
+            balance: None,
+            balance_raw_quota: None,
+            used_amount: None,
+            used_raw_quota: None,
+            request_count: None,
+            currency_symbol: None,
+            quota_per_unit: None,
+            quota_display_type: None,
+            expires_at: None,
+            note: Some("当前仅支持基于 API Key 的额度查询".to_string()),
+            error: Some(message),
+        });
+    }
+
+    let status_json = match client
+        .get("https://api.tu-zi.com/api/status")
+        .header("accept", "application/json")
+        .send()
+        .await
+    {
+        Ok(response) => response.json::<Value>().await.ok(),
+        Err(_) => None,
+    };
+
+    let data = token_json.get("data").unwrap_or(&token_json);
+    let status_data = status_json
+        .as_ref()
+        .and_then(|value| value.get("data"))
+        .unwrap_or(&Value::Null);
+
+    let quota_per_unit = read_f64(status_data, &["quota_per_unit"]).or(Some(500000.0));
+    let quota_display_type = read_string(status_data, &["quota_display_type"]);
+    let currency_symbol = resolve_currency_symbol(status_data, quota_display_type.as_deref());
+
+    let balance_raw_quota = read_f64(data, &["quota", "remain_quota", "remaining_quota"]);
+    let used_raw_quota = read_f64(data, &["used_quota", "usedQuota"]);
+    let request_count = read_u64(data, &["request_count", "requestCount"]);
+    let expires_at = read_i64(data, &["expired_time", "expiredAt", "expires_at"]);
+
+    let balance = balance_raw_quota.and_then(|quota| quota_per_unit.map(|unit| quota / unit));
+    let used_amount = used_raw_quota.and_then(|quota| quota_per_unit.map(|unit| quota / unit));
+
+    Ok(TuziKeyUsage {
+        success: balance.is_some() || used_amount.is_some() || request_count.is_some(),
+        source: "token-key".to_string(),
+        key_masked: Some(mask_key(trimmed)),
+        balance,
+        balance_raw_quota,
+        used_amount,
+        used_raw_quota,
+        request_count,
+        currency_symbol,
+        quota_per_unit,
+        quota_display_type,
+        expires_at,
+        note: Some("当前数据基于 API Key 查询，不包含面板登录态下的日志与趋势统计".to_string()),
+        error: None,
+    })
+}
+
 /// 删除模型定价
 #[tauri::command]
 pub fn delete_model_pricing(state: State<'_, AppState>, model_id: String) -> Result<(), AppError> {
@@ -164,6 +306,73 @@ pub fn delete_model_pricing(state: State<'_, AppState>, model_id: String) -> Res
 
     log::info!("已删除模型定价: {model_id}");
     Ok(())
+}
+
+fn extract_message(value: &Value) -> Option<String> {
+    value
+        .get("message")
+        .and_then(|item| item.as_str())
+        .map(ToString::to_string)
+        .or_else(|| {
+            value.get("error").and_then(|error| {
+                error
+                    .get("message")
+                    .and_then(|item| item.as_str())
+                    .map(ToString::to_string)
+            })
+        })
+}
+
+fn read_value<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a Value> {
+    keys.iter().find_map(|key| value.get(*key))
+}
+
+fn read_string(value: &Value, keys: &[&str]) -> Option<String> {
+    read_value(value, keys).and_then(|item| item.as_str().map(ToString::to_string))
+}
+
+fn read_f64(value: &Value, keys: &[&str]) -> Option<f64> {
+    read_value(value, keys).and_then(|item| match item {
+        Value::Number(number) => number.as_f64(),
+        Value::String(text) => text.parse::<f64>().ok(),
+        _ => None,
+    })
+}
+
+fn read_u64(value: &Value, keys: &[&str]) -> Option<u64> {
+    read_value(value, keys).and_then(|item| match item {
+        Value::Number(number) => number.as_u64(),
+        Value::String(text) => text.parse::<u64>().ok(),
+        _ => None,
+    })
+}
+
+fn read_i64(value: &Value, keys: &[&str]) -> Option<i64> {
+    read_value(value, keys).and_then(|item| match item {
+        Value::Number(number) => number.as_i64(),
+        Value::String(text) => text.parse::<i64>().ok(),
+        _ => None,
+    })
+}
+
+fn resolve_currency_symbol(status_data: &Value, quota_display_type: Option<&str>) -> Option<String> {
+    match quota_display_type.unwrap_or("USD") {
+        "CNY" => Some("¥".to_string()),
+        "CUSTOM" => read_string(status_data, &["custom_currency_symbol"]).or(Some("¤".to_string())),
+        "USD" => Some("$".to_string()),
+        _ => Some("$".to_string()),
+    }
+}
+
+fn mask_key(raw: &str) -> String {
+    let chars: Vec<char> = raw.chars().collect();
+    if chars.len() <= 8 {
+        return "*".repeat(chars.len());
+    }
+
+    let prefix: String = chars.iter().take(4).collect();
+    let suffix: String = chars[chars.len() - 4..].iter().collect();
+    format!("{prefix}****{suffix}")
 }
 
 /// 模型定价信息

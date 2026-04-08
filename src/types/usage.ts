@@ -90,12 +90,15 @@ export interface ModelStats {
 
 export interface LogFilters {
   appType?: string;
+  businessLine?: "tuzi" | "gac";
   providerName?: string;
   model?: string;
   statusCode?: number;
   startDate?: number;
   endDate?: number;
 }
+
+export type BusinessLineFilter = "all" | "tuzi" | "gac";
 
 export interface ProviderLimitStatus {
   providerId: string;
@@ -105,6 +108,23 @@ export interface ProviderLimitStatus {
   monthlyUsage: string;
   monthlyLimit?: string;
   monthlyExceeded: boolean;
+}
+
+export interface TuziKeyUsage {
+  success: boolean;
+  source: string;
+  keyMasked?: string;
+  balance?: number;
+  balanceRawQuota?: number;
+  usedAmount?: number;
+  usedRawQuota?: number;
+  requestCount?: number;
+  currencySymbol?: string;
+  quotaPerUnit?: number;
+  quotaDisplayType?: string;
+  expiresAt?: number;
+  note?: string;
+  error?: string;
 }
 
 export type TimeRange = "1d" | "7d" | "30d";

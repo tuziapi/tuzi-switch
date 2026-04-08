@@ -1,45 +1,59 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Upload, Wrench } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  Route,
+  ShieldCheck,
+  Upload,
+  Wrench,
+} from "lucide-react";
 import type { AppId } from "@/lib/api";
 import { providersApi } from "@/lib/api/providers";
 import { installerApi, type ClaudeInstallerStatus, type CodexInstallerStatus, type InstallerActionResult } from "@/lib/api/installer";
 import { openclawApi } from "@/lib/api/openclaw";
 import { openclawKeys, useOpenClawAgentsDefaults, useOpenClawDefaultModel, useOpenClawHealth, useOpenClawLiveProviderIds, useOpenClawTools } from "@/hooks/useOpenClaw";
 import { ClaudeIcon, CodexIcon, TuziIcon } from "@/components/BrandIcons";
+import {
+  generateThirdPartyAuth,
+  generateThirdPartyConfig,
+} from "@/config/codexProviderPresets";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { OpenClawModel, Provider } from "@/types";
 
-type OpenClawRoute = "claude" | "codex";
+type OpenClawRoute =
+  | "tuzi-claude"
+  | "tuzi-codex"
+  | "gac-claude"
+  | "gac-codex";
 type ClaudeBusinessRoute = "gaccode" | "tu-zi";
 type CodexBusinessRoute = "gac" | "tuzi" | "tuzi-codex-sub";
+type ClaudeEntryOption = "modified" | "gaccode" | "tu-zi";
+type CodexEntryOption = "tuzi" | "gac" | "gac-modified";
 
 const OPENCLAW_ROUTE_CONFIG: Record<
   OpenClawRoute,
   {
     label: string;
+    optionLabel: string;
     providerId: string;
     providerName: string;
     baseUrl: string;
     api: string;
+    apiKeyLabel: string;
     models: OpenClawModel[];
   }
 > = {
-  claude: {
-    label: "Claude 线路",
+  "tuzi-claude": {
+    label: "兔子 Claude 线路",
+    optionLabel: "兔子 · Claude 线路",
     providerId: "tuzi-openclaw-claude",
     providerName: "兔子 Claude 线路",
     baseUrl: "https://api.tu-zi.com",
     api: "anthropic-messages",
+    apiKeyLabel: "兔子 API Key",
     models: [
       {
         id: "claude-opus-4-6",
@@ -61,12 +75,60 @@ const OPENCLAW_ROUTE_CONFIG: Record<
       },
     ],
   },
-  codex: {
-    label: "Codex 线路",
+  "tuzi-codex": {
+    label: "兔子 Codex 线路",
+    optionLabel: "兔子 · Codex 线路",
     providerId: "tuzi-openclaw-codex",
     providerName: "兔子 Codex 线路",
     baseUrl: "https://api.tu-zi.com/v1",
     api: "openai-responses",
+    apiKeyLabel: "兔子 API Key",
+    models: [
+      {
+        id: "gpt-5.4",
+        name: "GPT-5.4",
+        contextWindow: 200000,
+        maxTokens: 100000,
+      },
+    ],
+  },
+  "gac-claude": {
+    label: "gac Claude 线路",
+    optionLabel: "gac · Claude 线路",
+    providerId: "gac-openclaw-claude",
+    providerName: "gac Claude 线路",
+    baseUrl: "https://gaccode.com/claudecode",
+    api: "anthropic-messages",
+    apiKeyLabel: "GAC API Key",
+    models: [
+      {
+        id: "claude-opus-4-6",
+        name: "Claude Opus 4.6",
+        contextWindow: 200000,
+        maxTokens: 8192,
+      },
+      {
+        id: "claude-sonnet-4-6",
+        name: "Claude Sonnet 4.6",
+        contextWindow: 200000,
+        maxTokens: 8192,
+      },
+      {
+        id: "claude-haiku-4-5-20251001",
+        name: "Claude Haiku 4.5",
+        contextWindow: 200000,
+        maxTokens: 8192,
+      },
+    ],
+  },
+  "gac-codex": {
+    label: "gac Codex 线路",
+    optionLabel: "gac · Codex 线路",
+    providerId: "gac-openclaw-codex",
+    providerName: "gac Codex 线路",
+    baseUrl: "https://gaccode.com/codex/v1",
+    api: "openai-completions",
+    apiKeyLabel: "GAC API Key",
     models: [
       {
         id: "gpt-5.4",
@@ -116,6 +178,22 @@ function getCodexRouteLabel(route: string | null | undefined) {
     CODEX_ROUTE_OPTIONS.find((option) => option.value === route)?.label || route
   );
 }
+const CODEX_ROUTE_CONFIG = {
+  tuzi: {
+    providerId: "tuzi.coding",
+    providerName: "tuzi.coding",
+    baseUrl: "https://coding.tu-zi.com",
+    websiteUrl: "https://coding.tu-zi.com",
+    businessLine: "tuzi" as const,
+  },
+  gac: {
+    providerId: "default",
+    providerName: "default",
+    baseUrl: "https://gaccode.com/codex/v1",
+    websiteUrl: "https://gaccode.com/codex",
+    businessLine: "gac" as const,
+  },
+};
 
 function Stat({
   label,
@@ -130,6 +208,100 @@ function Stat({
         {label}
       </div>
       <div className="mt-1 text-sm font-medium">{value}</div>
+    </div>
+  );
+}
+
+function JourneyStep({
+  step,
+  title,
+  description,
+}: {
+  step: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-4">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        {step}
+      </div>
+      <div className="mt-2 text-sm font-medium">{title}</div>
+      <div className="mt-1 text-xs leading-5 text-muted-foreground">
+        {description}
+      </div>
+    </div>
+  );
+}
+
+function RouteCard({
+  title,
+  description,
+  meta,
+  status,
+  selected,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  meta: string;
+  status: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl border px-4 py-4 text-left transition ${
+        selected
+          ? "border-orange-300 bg-orange-50/80 shadow-sm"
+          : "border-border/60 bg-background/70 hover:border-orange-200 hover:bg-orange-50/40"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium">{title}</div>
+          <div className="mt-1 text-xs leading-5 text-muted-foreground">
+            {description}
+          </div>
+        </div>
+        <div
+          className={`inline-flex min-w-[52px] items-center justify-center whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-medium ${
+            status === "已接入"
+              ? "bg-emerald-100 text-emerald-700"
+              : selected
+                ? "bg-orange-100 text-orange-700"
+                : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {status}
+        </div>
+      </div>
+      <div className="mt-3 text-xs text-muted-foreground">{meta}</div>
+    </button>
+  );
+}
+
+function ResultHint({
+  target,
+  syncHint,
+}: {
+  target: string;
+  syncHint: string;
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+        当前目标:
+        {" "}
+        <span className="text-foreground">{target}</span>
+      </div>
+      <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+        配置完成后:
+        {" "}
+        <span className="text-foreground">{syncHint}</span>
+      </div>
     </div>
   );
 }
@@ -151,13 +323,14 @@ export function BusinessQuickAccess({
   const [pageError, setPageError] = useState<string | null>(null);
   const [claudeStatus, setClaudeStatus] = useState<ClaudeInstallerStatus | null>(null);
   const [codexStatus, setCodexStatus] = useState<CodexInstallerStatus | null>(null);
+  const [claudeEntryOption, setClaudeEntryOption] = useState<ClaudeEntryOption>("tu-zi");
+  const [codexEntryOption, setCodexEntryOption] = useState<CodexEntryOption>("tuzi");
   const [claudeGacKey, setClaudeGacKey] = useState("");
   const [claudeTuziKey, setClaudeTuziKey] = useState("");
-  const [codexRoute, setCodexRoute] = useState<CodexBusinessRoute>("gac");
   const [codexApiKey, setCodexApiKey] = useState("");
   const [codexModel, setCodexModel] = useState("gpt-5.4");
   const [codexReasoning, setCodexReasoning] = useState("medium");
-  const [openclawRoute, setOpenclawRoute] = useState<OpenClawRoute>("claude");
+  const [openclawRoute, setOpenclawRoute] = useState<OpenClawRoute>("tuzi-claude");
   const [openclawApiKey, setOpenclawApiKey] = useState("");
 
   const { data: openclawDefaultModel } = useOpenClawDefaultModel(isOpenClaw);
@@ -225,6 +398,26 @@ export function BusinessQuickAccess({
     return "";
   }, [isClaude, isCodex, isOpenClaw]);
 
+  const subtitle = useMemo(() => {
+    if (isClaude) {
+      return "把 Claude Code 变成兔子客户可直接交付的一键接入入口。";
+    }
+    if (isCodex) {
+      return "保留 Codex 原版体验，同时把兔子业务线路配置前置。";
+    }
+    if (isOpenClaw) {
+      return "把 OpenClaw 做成可切换兔子与 gac 线路的统一业务入口。";
+    }
+    return "";
+  }, [isClaude, isCodex, isOpenClaw]);
+
+  const recommendedAction = useMemo(() => {
+    if (isClaude) return "推荐优先使用兔子线路，输入 Key 后即可完成接入。";
+    if (isCodex) return "推荐优先选择合适线路，再完成一次配置即可开始使用。";
+    if (isOpenClaw) return "推荐先选业务线路，再由系统自动完成所需设置。";
+    return "";
+  }, [isClaude, isCodex, isOpenClaw]);
+
   const cardClassName = useMemo(() => {
     if (isCodex) {
       return "overflow-hidden border-sky-200/70 bg-gradient-to-br from-sky-50 via-background to-blue-50 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:to-blue-500/10";
@@ -260,6 +453,17 @@ export function BusinessQuickAccess({
     openclawLiveProviderIds,
     openclawTools?.profile,
   ]);
+  const selectedOpenClawConfig = OPENCLAW_ROUTE_CONFIG[openclawRoute];
+  const activeClaudeRoute = useMemo<ClaudeEntryOption>(() => {
+    if (claudeStatus?.current_route === "改版") return "modified";
+    if (
+      claudeStatus?.env_summary.anthropic_base_url?.includes("gaccode.com") ||
+      claudeStatus?.routes.some((route) => route.is_current && route.base_url?.includes("gaccode.com"))
+    ) {
+      return "gaccode";
+    }
+    return "tu-zi";
+  }, [claudeStatus]);
 
   const configureOpenClawRoute = async (
     route: OpenClawRoute,
@@ -269,8 +473,8 @@ export function BusinessQuickAccess({
     if (!trimmedKey) {
       return {
         success: false,
-        message: "请先输入兔子 API Key",
-        error: "MISSING_TUZI_API_KEY",
+        message: `请先输入${OPENCLAW_ROUTE_CONFIG[route].apiKeyLabel}`,
+        error: "MISSING_OPENCLAW_ROUTE_API_KEY",
         stdout: "",
         stderr: "",
         restart_required: false,
@@ -287,6 +491,9 @@ export function BusinessQuickAccess({
       category: "custom",
       icon: "tuzi",
       notes: `由兔子快速接入自动生成，适用于 ${routeConfig.label}`,
+      meta: {
+        businessLine: route.startsWith("gac-") ? "gac" : "tuzi",
+      },
       settingsConfig: {
         baseUrl: routeConfig.baseUrl,
         apiKey: trimmedKey,
@@ -339,7 +546,7 @@ export function BusinessQuickAccess({
 
     return {
       success: true,
-      message: `已为 OpenClaw 写入${routeConfig.label}，现在可以直接使用兔子 API 了。`,
+      message: `已为 OpenClaw 写入${routeConfig.label}，现在可以直接使用对应业务线路了。`,
       stdout: [
         `Provider: ${routeConfig.providerId}`,
         `Base URL: ${routeConfig.baseUrl}`,
@@ -365,6 +572,9 @@ export function BusinessQuickAccess({
       icon: "tuzi",
       iconColor: "#F97316",
       notes: "由兔子业务一键接入自动生成",
+      meta: {
+        businessLine: route === "gaccode" ? "gac" : "tuzi",
+      },
       settingsConfig: {
         env: {
           ANTHROPIC_BASE_URL: routeConfig.baseUrl,
@@ -400,6 +610,74 @@ export function BusinessQuickAccess({
     return result;
   };
 
+  const syncCodexBusinessProvider = async (
+    route: "gac" | "tuzi",
+    apiKey: string,
+    model: string,
+  ) => {
+    const routeConfig = CODEX_ROUTE_CONFIG[route];
+    const provider: Provider = {
+      id: routeConfig.providerId,
+      name: routeConfig.providerName,
+      websiteUrl: routeConfig.websiteUrl,
+      category: "custom",
+      icon: "tuzi",
+      iconColor: route === "tuzi" ? "#0EA5E9" : "#F97316",
+      notes:
+        route === "tuzi"
+          ? "由兔子业务一键接入自动生成"
+          : "由 gac 业务一键接入自动生成",
+      meta: {
+        businessLine: routeConfig.businessLine,
+      },
+      settingsConfig: {
+        auth: generateThirdPartyAuth(apiKey),
+        config: generateThirdPartyConfig(
+          routeConfig.providerName,
+          routeConfig.baseUrl,
+          model,
+        ),
+      },
+    };
+
+    if (providers?.[routeConfig.providerId]) {
+      await providersApi.update(provider, "codex", routeConfig.providerId);
+    } else {
+      await providersApi.add(provider, "codex");
+    }
+
+    await providersApi.switch(routeConfig.providerId, "codex");
+    await queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
+  };
+
+  const installCodexBusinessRoute = async (): Promise<InstallerActionResult> => {
+    if (codexEntryOption === "gac-modified") {
+      return await installerApi.installCodex({ variant: "gac" });
+    }
+
+    const trimmedKey = codexApiKey.trim();
+    const trimmedModel = codexModel.trim() || "gpt-5.4";
+    const trimmedReasoning = codexReasoning.trim() || "medium";
+    const result = await installerApi.installCodex({
+      variant: "openai",
+      route: codexEntryOption === "gac" ? "gac" : "tuzi",
+      apiKey: trimmedKey,
+      model: trimmedModel,
+      modelReasoningEffort: trimmedReasoning,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    await syncCodexBusinessProvider(
+      codexEntryOption === "gac" ? "gac" : "tuzi",
+      trimmedKey,
+      trimmedModel,
+    );
+    return result;
+  };
+
   if (!isClaude && !isCodex && !isOpenClaw) return null;
 
   return (
@@ -429,6 +707,7 @@ export function BusinessQuickAccess({
               </div>
               <div>
                 <h3 className="text-xl font-semibold">{title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
               </div>
             </div>
           </div>
@@ -473,6 +752,46 @@ export function BusinessQuickAccess({
           </div>
         ) : null}
 
+        <div className="grid gap-3 lg:grid-cols-3">
+          <JourneyStep
+            step="第一步"
+            title="选择最适合的线路"
+            description={
+              isOpenClaw
+                ? "根据你的使用场景，选择 tuzi 或 gac，以及 Claude 或 Codex 方向。"
+                : "根据你的账号和使用方式，先确定要接入的业务线路。"
+            }
+          />
+          <JourneyStep
+            step="第二步"
+            title="输入 Key 一键完成设置"
+            description="只需要输入对应 Key，应用会自动完成所需配置。"
+          />
+          <JourneyStep
+            step="第三步"
+            title="确认已可正常使用"
+            description="配置完成后，可直接查看当前线路和接入状态，确认已经可以开始使用。"
+          />
+        </div>
+
+        <div className="rounded-2xl border border-white/60 bg-white/65 px-4 py-4 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                推荐使用方式
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {recommendedAction}
+              </div>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200/70 bg-orange-50/80 px-3 py-1 text-xs text-orange-700">
+              <Route className="h-3.5 w-3.5" />
+              选择线路后即可快速开始
+            </div>
+          </div>
+        </div>
+
         {isClaude && claudeStatus ? (
           <>
             <div className="grid gap-3 md:grid-cols-4">
@@ -488,94 +807,105 @@ export function BusinessQuickAccess({
               />
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr_auto]">
+            <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <div className="font-medium">方案 1：改版 ClaudeCode</div>
+                <div className="font-medium">Claude 路线管理</div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  适合希望尽快开始使用的客户，首次登录可走网页授权。
+                  选择适合你的 Claude 使用方式，输入对应 Key 后即可快速完成接入。
                 </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <RouteCard
+                    title="Claude · 兔子线路"
+                    description="适合希望直接接入兔子服务的使用场景。"
+                    meta="Base URL: https://api.tu-zi.com"
+                    status={activeClaudeRoute === "tu-zi" ? "已接入" : claudeEntryOption === "tu-zi" ? "当前选择" : "推荐"}
+                    selected={claudeEntryOption === "tu-zi"}
+                    onClick={() => setClaudeEntryOption("tu-zi")}
+                  />
+                  <RouteCard
+                    title="Claude · gac 线路"
+                    description="适合已经在使用 gac 服务的场景。"
+                    meta="Base URL: https://gaccode.com/claudecode"
+                    status={activeClaudeRoute === "gaccode" ? "已接入" : claudeEntryOption === "gaccode" ? "当前选择" : "可选"}
+                    selected={claudeEntryOption === "gaccode"}
+                    onClick={() => setClaudeEntryOption("gaccode")}
+                  />
+                  <RouteCard
+                    title="兔子改版 Claude"
+                    description="适合希望直接使用改版 Claude 体验的场景。"
+                    meta="无需额外输入 Key，直接写入改版 Claude。"
+                    status={activeClaudeRoute === "modified" ? "已接入" : claudeEntryOption === "modified" ? "当前选择" : "可选"}
+                    selected={claudeEntryOption === "modified"}
+                    onClick={() => setClaudeEntryOption("modified")}
+                  />
+                </div>
+                <div className="mt-4 grid gap-3">
+                  {claudeEntryOption === "gaccode" ? (
+                    <Input
+                      value={claudeGacKey}
+                      onChange={(event) => setClaudeGacKey(event.target.value)}
+                      placeholder="输入 gac API Key"
+                    />
+                  ) : claudeEntryOption === "tu-zi" ? (
+                    <Input
+                      value={claudeTuziKey}
+                      onChange={(event) => setClaudeTuziKey(event.target.value)}
+                      placeholder="输入兔子 API Key"
+                    />
+                  ) : (
+                    <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+                      当前方案不需要额外输入 Key，适合希望直接交付改版 Claude 的场景。
+                      当前方案不需要额外输入 Key，完成后即可直接开始使用。
+                    </div>
+                  )}
+                </div>
+                <ResultHint
+                  target={
+                    claudeEntryOption === "modified"
+                      ? "写入改版 Claude 客户端"
+                      : claudeEntryOption === "gaccode"
+                        ? "写入 gac Claude 线路"
+                        : "写入兔子 Claude 线路"
+                  }
+                  syncHint="自动同步配置状态，并在下方列表显示对应入口"
+                />
                 <Button
                   onClick={() =>
-                    void runAction("claude-install-a", () =>
-                      installerApi.installClaudeCode("A"),
+                    void runAction(
+                      claudeEntryOption === "modified"
+                        ? "claude-install-a"
+                        : claudeEntryOption === "gaccode"
+                          ? "claude-install-b"
+                          : "claude-install-c",
+                      () =>
+                        claudeEntryOption === "modified"
+                          ? installerApi.installClaudeCode("A")
+                          : claudeEntryOption === "gaccode"
+                            ? installClaudeBusinessRoute("B", claudeGacKey)
+                            : installClaudeBusinessRoute("C", claudeTuziKey),
                     )
                   }
                   disabled={!!runningAction}
                   className="mt-4 gap-2"
                 >
-                  {runningAction === "claude-install-a" ? (
+                  {runningAction === "claude-install-a" ||
+                  runningAction === "claude-install-b" ||
+                  runningAction === "claude-install-c" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Wrench className="h-4 w-4" />
                   )}
-                  一键配置改版 Claude
+                  立即配置
                 </Button>
               </div>
 
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <div className="font-medium">方案 2：gac 订阅接入</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  让客户只输入 gac key，就自动写好 Claude 所需配置。
-                </div>
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                  <Input
-                    value={claudeGacKey}
-                    onChange={(event) => setClaudeGacKey(event.target.value)}
-                    placeholder="输入 gac API Key"
-                  />
-                  <Button
-                    onClick={() =>
-                      void runAction("claude-install-b", () =>
-                        installClaudeBusinessRoute("B", claudeGacKey),
-                      )
-                    }
-                    disabled={!!runningAction}
-                    className="gap-2"
-                  >
-                    {runningAction === "claude-install-b" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Wrench className="h-4 w-4" />
-                    )}
-                    一键配置
-                  </Button>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <div className="font-medium">方案 3：兔子 API 接入</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  让客户输入兔子 API Key 后，自动写好 Claude 所需配置。
-                </div>
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                  <Input
-                    value={claudeTuziKey}
-                    onChange={(event) => setClaudeTuziKey(event.target.value)}
-                    placeholder="输入兔子 API Key"
-                  />
-                  <Button
-                    onClick={() =>
-                      void runAction("claude-install-c", () =>
-                        installClaudeBusinessRoute("C", claudeTuziKey),
-                      )
-                    }
-                    disabled={!!runningAction}
-                    className="gap-2"
-                  >
-                    {runningAction === "claude-install-c" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Wrench className="h-4 w-4" />
-                    )}
-                    一键配置
-                  </Button>
-                </div>
-              </div>
-
               <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-4">
-                <div className="font-medium">升级当前</div>
+                <div className="font-medium">使用与升级</div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  按当前线路升级，避免用户自己判断。
+                  已为你保留当前线路的升级入口，后续可直接升级当前使用方式。
+                </div>
+                <div className="mt-4 rounded-xl border border-border/60 bg-background/70 px-3 py-3 text-sm text-muted-foreground">
+                  配置完成后，下方会直接出现对应的 Claude 入口卡片。
                 </div>
                 <Button
                   variant="secondary"
@@ -618,97 +948,101 @@ export function BusinessQuickAccess({
               />
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr_auto]">
+            <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <div className="font-medium">原版 Codex + 业务线路</div>
+                <div className="font-medium">Codex 路线管理</div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  只输入 key 和线路，就自动写入 `~/.codex/config.toml` 与环境变量。
+                  选择适合你的 Codex 线路后，一次完成所需设置即可开始使用。
                 </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <Select
-                    value={codexRoute}
-                    onValueChange={(value: CodexBusinessRoute) =>
-                      setCodexRoute(value)
-                    }
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <RouteCard
+                    title="Codex · 兔子线路"
+                    description="适合直接接入兔子服务的工程与代码场景。"
+                    meta="Base URL 走兔子 API，推荐主模型 gpt-5.4。"
+                    status={codexStatus.current_route?.includes("tuzi") ? "已接入" : codexEntryOption === "tuzi" ? "当前选择" : "推荐"}
+                    selected={codexEntryOption === "tuzi"}
+                    onClick={() => setCodexEntryOption("tuzi")}
+                  />
+                  <RouteCard
+                    title="Codex · gac 线路"
+                    description="适合已有 gac 使用基础或迁移场景。"
+                    meta="沿用 gac 路线配置。"
+                    status={codexStatus.current_route?.includes("gac") && codexStatus.install_type !== "gac" ? "已接入" : codexEntryOption === "gac" ? "当前选择" : "可选"}
+                    selected={codexEntryOption === "gac"}
+                    onClick={() => setCodexEntryOption("gac")}
+                  />
+                  <RouteCard
+                    title="gac 改版 Codex"
+                    description="适合希望直接使用 gac 改版体验的场景。"
+                    meta="直接落地 gac 改版 Codex。"
+                    status={codexStatus.install_type === "gac" ? "已接入" : codexEntryOption === "gac-modified" ? "当前选择" : "可选"}
+                    selected={codexEntryOption === "gac-modified"}
+                    onClick={() => setCodexEntryOption("gac-modified")}
+                  />
+                </div>
+                <div className="mt-4 grid gap-3">
+                  {codexEntryOption !== "gac-modified" ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <Input
+                        value={codexApiKey}
+                        onChange={(event) => setCodexApiKey(event.target.value)}
+                        placeholder={`输入${codexEntryOption === "tuzi" ? "兔子" : "gac"} API Key`}
+                      />
+                      <Input
+                        value={codexModel}
+                        onChange={(event) => setCodexModel(event.target.value)}
+                        placeholder="模型，如 gpt-5.4"
+                      />
+                      <Input
+                        value={codexReasoning}
+                        onChange={(event) => setCodexReasoning(event.target.value)}
+                        placeholder="推理强度，如 medium"
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+                      当前方案会直接落地 gac 改版 Codex，不需要再填写路线 Key 或模型参数。
+                      当前方案不需要额外设置，完成后即可直接开始使用。
+                    </div>
+                  )}
+                </div>
+                <ResultHint
+                  target={
+                    codexEntryOption === "gac-modified"
+                      ? "写入 gac 改版 Codex"
+                      : codexEntryOption === "tuzi"
+                        ? "写入兔子 Codex 路线"
+                        : "写入 gac Codex 路线"
+                  }
+                  syncHint={
+                    codexEntryOption === "gac-modified"
+                      ? "保留 gac 改版 Codex 入口，并在下方列表显示当前模块"
+                      : "自动同步配置，并在下方列表显示对应入口"
+                  }
+                />
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Button
+                    onClick={() => void runAction("codex-install-openai", installCodexBusinessRoute)}
+                    disabled={!!runningAction}
+                    className="gap-2"
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择线路" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CODEX_ROUTE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={codexApiKey}
-                    onChange={(event) => setCodexApiKey(event.target.value)}
-                    placeholder="输入 Codex API Key"
-                  />
-                  <Input
-                    value={codexModel}
-                    onChange={(event) => setCodexModel(event.target.value)}
-                    placeholder="模型，如 gpt-5.4"
-                  />
-                  <Input
-                    value={codexReasoning}
-                    onChange={(event) => setCodexReasoning(event.target.value)}
-                    placeholder="推理强度，如 medium"
-                  />
+                    {runningAction === "codex-install-openai" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wrench className="h-4 w-4" />
+                    )}
+                    立即配置
+                  </Button>
                 </div>
-                <Button
-                  onClick={() =>
-                    void runAction("codex-install-openai", () =>
-                      installerApi.installCodex({
-                        variant: "openai",
-                        route: codexRoute,
-                        apiKey: codexApiKey,
-                        model: codexModel,
-                        modelReasoningEffort: codexReasoning,
-                      }),
-                    )
-                  }
-                  disabled={!!runningAction}
-                  className="mt-4 gap-2"
-                >
-                  {runningAction === "codex-install-openai" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wrench className="h-4 w-4" />
-                  )}
-                  一键配置原版 Codex
-                </Button>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <div className="font-medium">gac 改版 Codex</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  面向更快接入场景，无需客户自己理解 route 配置。
-                </div>
-                <Button
-                  onClick={() =>
-                    void runAction("codex-install-gac", () =>
-                      installerApi.installCodex({ variant: "gac" }),
-                    )
-                  }
-                  disabled={!!runningAction}
-                  className="mt-4 gap-2"
-                >
-                  {runningAction === "codex-install-gac" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wrench className="h-4 w-4" />
-                  )}
-                  一键配置 gac Codex
-                </Button>
               </div>
 
               <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-4">
-                <div className="font-medium">升级当前</div>
+                <div className="font-medium">使用与升级</div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  保持当前客户线路不变，只升级现有 CLI。
+                  已为你保留当前线路的升级入口，后续可直接升级当前使用方式。
+                </div>
+                <div className="mt-4 rounded-xl border border-border/60 bg-background/70 px-3 py-3 text-sm text-muted-foreground">
+                  配置完成后，下方会直接出现对应的 Codex 入口卡片。
                 </div>
                 <Button
                   variant="secondary"
@@ -761,38 +1095,81 @@ export function BusinessQuickAccess({
 
             <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <div className="font-medium">兔子业务接入</div>
+                <div className="font-medium">业务线路接入</div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  输入一次兔子 API Key，就自动写好 OpenClaw 的 provider、默认模型和 coding 模式。
+                  先选 tuzi 或 gac，再选 Claude 或 Codex 方向，系统会自动完成所需设置。
                 </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <Select
-                    value={openclawRoute}
-                    onValueChange={(value: OpenClawRoute) => setOpenclawRoute(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择接入线路" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="claude">Claude 线路</SelectItem>
-                      <SelectItem value="codex">Codex 线路</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {(
+                    Object.entries(OPENCLAW_ROUTE_CONFIG) as Array<
+                      [OpenClawRoute, (typeof OPENCLAW_ROUTE_CONFIG)[OpenClawRoute]]
+                    >
+                  ).map(([route, config]) => {
+                    const isSelected = openclawRoute === route;
+                    const isConfigured = openclawLiveProviderIds.includes(
+                      config.providerId,
+                    );
+                    return (
+                      <button
+                        key={route}
+                        type="button"
+                        onClick={() => setOpenclawRoute(route)}
+                        className={`rounded-2xl border px-4 py-4 text-left transition ${
+                          isSelected
+                            ? "border-orange-300 bg-orange-50/80 shadow-sm"
+                            : "border-border/60 bg-background/70 hover:border-orange-200 hover:bg-orange-50/40"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium">
+                              {config.optionLabel}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {config.apiKeyLabel} / {config.models[0]?.name}
+                            </div>
+                          </div>
+                          <div
+                            className={`rounded-full px-2 py-1 text-[10px] font-medium ${
+                              isConfigured
+                                ? "bg-emerald-100 text-emerald-700"
+                                : isSelected
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {isConfigured ? "已写入" : isSelected ? "当前选择" : "可选"}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 grid gap-3">
                   <Input
                     value={openclawApiKey}
                     onChange={(event) => setOpenclawApiKey(event.target.value)}
-                    placeholder="输入兔子 API Key"
+                    placeholder={`输入${selectedOpenClawConfig.apiKeyLabel}`}
                   />
                 </div>
-                <div className="mt-3 rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
-                  当前将写入
-                  {` ${OPENCLAW_ROUTE_CONFIG[openclawRoute].label} `}
-                  和
-                  {` ${OPENCLAW_ROUTE_CONFIG[openclawRoute].models.length} `}
-                  个推荐模型，首选模型为
-                  {` ${OPENCLAW_ROUTE_CONFIG[openclawRoute].models[0]?.id} `}
-                  。
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+                    将接入
+                    {` ${selectedOpenClawConfig.providerName} `}
+                    ，并自动切换到对应服务线路。
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+                    推荐模型共
+                    {` ${selectedOpenClawConfig.models.length} `}
+                    个，默认优先使用
+                    {` ${selectedOpenClawConfig.models[0]?.id} `}
+                    。
+                  </div>
                 </div>
+                <ResultHint
+                  target={`${selectedOpenClawConfig.label} ${selectedOpenClawConfig.baseUrl}`}
+                  syncHint="自动完成相关设置，并在下方列表显示对应入口"
+                />
                 <Button
                   onClick={() =>
                     void runAction("openclaw-configure", () =>
@@ -807,21 +1184,46 @@ export function BusinessQuickAccess({
                   ) : (
                     <Wrench className="h-4 w-4" />
                   )}
-                  一键配置 OpenClaw
+                  立即配置
                 </Button>
               </div>
 
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                <div className="font-medium">推荐说明</div>
+                <div className="font-medium">使用建议</div>
                 <div className="mt-3 space-y-3 text-sm text-muted-foreground">
                   <div>
-                    `Claude 线路` 更适合把 OpenClaw 当成 Claude 风格入口，默认写入 Claude 系列模型。
+                    `Claude 方向` 更适合作为偏对话式、偏 Claude 体验的入口。
                   </div>
                   <div>
-                    `Codex 线路` 更适合代码生成和补全场景，默认主模型是 `gpt-5.4`。
+                    `Codex 方向` 更适合代码生成、补全和工程类场景。
                   </div>
                   <div>
-                    配置完成后，下面原有的 Provider、Env、Tools、Agents 面板仍然保留，方便继续深改。
+                    `兔子` 与 `gac` 对应不同服务线路，可以根据你的账号和场景灵活选择。
+                  </div>
+                  <div>
+                    配置完成后，下面原有的设置面板仍然保留，方便继续调整细节。
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-emerald-800">
+                    <CheckCircle2 className="h-4 w-4" />
+                    重点是尽快开始使用，而不是理解底层配置细节。
+                  </div>
+                  <div className="rounded-xl border border-sky-200/70 bg-sky-50/70 px-3 py-3 text-sky-900">
+                    <div className="text-sm font-medium">适合的选择</div>
+                    <div className="mt-2 space-y-2 text-xs leading-5">
+                      <div>兔子 Claude: 更适合希望统一走兔子服务的 Claude 使用场景。</div>
+                      <div>兔子 Codex: 更适合代码生成、补全和工程类工作流。</div>
+                      <div>gac 线路: 更适合已有 gac 服务基础的使用场景。</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-3">
+                    <div className="text-sm font-medium">当前可直接使用的线路</div>
+                    <div className="mt-2 text-xs leading-5 text-muted-foreground">
+                      {openclawStatus.configuredRoutes.length > 0
+                        ? openclawStatus.configuredRoutes
+                            .map((route) => OPENCLAW_ROUTE_CONFIG[route].optionLabel)
+                            .join(" / ")
+                        : "当前还没有完成配置，建议先从兔子 Claude 或兔子 Codex 开始。"}
+                    </div>
                   </div>
                 </div>
               </div>

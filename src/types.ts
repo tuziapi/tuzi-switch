@@ -136,6 +136,8 @@ export interface AuthBinding {
 export interface ProviderMeta {
   // 自定义端点：以 URL 为键，值为端点信息
   custom_endpoints?: Record<string, CustomEndpoint>;
+  // 业务线路标识
+  businessLine?: "tuzi" | "gac";
   // 是否在切换/同步到 live 时应用通用配置片段
   commonConfigEnabled?: boolean;
   // 用量查询脚本配置

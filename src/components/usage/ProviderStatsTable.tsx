@@ -9,16 +9,19 @@ import {
 } from "@/components/ui/table";
 import { useProviderStats } from "@/lib/query/usage";
 import { fmtUsd } from "./format";
+import type { BusinessLineFilter } from "@/types/usage";
 
 interface ProviderStatsTableProps {
+  businessLine: BusinessLineFilter;
   refreshIntervalMs: number;
 }
 
 export function ProviderStatsTable({
+  businessLine,
   refreshIntervalMs,
 }: ProviderStatsTableProps) {
   const { t } = useTranslation();
-  const { data: stats, isLoading } = useProviderStats({
+  const { data: stats, isLoading } = useProviderStats(businessLine, {
     refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
   });
 

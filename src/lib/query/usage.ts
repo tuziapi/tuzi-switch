@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usageApi } from "@/lib/api/usage";
-import type { LogFilters } from "@/types/usage";
+import type { BusinessLineFilter, LogFilters } from "@/types/usage";
 
 const DEFAULT_REFETCH_INTERVAL_MS = 30000;
 
@@ -24,6 +24,7 @@ type RequestLogsKey = {
   timeMode: RequestLogsTimeMode;
   rollingWindowSeconds?: number;
   appType?: string;
+  businessLine?: string;
   providerName?: string;
   model?: string;
   statusCode?: number;
@@ -34,10 +35,16 @@ type RequestLogsKey = {
 // Query keys
 export const usageKeys = {
   all: ["usage"] as const,
-  summary: (days: number) => [...usageKeys.all, "summary", days] as const,
-  trends: (days: number) => [...usageKeys.all, "trends", days] as const,
-  providerStats: () => [...usageKeys.all, "provider-stats"] as const,
-  modelStats: () => [...usageKeys.all, "model-stats"] as const,
+  tuziKeyUsage: (keyFingerprint: string) =>
+    [...usageKeys.all, "tuzi-key-usage", keyFingerprint] as const,
+  summary: (days: number, businessLine: BusinessLineFilter) =>
+    [...usageKeys.all, "summary", days, businessLine] as const,
+  trends: (days: number, businessLine: BusinessLineFilter) =>
+    [...usageKeys.all, "trends", days, businessLine] as const,
+  providerStats: (businessLine: BusinessLineFilter) =>
+    [...usageKeys.all, "provider-stats", businessLine] as const,
+  modelStats: (businessLine: BusinessLineFilter) =>
+    [...usageKeys.all, "model-stats", businessLine] as const,
   logs: (key: RequestLogsKey, page: number, pageSize: number) =>
     [
       ...usageKeys.all,
@@ -45,6 +52,7 @@ export const usageKeys = {
       key.timeMode,
       key.rollingWindowSeconds ?? 0,
       key.appType ?? "",
+      key.businessLine ?? "",
       key.providerName ?? "",
       key.model ?? "",
       key.statusCode ?? -1,
@@ -67,43 +75,69 @@ const getWindow = (days: number) => {
 };
 
 // Hooks
-export function useUsageSummary(days: number, options?: UsageQueryOptions) {
+export function useUsageSummary(
+  days: number,
+  businessLine: BusinessLineFilter,
+  options?: UsageQueryOptions,
+) {
   return useQuery({
-    queryKey: usageKeys.summary(days),
+    queryKey: usageKeys.summary(days, businessLine),
     queryFn: () => {
       const { startDate, endDate } = getWindow(days);
-      return usageApi.getUsageSummary(startDate, endDate);
+      return usageApi.getUsageSummary(
+        startDate,
+        endDate,
+        businessLine === "all" ? undefined : businessLine,
+      );
     },
     refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS, // 每30秒自动刷新
     refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false, // 后台不刷新
   });
 }
 
-export function useUsageTrends(days: number, options?: UsageQueryOptions) {
+export function useUsageTrends(
+  days: number,
+  businessLine: BusinessLineFilter,
+  options?: UsageQueryOptions,
+) {
   return useQuery({
-    queryKey: usageKeys.trends(days),
+    queryKey: usageKeys.trends(days, businessLine),
     queryFn: () => {
       const { startDate, endDate } = getWindow(days);
-      return usageApi.getUsageTrends(startDate, endDate);
+      return usageApi.getUsageTrends(
+        startDate,
+        endDate,
+        businessLine === "all" ? undefined : businessLine,
+      );
     },
     refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS, // 每30秒自动刷新
     refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
   });
 }
 
-export function useProviderStats(options?: UsageQueryOptions) {
+export function useProviderStats(
+  businessLine: BusinessLineFilter,
+  options?: UsageQueryOptions,
+) {
   return useQuery({
-    queryKey: usageKeys.providerStats(),
-    queryFn: usageApi.getProviderStats,
+    queryKey: usageKeys.providerStats(businessLine),
+    queryFn: () =>
+      usageApi.getProviderStats(
+        businessLine === "all" ? undefined : businessLine,
+      ),
     refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS, // 每30秒自动刷新
     refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
   });
 }
 
-export function useModelStats(options?: UsageQueryOptions) {
+export function useModelStats(
+  businessLine: BusinessLineFilter,
+  options?: UsageQueryOptions,
+) {
   return useQuery({
-    queryKey: usageKeys.modelStats(),
-    queryFn: usageApi.getModelStats,
+    queryKey: usageKeys.modelStats(businessLine),
+    queryFn: () =>
+      usageApi.getModelStats(businessLine === "all" ? undefined : businessLine),
     refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS, // 每30秒自动刷新
     refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
   });
@@ -128,6 +162,7 @@ export function useRequestLogs({
     rollingWindowSeconds:
       timeMode === "rolling" ? rollingWindowSeconds : undefined,
     appType: filters.appType,
+    businessLine: filters.businessLine,
     providerName: filters.providerName,
     model: filters.model,
     statusCode: filters.statusCode,
@@ -169,6 +204,24 @@ export function useProviderLimits(providerId: string, appType: string) {
     queryKey: usageKeys.limits(providerId, appType),
     queryFn: () => usageApi.checkProviderLimits(providerId, appType),
     enabled: !!providerId && !!appType,
+  });
+}
+
+export function useTuziKeyUsage(
+  apiKey?: string,
+  options?: UsageQueryOptions & { enabled?: boolean },
+) {
+  const normalizedKey = apiKey?.trim() || "";
+  const keyFingerprint = normalizedKey
+    ? `${normalizedKey.slice(0, 4)}:${normalizedKey.slice(-4)}:${normalizedKey.length}`
+    : "none";
+
+  return useQuery({
+    queryKey: usageKeys.tuziKeyUsage(keyFingerprint),
+    queryFn: () => usageApi.getTuziKeyUsage(normalizedKey),
+    enabled: (options?.enabled ?? true) && normalizedKey.length > 0,
+    refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
   });
 }
 

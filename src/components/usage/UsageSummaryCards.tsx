@@ -5,19 +5,22 @@ import { useUsageSummary } from "@/lib/query/usage";
 import { Activity, DollarSign, Layers, Database, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { fmtUsd, parseFiniteNumber } from "./format";
+import type { BusinessLineFilter } from "@/types/usage";
 
 interface UsageSummaryCardsProps {
   days: number;
+  businessLine: BusinessLineFilter;
   refreshIntervalMs: number;
 }
 
 export function UsageSummaryCards({
   days,
+  businessLine,
   refreshIntervalMs,
 }: UsageSummaryCardsProps) {
   const { t } = useTranslation();
 
-  const { data: summary, isLoading } = useUsageSummary(days, {
+  const { data: summary, isLoading } = useUsageSummary(days, businessLine, {
     refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
   });
 

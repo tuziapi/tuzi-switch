@@ -9,14 +9,19 @@ import {
 } from "@/components/ui/table";
 import { useModelStats } from "@/lib/query/usage";
 import { fmtUsd } from "./format";
+import type { BusinessLineFilter } from "@/types/usage";
 
 interface ModelStatsTableProps {
+  businessLine: BusinessLineFilter;
   refreshIntervalMs: number;
 }
 
-export function ModelStatsTable({ refreshIntervalMs }: ModelStatsTableProps) {
+export function ModelStatsTable({
+  businessLine,
+  refreshIntervalMs,
+}: ModelStatsTableProps) {
   const { t } = useTranslation();
-  const { data: stats, isLoading } = useModelStats({
+  const { data: stats, isLoading } = useModelStats(businessLine, {
     refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
   });
 

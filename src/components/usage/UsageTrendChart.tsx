@@ -17,18 +17,21 @@ import {
   getLocaleFromLanguage,
   parseFiniteNumber,
 } from "./format";
+import type { BusinessLineFilter } from "@/types/usage";
 
 interface UsageTrendChartProps {
   days: number;
+  businessLine: BusinessLineFilter;
   refreshIntervalMs: number;
 }
 
 export function UsageTrendChart({
   days,
+  businessLine,
   refreshIntervalMs,
 }: UsageTrendChartProps) {
   const { t, i18n } = useTranslation();
-  const { data: trends, isLoading } = useUsageTrends(days, {
+  const { data: trends, isLoading } = useUsageTrends(days, businessLine, {
     refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
   });
 

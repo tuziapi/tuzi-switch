@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Table,
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useRequestLogs, usageKeys } from "@/lib/query/usage";
 import { useQueryClient } from "@tanstack/react-query";
-import type { LogFilters } from "@/types/usage";
+import type { BusinessLineFilter, LogFilters } from "@/types/usage";
 import { ChevronLeft, ChevronRight, RefreshCw, Search, X } from "lucide-react";
 import {
   fmtInt,
@@ -29,6 +29,7 @@ import {
 } from "./format";
 
 interface RequestLogTableProps {
+  businessLine: BusinessLineFilter;
   refreshIntervalMs: number;
 }
 
@@ -37,7 +38,10 @@ const MAX_FIXED_RANGE_SECONDS = 30 * ONE_DAY_SECONDS;
 
 type TimeMode = "rolling" | "fixed";
 
-export function RequestLogTable({ refreshIntervalMs }: RequestLogTableProps) {
+export function RequestLogTable({
+  businessLine,
+  refreshIntervalMs,
+}: RequestLogTableProps) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -50,8 +54,12 @@ export function RequestLogTable({ refreshIntervalMs }: RequestLogTableProps) {
   const [appliedTimeMode, setAppliedTimeMode] = useState<TimeMode>("rolling");
   const [draftTimeMode, setDraftTimeMode] = useState<TimeMode>("rolling");
 
-  const [appliedFilters, setAppliedFilters] = useState<LogFilters>({});
-  const [draftFilters, setDraftFilters] = useState<LogFilters>({});
+  const [appliedFilters, setAppliedFilters] = useState<LogFilters>({
+    businessLine: businessLine === "all" ? undefined : businessLine,
+  });
+  const [draftFilters, setDraftFilters] = useState<LogFilters>({
+    businessLine: businessLine === "all" ? undefined : businessLine,
+  });
   const [page, setPage] = useState(0);
   const pageSize = 20;
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -70,6 +78,13 @@ export function RequestLogTable({ refreshIntervalMs }: RequestLogTableProps) {
   const logs = result?.data ?? [];
   const total = result?.total ?? 0;
   const totalPages = Math.ceil(total / pageSize);
+
+  useEffect(() => {
+    const nextBusinessLine = businessLine === "all" ? undefined : businessLine;
+    setDraftFilters((prev) => ({ ...prev, businessLine: nextBusinessLine }));
+    setAppliedFilters((prev) => ({ ...prev, businessLine: nextBusinessLine }));
+    setPage(0);
+  }, [businessLine]);
 
   const handleSearch = () => {
     setValidationError(null);
@@ -116,8 +131,12 @@ export function RequestLogTable({ refreshIntervalMs }: RequestLogTableProps) {
     setValidationError(null);
     setAppliedTimeMode("rolling");
     setDraftTimeMode("rolling");
-    setDraftFilters({});
-    setAppliedFilters({});
+    setDraftFilters({
+      businessLine: businessLine === "all" ? undefined : businessLine,
+    });
+    setAppliedFilters({
+      businessLine: businessLine === "all" ? undefined : businessLine,
+    });
     setPage(0);
   };
 
@@ -127,6 +146,7 @@ export function RequestLogTable({ refreshIntervalMs }: RequestLogTableProps) {
       rollingWindowSeconds:
         appliedTimeMode === "rolling" ? ONE_DAY_SECONDS : undefined,
       appType: appliedFilters.appType,
+      businessLine: appliedFilters.businessLine,
       providerName: appliedFilters.providerName,
       model: appliedFilters.model,
       statusCode: appliedFilters.statusCode,

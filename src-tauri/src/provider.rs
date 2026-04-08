@@ -222,6 +222,9 @@ pub struct ProviderMeta {
     /// 自定义端点列表（按 URL 去重存储）
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub custom_endpoints: HashMap<String, crate::settings::CustomEndpoint>,
+    /// 业务线路标识（tuzi / gac）
+    #[serde(rename = "businessLine", skip_serializing_if = "Option::is_none")]
+    pub business_line: Option<String>,
     /// 是否在写入 live 时应用通用配置片段
     #[serde(
         rename = "commonConfigEnabled",
