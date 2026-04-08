@@ -1,499 +1,156 @@
 <div align="center">
 
-# CC Switch
+# tuzi-switch
 
-### Claude Code、Codex、Gemini CLI、OpenCode、OpenClaw のオールインワン管理ツール
+### Claude Code、Codex、OpenClaw 向けの Tuzi 業務デスクトップアシスタント
 
-[![Version](https://img.shields.io/github/v/release/farion1231/cc-switch?color=blue&label=version)](https://github.com/farion1231/cc-switch/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/farion1231/cc-switch/releases)
-[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-orange.svg)](https://tauri.app/)
-[![Downloads](https://img.shields.io/github/downloads/farion1231/cc-switch/total)](https://github.com/farion1231/cc-switch/releases/latest)
+[![Version](https://img.shields.io/github/v/release/tuziapi/tuzi-switch?color=0ea5e9&label=version)](https://github.com/tuziapi/tuzi-switch/releases)
+[![Downloads](https://img.shields.io/github/downloads/tuziapi/tuzi-switch/total?color=f97316)](https://github.com/tuziapi/tuzi-switch/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-94a3b8)](https://github.com/tuziapi/tuzi-switch/releases)
+[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-111827)](https://tauri.app/)
 
-<a href="https://trendshift.io/repositories/15372" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15372" alt="farion1231%2Fcc-switch | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-[English](README.md) | [中文](README_ZH.md) | 日本語 | [Changelog](CHANGELOG.md)
+[中文](README_ZH.md) | [English](README.md) | 日本語 | [Releases](https://github.com/tuziapi/tuzi-switch/releases)
 
 </div>
 
-## ❤️スポンサー
+## ダウンロード
 
-<details open>
-<summary>クリックで折りたたむ</summary>
+最新のインストーラは [GitHub Releases](https://github.com/tuziapi/tuzi-switch/releases) から取得できます。
 
-[![MiniMax](assets/partners/banners/minimax-en.jpeg)](https://platform.minimax.io/subscribe/coding-plan?code=ClLhgxr2je&source=link)
-
-MiniMax-M2.7 は、自律的進化と実世界の生産性向上のために設計された次世代大規模言語モデルです。従来のモデルとは異なり、M2.7 はエージェントチーム、動的ツール使用、強化学習ループを通じて自身の改善に積極的に参加します。ソフトウェアエンジニアリングにおいて優れた性能を発揮し（SWE-Pro で 56.22%、VIBE-Pro で 55.6%、Terminal Bench 2 で 57.0%）、複雑なオフィスワークフローにも秀でており、GDPval-AA で 1495 ELO のリーディングスコアを達成しています。Word・Excel・PowerPoint の高忠実度編集と、40 以上の複雑なスキルにわたる 97% の遵守率により、M2.7 は AI ネイティブなワークフローと組織構築の新基準を打ち立てます。
+推奨パッケージ:
 
-[こちら](https://platform.minimax.io/subscribe/coding-plan?code=ClLhgxr2je&source=link)から MiniMax Token Plan の限定 12% オフを入手！
+- Windows: `.msi`
+- Windows ポータブル版: `Windows-Portable.zip`
+- Linux: `.AppImage`、`.deb`、`.rpm`
+- macOS: `macOS-unsigned.dmg` または `macOS-unsigned.zip`
 
----
+現在の公開 Release は Windows / Linux での利用を前提にしています。macOS は未署名のテストビルドです。
 
-<table>
-<tr>
-<td width="180"><a href="https://www.packyapi.com/register?aff=cc-switch"><img src="assets/partners/logos/packycode.png" alt="PackyCode" width="150"></a></td>
-<td>PackyCode のご支援に感謝します！PackyCode は Claude Code、Codex、Gemini などのリレーサービスを提供する信頼性の高い API 中継プラットフォームです。本ソフト利用者向けに特別割引があります：<a href="https://www.packyapi.com/register?aff=cc-switch">このリンク</a>で登録し、チャージ時に「cc-switch」クーポンを入力すると 10% オフになります。</td>
-</tr>
+### ワンコマンドインストール
 
-<tr>
-<td width="180"><a href="https://cloud.siliconflow.cn/i/drGuwc9k"><img src="assets/partners/logos/silicon_en.jpg" alt="SiliconFlow" width="150"></a></td>
-<td>SiliconFlow のご支援に感謝します！SiliconFlow は高性能 AI インフラストラクチャおよびモデル API プラットフォームで、言語・音声・画像・動画モデルへの高速かつ信頼性の高いアクセスをワンストップで提供します。従量課金制、豊富なマルチモーダルモデル対応、高速推論、エンタープライズグレードの安定性を備え、開発者やチームがより効率的に AI アプリケーションを構築・拡張できるようサポートします。<a href="https://cloud.siliconflow.cn/i/drGuwc9k">このリンク</a>から登録し、本人確認を完了すると、プラットフォーム内の全モデルで利用可能な ¥20 のボーナスクレジットが付与されます。SiliconFlow は OpenClaw にも対応しており、SiliconFlow の API キーを接続することで主要な AI モデルを無料で呼び出すことができます。</td>
-</tr>
+最新版を GitHub から直接インストール:
 
-<tr>
-<td width="180"><a href="https://aigocode.com/invite/CC-SWITCH"><img src="assets/partners/logos/aigocode.png" alt="AIGoCode" width="150"></a></td>
-<td>本プロジェクトは AIGoCode のスポンサー提供でお届けしています。AIGoCode は、Claude Code・Codex・最新の Gemini モデルを統合したオールインワンのAIコーディングプラットフォームで、安定性・高速性・コストパフォーマンスに優れた開発サービスを提供します。柔軟なサブスクリプションプランを備え、レスポンスも非常に高速です。さらに、CC Switch ユーザー向けの特典として、<a href="https://aigocode.com/invite/CC-SWITCH">このリンク</a>から登録すると、初回チャージ時に10％分のボーナスクレジットが付与されます！</td>
-</tr>
+```bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
+```
 
-<tr>
-<td width="180"><a href="https://www.aicodemirror.com/register?invitecode=9915W3"><img src="assets/partners/logos/aicodemirror.jpg" alt="AICodeMirror" width="150"></a></td>
-<td>AICodeMirror のご支援に感謝します！AICodeMirror は Claude Code / Codex / Gemini CLI の公式高安定リレーサービスを提供しており、エンタープライズ級の同時接続、迅速な請求書発行、24時間年中無休の専用テクニカルサポートを備えています。
-Claude Code / Codex / Gemini 公式チャンネルが最安で元価格の 38% / 2% / 9%、チャージ時にはさらに割引！AICodeMirror は CC Switch ユーザー向けに特別特典を用意：<a href="https://www.aicodemirror.com/register?invitecode=9915W3">このリンク</a>から登録すると初回チャージ 20% オフ、法人のお客様は最大 25% オフ！</td>
-</tr>
+### macOS 未署名ビルド
 
-<tr>
-<td width="180"><a href="https://cubence.com/signup?code=CCSWITCH&source=ccs"><img src="assets/partners/logos/cubence.png" alt="Cubence" width="150"></a></td>
-<td>Cubence のご支援に感謝します！Cubence は Claude Code、Codex、Gemini などのリレーサービスを提供する信頼性の高い API 中継プラットフォームで、従量課金や月額プランなど柔軟な料金体系を提供しています。CC Switch ユーザー向けの特別割引：<a href="https://cubence.com/signup?code=CCSWITCH&source=ccs">このリンク</a>で登録し、チャージ時に「CCSWITCH」クーポンを入力すると、毎回 10% オフになります！</td>
-</tr>
+初回起動時に macOS にブロックされた場合は、次のいずれかを実行してください。
 
-<tr>
-<td width="180"><a href="https://www.dmxapi.cn/register?aff=bUHu"><img src="assets/partners/logos/dmx-en.jpg" alt="DMXAPI" width="150"></a></td>
-<td>DMXAPI のご支援に感謝します！DMXAPI は 200 社以上の企業ユーザーにグローバル大規模モデル API サービスを提供しています。1 つの API キーで全世界のモデルにアクセス可能。即時請求書発行、同時接続数無制限、最低 $0.15 から、24 時間年中無休のテクニカルサポート。GPT/Claude/Gemini が全て 32% オフ、国内モデルは 20〜50% オフ、Claude Code 専用モデルは 66% オフ実施中！<a href="https://www.dmxapi.cn/register?aff=bUHu">登録はこちら</a></td>
-</tr>
+1. アプリを右クリックして `開く` を選び、確認ダイアログでもう一度 `開く` を押す
+2. またはターミナルで以下を実行する
 
-<tr>
-<td width="180"><a href="https://www.compshare.cn/coding-plan?ytag=GPU_YY_YX_git_cc-switch"><img src="assets/partners/logos/ucloud.png" alt="Compshare" width="150"></a></td>
-<td>Compshare のご支援に感謝します！Compshare は UCloud 傘下の AI クラウドプラットフォームで、国内外の安定した包括的なモデル API を 1 つのキーだけで利用可能。月額・従量課金のコストパフォーマンスに優れた Coding Plan パッケージを提供し、公式価格の 60〜80% オフで利用できます。Claude Code、Codex および API アクセスに対応。エンタープライズ級の高同時接続、24 時間年中無休のテクニカルサポート、セルフサービス請求書発行に対応。<a href="https://www.compshare.cn/coding-plan?ytag=GPU_YY_YX_git_cc-switch">こちらのリンク</a>から登録すると、無料で 5 元分のプラットフォーム体験クレジットがもらえます！</td>
-</tr>
+```bash
+xattr -dr com.apple.quarantine "/Applications/tuzi-switch.app"
+open "/Applications/tuzi-switch.app"
+```
 
-<tr>
-<td width="180"><a href="https://www.right.codes/register?aff=CCSWITCH"><img src="assets/partners/logos/rightcode.jpg" alt="RightCode" width="150"></a></td>
-<td>本プロジェクトへのご支援として、Right Code にご協賛いただき誠にありがとうございます。Right Code は、Claude Code、Codex、Gemini などのモデルに対応した中継（プロキシ）サービスを安定して提供しています。特に高いコストパフォーマンスを誇る Codex の月額プランを主力としており、<strong>未使用分の利用枠を翌日に繰り越して利用できる（繰越対応）</strong>点が特長です。チャージ（入金）後に請求書の発行が可能で、企業・チーム向けには専任担当による個別対応も行っています。さらに CC Switch ユーザー向けの特別優待として、<a href="https://www.right.codes/register?aff=CCSWITCH">こちらのリンク</a>からご登録いただくと、チャージのたびに実支払額の 25% 相当の従量課金クレジットが付与されます。</td>
-</tr>
+`/Applications` 以外に配置した場合は、パスを実際の場所に置き換えてください。
 
-<tr>
-<td width="180"><a href="https://aicoding.sh/i/CCSWITCH"><img src="assets/partners/logos/aicoding.jpg" alt="AICoding" width="150"></a></td>
-<td>AICoding.sh のご支援に感謝します！AICoding.sh —— グローバル AI モデル API 超お得な中継サービス！Claude Code 81% オフ、GPT 99% オフ！数百社の企業に高コストパフォーマンスの AI サービスを提供。Claude Code、GPT、Gemini および国内主要モデルに対応、エンタープライズ級の高同時接続、迅速な請求書発行、24 時間年中無休の専属テクニカルサポート。<a href="https://aicoding.sh/i/CCSWITCH">こちらのリンク</a>から登録した CC Switch ユーザーは、初回チャージ 10% オフ！</td>
-</tr>
+## tuzi-switch とは
 
-<tr>
-<td width="180"><a href="https://crazyrouter.com/register?aff=OZcm&ref=cc-switch"><img src="assets/partners/logos/crazyrouter.jpg" alt="Crazyrouter" width="150"></a></td>
-<td>Crazyrouter のご支援に感謝します！Crazyrouter は高性能 AI API アグリゲーションプラットフォームです。1 つの API キーで Claude Code、Codex、Gemini CLI など 300 以上のモデルにアクセス可能。全モデルが公式価格の 55% で利用でき、自動フェイルオーバー、スマートルーティング、無制限同時接続に対応。CC Switch ユーザー向けの限定特典：<a href="https://crazyrouter.com/register?aff=OZcm&ref=cc-switch">こちらのリンク</a>から登録すると <strong>$2 の無料クレジット</strong> を即時進呈。さらに初回チャージ時にプロモコード `CCSWITCH` を入力すると <strong>30% のボーナスクレジット</strong> が追加されます！</td>
-</tr>
+tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム版です。多ツール管理の基盤は残しつつ、Tuzi のお客様がより簡単に接続できる導線を優先しています。
 
-<tr>
-<td width="180"><a href="https://www.sssaicode.com/register?ref=DCP0SM"><img src="assets/partners/logos/sssaicode.png" alt="SSSAiCode" width="150"></a></td>
-<td>SSSAiCode のご支援に感謝します！SSSAiCode は安定性と信頼性に優れた API 中継サービスで、安定的で信頼性が高く、手頃な価格の Claude・Codex モデルサービスを提供しています。<strong>高コストパフォーマンスの公式 Claude サービスを 0.5￥/$ 換算で提供</strong>、月額制・Paygo など多様な課金方式に対応し、当日の迅速な請求書発行をサポート。CC Switch ユーザー向けの特別特典：<a href="https://www.sssaicode.com/register?ref=DCP0SM">こちらのリンク</a>から登録すると、毎回のチャージで $10 の追加ボーナスを受けられます！</td>
-</tr>
+現在の中心ツールは次の 3 つです。
 
-<tr>
-<td width="180"><a href="https://www.openclaudecode.cn/register?aff=aOYQ"><img src="assets/partners/logos/mikubanner.svg" alt="Micu" width="150"></a></td>
-<td>Micu API のご支援に感謝します！Micu API は、最高のコストパフォーマンスと高い安定性を追求するグローバル大規模言語モデル中継サービスプロバイダーです。法人企業がバックアップしており、サービス停止のリスクを排除、迅速な正規請求書発行に対応！「試行コストゼロ」をモットーに、最低 1 元からチャージ可能で手数料無料、いつでも返金可能！CC Switch ユーザー向けの限定特典：<a href="https://www.openclaudecode.cn/register?aff=aOYQ">こちらのリンク</a>から登録し、チャージ時にプロモコード「ccswitch」を入力すると <strong>10% 割引</strong> が適用されます！</td>
-</tr>
+- Claude Code
+- Codex
+- OpenClaw
 
-<tr>
-<td width="180"><a href="https://x-code.cc/register?aff=IbPp"><img src="assets/partners/logos/xcodeapi.png" alt="XCodeAPI" width="150"></a></td>
-<td>XCodeAPI のご支援に感謝します！CC Switch ユーザー向けの特別特典：<a href="https://x-code.cc/register?aff=IbPp">こちらのリンク</a>から登録すると、初回注文で 10% の追加クレジットボーナスがもらえます！（サイト管理者に連絡して受け取りください）</td>
-</tr>
+ユーザーは Tuzi Key を 1 回入力するだけで、ルート設定とローカル設定をより素早く完了できます。設定ファイルを手動編集する前提ではありません。
 
-<tr>
-<td width="180"><a href="https://ctok.ai"><img src="assets/partners/logos/ctok.png" alt="CTok" width="150"></a></td>
-<td>CTok.ai のご支援に感謝します！CTok.ai はワンストップ AI プログラミングツールサービスプラットフォームの構築に取り組んでいます。Claude Code のプロフェッショナルプランと技術コミュニティサービスを提供し、Google Gemini や OpenAI Codex にも対応しています。丁寧に設計されたプランと専門的な技術コミュニティを通じて、開発者に安定したサービス保証と継続的な技術サポートを提供し、AI アシストプログラミングを真の生産性ツールにします。<a href="https://ctok.ai">こちら</a>から登録してください！</td>
-</tr>
+## 製品のポイント
 
-<tr>
-<td width="180"><a href="https://chefshop.ai"><img src="assets/partners/logos/chefshop.png" alt="ChefShop" width="150"></a></td>
-<td>ChefShop AI のご支援に感謝します！ChefShop AI は、AI ヘビーユーザー向けにカスタマイズされたプレミアムアカウントサービスプロバイダーです。ChatGPT Plus/Pro、Claude Max、Grok Super/Heavy、Gemini など主流の大規模モデルの公式チャージと安定したアカウントサービスを提供しています。<a href="https://chefshop.ai">こちら</a>から購入してください！</td>
-</tr>
+- Claude Code、Codex、OpenClaw 向けの Tuzi 優先クイック入口
+- メイン画面から Tuzi / GAC ラインの案内付きで接続設定を実行
+- Tuzi ブランドのビジュアル、アイコン、接入カード
+- アプリ内でのプロバイダ切り替えとデスクトップ版ベースのトレイ切り替え導線
+- Providers、MCP、Prompts、Skills など既存基盤機能を継続利用
+- Tauri 2 ベースのデスクトップアプリ構成
 
-</table>
+## 現在のカスタマイズ方針
 
-</details>
+上流版と比べると、この版は汎用的な高機能ツールというより、業務導入と顧客オンボーディングを重視しています。
 
-## CC Switch を選ぶ理由
+- 右上の入口エリアを Tuzi 接続フロー向けに再構成
+- Claude Code、Codex、OpenClaw に個別のインストール / 設定入口を用意
+- Tuzi クイック設定を主要導線として前面に配置
+- 一部の汎用設定やワークベンチ要素を簡素化
 
-最新の AI コーディングは Claude Code、Codex、Gemini CLI、OpenCode、OpenClaw などの CLI ツールに依存していますが、各ツールの設定形式はバラバラです。API プロバイダを切り替えるたびに JSON、TOML、`.env` ファイルを手動で編集する必要があり、複数ツール間で MCP や Skills を統一的に管理する手段もありません。
+## 画面プレビュー
 
-**CC Switch** は、5 つの CLI ツールを 1 つのデスクトップアプリで一元管理できます。設定ファイルを手作業で編集する代わりに、ワンクリックでプロバイダをインポートし、瞬時に切り替えられるビジュアルインターフェースを提供します。50 以上の組み込みプリセット、統一 MCP・Skills 管理、システムトレイからの即時切り替え機能を搭載。すべてはアトミック書き込みによる信頼性の高い SQLite データベースに支えられており、設定の破損を防ぎます。
+### Claude
 
-- **1 つのアプリで 5 つの CLI ツール** -- Claude Code、Codex、Gemini CLI、OpenCode、OpenClaw を単一インターフェースで管理
-- **手動編集は不要** -- AWS Bedrock、NVIDIA NIM、コミュニティリレーなど 50 以上のプロバイダプリセットを内蔵。選んで切り替えるだけ
-- **統一 MCP・Skills 管理** -- 1 つのパネルで 4 つのアプリの MCP サーバーと Skills を双方向同期で管理
-- **システムトレイでクイック切り替え** -- トレイメニューから即座にプロバイダを切り替え。アプリを開く必要なし
-- **クラウド同期** -- Dropbox、OneDrive、iCloud、または WebDAV サーバー経由でデバイス間のプロバイダデータを同期
-- **クロスプラットフォーム** -- Tauri 2 で構築された Windows、macOS、Linux 対応のネイティブデスクトップアプリ
-- **便利ツール内蔵** -- 初回起動時のログイン確認、署名バイパス、プラグイン拡張の同期など、さまざまなユーティリティを搭載
+![Claude Tuzi Flow](assets/screenshots/claude-tuzi.png)
 
-## スクリーンショット
+### Codex
 
-|                  メイン画面                   |                  プロバイダ追加                  |
-| :-------------------------------------------: | :----------------------------------------------: |
-| ![メイン画面](assets/screenshots/main-ja.png) | ![プロバイダ追加](assets/screenshots/add-ja.png) |
+![Codex Tuzi Flow](assets/screenshots/codex-tuzi.png)
 
-## 特長
+### OpenClaw
 
-[完全な更新履歴](CHANGELOG.md) | [リリースノート](docs/release-notes/v3.12.3-ja.md)
-
-### プロバイダ管理
-
-- **5 つの CLI ツール、50 以上のプリセット** -- Claude Code、Codex、Gemini CLI、OpenCode、OpenClaw。キーをコピーしてワンクリックでインポート
-- **ユニバーサルプロバイダ** -- 1 つの設定を複数アプリに同期（OpenCode、OpenClaw）
-- ワンクリック切り替え、システムトレイクイックアクセス、ドラッグ＆ドロップ並び替え、インポート/エクスポート
-
-### プロキシ & フェイルオーバー
-
-- **ローカルプロキシのホットスイッチ** -- フォーマット変換、自動フェイルオーバー、サーキットブレーカー、プロバイダヘルスモニタリング、リクエストレクティファイア
-- **アプリレベルのテイクオーバー** -- Claude、Codex、Gemini を個別にプロキシ経由でルーティング、プロバイダ単位で設定可能
-
-### MCP、Prompts & Skills
-
-- **統一 MCP パネル** -- 4 つのアプリの MCP サーバーを管理、双方向同期、Deep Link インポート対応
-- **Prompts** -- Markdown エディタ、クロスアプリ同期（CLAUDE.md / AGENTS.md / GEMINI.md）、バックフィル保護
-- **Skills** -- GitHub リポジトリまたは ZIP ファイルからワンクリックインストール、カスタムリポジトリ管理、シンボリックリンクとファイルコピーに対応
-
-### 使用量 & コストトラッキング
-
-- **使用量ダッシュボード** -- プロバイダ横断で支出・リクエスト数・トークン使用量を追跡、トレンドチャート、詳細リクエストログ、カスタムモデル価格設定
-
-### Session Manager & ワークスペース
-
-- すべてのアプリの会話履歴を閲覧・検索・復元
-- **ワークスペースエディタ**（OpenClaw）-- エージェントファイル（AGENTS.md、SOUL.md など）を Markdown プレビュー付きで編集
-
-### システム & プラットフォーム
-
-- **クラウド同期** -- カスタム設定ディレクトリ（Dropbox、OneDrive、iCloud、NAS）および WebDAV サーバー同期
-- **Deep Link** (`ccswitch://`) -- URL 経由でプロバイダ、MCP サーバー、Prompts、Skills をワンクリックインポート
-- ダーク / ライト / システムテーマ、自動起動、自動アップデーター、アトミック書き込み、自動バックアップ、多言語対応（中/英/日）
-
-## よくある質問
-
-<details>
-<summary><strong>CC Switch はどの AI CLI ツールに対応していますか？</strong></summary>
-
-CC Switch は **Claude Code**、**Codex**、**Gemini CLI**、**OpenCode**、**OpenClaw** の 5 つのツールに対応しています。各ツールに専用のプロバイダプリセットと設定管理が用意されています。
-
-</details>
-
-<details>
-<summary><strong>プロバイダを切り替えた後、ターミナルの再起動は必要ですか？</strong></summary>
-
-ほとんどのツールでは、はい。変更を反映するにはターミナルまたは CLI ツールを再起動してください。ただし **Claude Code** は例外で、現在プロバイダデータのホットスイッチに対応しており、再起動は不要です。
-
-</details>
-
-<details>
-<summary><strong>プロバイダを切り替えた後、プラグイン設定が消えてしまいました。どうすればよいですか？</strong></summary>
-
-CC Switch には「共有設定スニペット」機能があり、APIキーやエンドポイント以外の共通データをプロバイダ間で引き継ぐことができます。「プロバイダ編集」→「共有設定パネル」→「現在のプロバイダから抽出」をクリックして、すべての共通データを保存してください。新しいプロバイダを作成する際に「共有設定を書き込む」にチェック（デフォルトで有効）を入れれば、プラグインなどのデータが新しいプロバイダ設定に含まれます。すべての設定項目は、アプリ初回起動時にインポートされたデフォルトプロバイダに保存されており、失われることはありません。
-
-</details>
-
-<details>
-<summary><strong>macOS で「開発元を確認できません」と表示されます。どうすればよいですか？</strong></summary>
-
-開発者が Apple Developer アカウントをまだ取得していないためです（登録手続き中）。警告を閉じてから、**システム設定 → プライバシーとセキュリティ → このまま開く**をクリックしてください。以降は通常通り起動できます。
-
-</details>
-
-<details>
-<summary><strong>現在アクティブなプロバイダを削除できないのはなぜですか？</strong></summary>
-
-CC Switch は「最小限の介入」という設計原則に従っています。アプリをアンインストールしても、CLI ツールは正常に動作し続けます。すべての設定を削除すると対応する CLI ツールが使用できなくなるため、システムは常にアクティブな設定を 1 つ保持します。特定の CLI ツールをあまり使用しない場合は、設定で非表示にできます。公式ログインに戻す方法は、次の質問をご覧ください。
-
-</details>
-
-<details>
-<summary><strong>公式ログインに戻すにはどうすればよいですか？</strong></summary>
-
-プリセットリストから公式プロバイダを追加してください。切り替え後、ログアウト／ログインのフローを実行すれば、以降は公式プロバイダとサードパーティプロバイダを自由に切り替えられます。Codex では異なる公式プロバイダ間の切り替えに対応しており、複数の Plus アカウントや Team アカウントの切り替えに便利です。
-
-</details>
-
-<details>
-<summary><strong>データはどこに保存されますか？</strong></summary>
-
-- **データベース**: `~/.cc-switch/cc-switch.db`（SQLite -- プロバイダ、MCP、Prompts、Skills）
-- **ローカル設定**: `~/.cc-switch/settings.json`（デバイスレベルの UI 設定）
-- **バックアップ**: `~/.cc-switch/backups/`（自動ローテーション、最新 10 件を保持）
-- **Skills**: `~/.cc-switch/skills/`（デフォルトでシンボリックリンクにより対応アプリに接続）
-- **Skill バックアップ**: `~/.cc-switch/skill-backups/`（アンインストール前に自動作成、最新 20 件を保持）
-
-</details>
-
-## ドキュメント
-
-各機能の詳しい使い方については、**[ユーザーマニュアル](docs/user-manual/ja/README.md)** をご覧ください。プロバイダ管理、MCP/Prompts/Skills、プロキシとフェイルオーバーなど、すべての機能を網羅しています。
+![OpenClaw Tuzi Flow](assets/screenshots/openclaw-tuzi.png)
 
 ## クイックスタート
 
-### 基本的な使い方
+1. [Releases](https://github.com/tuziapi/tuzi-switch/releases) から最新版をダウンロード
+2. `tuzi-switch` を起動
+3. Claude Code、Codex、OpenClaw のいずれかを選択
+4. ガイドに従って Tuzi Key を入力
+5. ワンクリック設定を完了して利用開始
 
-1. **プロバイダ追加**: 「Add Provider」をクリック → プリセットを選ぶかカスタム設定を作成
-2. **プロバイダ切り替え**:
-   - メイン UI: プロバイダを選択 → 「Enable」をクリック
-   - システムトレイ: プロバイダ名をクリック（即時反映）
-3. **反映**: ターミナルまたは対応する CLI ツールを再起動して適用（Claude Code は再起動不要）
-4. **公式設定に戻す**: 「Official Login」プリセットを追加し、CLI ツールを再起動してログイン/OAuth フローを実行
+## 主な機能
 
-### MCP、Prompts、Skills & Sessions
+### ツール入口
 
-- **MCP**: 「MCP」ボタンをクリック → テンプレートまたはカスタム設定でサーバーを追加 → アプリごとの同期をトグルで切り替え
-- **Prompts**: 「Prompts」をクリック → Markdown エディタでプリセットを作成 → 有効化してライブファイルに同期
-- **Skills**: 「Skills」をクリック → GitHub リポジトリを閲覧 → ワンクリックですべてのアプリにインストール
-- **Sessions**: 「Sessions」をクリック → すべてのアプリの会話履歴を閲覧・検索・復元
+- Claude Code、Codex、OpenClaw の独立した入口
+- 対応ツール向けのインストール / 更新ガイド
+- 汎用プロバイダ設定よりも業務導線を優先した画面構成
 
-> **補足**: 初回起動時に、既存の CLI ツール設定を手動でインポートしてデフォルトプロバイダとして使用できます。
+### プロバイダ管理
 
-## ダウンロード & インストール
+- プロバイダの追加、編集、有効化、無効化、インポート、エクスポート
+- 適用可能な範囲で複数ツールへ同一設定を同期
+- アプリ内から現在のプロバイダを切り替え
 
-### システム要件
+### MCP、Prompts、Skills
 
-- **Windows**: Windows 10 以上
-- **macOS**: macOS 12 (Monterey) 以上
-- **Linux**: Ubuntu 22.04+ / Debian 11+ / Fedora 34+ など主要ディストリビューション
+- MCP の基本管理機能を継続搭載
+- 対応ツール間の Prompt ファイル同期を維持
+- 上流デスクトップ基盤由来の Skills インストール / 同期フローを利用
 
-### Windows ユーザー
+注記:
 
-[Releases](../../releases) ページから最新版の `CC-Switch-v{version}-Windows.msi` インストーラー、またはポータブル版 `CC-Switch-v{version}-Windows-Portable.zip` をダウンロード。
+- 一部の同期挙動はツールごとに差があります
+- OpenClaw 関連の一部連携機能は引き続き調整中です
 
-### macOS ユーザー
+### データとローカル保存先
 
-**方法 1: Homebrew でインストール（推奨）**
+上流との互換性維持のため、ローカルデータは現在も CC Switch の保存パスを利用しています。
 
-```bash
-brew tap farion1231/ccswitch
-brew install --cask cc-switch
-```
+- `~/.cc-switch/cc-switch.db`
+- `~/.cc-switch/settings.json`
+- `~/.cc-switch/backups/`
+- `~/.cc-switch/skills/`
 
-アップデート:
+## 開発計画 / TODO
 
-```bash
-brew upgrade --cask cc-switch
-```
+- 現在の Key ベース表示に加えて、Tuzi ワークスペースの実データ連携をさらに拡張する
+- 安定した認証方式が確定した後、Tuzi パネルの認証付き API を接続する
+- 当日消費、月次消費、トレンド表示を Tuzi ワークスペースに追加する
+- OpenClaw における Tuzi / GAC 業務ルートの接入体験をさらに改善する
+- セッション管理を再整理し、OpenClaw の会話復元方針を明確化または実装する
+- Claude Code、Codex、OpenClaw の案内文、状態表示、接入フィードバックを継続改善する
+- 設定画面と統計画面をさらに整理し、顧客に不要な技術情報を減らす
+- Tuzi 版スクリーンショット、リリースノート、対外向け製品ドキュメントを拡充する
 
-**方法 2: 手動ダウンロード**
+## 補足
 
-[Releases](../../releases) から `CC-Switch-v{version}-macOS.zip` をダウンロードして展開。
+- このリポジトリは Tuzi 業務シナリオ向けのカスタム分岐です
+- 一部の文書や内部パスには上流由来の命名が残っています
+- 配布パッケージはこのリポジトリの GitHub Releases から提供されます
 
-> **注意**: 開発者アカウント未登録のため、初回起動時に「開発元を確認できません」と表示される場合があります。一度閉じてから「システム設定」→「プライバシーとセキュリティ」→「このまま開く」をクリックしてください。以降は通常通り起動できます。
+## クレジット
 
-### Arch Linux ユーザー
-
-**paru でインストール（推奨）**
-
-```bash
-paru -S cc-switch-bin
-```
-
-### Linux ユーザー
-
-[Releases](../../releases) から最新版の Linux ビルドをダウンロード：
-
-- `CC-Switch-v{version}-Linux.deb`（Debian/Ubuntu）
-- `CC-Switch-v{version}-Linux.rpm`（Fedora/RHEL/openSUSE）
-- `CC-Switch-v{version}-Linux.AppImage`（汎用）
-- `CC-Switch-v{version}-Linux.flatpak`（Flatpak）
-
-Flatpak のインストールと起動：
-
-```bash
-flatpak install --user ./CC-Switch-v{version}-Linux.flatpak
-flatpak run com.ccswitch.desktop
-```
-
-<details>
-<summary><strong>アーキテクチャ概要</strong></summary>
-
-### 設計原則
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React + TS)                    │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐    │
-│  │ Components  │  │    Hooks     │  │  TanStack Query  │    │
-│  │   (UI)      │──│ (Bus. Logic) │──│   (Cache/Sync)   │    │
-│  └─────────────┘  └──────────────┘  └──────────────────┘    │
-└────────────────────────┬────────────────────────────────────┘
-                         │ Tauri IPC
-┌────────────────────────▼────────────────────────────────────┐
-│                  Backend (Tauri + Rust)                     │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐    │
-│  │  Commands   │  │   Services   │  │  Models/Config   │    │
-│  │ (API Layer) │──│ (Bus. Layer) │──│     (Data)       │    │
-│  └─────────────┘  └──────────────┘  └──────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**コア設計パターン**
-
-- **SSOT** (Single Source of Truth): すべてのデータを `~/.cc-switch/cc-switch.db`（SQLite）に集約
-- **二層ストレージ**: 同期データは SQLite、デバイスデータは JSON
-- **双方向同期**: 切り替え時はライブファイルへ書き込み、編集時はアクティブプロバイダから逆同期
-- **アトミック書き込み**: 一時ファイル + rename パターンで設定破損を防止
-- **並行安全**: Mutex で保護された DB 接続でレースコンディションを防止
-- **レイヤードアーキテクチャ**: Commands → Services → DAO → Database を明確に分離
-
-**主要コンポーネント**
-
-- **ProviderService**: プロバイダの CRUD、切り替え、バックフィル、ソート
-- **McpService**: MCP サーバー管理、インポート/エクスポート、ライブファイル同期
-- **ProxyService**: ローカル Proxy モードのホットスイッチとフォーマット変換
-- **SessionManager**: Claude Code の会話履歴閲覧
-- **ConfigService**: 設定のインポート/エクスポート、バックアップローテーション
-- **SpeedtestService**: API エンドポイントの遅延計測
-
-</details>
-
-<details>
-<summary><strong>開発ガイド</strong></summary>
-
-### 開発環境
-
-- Node.js 18+
-- pnpm 8+
-- Rust 1.85+
-- Tauri CLI 2.8+
-
-### 開発コマンド
-
-```bash
-# 依存関係をインストール
-pnpm install
-
-# ホットリロード付き開発モード
-pnpm dev
-
-# 型チェック
-pnpm typecheck
-
-# コード整形
-pnpm format
-
-# フォーマット検証
-pnpm format:check
-
-# フロントエンド単体テスト
-pnpm test:unit
-
-# ウォッチモード（開発に推奨）
-pnpm test:unit:watch
-
-# アプリをビルド
-pnpm build
-
-# デバッグビルド
-pnpm tauri build --debug
-```
-
-### Rust バックエンド開発
-
-```bash
-cd src-tauri
-
-# Rust コード整形
-cargo fmt
-
-# clippy チェック
-cargo clippy
-
-# バックエンドテスト
-cargo test
-
-# 特定テストのみ実行
-cargo test test_name
-
-# test-hooks フィーチャー付きでテスト
-cargo test --features test-hooks
-```
-
-### テストガイド
-
-**フロントエンドテスト**:
-
-- テストフレームワークに **vitest** を使用
-- **MSW (Mock Service Worker)** で Tauri API 呼び出しをモック
-- コンポーネントテストに **@testing-library/react** を採用
-
-**テスト実行**:
-
-```bash
-# 全テストを実行
-pnpm test:unit
-
-# ウォッチモード（自動再実行）
-pnpm test:unit:watch
-
-# カバレッジレポート付き
-pnpm test:unit --coverage
-```
-
-### 技術スタック
-
-**フロントエンド**: React 18 · TypeScript · Vite · TailwindCSS 3.4 · TanStack Query v5 · react-i18next · react-hook-form · zod · shadcn/ui · @dnd-kit
-
-**バックエンド**: Tauri 2.8 · Rust · serde · tokio · thiserror · tauri-plugin-updater/process/dialog/store/log
-
-**テスト**: vitest · MSW · @testing-library/react
-
-</details>
-
-<details>
-<summary><strong>プロジェクト構成</strong></summary>
-
-```
-├── src/                        # フロントエンド (React + TypeScript)
-│   ├── components/
-│   │   ├── providers/          # プロバイダ管理
-│   │   ├── mcp/                # MCP パネル
-│   │   ├── prompts/            # Prompts 管理
-│   │   ├── skills/             # Skills 管理
-│   │   ├── sessions/           # Session Manager
-│   │   ├── proxy/              # Proxy モードパネル
-│   │   ├── openclaw/           # OpenClaw 設定パネル
-│   │   ├── settings/           # 設定 (Terminal/Backup/About)
-│   │   ├── deeplink/           # Deep Link インポート
-│   │   ├── env/                # 環境変数管理
-│   │   ├── universal/          # クロスアプリ設定
-│   │   ├── usage/              # 使用量統計
-│   │   └── ui/                 # shadcn/ui コンポーネントライブラリ
-│   ├── hooks/                  # カスタムフック（ビジネスロジック）
-│   ├── lib/
-│   │   ├── api/                # Tauri API ラッパー（型安全）
-│   │   └── query/              # TanStack Query 設定
-│   ├── locales/                # 翻訳 (zh/en/ja)
-│   ├── config/                 # プリセット (providers/mcp)
-│   └── types/                  # TypeScript 型定義
-├── src-tauri/                  # バックエンド (Rust)
-│   └── src/
-│       ├── commands/           # Tauri コマンド層（ドメイン別）
-│       ├── services/           # ビジネスロジック層
-│       ├── database/           # SQLite DAO 層
-│       ├── proxy/              # Proxy モジュール
-│       ├── session_manager/    # セッション管理
-│       ├── deeplink/           # Deep Link 処理
-│       └── mcp/                # MCP 同期モジュール
-├── tests/                      # フロントエンドテスト
-└── assets/                     # スクリーンショット & パートナーリソース
-```
-
-</details>
-
-## 貢献
-
-Issue や提案を歓迎します！
-
-PR を送る前に以下をご確認ください：
-
-- 型チェック: `pnpm typecheck`
-- フォーマットチェック: `pnpm format:check`
-- 単体テスト: `pnpm test:unit`
-
-新機能の場合は、PR を送る前に Issue でディスカッションしてください。プロジェクトに合わない機能の PR はクローズされる場合があります。
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=farion1231/cc-switch&type=Date)](https://www.star-history.com/#farion1231/cc-switch&Date)
-
-## ライセンス
-
-MIT © Jason Young
+tuzi-switch はオープンソースの CC Switch を土台として構築されています。その上で、Tuzi 業務フローに合う体験へ再設計を進めています。

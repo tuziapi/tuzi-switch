@@ -9,7 +9,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-94a3b8)](https://github.com/tuziapi/tuzi-switch/releases)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-111827)](https://tauri.app/)
 
-English | [中文](README_ZH.md) | [日本語](README_JA.md) | [Releases](https://github.com/tuziapi/tuzi-switch/releases)
+[中文](README_ZH.md) | English | [日本語](README_JA.md) | [Releases](https://github.com/tuziapi/tuzi-switch/releases)
 
 </div>
 
@@ -63,11 +63,11 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 ## Product Highlights
 
 - Tuzi-first quick access for Claude Code, Codex, and OpenClaw
-- One-click business route setup from the main app entry
+- One-click Tuzi route onboarding from the main app entry
 - Dedicated Tuzi branding, icon system, and onboarding cards
-- Provider switching from the desktop app and tray menu
-- Unified management for providers, MCP, prompts, and skills
-- Cross-platform desktop support on Windows, macOS, and Linux
+- Provider switching from the app, with the desktop tray flow retained
+- Retained base management capabilities for providers, MCP, prompts, and skills
+- Desktop application architecture built on Tauri 2
 
 ## Current Customization Direction
 
@@ -116,9 +116,14 @@ Compared with the original upstream project, this edition focuses more on busine
 
 ### MCP, Prompts, and Skills
 
-- Centralized MCP management
+- Base MCP management retained from the desktop foundation
 - Prompt file sync across supported tools
 - Skills installation and synchronization workflow inherited from the upstream desktop foundation
+
+Notes:
+
+- Sync behavior is not identical across every tool
+- Some OpenClaw-related integrations are still being refined
 
 ### Data and Local Storage
 
@@ -128,6 +133,17 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 - `~/.cc-switch/settings.json`
 - `~/.cc-switch/backups/`
 - `~/.cc-switch/skills/`
+
+## Development Plan / TODO
+
+- Continue wiring real Tuzi workspace data beyond the current key-based account metrics
+- Integrate authenticated Tuzi panel APIs once a stable auth contract is available
+- Add daily spend, monthly spend, and trend sync for the Tuzi workspace dashboard
+- Further improve OpenClaw onboarding around Tuzi and GAC business routes
+- Revisit session manager behavior and either clarify or implement a real OpenClaw resume flow
+- Keep refining Claude Code, Codex, and OpenClaw onboarding copy, feedback states, and business guidance
+- Simplify settings and statistics pages further so customer-facing flows stay focused
+- Expand Tuzi-specific screenshots, release notes, and external-facing product documentation
 
 ## Notes
 

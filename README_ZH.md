@@ -9,7 +9,7 @@
 [![平台](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-94a3b8)](https://github.com/tuziapi/tuzi-switch/releases)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-111827)](https://tauri.app/)
 
-[English](README.md) | 中文 | [日本語](README_JA.md) | [Releases](https://github.com/tuziapi/tuzi-switch/releases)
+中文 | [English](README.md) | [日本語](README_JA.md) | [Releases](https://github.com/tuziapi/tuzi-switch/releases)
 
 </div>
 
@@ -63,11 +63,11 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 ## 产品亮点
 
 - 兔子优先的 Claude Code、Codex、OpenClaw 快速入口
-- 从主界面直接完成一键业务线路配置
+- 从主界面直接完成兔子业务线路的一键接入配置
 - 独立的兔子品牌视觉、图标和接入卡片
-- 支持从应用和任务栏菜单快速切换供应商
-- 统一管理 providers、MCP、prompts、skills
-- 支持 Windows、macOS、Linux 跨平台使用
+- 支持从应用内切换供应商，并保留桌面版任务栏切换入口
+- 保留 providers、MCP、prompts、skills 等基础管理能力
+- 基于 Tauri 2 的桌面应用架构
 
 ## 当前改版方向
 
@@ -116,9 +116,14 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ### MCP、Prompts 与 Skills
 
-- 集中管理 MCP
+- 保留 MCP 的基础管理能力
 - 同步各工具的提示词文件
-- 继承上游桌面基础能力的 skills 安装与同步流程
+- 沿用上游桌面基础能力中的 skills 安装与同步流程
+
+补充说明：
+
+- 不同工具的同步能力并不完全一致
+- OpenClaw 的部分联动能力仍在持续完善中
 
 ### 数据与本地存储
 
@@ -128,6 +133,17 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 - `~/.cc-switch/settings.json`
 - `~/.cc-switch/backups/`
 - `~/.cc-switch/skills/`
+
+## 开发计划 / TODO List
+
+- 完善兔子工作台真实数据接入，优先补齐余额、已用额度、请求次数之外的业务统计
+- 在拿到稳定鉴权方案后，对接兔子面板接口，同步今日消耗、月度消耗与趋势图
+- 继续优化 OpenClaw 的业务接入体验，补强与兔子 / gac 线路的联动能力
+- 重新梳理会话管理能力，明确 OpenClaw 会话恢复的产品边界或补齐可恢复方案
+- 持续打磨 Claude Code、Codex、OpenClaw 三个入口的引导文案与状态反馈
+- 优化设置与统计页面的信息层级，减少对客户无价值的技术细节暴露
+- 补充更多兔子版说明图、发布说明和对外产品文档
+- 在后续版本中逐步减少 README 与内部兼容路径里残留的上游命名
 
 ## 说明
 
