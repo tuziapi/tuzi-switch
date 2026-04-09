@@ -51,6 +51,28 @@ export interface CodexInstallerStatus {
   };
 }
 
+export interface GeminiInstallerStatus {
+  installed: boolean;
+  version: string | null;
+  install_type: string | null;
+  current_route: string | null;
+  env_file_exists: boolean;
+  settings_file_exists: boolean;
+  routes: Array<{
+    name: string;
+    base_url: string | null;
+    has_key: boolean;
+    is_current: boolean;
+    api_key_masked: string | null;
+    model: string;
+  }>;
+  env_summary: {
+    gemini_api_key_masked: string | null;
+    google_gemini_base_url: string | null;
+    gemini_model: string | null;
+  };
+}
+
 export const installerApi = {
   async getClaudeStatus(): Promise<ClaudeInstallerStatus> {
     return await invoke("get_claudecode_status");
@@ -75,7 +97,7 @@ export const installerApi = {
 
   async installCodex(options: {
     variant: "openai" | "gac";
-    route?: "gac" | "tuzi" | "tuzi-codex-sub";
+    route?: "gac" | "tuzi" | "codex";
     apiKey?: string;
     model?: string;
     modelReasoningEffort?: string;
@@ -96,6 +118,35 @@ export const installerApi = {
     targetVariant?: "openai" | "gac",
   ): Promise<InstallerActionResult> {
     return await invoke("upgrade_codex", {
+      targetVariant,
+      target_variant: targetVariant,
+    });
+  },
+
+  async getGeminiStatus(): Promise<GeminiInstallerStatus> {
+    return await invoke("get_gemini_status");
+  },
+
+  async installGemini(options: {
+    variant: "official" | "gac";
+    route?: "tuzi";
+    apiKey?: string;
+    model?: string;
+  }): Promise<InstallerActionResult> {
+    const { variant, route, apiKey, model } = options;
+    return await invoke("install_gemini", {
+      variant,
+      route,
+      apiKey,
+      api_key: apiKey,
+      model,
+    });
+  },
+
+  async upgradeGemini(
+    targetVariant?: "official" | "gac",
+  ): Promise<InstallerActionResult> {
+    return await invoke("upgrade_gemini", {
       targetVariant,
       target_variant: targetVariant,
     });

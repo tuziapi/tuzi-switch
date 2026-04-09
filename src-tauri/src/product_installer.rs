@@ -9,8 +9,11 @@ const CLAUDE_MODIFIED_INSTALL_URL: &str = "https://gaccode.com/claudecode/instal
 const CLAUDE_ORIGINAL_PACKAGE: &str = "@anthropic-ai/claude-code";
 const CODEX_OPENAI_PACKAGE: &str = "@openai/codex";
 const CODEX_GAC_INSTALL_URL: &str = "https://gaccode.com/codex/install";
+const GEMINI_OFFICIAL_PACKAGE: &str = "@google/gemini-cli";
+const GEMINI_GAC_INSTALL_URL: &str = "https://gaccode.com/gemini/install";
 const DEFAULT_MODEL: &str = "gpt-5.4";
 const DEFAULT_REASONING: &str = "medium";
+const DEFAULT_GEMINI_MODEL: &str = "gemini-2.5-pro";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeRoute {
@@ -83,6 +86,45 @@ pub struct CodexStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodexActionResult {
+    pub success: bool,
+    pub message: String,
+    pub error: Option<String>,
+    pub stdout: String,
+    pub stderr: String,
+    pub restart_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeminiRoute {
+    pub name: String,
+    pub base_url: Option<String>,
+    pub has_key: bool,
+    pub is_current: bool,
+    pub api_key_masked: Option<String>,
+    pub model: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeminiEnvSummary {
+    pub gemini_api_key_masked: Option<String>,
+    pub google_gemini_base_url: Option<String>,
+    pub gemini_model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeminiStatus {
+    pub installed: bool,
+    pub version: Option<String>,
+    pub install_type: Option<String>,
+    pub current_route: Option<String>,
+    pub env_file_exists: bool,
+    pub settings_file_exists: bool,
+    pub routes: Vec<GeminiRoute>,
+    pub env_summary: GeminiEnvSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeminiActionResult {
     pub success: bool,
     pub message: String,
     pub error: Option<String>,
@@ -668,13 +710,59 @@ fn get_codex_config_file_path() -> Result<String, String> {
     Ok(format!("{}/config.toml", get_codex_dir()?))
 }
 
+fn get_codex_auth_file_path() -> Result<String, String> {
+    Ok(format!("{}/auth.json", get_codex_dir()?))
+}
+
 fn get_codex_state_file_path() -> Result<String, String> {
     Ok(format!("{}/install_state", get_codex_dir()?))
+}
+
+fn get_gemini_dir() -> Result<PathBuf, String> {
+    Ok(crate::gemini_config::get_gemini_dir())
+}
+
+fn get_gemini_env_file_path() -> Result<String, String> {
+    Ok(crate::gemini_config::get_gemini_env_path()
+        .to_string_lossy()
+        .to_string())
+}
+
+fn get_gemini_settings_file_path() -> Result<String, String> {
+    Ok(crate::gemini_config::get_gemini_settings_path()
+        .to_string_lossy()
+        .to_string())
+}
+
+fn get_gemini_state_file_path() -> Result<String, String> {
+    Ok(format!("{}/install_state", get_gemini_dir()?.display()))
 }
 
 fn normalize_install_type(value: &str) -> Option<String> {
     match value.trim().to_lowercase().as_str() {
         "openai" | "gac" => Some(value.trim().to_lowercase()),
+        _ => None,
+    }
+}
+
+fn normalize_gemini_install_type(value: &str) -> Option<String> {
+    match value.trim().to_lowercase().as_str() {
+        "official" | "gac" => Some(value.trim().to_lowercase()),
+        _ => None,
+    }
+}
+
+fn normalize_gemini_route(value: &str) -> Option<String> {
+    match value.trim().to_lowercase().as_str() {
+        "tuzi" => Some(value.trim().to_lowercase()),
+        "none" | "" => None,
+        _ => None,
+    }
+}
+
+fn gemini_route_base_url(route: &str) -> Option<&'static str> {
+    match route {
+        "tuzi" => Some("https://api.tu-zi.com"),
         _ => None,
     }
 }
@@ -685,13 +773,15 @@ fn normalize_route_input(value: &str) -> Option<String> {
         return None;
     }
     match s.as_str() {
-        "gac" | "tuzi" | "tuzi-codex-sub" => Some(s),
+        "gac" | "tuzi" | "codex" => Some(s),
+        "tuzi-codex-sub" => Some("codex".to_string()),
         "none" => None,
         _ if !s.is_empty()
             && s.len() <= 48
             && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
             && s != "gac"
             && s != "tuzi"
+            && s != "codex"
             && s != "tuzi-codex-sub"
             && s != "none" =>
         {
@@ -705,7 +795,7 @@ fn route_base_url(route: &str) -> Option<&'static str> {
     match route {
         "gac" => Some("https://gaccode.com/codex/v1"),
         "tuzi" => Some("https://api.tu-zi.com/v1"),
-        "tuzi-codex-sub" => Some("https://coding.tu-zi.com"),
+        "codex" => Some("https://coding.tu-zi.com"),
         _ => None,
     }
 }
@@ -740,6 +830,38 @@ fn save_install_state(install_type: &str, route: Option<&str>) -> Result<(), Str
         Some(r) => normalize_route_input(r).ok_or_else(|| format!("非法路线: {r}"))?,
     };
     let path = get_codex_state_file_path()?;
+    write_file(
+        &path,
+        &format!("INSTALL_TYPE={install_type}\nROUTE={route_value}\nMANAGED_BY=cc-switch\n"),
+    )
+}
+
+fn load_gemini_install_state() -> InstallState {
+    let path = get_gemini_state_file_path().unwrap_or_default();
+    let mut install_type = None;
+    let mut route = None;
+    for raw in read_file(&path).unwrap_or_default().lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("INSTALL_TYPE=") {
+            install_type = normalize_gemini_install_type(value);
+        } else if let Some(value) = line.strip_prefix("ROUTE=") {
+            route = normalize_gemini_route(value);
+        }
+    }
+    InstallState { install_type, route }
+}
+
+fn save_gemini_install_state(install_type: &str, route: Option<&str>) -> Result<(), String> {
+    let install_type = normalize_gemini_install_type(install_type)
+        .ok_or_else(|| format!("非法安装类型: {install_type}"))?;
+    let route_value = match route {
+        None | Some("") => "none".to_string(),
+        Some(route) => normalize_gemini_route(route).ok_or_else(|| format!("非法路线: {route}"))?,
+    };
+    let path = get_gemini_state_file_path()?;
     write_file(
         &path,
         &format!("INSTALL_TYPE={install_type}\nROUTE={route_value}\nMANAGED_BY=cc-switch\n"),
@@ -805,6 +927,26 @@ fn parse_codex_config(content: &str) -> ParsedCodexConfig {
     parsed
 }
 
+fn read_codex_auth_api_key() -> Option<String> {
+    let auth_path = get_codex_auth_file_path().ok()?;
+    let content = read_file(&auth_path).ok()?;
+    let parsed: Value = serde_json::from_str(&content).ok()?;
+    parsed
+        .get("OPENAI_API_KEY")
+        .and_then(Value::as_str)
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn write_codex_auth_file(api_key: &str) -> Result<(), String> {
+    let auth_path = get_codex_auth_file_path()?;
+    let serialized = serde_json::to_string_pretty(&json!({
+        "OPENAI_API_KEY": api_key.trim(),
+    }))
+    .map_err(|e| e.to_string())?;
+    write_file(&auth_path, &serialized)
+}
+
 fn collect_strip_route_names(merged: &ParsedCodexConfig, existing: &str) -> BTreeSet<String> {
     let mut strip = BTreeSet::new();
     for key in parse_codex_config(existing).routes.keys() {
@@ -815,6 +957,7 @@ fn collect_strip_route_names(merged: &ParsedCodexConfig, existing: &str) -> BTre
     }
     strip.insert("gac".to_string());
     strip.insert("tuzi".to_string());
+    strip.insert("codex".to_string());
     strip.insert("tuzi-codex-sub".to_string());
     strip
 }
@@ -905,7 +1048,7 @@ fn write_codex_config_merged(merged: &ParsedCodexConfig, profile_route: &str) ->
             .filter(|s| !s.trim().is_empty())
             .unwrap_or(DEFAULT_REASONING);
         output.push_str(&format!(
-            "[model_providers.{route}]\nname = \"{route}\"\nbase_url = \"{base_url}\"\nwire_api = \"responses\"\nenv_key = \"CODEX_API_KEY\"\n\n[profiles.{route}]\nmodel_provider = \"{route}\"\nmodel = \"{model}\"\nmodel_reasoning_effort = \"{reasoning}\"\napproval_policy = \"on-request\"\n\n"
+            "[model_providers.{route}]\nname = \"{route}\"\nbase_url = \"{base_url}\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n\n[profiles.{route}]\nmodel_provider = \"{route}\"\nmodel = \"{model}\"\nmodel_reasoning_effort = \"{reasoning}\"\napproval_policy = \"on-request\"\n\n"
         ));
     }
     write_file(&config_path, &output)
@@ -990,16 +1133,18 @@ fn configure_openai_route(
         entry.base_url = route_base_url(&normalized_route).map(|v| v.to_string());
     }
     if entry.base_url.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true) {
-        return Err("当前仅支持内置 gac / tuzi / tuzi-codex-sub 线路".to_string());
+        return Err("当前仅支持内置 gac / tuzi / codex 线路".to_string());
     }
     entry.model = Some(settings.model.clone());
     entry.model_reasoning_effort = Some(settings.model_reasoning_effort.clone());
     merged.profile = Some(normalized_route.clone());
     write_codex_config_merged(&merged, &normalized_route)?;
+    write_codex_auth_file(api_key.trim())?;
     let rc_paths = apply_codex_env_to_rc(api_key.trim())?;
     save_install_state("openai", Some(&normalized_route))?;
     let mut logs = vec![
         format!("已写入配置: {}", get_codex_config_file_path()?),
+        format!("已写入鉴权: {}", get_codex_auth_file_path()?),
         format!("路线={normalized_route} model={} reasoning={}", settings.model, settings.model_reasoning_effort),
     ];
     for path in rc_paths {
@@ -1034,7 +1179,7 @@ fn build_codex_routes(current_route: Option<&str>, config: &ParsedCodexConfig, e
     let mut names = BTreeSet::new();
     names.insert("gac".to_string());
     names.insert("tuzi".to_string());
-    names.insert("tuzi-codex-sub".to_string());
+    names.insert("codex".to_string());
     for key in config.routes.keys() {
         names.insert(key.clone());
     }
@@ -1084,7 +1229,10 @@ pub async fn get_codex_status() -> Result<CodexStatus, String> {
     let current_route = state.route.clone().or(config.profile.clone());
     let env_api_key = std::env::var("CODEX_API_KEY").ok().unwrap_or_default();
     let env_codex_key = std::env::var("CODEX_KEY").ok().unwrap_or_default();
-    let env_key_effective = if env_api_key.trim().is_empty() {
+    let auth_api_key = read_codex_auth_api_key().unwrap_or_default();
+    let env_key_effective = if !auth_api_key.trim().is_empty() {
+        auth_api_key
+    } else if env_api_key.trim().is_empty() {
         env_codex_key
     } else {
         env_api_key
@@ -1173,5 +1321,238 @@ pub async fn upgrade_codex(target_variant: Option<String>) -> Result<CodexAction
             variant == "gac",
         )),
         Err(e) => Ok(codex_err("Codex 升级失败", e, String::new())),
+    }
+}
+
+fn gemini_ok(message: &str, stdout: String, restart_required: bool) -> GeminiActionResult {
+    GeminiActionResult {
+        success: true,
+        message: message.to_string(),
+        error: None,
+        stdout,
+        stderr: String::new(),
+        restart_required,
+    }
+}
+
+fn gemini_err(message: &str, error: String, stdout: String) -> GeminiActionResult {
+    GeminiActionResult {
+        success: false,
+        message: message.to_string(),
+        error: Some(error.clone()),
+        stdout,
+        stderr: error,
+        restart_required: false,
+    }
+}
+
+fn infer_gemini_route(base_url: &str) -> Option<String> {
+    if base_url.contains("gaccode.com") {
+        Some("gac".to_string())
+    } else if !base_url.trim().is_empty() {
+        Some("tuzi".to_string())
+    } else {
+        None
+    }
+}
+
+fn build_gemini_routes(
+    current_route: Option<&str>,
+    env_map: &BTreeMap<String, String>,
+) -> Vec<GeminiRoute> {
+    ["tuzi"]
+        .iter()
+        .map(|route_name| {
+            let is_current = current_route == Some(*route_name);
+            let api_key = env_map.get("GEMINI_API_KEY").cloned().unwrap_or_default();
+            let model = env_map
+                .get("GEMINI_MODEL")
+                .cloned()
+                .filter(|v| !v.trim().is_empty())
+                .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.to_string());
+            GeminiRoute {
+                name: route_name.to_string(),
+                base_url: gemini_route_base_url(route_name).map(|v| v.to_string()),
+                has_key: is_current && !api_key.trim().is_empty(),
+                is_current,
+                api_key_masked: if is_current && !api_key.trim().is_empty() {
+                    Some(mask_key(api_key.trim()))
+                } else {
+                    None
+                },
+                model,
+            }
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub async fn get_gemini_status() -> Result<GeminiStatus, String> {
+    let installed = command_exists("gemini");
+    let version = None;
+    let env_path = get_gemini_env_file_path()?;
+    let settings_path = get_gemini_settings_file_path()?;
+    let state = load_gemini_install_state();
+    let env_map = crate::gemini_config::read_gemini_env().map_err(|e| e.to_string())?;
+    let env_sorted = env_map.into_iter().collect::<BTreeMap<String, String>>();
+    let base_url = env_sorted
+        .get("GOOGLE_GEMINI_BASE_URL")
+        .cloned()
+        .unwrap_or_default();
+    let current_route = if state.install_type.as_deref() == Some("gac") {
+        None
+    } else {
+        state
+            .route
+            .clone()
+            .or_else(|| infer_gemini_route(&base_url))
+    };
+    let api_key = env_sorted.get("GEMINI_API_KEY").cloned().unwrap_or_default();
+    let model = env_sorted.get("GEMINI_MODEL").cloned();
+
+    Ok(GeminiStatus {
+        installed,
+        version,
+        install_type: state
+            .install_type
+            .or_else(|| {
+                if installed && Path::new(&env_path).exists() {
+                    Some("official".to_string())
+                } else {
+                    None
+                }
+            }),
+        current_route: current_route.clone(),
+        env_file_exists: Path::new(&env_path).exists(),
+        settings_file_exists: Path::new(&settings_path).exists(),
+        routes: build_gemini_routes(current_route.as_deref(), &env_sorted),
+        env_summary: GeminiEnvSummary {
+            gemini_api_key_masked: if api_key.trim().is_empty() {
+                None
+            } else {
+                Some(mask_key(api_key.trim()))
+            },
+            google_gemini_base_url: if base_url.trim().is_empty() {
+                None
+            } else {
+                Some(base_url)
+            },
+            gemini_model: model.filter(|v| !v.trim().is_empty()),
+        },
+    })
+}
+
+fn configure_gemini_route(
+    route: &str,
+    api_key: &str,
+    model: Option<String>,
+) -> Result<Vec<String>, String> {
+    let normalized_route =
+        normalize_gemini_route(route).ok_or_else(|| format!("非法路线: {route}"))?;
+    if api_key.trim().is_empty() {
+        return Err("Gemini 路线配置需要填写 API Key".to_string());
+    }
+    let mut env_map = crate::gemini_config::read_gemini_env().map_err(|e| e.to_string())?;
+    env_map.insert(
+        "GOOGLE_GEMINI_BASE_URL".to_string(),
+        gemini_route_base_url(&normalized_route)
+            .ok_or_else(|| format!("路线缺少 base_url: {normalized_route}"))?
+            .to_string(),
+    );
+    env_map.insert("GEMINI_API_KEY".to_string(), api_key.trim().to_string());
+    env_map.insert(
+        "GEMINI_MODEL".to_string(),
+        model
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.to_string()),
+    );
+    crate::gemini_config::write_gemini_env_atomic(&env_map).map_err(|e| e.to_string())?;
+    crate::gemini_config::write_packycode_settings().map_err(|e| e.to_string())?;
+    save_gemini_install_state("official", Some(&normalized_route))?;
+
+    Ok(vec![
+        format!("已写入配置: {}", get_gemini_env_file_path()?),
+        format!("已写入设置: {}", get_gemini_settings_file_path()?),
+        format!(
+            "路线={normalized_route} model={}",
+            env_map
+                .get("GEMINI_MODEL")
+                .cloned()
+                .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.to_string())
+        ),
+    ])
+}
+
+#[tauri::command]
+pub async fn install_gemini(
+    variant: String,
+    route: Option<String>,
+    api_key: Option<String>,
+    model: Option<String>,
+) -> Result<GeminiActionResult, String> {
+    let normalized_variant = variant.trim().to_lowercase();
+    if normalized_variant != "official" && normalized_variant != "gac" {
+        return Ok(gemini_err(
+            "Gemini 安装失败",
+            format!("未知安装类型: {variant}"),
+            String::new(),
+        ));
+    }
+    if normalized_variant == "gac" {
+        let command = format!("npm install -g {GEMINI_GAC_INSTALL_URL}");
+        return match run_shell_script(&command) {
+            Ok(output) => {
+                save_gemini_install_state("gac", None)?;
+                Ok(gemini_ok(
+                    "gac 改版 Gemini 安装成功",
+                    format!("$ {command}\n{output}"),
+                    true,
+                ))
+            }
+            Err(e) => Ok(gemini_err("Gemini 安装失败", e, String::new())),
+        };
+    }
+
+    let install_command = format!("npm install -g {GEMINI_OFFICIAL_PACKAGE}");
+    let install_output = match run_shell_script(&install_command) {
+        Ok(v) => v,
+        Err(e) => return Ok(gemini_err("Gemini 安装失败", e, String::new())),
+    };
+    let selected_route = route.unwrap_or_else(|| "tuzi".to_string());
+    let selected_api_key = api_key.unwrap_or_default();
+    let mut logs = vec![format!("$ {install_command}"), install_output];
+    match configure_gemini_route(&selected_route, &selected_api_key, model) {
+        Ok(route_logs) => {
+            logs.extend(route_logs);
+            Ok(gemini_ok(
+                "Gemini 安装并配置成功，请重开终端后执行 gemini",
+                logs.join("\n"),
+                true,
+            ))
+        }
+        Err(e) => Ok(gemini_err("Gemini 安装成功，但路线配置失败", e, logs.join("\n"))),
+    }
+}
+
+#[tauri::command]
+pub async fn upgrade_gemini(target_variant: Option<String>) -> Result<GeminiActionResult, String> {
+    let variant = target_variant
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty())
+        .or_else(|| load_gemini_install_state().install_type)
+        .unwrap_or_else(|| "official".to_string());
+    let command = if variant == "gac" {
+        format!("npm install -g {GEMINI_GAC_INSTALL_URL}")
+    } else {
+        format!("npm install -g {GEMINI_OFFICIAL_PACKAGE}@latest")
+    };
+    match run_shell_script(&command) {
+        Ok(output) => Ok(gemini_ok(
+            "Gemini 升级成功",
+            format!("$ {command}\n{output}"),
+            variant == "gac",
+        )),
+        Err(e) => Ok(gemini_err("Gemini 升级失败", e, String::new())),
     }
 }

@@ -127,6 +127,40 @@ export interface TuziKeyUsage {
   error?: string;
 }
 
+export interface TuziWorkspaceSummary {
+  success: boolean;
+  currencySymbol: string;
+  balance: number;
+  usedToday: number;
+  usedMonth: number;
+  requestCountToday: number;
+  requestCountMonth: number;
+  activeRoutes: number;
+  expiresAt?: number;
+  note?: string;
+  error?: string;
+}
+
+export interface TuziWorkspaceTrendPoint {
+  date: string;
+  spend: number;
+  requests: number;
+  tokens?: number;
+}
+
+export interface TuziWorkspaceDistributionItem {
+  key: string;
+  label: string;
+  value: number;
+  percentage: number;
+}
+
+export interface TuziWorkspaceDistribution {
+  byBusinessLine: TuziWorkspaceDistributionItem[];
+  byRoute: TuziWorkspaceDistributionItem[];
+  byModel?: TuziWorkspaceDistributionItem[];
+}
+
 export type TimeRange = "1d" | "7d" | "30d";
 
 export interface StatsFilters {

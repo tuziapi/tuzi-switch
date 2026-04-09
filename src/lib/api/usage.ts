@@ -10,6 +10,9 @@ import type {
   ProviderLimitStatus,
   PaginatedLogs,
   TuziKeyUsage,
+  TuziWorkspaceSummary,
+  TuziWorkspaceTrendPoint,
+  TuziWorkspaceDistribution,
 } from "@/types/usage";
 import type { UsageResult } from "@/types";
 import type { AppId } from "./types";
@@ -125,5 +128,25 @@ export const usageApi = {
 
   getTuziKeyUsage: async (apiKey: string): Promise<TuziKeyUsage> => {
     return invoke("get_tuzi_key_usage", { apiKey });
+  },
+
+  getTuziWorkspaceSummary: async (
+    apiKey: string,
+  ): Promise<TuziWorkspaceSummary> => {
+    return invoke("get_tuzi_workspace_summary", { apiKey });
+  },
+
+  getTuziWorkspaceTrends: async (
+    apiKey: string,
+    days: number,
+  ): Promise<TuziWorkspaceTrendPoint[]> => {
+    return invoke("get_tuzi_workspace_trends", { apiKey, days });
+  },
+
+  getTuziWorkspaceDistribution: async (
+    apiKey: string,
+    days: number,
+  ): Promise<TuziWorkspaceDistribution> => {
+    return invoke("get_tuzi_workspace_distribution", { apiKey, days });
   },
 };

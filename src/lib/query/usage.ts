@@ -37,6 +37,17 @@ export const usageKeys = {
   all: ["usage"] as const,
   tuziKeyUsage: (keyFingerprint: string) =>
     [...usageKeys.all, "tuzi-key-usage", keyFingerprint] as const,
+  tuziWorkspaceSummary: (keyFingerprint: string) =>
+    [...usageKeys.all, "tuzi-workspace-summary", keyFingerprint] as const,
+  tuziWorkspaceTrends: (keyFingerprint: string, days: number) =>
+    [...usageKeys.all, "tuzi-workspace-trends", keyFingerprint, days] as const,
+  tuziWorkspaceDistribution: (keyFingerprint: string, days: number) =>
+    [
+      ...usageKeys.all,
+      "tuzi-workspace-distribution",
+      keyFingerprint,
+      days,
+    ] as const,
   summary: (days: number, businessLine: BusinessLineFilter) =>
     [...usageKeys.all, "summary", days, businessLine] as const,
   trends: (days: number, businessLine: BusinessLineFilter) =>
@@ -219,6 +230,63 @@ export function useTuziKeyUsage(
   return useQuery({
     queryKey: usageKeys.tuziKeyUsage(keyFingerprint),
     queryFn: () => usageApi.getTuziKeyUsage(normalizedKey),
+    enabled: (options?.enabled ?? true) && normalizedKey.length > 0,
+    refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
+  });
+}
+
+function getTuziWorkspaceKeyFingerprint(apiKey?: string) {
+  const normalizedKey = apiKey?.trim() || "";
+  return normalizedKey
+    ? `${normalizedKey.slice(0, 4)}:${normalizedKey.slice(-4)}:${normalizedKey.length}`
+    : "none";
+}
+
+export function useTuziWorkspaceSummary(
+  apiKey?: string,
+  options?: UsageQueryOptions & { enabled?: boolean },
+) {
+  const normalizedKey = apiKey?.trim() || "";
+  const keyFingerprint = getTuziWorkspaceKeyFingerprint(normalizedKey);
+
+  return useQuery({
+    queryKey: usageKeys.tuziWorkspaceSummary(keyFingerprint),
+    queryFn: () => usageApi.getTuziWorkspaceSummary(normalizedKey),
+    enabled: (options?.enabled ?? true) && normalizedKey.length > 0,
+    refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
+  });
+}
+
+export function useTuziWorkspaceTrends(
+  apiKey?: string,
+  days: number = 7,
+  options?: UsageQueryOptions & { enabled?: boolean },
+) {
+  const normalizedKey = apiKey?.trim() || "";
+  const keyFingerprint = getTuziWorkspaceKeyFingerprint(normalizedKey);
+
+  return useQuery({
+    queryKey: usageKeys.tuziWorkspaceTrends(keyFingerprint, days),
+    queryFn: () => usageApi.getTuziWorkspaceTrends(normalizedKey, days),
+    enabled: (options?.enabled ?? true) && normalizedKey.length > 0,
+    refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
+  });
+}
+
+export function useTuziWorkspaceDistribution(
+  apiKey?: string,
+  days: number = 30,
+  options?: UsageQueryOptions & { enabled?: boolean },
+) {
+  const normalizedKey = apiKey?.trim() || "";
+  const keyFingerprint = getTuziWorkspaceKeyFingerprint(normalizedKey);
+
+  return useQuery({
+    queryKey: usageKeys.tuziWorkspaceDistribution(keyFingerprint, days),
+    queryFn: () => usageApi.getTuziWorkspaceDistribution(normalizedKey, days),
     enabled: (options?.enabled ?? true) && normalizedKey.length > 0,
     refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS,
     refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,

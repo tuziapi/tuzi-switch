@@ -182,6 +182,48 @@ pub struct TuziKeyUsage {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TuziWorkspaceSummary {
+    pub success: bool,
+    pub currency_symbol: String,
+    pub balance: f64,
+    pub used_today: f64,
+    pub used_month: f64,
+    pub request_count_today: u64,
+    pub request_count_month: u64,
+    pub active_routes: u64,
+    pub expires_at: Option<i64>,
+    pub note: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TuziWorkspaceTrendPoint {
+    pub date: String,
+    pub spend: f64,
+    pub requests: u64,
+    pub tokens: Option<u64>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TuziWorkspaceDistributionItem {
+    pub key: String,
+    pub label: String,
+    pub value: f64,
+    pub percentage: f64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TuziWorkspaceDistribution {
+    pub by_business_line: Vec<TuziWorkspaceDistributionItem>,
+    pub by_route: Vec<TuziWorkspaceDistributionItem>,
+    pub by_model: Option<Vec<TuziWorkspaceDistributionItem>>,
+}
+
 #[tauri::command]
 pub async fn get_tuzi_key_usage(api_key: String) -> Result<TuziKeyUsage, AppError> {
     let trimmed = api_key.trim();
@@ -289,6 +331,51 @@ pub async fn get_tuzi_key_usage(api_key: String) -> Result<TuziKeyUsage, AppErro
         expires_at,
         note: Some("当前数据基于 API Key 查询，不包含面板登录态下的日志与趋势统计".to_string()),
         error: None,
+    })
+}
+
+#[tauri::command]
+pub async fn get_tuzi_workspace_summary(api_key: String) -> Result<TuziWorkspaceSummary, AppError> {
+    let key_usage = get_tuzi_key_usage(api_key).await?;
+
+    Ok(TuziWorkspaceSummary {
+        success: key_usage.success,
+        currency_symbol: key_usage
+            .currency_symbol
+            .unwrap_or_else(|| "$".to_string()),
+        balance: key_usage.balance.unwrap_or(0.0),
+        used_today: 0.0,
+        used_month: key_usage.used_amount.unwrap_or(0.0),
+        request_count_today: 0,
+        request_count_month: key_usage.request_count.unwrap_or(0),
+        active_routes: 0,
+        expires_at: key_usage.expires_at,
+        note: Some(
+            key_usage.note.unwrap_or_else(|| {
+                "当前工作台汇总接口仍在接入中，现阶段先复用 API Key 查询结果".to_string()
+            }),
+        ),
+        error: key_usage.error,
+    })
+}
+
+#[tauri::command]
+pub async fn get_tuzi_workspace_trends(
+    _api_key: String,
+    _days: i64,
+) -> Result<Vec<TuziWorkspaceTrendPoint>, AppError> {
+    Ok(Vec::new())
+}
+
+#[tauri::command]
+pub async fn get_tuzi_workspace_distribution(
+    _api_key: String,
+    _days: i64,
+) -> Result<TuziWorkspaceDistribution, AppError> {
+    Ok(TuziWorkspaceDistribution {
+        by_business_line: Vec::new(),
+        by_route: Vec::new(),
+        by_model: Some(Vec::new()),
     })
 }
 

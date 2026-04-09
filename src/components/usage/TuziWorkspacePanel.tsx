@@ -13,7 +13,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useProvidersQuery } from "@/lib/query/queries";
-import { useTuziKeyUsage } from "@/lib/query/usage";
+import {
+  useTuziKeyUsage,
+  useTuziWorkspaceSummary,
+} from "@/lib/query/usage";
 import {
   ClaudeIcon,
   CodexIcon,
@@ -243,15 +246,43 @@ export function TuziWorkspacePanel({
       refetchInterval: refreshIntervalMs ?? 30000,
     },
   );
+  const {
+    data: workspaceSummary,
+    isLoading: workspaceSummaryLoading,
+  } = useTuziWorkspaceSummary(tuziKeySource?.key, {
+    enabled: Boolean(tuziKeySource?.key),
+    refetchInterval: refreshIntervalMs ?? 30000,
+  });
 
-  const usageSymbol = tuziUsage?.currencySymbol || "$";
+  const hasWorkspaceSummary = Boolean(workspaceSummary?.success);
+  const usageSymbol =
+    workspaceSummary?.currencySymbol || tuziUsage?.currencySymbol || "$";
+  const balanceValue = hasWorkspaceSummary
+    ? workspaceSummary?.balance
+    : tuziUsage?.balance;
+  const usedAmountValue = hasWorkspaceSummary
+    ? workspaceSummary?.usedMonth
+    : tuziUsage?.usedAmount;
+  const requestCountValue = hasWorkspaceSummary
+    ? workspaceSummary?.requestCountMonth
+    : tuziUsage?.requestCount;
+  const expiresAtValue = workspaceSummary?.expiresAt || tuziUsage?.expiresAt;
+  const usageLoading = hasWorkspaceSummary
+    ? workspaceSummaryLoading
+    : workspaceSummaryLoading && tuziUsageLoading;
   const usageNote =
+    workspaceSummary?.error ||
+    workspaceSummary?.note ||
     tuziUsage?.error ||
     tuziUsage?.note ||
     (tuziKeySource
       ? "当前已检测到兔子 API Key，优先同步可公开查询的额度数据。"
       : "当前还没有检测到可用的兔子 API Key，所以这里只展示接入状态。");
-  const statusTone = tuziUsage?.success ? "已同步部分真实数据" : "当前以接入状态为主";
+  const statusTone = hasWorkspaceSummary
+    ? "已同步工作台汇总数据"
+    : tuziUsage?.success
+      ? "已同步部分真实数据"
+      : "当前以接入状态为主";
   const quotaNote =
     tuziUsage?.quotaPerUnit && tuziUsage?.quotaDisplayType
       ? `换算规则：1 ${tuziUsage.quotaDisplayType} = ${tuziUsage.quotaPerUnit}`
@@ -312,13 +343,13 @@ export function TuziWorkspacePanel({
                     <Wallet className="h-4 w-4 text-orange-500" />
                   </div>
                   <div className="mt-3 text-3xl font-semibold">
-                    {tuziUsageLoading
-                      ? "--"
-                      : formatCurrency(tuziUsage?.balance, usageSymbol)}
+                    {usageLoading ? "--" : formatCurrency(balanceValue, usageSymbol)}
                   </div>
                   <div className="mt-2 text-xs text-muted-foreground">
-                    {tuziUsage?.success
-                      ? "基于兔子 API Key 查询"
+                    {hasWorkspaceSummary
+                      ? "基于兔子工作台汇总接口"
+                      : tuziUsage?.success
+                        ? "基于兔子 API Key 查询"
                       : "当前未同步到可用余额数据"}
                   </div>
                 </CardContent>
@@ -331,13 +362,15 @@ export function TuziWorkspacePanel({
                     <Coins className="h-4 w-4 text-sky-500" />
                   </div>
                   <div className="mt-3 text-3xl font-semibold">
-                    {tuziUsageLoading
+                    {usageLoading
                       ? "--"
-                      : formatCurrency(tuziUsage?.usedAmount, usageSymbol)}
+                      : formatCurrency(usedAmountValue, usageSymbol)}
                   </div>
                   <div className="mt-2 text-xs text-muted-foreground">
-                    {tuziUsage?.success
-                      ? "展示累计已用额度"
+                    {hasWorkspaceSummary
+                      ? "展示本月累计已用额度"
+                      : tuziUsage?.success
+                        ? "展示累计已用额度"
                       : "当前未同步到已用额度数据"}
                   </div>
                 </CardContent>
@@ -350,11 +383,13 @@ export function TuziWorkspacePanel({
                     <Sparkles className="h-4 w-4 text-rose-500" />
                   </div>
                   <div className="mt-3 text-3xl font-semibold">
-                    {tuziUsageLoading ? "--" : formatCount(tuziUsage?.requestCount)}
+                    {usageLoading ? "--" : formatCount(requestCountValue)}
                   </div>
                   <div className="mt-2 text-xs text-muted-foreground">
-                    {tuziUsage?.success
-                      ? "展示当前 Key 的累计请求数"
+                    {hasWorkspaceSummary
+                      ? "展示本月累计请求数"
+                      : tuziUsage?.success
+                        ? "展示当前 Key 的累计请求数"
                       : "当前未同步到请求次数数据"}
                   </div>
                 </CardContent>
@@ -421,9 +456,9 @@ export function TuziWorkspacePanel({
                     当前查询 Key：{tuziUsage.keyMasked}
                   </div>
                 ) : null}
-                {tuziUsage?.expiresAt ? (
+                {expiresAtValue ? (
                   <div className="mt-2 text-orange-800/70">
-                    到期时间：{formatDateTime(tuziUsage.expiresAt)}
+                    到期时间：{formatDateTime(expiresAtValue)}
                   </div>
                 ) : null}
                 {quotaNote ? (
