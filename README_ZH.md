@@ -2,7 +2,7 @@
 
 # tuzi-switch
 
-### 面向 Claude Code、Codex 与 OpenClaw 的兔子业务桌面助手
+### 面向 Claude Code、Codex、Gemini 与 OpenClaw 的兔子业务桌面助手
 
 [![版本](https://img.shields.io/github/v/release/tuziapi/tuzi-switch?color=0ea5e9&label=version)](https://github.com/tuziapi/tuzi-switch/releases)
 [![下载量](https://img.shields.io/github/downloads/tuziapi/tuzi-switch/total?color=f97316)](https://github.com/tuziapi/tuzi-switch/releases)
@@ -58,17 +58,28 @@ open "/Applications/tuzi-switch.app"
 
 tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟的多工具桌面管理基础能力，同时把产品重点放在兔子客户更容易上手的接入流程上。
 
-当前版本主要围绕 3 个工具展开：
+当前版本主要围绕 4 个入口展开：
 
 - Claude Code
 - Codex
+- Gemini
 - OpenClaw
 
 用户只需要输入一次兔子 Key，就可以更快完成线路接入和本地配置，不需要自己手动改配置文件。
 
+## 当前版本更新
+
+当前公开版本为 `v3.12.10`，这一轮更新重点包括：
+
+- 新增 Gemini 兔子一键接入，当前支持“原版 Gemini + 兔子 API”与“gac 改版 Gemini”
+- 完成 Codex 兔子主线路与 Coding 特别线路拆分，减少一键配置与手动配置之间的差异
+- 统一 Claude、Codex、Gemini、OpenClaw 四个入口的路线管理结构、状态卡与模块视觉
+- 优化 OpenClaw 的路线卡表达与业务接入层级
+- 修复兔子图标与部分入口状态显示问题
+
 ## 产品亮点
 
-- 兔子优先的 Claude Code、Codex、OpenClaw 快速入口
+- 兔子优先的 Claude Code、Codex、Gemini、OpenClaw 快速入口
 - 从主界面直接完成兔子业务线路的一键接入配置
 - 独立的兔子品牌视觉、图标和接入卡片
 - 支持从应用内切换供应商，并保留桌面版任务栏切换入口
@@ -80,9 +91,9 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 相比原始上游项目，这一版更偏向业务交付和客户使用效率，而不是通用型高级配置工具：
 
 - 右上角入口区改成更适合兔子业务接入的结构
-- Claude Code、Codex、OpenClaw 各自拥有独立的安装或配置路径
+- Claude Code、Codex、Gemini、OpenClaw 各自拥有独立的安装或配置路径
 - 兔子快速接入被提升为主流程入口
-- 一些原本偏通用的设置和工作台内容做了简化
+- 一些原本偏通用的设置与配置流程做了简化
 
 ## 界面预览
 
@@ -102,7 +113,7 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 1. 从 [Releases](https://github.com/tuziapi/tuzi-switch/releases) 下载最新安装包。
 2. 打开 `tuzi-switch`。
-3. 选择 Claude Code、Codex 或 OpenClaw。
+3. 选择 Claude Code、Codex、Gemini 或 OpenClaw。
 4. 在引导流程中输入你的兔子 Key。
 5. 完成一键配置后开始使用对应工具。
 
@@ -110,7 +121,7 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ### 工具入口
 
-- Claude Code、Codex、OpenClaw 独立入口
+- Claude Code、Codex、Gemini、OpenClaw 独立入口
 - 支持对应工具的安装与升级引导
 - 更强调业务接入，而不是先做通用供应商配置
 
@@ -142,14 +153,17 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 开发计划 / TODO List
 
-- 已完成一轮 Claude Code、Codex、OpenClaw 三个入口的路线管理器改版，后续继续补状态样式与细节反馈
-- 已完成一轮“兔子工作台 + 本地代理统计”的信息结构重做，后续继续提升统计可读性与表格体验
-- 下一阶段优先完善兔子工作台真实数据接入，补齐余额、已用额度、请求次数之外的业务统计
-- 在拿到稳定鉴权方案后，对接兔子后端聚合接口，同步今日消耗、月度消耗、趋势和分布数据
-- 继续优化 OpenClaw 的业务接入体验，补强与兔子 / gac 线路的联动能力
-- 重新梳理会话管理能力，明确 OpenClaw 会话恢复的产品边界或补齐可恢复方案
-- 持续补充兔子版说明图、发布说明和对外产品文档，并逐步减少文档与兼容路径里残留的上游命名
-- 继续优化安装说明与发布流程，解决一键安装脚本和 `prerelease` 发布策略之间的不一致
+- P0 已完成：Claude、Codex、Gemini、OpenClaw 四个入口的第一轮兔子路线管理改版，并统一模块状态结构、路线卡逻辑与配色语义
+- P0 已完成：Codex 兔子主线路与 Coding 特别线路拆分完成，当前一键配置已更接近手动配置语义
+- P0 已完成：Gemini 首版业务接入完成，当前支持“原版 Gemini + 兔子 API”与“gac 改版 Gemini”两种方案
+- P0 已完成：四个入口的状态卡、刷新状态、模块图标与部分状态误判问题已完成一轮修正
+- P1 进行中：继续精修四个入口的状态反馈、异常提示、空状态、刷新逻辑与视觉层级，减少“已配置但状态不可信”的感知问题
+- P1 进行中：继续优化 OpenClaw 的业务接入体验，补强 Tuzi / GAC 路线切换后的联动反馈
+- P1 待做：重新梳理会话管理能力，明确 OpenClaw 会话恢复的产品边界，必要时补齐可恢复方案
+- P1 待做：补充更完整的发布说明、版本更新日志、安装提示与客户视角说明文案
+- P2 规划中：在拿到稳定鉴权方案后，对接兔子后端聚合接口，补齐 summary / trend / distribution 等真实业务数据视图
+- P2 规划中：继续优化安装说明与发布流程，解决一键安装脚本、`prerelease` 策略与“安装到最新版”之间的不一致
+- P2 规划中：持续减少文档、界面与兼容路径里残留的上游命名，逐步收口为兔子业务版本表达
 
 ## 说明
 

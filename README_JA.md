@@ -2,7 +2,7 @@
 
 # tuzi-switch
 
-### Claude Code、Codex、OpenClaw 向けの Tuzi 業務デスクトップアシスタント
+### Claude Code、Codex、Gemini、OpenClaw 向けの Tuzi 業務デスクトップアシスタント
 
 [![Version](https://img.shields.io/github/v/release/tuziapi/tuzi-switch?color=0ea5e9&label=version)](https://github.com/tuziapi/tuzi-switch/releases)
 [![Downloads](https://img.shields.io/github/downloads/tuziapi/tuzi-switch/total?color=f97316)](https://github.com/tuziapi/tuzi-switch/releases)
@@ -58,17 +58,28 @@ open "/Applications/tuzi-switch.app"
 
 tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム版です。多ツール管理の基盤は残しつつ、Tuzi のお客様がより簡単に接続できる導線を優先しています。
 
-現在の中心ツールは次の 3 つです。
+現在の中心入口は次の 4 つです。
 
 - Claude Code
 - Codex
+- Gemini
 - OpenClaw
 
 ユーザーは Tuzi Key を 1 回入力するだけで、ルート設定とローカル設定をより素早く完了できます。設定ファイルを手動編集する前提ではありません。
 
+## 現在のバージョン更新内容
+
+現在の公開版は `v3.12.10` で、今回の主な更新は以下です。
+
+- 「原版 Gemini + Tuzi API」と「gac 改版 Gemini」を含む Gemini クイック接入を追加
+- Codex の Tuzi 主ルートと Coding 特別ルートを明確に分離
+- Claude、Codex、Gemini、OpenClaw の 4 入口で、ルート管理 UI・状態カード・モジュール表現を揃えた
+- OpenClaw のルートカード構造と接入導線を改善
+- Tuzi アイコン表示と一部のルート状態表示不具合を修正
+
 ## 製品のポイント
 
-- Claude Code、Codex、OpenClaw 向けの Tuzi 優先クイック入口
+- Claude Code、Codex、Gemini、OpenClaw 向けの Tuzi 優先クイック入口
 - メイン画面から Tuzi / GAC ラインの案内付きで接続設定を実行
 - Tuzi ブランドのビジュアル、アイコン、接入カード
 - アプリ内でのプロバイダ切り替えとデスクトップ版ベースのトレイ切り替え導線
@@ -80,9 +91,9 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 上流版と比べると、この版は汎用的な高機能ツールというより、業務導入と顧客オンボーディングを重視しています。
 
 - 右上の入口エリアを Tuzi 接続フロー向けに再構成
-- Claude Code、Codex、OpenClaw に個別のインストール / 設定入口を用意
+- Claude Code、Codex、Gemini、OpenClaw に個別のインストール / 設定入口を用意
 - Tuzi クイック設定を主要導線として前面に配置
-- 一部の汎用設定やワークベンチ要素を簡素化
+- 一部の汎用設定や構成フローを簡素化
 
 ## 画面プレビュー
 
@@ -102,7 +113,7 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 1. [Releases](https://github.com/tuziapi/tuzi-switch/releases) から最新版をダウンロード
 2. `tuzi-switch` を起動
-3. Claude Code、Codex、OpenClaw のいずれかを選択
+3. Claude Code、Codex、Gemini、OpenClaw のいずれかを選択
 4. ガイドに従って Tuzi Key を入力
 5. ワンクリック設定を完了して利用開始
 
@@ -110,7 +121,7 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ### ツール入口
 
-- Claude Code、Codex、OpenClaw の独立した入口
+- Claude Code、Codex、Gemini、OpenClaw の独立した入口
 - 対応ツール向けのインストール / 更新ガイド
 - 汎用プロバイダ設定よりも業務導線を優先した画面構成
 
@@ -142,14 +153,17 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 開発計画 / TODO
 
-- Claude Code、Codex、OpenClaw のルート管理型 UI 改修は 1 ラウンド完了し、今後も状態表示とフィードバック表現を磨く
-- 「Tuzi ワークスペース + ローカルプロキシ統計」の情報構造見直しは 1 ラウンド完了し、今後は可読性とテーブル UX を改善する
-- 次の優先事項は、残高・使用量・リクエスト回数以外も含めた Tuzi ワークスペース実データ連携の拡張
-- 安定した認証方式が確定した後、日次消費・月次消費・トレンド・分布表示のために Tuzi バックエンドの集約 API を接続する
-- OpenClaw における Tuzi / GAC 業務ルートの接入体験をさらに改善する
-- セッション管理を再整理し、OpenClaw の会話復元方針を明確化または実装する
-- Tuzi 版スクリーンショット、リリースノート、対外向け製品ドキュメントを継続的に拡充し、文書や互換パスに残る上流由来の命名も徐々に減らす
-- ワンコマンドインストールと現在の `prerelease` 公開方針のずれを解消するため、インストール案内とリリースフローを引き続き調整する
+- P0 完了: Claude、Codex、Gemini、OpenClaw の 4 入口で、Tuzi 向けルート管理 UI 第 1 ラウンドを完了し、状態構造・ルートカード・配色文脈を揃えた
+- P0 完了: Codex では Tuzi 主ルートと Coding 特別ルートの分離を完了し、ワンクリック設定と手動設定の差異を縮小した
+- P0 完了: Gemini 接入の初版を完了し、現在は「原版 Gemini + Tuzi API」と「gac 改版 Gemini」の 2 方式をサポートしている
+- P0 完了: 4 入口の状態カード、更新状態、アイコン、ルート状態表示に対する一巡の修正を終えた
+- P1 進行中: 状態フィードバック、異常表示、空状態、更新導線、視覚階層をさらに磨き、「設定済みだが信用しづらい」感覚を減らす
+- P1 進行中: OpenClaw における Tuzi / GAC 業務ルートの接入体験と切替後のフィードバックをさらに改善する
+- P1 予定: セッション管理を再整理し、OpenClaw の復元境界を明確化したうえで、必要なら復元対応を実装する
+- P1 予定: リリースノート、更新案内、インストール時の注意点、顧客向け説明文を拡充する
+- P2 予定: 安定した認証方式が確定した後、Tuzi バックエンド集約 API を接続し、summary / trend / distribution の実データを補完する
+- P2 予定: インストール案内、`prerelease` 方針、「最新版を確実に入れる」挙動のずれを解消するため、リリースフローを継続調整する
+- P2 予定: ドキュメント、UI 文言、互換パスに残る上流由来の命名を段階的に減らしていく
 
 ## 補足
 

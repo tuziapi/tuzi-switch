@@ -2,7 +2,7 @@
 
 # tuzi-switch
 
-### Tuzi business desktop companion for Claude Code, Codex, and OpenClaw
+### Tuzi business desktop companion for Claude Code, Codex, Gemini, and OpenClaw
 
 [![Version](https://img.shields.io/github/v/release/tuziapi/tuzi-switch?color=0ea5e9&label=version)](https://github.com/tuziapi/tuzi-switch/releases)
 [![Downloads](https://img.shields.io/github/downloads/tuziapi/tuzi-switch/total?color=f97316)](https://github.com/tuziapi/tuzi-switch/releases)
@@ -58,17 +58,28 @@ If the app was launched from an extracted folder instead of `/Applications`, rep
 
 tuzi-switch is a Tuzi-branded business edition built on top of CC Switch. It keeps the mature multi-tool desktop foundation, then focuses the product around a simpler customer onboarding path for Tuzi services.
 
-The current version is centered on three tools:
+The current version is centered on four entry points:
 
 - Claude Code
 - Codex
+- Gemini
 - OpenClaw
 
 Users only need to enter their Tuzi key once, then complete route setup and local configuration faster without editing config files manually.
 
+## Current Version Updates
+
+The current public release is `v3.12.10`, with this round focused on:
+
+- Adding Gemini quick access for both "official Gemini + Tuzi API" and "GAC-modified Gemini"
+- Splitting Codex main Tuzi routing and the Coding special route more clearly
+- Aligning route-management layout, status cards, and module visuals across Claude, Codex, Gemini, and OpenClaw
+- Improving OpenClaw route-card hierarchy and onboarding structure
+- Fixing Tuzi icon rendering and part of the route-status display issues
+
 ## Product Highlights
 
-- Tuzi-first quick access for Claude Code, Codex, and OpenClaw
+- Tuzi-first quick access for Claude Code, Codex, Gemini, and OpenClaw
 - One-click Tuzi route onboarding from the main app entry
 - Dedicated Tuzi branding, icon system, and onboarding cards
 - Provider switching from the app, with the desktop tray flow retained
@@ -80,9 +91,9 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 Compared with the original upstream project, this edition focuses more on business delivery than generic power-user tooling:
 
 - The top-right entry area is adjusted for Tuzi onboarding flow
-- Claude Code, Codex, and OpenClaw each have their own independent installation or configuration path
+- Claude Code, Codex, Gemini, and OpenClaw each have their own independent installation or configuration path
 - Tuzi quick configuration is surfaced as the primary guided action
-- Some original settings and generic workflow content were simplified for customer use
+- Some original settings and generic configuration flows were simplified for customer use
 
 ## Screenshots
 
@@ -102,7 +113,7 @@ Compared with the original upstream project, this edition focuses more on busine
 
 1. Download the latest package from [Releases](https://github.com/tuziapi/tuzi-switch/releases).
 2. Open `tuzi-switch`.
-3. Choose Claude Code, Codex, or OpenClaw.
+3. Choose Claude Code, Codex, Gemini, or OpenClaw.
 4. Enter your Tuzi key in the guided setup flow.
 5. Finish one-click configuration and start using your selected tool.
 
@@ -110,7 +121,7 @@ Compared with the original upstream project, this edition focuses more on busine
 
 ### Tool Access
 
-- Separate entry points for Claude Code, Codex, and OpenClaw
+- Separate entry points for Claude Code, Codex, Gemini, and OpenClaw
 - Faster installation and upgrade guidance for supported tools
 - Business-oriented onboarding instead of generic provider-first navigation
 
@@ -142,14 +153,17 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 
 ## Development Plan / TODO
 
-- One round of the route-manager redesign for Claude Code, Codex, and OpenClaw is complete, with more state polish and feedback details still planned
-- One round of the "Tuzi workspace + local proxy stats" information architecture refresh is complete, with more readability and table UX improvements next
-- The next priority is deeper Tuzi workspace data coverage beyond balance, used quota, and request count
-- Once a stable auth contract is available, integrate Tuzi backend aggregation APIs for daily spend, monthly spend, trends, and distribution views
-- Further improve OpenClaw onboarding around Tuzi and GAC business routes
-- Revisit session manager behavior and either clarify or implement a real OpenClaw resume flow
-- Keep expanding Tuzi-specific screenshots, release notes, and public-facing product documentation while reducing leftover upstream naming in docs and compatibility paths
-- Continue aligning install documentation and release workflow so the one-command installer matches the current `prerelease` strategy
+- P0 done: the first Tuzi route-management pass is complete for Claude, Codex, Gemini, and OpenClaw, with aligned status structure, route-card logic, and module tone
+- P0 done: Codex main Tuzi routing and the Coding special route are now split correctly, reducing the mismatch between one-click config and manual config behavior
+- P0 done: the first Gemini business integration is complete, supporting both "official Gemini + Tuzi API" and "GAC-modified Gemini"
+- P0 done: one round of status-card, refresh-state, icon, and route-status fixes has been completed across the four onboarding modules
+- P1 in progress: continue polishing status feedback, error hints, empty states, refresh behavior, and visual hierarchy so configured states feel more trustworthy
+- P1 in progress: keep improving OpenClaw onboarding and route-switch feedback for Tuzi and GAC business routes
+- P1 planned: revisit session-manager behavior and clarify the OpenClaw recovery boundary, then implement recovery support if needed
+- P1 planned: expand release notes, upgrade guidance, install hints, and customer-facing product copy
+- P2 planned: after a stable auth contract is ready, integrate Tuzi backend aggregation APIs for real summary / trend / distribution business data
+- P2 planned: continue aligning install documentation and release workflow so the installer, `prerelease` strategy, and "install latest version" behavior stay consistent
+- P2 planned: gradually reduce leftover upstream naming across docs, UI copy, and compatibility paths
 
 ## Notes
 
