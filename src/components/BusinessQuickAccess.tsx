@@ -31,7 +31,7 @@ type OpenClawRoute =
 type ClaudeBusinessRoute = "gaccode" | "tu-zi";
 type CodexBusinessRoute = "gac" | "tuzi" | "tuzi-codex-sub";
 type ClaudeEntryOption = "modified" | "gaccode" | "tu-zi";
-type CodexEntryOption = "tuzi" | "gac" | "gac-modified";
+type CodexEntryOption = "tuzi" | "tuzi-coding" | "gac" | "gac-modified";
 
 const OPENCLAW_ROUTE_CONFIG: Record<
   OpenClawRoute,
@@ -168,8 +168,8 @@ const CODEX_ROUTE_OPTIONS: Array<{
   label: string;
 }> = [
   { value: "gac", label: "gac 线路" },
-  { value: "tuzi", label: "兔子 API 线路" },
-  { value: "tuzi-codex-sub", label: "兔子Codex订阅线路" },
+  { value: "tuzi", label: "兔子主线路" },
+  { value: "tuzi-codex-sub", label: "兔子 Coding 特别线路" },
 ];
 
 function getCodexRouteLabel(route: string | null | undefined) {
@@ -180,8 +180,15 @@ function getCodexRouteLabel(route: string | null | undefined) {
 }
 const CODEX_ROUTE_CONFIG = {
   tuzi: {
+    providerId: "tuzi-codex-route",
+    providerName: "兔子 Codex · 兔子主线路",
+    baseUrl: "https://api.tu-zi.com/v1",
+    websiteUrl: "https://api.tu-zi.com",
+    businessLine: "tuzi" as const,
+  },
+  "tuzi-codex-sub": {
     providerId: "tuzi.coding",
-    providerName: "tuzi.coding",
+    providerName: "兔子 Codex · Coding 特别线路",
     baseUrl: "https://coding.tu-zi.com",
     websiteUrl: "https://coding.tu-zi.com",
     businessLine: "tuzi" as const,
@@ -611,7 +618,7 @@ export function BusinessQuickAccess({
   };
 
   const syncCodexBusinessProvider = async (
-    route: "gac" | "tuzi",
+    route: CodexBusinessRoute,
     apiKey: string,
     model: string,
   ) => {
@@ -622,11 +629,13 @@ export function BusinessQuickAccess({
       websiteUrl: routeConfig.websiteUrl,
       category: "custom",
       icon: "tuzi",
-      iconColor: route === "tuzi" ? "#0EA5E9" : "#F97316",
+      iconColor: route === "gac" ? "#F97316" : "#0EA5E9",
       notes:
-        route === "tuzi"
-          ? "由兔子业务一键接入自动生成"
-          : "由 gac 业务一键接入自动生成",
+        route === "gac"
+          ? "由 gac 业务一键接入自动生成"
+          : route === "tuzi"
+            ? "由兔子业务一键接入自动生成（兔子主线路）"
+            : "由兔子业务一键接入自动生成（Coding 特别线路）",
       meta: {
         businessLine: routeConfig.businessLine,
       },
@@ -658,9 +667,15 @@ export function BusinessQuickAccess({
     const trimmedKey = codexApiKey.trim();
     const trimmedModel = codexModel.trim() || "gpt-5.4";
     const trimmedReasoning = codexReasoning.trim() || "medium";
+    const selectedRoute: CodexBusinessRoute =
+      codexEntryOption === "gac"
+        ? "gac"
+        : codexEntryOption === "tuzi-coding"
+          ? "tuzi-codex-sub"
+          : "tuzi";
     const result = await installerApi.installCodex({
       variant: "openai",
-      route: codexEntryOption === "gac" ? "gac" : "tuzi",
+      route: selectedRoute,
       apiKey: trimmedKey,
       model: trimmedModel,
       modelReasoningEffort: trimmedReasoning,
@@ -671,7 +686,7 @@ export function BusinessQuickAccess({
     }
 
     await syncCodexBusinessProvider(
-      codexEntryOption === "gac" ? "gac" : "tuzi",
+      selectedRoute,
       trimmedKey,
       trimmedModel,
     );
@@ -954,20 +969,28 @@ export function BusinessQuickAccess({
                 <div className="mt-1 text-sm text-muted-foreground">
                   选择适合你的 Codex 线路后，一次完成所需设置即可开始使用。
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <RouteCard
-                    title="Codex · 兔子线路"
-                    description="适合直接接入兔子服务的工程与代码场景。"
-                    meta="Base URL 走兔子 API，推荐主模型 gpt-5.4。"
-                    status={codexStatus.current_route?.includes("tuzi") ? "已接入" : codexEntryOption === "tuzi" ? "当前选择" : "推荐"}
+                    title="Codex · 兔子主线路"
+                    description="适合直接接入兔子主服务，和 Claude 兔子线路保持一致。"
+                    meta="Base URL 走 https://api.tu-zi.com/v1，推荐主模型 gpt-5.4。"
+                    status={codexStatus.current_route === "tuzi" ? "已接入" : codexEntryOption === "tuzi" ? "当前选择" : "推荐"}
                     selected={codexEntryOption === "tuzi"}
                     onClick={() => setCodexEntryOption("tuzi")}
+                  />
+                  <RouteCard
+                    title="Codex · 兔子 Coding 特别线路"
+                    description="适合单独使用 coding 业务线的 Codex 场景。"
+                    meta="Base URL 走 https://coding.tu-zi.com。"
+                    status={codexStatus.current_route === "tuzi-codex-sub" ? "已接入" : codexEntryOption === "tuzi-coding" ? "当前选择" : "可选"}
+                    selected={codexEntryOption === "tuzi-coding"}
+                    onClick={() => setCodexEntryOption("tuzi-coding")}
                   />
                   <RouteCard
                     title="Codex · gac 线路"
                     description="适合已有 gac 使用基础或迁移场景。"
                     meta="沿用 gac 路线配置。"
-                    status={codexStatus.current_route?.includes("gac") && codexStatus.install_type !== "gac" ? "已接入" : codexEntryOption === "gac" ? "当前选择" : "可选"}
+                    status={codexStatus.current_route === "gac" && codexStatus.install_type !== "gac" ? "已接入" : codexEntryOption === "gac" ? "当前选择" : "可选"}
                     selected={codexEntryOption === "gac"}
                     onClick={() => setCodexEntryOption("gac")}
                   />
@@ -986,7 +1009,7 @@ export function BusinessQuickAccess({
                       <Input
                         value={codexApiKey}
                         onChange={(event) => setCodexApiKey(event.target.value)}
-                        placeholder={`输入${codexEntryOption === "tuzi" ? "兔子" : "gac"} API Key`}
+                        placeholder={`输入${codexEntryOption === "gac" ? "gac" : "兔子"} API Key`}
                       />
                       <Input
                         value={codexModel}
@@ -1011,8 +1034,10 @@ export function BusinessQuickAccess({
                     codexEntryOption === "gac-modified"
                       ? "写入 gac 改版 Codex"
                       : codexEntryOption === "tuzi"
-                        ? "写入兔子 Codex 路线"
-                        : "写入 gac Codex 路线"
+                        ? "写入兔子 Codex 主线路"
+                        : codexEntryOption === "tuzi-coding"
+                          ? "写入兔子 Coding 特别线路"
+                          : "写入 gac Codex 路线"
                   }
                   syncHint={
                     codexEntryOption === "gac-modified"

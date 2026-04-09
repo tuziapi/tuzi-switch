@@ -841,7 +841,12 @@ fn filter_codex_config(existing_content: &str, strip: &BTreeSet<String>) -> Stri
         if skipping {
             continue;
         }
-        if trimmed.starts_with("profile") && trimmed.contains('=') {
+        if (trimmed.starts_with("profile") && trimmed.contains('='))
+            || (trimmed.starts_with("model_provider") && trimmed.contains('='))
+            || (trimmed.starts_with("model_reasoning_effort") && trimmed.contains('='))
+            || (trimmed.starts_with("model") && trimmed.contains('='))
+            || (trimmed.starts_with("disable_response_storage") && trimmed.contains('='))
+        {
             continue;
         }
         lines.push(raw.to_string());
@@ -867,10 +872,26 @@ fn write_codex_config_merged(merged: &ParsedCodexConfig, profile_route: &str) ->
     if !merged.routes.contains_key(&normalized_profile) {
         return Err(format!("路线「{normalized_profile}」尚未配置"));
     }
+    let current_entry = merged
+        .routes
+        .get(&normalized_profile)
+        .ok_or_else(|| format!("路线「{normalized_profile}」尚未配置"))?;
+    let current_model = current_entry
+        .model
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(DEFAULT_MODEL);
+    let current_reasoning = current_entry
+        .model_reasoning_effort
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(DEFAULT_REASONING);
     let config_path = get_codex_config_file_path()?;
     let existing = read_file(&config_path).unwrap_or_default();
     let filtered = filter_codex_config(&existing, &collect_strip_route_names(merged, &existing));
-    let mut output = format!("profile = \"{normalized_profile}\"\n\n");
+    let mut output = format!(
+        "profile = \"{normalized_profile}\"\n\nmodel_provider = \"{normalized_profile}\"\nmodel = \"{current_model}\"\nmodel_reasoning_effort = \"{current_reasoning}\"\ndisable_response_storage = true\n\n"
+    );
     if !filtered.is_empty() {
         output.push_str(filtered.as_str());
         output.push_str("\n\n");
