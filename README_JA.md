@@ -28,17 +28,18 @@
 
 ### ワンコマンドインストール
 
-GitHub から最新の正式版を直接インストール:
+現在の推奨版 `v3.12.10` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.10 bash
 ```
 
 補足:
 
-- 現在のスクリプトは GitHub の `releases/latest` を参照します
-- 最新版が `prerelease` として公開されている場合、その最新プレリリース版を取得できないことがあります
-- 最新のテスト版が必要な場合は、Releases ページから対象 tag のパッケージを直接ダウンロードしてください
+- 現在の Release workflow は引き続き `prerelease` 方式で公開されています
+- そのため GitHub の `releases/latest` では、最新のテスト版を正しく取れない場合があります
+- README のコマンドは `v3.12.10` に固定し、現在の推奨版を確実に入れられるようにしています
+- 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
 
@@ -104,6 +105,10 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 ### Codex
 
 ![Codex Tuzi Flow](assets/screenshots/codex-tuzi.png)
+
+### Gemini
+
+![Gemini Tuzi Flow](assets/screenshots/gemini-tuzi.png)
 
 ### OpenClaw
 

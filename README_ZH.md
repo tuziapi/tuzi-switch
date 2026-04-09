@@ -28,17 +28,18 @@
 
 ### 一键安装
 
-直接从 GitHub 安装最新正式版：
+直接安装当前推荐版本 `v3.12.10`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.10 bash
 ```
 
 补充说明：
 
-- 当前脚本默认跟随 GitHub `releases/latest`
-- 如果最新版本仍以 `prerelease` 方式发布，脚本可能不会拿到最新预发布版本
-- 需要安装最新测试版时，建议直接前往 Releases 页面手动下载对应 tag 的安装包
+- 当前 Release workflow 仍使用 `prerelease` 发布策略
+- 因此默认走 GitHub `releases/latest` 时，不一定能命中当前最新测试版本
+- 目前 README 默认固定到 `v3.12.10`，这样可以确保安装到我们当前推荐版本
+- 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
 
 ### macOS 未签名包打开方式
 
@@ -104,6 +105,10 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 ### Codex
 
 ![Codex 兔子接入](assets/screenshots/codex-tuzi.png)
+
+### Gemini
+
+![Gemini 兔子接入](assets/screenshots/gemini-tuzi.png)
 
 ### OpenClaw
 

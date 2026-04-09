@@ -28,17 +28,18 @@ Current public releases are ready for Windows and Linux users. macOS is currentl
 
 ### One-Command Install
 
-Install the latest stable public release directly from GitHub:
+Install the currently recommended build `v3.12.10` directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.10 bash
 ```
 
 Notes:
 
-- The script currently follows GitHub `releases/latest`
-- If the newest build is published as a `prerelease`, the script may not resolve to that newest prerelease build
-- If you need the newest testing build, download the package for the exact tag from the Releases page instead
+- The current release workflow still publishes builds as `prerelease`
+- Because of that, GitHub `releases/latest` does not always point to the newest testing build
+- The README command is now pinned to `v3.12.10` so it installs the current recommended version reliably
+- To install another version, replace the value in `TUZI_SWITCH_TAG=vX.Y.Z`
 
 ### macOS Unsigned Build
 
@@ -104,6 +105,10 @@ Compared with the original upstream project, this edition focuses more on busine
 ### Codex
 
 ![Codex Tuzi Flow](assets/screenshots/codex-tuzi.png)
+
+### Gemini
+
+![Gemini Tuzi Flow](assets/screenshots/gemini-tuzi.png)
 
 ### OpenClaw
 
