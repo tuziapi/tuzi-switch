@@ -2,12 +2,8 @@ import { useMemo, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowUpRight,
-  CheckCircle2,
   Coins,
-  Gauge,
-  Link2,
   Sparkles,
-  TimerReset,
   Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -39,21 +35,6 @@ type TuziKeySource = {
   key: string;
   sourceLabel: string;
 };
-
-const onboardingSteps = [
-  {
-    title: "先完成线路接入",
-    description: "从 Claude、Codex、OpenClaw 入口完成一键配置，快速开始使用。",
-  },
-  {
-    title: "确认当前可用状态",
-    description: "查看线路、Key 来源和接入数量，确认当前设备已经可以正常使用。",
-  },
-  {
-    title: "查看核心使用信息",
-    description: "优先展示余额、已用额度和请求次数，帮助你快速了解当前使用情况。",
-  },
-];
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
@@ -294,17 +275,17 @@ export function TuziWorkspacePanel({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="overflow-hidden rounded-[28px] border border-orange-200/70 bg-[radial-gradient(circle_at_top_left,_rgba(251,146,60,0.18),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_28%),linear-gradient(135deg,rgba(255,247,237,0.96),rgba(255,255,255,0.92))] shadow-sm"
+        className="overflow-hidden rounded-[28px] border border-orange-200/70 bg-[radial-gradient(circle_at_top_left,_rgba(251,146,60,0.18),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_28%),linear-gradient(135deg,rgba(255,247,237,0.96),rgba(255,255,255,0.92))] shadow-sm dark:border-orange-500/20 dark:bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(56,189,248,0.12),_transparent_28%),linear-gradient(135deg,rgba(35,29,26,0.96),rgba(23,23,27,0.98))]"
       >
         <div className="grid gap-6 p-6 lg:grid-cols-[1.3fr_0.9fr]">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/60 bg-white/80 px-3 py-1 text-xs font-medium text-orange-700">
+            <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/60 bg-white/80 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-400/30 dark:bg-orange-500/10 dark:text-orange-200">
               <TuziIcon size={14} />
               兔子工作台
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/85 shadow-sm ring-1 ring-orange-100">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/85 shadow-sm ring-1 ring-orange-100 dark:bg-white/10 dark:ring-orange-400/20">
                   <TuziIcon size={32} />
                 </div>
                 <div>
@@ -312,31 +293,18 @@ export function TuziWorkspacePanel({
                     兔子 API 业务总览
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    这里会优先展示接入状态和关键使用信息，帮助你快速了解当前是否已经可以正常使用。
+                    优先展示接入状态、余额、已用额度和请求次数，先帮你确认当前是否已经可以正常使用。
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              {onboardingSteps.map((item, index) => (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-white/70 bg-white/70 px-4 py-4 shadow-none backdrop-blur"
-                >
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-orange-700/80">
-                    第 {index + 1} 步
-                  </div>
-                  <div className="mt-2 text-sm font-medium">{item.title}</div>
-                  <div className="mt-1 text-xs leading-5 text-muted-foreground">
-                    {item.description}
-                  </div>
-                </div>
-              ))}
+            <div className="rounded-2xl border border-white/70 bg-white/72 px-4 py-3 text-sm text-muted-foreground dark:border-orange-400/15 dark:bg-orange-500/6 dark:text-white/68">
+              先完成 Claude、Codex 或 OpenClaw 的兔子线路接入，这里会自动汇总当前设备可用的关键状态与额度信息。
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <Card className="border-white/70 bg-white/75 shadow-none backdrop-blur">
+              <Card className="border-white/70 bg-white/75 shadow-none backdrop-blur dark:border-orange-400/15 dark:bg-[linear-gradient(180deg,rgba(39,31,28,0.98),rgba(28,24,24,0.98))]">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">账户余额</span>
@@ -355,7 +323,7 @@ export function TuziWorkspacePanel({
                 </CardContent>
               </Card>
 
-              <Card className="border-white/70 bg-white/75 shadow-none backdrop-blur">
+              <Card className="border-white/70 bg-white/75 shadow-none backdrop-blur dark:border-sky-400/15 dark:bg-[linear-gradient(180deg,rgba(29,33,38,0.98),rgba(24,25,28,0.98))]">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">已用额度</span>
@@ -376,7 +344,7 @@ export function TuziWorkspacePanel({
                 </CardContent>
               </Card>
 
-              <Card className="border-white/70 bg-white/75 shadow-none backdrop-blur">
+              <Card className="border-white/70 bg-white/75 shadow-none backdrop-blur dark:border-rose-400/15 dark:bg-[linear-gradient(180deg,rgba(37,30,34,0.98),rgba(27,24,26,0.98))]">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">请求次数</span>
@@ -397,7 +365,7 @@ export function TuziWorkspacePanel({
             </div>
           </div>
 
-          <Card className="border-orange-200/60 bg-white/72 shadow-none backdrop-blur">
+          <Card className="border-orange-200/60 bg-white/72 shadow-none backdrop-blur dark:border-orange-400/20 dark:bg-[linear-gradient(180deg,rgba(33,29,28,0.98),rgba(24,24,26,0.98))]">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
@@ -406,7 +374,7 @@ export function TuziWorkspacePanel({
                     当前已接入 {activeCount} / 3 个业务入口
                   </div>
                 </div>
-                <Badge className="bg-orange-500/90 text-white hover:bg-orange-500/90">
+                <Badge className="bg-orange-500/90 text-white hover:bg-orange-500/90 dark:bg-orange-500/80">
                   {statusTone}
                 </Badge>
               </div>
@@ -415,10 +383,10 @@ export function TuziWorkspacePanel({
                 {accessCards.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
+                    className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/70 px-4 py-3 dark:border-white/10 dark:bg-white/4"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-background shadow-sm">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-background shadow-sm dark:bg-white/8">
                         {item.icon}
                       </div>
                       <div>
@@ -442,27 +410,27 @@ export function TuziWorkspacePanel({
                 ))}
               </div>
 
-              <div className="mt-5 rounded-2xl border border-dashed border-orange-200/80 bg-orange-50/70 px-4 py-3 text-xs text-orange-900/80">
+              <div className="mt-5 rounded-2xl border border-dashed border-orange-200/80 bg-orange-50/70 px-4 py-3 text-xs text-orange-900/80 dark:border-orange-400/20 dark:bg-[linear-gradient(180deg,rgba(73,53,39,0.92),rgba(46,36,31,0.96))] dark:text-orange-100/85">
                 <div className="flex items-center justify-between gap-3">
                   <span>{usageNote}</span>
                   {tuziKeySource?.sourceLabel ? (
-                    <Badge variant="outline" className="border-orange-300 bg-white/80">
+                    <Badge variant="outline" className="border-orange-300 bg-white/80 dark:border-orange-400/30 dark:bg-orange-500/10 dark:text-orange-100">
                       {tuziKeySource.sourceLabel}
                     </Badge>
                   ) : null}
                 </div>
                 {tuziUsage?.keyMasked ? (
-                  <div className="mt-2 text-orange-800/70">
+                  <div className="mt-2 text-orange-800/70 dark:text-orange-100/70">
                     当前查询 Key：{tuziUsage.keyMasked}
                   </div>
                 ) : null}
                 {expiresAtValue ? (
-                  <div className="mt-2 text-orange-800/70">
+                  <div className="mt-2 text-orange-800/70 dark:text-orange-100/70">
                     到期时间：{formatDateTime(expiresAtValue)}
                   </div>
                 ) : null}
                 {quotaNote ? (
-                  <div className="mt-2 text-orange-800/70">{quotaNote}</div>
+                  <div className="mt-2 text-orange-800/70 dark:text-orange-100/70">{quotaNote}</div>
                 ) : null}
               </div>
             </CardContent>
@@ -470,110 +438,21 @@ export function TuziWorkspacePanel({
         </div>
       </motion.div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">当前可查看的信息</h3>
-                <p className="text-sm text-muted-foreground">
-                  这里会优先展示已经可以稳定查看的信息，让你先看到真正有用的内容。
-                </p>
-              </div>
-              <Badge variant="outline" className="bg-background/60">
-                持续优化
-              </Badge>
-            </div>
-
-            <div className="mt-6 grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <Gauge className="h-4 w-4 text-orange-500" />
-                  当前已可查看
-                </div>
-                <div className="mt-3 text-xs leading-6 text-muted-foreground">
-                  账户余额、已用额度、请求次数、工具接入状态、当前线路来源。
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <TimerReset className="h-4 w-4 text-sky-500" />
-                  即将补充
-                </div>
-                <div className="mt-3 text-xs leading-6 text-muted-foreground">
-                  今日消耗、月度趋势、按天峰值、面板同款统计图和更细的业务维度。
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <Link2 className="h-4 w-4 text-rose-500" />
-                  后续可扩展
-                </div>
-                <div className="mt-3 text-xs leading-6 text-muted-foreground">
-                  需要后续拿到稳定鉴权或聚合接口，才能和兔子面板做更完整的真实同步。
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-dashed border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-              后续会继续补充更多使用数据和趋势信息，让这里成为更完整的业务工作台。
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-4">
-          {accessCards.map((item) => (
-            <Card
-              key={item.id}
-              className={`overflow-hidden border ${item.accentClass} shadow-sm`}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/85 shadow-sm">
-                      {item.icon}
-                    </div>
-                    <div>
-                      <div className="text-base font-semibold">{item.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {item.description}
-                      </div>
-                    </div>
-                  </div>
-                  {item.configured ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  ) : (
-                    <Link2 className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-white/70 bg-white/70 px-4 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    当前线路
-                  </div>
-                  <div className="mt-2 text-sm font-medium">{item.route}</div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-        <CardContent className="grid gap-4 p-6 md:grid-cols-[1.1fr_0.9fr]">
+      <Card className="overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(29,27,28,0.98),rgba(24,24,26,0.98))]">
+        <CardContent className="flex items-start justify-between gap-4 p-6">
           <div>
-            <h3 className="text-lg font-semibold">下一步建议</h3>
+            <h3 className="text-lg font-semibold">当前可查看的信息</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              如果你已经完成入口接入，接下来更适合从本地代理统计里观察真实请求，再逐步补齐账户趋势和业务维度数据。
+              目前优先展示余额、已用额度、请求次数和接入状态；更细的趋势与聚合数据会继续补充。
             </p>
           </div>
-          <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-4">
+          <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-4 dark:border-orange-400/15 dark:bg-orange-500/6">
             <div className="flex items-center gap-2 text-sm font-medium">
               <ArrowUpRight className="h-4 w-4 text-orange-500" />
-              推荐动作
+              推荐下一步
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              先确认三类入口都已接入，再切到“本地代理统计”查看近 1 天或近 7 天的请求变化，定位最常用的供应商和模型。
+              先切到“本地代理统计”看近 1 天或近 7 天的请求变化。
             </p>
           </div>
         </CardContent>

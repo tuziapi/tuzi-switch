@@ -1,3 +1,4 @@
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -231,6 +232,21 @@ fn command_output(program: &str, args: &[&str]) -> Result<String, String> {
     } else {
         Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
     }
+}
+
+fn extract_version_token(raw: &str) -> Option<String> {
+    let ansi_re = Regex::new(r"\x1b\[[0-9;]*[A-Za-z]").ok()?;
+    let version_re = Regex::new(r"\bv?(\d+\.\d+\.\d+(?:[-._][A-Za-z0-9]+)?)\b").ok()?;
+    let cleaned = ansi_re.replace_all(raw, "");
+    version_re
+        .captures(&cleaned)
+        .and_then(|captures| captures.get(1).map(|m| m.as_str().to_string()))
+}
+
+fn command_version(program: &str, args: &[&str]) -> Option<String> {
+    command_output(program, args)
+        .ok()
+        .and_then(|output| extract_version_token(&output).or(Some(output)))
 }
 
 fn run_shell_script(script: &str) -> Result<String, String> {
@@ -1389,6 +1405,8 @@ fn build_gemini_routes(
 #[tauri::command]
 pub async fn get_gemini_status() -> Result<GeminiStatus, String> {
     let installed = command_exists("gemini");
+    // Gemini CLI may touch ~/.gemini runtime files even for `--version`.
+    // Avoid blocking the whole quick-access panel on that side effect.
     let version = None;
     let env_path = get_gemini_env_file_path()?;
     let settings_path = get_gemini_settings_file_path()?;

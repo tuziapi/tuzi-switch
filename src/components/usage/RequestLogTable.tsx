@@ -29,6 +29,7 @@ import {
 } from "./format";
 
 interface RequestLogTableProps {
+  days: number;
   businessLine: BusinessLineFilter;
   refreshIntervalMs: number;
 }
@@ -39,16 +40,17 @@ const MAX_FIXED_RANGE_SECONDS = 30 * ONE_DAY_SECONDS;
 type TimeMode = "rolling" | "fixed";
 
 export function RequestLogTable({
+  days,
   businessLine,
   refreshIntervalMs,
 }: RequestLogTableProps) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
+  const [showCustomRange, setShowCustomRange] = useState(false);
 
   const getRollingRange = () => {
     const now = Math.floor(Date.now() / 1000);
-    const oneDayAgo = now - ONE_DAY_SECONDS;
-    return { startDate: oneDayAgo, endDate: now };
+    return { startDate: now - days * ONE_DAY_SECONDS, endDate: now };
   };
 
   const [appliedTimeMode, setAppliedTimeMode] = useState<TimeMode>("rolling");
@@ -67,7 +69,7 @@ export function RequestLogTable({
   const { data: result, isLoading } = useRequestLogs({
     filters: appliedFilters,
     timeMode: appliedTimeMode,
-    rollingWindowSeconds: ONE_DAY_SECONDS,
+    rollingWindowSeconds: days * ONE_DAY_SECONDS,
     page,
     pageSize,
     options: {
@@ -84,7 +86,7 @@ export function RequestLogTable({
     setDraftFilters((prev) => ({ ...prev, businessLine: nextBusinessLine }));
     setAppliedFilters((prev) => ({ ...prev, businessLine: nextBusinessLine }));
     setPage(0);
-  }, [businessLine]);
+  }, [businessLine, days]);
 
   const handleSearch = () => {
     setValidationError(null);
@@ -144,7 +146,7 @@ export function RequestLogTable({
     const key = {
       timeMode: appliedTimeMode,
       rollingWindowSeconds:
-        appliedTimeMode === "rolling" ? ONE_DAY_SECONDS : undefined,
+        appliedTimeMode === "rolling" ? days * ONE_DAY_SECONDS : undefined,
       appType: appliedFilters.appType,
       businessLine: appliedFilters.businessLine,
       providerName: appliedFilters.providerName,
@@ -187,6 +189,8 @@ export function RequestLogTable({
 
   const rollingRangeForDisplay =
     draftTimeMode === "rolling" ? getRollingRange() : null;
+  const currentRangeLabel =
+    days === 1 ? "当前跟随顶部 1 天范围" : days === 7 ? "当前跟随顶部 7 天范围" : "当前跟随顶部 30 天范围";
 
   return (
     <div className="space-y-4">
@@ -270,7 +274,61 @@ export function RequestLogTable({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span>{currentRangeLabel}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const next = !showCustomRange;
+                setShowCustomRange(next);
+                if (!next) {
+                  setDraftTimeMode("rolling");
+                  setDraftFilters((prev) => {
+                    const nextFilters = { ...prev };
+                    delete nextFilters.startDate;
+                    delete nextFilters.endDate;
+                    return nextFilters;
+                  });
+                }
+              }}
+              className="h-8 px-2"
+            >
+              {showCustomRange ? "收起自定义时间" : "自定义时间"}
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleSearch}
+              className="h-8"
+            >
+              <Search className="mr-2 h-3.5 w-3.5" />
+              {t("common.search")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleReset}
+              className="h-8"
+            >
+              <X className="mr-2 h-3.5 w-3.5" />
+              {t("common.reset")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleRefresh}
+              className="h-8 px-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {showCustomRange ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span className="whitespace-nowrap">{t("usage.timeRange")}:</span>
             <Input
               type="datetime-local"
@@ -314,36 +372,7 @@ export function RequestLogTable({
               }}
             />
           </div>
-
-          <div className="flex items-center gap-2 ml-auto">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={handleSearch}
-              className="h-8"
-            >
-              <Search className="mr-2 h-3.5 w-3.5" />
-              {t("common.search")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleReset}
-              className="h-8"
-            >
-              <X className="mr-2 h-3.5 w-3.5" />
-              {t("common.reset")}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleRefresh}
-              className="h-8 px-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        ) : null}
 
         {validationError && (
           <div className="text-sm text-red-600">{validationError}</div>

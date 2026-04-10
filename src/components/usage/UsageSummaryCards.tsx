@@ -50,7 +50,7 @@ export function UsageSummaryCards({
         icon: Activity,
         color: "text-blue-500",
         bg: "bg-blue-500/10",
-        hint: `${rangeLabel}请求总量`,
+        hint: `${rangeLabel}请求`,
         subValue: null,
       },
       {
@@ -59,7 +59,7 @@ export function UsageSummaryCards({
         icon: DollarSign,
         color: "text-green-500",
         bg: "bg-green-500/10",
-        hint: `${businessLineLabel}累计成本`,
+        hint: `${businessLineLabel}成本`,
         subValue: null,
       },
       {
@@ -68,7 +68,7 @@ export function UsageSummaryCards({
         icon: Layers,
         color: "text-purple-500",
         bg: "bg-purple-500/10",
-        hint: "输入与输出合计",
+        hint: "输入 + 输出",
         subValue: (
           <div className="flex flex-col gap-1 text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
             <div className="flex justify-between items-center">
@@ -92,7 +92,7 @@ export function UsageSummaryCards({
         icon: Database,
         color: "text-orange-500",
         bg: "bg-orange-500/10",
-        hint: "缓存读写合计",
+        hint: "缓存读 + 写",
         subValue: (
           <div className="flex flex-col gap-1 text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
             <div className="flex justify-between items-center">

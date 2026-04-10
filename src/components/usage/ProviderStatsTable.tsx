@@ -12,16 +12,18 @@ import { fmtUsd } from "./format";
 import type { BusinessLineFilter } from "@/types/usage";
 
 interface ProviderStatsTableProps {
+  days: number;
   businessLine: BusinessLineFilter;
   refreshIntervalMs: number;
 }
 
 export function ProviderStatsTable({
+  days,
   businessLine,
   refreshIntervalMs,
 }: ProviderStatsTableProps) {
   const { t } = useTranslation();
-  const { data: stats, isLoading } = useProviderStats(businessLine, {
+  const { data: stats, isLoading } = useProviderStats(days, businessLine, {
     refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
   });
 

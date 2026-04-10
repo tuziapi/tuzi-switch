@@ -120,6 +120,41 @@ export function ProviderCard({
 }: ProviderCardProps) {
   const { t } = useTranslation();
 
+  const activeTone = useMemo(() => {
+    switch (appId) {
+      case "claude":
+        return {
+          border: "border-orange-500/60",
+          shadow: "shadow-sm shadow-orange-500/10",
+          glow: "from-orange-500/10",
+        };
+      case "codex":
+        return {
+          border: "border-sky-500/60",
+          shadow: "shadow-sm shadow-sky-500/10",
+          glow: "from-sky-500/10",
+        };
+      case "gemini":
+        return {
+          border: "border-pink-500/60",
+          shadow: "shadow-sm shadow-pink-500/10",
+          glow: "from-pink-500/10",
+        };
+      case "openclaw":
+        return {
+          border: "border-red-500/60",
+          shadow: "shadow-sm shadow-red-500/10",
+          glow: "from-red-500/10",
+        };
+      default:
+        return {
+          border: "border-blue-500/60",
+          shadow: "shadow-sm shadow-blue-500/10",
+          glow: "from-blue-500/10",
+        };
+    }
+  }, [appId]);
+
   // OMO and OMO Slim share the same card behavior
   const isAnyOmo = isOmo || isOmoSlim;
   const handleDisableAnyOmo = isOmoSlim ? onDisableOmoSlim : onDisableOmo;
@@ -227,7 +262,7 @@ export function ProviderCard({
           : "hover:border-border-active",
         shouldUseGreen &&
           "border-emerald-500/60 shadow-sm shadow-emerald-500/10",
-        shouldUseBlue && "border-blue-500/60 shadow-sm shadow-blue-500/10",
+        shouldUseBlue && `${activeTone.border} ${activeTone.shadow}`,
         !(isActiveProvider || hasPersistentConfigHighlight) &&
           "hover:shadow-sm",
         dragHandleProps?.isDragging &&
@@ -238,7 +273,7 @@ export function ProviderCard({
         className={cn(
           "absolute inset-0 bg-gradient-to-r to-transparent transition-opacity duration-500 pointer-events-none",
           shouldUseGreen && "from-emerald-500/10",
-          shouldUseBlue && "from-blue-500/10",
+          shouldUseBlue && activeTone.glow,
           !shouldUseGreen && !shouldUseBlue && "from-primary/10",
           isActiveProvider || hasPersistentConfigHighlight
             ? "opacity-100"

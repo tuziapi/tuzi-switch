@@ -36,18 +36,26 @@ pub fn get_usage_trends(
 #[tauri::command]
 pub fn get_provider_stats(
     state: State<'_, AppState>,
+    start_date: Option<i64>,
+    end_date: Option<i64>,
     business_line: Option<String>,
 ) -> Result<Vec<ProviderStats>, AppError> {
-    state.db.get_provider_stats(business_line.as_deref())
+    state
+        .db
+        .get_provider_stats(start_date, end_date, business_line.as_deref())
 }
 
 /// 获取模型统计
 #[tauri::command]
 pub fn get_model_stats(
     state: State<'_, AppState>,
+    start_date: Option<i64>,
+    end_date: Option<i64>,
     business_line: Option<String>,
 ) -> Result<Vec<ModelStats>, AppError> {
-    state.db.get_model_stats(business_line.as_deref())
+    state
+        .db
+        .get_model_stats(start_date, end_date, business_line.as_deref())
 }
 
 /// 获取请求日志列表

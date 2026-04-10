@@ -127,28 +127,40 @@ export function useUsageTrends(
 }
 
 export function useProviderStats(
+  days: number,
   businessLine: BusinessLineFilter,
   options?: UsageQueryOptions,
 ) {
   return useQuery({
-    queryKey: usageKeys.providerStats(businessLine),
-    queryFn: () =>
-      usageApi.getProviderStats(
+    queryKey: [...usageKeys.providerStats(businessLine), days],
+    queryFn: () => {
+      const { startDate, endDate } = getWindow(days);
+      return usageApi.getProviderStats(
+        startDate,
+        endDate,
         businessLine === "all" ? undefined : businessLine,
-      ),
+      );
+    },
     refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS, // 每30秒自动刷新
     refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
   });
 }
 
 export function useModelStats(
+  days: number,
   businessLine: BusinessLineFilter,
   options?: UsageQueryOptions,
 ) {
   return useQuery({
-    queryKey: usageKeys.modelStats(businessLine),
-    queryFn: () =>
-      usageApi.getModelStats(businessLine === "all" ? undefined : businessLine),
+    queryKey: [...usageKeys.modelStats(businessLine), days],
+    queryFn: () => {
+      const { startDate, endDate } = getWindow(days);
+      return usageApi.getModelStats(
+        startDate,
+        endDate,
+        businessLine === "all" ? undefined : businessLine,
+      );
+    },
     refetchInterval: options?.refetchInterval ?? DEFAULT_REFETCH_INTERVAL_MS, // 每30秒自动刷新
     refetchIntervalInBackground: options?.refetchIntervalInBackground ?? false,
   });

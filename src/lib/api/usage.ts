@@ -66,15 +66,19 @@ export const usageApi = {
   },
 
   getProviderStats: async (
+    startDate?: number,
+    endDate?: number,
     businessLine?: "tuzi" | "gac",
   ): Promise<ProviderStats[]> => {
-    return invoke("get_provider_stats", { businessLine });
+    return invoke("get_provider_stats", { startDate, endDate, businessLine });
   },
 
   getModelStats: async (
+    startDate?: number,
+    endDate?: number,
     businessLine?: "tuzi" | "gac",
   ): Promise<ModelStats[]> => {
-    return invoke("get_model_stats", { businessLine });
+    return invoke("get_model_stats", { startDate, endDate, businessLine });
   },
 
   getRequestLogs: async (

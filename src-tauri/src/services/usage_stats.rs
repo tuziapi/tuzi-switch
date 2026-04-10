@@ -459,14 +459,41 @@ impl Database {
     }
 
     /// 获取 Provider 统计
-    pub fn get_provider_stats(&self, business_line: Option<&str>) -> Result<Vec<ProviderStats>, AppError> {
+    pub fn get_provider_stats(
+        &self,
+        start_date: Option<i64>,
+        end_date: Option<i64>,
+        business_line: Option<&str>,
+    ) -> Result<Vec<ProviderStats>, AppError> {
         let conn = lock_conn!(self.conn);
-        let detail_filter = Self::business_line_condition(business_line, "l", "p")
-            .map(|condition| format!("WHERE {condition}"))
-            .unwrap_or_default();
-        let rollup_filter = Self::business_line_condition(business_line, "r", "p2")
-            .map(|condition| format!("WHERE {condition}"))
-            .unwrap_or_default();
+        let mut detail_conditions = Vec::new();
+        let mut rollup_conditions = Vec::new();
+
+        if let Some(condition) = Self::business_line_condition(business_line, "l", "p") {
+            detail_conditions.push(condition);
+        }
+        if let Some(condition) = Self::business_line_condition(business_line, "r", "p2") {
+            rollup_conditions.push(condition);
+        }
+        if let Some(start) = start_date {
+            detail_conditions.push(format!("l.created_at >= {start}"));
+            rollup_conditions.push(format!("r.date >= {start}"));
+        }
+        if let Some(end) = end_date {
+            detail_conditions.push(format!("l.created_at <= {end}"));
+            rollup_conditions.push(format!("r.date <= {end}"));
+        }
+
+        let detail_filter = if detail_conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", detail_conditions.join(" AND "))
+        };
+        let rollup_filter = if rollup_conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", rollup_conditions.join(" AND "))
+        };
 
         // UNION detail logs + rollup data, then aggregate
         let sql = format!("SELECT
@@ -538,14 +565,41 @@ impl Database {
     }
 
     /// 获取模型统计
-    pub fn get_model_stats(&self, business_line: Option<&str>) -> Result<Vec<ModelStats>, AppError> {
+    pub fn get_model_stats(
+        &self,
+        start_date: Option<i64>,
+        end_date: Option<i64>,
+        business_line: Option<&str>,
+    ) -> Result<Vec<ModelStats>, AppError> {
         let conn = lock_conn!(self.conn);
-        let detail_filter = Self::business_line_condition(business_line, "l", "p")
-            .map(|condition| format!("WHERE {condition}"))
-            .unwrap_or_default();
-        let rollup_filter = Self::business_line_condition(business_line, "r", "p2")
-            .map(|condition| format!("WHERE {condition}"))
-            .unwrap_or_default();
+        let mut detail_conditions = Vec::new();
+        let mut rollup_conditions = Vec::new();
+
+        if let Some(condition) = Self::business_line_condition(business_line, "l", "p") {
+            detail_conditions.push(condition);
+        }
+        if let Some(condition) = Self::business_line_condition(business_line, "r", "p2") {
+            rollup_conditions.push(condition);
+        }
+        if let Some(start) = start_date {
+            detail_conditions.push(format!("l.created_at >= {start}"));
+            rollup_conditions.push(format!("r.date >= {start}"));
+        }
+        if let Some(end) = end_date {
+            detail_conditions.push(format!("l.created_at <= {end}"));
+            rollup_conditions.push(format!("r.date <= {end}"));
+        }
+
+        let detail_filter = if detail_conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", detail_conditions.join(" AND "))
+        };
+        let rollup_filter = if rollup_conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", rollup_conditions.join(" AND "))
+        };
 
         // UNION detail logs + rollup data
         let sql = format!("SELECT
