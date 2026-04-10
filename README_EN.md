@@ -158,17 +158,16 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 
 ## Development Plan / TODO
 
-- P0 done: the first Tuzi route-management pass is complete for Claude, Codex, Gemini, and OpenClaw, with aligned status structure, route-card logic, and module tone
-- P0 done: Codex main Tuzi routing and the Coding special route are now split correctly, reducing the mismatch between one-click config and manual config behavior
-- P0 done: the first Gemini business integration is complete, supporting both "official Gemini + Tuzi API" and "GAC-modified Gemini"
-- P0 done: one round of status-card, refresh-state, icon, and route-status fixes has been completed across the four onboarding modules
-- P1 in progress: continue polishing status feedback, error hints, empty states, refresh behavior, and visual hierarchy so configured states feel more trustworthy
-- P1 in progress: keep improving OpenClaw onboarding and route-switch feedback for Tuzi and GAC business routes
-- P1 planned: revisit session-manager behavior and clarify the OpenClaw recovery boundary, then implement recovery support if needed
-- P1 planned: expand release notes, upgrade guidance, install hints, and customer-facing product copy
-- P2 planned: after a stable auth contract is ready, integrate Tuzi backend aggregation APIs for real summary / trend / distribution business data
-- P2 planned: continue aligning install documentation and release workflow so the installer, `prerelease` strategy, and "install latest version" behavior stay consistent
-- P2 planned: gradually reduce leftover upstream naming across docs, UI copy, and compatibility paths
+- P0 done: the first Tuzi route-management pass is complete across Claude, Codex, Gemini, and OpenClaw
+- P0 done: Codex main / Coding route split is complete, and the first Gemini business onboarding pass is complete
+- P0 done: one round of fixes has been completed for status cards, current-route detection, module icons, and base visual issues
+- P1 in progress: keep improving state reliability, refresh feedback, and error hints across the four entry modules
+- P1 in progress: keep aligning route cards, status blocks, hint blocks, and provider-list highlights across light and dark themes
+- P1 in progress: keep improving OpenClaw onboarding and route explanation
+- P1 planned: revisit session management and clarify the OpenClaw recovery boundary
+- P1 planned: expand release notes, install hints, and customer-facing product copy
+- P2 planned: connect more complete real business-data capabilities
+- P2 planned: keep refining install guidance, release flow, and documentation naming consistency
 
 ## Notes
 
