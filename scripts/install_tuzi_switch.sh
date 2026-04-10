@@ -67,8 +67,10 @@ if [[ -n "${TAG}" ]]; then
   TAG_NORM="${TAG#v}"
   TAG_NORM="v${TAG_NORM}"
   API_URL="https://api.github.com/repos/${REPO}/releases/tags/${TAG_NORM}"
+  RELEASE_MODE="tag"
 else
-  API_URL="https://api.github.com/repos/${REPO}/releases/latest"
+  API_URL="https://api.github.com/repos/${REPO}/releases?per_page=20"
+  RELEASE_MODE="list"
 fi
 
 CURL_HEADERS=(-H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
@@ -104,15 +106,31 @@ REL_JSON="${TMP}/release.json"
 printf '%s' "$RELEASE_JSON" > "${REL_JSON}"
 
 DOWNLOAD_URL=$(
-  python3 - "${REL_JSON}" "${PLATFORM}" "${PREFER_APPIMAGE}" <<'PY'
+  python3 - "${REL_JSON}" "${PLATFORM}" "${PREFER_APPIMAGE}" "${RELEASE_MODE}" <<'PY'
 import json
 import sys
 
-path, platform, prefer = sys.argv[1], sys.argv[2], sys.argv[3]
+path, platform, prefer, release_mode = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 prefer_appimage = prefer == "1"
 
 with open(path, encoding="utf-8") as f:
-    data = json.load(f)
+    payload = json.load(f)
+
+if release_mode == "tag":
+    data = payload
+else:
+    if not isinstance(payload, list):
+        print("Error: unexpected GitHub releases response.", file=sys.stderr)
+        sys.exit(1)
+    data = None
+    for item in payload:
+        if item.get("draft"):
+            continue
+        data = item
+        break
+    if data is None:
+        print("Error: no published release found.", file=sys.stderr)
+        sys.exit(1)
 
 if data.get("draft"):
     print("Error: release is still a draft.", file=sys.stderr)
