@@ -28,17 +28,17 @@
 
 ### ワンコマンドインストール
 
-現在の推奨版 `v3.12.10` を直接インストール:
+現在の推奨版 `v3.12.11` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.10 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.11 bash
 ```
 
 補足:
 
 - 現在の Release workflow は引き続き `prerelease` 方式で公開されています
 - そのため GitHub の `releases/latest` では、最新のテスト版を正しく取れない場合があります
-- README のコマンドは `v3.12.10` に固定し、現在の推奨版を確実に入れられるようにしています
+- README のコマンドは `v3.12.11` に固定し、現在の推奨版を確実に入れられるようにしています
 - 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
@@ -70,13 +70,13 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 現在のバージョン更新内容
 
-現在の公開版は `v3.12.10` で、今回の主な更新は以下です。
+現在の公開版は `v3.12.11` で、今回の主な更新は以下です。
 
-- 「原版 Gemini + Tuzi API」と「gac 改版 Gemini」を含む Gemini クイック接入を追加
-- Codex の Tuzi 主ルートと Coding 特別ルートを明確に分離
-- Claude、Codex、Gemini、OpenClaw の 4 入口で、ルート管理 UI・状態カード・モジュール表現を揃えた
-- OpenClaw のルートカード構造と接入導線を改善
-- Tuzi アイコン表示と一部のルート状態表示不具合を修正
+- Claude、Codex、Gemini、OpenClaw の各入口で、ルート管理体験の磨き込みを継続
+- ライト / ダーク両テーマで、モジュール色、選択状態、下部カード高亮、状態ヒントの表現をさらに統一
+- OpenClaw の導線階層と提案ブロックを見直し、業務ルートの選択がわかりやすくなった
+- Gemini や Codex 周辺の状態取得と現在ルート判定ロジックをさらに補正
+- 上部のクイック接入エリアと下部のプロバイダ一覧の視覚一貫性を改善
 
 ## 製品のポイント
 
