@@ -305,6 +305,7 @@ fn handle_provider_click(
             app_state.clone(),
             app_type_str.to_string(),
             provider_id.to_string(),
+            None,
         )
         .map_err(AppError::Message)?;
 

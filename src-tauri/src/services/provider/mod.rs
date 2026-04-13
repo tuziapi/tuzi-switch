@@ -1345,7 +1345,12 @@ impl ProviderService {
     ///    c. Update database is_current (as default for new devices)
     ///    d. Write target provider config to live files
     ///    e. Sync MCP configuration
-    pub fn switch(state: &AppState, app_type: AppType, id: &str) -> Result<SwitchResult, AppError> {
+    pub fn switch(
+        state: &AppState,
+        app_type: AppType,
+        id: &str,
+        skip_backfill: bool,
+    ) -> Result<SwitchResult, AppError> {
         // Check if provider exists
         let providers = state.db.get_all_providers(app_type.as_str())?;
         let _provider = providers
@@ -1354,14 +1359,14 @@ impl ProviderService {
 
         // OMO providers are switched through their own exclusive path.
         if matches!(app_type, AppType::OpenCode) && _provider.category.as_deref() == Some("omo") {
-            return Self::switch_normal(state, app_type, id, &providers);
+            return Self::switch_normal(state, app_type, id, &providers, skip_backfill);
         }
 
         // OMO Slim providers are switched through their own exclusive path.
         if matches!(app_type, AppType::OpenCode)
             && _provider.category.as_deref() == Some("omo-slim")
         {
-            return Self::switch_normal(state, app_type, id, &providers);
+            return Self::switch_normal(state, app_type, id, &providers, skip_backfill);
         }
 
         // Check if proxy takeover mode is active AND proxy server is actually running
@@ -1401,7 +1406,7 @@ impl ProviderService {
         }
 
         // Normal mode: full switch with Live config write
-        Self::switch_normal(state, app_type, id, &providers)
+        Self::switch_normal(state, app_type, id, &providers, skip_backfill)
     }
 
     /// Normal switch flow (non-proxy mode)
@@ -1410,6 +1415,7 @@ impl ProviderService {
         app_type: AppType,
         id: &str,
         providers: &indexmap::IndexMap<String, Provider>,
+        skip_backfill: bool,
     ) -> Result<SwitchResult, AppError> {
         let provider = providers
             .get(id)
@@ -1440,28 +1446,31 @@ impl ProviderService {
         // Use effective current provider (validated existence) to ensure backfill targets valid provider
         let current_id = crate::settings::get_effective_current_provider(&state.db, &app_type)?;
 
-        if let Some(current_id) = current_id {
-            if current_id != id {
-                // Additive mode apps - all providers coexist in the same file,
-                // no backfill needed (backfill is for exclusive mode apps like Claude/Codex/Gemini)
-                if !app_type.is_additive_mode() {
-                    // Only backfill when switching to a different provider
-                    if let Ok(live_config) = read_live_settings(app_type.clone()) {
-                        if let Some(mut current_provider) = providers.get(&current_id).cloned() {
-                            current_provider.settings_config =
-                                strip_common_config_from_live_settings(
-                                    state.db.as_ref(),
-                                    &app_type,
-                                    &current_provider,
-                                    live_config,
-                                );
-                            if let Err(e) =
-                                state.db.save_provider(app_type.as_str(), &current_provider)
+        if !skip_backfill {
+            if let Some(current_id) = current_id {
+                if current_id != id {
+                    // Additive mode apps - all providers coexist in the same file,
+                    // no backfill needed (backfill is for exclusive mode apps like Claude/Codex/Gemini)
+                    if !app_type.is_additive_mode() {
+                        // Only backfill when switching to a different provider
+                        if let Ok(live_config) = read_live_settings(app_type.clone()) {
+                            if let Some(mut current_provider) = providers.get(&current_id).cloned()
                             {
-                                log::warn!("Backfill failed: {e}");
-                                result
-                                    .warnings
-                                    .push(format!("backfill_failed:{current_id}"));
+                                current_provider.settings_config =
+                                    strip_common_config_from_live_settings(
+                                        state.db.as_ref(),
+                                        &app_type,
+                                        &current_provider,
+                                        live_config,
+                                    );
+                                if let Err(e) =
+                                    state.db.save_provider(app_type.as_str(), &current_provider)
+                                {
+                                    log::warn!("Backfill failed: {e}");
+                                    result
+                                        .warnings
+                                        .push(format!("backfill_failed:{current_id}"));
+                                }
                             }
                         }
                     }

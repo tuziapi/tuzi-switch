@@ -172,7 +172,7 @@ const CLAUDE_ROUTE_CONFIG: Record<
 const CODEX_ROUTE_CONFIG = {
   tuzi: {
     providerId: "tuzi-codex-route",
-    providerName: "兔子 Codex · 兔子主线路",
+    providerName: "兔子 Codex · 兔子线路",
     baseUrl: "https://api.tu-zi.com/v1",
     websiteUrl: "https://api.tu-zi.com",
     businessLine: "tuzi" as const,
@@ -185,8 +185,8 @@ const CODEX_ROUTE_CONFIG = {
     businessLine: "tuzi" as const,
   },
   gac: {
-    providerId: "default",
-    providerName: "default",
+    providerId: "gac-codex-route",
+    providerName: "兔子 Codex · gac 线路",
     baseUrl: "https://gaccode.com/codex/v1",
     websiteUrl: "https://gaccode.com/codex",
     businessLine: "gac" as const,
@@ -197,6 +197,13 @@ function getCurrentRouteBaseUrl(
   routes: Array<{ is_current: boolean; base_url: string | null }> | undefined,
 ) {
   return routes?.find((route) => route.is_current)?.base_url || "--";
+}
+
+function hasNamedRoute(
+  routes: Array<{ name?: string | null }> | undefined,
+  routeName: string,
+) {
+  return Boolean(routes?.some((route) => route.name === routeName));
 }
 
 function getGeminiCliStatusLabel(status: GeminiInstallerStatus) {
@@ -217,19 +224,25 @@ function getClaudeRouteLabel(route: ClaudeEntryOption | null | undefined) {
 function getClaudeRouteFromProvider(
   currentProviderId: string,
   provider?: Provider,
-): ClaudeEntryOption | null {
+): ClaudeEntryOption | "custom" | null {
   if (!currentProviderId && !provider?.name) return null;
+  const baseUrl = getProviderBaseUrl(provider)?.toLowerCase() || "";
   if (
     currentProviderId === CLAUDE_ROUTE_CONFIG["tu-zi"].providerId ||
-    provider?.name?.includes("兔子 Claude")
+    provider?.name?.includes("兔子 Claude") ||
+    baseUrl.includes("api.tu-zi.com")
   ) {
     return "tu-zi";
   }
   if (
     currentProviderId === CLAUDE_ROUTE_CONFIG.gaccode.providerId ||
-    provider?.name?.includes("gac Claude")
+    provider?.name?.includes("gac Claude") ||
+    baseUrl.includes("gaccode.com/claudecode")
   ) {
     return "gaccode";
+  }
+  if (currentProviderId) {
+    return "custom";
   }
   return null;
 }
@@ -237,26 +250,33 @@ function getClaudeRouteFromProvider(
 function getCodexRouteFromProvider(
   currentProviderId: string,
   provider?: Provider,
-): CodexEntryOption | null {
+): CodexEntryOption | "custom" | null {
   if (!currentProviderId && !provider?.name) return null;
+  const baseUrl = getProviderBaseUrl(provider)?.toLowerCase() || "";
+
   if (
     currentProviderId === CODEX_ROUTE_CONFIG.tuzi.providerId ||
-    provider?.name?.includes("兔子 Codex · 兔子主线路")
+    provider?.name?.includes("兔子 Codex · 兔子主线路") ||
+    baseUrl.includes("api.tu-zi.com/v1")
   ) {
     return "tuzi";
   }
   if (
     currentProviderId === CODEX_ROUTE_CONFIG.codex.providerId ||
-    provider?.name?.includes("Coding 特别线路")
+    provider?.name?.includes("Coding 特别线路") ||
+    baseUrl.includes("coding.tu-zi.com")
   ) {
     return "tuzi-coding";
   }
   if (
-    currentProviderId === CODEX_ROUTE_CONFIG.gac.providerId ||
     provider?.name?.includes("gac") ||
-    provider?.meta?.businessLine === "gac"
+    provider?.meta?.businessLine === "gac" ||
+    baseUrl.includes("gaccode.com/codex")
   ) {
     return "gac";
+  }
+  if (currentProviderId) {
+    return "custom";
   }
   return null;
 }
@@ -264,13 +284,18 @@ function getCodexRouteFromProvider(
 function getGeminiRouteFromProvider(
   currentProviderId: string,
   provider?: Provider,
-): GeminiEntryOption | null {
+): GeminiEntryOption | "custom" | null {
   if (!currentProviderId && !provider?.name) return null;
+  const baseUrl = getProviderBaseUrl(provider)?.toLowerCase() || "";
   if (
     currentProviderId === GEMINI_ROUTE_CONFIG.tuzi.providerId ||
-    provider?.name?.includes("兔子 Gemini")
+    provider?.name?.includes("兔子 Gemini") ||
+    baseUrl.includes("api.tu-zi.com")
   ) {
     return "tuzi";
+  }
+  if (currentProviderId) {
+    return "custom";
   }
   return null;
 }
@@ -317,8 +342,12 @@ function getProviderBaseUrl(provider?: Provider): string | null {
 
   const config = provider.settingsConfig?.config;
   if (typeof config === "string" && config.trim()) {
+    const modelProviderMatch = config.match(
+      /^\s*model_provider\s*=\s*"([^"]+)"/m,
+    );
     const profileMatch = config.match(/^\s*profile\s*=\s*"([^"]+)"/m);
     const profile =
+      modelProviderMatch?.[1]?.trim() ||
       profileMatch?.[1]?.trim() ||
       provider.id.split(".").pop()?.trim() ||
       "";
@@ -336,10 +365,10 @@ function getProviderBaseUrl(provider?: Provider): string | null {
   }
   if (config && typeof config === "object") {
     const profile =
-      typeof config.profile === "string"
-        ? config.profile
-        : typeof config.model_provider === "string"
-          ? config.model_provider
+      typeof config.model_provider === "string"
+        ? config.model_provider
+        : typeof config.profile === "string"
+          ? config.profile
           : null;
     const modelProviders = config.model_providers;
     if (
@@ -370,20 +399,21 @@ function buildCodexBusinessConfig(
   baseUrl: string,
   modelName = "gpt-5.4",
 ) {
-  return `profile = "${route}"
-model_provider = "${route}"
+  const profileName = route === "gac" ? "codex" : route;
+  return `profile = "${profileName}"
+model_provider = "${profileName}"
 model = "${modelName}"
 model_reasoning_effort = "high"
 disable_response_storage = true
 
-[model_providers.${route}]
-name = "${route}"
+[model_providers.${profileName}]
+name = "${profileName}"
 base_url = "${baseUrl}"
 wire_api = "responses"
 requires_openai_auth = true
 
-[profiles.${route}]
-model_provider = "${route}"
+[profiles.${profileName}]
+model_provider = "${profileName}"
 model = "${modelName}"
 model_reasoning_effort = "high"
 approval_policy = "on-request"`;
@@ -562,6 +592,9 @@ export function BusinessQuickAccess({
   const [claudeEntryOption, setClaudeEntryOption] = useState<ClaudeEntryOption>("tu-zi");
   const [codexEntryOption, setCodexEntryOption] = useState<CodexEntryOption>("tuzi");
   const [geminiEntryOption, setGeminiEntryOption] = useState<GeminiEntryOption>("tuzi");
+  const [claudeSelectionTouched, setClaudeSelectionTouched] = useState(false);
+  const [codexSelectionTouched, setCodexSelectionTouched] = useState(false);
+  const [geminiSelectionTouched, setGeminiSelectionTouched] = useState(false);
   const [claudeGacKey, setClaudeGacKey] = useState("");
   const [claudeTuziKey, setClaudeTuziKey] = useState("");
   const [codexApiKey, setCodexApiKey] = useState("");
@@ -765,7 +798,7 @@ export function BusinessQuickAccess({
     openclawTools?.profile,
   ]);
   const selectedOpenClawConfig = OPENCLAW_ROUTE_CONFIG[openclawRoute];
-  const activeClaudeRoute = useMemo<ClaudeEntryOption>(() => {
+  const activeClaudeRoute = useMemo<ClaudeEntryOption | "custom" | null>(() => {
     const providerRoute = getClaudeRouteFromProvider(
       claudeCurrentProviderId,
       claudeCurrentProvider,
@@ -775,10 +808,10 @@ export function BusinessQuickAccess({
     if (claudeStatus?.current_route === "gaccode") {
       return "gaccode";
     }
-    return "tu-zi";
+    return claudeCurrentProviderId || claudeCurrentProvider ? "custom" : null;
   }, [claudeCurrentProvider, claudeCurrentProviderId, claudeStatus]);
 
-  const activeCodexRoute = useMemo<CodexEntryOption | "gac-modified">(() => {
+  const activeCodexRoute = useMemo<CodexEntryOption | "gac-modified" | "custom" | null>(() => {
     const providerRoute = getCodexRouteFromProvider(
       codexCurrentProviderId,
       codexCurrentProvider,
@@ -787,18 +820,42 @@ export function BusinessQuickAccess({
     if (codexStatus?.install_type === "gac") return "gac-modified";
     if (codexStatus?.current_route === "codex") return "tuzi-coding";
     if (codexStatus?.current_route === "gac") return "gac";
-    return "tuzi";
+    if (codexStatus?.current_route === "tuzi") return "tuzi";
+    return codexCurrentProviderId || codexCurrentProvider ? "custom" : null;
   }, [codexCurrentProvider, codexCurrentProviderId, codexStatus]);
 
-  const activeGeminiRoute = useMemo<GeminiEntryOption | "gac-modified">(() => {
+  const activeGeminiRoute = useMemo<GeminiEntryOption | "gac-modified" | "custom" | null>(() => {
     const providerRoute = getGeminiRouteFromProvider(
       geminiCurrentProviderId,
       geminiCurrentProvider,
     );
     if (providerRoute) return providerRoute;
     if (geminiStatus?.install_type === "gac") return "gac-modified";
-    return "tuzi";
+    if (geminiStatus?.current_route === "tuzi") return "tuzi";
+    return geminiCurrentProviderId || geminiCurrentProvider ? "custom" : null;
   }, [geminiCurrentProvider, geminiCurrentProviderId, geminiStatus]);
+
+  const claudeSelectedRoute = claudeSelectionTouched
+    ? claudeEntryOption
+    : activeClaudeRoute === "custom"
+      ? null
+      : activeClaudeRoute;
+  const codexSelectedRoute = codexSelectionTouched
+    ? codexEntryOption
+    : activeCodexRoute === "custom"
+      ? null
+      : activeCodexRoute;
+  const geminiSelectedRoute = geminiSelectionTouched
+    ? geminiEntryOption
+    : activeGeminiRoute === "custom"
+      ? null
+      : activeGeminiRoute;
+  const hasClaudeTuziRoute = hasNamedRoute(claudeStatus?.routes, "tu-zi");
+  const hasClaudeGacRoute = hasNamedRoute(claudeStatus?.routes, "gaccode");
+  const hasCodexTuziRoute = hasNamedRoute(codexStatus?.routes, "tuzi");
+  const hasCodexCodingRoute = hasNamedRoute(codexStatus?.routes, "codex");
+  const hasCodexGacRoute = hasNamedRoute(codexStatus?.routes, "gac");
+  const hasGeminiTuziRoute = hasNamedRoute(geminiStatus?.routes, "tuzi");
 
   const configureOpenClawRoute = async (
     route: OpenClawRoute,
@@ -878,6 +935,7 @@ export function BusinessQuickAccess({
     });
 
     await loadStatus();
+    setOpenclawApiKey("");
 
     return {
       success: true,
@@ -942,6 +1000,11 @@ export function BusinessQuickAccess({
       scheme === "B" ? "gaccode" : "tu-zi",
       trimmedKey,
     );
+    if (scheme === "B") {
+      setClaudeGacKey("");
+    } else {
+      setClaudeTuziKey("");
+    }
     return result;
   };
 
@@ -962,7 +1025,7 @@ export function BusinessQuickAccess({
         route === "gac"
           ? "由 gac 业务一键接入自动生成"
           : route === "tuzi"
-            ? "由兔子业务一键接入自动生成（兔子主线路）"
+            ? "由兔子业务一键接入自动生成（兔子线路）"
             : "由兔子业务一键接入自动生成（Coding 特别线路）",
       meta: {
         businessLine: routeConfig.businessLine,
@@ -979,7 +1042,9 @@ export function BusinessQuickAccess({
       await providersApi.add(provider, "codex");
     }
 
-    await providersApi.switch(routeConfig.providerId, "codex");
+    await providersApi.switch(routeConfig.providerId, "codex", {
+      skipBackfill: true,
+    });
     await queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
   };
 
@@ -1014,6 +1079,7 @@ export function BusinessQuickAccess({
       trimmedKey,
       trimmedModel,
     );
+    setCodexApiKey("");
     return result;
   };
 
@@ -1050,7 +1116,9 @@ export function BusinessQuickAccess({
       await providersApi.add(provider, "gemini");
     }
 
-    await providersApi.switch(routeConfig.providerId, "gemini");
+    await providersApi.switch(routeConfig.providerId, "gemini", {
+      skipBackfill: true,
+    });
     await queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
   };
 
@@ -1074,6 +1142,7 @@ export function BusinessQuickAccess({
     }
 
     await syncGeminiBusinessProvider(selectedRoute, trimmedKey, trimmedModel);
+    setGeminiApiKey("");
     return result;
   };
 
@@ -1156,7 +1225,14 @@ export function BusinessQuickAccess({
         {isClaude && claudeStatus ? (
           <>
             <div className="grid gap-3 md:grid-cols-4">
-              <Stat label="当前线路" value={getClaudeRouteLabel(activeClaudeRoute)} />
+              <Stat
+                label="当前线路"
+                value={
+                  activeClaudeRoute === "custom"
+                    ? claudeCurrentProvider?.name || "自定义线路"
+                    : getClaudeRouteLabel(activeClaudeRoute)
+                }
+              />
               <Stat
                 label="CLI 状态"
                 value={claudeStatus.installed ? "已安装" : "未安装"}
@@ -1179,36 +1255,69 @@ export function BusinessQuickAccess({
                     title="Claude · 兔子线路"
                     description="适合希望直接接入兔子服务的使用场景。"
                     meta="Base URL: https://api.tu-zi.com"
-                    status={activeClaudeRoute === "tu-zi" ? "已接入" : claudeEntryOption === "tu-zi" ? "当前选择" : "推荐"}
-                    selected={claudeEntryOption === "tu-zi"}
-                    onClick={() => setClaudeEntryOption("tu-zi")}
+                    status={
+                      activeClaudeRoute === "tu-zi"
+                        ? "已接入"
+                        : hasClaudeTuziRoute
+                          ? "已写入"
+                          : claudeSelectedRoute === "tu-zi"
+                            ? "当前选择"
+                            : "推荐"
+                    }
+                    selected={claudeSelectedRoute === "tu-zi"}
+                    onClick={() => {
+                      setClaudeSelectionTouched(true);
+                      setClaudeEntryOption("tu-zi");
+                    }}
                   />
                   <RouteCard
                     title="Claude · gac 线路"
                     description="适合已经在使用 gac 服务的场景。"
                     meta="Base URL: https://gaccode.com/claudecode"
-                    status={activeClaudeRoute === "gaccode" ? "已接入" : claudeEntryOption === "gaccode" ? "当前选择" : "可选"}
-                    selected={claudeEntryOption === "gaccode"}
-                    onClick={() => setClaudeEntryOption("gaccode")}
+                    status={
+                      activeClaudeRoute === "gaccode"
+                        ? "已接入"
+                        : hasClaudeGacRoute
+                          ? "已写入"
+                          : claudeSelectedRoute === "gaccode"
+                            ? "当前选择"
+                            : "可选"
+                    }
+                    selected={claudeSelectedRoute === "gaccode"}
+                    onClick={() => {
+                      setClaudeSelectionTouched(true);
+                      setClaudeEntryOption("gaccode");
+                    }}
                   />
                   <RouteCard
                     title="兔子改版 Claude"
                     description="适合希望直接使用改版 Claude 体验的场景。"
                     meta="无需额外输入 Key，直接写入改版 Claude。"
-                    status={activeClaudeRoute === "modified" ? "已接入" : claudeEntryOption === "modified" ? "当前选择" : "可选"}
-                    selected={claudeEntryOption === "modified"}
-                    onClick={() => setClaudeEntryOption("modified")}
+                    status={
+                      activeClaudeRoute === "modified"
+                        ? "已接入"
+                        : claudeSelectedRoute === "modified"
+                          ? "当前选择"
+                          : "可选"
+                    }
+                    selected={claudeSelectedRoute === "modified"}
+                    onClick={() => {
+                      setClaudeSelectionTouched(true);
+                      setClaudeEntryOption("modified");
+                    }}
                   />
                 </div>
                 <div className="mt-4 grid gap-3">
                   {claudeEntryOption === "gaccode" ? (
                     <Input
+                      type="password"
                       value={claudeGacKey}
                       onChange={(event) => setClaudeGacKey(event.target.value)}
                       placeholder="输入 gac API Key"
                     />
                   ) : claudeEntryOption === "tu-zi" ? (
                     <Input
+                      type="password"
                       value={claudeTuziKey}
                       onChange={(event) => setClaudeTuziKey(event.target.value)}
                       placeholder="输入兔子 API Key"
@@ -1299,11 +1408,15 @@ export function BusinessQuickAccess({
                 value={
                   activeCodexRoute === "gac-modified"
                     ? "gac 改版"
+                    : activeCodexRoute === "custom"
+                      ? codexCurrentProvider?.name || "自定义线路"
+                    : activeCodexRoute === null
+                      ? "--"
                     : activeCodexRoute === "tuzi-coding"
                       ? "兔子 Coding 特别线路"
-                      : activeCodexRoute === "gac"
+                    : activeCodexRoute === "gac"
                         ? "gac 线路"
-                        : "兔子主线路"
+                        : "兔子线路"
                 }
               />
               <Stat
@@ -1325,46 +1438,89 @@ export function BusinessQuickAccess({
                 <div className="font-medium">Codex 路线管理</div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <RouteCard
-                    title="Codex · 兔子主线路"
+                    title="Codex · 兔子线路"
                     description="适合直接接入兔子主服务，和 Claude 兔子线路保持一致。"
                     meta="Base URL 走 https://api.tu-zi.com/v1，推荐主模型 gpt-5.4。"
-                    status={activeCodexRoute === "tuzi" ? "已接入" : codexEntryOption === "tuzi" ? "当前选择" : "推荐"}
-                    selected={codexEntryOption === "tuzi"}
+                    status={
+                      activeCodexRoute === "tuzi"
+                        ? "已接入"
+                        : hasCodexTuziRoute
+                          ? "已写入"
+                          : codexSelectedRoute === "tuzi"
+                            ? "当前选择"
+                            : "推荐"
+                    }
+                    selected={codexSelectedRoute === "tuzi"}
                     tone="sky"
-                    onClick={() => setCodexEntryOption("tuzi")}
+                    onClick={() => {
+                      setCodexSelectionTouched(true);
+                      setCodexEntryOption("tuzi");
+                    }}
                   />
                   <RouteCard
                     title="Codex · 兔子 Coding 特别线路"
                     description="适合单独使用 coding 业务线的 Codex 场景。"
                     meta="Base URL 走 https://coding.tu-zi.com。"
-                    status={activeCodexRoute === "tuzi-coding" ? "已接入" : codexEntryOption === "tuzi-coding" ? "当前选择" : "可选"}
-                    selected={codexEntryOption === "tuzi-coding"}
+                    status={
+                      activeCodexRoute === "tuzi-coding"
+                        ? "已接入"
+                        : hasCodexCodingRoute
+                          ? "已写入"
+                          : codexSelectedRoute === "tuzi-coding"
+                            ? "当前选择"
+                            : "可选"
+                    }
+                    selected={codexSelectedRoute === "tuzi-coding"}
                     tone="sky"
-                    onClick={() => setCodexEntryOption("tuzi-coding")}
+                    onClick={() => {
+                      setCodexSelectionTouched(true);
+                      setCodexEntryOption("tuzi-coding");
+                    }}
                   />
                   <RouteCard
                     title="Codex · gac 线路"
                     description="适合已有 gac 使用基础或迁移场景。"
                     meta="沿用 gac 路线配置。"
-                    status={activeCodexRoute === "gac" ? "已接入" : codexEntryOption === "gac" ? "当前选择" : "可选"}
-                    selected={codexEntryOption === "gac"}
+                    status={
+                      activeCodexRoute === "gac"
+                        ? "已接入"
+                        : hasCodexGacRoute
+                          ? "已写入"
+                          : codexSelectedRoute === "gac"
+                            ? "当前选择"
+                            : "可选"
+                    }
+                    selected={codexSelectedRoute === "gac"}
                     tone="sky"
-                    onClick={() => setCodexEntryOption("gac")}
+                    onClick={() => {
+                      setCodexSelectionTouched(true);
+                      setCodexEntryOption("gac");
+                    }}
                   />
                   <RouteCard
                     title="gac 改版 Codex"
                     description="适合希望直接使用 gac 改版体验的场景。"
                     meta="直接落地 gac 改版 Codex。"
-                    status={activeCodexRoute === "gac-modified" ? "已接入" : codexEntryOption === "gac-modified" ? "当前选择" : "可选"}
-                    selected={codexEntryOption === "gac-modified"}
+                    status={
+                      activeCodexRoute === "gac-modified"
+                        ? "已接入"
+                        : codexSelectedRoute === "gac-modified"
+                          ? "当前选择"
+                          : "可选"
+                    }
+                    selected={codexSelectedRoute === "gac-modified"}
                     tone="sky"
-                    onClick={() => setCodexEntryOption("gac-modified")}
+                    onClick={() => {
+                      setCodexSelectionTouched(true);
+                      setCodexEntryOption("gac-modified");
+                    }}
                   />
                 </div>
                 <div className="mt-4 grid gap-3">
                   {codexEntryOption !== "gac-modified" ? (
                     <div className="grid gap-3 md:grid-cols-2">
                       <Input
+                        type="password"
                         value={codexApiKey}
                         onChange={(event) => setCodexApiKey(event.target.value)}
                         placeholder={`输入${codexEntryOption === "gac" ? "gac" : "兔子"} API Key`}
@@ -1453,7 +1609,15 @@ export function BusinessQuickAccess({
             <div className="grid gap-3 md:grid-cols-4">
               <Stat
                 label="当前线路"
-                value={activeGeminiRoute === "gac-modified" ? "gac 改版" : "兔子线路"}
+                value={
+                  activeGeminiRoute === "gac-modified"
+                    ? "gac 改版"
+                    : activeGeminiRoute === "custom"
+                      ? geminiCurrentProvider?.name || "自定义线路"
+                      : activeGeminiRoute === null
+                        ? "--"
+                      : "兔子线路"
+                }
               />
               <Stat
                 label="CLI 状态"
@@ -1478,25 +1642,46 @@ export function BusinessQuickAccess({
                     title="Gemini · 兔子线路"
                     description="原版 Gemini CLI 搭配兔子 API，适合希望保留原版体验的场景。"
                     meta="Base URL 走 https://api.tu-zi.com，推荐模型 gemini-2.5-pro。"
-                    status={activeGeminiRoute === "tuzi" ? "已接入" : geminiEntryOption === "tuzi" ? "当前选择" : "推荐"}
-                    selected={geminiEntryOption === "tuzi"}
+                    status={
+                      activeGeminiRoute === "tuzi"
+                        ? "已接入"
+                        : hasGeminiTuziRoute
+                          ? "已写入"
+                          : geminiSelectedRoute === "tuzi"
+                            ? "当前选择"
+                            : "推荐"
+                    }
+                    selected={geminiSelectedRoute === "tuzi"}
                     tone="pink"
-                    onClick={() => setGeminiEntryOption("tuzi")}
+                    onClick={() => {
+                      setGeminiSelectionTouched(true);
+                      setGeminiEntryOption("tuzi");
+                    }}
                   />
                   <RouteCard
                     title="gac 改版 Gemini"
                     description="适合直接使用 gac 改版 Gemini 方案的场景。"
                     meta="直接落地 gac 改版 Gemini。"
-                    status={activeGeminiRoute === "gac-modified" ? "已接入" : geminiEntryOption === "gac-modified" ? "当前选择" : "可选"}
-                    selected={geminiEntryOption === "gac-modified"}
+                    status={
+                      activeGeminiRoute === "gac-modified"
+                        ? "已接入"
+                        : geminiSelectedRoute === "gac-modified"
+                          ? "当前选择"
+                          : "可选"
+                    }
+                    selected={geminiSelectedRoute === "gac-modified"}
                     tone="pink"
-                    onClick={() => setGeminiEntryOption("gac-modified")}
+                    onClick={() => {
+                      setGeminiSelectionTouched(true);
+                      setGeminiEntryOption("gac-modified");
+                    }}
                   />
                 </div>
                 <div className="mt-4 grid gap-3">
                   {geminiEntryOption !== "gac-modified" ? (
                     <div className="grid gap-3 md:grid-cols-2">
                       <Input
+                        type="password"
                         value={geminiApiKey}
                         onChange={(event) => setGeminiApiKey(event.target.value)}
                         placeholder="输入兔子 API Key"
@@ -1631,6 +1816,7 @@ export function BusinessQuickAccess({
                 </div>
                 <div className="mt-4 grid gap-3">
                   <Input
+                    type="password"
                     value={openclawApiKey}
                     onChange={(event) => setOpenclawApiKey(event.target.value)}
                     placeholder={`输入${selectedOpenClawConfig.apiKeyLabel}`}

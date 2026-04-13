@@ -1,4 +1,3 @@
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -162,6 +161,7 @@ struct ConfigRouteEntry {
 
 #[derive(Debug, Clone, Default)]
 struct ParsedCodexConfig {
+    model_provider: Option<String>,
     profile: Option<String>,
     routes: BTreeMap<String, ConfigRouteEntry>,
 }
@@ -232,21 +232,6 @@ fn command_output(program: &str, args: &[&str]) -> Result<String, String> {
     } else {
         Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
     }
-}
-
-fn extract_version_token(raw: &str) -> Option<String> {
-    let ansi_re = Regex::new(r"\x1b\[[0-9;]*[A-Za-z]").ok()?;
-    let version_re = Regex::new(r"\bv?(\d+\.\d+\.\d+(?:[-._][A-Za-z0-9]+)?)\b").ok()?;
-    let cleaned = ansi_re.replace_all(raw, "");
-    version_re
-        .captures(&cleaned)
-        .and_then(|captures| captures.get(1).map(|m| m.as_str().to_string()))
-}
-
-fn command_version(program: &str, args: &[&str]) -> Option<String> {
-    command_output(program, args)
-        .ok()
-        .and_then(|output| extract_version_token(&output).or(Some(output)))
 }
 
 fn run_shell_script(script: &str) -> Result<String, String> {
@@ -915,6 +900,10 @@ fn parse_codex_config(content: &str) -> ParsedCodexConfig {
         if let Some((key, value_raw)) = line.split_once('=') {
             let key = key.trim();
             let value = value_raw.trim().trim_matches('"').to_string();
+            if key == "model_provider" {
+                parsed.model_provider = normalize_route_input(&value);
+                continue;
+            }
             if key == "profile" {
                 parsed.profile = normalize_route_input(&value);
                 continue;
@@ -1242,7 +1231,11 @@ pub async fn get_codex_status() -> Result<CodexStatus, String> {
     let config_path = get_codex_config_file_path()?;
     let state = load_install_state();
     let config = parse_codex_config(&read_file(&config_path).unwrap_or_default());
-    let current_route = state.route.clone().or(config.profile.clone());
+    let current_route = state
+        .route
+        .clone()
+        .or(config.model_provider.clone())
+        .or(config.profile.clone());
     let env_api_key = std::env::var("CODEX_API_KEY").ok().unwrap_or_default();
     let env_codex_key = std::env::var("CODEX_KEY").ok().unwrap_or_default();
     let auth_api_key = read_codex_auth_api_key().unwrap_or_default();
@@ -1365,8 +1358,10 @@ fn gemini_err(message: &str, error: String, stdout: String) -> GeminiActionResul
 fn infer_gemini_route(base_url: &str) -> Option<String> {
     if base_url.contains("gaccode.com") {
         Some("gac".to_string())
-    } else if !base_url.trim().is_empty() {
+    } else if base_url.contains("api.tu-zi.com") {
         Some("tuzi".to_string())
+    } else if !base_url.trim().is_empty() {
+        Some("custom".to_string())
     } else {
         None
     }

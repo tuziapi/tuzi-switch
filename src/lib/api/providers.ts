@@ -25,6 +25,10 @@ export interface OpenTerminalOptions {
   cwd?: string;
 }
 
+export interface SwitchProviderOptions {
+  skipBackfill?: boolean;
+}
+
 export const providersApi = {
   async getAll(appId: AppId): Promise<Record<string, Provider>> {
     return await invoke("get_providers", { app: appId });
@@ -66,8 +70,16 @@ export const providersApi = {
     return await invoke("remove_provider_from_live_config", { id, app: appId });
   },
 
-  async switch(id: string, appId: AppId): Promise<SwitchResult> {
-    return await invoke("switch_provider", { id, app: appId });
+  async switch(
+    id: string,
+    appId: AppId,
+    options?: SwitchProviderOptions,
+  ): Promise<SwitchResult> {
+    return await invoke("switch_provider", {
+      id,
+      app: appId,
+      skipBackfill: options?.skipBackfill,
+    });
   },
 
   async importDefault(appId: AppId): Promise<boolean> {

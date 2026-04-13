@@ -122,12 +122,18 @@ else:
     if not isinstance(payload, list):
         print("Error: unexpected GitHub releases response.", file=sys.stderr)
         sys.exit(1)
-    data = None
+    stable = None
+    prerelease = None
     for item in payload:
         if item.get("draft"):
             continue
-        data = item
+        if item.get("prerelease"):
+            if prerelease is None:
+                prerelease = item
+            continue
+        stable = item
         break
+    data = stable or prerelease
     if data is None:
         print("Error: no published release found.", file=sys.stderr)
         sys.exit(1)
@@ -220,6 +226,54 @@ fi
 log "Downloading: ${FILENAME}"
 curl -fL --progress-bar -o "${DEST}" "${DOWNLOAD_URL}"
 
+copy_app_bundle() {
+  local source="$1"
+  local destination="$2"
+  if command -v ditto >/dev/null 2>&1; then
+    ditto "${source}" "${destination}"
+  else
+    cp -R "${source}" "${destination}"
+  fi
+}
+
+install_macos_app_bundle() {
+  local app_path="$1"
+  local app_name
+  app_name=$(basename "${app_path}")
+  local target="/Applications/${app_name}"
+  local staging="/Applications/.${app_name}.new.$$"
+  local backup="/Applications/.${app_name}.backup.$$"
+
+  rm -rf "${staging}" "${backup}"
+  log "Preparing staged install for ${target}"
+  copy_app_bundle "${app_path}" "${staging}"
+
+  if [[ -e "${target}" ]]; then
+    log "Backing up existing app"
+    mv "${target}" "${backup}"
+  fi
+
+  if ! mv "${staging}" "${target}"; then
+    rm -rf "${staging}"
+    if [[ -e "${backup}" ]]; then
+      mv "${backup}" "${target}" 2>/dev/null || true
+    fi
+    echo "Error: failed to replace ${target}" >&2
+    exit 1
+  fi
+
+  rm -rf "${backup}"
+
+  if command -v xattr >/dev/null 2>&1; then
+    xattr -cr "${target}" 2>/dev/null || true
+  fi
+
+  log "Installed: ${target}"
+  if [[ "$NO_OPEN" -eq 0 ]]; then
+    open "${target}"
+  fi
+}
+
 install_macos_dmg() {
   local dmg="$1"
   local mnt
@@ -234,22 +288,9 @@ install_macos_dmg() {
     exit 1
   fi
 
-  local app_name
-  app_name=$(basename "${app_path}")
-  log "Installing to /Applications/${app_name}"
-  rm -rf "/Applications/${app_name}"
-  cp -R "${app_path}" /Applications/
+  install_macos_app_bundle "${app_path}"
   hdiutil detach -quiet "${mnt}"
   trap 'rm -rf "${TMP}"' EXIT
-
-  if command -v xattr >/dev/null 2>&1; then
-    xattr -cr "/Applications/${app_name}" 2>/dev/null || true
-  fi
-
-  log "Installed: /Applications/${app_name}"
-  if [[ "$NO_OPEN" -eq 0 ]]; then
-    open "/Applications/${app_name}"
-  fi
 }
 
 install_macos_zip() {
@@ -265,20 +306,7 @@ install_macos_zip() {
     exit 1
   fi
 
-  local app_name
-  app_name=$(basename "${app_path}")
-  log "Installing to /Applications/${app_name}"
-  rm -rf "/Applications/${app_name}"
-  cp -R "${app_path}" /Applications/
-
-  if command -v xattr >/dev/null 2>&1; then
-    xattr -cr "/Applications/${app_name}" 2>/dev/null || true
-  fi
-
-  log "Installed: /Applications/${app_name}"
-  if [[ "$NO_OPEN" -eq 0 ]]; then
-    open "/Applications/${app_name}"
-  fi
+  install_macos_app_bundle "${app_path}"
 }
 
 install_linux_deb() {

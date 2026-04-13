@@ -83,8 +83,9 @@ fn switch_provider_internal(
     state: &AppState,
     app_type: AppType,
     id: &str,
+    skip_backfill: bool,
 ) -> Result<SwitchResult, AppError> {
-    ProviderService::switch(state, app_type, id)
+    ProviderService::switch(state, app_type, id, skip_backfill)
 }
 
 #[cfg_attr(not(feature = "test-hooks"), doc(hidden))]
@@ -93,7 +94,7 @@ pub fn switch_provider_test_hook(
     app_type: AppType,
     id: &str,
 ) -> Result<SwitchResult, AppError> {
-    switch_provider_internal(state, app_type, id)
+    switch_provider_internal(state, app_type, id, false)
 }
 
 #[tauri::command]
@@ -101,9 +102,11 @@ pub fn switch_provider(
     state: State<'_, AppState>,
     app: String,
     id: String,
+    #[allow(non_snake_case)] skipBackfill: Option<bool>,
 ) -> Result<SwitchResult, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    switch_provider_internal(&state, app_type, &id).map_err(|e| e.to_string())
+    switch_provider_internal(&state, app_type, &id, skipBackfill.unwrap_or(false))
+        .map_err(|e| e.to_string())
 }
 
 fn import_default_config_internal(state: &AppState, app_type: AppType) -> Result<bool, AppError> {

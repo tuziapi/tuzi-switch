@@ -378,6 +378,18 @@ export const updateTomlCommonConfigSnippet = (
     const config = parseToml(normalizeTomlText(tomlString || ""));
     const snippet = parseToml(normalizeTomlText(snippetString));
 
+    // Codex common snippet should not override current route selection or
+    // inject route-specific profiles/model_providers into newly created configs.
+    if (isPlainObject(snippet)) {
+      delete (snippet as Record<string, any>).profile;
+      delete (snippet as Record<string, any>).model_provider;
+      delete (snippet as Record<string, any>).model;
+      delete (snippet as Record<string, any>).model_reasoning_effort;
+      delete (snippet as Record<string, any>).disable_response_storage;
+      delete (snippet as Record<string, any>).model_providers;
+      delete (snippet as Record<string, any>).profiles;
+    }
+
     if (enabled) {
       const merged = deepMerge(
         deepClone(config) as Record<string, any>,
@@ -404,6 +416,15 @@ export const hasTomlCommonConfigSnippet = (
   try {
     const config = parseToml(normalizeTomlText(tomlString || ""));
     const snippet = parseToml(normalizeTomlText(snippetString));
+    if (isPlainObject(snippet)) {
+      delete (snippet as Record<string, any>).profile;
+      delete (snippet as Record<string, any>).model_provider;
+      delete (snippet as Record<string, any>).model;
+      delete (snippet as Record<string, any>).model_reasoning_effort;
+      delete (snippet as Record<string, any>).disable_response_storage;
+      delete (snippet as Record<string, any>).model_providers;
+      delete (snippet as Record<string, any>).profiles;
+    }
     return isSubset(config, snippet);
   } catch {
     // Fallback to text-based matching if TOML parsing fails

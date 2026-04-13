@@ -129,7 +129,7 @@ pub fn import_provider_from_deeplink(
 
     // If enabled=true, set as current provider
     if merged_request.enabled.unwrap_or(false) {
-        ProviderService::switch(state, app_type.clone(), &provider_id)?;
+        ProviderService::switch(state, app_type.clone(), &provider_id, false)?;
         log::info!("Provider '{provider_id}' set as current for {app_type:?}");
     }
 
