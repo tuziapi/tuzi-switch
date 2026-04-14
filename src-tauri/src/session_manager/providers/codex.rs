@@ -11,6 +11,7 @@ use crate::session_manager::{SessionMessage, SessionMeta};
 
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, read_head_tail_lines, truncate_summary,
+    TITLE_MAX_CHARS,
 };
 
 const PROVIDER_ID: &str = "codex";
@@ -129,8 +130,9 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
     let mut session_id: Option<String> = None;
     let mut project_dir: Option<String> = None;
     let mut created_at: Option<i64> = None;
+    let mut first_user_message: Option<String> = None;
 
-    // Extract metadata from head lines
+    // Extract metadata and first meaningful user message from head lines
     for line in &head {
         let value: Value = match serde_json::from_str(line) {
             Ok(parsed) => parsed,
@@ -157,6 +159,30 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
                     created_at.get_or_insert(ts);
                 }
             }
+        }
+
+        if first_user_message.is_none()
+            && value.get("type").and_then(Value::as_str) == Some("response_item")
+        {
+            if let Some(payload) = value.get("payload") {
+                if payload.get("type").and_then(Value::as_str) == Some("message")
+                    && payload.get("role").and_then(Value::as_str) == Some("user")
+                {
+                    let text = payload.get("content").map(extract_text).unwrap_or_default();
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() && !trimmed.starts_with("# AGENTS.md") {
+                        first_user_message = Some(trimmed.to_string());
+                    }
+                }
+            }
+        }
+
+        if session_id.is_some()
+            && project_dir.is_some()
+            && created_at.is_some()
+            && first_user_message.is_some()
+        {
+            break;
         }
     }
 
@@ -190,10 +216,14 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
     let session_id = session_id.or_else(|| infer_session_id_from_filename(path));
     let session_id = session_id?;
 
-    let title = project_dir
-        .as_deref()
-        .and_then(path_basename)
-        .map(|value| value.to_string());
+    let title = first_user_message
+        .map(|text| truncate_summary(&text, TITLE_MAX_CHARS))
+        .or_else(|| {
+            project_dir
+                .as_deref()
+                .and_then(path_basename)
+                .map(|value| value.to_string())
+        });
 
     let summary = summary.map(|text| truncate_summary(&text, 160));
 

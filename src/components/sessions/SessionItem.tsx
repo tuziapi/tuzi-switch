@@ -82,7 +82,7 @@ export function SessionItem({
               {getProviderLabel(session.providerId, t)}
             </TooltipContent>
           </Tooltip>
-          <span className="text-sm font-medium truncate flex-1">{title}</span>
+          <span className="text-sm font-medium line-clamp-2 flex-1">{title}</span>
           <ChevronRight
             className={cn(
               "size-4 text-muted-foreground/50 shrink-0 transition-transform",

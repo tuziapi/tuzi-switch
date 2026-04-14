@@ -24,6 +24,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useProvidersQuery } from "@/lib/query/queries";
 import type { OpenClawModel, Provider } from "@/types";
 
@@ -38,6 +45,13 @@ type GeminiBusinessRoute = "tuzi";
 type ClaudeEntryOption = "modified" | "gaccode" | "tu-zi";
 type CodexEntryOption = "tuzi" | "tuzi-coding" | "gac" | "gac-modified";
 type GeminiEntryOption = "tuzi" | "gac-modified";
+
+const CODEX_REASONING_OPTIONS = [
+  { value: "low", label: "low" },
+  { value: "medium", label: "medium" },
+  { value: "high", label: "high" },
+  { value: "xhigh", label: "xhigh / 超高" },
+];
 
 const OPENCLAW_ROUTE_CONFIG: Record<
   OpenClawRoute,
@@ -157,13 +171,13 @@ const CLAUDE_ROUTE_CONFIG: Record<
 > = {
   gaccode: {
     providerId: "gac-claude-route",
-    providerName: "兔子 Claude · gac 线路",
+    providerName: "Claude · gac 线路",
     baseUrl: "https://gaccode.com/claudecode",
     websiteUrl: "https://gaccode.com/claudecode",
   },
   "tu-zi": {
     providerId: "tuzi-claude-route",
-    providerName: "兔子 Claude · 兔子线路",
+    providerName: "Claude · 兔子线路",
     baseUrl: "https://api.tu-zi.com",
     websiteUrl: "https://api.tu-zi.com",
   },
@@ -172,21 +186,21 @@ const CLAUDE_ROUTE_CONFIG: Record<
 const CODEX_ROUTE_CONFIG = {
   tuzi: {
     providerId: "tuzi-codex-route",
-    providerName: "兔子 Codex · 兔子线路",
+    providerName: "Codex · 兔子线路",
     baseUrl: "https://api.tu-zi.com/v1",
     websiteUrl: "https://api.tu-zi.com",
     businessLine: "tuzi" as const,
   },
   codex: {
     providerId: "tuzi.coding",
-    providerName: "兔子 Codex · Coding 特别线路",
+    providerName: "Codex · 兔子 Coding 特别线路",
     baseUrl: "https://coding.tu-zi.com",
     websiteUrl: "https://coding.tu-zi.com",
     businessLine: "tuzi" as const,
   },
   gac: {
     providerId: "gac-codex-route",
-    providerName: "兔子 Codex · gac 线路",
+    providerName: "Codex · gac 线路",
     baseUrl: "https://gaccode.com/codex/v1",
     websiteUrl: "https://gaccode.com/codex",
     businessLine: "gac" as const,
@@ -214,11 +228,12 @@ function getGeminiCliStatusLabel(status: GeminiInstallerStatus) {
   return "已安装";
 }
 
-function getClaudeRouteLabel(route: ClaudeEntryOption | null | undefined) {
+function getClaudeRouteLabel(route: ClaudeEntryOption | "modified" | "custom" | null | undefined) {
   if (!route) return "--";
   if (route === "tu-zi") return "兔子线路";
   if (route === "gaccode") return "gac 线路";
-  return "改版";
+  if (route === "modified") return "改版";
+  return "自定义线路";
 }
 
 function getClaudeRouteFromProvider(
@@ -227,19 +242,22 @@ function getClaudeRouteFromProvider(
 ): ClaudeEntryOption | "custom" | null {
   if (!currentProviderId && !provider?.name) return null;
   const baseUrl = getProviderBaseUrl(provider)?.toLowerCase() || "";
-  if (
-    currentProviderId === CLAUDE_ROUTE_CONFIG["tu-zi"].providerId ||
-    provider?.name?.includes("兔子 Claude") ||
-    baseUrl.includes("api.tu-zi.com")
-  ) {
-    return "tu-zi";
-  }
+  const providerName = provider?.name || "";
   if (
     currentProviderId === CLAUDE_ROUTE_CONFIG.gaccode.providerId ||
-    provider?.name?.includes("gac Claude") ||
+    providerName.includes("Claude · gac 线路") ||
+    providerName.includes("gac Claude") ||
     baseUrl.includes("gaccode.com/claudecode")
   ) {
     return "gaccode";
+  }
+  if (
+    currentProviderId === CLAUDE_ROUTE_CONFIG["tu-zi"].providerId ||
+    providerName.includes("Claude · 兔子线路") ||
+    providerName.includes("兔子 Claude") ||
+    baseUrl.includes("api.tu-zi.com")
+  ) {
+    return "tu-zi";
   }
   if (currentProviderId) {
     return "custom";
@@ -253,27 +271,33 @@ function getCodexRouteFromProvider(
 ): CodexEntryOption | "custom" | null {
   if (!currentProviderId && !provider?.name) return null;
   const baseUrl = getProviderBaseUrl(provider)?.toLowerCase() || "";
+  const providerName = provider?.name || "";
+
+  if (
+    currentProviderId === CODEX_ROUTE_CONFIG.gac.providerId ||
+    providerName.includes("Codex · gac 线路") ||
+    providerName.includes("gac") ||
+    provider?.meta?.businessLine === "gac" ||
+    baseUrl.includes("gaccode.com/codex")
+  ) {
+    return "gac";
+  }
 
   if (
     currentProviderId === CODEX_ROUTE_CONFIG.tuzi.providerId ||
-    provider?.name?.includes("兔子 Codex · 兔子主线路") ||
+    providerName.includes("Codex · 兔子线路") ||
+    providerName.includes("兔子 Codex · 兔子主线路") ||
     baseUrl.includes("api.tu-zi.com/v1")
   ) {
     return "tuzi";
   }
   if (
     currentProviderId === CODEX_ROUTE_CONFIG.codex.providerId ||
-    provider?.name?.includes("Coding 特别线路") ||
+    providerName.includes("Codex · 兔子 Coding 特别线路") ||
+    providerName.includes("Coding 特别线路") ||
     baseUrl.includes("coding.tu-zi.com")
   ) {
     return "tuzi-coding";
-  }
-  if (
-    provider?.name?.includes("gac") ||
-    provider?.meta?.businessLine === "gac" ||
-    baseUrl.includes("gaccode.com/codex")
-  ) {
-    return "gac";
   }
   if (currentProviderId) {
     return "custom";
@@ -287,9 +311,11 @@ function getGeminiRouteFromProvider(
 ): GeminiEntryOption | "custom" | null {
   if (!currentProviderId && !provider?.name) return null;
   const baseUrl = getProviderBaseUrl(provider)?.toLowerCase() || "";
+  const providerName = provider?.name || "";
   if (
     currentProviderId === GEMINI_ROUTE_CONFIG.tuzi.providerId ||
-    provider?.name?.includes("兔子 Gemini") ||
+    providerName.includes("Gemini · 兔子线路") ||
+    providerName.includes("兔子 Gemini") ||
     baseUrl.includes("api.tu-zi.com")
   ) {
     return "tuzi";
@@ -298,6 +324,55 @@ function getGeminiRouteFromProvider(
     return "custom";
   }
   return null;
+}
+
+function getClaudeInstallerRoute(
+  status: ClaudeInstallerStatus | null,
+): ClaudeEntryOption | "modified" | "custom" | null {
+  if (!status) return null;
+  if (status.current_route === "改版") return "modified";
+  if (status.current_route === "gaccode") return "gaccode";
+  if (status.current_route === "tu-zi") return "tu-zi";
+  if (status.current_route) return "custom";
+  return null;
+}
+
+function getCodexInstallerRoute(
+  status: CodexInstallerStatus | null,
+): CodexEntryOption | "gac-modified" | "custom" | null {
+  if (!status) return null;
+  if (status.install_type === "gac") return "gac-modified";
+  if (status.current_route === "codex") return "tuzi-coding";
+  if (status.current_route === "gac") return "gac";
+  if (status.current_route === "tuzi") return "tuzi";
+  if (status.current_route) return "custom";
+  return null;
+}
+
+function getGeminiInstallerRoute(
+  status: GeminiInstallerStatus | null,
+): GeminiEntryOption | "gac-modified" | "custom" | null {
+  if (!status) return null;
+  if (status.install_type === "gac") return "gac-modified";
+  if (status.current_route === "tuzi") return "tuzi";
+  if (status.current_route) return "custom";
+  return null;
+}
+
+function getCodexRouteLabel(route: CodexEntryOption | "gac-modified" | "custom" | null | undefined) {
+  if (!route) return "--";
+  if (route === "tuzi") return "兔子线路";
+  if (route === "tuzi-coding") return "兔子 Coding 特别线路";
+  if (route === "gac") return "gac 线路";
+  if (route === "gac-modified") return "gac 改版";
+  return "自定义线路";
+}
+
+function getGeminiRouteLabel(route: GeminiEntryOption | "gac-modified" | "custom" | null | undefined) {
+  if (!route) return "--";
+  if (route === "tuzi") return "兔子线路";
+  if (route === "gac-modified") return "gac 改版";
+  return "自定义线路";
 }
 
 function getOpenClawCurrentRoute(
@@ -387,7 +462,7 @@ function getProviderBaseUrl(provider?: Provider): string | null {
 const GEMINI_ROUTE_CONFIG = {
   tuzi: {
     providerId: "tuzi-gemini-route",
-    providerName: "兔子 Gemini · 兔子线路",
+    providerName: "Gemini · 兔子线路",
     baseUrl: "https://api.tu-zi.com",
     websiteUrl: "https://api.tu-zi.com",
     businessLine: "tuzi" as const,
@@ -808,6 +883,9 @@ export function BusinessQuickAccess({
     if (claudeStatus?.current_route === "gaccode") {
       return "gaccode";
     }
+    if (claudeStatus?.current_route) {
+      return "custom";
+    }
     return claudeCurrentProviderId || claudeCurrentProvider ? "custom" : null;
   }, [claudeCurrentProvider, claudeCurrentProviderId, claudeStatus]);
 
@@ -821,6 +899,7 @@ export function BusinessQuickAccess({
     if (codexStatus?.current_route === "codex") return "tuzi-coding";
     if (codexStatus?.current_route === "gac") return "gac";
     if (codexStatus?.current_route === "tuzi") return "tuzi";
+    if (codexStatus?.current_route) return "custom";
     return codexCurrentProviderId || codexCurrentProvider ? "custom" : null;
   }, [codexCurrentProvider, codexCurrentProviderId, codexStatus]);
 
@@ -832,6 +911,7 @@ export function BusinessQuickAccess({
     if (providerRoute) return providerRoute;
     if (geminiStatus?.install_type === "gac") return "gac-modified";
     if (geminiStatus?.current_route === "tuzi") return "tuzi";
+    if (geminiStatus?.current_route) return "custom";
     return geminiCurrentProviderId || geminiCurrentProvider ? "custom" : null;
   }, [geminiCurrentProvider, geminiCurrentProviderId, geminiStatus]);
 
@@ -856,6 +936,51 @@ export function BusinessQuickAccess({
   const hasCodexCodingRoute = hasNamedRoute(codexStatus?.routes, "codex");
   const hasCodexGacRoute = hasNamedRoute(codexStatus?.routes, "gac");
   const hasGeminiTuziRoute = hasNamedRoute(geminiStatus?.routes, "tuzi");
+  const installerClaudeRoute = getClaudeInstallerRoute(claudeStatus);
+  const installerCodexRoute = getCodexInstallerRoute(codexStatus);
+  const installerGeminiRoute = getGeminiInstallerRoute(geminiStatus);
+  const claudeRouteMismatch = Boolean(
+    activeClaudeRoute &&
+      installerClaudeRoute &&
+      activeClaudeRoute !== installerClaudeRoute,
+  );
+  const codexRouteMismatch = Boolean(
+    activeCodexRoute &&
+      installerCodexRoute &&
+      activeCodexRoute !== installerCodexRoute,
+  );
+  const geminiRouteMismatch = Boolean(
+    activeGeminiRoute &&
+      installerGeminiRoute &&
+      activeGeminiRoute !== installerGeminiRoute,
+  );
+
+  useEffect(() => {
+    if (!isCodex || !codexStatus) return;
+
+    const currentRouteName =
+      codexStatus.current_route ||
+      (activeCodexRoute === "tuzi"
+        ? "tuzi"
+        : activeCodexRoute === "tuzi-coding"
+          ? "codex"
+          : activeCodexRoute === "gac"
+            ? "gac"
+            : null);
+
+    if (!currentRouteName) return;
+
+    const currentRoute = codexStatus.routes.find((route) => route.name === currentRouteName);
+    const model = currentRoute?.model_settings?.model?.trim();
+    const reasoning = currentRoute?.model_settings?.model_reasoning_effort?.trim();
+
+    if (model) {
+      setCodexModel(model);
+    }
+    if (reasoning) {
+      setCodexReasoning(reasoning);
+    }
+  }, [activeCodexRoute, codexStatus, isCodex]);
 
   const configureOpenClawRoute = async (
     route: OpenClawRoute,
@@ -1246,6 +1371,13 @@ export function BusinessQuickAccess({
                 }
               />
             </div>
+            {claudeRouteMismatch ? (
+              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                当前页面显示的线路以已切换的 provider 为准；CLI 安装器记录仍显示为
+                {` ${getClaudeRouteLabel(installerClaudeRoute)} `}
+                ，两边暂时不一致。
+              </div>
+            ) : null}
 
             <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
@@ -1335,7 +1467,7 @@ export function BusinessQuickAccess({
                       ? "写入改版 Claude 客户端"
                       : claudeEntryOption === "gaccode"
                         ? "写入 gac Claude 线路"
-                        : "写入兔子 Claude 线路"
+                        : "写入 Claude · 兔子线路"
                   }
                   syncHint="自动同步配置状态，并在下方列表显示对应入口"
                 />
@@ -1432,6 +1564,13 @@ export function BusinessQuickAccess({
                 }
               />
             </div>
+            {codexRouteMismatch ? (
+              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                当前页面显示的线路以已切换的 provider 为准；CLI 安装器记录仍显示为
+                {` ${getCodexRouteLabel(installerCodexRoute)} `}
+                ，两边暂时不一致。
+              </div>
+            ) : null}
 
             <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
@@ -1530,11 +1669,18 @@ export function BusinessQuickAccess({
                         onChange={(event) => setCodexModel(event.target.value)}
                         placeholder="模型，如 gpt-5.4"
                       />
-                      <Input
-                        value={codexReasoning}
-                        onChange={(event) => setCodexReasoning(event.target.value)}
-                        placeholder="推理强度，如 medium"
-                      />
+                      <Select value={codexReasoning} onValueChange={setCodexReasoning}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择推理强度" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CODEX_REASONING_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   ) : (
                     <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
@@ -1548,10 +1694,10 @@ export function BusinessQuickAccess({
                     codexEntryOption === "gac-modified"
                       ? "写入 gac 改版 Codex"
                       : codexEntryOption === "tuzi"
-                        ? "写入兔子 Codex 主线路"
+                        ? "写入 Codex · 兔子线路"
                         : codexEntryOption === "tuzi-coding"
-                          ? "写入兔子 Coding 特别线路"
-                          : "写入 gac Codex 路线"
+                          ? "写入 Codex · 兔子 Coding 特别线路"
+                          : "写入 Codex · gac 线路"
                   }
                   syncHint={
                     codexEntryOption === "gac-modified"
@@ -1633,6 +1779,13 @@ export function BusinessQuickAccess({
                 }
               />
             </div>
+            {geminiRouteMismatch ? (
+              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                当前页面显示的线路以已切换的 provider 为准；CLI 安装器记录仍显示为
+                {` ${getGeminiRouteLabel(installerGeminiRoute)} `}
+                ，两边暂时不一致。
+              </div>
+            ) : null}
 
             <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
@@ -1703,7 +1856,7 @@ export function BusinessQuickAccess({
                   target={
                     geminiEntryOption === "gac-modified"
                       ? "写入 gac 改版 Gemini"
-                      : "写入原版 Gemini + 兔子 API"
+                      : "写入 Gemini · 兔子线路"
                   }
                   syncHint={
                     geminiEntryOption === "gac-modified"
@@ -1760,7 +1913,7 @@ export function BusinessQuickAccess({
           <>
             <div className="grid gap-3 md:grid-cols-4">
               <Stat
-                label="当前接入"
+                label="当前默认线路"
                 value={
                   openclawStatus.inferredRoute
                     ? OPENCLAW_ROUTE_CONFIG[openclawStatus.inferredRoute].label
@@ -1800,7 +1953,7 @@ export function BusinessQuickAccess({
                         meta={config.baseUrl}
                         status={
                           openclawStatus.inferredRoute === route
-                            ? "已接入"
+                            ? "默认使用"
                             : isConfigured
                               ? "已写入"
                               : isSelected
@@ -1826,7 +1979,7 @@ export function BusinessQuickAccess({
                   <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
                     将接入
                     {` ${selectedOpenClawConfig.providerName} `}
-                    ，并自动切换到对应服务线路。
+                    ，并同步更新默认模型指向的服务线路。
                   </div>
                   <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
                     推荐模型共
@@ -1872,6 +2025,9 @@ export function BusinessQuickAccess({
                   </div>
                   <div>
                     配置完成后，下面原有的设置面板仍然保留，方便继续调整细节。
+                  </div>
+                  <div>
+                    当前默认线路是根据默认模型和已写入配置推定出来的，用于帮助快速判断当前主要使用方向。
                   </div>
                   <div className="flex items-center gap-2 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-emerald-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-100/88">
                     <CheckCircle2 className="h-4 w-4" />

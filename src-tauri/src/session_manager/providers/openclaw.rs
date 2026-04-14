@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -12,9 +13,18 @@ use crate::{
 
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, read_head_tail_lines, truncate_summary,
+    TITLE_MAX_CHARS,
 };
 
 const PROVIDER_ID: &str = "openclaw";
+
+fn strip_message_id_suffix(text: &str) -> &str {
+    if let Some(pos) = text.rfind("\n[message_id:") {
+        text[..pos].trim_end()
+    } else {
+        text
+    }
+}
 
 pub fn scan_sessions() -> Vec<SessionMeta> {
     let agents_dir = get_openclaw_dir().join("agents");
@@ -46,12 +56,13 @@ pub fn scan_sessions() -> Vec<SessionMeta> {
             Err(_) => continue,
         };
 
+        let display_names = load_display_names(&sessions_dir);
+
         for entry in session_entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
                 continue;
             }
-            // Skip sessions.json index file
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -61,7 +72,7 @@ pub fn scan_sessions() -> Vec<SessionMeta> {
                 continue;
             }
 
-            if let Some(meta) = parse_session(&path) {
+            if let Some(meta) = parse_session(&path, Some(&display_names)) {
                 sessions.push(meta);
             }
         }
@@ -119,7 +130,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
 }
 
 pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
-    let meta = parse_session(path).ok_or_else(|| {
+    let meta = parse_session(path, None).ok_or_else(|| {
         format!(
             "Failed to parse OpenClaw session metadata: {}",
             path.display()
@@ -149,15 +160,42 @@ pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<boo
     Ok(true)
 }
 
-fn parse_session(path: &Path) -> Option<SessionMeta> {
+fn load_display_names(sessions_dir: &Path) -> HashMap<String, String> {
+    let index_path = sessions_dir.join("sessions.json");
+    let content = match std::fs::read_to_string(&index_path) {
+        Ok(content) => content,
+        Err(_) => return HashMap::new(),
+    };
+    let index: serde_json::Map<String, Value> = match serde_json::from_str(&content) {
+        Ok(index) => index,
+        Err(_) => return HashMap::new(),
+    };
+
+    let mut map = HashMap::new();
+    for entry in index.values() {
+        if let (Some(id), Some(name)) = (
+            entry.get("sessionId").and_then(Value::as_str),
+            entry.get("displayName").and_then(Value::as_str),
+        ) {
+            if !name.is_empty() {
+                map.insert(id.to_string(), name.to_string());
+            }
+        }
+    }
+
+    map
+}
+
+fn parse_session(path: &Path, display_names: Option<&HashMap<String, String>>) -> Option<SessionMeta> {
     let (head, tail) = read_head_tail_lines(path, 10, 30).ok()?;
 
     let mut session_id: Option<String> = None;
     let mut cwd: Option<String> = None;
     let mut created_at: Option<i64> = None;
     let mut summary: Option<String> = None;
+    let mut first_user_message: Option<String> = None;
 
-    // Extract metadata and first message summary from head lines
+    // Extract metadata, summary, and first meaningful user message
     for line in &head {
         let value: Value = match serde_json::from_str(line) {
             Ok(parsed) => parsed,
@@ -189,14 +227,30 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
             continue;
         }
 
-        // OpenClaw summary is the first message content
-        if event_type == "message" && summary.is_none() {
+        if event_type == "message" {
             if let Some(message) = value.get("message") {
                 let text = message.get("content").map(extract_text).unwrap_or_default();
-                if !text.trim().is_empty() {
-                    summary = Some(text);
+                let cleaned = strip_message_id_suffix(&text);
+                if !cleaned.trim().is_empty() {
+                    if first_user_message.is_none()
+                        && message.get("role").and_then(Value::as_str) == Some("user")
+                    {
+                        first_user_message = Some(cleaned.trim().to_string());
+                    }
+                    if summary.is_none() {
+                        summary = Some(cleaned.trim().to_string());
+                    }
                 }
             }
+        }
+
+        if session_id.is_some()
+            && cwd.is_some()
+            && created_at.is_some()
+            && summary.is_some()
+            && first_user_message.is_some()
+        {
+            break;
         }
     }
 
@@ -221,10 +275,12 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
     });
     let session_id = session_id?;
 
-    let title = cwd
-        .as_deref()
-        .and_then(path_basename)
-        .map(|s| s.to_string());
+    let title = display_names
+        .and_then(|names| names.get(&session_id))
+        .filter(|name| !name.is_empty())
+        .map(|name| truncate_summary(name, TITLE_MAX_CHARS))
+        .or_else(|| first_user_message.map(|text| truncate_summary(&text, TITLE_MAX_CHARS)))
+        .or_else(|| cwd.as_deref().and_then(path_basename).map(|s| s.to_string()));
 
     let summary = summary.map(|text| truncate_summary(&text, 160));
 

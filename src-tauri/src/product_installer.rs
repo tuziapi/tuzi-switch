@@ -1371,10 +1371,18 @@ fn build_gemini_routes(
     current_route: Option<&str>,
     env_map: &BTreeMap<String, String>,
 ) -> Vec<GeminiRoute> {
-    ["tuzi"]
-        .iter()
+    let mut route_names = BTreeSet::new();
+    route_names.insert("tuzi".to_string());
+    if let Some(route_name) = current_route {
+        if !route_name.trim().is_empty() {
+            route_names.insert(route_name.to_string());
+        }
+    }
+
+    route_names
+        .into_iter()
         .map(|route_name| {
-            let is_current = current_route == Some(*route_name);
+            let is_current = current_route == Some(route_name.as_str());
             let api_key = env_map.get("GEMINI_API_KEY").cloned().unwrap_or_default();
             let model = env_map
                 .get("GEMINI_MODEL")
@@ -1382,8 +1390,15 @@ fn build_gemini_routes(
                 .filter(|v| !v.trim().is_empty())
                 .unwrap_or_else(|| DEFAULT_GEMINI_MODEL.to_string());
             GeminiRoute {
-                name: route_name.to_string(),
-                base_url: gemini_route_base_url(route_name).map(|v| v.to_string()),
+                name: route_name.clone(),
+                base_url: if route_name == "tuzi" {
+                    gemini_route_base_url("tuzi").map(|v| v.to_string())
+                } else {
+                    env_map
+                        .get("GOOGLE_GEMINI_BASE_URL")
+                        .cloned()
+                        .filter(|v| !v.trim().is_empty())
+                },
                 has_key: is_current && !api_key.trim().is_empty(),
                 is_current,
                 api_key_masked: if is_current && !api_key.trim().is_empty() {
