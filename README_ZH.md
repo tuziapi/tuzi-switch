@@ -28,17 +28,17 @@
 
 ### 一键安装
 
-直接安装当前推荐版本 `v3.12.12`：
+直接安装当前推荐版本 `v3.12.13`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.12 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.13 bash
 ```
 
 补充说明：
 
 - 当前 Release workflow 仍使用 `prerelease` 发布策略
 - 因此默认走 GitHub `releases/latest` 时，不一定能命中当前最新测试版本
-- 目前 README 默认固定到 `v3.12.12`，这样可以确保安装到我们当前推荐版本
+- 目前 README 默认固定到 `v3.12.13`，这样可以确保安装到我们当前推荐版本
 - 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
 
 ### macOS 未签名包打开方式
@@ -70,13 +70,13 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 当前版本更新
 
-当前公开版本为 `v3.12.12`，这一轮更新重点包括：
+当前公开版本为 `v3.12.13`，这一轮更新重点包括：
 
-- 继续精修 Claude、Codex、Gemini、OpenClaw 四个入口的路线管理与状态区表达
-- 修正 Codex、Gemini 的当前线路识别逻辑，让顶部状态与真实配置更一致
-- 修正业务一键配置时可能串改其他线路 Key 的问题，并统一改为隐藏输入、成功后自动清空
-- 补强安装脚本的版本选择与 macOS 替换安装流程，降低装到旧版或安装失败的风险
-- 继续收口深色 / 浅色主题下的模块卡片、状态提示和下方供应商列表视觉一致性
+- 继续收尾 Claude、Codex、Gemini、OpenClaw 四个入口的状态可信度与路线表达
+- 页面主状态继续以当前 provider 为准，并新增 provider 与 CLI/安装器记录不一致时的提示
+- 同步优化 Codex、OpenClaw 的会话标题提取逻辑，减少噪音信息并提升可读性
+- 补充使用统计页的分页体验，增强页码折叠与跳页交互
+- 继续补强安装脚本固定版本安装方式，确保一键安装命中当前推荐版本
 
 ## 产品亮点
 
@@ -158,14 +158,13 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 开发计划 / TODO List
 
-- 已完成：Claude、Codex、Gemini、OpenClaw 四个入口的第一轮兔子路线管理改版已经落地
-- 已完成：Codex 主线路 / Coding 特别线路拆分完成，Gemini 首版业务接入完成
-- 已完成：四个入口的当前线路识别、状态卡表达、Key 输入安全性与基础视觉问题已完成一轮修正
-- 已完成：安装脚本已改为优先稳定版、失败回退更稳的安装流程
+- 已完成：四个入口的第一轮兔子路线管理、Codex 主线路 / Coding 特别线路拆分、Gemini 首版业务接入
+- 已完成：状态卡、Key 输入安全、安装脚本固定版本安装流程、基础主题视觉的一轮修正
+- 已完成：provider 与 CLI/安装器状态冲突提示的首版落地
 - 进行中：继续优化四个入口的状态可信度、刷新反馈与异常提示
 - 进行中：继续统一深色 / 浅色主题下的路线卡、状态区、提示区与列表高亮
 - 进行中：继续优化 OpenClaw 的业务接入体验和路线说明
-- 下一步：梳理会话管理能力，明确 OpenClaw 会话恢复边界
+- 下一步：继续梳理会话管理能力，明确 OpenClaw 会话恢复边界
 - 下一步：补充更完整的 release 说明、安装提示与客户视角文案
 - 后续规划：在条件允许时对接更完整的真实业务数据能力
 

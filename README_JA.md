@@ -28,17 +28,17 @@
 
 ### ワンコマンドインストール
 
-現在の推奨版 `v3.12.12` を直接インストール:
+現在の推奨版 `v3.12.13` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.12 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.13 bash
 ```
 
 補足:
 
 - 現在の Release workflow は引き続き `prerelease` 方式で公開されています
 - そのため GitHub の `releases/latest` では、最新のテスト版を正しく取れない場合があります
-- README のコマンドは `v3.12.12` に固定し、現在の推奨版を確実に入れられるようにしています
+- README のコマンドは `v3.12.13` に固定し、現在の推奨版を確実に入れられるようにしています
 - 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
@@ -70,13 +70,13 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 現在のバージョン更新内容
 
-現在の公開版は `v3.12.12` で、今回の主な更新は以下です。
+現在の公開版は `v3.12.13` で、今回の主な更新は以下です。
 
-- Claude、Codex、Gemini、OpenClaw の各入口で、ルート管理と状態表示をさらに整理
-- Codex と Gemini の現在ルート判定を補正し、上部状態と実際の設定内容の一致度を改善
-- ワンクリック業務設定時に他ルートの Key が汚染される問題を修正し、入力欄も非表示化・成功後自動クリアに統一
-- インストーラスクリプトのバージョン選択と macOS 置き換えインストール手順をより安全に改善
-- ライト / ダーク両テーマで、モジュールカード、状態ヒント、下部リスト高亮の一貫性を引き続き調整
+- Claude、Codex、Gemini、OpenClaw の各入口で、状態信頼性とルート表現をさらに整理
+- 画面主状態は現在の provider を優先し、provider と CLI / installer 記録が不一致な場合は補助ヒントを表示
+- Codex / OpenClaw のセッションタイトル抽出を改善し、ノイズ情報を減らして読みやすさを向上
+- 利用統計ページのページングを改善し、ページ折りたたみと直接ジャンプを強化
+- ワンコマンドインストールが現在の推奨版を確実に取得できるよう継続調整
 
 ## 製品のポイント
 
@@ -160,8 +160,8 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 - 完了: Claude、Codex、Gemini、OpenClaw の 4 入口で、第 1 ラウンドの Tuzi ルート管理改版を完了
 - 完了: Codex の主ルート / Coding 特別ルート分離と、Gemini の初版業務接入を完了
-- 完了: 現在ルート判定、状態カード、API Key 入力安全性、基本的な視覚整合性の一巡修正を完了
-- 完了: インストーラスクリプトは stable 優先・失敗時復旧を意識した構成へ改善
+- 完了: 状態カード、API Key 入力安全性、固定版インストール導線、基本的な視覚整合性の一巡修正を完了
+- 完了: provider と CLI / installer 状態の不一致ヒントを初版実装
 - 進行中: 4 入口の状態信頼性、更新フィードバック、異常表示をさらに改善する
 - 進行中: ライト / ダーク両テーマで、ルートカード、状態ブロック、ヒント領域、下部リスト高亮をさらに揃える
 - 進行中: OpenClaw の接入体験とルート説明をさらにわかりやすくする
