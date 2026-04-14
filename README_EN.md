@@ -28,17 +28,17 @@ Current public releases are ready for Windows and Linux users. macOS is currentl
 
 ### One-Command Install
 
-Install the currently recommended build `v3.12.11` directly from GitHub:
+Install the currently recommended build `v3.12.12` directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.11 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.12 bash
 ```
 
 Notes:
 
 - The current release workflow still publishes builds as `prerelease`
 - Because of that, GitHub `releases/latest` does not always point to the newest testing build
-- The README command is now pinned to `v3.12.11` so it installs the current recommended version reliably
+- The README command is now pinned to `v3.12.12` so it installs the current recommended version reliably
 - To install another version, replace the value in `TUZI_SWITCH_TAG=vX.Y.Z`
 
 ### macOS Unsigned Build
@@ -70,13 +70,13 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 
 ## Current Version Updates
 
-The current public release is `v3.12.11`, with this round focused on:
+The current public release is `v3.12.12`, with this round focused on:
 
-- Further polishing the route-management experience across Claude, Codex, Gemini, and OpenClaw
-- Aligning module colors, selected states, provider-card highlights, and status hints across light and dark themes
-- Improving OpenClaw onboarding hierarchy and recommendation blocks for business route selection
-- Fixing more route-detection and status-reading issues for Gemini, Codex, and related quick-access flows
-- Tightening the visual consistency between the top quick-access area and the provider list below
+- Further polishing route management and status presentation across Claude, Codex, Gemini, and OpenClaw
+- Fixing current-route detection for Codex and Gemini so the top status matches real config state more reliably
+- Fixing key pollution during one-click business onboarding, while hiding API key input and clearing it after success
+- Hardening the installer script for release selection and safer macOS replacement installs
+- Continuing to align module cards, status hints, and lower provider-list highlights across light and dark themes
 
 ## Product Highlights
 
@@ -158,16 +158,16 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 
 ## Development Plan / TODO
 
-- P0 done: the first Tuzi route-management pass is complete across Claude, Codex, Gemini, and OpenClaw
-- P0 done: Codex main / Coding route split is complete, and the first Gemini business onboarding pass is complete
-- P0 done: one round of fixes has been completed for status cards, current-route detection, module icons, and base visual issues
-- P1 in progress: keep improving state reliability, refresh feedback, and error hints across the four entry modules
-- P1 in progress: keep aligning route cards, status blocks, hint blocks, and provider-list highlights across light and dark themes
-- P1 in progress: keep improving OpenClaw onboarding and route explanation
-- P1 planned: revisit session management and clarify the OpenClaw recovery boundary
-- P1 planned: expand release notes, install hints, and customer-facing product copy
-- P2 planned: connect more complete real business-data capabilities
-- P2 planned: keep refining install guidance, release flow, and documentation naming consistency
+- Done: the first Tuzi route-management pass is complete across Claude, Codex, Gemini, and OpenClaw
+- Done: the Codex main / Coding route split is complete, and the first Gemini business onboarding pass is in place
+- Done: one round of fixes has landed for current-route detection, status cards, API key handling, and base visual consistency
+- Done: the installer script now prefers stable releases first and uses a safer fallback-friendly macOS install flow
+- In progress: keep improving state reliability, refresh feedback, and error hints across the four entry modules
+- In progress: keep aligning route cards, status blocks, hint blocks, and provider-list highlights across light and dark themes
+- In progress: keep improving OpenClaw onboarding and route explanation
+- Next: revisit session management and clarify the OpenClaw recovery boundary
+- Next: expand release notes, install hints, and customer-facing product copy
+- Later: connect more complete real business-data capabilities when the backend path is ready
 
 ## Notes
 
