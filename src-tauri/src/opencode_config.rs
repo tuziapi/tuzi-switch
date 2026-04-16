@@ -1,4 +1,4 @@
-use crate::config::write_json_file;
+use crate::config::{get_home_dir, write_json_file};
 use crate::error::AppError;
 use crate::provider::OpenCodeProviderConfig;
 use crate::settings::get_opencode_override_dir;
@@ -37,9 +37,7 @@ pub fn get_opencode_dir() -> PathBuf {
         return override_dir;
     }
 
-    dirs::home_dir()
-        .map(|h| h.join(".config").join("opencode"))
-        .unwrap_or_else(|| PathBuf::from(".config").join("opencode"))
+    get_home_dir().join(".config").join("opencode")
 }
 
 pub fn get_opencode_config_path() -> PathBuf {

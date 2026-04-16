@@ -1180,7 +1180,7 @@ mod tests {
             )?;
         }
 
-        let summary = db.get_usage_summary(None, None)?;
+        let summary = db.get_usage_summary(None, None, None)?;
         assert_eq!(summary.total_requests, 2);
         assert_eq!(summary.success_rate, 100.0);
 
@@ -1215,7 +1215,7 @@ mod tests {
             )?;
         }
 
-        let stats = db.get_model_stats()?;
+        let stats = db.get_model_stats(None, None, None)?;
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].model, "claude-3-sonnet");
         assert_eq!(stats[0].request_count, 1);

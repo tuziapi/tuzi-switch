@@ -28,17 +28,17 @@ Current public releases are ready for Windows and Linux users. macOS is currentl
 
 ### One-Command Install
 
-Install the currently recommended build `v3.12.13` directly from GitHub:
+Install the currently recommended build `v3.12.14` directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.13 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.14 bash
 ```
 
 Notes:
 
 - The current release workflow still publishes builds as `prerelease`
 - Because of that, GitHub `releases/latest` does not always point to the newest testing build
-- The README command is now pinned to `v3.12.13` so it installs the current recommended version reliably
+- The README command is now pinned to `v3.12.14` so it installs the current recommended version reliably
 - To install another version, replace the value in `TUZI_SWITCH_TAG=vX.Y.Z`
 
 ### macOS Unsigned Build
@@ -70,7 +70,7 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 
 ## Current Version Updates
 
-The current public release is `v3.12.13`, with this round focused on:
+The current public release is `v3.12.14`, with this round focused on:
 
 - Finishing another pass on state reliability and route presentation across Claude, Codex, Gemini, and OpenClaw
 - Keeping the page-level primary state tied to the active provider, while adding mismatch hints for provider vs CLI/installer records

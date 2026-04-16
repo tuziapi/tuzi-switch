@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { useProvidersQuery } from "@/lib/query/queries";
 import type { OpenClawModel, Provider } from "@/types";
+import { extractErrorMessage } from "@/utils/errorUtils";
 
 type OpenClawRoute =
   | "tuzi-claude"
@@ -45,6 +46,48 @@ type GeminiBusinessRoute = "tuzi";
 type ClaudeEntryOption = "modified" | "gaccode" | "tu-zi";
 type CodexEntryOption = "tuzi" | "tuzi-coding" | "gac" | "gac-modified";
 type GeminiEntryOption = "tuzi" | "gac-modified";
+type BusinessProviderApp = "claude" | "codex" | "gemini" | "openclaw";
+
+const EMPTY_CLAUDE_STATUS: ClaudeInstallerStatus = {
+  installed: false,
+  version: null,
+  current_route: null,
+  route_file_exists: false,
+  routes: [],
+  env_summary: {
+    anthropic_api_key_masked: null,
+    anthropic_base_url: null,
+    anthropic_api_token_set: false,
+  },
+};
+
+const EMPTY_CODEX_STATUS: CodexInstallerStatus = {
+  installed: false,
+  version: null,
+  install_type: null,
+  current_route: null,
+  state_file_exists: false,
+  config_file_exists: false,
+  routes: [],
+  env_summary: {
+    codex_api_key_masked: null,
+  },
+};
+
+const EMPTY_GEMINI_STATUS: GeminiInstallerStatus = {
+  installed: false,
+  version: null,
+  install_type: null,
+  current_route: null,
+  env_file_exists: false,
+  settings_file_exists: false,
+  routes: [],
+  env_summary: {
+    gemini_api_key_masked: null,
+    google_gemini_base_url: null,
+    gemini_model: null,
+  },
+};
 
 const CODEX_REASONING_OPTIONS = [
   { value: "low", label: "low" },
@@ -206,6 +249,172 @@ const CODEX_ROUTE_CONFIG = {
     businessLine: "gac" as const,
   },
 };
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isBusinessRouteProviderId(providerId: string, baseProviderId: string) {
+  if (providerId === baseProviderId) return true;
+  return new RegExp(
+    `^${escapeRegExp(baseProviderId)}-alt-\\d+$`,
+  ).test(providerId);
+}
+
+function getBusinessRouteProviderAltIndex(
+  providerId: string,
+  baseProviderId: string,
+): number | null {
+  if (providerId === baseProviderId) return null;
+  const match = providerId.match(
+    new RegExp(`^${escapeRegExp(baseProviderId)}-alt-(\\d+)$`),
+  );
+  if (!match) return null;
+  const index = Number(match[1]);
+  return Number.isFinite(index) ? index : null;
+}
+
+function getBusinessRouteProviders(
+  providerMap: Record<string, Provider> | undefined,
+  baseProviderId: string,
+) {
+  return Object.values(providerMap || {}).filter((provider) =>
+    isBusinessRouteProviderId(provider.id, baseProviderId),
+  );
+}
+
+function getBusinessRouteApiKey(
+  provider: Provider,
+  app: BusinessProviderApp,
+): string {
+  if (app === "claude") {
+    return (
+      provider.settingsConfig?.env?.ANTHROPIC_AUTH_TOKEN ||
+      provider.settingsConfig?.env?.ANTHROPIC_API_KEY ||
+      ""
+    )
+      .toString()
+      .trim();
+  }
+  if (app === "codex") {
+    return (provider.settingsConfig?.auth?.OPENAI_API_KEY || "")
+      .toString()
+      .trim();
+  }
+  if (app === "gemini") {
+    return (provider.settingsConfig?.env?.GEMINI_API_KEY || "")
+      .toString()
+      .trim();
+  }
+  return (provider.settingsConfig?.apiKey || "").toString().trim();
+}
+
+function getNextBusinessRouteProviderSlot(
+  providerMap: Record<string, Provider> | undefined,
+  baseProviderId: string,
+) {
+  const nextProviderMap = providerMap || {};
+  if (!nextProviderMap[baseProviderId]) {
+    return {
+      targetProviderId: baseProviderId,
+      altIndex: null as number | null,
+    };
+  }
+
+  let altIndex = 2;
+  while (nextProviderMap[`${baseProviderId}-alt-${altIndex}`]) {
+    altIndex += 1;
+  }
+
+  return {
+    targetProviderId: `${baseProviderId}-alt-${altIndex}`,
+    altIndex,
+  };
+}
+
+function resolveBusinessRouteProviderTarget(
+  providerMap: Record<string, Provider> | undefined,
+  baseProviderId: string,
+  apiKey: string,
+  app: BusinessProviderApp,
+) {
+  const nextProviderMap = providerMap || {};
+  const matchedProvider = getBusinessRouteProviders(
+    nextProviderMap,
+    baseProviderId,
+  ).find((provider) => getBusinessRouteApiKey(provider, app) === apiKey);
+
+  if (matchedProvider) {
+    return {
+      targetProviderId: matchedProvider.id,
+      altIndex: getBusinessRouteProviderAltIndex(
+        matchedProvider.id,
+        baseProviderId,
+      ),
+      existingProvider: matchedProvider,
+      isNew: false,
+    };
+  }
+
+  const nextSlot = getNextBusinessRouteProviderSlot(
+    nextProviderMap,
+    baseProviderId,
+  );
+
+  return {
+    ...nextSlot,
+    existingProvider: nextProviderMap[nextSlot.targetProviderId],
+    isNew: !nextProviderMap[nextSlot.targetProviderId],
+  };
+}
+
+function buildBusinessRouteProviderName(
+  baseName: string,
+  altIndex: number | null,
+) {
+  if (!altIndex) return baseName;
+  return `${baseName}（附加 Key ${altIndex}）`;
+}
+
+function buildBusinessRouteProviderNotes(
+  baseNotes: string,
+  altIndex: number | null,
+) {
+  if (!altIndex) return baseNotes;
+  return `${baseNotes}（附加 Key ${altIndex}）`;
+}
+
+function getOpenClawRouteFromProviderId(
+  providerId: string | null | undefined,
+): OpenClawRoute | null {
+  if (!providerId) return null;
+  for (const [route, config] of Object.entries(OPENCLAW_ROUTE_CONFIG) as Array<
+    [OpenClawRoute, (typeof OPENCLAW_ROUTE_CONFIG)[OpenClawRoute]]
+  >) {
+    if (isBusinessRouteProviderId(providerId, config.providerId)) {
+      return route;
+    }
+  }
+  return null;
+}
+
+function hasBusinessRouteProviderInList(
+  providerIds: string[],
+  baseProviderId: string,
+) {
+  return providerIds.some((providerId) =>
+    isBusinessRouteProviderId(providerId, baseProviderId),
+  );
+}
+
+function hasBusinessRouteProviderInRecord(
+  providerMap: Record<string, Provider>,
+  baseProviderId: string,
+) {
+  return Object.keys(providerMap).some((providerId) =>
+    isBusinessRouteProviderId(providerId, baseProviderId),
+  );
+}
 
 function getCurrentRouteBaseUrl(
   routes: Array<{ is_current: boolean; base_url: string | null }> | undefined,
@@ -379,14 +588,10 @@ function getOpenClawCurrentRoute(
   primaryModel: string | undefined,
   configuredRoutes: OpenClawRoute[],
 ): OpenClawRoute | null {
-  if (primaryModel) {
-    for (const [route, config] of Object.entries(OPENCLAW_ROUTE_CONFIG) as Array<
-      [OpenClawRoute, (typeof OPENCLAW_ROUTE_CONFIG)[OpenClawRoute]]
-    >) {
-      if (primaryModel.startsWith(`${config.providerId}/`)) {
-        return route;
-      }
-    }
+  const primaryProviderId = primaryModel?.split("/")[0] || null;
+  const providerRoute = getOpenClawRouteFromProviderId(primaryProviderId);
+  if (providerRoute) {
+    return providerRoute;
   }
 
   if (configuredRoutes.length === 1) {
@@ -657,6 +862,7 @@ export function BusinessQuickAccess({
   const isOpenClaw = appId === "openclaw";
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [runningAction, setRunningAction] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<InstallerActionResult | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -701,8 +907,33 @@ export function BusinessQuickAccess({
   const geminiCurrentProvider =
     geminiProvidersData?.providers?.[geminiCurrentProviderId];
   const openclawProviderMap = openclawProvidersData?.providers || {};
+  const claudeStatusView = claudeStatus ?? EMPTY_CLAUDE_STATUS;
+  const codexStatusView = codexStatus ?? EMPTY_CODEX_STATUS;
+  const geminiStatusView = geminiStatus ?? EMPTY_GEMINI_STATUS;
+  const statusErrorHint = useMemo(() => {
+    if (isClaude || isCodex || isGemini) {
+      return "状态读取失败不会影响下方路线管理，你仍可继续输入 Key 并立即配置。";
+    }
+    if (isOpenClaw) {
+      return "状态读取失败不会影响当前页面，你仍可继续调整 OpenClaw 路线配置。";
+    }
+    return "";
+  }, [isClaude, isCodex, isGemini, isOpenClaw]);
 
-  const loadStatus = async () => {
+  const getStatusReadErrorMessage = (error: unknown) => {
+    const detail = extractErrorMessage(error);
+    if (detail) return detail;
+    if (isClaude) return "Claude 状态读取失败，请稍后重试。";
+    if (isCodex) return "Codex 状态读取失败，请稍后重试。";
+    if (isGemini) return "Gemini 状态读取失败，请稍后重试。";
+    if (isOpenClaw) return "OpenClaw 状态读取失败，请稍后重试。";
+    return "状态读取失败，请稍后重试。";
+  };
+
+  const loadStatus = async ({ showRefreshState = false } = {}) => {
+    if (showRefreshState) {
+      setIsRefreshing(true);
+    }
     setPageError(null);
     try {
       if (isClaude) {
@@ -744,7 +975,11 @@ export function BusinessQuickAccess({
       }
       setLastRefreshedAt(Date.now());
     } catch (error) {
-      setPageError(String(error));
+      setPageError(getStatusReadErrorMessage(error));
+    } finally {
+      if (showRefreshState) {
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -772,7 +1007,7 @@ export function BusinessQuickAccess({
         setPageError(result.error || result.message);
       }
     } catch (error) {
-      setPageError(String(error));
+      setPageError(getStatusReadErrorMessage(error));
     } finally {
       setRunningAction(null);
     }
@@ -850,7 +1085,12 @@ export function BusinessQuickAccess({
         [OpenClawRoute, (typeof OPENCLAW_ROUTE_CONFIG)[OpenClawRoute]]
       >
     )
-      .filter(([, config]) => openclawLiveProviderIds.includes(config.providerId))
+      .filter(([, config]) =>
+        hasBusinessRouteProviderInList(
+          openclawLiveProviderIds,
+          config.providerId,
+        ),
+      )
       .map(([route]) => route);
 
     const inferredRoute = getOpenClawCurrentRoute(
@@ -930,15 +1170,15 @@ export function BusinessQuickAccess({
     : activeGeminiRoute === "custom"
       ? null
       : activeGeminiRoute;
-  const hasClaudeTuziRoute = hasNamedRoute(claudeStatus?.routes, "tu-zi");
-  const hasClaudeGacRoute = hasNamedRoute(claudeStatus?.routes, "gaccode");
-  const hasCodexTuziRoute = hasNamedRoute(codexStatus?.routes, "tuzi");
-  const hasCodexCodingRoute = hasNamedRoute(codexStatus?.routes, "codex");
-  const hasCodexGacRoute = hasNamedRoute(codexStatus?.routes, "gac");
-  const hasGeminiTuziRoute = hasNamedRoute(geminiStatus?.routes, "tuzi");
-  const installerClaudeRoute = getClaudeInstallerRoute(claudeStatus);
-  const installerCodexRoute = getCodexInstallerRoute(codexStatus);
-  const installerGeminiRoute = getGeminiInstallerRoute(geminiStatus);
+  const hasClaudeTuziRoute = hasNamedRoute(claudeStatusView.routes, "tu-zi");
+  const hasClaudeGacRoute = hasNamedRoute(claudeStatusView.routes, "gaccode");
+  const hasCodexTuziRoute = hasNamedRoute(codexStatusView.routes, "tuzi");
+  const hasCodexCodingRoute = hasNamedRoute(codexStatusView.routes, "codex");
+  const hasCodexGacRoute = hasNamedRoute(codexStatusView.routes, "gac");
+  const hasGeminiTuziRoute = hasNamedRoute(geminiStatusView.routes, "tuzi");
+  const installerClaudeRoute = getClaudeInstallerRoute(claudeStatusView);
+  const installerCodexRoute = getCodexInstallerRoute(codexStatusView);
+  const installerGeminiRoute = getGeminiInstallerRoute(geminiStatusView);
   const claudeRouteMismatch = Boolean(
     activeClaudeRoute &&
       installerClaudeRoute &&
@@ -999,16 +1239,34 @@ export function BusinessQuickAccess({
     }
 
     const routeConfig = OPENCLAW_ROUTE_CONFIG[route];
-    const routeProviderIds = Object.values(OPENCLAW_ROUTE_CONFIG).map(
-      (item) => item.providerId,
+    const providerMap = {
+      ...openclawProviderMap,
+      ...(providers || {}),
+    };
+    const target = resolveBusinessRouteProviderTarget(
+      providerMap,
+      routeConfig.providerId,
+      trimmedKey,
+      "openclaw",
+    );
+    const providerName = buildBusinessRouteProviderName(
+      routeConfig.providerName,
+      target.altIndex,
+    );
+    const providerNotes = buildBusinessRouteProviderNotes(
+      `由兔子快速接入自动生成，适用于 ${routeConfig.label}`,
+      target.altIndex,
     );
     const provider: Provider = {
-      id: routeConfig.providerId,
-      name: routeConfig.providerName,
+      ...target.existingProvider,
+      id: target.targetProviderId,
+      name: providerName,
       category: "custom",
       icon: "tuzi",
-      notes: `由兔子快速接入自动生成，适用于 ${routeConfig.label}`,
+      notes: providerNotes,
+      createdAt: target.existingProvider?.createdAt ?? Date.now(),
       meta: {
+        ...(target.existingProvider?.meta || {}),
         businessLine: route.startsWith("gac-") ? "gac" : "tuzi",
       },
       settingsConfig: {
@@ -1019,27 +1277,27 @@ export function BusinessQuickAccess({
       },
     };
 
-    const exists = Boolean(providers?.[routeConfig.providerId]);
-    if (exists) {
-      await providersApi.update(provider, "openclaw", routeConfig.providerId);
-    } else {
+    if (target.isNew) {
       await providersApi.add(provider, "openclaw", true);
+    } else {
+      await providersApi.update(provider, "openclaw", target.targetProviderId);
     }
+    await providersApi.switch(target.targetProviderId, "openclaw");
 
     const modelRefs = routeConfig.models.map(
-      (model) => `${routeConfig.providerId}/${model.id}`,
+      (model) => `${target.targetProviderId}/${model.id}`,
     );
     const currentModelCatalog = openclawAgentsDefaults?.models || {};
     const preservedModelCatalog = Object.fromEntries(
       Object.entries(currentModelCatalog).filter(
-        ([key]) => !routeProviderIds.some((providerId) => key.startsWith(`${providerId}/`)),
+        ([key]) => !key.startsWith(`${target.targetProviderId}/`),
       ),
     );
     const nextModelCatalog = {
       ...preservedModelCatalog,
       ...Object.fromEntries(
         routeConfig.models.map((model) => [
-          `${routeConfig.providerId}/${model.id}`,
+          `${target.targetProviderId}/${model.id}`,
           { alias: model.name },
         ]),
       ),
@@ -1066,7 +1324,7 @@ export function BusinessQuickAccess({
       success: true,
       message: `已为 OpenClaw 写入${routeConfig.label}，现在可以直接使用对应业务线路了。`,
       stdout: [
-        `Provider: ${routeConfig.providerId}`,
+        `Provider: ${target.targetProviderId}`,
         `Base URL: ${routeConfig.baseUrl}`,
         `Primary Model: ${modelRefs[0]}`,
         `Tools Profile: coding`,
@@ -1082,15 +1340,36 @@ export function BusinessQuickAccess({
     apiKey: string,
   ) => {
     const routeConfig = CLAUDE_ROUTE_CONFIG[route];
+    const providerMap = {
+      ...(claudeProvidersData?.providers || {}),
+      ...(providers || {}),
+    };
+    const target = resolveBusinessRouteProviderTarget(
+      providerMap,
+      routeConfig.providerId,
+      apiKey,
+      "claude",
+    );
+    const providerName = buildBusinessRouteProviderName(
+      routeConfig.providerName,
+      target.altIndex,
+    );
+    const providerNotes = buildBusinessRouteProviderNotes(
+      "由兔子业务一键接入自动生成",
+      target.altIndex,
+    );
     const provider: Provider = {
-      id: routeConfig.providerId,
-      name: routeConfig.providerName,
+      ...target.existingProvider,
+      id: target.targetProviderId,
+      name: providerName,
       websiteUrl: routeConfig.websiteUrl,
       category: "custom",
       icon: "tuzi",
       iconColor: "#F97316",
-      notes: "由兔子业务一键接入自动生成",
+      notes: providerNotes,
+      createdAt: target.existingProvider?.createdAt ?? Date.now(),
       meta: {
+        ...(target.existingProvider?.meta || {}),
         businessLine: route === "gaccode" ? "gac" : "tuzi",
       },
       settingsConfig: {
@@ -1101,13 +1380,13 @@ export function BusinessQuickAccess({
       },
     };
 
-    if (providers?.[routeConfig.providerId]) {
-      await providersApi.update(provider, "claude", routeConfig.providerId);
-    } else {
+    if (target.isNew) {
       await providersApi.add(provider, "claude");
+    } else {
+      await providersApi.update(provider, "claude", target.targetProviderId);
     }
 
-    await providersApi.switch(routeConfig.providerId, "claude");
+    await providersApi.switch(target.targetProviderId, "claude");
     await queryClient.invalidateQueries({ queryKey: ["providers", "claude"] });
   };
 
@@ -1139,20 +1418,38 @@ export function BusinessQuickAccess({
     model: string,
   ) => {
     const routeConfig = CODEX_ROUTE_CONFIG[route];
+    const providerMap = {
+      ...(codexProvidersData?.providers || {}),
+      ...(providers || {}),
+    };
+    const target = resolveBusinessRouteProviderTarget(
+      providerMap,
+      routeConfig.providerId,
+      apiKey,
+      "codex",
+    );
+    const providerName = buildBusinessRouteProviderName(
+      routeConfig.providerName,
+      target.altIndex,
+    );
+    const baseNotes =
+      route === "gac"
+        ? "由 gac 业务一键接入自动生成"
+        : route === "tuzi"
+          ? "由兔子业务一键接入自动生成（兔子线路）"
+          : "由兔子业务一键接入自动生成（Coding 特别线路）";
     const provider: Provider = {
-      id: routeConfig.providerId,
-      name: routeConfig.providerName,
+      ...target.existingProvider,
+      id: target.targetProviderId,
+      name: providerName,
       websiteUrl: routeConfig.websiteUrl,
       category: "custom",
       icon: "tuzi",
       iconColor: route === "gac" ? "#F97316" : "#0EA5E9",
-      notes:
-        route === "gac"
-          ? "由 gac 业务一键接入自动生成"
-          : route === "tuzi"
-            ? "由兔子业务一键接入自动生成（兔子线路）"
-            : "由兔子业务一键接入自动生成（Coding 特别线路）",
+      notes: buildBusinessRouteProviderNotes(baseNotes, target.altIndex),
+      createdAt: target.existingProvider?.createdAt ?? Date.now(),
       meta: {
+        ...(target.existingProvider?.meta || {}),
         businessLine: routeConfig.businessLine,
       },
       settingsConfig: {
@@ -1161,13 +1458,13 @@ export function BusinessQuickAccess({
       },
     };
 
-    if (providers?.[routeConfig.providerId]) {
-      await providersApi.update(provider, "codex", routeConfig.providerId);
-    } else {
+    if (target.isNew) {
       await providersApi.add(provider, "codex");
+    } else {
+      await providersApi.update(provider, "codex", target.targetProviderId);
     }
 
-    await providersApi.switch(routeConfig.providerId, "codex", {
+    await providersApi.switch(target.targetProviderId, "codex", {
       skipBackfill: true,
     });
     await queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
@@ -1214,15 +1511,35 @@ export function BusinessQuickAccess({
     model: string,
   ) => {
     const routeConfig = GEMINI_ROUTE_CONFIG[route];
+    const providerMap = {
+      ...(geminiProvidersData?.providers || {}),
+      ...(providers || {}),
+    };
+    const target = resolveBusinessRouteProviderTarget(
+      providerMap,
+      routeConfig.providerId,
+      apiKey,
+      "gemini",
+    );
+    const providerName = buildBusinessRouteProviderName(
+      routeConfig.providerName,
+      target.altIndex,
+    );
     const provider: Provider = {
-      id: routeConfig.providerId,
-      name: routeConfig.providerName,
+      ...target.existingProvider,
+      id: target.targetProviderId,
+      name: providerName,
       websiteUrl: routeConfig.websiteUrl,
       category: "custom",
       icon: "gemini",
       iconColor: "#DB2777",
-      notes: "由兔子业务一键接入自动生成",
+      notes: buildBusinessRouteProviderNotes(
+        "由兔子业务一键接入自动生成",
+        target.altIndex,
+      ),
+      createdAt: target.existingProvider?.createdAt ?? Date.now(),
       meta: {
+        ...(target.existingProvider?.meta || {}),
         businessLine: routeConfig.businessLine,
       },
       settingsConfig: {
@@ -1235,13 +1552,13 @@ export function BusinessQuickAccess({
       },
     };
 
-    if (providers?.[routeConfig.providerId]) {
-      await providersApi.update(provider, "gemini", routeConfig.providerId);
-    } else {
+    if (target.isNew) {
       await providersApi.add(provider, "gemini");
+    } else {
+      await providersApi.update(provider, "gemini", target.targetProviderId);
     }
 
-    await providersApi.switch(routeConfig.providerId, "gemini", {
+    await providersApi.switch(target.targetProviderId, "gemini", {
       skipBackfill: true,
     });
     await queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
@@ -1302,11 +1619,16 @@ export function BusinessQuickAccess({
           </div>
           <Button
             variant="outline"
-            onClick={() => void loadStatus()}
-            disabled={!!runningAction}
+            onClick={() => void loadStatus({ showRefreshState: true })}
+            disabled={!!runningAction || isRefreshing}
             className="self-start"
           >
-            {lastRefreshedAt
+            {isRefreshing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                刷新中...
+              </>
+            ) : lastRefreshedAt
               ? `刷新状态 · ${new Date(lastRefreshedAt).toLocaleTimeString("zh-CN", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -1319,12 +1641,18 @@ export function BusinessQuickAccess({
         {loading ? (
           <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-6 text-sm text-muted-foreground dark:border-white/10 dark:bg-white/4">
             正在读取当前配置状态...
+            {(isClaude || isCodex || isGemini) ? " 你现在也可以直接使用下方路线管理继续配置。" : ""}
           </div>
         ) : null}
 
         {pageError ? (
           <div className="rounded-2xl border border-red-300/60 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
-            {pageError}
+            <div className="font-medium">{pageError}</div>
+            {statusErrorHint ? (
+              <div className="mt-1 text-red-700/90 dark:text-red-200/90">
+                {statusErrorHint}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -1347,7 +1675,7 @@ export function BusinessQuickAccess({
           </div>
         ) : null}
 
-        {isClaude && claudeStatus ? (
+        {isClaude ? (
           <>
             <div className="grid gap-3 md:grid-cols-4">
               <Stat
@@ -1360,14 +1688,14 @@ export function BusinessQuickAccess({
               />
               <Stat
                 label="CLI 状态"
-                value={claudeStatus.installed ? "已安装" : "未安装"}
+                value={claudeStatusView.installed ? "已安装" : "未安装"}
               />
-              <Stat label="版本" value={claudeStatus.version || "--"} />
+              <Stat label="版本" value={claudeStatusView.version || "--"} />
               <Stat
                 label="Base URL"
                 value={
                   getProviderBaseUrl(claudeCurrentProvider) ||
-                  getCurrentRouteBaseUrl(claudeStatus.routes)
+                  getCurrentRouteBaseUrl(claudeStatusView.routes)
                 }
               />
             </div>
@@ -1511,7 +1839,7 @@ export function BusinessQuickAccess({
                   onClick={() =>
                     void runAction("claude-upgrade", () =>
                       installerApi.upgradeClaudeCode(
-                        claudeStatus.current_route === "改版"
+                        claudeStatusView.current_route === "改版"
                           ? "modified"
                           : "original",
                       ),
@@ -1532,7 +1860,7 @@ export function BusinessQuickAccess({
           </>
         ) : null}
 
-        {isCodex && codexStatus ? (
+        {isCodex ? (
           <>
             <div className="grid gap-3 md:grid-cols-4">
               <Stat
@@ -1553,14 +1881,14 @@ export function BusinessQuickAccess({
               />
               <Stat
                 label="CLI 状态"
-                value={codexStatus.installed ? "已安装" : "未安装"}
+                value={codexStatusView.installed ? "已安装" : "未安装"}
               />
-              <Stat label="版本" value={codexStatus.version || "--"} />
+              <Stat label="版本" value={codexStatusView.version || "--"} />
               <Stat
                 label="Base URL"
                 value={
                   getProviderBaseUrl(codexCurrentProvider) ||
-                  getCurrentRouteBaseUrl(codexStatus.routes)
+                  getCurrentRouteBaseUrl(codexStatusView.routes)
                 }
               />
             </div>
@@ -1731,7 +2059,7 @@ export function BusinessQuickAccess({
                   onClick={() =>
                     void runAction("codex-upgrade", () =>
                       installerApi.upgradeCodex(
-                        codexStatus.install_type === "gac" ? "gac" : "openai",
+                        codexStatusView.install_type === "gac" ? "gac" : "openai",
                       ),
                     )
                   }
@@ -1750,7 +2078,7 @@ export function BusinessQuickAccess({
           </>
         ) : null}
 
-        {isGemini && geminiStatus ? (
+        {isGemini ? (
           <>
             <div className="grid gap-3 md:grid-cols-4">
               <Stat
@@ -1767,15 +2095,15 @@ export function BusinessQuickAccess({
               />
               <Stat
                 label="CLI 状态"
-                value={getGeminiCliStatusLabel(geminiStatus)}
+                value={getGeminiCliStatusLabel(geminiStatusView)}
               />
-              <Stat label="版本" value={geminiStatus.version || "--"} />
+              <Stat label="版本" value={geminiStatusView.version || "--"} />
               <Stat
                 label="Base URL"
                 value={
                   getProviderBaseUrl(geminiCurrentProvider) ||
-                  geminiStatus.env_summary.google_gemini_base_url ||
-                  getCurrentRouteBaseUrl(geminiStatus.routes)
+                  geminiStatusView.env_summary.google_gemini_base_url ||
+                  getCurrentRouteBaseUrl(geminiStatusView.routes)
                 }
               />
             </div>
@@ -1890,7 +2218,7 @@ export function BusinessQuickAccess({
                   onClick={() =>
                     void runAction("gemini-upgrade", () =>
                       installerApi.upgradeGemini(
-                        geminiStatus.install_type === "gac" ? "gac" : "official",
+                        geminiStatusView.install_type === "gac" ? "gac" : "official",
                       ),
                     )
                   }
@@ -1943,8 +2271,14 @@ export function BusinessQuickAccess({
                   ).map(([route, config]) => {
                     const isSelected = openclawRoute === route;
                     const isConfigured =
-                      openclawLiveProviderIds.includes(config.providerId) ||
-                      Boolean(openclawProviderMap[config.providerId]);
+                      hasBusinessRouteProviderInList(
+                        openclawLiveProviderIds,
+                        config.providerId,
+                      ) ||
+                      hasBusinessRouteProviderInRecord(
+                        openclawProviderMap,
+                        config.providerId,
+                      );
                     return (
                       <RouteCard
                         key={route}

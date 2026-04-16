@@ -173,7 +173,7 @@ command = "say"
 
     let state = create_test_state_with_config(&initial_config).expect("create test state");
 
-    ProviderService::switch(&state, AppType::Codex, "new-provider")
+    ProviderService::switch(&state, AppType::Codex, "new-provider", false)
         .expect("switch provider should succeed");
 
     let auth_value: serde_json::Value =
@@ -446,7 +446,7 @@ fn switch_packycode_gemini_updates_security_selected_type() {
 
     let state = create_test_state_with_config(&config).expect("create test state");
 
-    ProviderService::switch(&state, AppType::Gemini, "packy-gemini")
+    ProviderService::switch(&state, AppType::Gemini, "packy-gemini", false)
         .expect("switching to PackyCode Gemini should succeed");
 
     // Gemini security settings are written to ~/.gemini/settings.json, not ~/.cc-switch/settings.json
@@ -501,7 +501,7 @@ fn packycode_partner_meta_triggers_security_flag_even_without_keywords() {
 
     let state = create_test_state_with_config(&config).expect("create test state");
 
-    ProviderService::switch(&state, AppType::Gemini, "packy-meta")
+    ProviderService::switch(&state, AppType::Gemini, "packy-meta", false)
         .expect("switching to partner meta provider should succeed");
 
     // Gemini security settings are written to ~/.gemini/settings.json, not ~/.cc-switch/settings.json
@@ -555,7 +555,7 @@ fn switch_google_official_gemini_sets_oauth_security() {
 
     let state = create_test_state_with_config(&config).expect("create test state");
 
-    ProviderService::switch(&state, AppType::Gemini, "google-official")
+    ProviderService::switch(&state, AppType::Gemini, "google-official", false)
         .expect("switching to Google official Gemini should succeed");
 
     // Gemini security settings are written to ~/.gemini/settings.json, not ~/.cc-switch/settings.json
@@ -635,7 +635,7 @@ fn provider_service_switch_claude_updates_live_and_state() {
 
     let state = create_test_state_with_config(&config).expect("create test state");
 
-    ProviderService::switch(&state, AppType::Claude, "new-provider")
+    ProviderService::switch(&state, AppType::Claude, "new-provider", false)
         .expect("switch provider should succeed");
 
     let live_after: serde_json::Value =
@@ -680,7 +680,7 @@ fn provider_service_switch_missing_provider_returns_error() {
 
     let state = create_test_state().expect("create test state");
 
-    let err = ProviderService::switch(&state, AppType::Claude, "missing")
+    let err = ProviderService::switch(&state, AppType::Claude, "missing", false)
         .expect_err("switching missing provider should fail");
     match err {
         AppError::Message(msg) => {
@@ -719,7 +719,7 @@ fn provider_service_switch_codex_missing_auth_returns_error() {
 
     let state = create_test_state_with_config(&config).expect("create test state");
 
-    let err = ProviderService::switch(&state, AppType::Codex, "invalid")
+    let err = ProviderService::switch(&state, AppType::Codex, "invalid", false)
         .expect_err("switching should fail without auth");
     match err {
         AppError::Config(msg) => assert!(

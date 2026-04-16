@@ -76,9 +76,45 @@ export const handlers = [
     success(getLiveProviderIds("openclaw")),
   ),
 
+  http.post(`${TAURI_ENDPOINT}/get_claudecode_status`, () =>
+    success({
+      installed: false,
+      version: null,
+      current_route: null,
+      route_file_exists: false,
+      routes: [],
+      env_summary: {
+        anthropic_api_key_masked: null,
+        anthropic_base_url: null,
+        anthropic_api_token_set: false,
+      },
+    }),
+  ),
+
+  http.post(`${TAURI_ENDPOINT}/get_codex_status`, () =>
+    success({
+      installed: false,
+      version: null,
+      install_type: null,
+      current_route: null,
+      state_file_exists: false,
+      config_file_exists: false,
+      routes: [],
+      env_summary: {
+        codex_api_key_masked: null,
+      },
+    }),
+  ),
+
   http.post(`${TAURI_ENDPOINT}/get_openclaw_default_model`, () =>
     success({ primary: null, fallback: [] }),
   ),
+
+  http.post(`${TAURI_ENDPOINT}/get_openclaw_agents_defaults`, () =>
+    success(null),
+  ),
+
+  http.post(`${TAURI_ENDPOINT}/get_openclaw_tools`, () => success({})),
 
   http.post(`${TAURI_ENDPOINT}/scan_openclaw_config_health`, () => success([])),
 

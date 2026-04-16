@@ -223,6 +223,69 @@ fn command_exists(command: &str) -> bool {
     cmd.output().map(|o| o.status.success()).unwrap_or(false)
 }
 
+fn executable_candidates(program: &str, dir: &Path) -> Vec<PathBuf> {
+    #[cfg(windows)]
+    {
+        vec![
+            dir.join(format!("{program}.cmd")),
+            dir.join(format!("{program}.exe")),
+            dir.join(program),
+        ]
+    }
+
+    #[cfg(not(windows))]
+    {
+        vec![dir.join(program)]
+    }
+}
+
+fn find_executable_in_path(program: &str) -> Option<PathBuf> {
+    let path = extended_path();
+    for dir in std::env::split_paths(&path) {
+        for candidate in executable_candidates(program, &dir) {
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+fn read_version_from_package_metadata(executable_path: &Path) -> Option<String> {
+    let resolved = fs::canonicalize(executable_path)
+        .unwrap_or_else(|_| executable_path.to_path_buf());
+
+    for ancestor in resolved.ancestors().take(8) {
+        let package_json_path = ancestor.join("package.json");
+        if !package_json_path.is_file() {
+            continue;
+        }
+
+        let Ok(content) = fs::read_to_string(&package_json_path) else {
+            continue;
+        };
+        let Ok(parsed) = serde_json::from_str::<Value>(&content) else {
+            continue;
+        };
+        let version = parsed
+            .get("version")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if let Some(version) = version {
+            return Some(version.to_string());
+        }
+    }
+
+    None
+}
+
+fn cli_version_from_package_metadata(program: &str) -> Option<String> {
+    find_executable_in_path(program)
+        .as_deref()
+        .and_then(read_version_from_package_metadata)
+}
+
 fn command_output(program: &str, args: &[&str]) -> Result<String, String> {
     let mut cmd = Command::new(program);
     cmd.args(args).env("PATH", extended_path());
@@ -496,6 +559,58 @@ fn resolve_install_api_key(route_data: &RouteFileData, route_name: &str, provide
         .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.trim().is_empty()))
 }
 
+fn configure_claude_modified_route(data: &mut RouteFileData) -> Result<Vec<String>, String> {
+    data.routes.entry("改版".to_string()).or_insert(RouteEntry {
+        api_key: None,
+        base_url: None,
+        api_token: None,
+    });
+    data.current_route = Some("改版".to_string());
+    write_route_file(data)?;
+    let cleared_paths = clear_claude_env_in_rc()?;
+    let mut logs = vec![
+        format!("已写入路线文件: {}", get_claude_route_file_path()?),
+        "当前线路=改版".to_string(),
+    ];
+    for path in cleared_paths {
+        logs.push(format!("已清理环境变量: {path}"));
+    }
+    Ok(logs)
+}
+
+fn configure_claude_original_route(
+    data: &mut RouteFileData,
+    route_name: &str,
+    base_url: &str,
+    api_key: &str,
+) -> Result<Vec<String>, String> {
+    if api_key.trim().is_empty() {
+        return Err("该线路需要先填写 API Key".to_string());
+    }
+
+    data.routes.insert(
+        route_name.to_string(),
+        RouteEntry {
+            api_key: Some(api_key.trim().to_string()),
+            base_url: Some(base_url.to_string()),
+            api_token: Some(String::new()),
+        },
+    );
+    data.current_route = Some(route_name.to_string());
+    write_route_file(data)?;
+    let rc_paths = apply_claude_env_to_rc(api_key.trim(), base_url, "")?;
+    ensure_claude_json_onboarding()?;
+
+    let mut logs = vec![
+        format!("已写入路线文件: {}", get_claude_route_file_path()?),
+        format!("当前线路={route_name} base_url={base_url}"),
+    ];
+    for path in rc_paths {
+        logs.push(format!("已更新环境变量: {path}"));
+    }
+    Ok(logs)
+}
+
 fn claude_ok(message: &str, stdout: String, restart_required: bool) -> ClaudeActionResult {
     ClaudeActionResult {
         success: true,
@@ -522,7 +637,10 @@ fn claude_err(message: &str, error: String, stdout: String) -> ClaudeActionResul
 pub async fn get_claudecode_status() -> Result<ClaudeCodeStatus, String> {
     let installed = command_exists("claude");
     let version = if installed {
-        command_output("claude", &["--version"]).ok()
+        // Some Claude variants attach side effects to CLI startup.
+        // Prefer package metadata to avoid accidentally opening external pages
+        // while the quick-access panel is only trying to read status.
+        cli_version_from_package_metadata("claude")
     } else {
         None
     };
@@ -575,25 +693,42 @@ pub async fn get_claudecode_status() -> Result<ClaudeCodeStatus, String> {
 pub async fn install_claudecode(scheme: String, api_key: Option<String>) -> Result<ClaudeActionResult, String> {
     let normalized = scheme.trim().to_uppercase();
     let mut data = read_route_file();
+    let installed = command_exists("claude");
+    let is_modified_variant = data.current_route.as_deref() == Some("改版");
     if normalized == "A" {
+        if installed && is_modified_variant {
+            return match configure_claude_modified_route(&mut data) {
+                Ok(logs) => Ok(claude_ok(
+                    "检测到已安装 ClaudeCode 改版，仅更新当前配置。如需在已打开的终端中使用，请重新打开终端后再运行 claude",
+                    logs.join("\n"),
+                    false,
+                )),
+                Err(e) => Ok(claude_err("ClaudeCode 配置失败", e, String::new())),
+            };
+        }
         let command = format!("npm install -g {CLAUDE_MODIFIED_INSTALL_URL}");
         let output = match run_shell_script(&command) {
             Ok(v) => v,
             Err(e) => return Ok(claude_err("ClaudeCode 安装失败", e, String::new())),
         };
-        data.routes.entry("改版".to_string()).or_insert(RouteEntry {
-            api_key: None,
-            base_url: None,
-            api_token: None,
-        });
-        data.current_route = Some("改版".to_string());
-        write_route_file(&data)?;
-        let _ = clear_claude_env_in_rc();
-        return Ok(claude_ok(
-            "改版 ClaudeCode 安装成功，请重新打开终端后再运行 claude",
-            format!("$ {command}\n{output}"),
-            true,
-        ));
+        let mut logs = vec![format!("$ {command}"), output];
+        match configure_claude_modified_route(&mut data) {
+            Ok(config_logs) => {
+                logs.extend(config_logs);
+                return Ok(claude_ok(
+                    "改版 ClaudeCode 安装成功，请重新打开终端后再运行 claude",
+                    logs.join("\n"),
+                    true,
+                ));
+            }
+            Err(e) => {
+                return Ok(claude_err(
+                    "ClaudeCode 安装成功，但配置失败",
+                    e,
+                    logs.join("\n"),
+                ))
+            }
+        }
     }
     if normalized != "B" && normalized != "C" {
         return Ok(claude_err(
@@ -619,38 +754,43 @@ pub async fn install_claudecode(scheme: String, api_key: Option<String>) -> Resu
         Some(v) => v,
         None => {
             return Ok(claude_err(
-                "ClaudeCode 安装失败",
-                "安装该线路需要先填写 API Key".to_string(),
+                "ClaudeCode 配置失败",
+                "该线路需要先填写 API Key".to_string(),
                 String::new(),
             ))
         }
     };
+    if installed && !is_modified_variant {
+        return match configure_claude_original_route(&mut data, route_name, base_url, &final_key) {
+            Ok(logs) => Ok(claude_ok(
+                "检测到已安装原版 ClaudeCode，仅更新配置。如需在已打开的终端中使用，请重新打开终端后再运行 claude",
+                logs.join("\n"),
+                false,
+            )),
+            Err(e) => Ok(claude_err("ClaudeCode 配置失败", e, String::new())),
+        };
+    }
     let command = format!("npm install -g {CLAUDE_ORIGINAL_PACKAGE}");
     let output = match run_shell_script(&command) {
         Ok(v) => v,
         Err(e) => return Ok(claude_err("ClaudeCode 安装失败", e, String::new())),
     };
-    data.routes.insert(
-        route_name.to_string(),
-        RouteEntry {
-            api_key: Some(final_key.clone()),
-            base_url: Some(base_url.to_string()),
-            api_token: Some(String::new()),
-        },
-    );
-    data.current_route = Some(route_name.to_string());
-    write_route_file(&data)?;
-    let rc_paths = apply_claude_env_to_rc(&final_key, base_url, "")?;
-    ensure_claude_json_onboarding()?;
     let mut logs = vec![format!("$ {command}"), output];
-    for path in rc_paths {
-        logs.push(format!("已更新环境变量: {path}"));
+    match configure_claude_original_route(&mut data, route_name, base_url, &final_key) {
+        Ok(config_logs) => {
+            logs.extend(config_logs);
+            Ok(claude_ok(
+                success_message,
+                logs.join("\n"),
+                true,
+            ))
+        }
+        Err(e) => Ok(claude_err(
+            "ClaudeCode 安装成功，但配置失败",
+            e,
+            logs.join("\n"),
+        )),
     }
-    Ok(claude_ok(
-        success_message,
-        logs.join("\n"),
-        true,
-    ))
 }
 
 #[tauri::command]
@@ -1273,10 +1413,20 @@ pub async fn install_codex(
     model_reasoning_effort: Option<String>,
 ) -> Result<CodexActionResult, String> {
     let normalized_variant = variant.trim().to_lowercase();
+    let installed = command_exists("codex");
+    let current_install_type = load_install_state().install_type;
     if normalized_variant != "openai" && normalized_variant != "gac" {
         return Ok(codex_err("Codex 安装失败", format!("未知安装类型: {variant}"), String::new()));
     }
     if normalized_variant == "gac" {
+        if installed && current_install_type.as_deref() == Some("gac") {
+            save_install_state("gac", None)?;
+            return Ok(codex_ok(
+                "检测到已安装 gac 改版 Codex，当前仅刷新安装状态。如需在已打开的终端中使用，请重新打开终端后再运行 codex",
+                "已确认安装类型=gac".to_string(),
+                false,
+            ));
+        }
         let command = format!("npm install -g {CODEX_GAC_INSTALL_URL}");
         return match run_shell_script(&command) {
             Ok(output) => {
@@ -1290,13 +1440,28 @@ pub async fn install_codex(
             Err(e) => Ok(codex_err("Codex 安装失败", e, String::new())),
         };
     }
+    let selected_route = route.unwrap_or_else(|| "gac".to_string());
+    let selected_api_key = api_key.unwrap_or_default();
+    if installed && current_install_type.as_deref() != Some("gac") {
+        return match configure_openai_route(
+            &selected_route,
+            &selected_api_key,
+            model,
+            model_reasoning_effort,
+        ) {
+            Ok(route_logs) => Ok(codex_ok(
+                "检测到已安装原版 Codex，仅更新路线配置。如需在已打开的终端中使用，请重新打开终端后再运行 codex",
+                route_logs.join("\n"),
+                false,
+            )),
+            Err(e) => Ok(codex_err("Codex 配置失败", e, String::new())),
+        };
+    }
     let install_command = format!("npm install -g {CODEX_OPENAI_PACKAGE}");
     let install_output = match run_shell_script(&install_command) {
         Ok(v) => v,
         Err(e) => return Ok(codex_err("Codex 安装失败", e, String::new())),
     };
-    let selected_route = route.unwrap_or_else(|| "gac".to_string());
-    let selected_api_key = api_key.unwrap_or_default();
     let mut logs = vec![format!("$ {install_command}"), install_output];
     match configure_openai_route(&selected_route, &selected_api_key, model, model_reasoning_effort) {
         Ok(route_logs) => {
@@ -1520,6 +1685,8 @@ pub async fn install_gemini(
     model: Option<String>,
 ) -> Result<GeminiActionResult, String> {
     let normalized_variant = variant.trim().to_lowercase();
+    let installed = command_exists("gemini");
+    let current_install_type = load_gemini_install_state().install_type;
     if normalized_variant != "official" && normalized_variant != "gac" {
         return Ok(gemini_err(
             "Gemini 安装失败",
@@ -1528,6 +1695,14 @@ pub async fn install_gemini(
         ));
     }
     if normalized_variant == "gac" {
+        if installed && current_install_type.as_deref() == Some("gac") {
+            save_gemini_install_state("gac", None)?;
+            return Ok(gemini_ok(
+                "检测到已安装 gac 改版 Gemini，当前仅刷新安装状态。如需在已打开的终端中使用，请重新打开终端后再运行 gemini",
+                "已确认安装类型=gac".to_string(),
+                false,
+            ));
+        }
         let command = format!("npm install -g {GEMINI_GAC_INSTALL_URL}");
         return match run_shell_script(&command) {
             Ok(output) => {
@@ -1542,13 +1717,24 @@ pub async fn install_gemini(
         };
     }
 
+    let selected_route = route.unwrap_or_else(|| "tuzi".to_string());
+    let selected_api_key = api_key.unwrap_or_default();
+    if installed && current_install_type.as_deref() != Some("gac") {
+        return match configure_gemini_route(&selected_route, &selected_api_key, model) {
+            Ok(route_logs) => Ok(gemini_ok(
+                "检测到已安装官方版 Gemini，仅更新路线配置。如需在已打开的终端中使用，请重新打开终端后再运行 gemini",
+                route_logs.join("\n"),
+                false,
+            )),
+            Err(e) => Ok(gemini_err("Gemini 配置失败", e, String::new())),
+        };
+    }
+
     let install_command = format!("npm install -g {GEMINI_OFFICIAL_PACKAGE}");
     let install_output = match run_shell_script(&install_command) {
         Ok(v) => v,
         Err(e) => return Ok(gemini_err("Gemini 安装失败", e, String::new())),
     };
-    let selected_route = route.unwrap_or_else(|| "tuzi".to_string());
-    let selected_api_key = api_key.unwrap_or_default();
     let mut logs = vec![format!("$ {install_command}"), install_output];
     match configure_gemini_route(&selected_route, &selected_api_key, model) {
         Ok(route_logs) => {

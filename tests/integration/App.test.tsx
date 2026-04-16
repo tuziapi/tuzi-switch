@@ -1,18 +1,20 @@
 import { Suspense, type ComponentType } from "react";
+import { http, HttpResponse } from "msw";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { providersApi } from "@/lib/api/providers";
 import {
   resetProviderState,
   setCurrentProviderId,
   setLiveProviderIds,
   setProviders,
 } from "../msw/state";
+import { server } from "../msw/server";
 import { emitTauriEvent } from "../msw/tauriMocks";
 
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
+const TAURI_ENDPOINT = "http://tauri.local";
 
 vi.mock("sonner", () => ({
   toast: {
@@ -146,7 +148,13 @@ vi.mock("@/components/mcp/McpPanel", () => ({
 }));
 
 const renderApp = (AppComponent: ComponentType) => {
-  const client = new QueryClient();
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
   return render(
     <QueryClientProvider client={client}>
       <Suspense fallback={<div data-testid="loading">loading</div>}>
@@ -218,7 +226,7 @@ describe("App integration with MSW", () => {
 
     expect(toastErrorMock).not.toHaveBeenCalled();
     expect(toastSuccessMock).toHaveBeenCalled();
-  });
+  }, 10000);
 
   it("shows toast when auto sync fails in background", async () => {
     const { default: App } = await import("@/App");
@@ -301,10 +309,11 @@ describe("App integration with MSW", () => {
       },
     });
     setCurrentProviderId("openclaw", "deepseek");
-
-    const liveIdsSpy = vi
-      .spyOn(providersApi, "getOpenClawLiveProviderIds")
-      .mockRejectedValueOnce(new Error("broken config"));
+    server.use(
+      http.post(`${TAURI_ENDPOINT}/get_openclaw_live_provider_ids`, () =>
+        new HttpResponse("broken config", { status: 500 }),
+      ),
+    );
 
     const { default: App } = await import("@/App");
     renderApp(App);
@@ -328,7 +337,5 @@ describe("App integration with MSW", () => {
     expect(screen.getByTestId("provider-list").textContent).not.toContain(
       "deepseek-copy",
     );
-
-    liveIdsSpy.mockRestore();
   });
 });

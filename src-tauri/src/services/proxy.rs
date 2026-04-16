@@ -1595,6 +1595,17 @@ impl ProxyService {
         self.switch_locks.lock_for_app(app_type).await
     }
 
+    #[cfg(test)]
+    pub(crate) async fn mark_running_for_test(&self) {
+        let config = self
+            .db
+            .get_proxy_config()
+            .await
+            .unwrap_or_else(|_| ProxyConfig::default());
+        let app_handle = self.app_handle.read().await.clone();
+        *self.server.write().await = Some(ProxyServer::new(config, self.db.clone(), app_handle));
+    }
+
     fn preserve_codex_mcp_servers_in_backup(
         target_settings: &mut Value,
         existing_backup: &Value,

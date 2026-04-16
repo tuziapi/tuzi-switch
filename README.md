@@ -28,17 +28,17 @@
 
 ### 一键安装
 
-直接安装当前推荐版本 `v3.12.13`：
+直接安装当前推荐版本 `v3.12.14`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.13 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.14 bash
 ```
 
 补充说明：
 
 - 当前 Release workflow 仍使用 `prerelease` 发布策略
 - 因此默认走 GitHub `releases/latest` 时，不一定能命中当前最新测试版本
-- 目前 README 默认固定到 `v3.12.13`，这样可以确保安装到我们当前推荐版本
+- 目前 README 默认固定到 `v3.12.14`，这样可以确保安装到我们当前推荐版本
 - 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
 
 ### macOS 未签名包打开方式
@@ -70,7 +70,7 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 当前版本更新
 
-当前公开版本为 `v3.12.13`，这一轮更新重点包括：
+当前公开版本为 `v3.12.14`，这一轮更新重点包括：
 
 - 继续收尾 Claude、Codex、Gemini、OpenClaw 四个入口的状态可信度与路线表达
 - 页面主状态继续以当前 provider 为准，并新增 provider 与 CLI/安装器记录不一致时的提示

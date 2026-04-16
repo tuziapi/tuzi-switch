@@ -28,17 +28,17 @@
 
 ### ワンコマンドインストール
 
-現在の推奨版 `v3.12.13` を直接インストール:
+現在の推奨版 `v3.12.14` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.13 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.14 bash
 ```
 
 補足:
 
 - 現在の Release workflow は引き続き `prerelease` 方式で公開されています
 - そのため GitHub の `releases/latest` では、最新のテスト版を正しく取れない場合があります
-- README のコマンドは `v3.12.13` に固定し、現在の推奨版を確実に入れられるようにしています
+- README のコマンドは `v3.12.14` に固定し、現在の推奨版を確実に入れられるようにしています
 - 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
@@ -70,7 +70,7 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 現在のバージョン更新内容
 
-現在の公開版は `v3.12.13` で、今回の主な更新は以下です。
+現在の公開版は `v3.12.14` で、今回の主な更新は以下です。
 
 - Claude、Codex、Gemini、OpenClaw の各入口で、状態信頼性とルート表現をさらに整理
 - 画面主状態は現在の provider を優先し、provider と CLI / installer 記録が不一致な場合は補助ヒントを表示
