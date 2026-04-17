@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  CheckCircle2,
   Loader2,
   Upload,
   Wrench,
@@ -17,7 +16,7 @@ import {
 } from "@/lib/api/installer";
 import { openclawApi } from "@/lib/api/openclaw";
 import { openclawKeys, useOpenClawAgentsDefaults, useOpenClawDefaultModel, useOpenClawHealth, useOpenClawLiveProviderIds, useOpenClawTools } from "@/hooks/useOpenClaw";
-import { ClaudeIcon, CodexIcon, GeminiIcon, TuziIcon } from "@/components/BrandIcons";
+import { ClaudeIcon, CodexIcon, GeminiIcon, OpenClawIcon } from "@/components/BrandIcons";
 import {
   generateThirdPartyAuth,
 } from "@/config/codexProviderPresets";
@@ -429,19 +428,11 @@ function hasNamedRoute(
   return Boolean(routes?.some((route) => route.name === routeName));
 }
 
-function getGeminiCliStatusLabel(status: GeminiInstallerStatus) {
-  if (!status.installed) return "未安装";
-  if (!status.install_type && !status.env_file_exists && !status.settings_file_exists) {
-    return "检测到命令";
-  }
-  return "已安装";
-}
-
 function getClaudeRouteLabel(route: ClaudeEntryOption | "modified" | "custom" | null | undefined) {
   if (!route) return "--";
-  if (route === "tu-zi") return "兔子线路";
-  if (route === "gaccode") return "gac 线路";
-  if (route === "modified") return "改版";
+  if (route === "tu-zi") return CLAUDE_ROUTE_CONFIG["tu-zi"].providerName;
+  if (route === "gaccode") return CLAUDE_ROUTE_CONFIG.gaccode.providerName;
+  if (route === "modified") return "兔子改版 Claude";
   return "自定义线路";
 }
 
@@ -546,18 +537,6 @@ function getClaudeInstallerRoute(
   return null;
 }
 
-function getCodexInstallerRoute(
-  status: CodexInstallerStatus | null,
-): CodexEntryOption | "gac-modified" | "custom" | null {
-  if (!status) return null;
-  if (status.install_type === "gac") return "gac-modified";
-  if (status.current_route === "codex") return "tuzi-coding";
-  if (status.current_route === "gac") return "gac";
-  if (status.current_route === "tuzi") return "tuzi";
-  if (status.current_route) return "custom";
-  return null;
-}
-
 function getGeminiInstallerRoute(
   status: GeminiInstallerStatus | null,
 ): GeminiEntryOption | "gac-modified" | "custom" | null {
@@ -570,18 +549,26 @@ function getGeminiInstallerRoute(
 
 function getCodexRouteLabel(route: CodexEntryOption | "gac-modified" | "custom" | null | undefined) {
   if (!route) return "--";
-  if (route === "tuzi") return "兔子线路";
-  if (route === "tuzi-coding") return "兔子 Coding 特别线路";
-  if (route === "gac") return "gac 线路";
-  if (route === "gac-modified") return "gac 改版";
+  if (route === "tuzi") return CODEX_ROUTE_CONFIG.tuzi.providerName;
+  if (route === "tuzi-coding") return CODEX_ROUTE_CONFIG.codex.providerName;
+  if (route === "gac") return CODEX_ROUTE_CONFIG.gac.providerName;
+  if (route === "gac-modified") return "gac 改版 Codex";
   return "自定义线路";
 }
 
 function getGeminiRouteLabel(route: GeminiEntryOption | "gac-modified" | "custom" | null | undefined) {
   if (!route) return "--";
-  if (route === "tuzi") return "兔子线路";
-  if (route === "gac-modified") return "gac 改版";
+  if (route === "tuzi") return GEMINI_ROUTE_CONFIG.tuzi.providerName;
+  if (route === "gac-modified") return "gac 改版 Gemini";
   return "自定义线路";
+}
+
+function getInstalledVersionLabel(
+  installed: boolean,
+  version: string | null | undefined,
+) {
+  if (!installed) return "未安装";
+  return version?.trim() || "已安装";
 }
 
 function getOpenClawCurrentRoute(
@@ -702,16 +689,40 @@ approval_policy = "on-request"`;
 function Stat({
   label,
   value,
+  action,
+  compact = false,
+  valueClassName,
+  valueTitle,
 }: {
   label: string;
   value: string;
+  action?: ReactNode;
+  compact?: boolean;
+  valueClassName?: string;
+  valueTitle?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/75 px-3 py-3 dark:border-white/10 dark:bg-white/6">
+    <div
+      className={`rounded-2xl border border-border/60 bg-background/75 px-3 dark:border-white/10 dark:bg-white/6 ${
+        compact ? "py-2" : "py-3"
+      }`}
+    >
       <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
         {label}
       </div>
-      <div className="mt-1 text-sm font-medium">{value}</div>
+      <div
+        className={`flex items-center justify-between gap-3 ${
+          compact ? "mt-1 min-h-5" : "mt-2 min-h-6"
+        }`}
+      >
+        <div
+          className={`min-w-0 flex-1 text-sm font-medium leading-5 ${valueClassName || ""}`}
+          title={valueTitle || value}
+        >
+          {value}
+        </div>
+        {action ? <div className="shrink-0 self-center">{action}</div> : null}
+      </div>
     </div>
   );
 }
@@ -1014,26 +1025,10 @@ export function BusinessQuickAccess({
   };
 
   const title = useMemo(() => {
-    if (isClaude) return "Claude 快速接入";
-    if (isCodex) return "Codex 快速接入";
-    if (isGemini) return "Gemini 快速接入";
+    if (isClaude) return "Claude 兔子快速接入";
+    if (isCodex) return "Codex 兔子快速接入";
+    if (isGemini) return "Gemini 兔子快速接入";
     if (isOpenClaw) return "OpenClaw 兔子快速接入";
-    return "";
-  }, [isClaude, isCodex, isOpenClaw]);
-
-  const subtitle = useMemo(() => {
-    if (isClaude) {
-      return "选择适合你的 Claude 使用方式，输入对应 Key 后即可快速完成接入。";
-    }
-    if (isCodex) {
-      return "选择适合你的 Codex 使用方式，输入对应 Key 后即可快速完成接入。";
-    }
-    if (isGemini) {
-      return "选择适合你的 Gemini 使用方式，输入对应 Key 后即可快速完成接入。";
-    }
-    if (isOpenClaw) {
-      return "先选 tuzi 或 gac，再选 Claude 或 Codex 方向，系统会自动完成所需设置。";
-    }
     return "";
   }, [isClaude, isCodex, isOpenClaw]);
 
@@ -1048,19 +1043,6 @@ export function BusinessQuickAccess({
       return "overflow-hidden border-rose-200/70 bg-gradient-to-br from-rose-50 via-background to-red-50 shadow-sm dark:border-rose-500/20 dark:from-rose-500/10 dark:to-red-500/10";
     }
     return "overflow-hidden border-orange-200/70 bg-gradient-to-br from-orange-50 via-background to-amber-50 shadow-sm dark:border-orange-500/20 dark:from-orange-500/10 dark:to-amber-500/10";
-  }, [isCodex, isGemini, isOpenClaw]);
-
-  const heroBadgeClassName = useMemo(() => {
-    if (isGemini) {
-      return "border-pink-300/60 bg-white/80 text-pink-700 dark:border-pink-500/30 dark:bg-pink-500/10 dark:text-pink-200";
-    }
-    if (isCodex) {
-      return "border-sky-300/60 bg-white/80 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200";
-    }
-    if (isOpenClaw) {
-      return "border-red-300/60 bg-white/80 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200";
-    }
-    return "border-orange-300/60 bg-white/80 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-200";
   }, [isCodex, isGemini, isOpenClaw]);
 
   const heroIconClassName = useMemo(() => {
@@ -1177,23 +1159,45 @@ export function BusinessQuickAccess({
   const hasCodexGacRoute = hasNamedRoute(codexStatusView.routes, "gac");
   const hasGeminiTuziRoute = hasNamedRoute(geminiStatusView.routes, "tuzi");
   const installerClaudeRoute = getClaudeInstallerRoute(claudeStatusView);
-  const installerCodexRoute = getCodexInstallerRoute(codexStatusView);
   const installerGeminiRoute = getGeminiInstallerRoute(geminiStatusView);
   const claudeRouteMismatch = Boolean(
     activeClaudeRoute &&
       installerClaudeRoute &&
       activeClaudeRoute !== installerClaudeRoute,
   );
-  const codexRouteMismatch = Boolean(
-    activeCodexRoute &&
-      installerCodexRoute &&
-      activeCodexRoute !== installerCodexRoute,
-  );
   const geminiRouteMismatch = Boolean(
     activeGeminiRoute &&
       installerGeminiRoute &&
       activeGeminiRoute !== installerGeminiRoute,
   );
+  const claudeVersionLabel = getInstalledVersionLabel(
+    claudeStatusView.installed,
+    claudeStatusView.version,
+  );
+  const codexVersionLabel = getInstalledVersionLabel(
+    codexStatusView.installed,
+    codexStatusView.version,
+  );
+  const geminiVersionLabel = getInstalledVersionLabel(
+    geminiStatusView.installed,
+    geminiStatusView.version,
+  );
+  const claudeCurrentRouteLabel =
+    claudeCurrentProvider?.name || getClaudeRouteLabel(activeClaudeRoute);
+  const codexCurrentRouteLabel =
+    codexCurrentProvider?.name || getCodexRouteLabel(activeCodexRoute);
+  const geminiCurrentRouteLabel =
+    geminiCurrentProvider?.name || getGeminiRouteLabel(activeGeminiRoute);
+  const claudeCurrentBaseUrl =
+    getProviderBaseUrl(claudeCurrentProvider) ||
+    getCurrentRouteBaseUrl(claudeStatusView.routes);
+  const codexCurrentBaseUrl =
+    getProviderBaseUrl(codexCurrentProvider) ||
+    getCurrentRouteBaseUrl(codexStatusView.routes);
+  const geminiCurrentBaseUrl =
+    getProviderBaseUrl(geminiCurrentProvider) ||
+    geminiStatusView.env_summary.google_gemini_base_url ||
+    getCurrentRouteBaseUrl(geminiStatusView.routes);
 
   useEffect(() => {
     if (!isCodex || !codexStatus) return;
@@ -1593,32 +1597,24 @@ export function BusinessQuickAccess({
   return (
     <Card className={cardClassName}>
       <CardContent className="space-y-5 p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${heroBadgeClassName}`}>
-              <TuziIcon size={14} />
-              兔子一键接入
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center justify-center rounded-2xl dark:bg-black/10 ${heroIconClassName}`}>
+              {isClaude ? (
+                <ClaudeIcon size={26} />
+              ) : isCodex ? (
+                <CodexIcon size={26} />
+              ) : isGemini ? (
+                <GeminiIcon size={26} />
+              ) : (
+                <OpenClawIcon size={26} />
+              )}
             </div>
-            <div className="flex items-center gap-3">
-              <div className={`flex items-center justify-center rounded-2xl dark:bg-black/10 ${heroIconClassName}`}>
-                {isClaude ? (
-                  <ClaudeIcon size={26} />
-                ) : isCodex ? (
-                  <CodexIcon size={26} />
-                ) : isGemini ? (
-                  <GeminiIcon size={26} />
-                ) : (
-                  <TuziIcon size={34} className="rounded-[12px]" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold">{title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-              </div>
-            </div>
+            <h3 className="text-xl font-semibold">{title}</h3>
           </div>
           <Button
             variant="outline"
+            size="sm"
             onClick={() => void loadStatus({ showRefreshState: true })}
             disabled={!!runningAction || isRefreshing}
             className="self-start"
@@ -1677,26 +1673,50 @@ export function BusinessQuickAccess({
 
         {isClaude ? (
           <>
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3">
               <Stat
                 label="当前线路"
-                value={
-                  activeClaudeRoute === "custom"
-                    ? claudeCurrentProvider?.name || "自定义线路"
-                    : getClaudeRouteLabel(activeClaudeRoute)
-                }
+                value={claudeCurrentRouteLabel}
+                compact
+                valueTitle={claudeCurrentRouteLabel}
               />
               <Stat
-                label="CLI 状态"
-                value={claudeStatusView.installed ? "已安装" : "未安装"}
+                label="版本"
+                value={claudeVersionLabel}
+                compact
+                action={
+                  claudeStatusView.installed ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        void runAction("claude-upgrade", () =>
+                          installerApi.upgradeClaudeCode(
+                            claudeStatusView.current_route === "改版"
+                              ? "modified"
+                              : "original",
+                          ),
+                        )
+                      }
+                      disabled={!!runningAction}
+                      className="h-7 gap-1.5 px-2 text-[11px]"
+                    >
+                      {runningAction === "claude-upgrade" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                      升级
+                    </Button>
+                  ) : null
+                }
               />
-              <Stat label="版本" value={claudeStatusView.version || "--"} />
               <Stat
                 label="Base URL"
-                value={
-                  getProviderBaseUrl(claudeCurrentProvider) ||
-                  getCurrentRouteBaseUrl(claudeStatusView.routes)
-                }
+                value={claudeCurrentBaseUrl}
+                compact
+                valueTitle={claudeCurrentBaseUrl}
+                valueClassName="break-all whitespace-normal leading-5"
               />
             </div>
             {claudeRouteMismatch ? (
@@ -1707,371 +1727,320 @@ export function BusinessQuickAccess({
               </div>
             ) : null}
 
-            <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
-                <div className="font-medium">Claude 路线管理</div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <RouteCard
-                    title="Claude · 兔子线路"
-                    description="适合希望直接接入兔子服务的使用场景。"
-                    meta="Base URL: https://api.tu-zi.com"
-                    status={
-                      activeClaudeRoute === "tu-zi"
-                        ? "已接入"
-                        : hasClaudeTuziRoute
-                          ? "已写入"
-                          : claudeSelectedRoute === "tu-zi"
-                            ? "当前选择"
-                            : "推荐"
-                    }
-                    selected={claudeSelectedRoute === "tu-zi"}
-                    onClick={() => {
-                      setClaudeSelectionTouched(true);
-                      setClaudeEntryOption("tu-zi");
-                    }}
-                  />
-                  <RouteCard
-                    title="Claude · gac 线路"
-                    description="适合已经在使用 gac 服务的场景。"
-                    meta="Base URL: https://gaccode.com/claudecode"
-                    status={
-                      activeClaudeRoute === "gaccode"
-                        ? "已接入"
-                        : hasClaudeGacRoute
-                          ? "已写入"
-                          : claudeSelectedRoute === "gaccode"
-                            ? "当前选择"
-                            : "可选"
-                    }
-                    selected={claudeSelectedRoute === "gaccode"}
-                    onClick={() => {
-                      setClaudeSelectionTouched(true);
-                      setClaudeEntryOption("gaccode");
-                    }}
-                  />
-                  <RouteCard
-                    title="兔子改版 Claude"
-                    description="适合希望直接使用改版 Claude 体验的场景。"
-                    meta="无需额外输入 Key，直接写入改版 Claude。"
-                    status={
-                      activeClaudeRoute === "modified"
-                        ? "已接入"
-                        : claudeSelectedRoute === "modified"
+            <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
+              <div className="font-medium">Claude 路线管理</div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <RouteCard
+                  title="Claude · 兔子线路"
+                  description="适合希望直接接入兔子服务的使用场景。"
+                  meta="Base URL: https://api.tu-zi.com"
+                  status={
+                    activeClaudeRoute === "tu-zi"
+                      ? "已接入"
+                      : hasClaudeTuziRoute
+                        ? "已写入"
+                        : claudeSelectedRoute === "tu-zi"
+                          ? "当前选择"
+                          : "推荐"
+                  }
+                  selected={claudeSelectedRoute === "tu-zi"}
+                  onClick={() => {
+                    setClaudeSelectionTouched(true);
+                    setClaudeEntryOption("tu-zi");
+                  }}
+                />
+                <RouteCard
+                  title="Claude · gac 线路"
+                  description="适合已经在使用 gac 服务的场景。"
+                  meta="Base URL: https://gaccode.com/claudecode"
+                  status={
+                    activeClaudeRoute === "gaccode"
+                      ? "已接入"
+                      : hasClaudeGacRoute
+                        ? "已写入"
+                        : claudeSelectedRoute === "gaccode"
                           ? "当前选择"
                           : "可选"
-                    }
-                    selected={claudeSelectedRoute === "modified"}
-                    onClick={() => {
-                      setClaudeSelectionTouched(true);
-                      setClaudeEntryOption("modified");
-                    }}
-                  />
-                </div>
-                <div className="mt-4 grid gap-3">
-                  {claudeEntryOption === "gaccode" ? (
-                    <Input
-                      type="password"
-                      value={claudeGacKey}
-                      onChange={(event) => setClaudeGacKey(event.target.value)}
-                      placeholder="输入 gac API Key"
-                    />
-                  ) : claudeEntryOption === "tu-zi" ? (
-                    <Input
-                      type="password"
-                      value={claudeTuziKey}
-                      onChange={(event) => setClaudeTuziKey(event.target.value)}
-                      placeholder="输入兔子 API Key"
-                    />
-                  ) : (
-                    <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-                      当前方案不需要额外输入 Key，适合希望直接交付改版 Claude 的场景。
-                      当前方案不需要额外输入 Key，完成后即可直接开始使用。
-                    </div>
-                  )}
-                </div>
-                <ResultHint
-                  target={
-                    claudeEntryOption === "modified"
-                      ? "写入改版 Claude 客户端"
-                      : claudeEntryOption === "gaccode"
-                        ? "写入 gac Claude 线路"
-                        : "写入 Claude · 兔子线路"
                   }
-                  syncHint="自动同步配置状态，并在下方列表显示对应入口"
+                  selected={claudeSelectedRoute === "gaccode"}
+                  onClick={() => {
+                    setClaudeSelectionTouched(true);
+                    setClaudeEntryOption("gaccode");
+                  }}
                 />
-                <Button
-                  onClick={() =>
-                    void runAction(
+                <RouteCard
+                  title="兔子改版 Claude"
+                  description="适合希望直接使用改版 Claude 体验的场景。"
+                  meta="无需额外输入 Key，直接写入改版 Claude。"
+                  status={
+                    activeClaudeRoute === "modified"
+                      ? "已接入"
+                      : claudeSelectedRoute === "modified"
+                        ? "当前选择"
+                        : "可选"
+                  }
+                  selected={claudeSelectedRoute === "modified"}
+                  onClick={() => {
+                    setClaudeSelectionTouched(true);
+                    setClaudeEntryOption("modified");
+                  }}
+                />
+              </div>
+              <div className="mt-4 grid gap-3">
+                {claudeEntryOption === "gaccode" ? (
+                  <Input
+                    type="password"
+                    value={claudeGacKey}
+                    onChange={(event) => setClaudeGacKey(event.target.value)}
+                    placeholder="输入 gac API Key"
+                  />
+                ) : claudeEntryOption === "tu-zi" ? (
+                  <Input
+                    type="password"
+                    value={claudeTuziKey}
+                    onChange={(event) => setClaudeTuziKey(event.target.value)}
+                    placeholder="输入兔子 API Key"
+                  />
+                ) : (
+                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
+                    当前方案不需要额外输入 Key，适合希望直接交付改版 Claude 的场景。
+                    当前方案不需要额外输入 Key，完成后即可直接开始使用。
+                  </div>
+                )}
+              </div>
+              <ResultHint
+                target={
+                  claudeEntryOption === "modified"
+                    ? "写入改版 Claude 客户端"
+                    : claudeEntryOption === "gaccode"
+                      ? "写入 gac Claude 线路"
+                      : "写入 Claude · 兔子线路"
+                }
+                syncHint="自动同步配置状态，并在下方列表显示对应入口"
+              />
+              <Button
+                onClick={() =>
+                  void runAction(
+                    claudeEntryOption === "modified"
+                      ? "claude-install-a"
+                      : claudeEntryOption === "gaccode"
+                        ? "claude-install-b"
+                        : "claude-install-c",
+                    () =>
                       claudeEntryOption === "modified"
-                        ? "claude-install-a"
+                        ? installerApi.installClaudeCode("A")
                         : claudeEntryOption === "gaccode"
-                          ? "claude-install-b"
-                          : "claude-install-c",
-                      () =>
-                        claudeEntryOption === "modified"
-                          ? installerApi.installClaudeCode("A")
-                          : claudeEntryOption === "gaccode"
-                            ? installClaudeBusinessRoute("B", claudeGacKey)
-                            : installClaudeBusinessRoute("C", claudeTuziKey),
-                    )
-                  }
-                  disabled={!!runningAction}
-                  className="mt-4 gap-2"
-                >
-                  {runningAction === "claude-install-a" ||
-                  runningAction === "claude-install-b" ||
-                  runningAction === "claude-install-c" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wrench className="h-4 w-4" />
-                  )}
-                  立即配置
-                </Button>
-              </div>
-
-              <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-4 dark:border-white/10 dark:bg-white/4">
-                <div className="font-medium">使用与升级</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  已为你保留当前线路的升级入口，后续可直接升级当前使用方式。
-                </div>
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    void runAction("claude-upgrade", () =>
-                      installerApi.upgradeClaudeCode(
-                        claudeStatusView.current_route === "改版"
-                          ? "modified"
-                          : "original",
-                      ),
-                    )
-                  }
-                  disabled={!!runningAction}
-                  className="mt-4 gap-2"
-                >
-                  {runningAction === "claude-upgrade" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  升级
-                </Button>
-              </div>
+                          ? installClaudeBusinessRoute("B", claudeGacKey)
+                          : installClaudeBusinessRoute("C", claudeTuziKey),
+                  )
+                }
+                disabled={!!runningAction}
+                className="mt-4 gap-2"
+              >
+                {runningAction === "claude-install-a" ||
+                runningAction === "claude-install-b" ||
+                runningAction === "claude-install-c" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Wrench className="h-4 w-4" />
+                )}
+                立即配置
+              </Button>
             </div>
           </>
         ) : null}
 
         {isCodex ? (
           <>
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3">
               <Stat
                 label="当前线路"
-                value={
-                  activeCodexRoute === "gac-modified"
-                    ? "gac 改版"
-                    : activeCodexRoute === "custom"
-                      ? codexCurrentProvider?.name || "自定义线路"
-                    : activeCodexRoute === null
-                      ? "--"
-                    : activeCodexRoute === "tuzi-coding"
-                      ? "兔子 Coding 特别线路"
-                    : activeCodexRoute === "gac"
-                        ? "gac 线路"
-                        : "兔子线路"
-                }
+                value={codexCurrentRouteLabel}
+                compact
+                valueTitle={codexCurrentRouteLabel}
               />
               <Stat
-                label="CLI 状态"
-                value={codexStatusView.installed ? "已安装" : "未安装"}
+                label="版本"
+                value={codexVersionLabel}
+                compact
+                action={
+                  codexStatusView.installed ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        void runAction("codex-upgrade", () =>
+                          installerApi.upgradeCodex(
+                            codexStatusView.install_type === "gac" ? "gac" : "openai",
+                          ),
+                        )
+                      }
+                      disabled={!!runningAction}
+                      className="h-7 gap-1.5 px-2 text-[11px]"
+                    >
+                      {runningAction === "codex-upgrade" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                      升级
+                    </Button>
+                  ) : null
+                }
               />
-              <Stat label="版本" value={codexStatusView.version || "--"} />
               <Stat
                 label="Base URL"
-                value={
-                  getProviderBaseUrl(codexCurrentProvider) ||
-                  getCurrentRouteBaseUrl(codexStatusView.routes)
-                }
+                value={codexCurrentBaseUrl}
+                compact
+                valueTitle={codexCurrentBaseUrl}
+                valueClassName="break-all whitespace-normal leading-5"
               />
             </div>
-            {codexRouteMismatch ? (
-              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                当前页面显示的线路以已切换的 provider 为准；CLI 安装器记录仍显示为
-                {` ${getCodexRouteLabel(installerCodexRoute)} `}
-                ，两边暂时不一致。
-              </div>
-            ) : null}
 
-            <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
-                <div className="font-medium">Codex 路线管理</div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <RouteCard
-                    title="Codex · 兔子线路"
-                    description="适合直接接入兔子主服务，和 Claude 兔子线路保持一致。"
-                    meta="Base URL 走 https://api.tu-zi.com/v1，推荐主模型 gpt-5.4。"
-                    status={
-                      activeCodexRoute === "tuzi"
-                        ? "已接入"
-                        : hasCodexTuziRoute
-                          ? "已写入"
-                          : codexSelectedRoute === "tuzi"
-                            ? "当前选择"
-                            : "推荐"
-                    }
-                    selected={codexSelectedRoute === "tuzi"}
-                    tone="sky"
-                    onClick={() => {
-                      setCodexSelectionTouched(true);
-                      setCodexEntryOption("tuzi");
-                    }}
-                  />
-                  <RouteCard
-                    title="Codex · 兔子 Coding 特别线路"
-                    description="适合单独使用 coding 业务线的 Codex 场景。"
-                    meta="Base URL 走 https://coding.tu-zi.com。"
-                    status={
-                      activeCodexRoute === "tuzi-coding"
-                        ? "已接入"
-                        : hasCodexCodingRoute
-                          ? "已写入"
-                          : codexSelectedRoute === "tuzi-coding"
-                            ? "当前选择"
-                            : "可选"
-                    }
-                    selected={codexSelectedRoute === "tuzi-coding"}
-                    tone="sky"
-                    onClick={() => {
-                      setCodexSelectionTouched(true);
-                      setCodexEntryOption("tuzi-coding");
-                    }}
-                  />
-                  <RouteCard
-                    title="Codex · gac 线路"
-                    description="适合已有 gac 使用基础或迁移场景。"
-                    meta="沿用 gac 路线配置。"
-                    status={
-                      activeCodexRoute === "gac"
-                        ? "已接入"
-                        : hasCodexGacRoute
-                          ? "已写入"
-                          : codexSelectedRoute === "gac"
-                            ? "当前选择"
-                            : "可选"
-                    }
-                    selected={codexSelectedRoute === "gac"}
-                    tone="sky"
-                    onClick={() => {
-                      setCodexSelectionTouched(true);
-                      setCodexEntryOption("gac");
-                    }}
-                  />
-                  <RouteCard
-                    title="gac 改版 Codex"
-                    description="适合希望直接使用 gac 改版体验的场景。"
-                    meta="直接落地 gac 改版 Codex。"
-                    status={
-                      activeCodexRoute === "gac-modified"
-                        ? "已接入"
-                        : codexSelectedRoute === "gac-modified"
+            <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
+              <div className="font-medium">Codex 路线管理</div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <RouteCard
+                  title="Codex · 兔子线路"
+                  description="适合直接接入兔子主服务的场景。"
+                  meta="Base URL: https://api.tu-zi.com/v1"
+                  status={
+                    activeCodexRoute === "tuzi"
+                      ? "已接入"
+                      : hasCodexTuziRoute
+                        ? "已写入"
+                        : codexSelectedRoute === "tuzi"
+                          ? "当前选择"
+                          : "推荐"
+                  }
+                  selected={codexSelectedRoute === "tuzi"}
+                  tone="sky"
+                  onClick={() => {
+                    setCodexSelectionTouched(true);
+                    setCodexEntryOption("tuzi");
+                  }}
+                />
+                <RouteCard
+                  title="Codex · 兔子 Coding 特别线路"
+                  description="适合单独使用 Coding 业务线的场景。"
+                  meta="Base URL: https://coding.tu-zi.com"
+                  status={
+                    activeCodexRoute === "tuzi-coding"
+                      ? "已接入"
+                      : hasCodexCodingRoute
+                        ? "已写入"
+                        : codexSelectedRoute === "tuzi-coding"
                           ? "当前选择"
                           : "可选"
-                    }
-                    selected={codexSelectedRoute === "gac-modified"}
-                    tone="sky"
-                    onClick={() => {
-                      setCodexSelectionTouched(true);
-                      setCodexEntryOption("gac-modified");
-                    }}
-                  />
-                </div>
-                <div className="mt-4 grid gap-3">
-                  {codexEntryOption !== "gac-modified" ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input
-                        type="password"
-                        value={codexApiKey}
-                        onChange={(event) => setCodexApiKey(event.target.value)}
-                        placeholder={`输入${codexEntryOption === "gac" ? "gac" : "兔子"} API Key`}
-                      />
-                      <Input
-                        value={codexModel}
-                        onChange={(event) => setCodexModel(event.target.value)}
-                        placeholder="模型，如 gpt-5.4"
-                      />
-                      <Select value={codexReasoning} onValueChange={setCodexReasoning}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择推理强度" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CODEX_REASONING_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-                      当前方案会直接落地 gac 改版 Codex，不需要再填写路线 Key 或模型参数。
-                      当前方案不需要额外设置，完成后即可直接开始使用。
-                    </div>
-                  )}
-                </div>
-                <ResultHint
-                  target={
-                    codexEntryOption === "gac-modified"
-                      ? "写入 gac 改版 Codex"
-                      : codexEntryOption === "tuzi"
-                        ? "写入 Codex · 兔子线路"
-                        : codexEntryOption === "tuzi-coding"
-                          ? "写入 Codex · 兔子 Coding 特别线路"
-                          : "写入 Codex · gac 线路"
                   }
-                  syncHint={
-                    codexEntryOption === "gac-modified"
-                      ? "保留 gac 改版 Codex 入口，并在下方列表显示当前模块"
-                      : "自动同步配置，并在下方列表显示对应入口"
-                  }
+                  selected={codexSelectedRoute === "tuzi-coding"}
+                  tone="sky"
+                  onClick={() => {
+                    setCodexSelectionTouched(true);
+                    setCodexEntryOption("tuzi-coding");
+                  }}
                 />
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <Button
-                    onClick={() => void runAction("codex-install-openai", installCodexBusinessRoute)}
-                    disabled={!!runningAction}
-                    className="gap-2"
-                  >
-                    {runningAction === "codex-install-openai" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Wrench className="h-4 w-4" />
-                    )}
-                    立即配置
-                  </Button>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-4 dark:border-white/10 dark:bg-white/4">
-                <div className="font-medium">使用与升级</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  已为你保留当前线路的升级入口，后续可直接升级当前使用方式。
-                </div>
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    void runAction("codex-upgrade", () =>
-                      installerApi.upgradeCodex(
-                        codexStatusView.install_type === "gac" ? "gac" : "openai",
-                      ),
-                    )
+                <RouteCard
+                  title="Codex · gac 线路"
+                  description="适合已有 gac 使用基础的场景。"
+                  meta="沿用 gac 路线配置。"
+                  status={
+                    activeCodexRoute === "gac"
+                      ? "已接入"
+                      : hasCodexGacRoute
+                        ? "已写入"
+                        : codexSelectedRoute === "gac"
+                          ? "当前选择"
+                          : "可选"
                   }
+                  selected={codexSelectedRoute === "gac"}
+                  tone="sky"
+                  onClick={() => {
+                    setCodexSelectionTouched(true);
+                    setCodexEntryOption("gac");
+                  }}
+                />
+                <RouteCard
+                  title="gac 改版 Codex"
+                  description="适合希望直接使用 gac 改版体验的场景。"
+                  meta="直接落地 gac 改版 Codex。"
+                  status={
+                    activeCodexRoute === "gac-modified"
+                      ? "已接入"
+                      : codexSelectedRoute === "gac-modified"
+                        ? "当前选择"
+                        : "可选"
+                  }
+                  selected={codexSelectedRoute === "gac-modified"}
+                  tone="sky"
+                  onClick={() => {
+                    setCodexSelectionTouched(true);
+                    setCodexEntryOption("gac-modified");
+                  }}
+                />
+              </div>
+              <div className="mt-4 grid gap-3">
+                {codexEntryOption !== "gac-modified" ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Input
+                      type="password"
+                      value={codexApiKey}
+                      onChange={(event) => setCodexApiKey(event.target.value)}
+                      placeholder={`输入${codexEntryOption === "gac" ? "gac" : "兔子"} API Key`}
+                    />
+                    <Input
+                      value={codexModel}
+                      onChange={(event) => setCodexModel(event.target.value)}
+                      placeholder="模型，如 gpt-5.4"
+                    />
+                    <Select value={codexReasoning} onValueChange={setCodexReasoning}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择推理强度" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CODEX_REASONING_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
+                    当前方案会直接落地 gac 改版 Codex，不需要再填写路线 Key 或模型参数。
+                    当前方案不需要额外设置，完成后即可直接开始使用。
+                  </div>
+                )}
+              </div>
+              <ResultHint
+                target={
+                  codexEntryOption === "gac-modified"
+                    ? "写入 gac 改版 Codex"
+                    : codexEntryOption === "tuzi"
+                      ? "写入 Codex · 兔子线路"
+                      : codexEntryOption === "tuzi-coding"
+                        ? "写入 Codex · 兔子 Coding 特别线路"
+                        : "写入 Codex · gac 线路"
+                }
+                syncHint={
+                  codexEntryOption === "gac-modified"
+                    ? "保留 gac 改版 Codex 入口，并在下方列表显示当前模块"
+                    : "自动同步配置，并在下方列表显示对应入口"
+                }
+              />
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Button
+                  onClick={() => void runAction("codex-install-openai", installCodexBusinessRoute)}
                   disabled={!!runningAction}
-                  className="mt-4 gap-2"
+                  className="gap-2"
                 >
-                  {runningAction === "codex-upgrade" ? (
+                  {runningAction === "codex-install-openai" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Upload className="h-4 w-4" />
+                    <Wrench className="h-4 w-4" />
                   )}
-                  升级
+                  立即配置
                 </Button>
               </div>
             </div>
@@ -2080,31 +2049,48 @@ export function BusinessQuickAccess({
 
         {isGemini ? (
           <>
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3">
               <Stat
                 label="当前线路"
-                value={
-                  activeGeminiRoute === "gac-modified"
-                    ? "gac 改版"
-                    : activeGeminiRoute === "custom"
-                      ? geminiCurrentProvider?.name || "自定义线路"
-                      : activeGeminiRoute === null
-                        ? "--"
-                      : "兔子线路"
-                }
+                value={geminiCurrentRouteLabel}
+                compact
+                valueTitle={geminiCurrentRouteLabel}
               />
               <Stat
-                label="CLI 状态"
-                value={getGeminiCliStatusLabel(geminiStatusView)}
+                label="版本"
+                value={geminiVersionLabel}
+                compact
+                action={
+                  geminiStatusView.installed ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        void runAction("gemini-upgrade", () =>
+                          installerApi.upgradeGemini(
+                            geminiStatusView.install_type === "gac" ? "gac" : "official",
+                          ),
+                        )
+                      }
+                      disabled={!!runningAction}
+                      className="h-7 gap-1.5 px-2 text-[11px]"
+                    >
+                      {runningAction === "gemini-upgrade" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                      升级
+                    </Button>
+                  ) : null
+                }
               />
-              <Stat label="版本" value={geminiStatusView.version || "--"} />
               <Stat
                 label="Base URL"
-                value={
-                  getProviderBaseUrl(geminiCurrentProvider) ||
-                  geminiStatusView.env_summary.google_gemini_base_url ||
-                  getCurrentRouteBaseUrl(geminiStatusView.routes)
-                }
+                value={geminiCurrentBaseUrl}
+                compact
+                valueTitle={geminiCurrentBaseUrl}
+                valueClassName="break-all whitespace-normal leading-5"
               />
             </div>
             {geminiRouteMismatch ? (
@@ -2115,122 +2101,94 @@ export function BusinessQuickAccess({
               </div>
             ) : null}
 
-            <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
-                <div className="font-medium">Gemini 路线管理</div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  <RouteCard
-                    title="Gemini · 兔子线路"
-                    description="原版 Gemini CLI 搭配兔子 API，适合希望保留原版体验的场景。"
-                    meta="Base URL 走 https://api.tu-zi.com，推荐模型 gemini-2.5-pro。"
-                    status={
-                      activeGeminiRoute === "tuzi"
-                        ? "已接入"
-                        : hasGeminiTuziRoute
-                          ? "已写入"
-                          : geminiSelectedRoute === "tuzi"
-                            ? "当前选择"
-                            : "推荐"
-                    }
-                    selected={geminiSelectedRoute === "tuzi"}
-                    tone="pink"
-                    onClick={() => {
-                      setGeminiSelectionTouched(true);
-                      setGeminiEntryOption("tuzi");
-                    }}
-                  />
-                  <RouteCard
-                    title="gac 改版 Gemini"
-                    description="适合直接使用 gac 改版 Gemini 方案的场景。"
-                    meta="直接落地 gac 改版 Gemini。"
-                    status={
-                      activeGeminiRoute === "gac-modified"
-                        ? "已接入"
-                        : geminiSelectedRoute === "gac-modified"
+            <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
+              <div className="font-medium">Gemini 路线管理</div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <RouteCard
+                  title="Gemini · 兔子线路"
+                  description="适合希望保留原版体验的场景。"
+                  meta="Base URL: https://api.tu-zi.com"
+                  status={
+                    activeGeminiRoute === "tuzi"
+                      ? "已接入"
+                      : hasGeminiTuziRoute
+                        ? "已写入"
+                        : geminiSelectedRoute === "tuzi"
                           ? "当前选择"
-                          : "可选"
-                    }
-                    selected={geminiSelectedRoute === "gac-modified"}
-                    tone="pink"
-                    onClick={() => {
-                      setGeminiSelectionTouched(true);
-                      setGeminiEntryOption("gac-modified");
-                    }}
-                  />
-                </div>
-                <div className="mt-4 grid gap-3">
-                  {geminiEntryOption !== "gac-modified" ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <Input
-                        type="password"
-                        value={geminiApiKey}
-                        onChange={(event) => setGeminiApiKey(event.target.value)}
-                        placeholder="输入兔子 API Key"
-                      />
-                      <Input
-                        value={geminiModel}
-                        onChange={(event) => setGeminiModel(event.target.value)}
-                        placeholder="模型，如 gemini-2.5-pro"
-                      />
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-                      当前方案会直接落地 gac 改版 Gemini，不需要再填写路线 Key 或模型参数。
-                      当前方案不需要额外设置，完成后即可直接开始使用。
-                    </div>
-                  )}
-                </div>
-                <ResultHint
-                  target={
-                    geminiEntryOption === "gac-modified"
-                      ? "写入 gac 改版 Gemini"
-                      : "写入 Gemini · 兔子线路"
+                          : "推荐"
                   }
-                  syncHint={
-                    geminiEntryOption === "gac-modified"
-                      ? "保留 gac 改版 Gemini 入口，并在下方列表显示当前模块"
-                      : "自动同步配置状态，并在下方列表显示对应入口"
-                  }
+                  selected={geminiSelectedRoute === "tuzi"}
+                  tone="pink"
+                  onClick={() => {
+                    setGeminiSelectionTouched(true);
+                    setGeminiEntryOption("tuzi");
+                  }}
                 />
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <Button
-                    onClick={() => void runAction("gemini-install", installGeminiBusinessRoute)}
-                    disabled={!!runningAction}
-                    className="gap-2"
-                  >
-                    {runningAction === "gemini-install" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Wrench className="h-4 w-4" />
-                    )}
-                    立即配置
-                  </Button>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-4 dark:border-white/10 dark:bg-white/4">
-                <div className="font-medium">使用与升级</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  已为你保留当前线路的升级入口，后续可直接升级当前使用方式。
-                </div>
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    void runAction("gemini-upgrade", () =>
-                      installerApi.upgradeGemini(
-                        geminiStatusView.install_type === "gac" ? "gac" : "official",
-                      ),
-                    )
+                <RouteCard
+                  title="gac 改版 Gemini"
+                  description="适合希望直接使用 gac 改版体验的场景。"
+                  meta="直接落地 gac 改版 Gemini。"
+                  status={
+                    activeGeminiRoute === "gac-modified"
+                      ? "已接入"
+                      : geminiSelectedRoute === "gac-modified"
+                        ? "当前选择"
+                        : "可选"
                   }
+                  selected={geminiSelectedRoute === "gac-modified"}
+                  tone="pink"
+                  onClick={() => {
+                    setGeminiSelectionTouched(true);
+                    setGeminiEntryOption("gac-modified");
+                  }}
+                />
+              </div>
+              <div className="mt-4 grid gap-3">
+                {geminiEntryOption !== "gac-modified" ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Input
+                      type="password"
+                      value={geminiApiKey}
+                      onChange={(event) => setGeminiApiKey(event.target.value)}
+                      placeholder="输入兔子 API Key"
+                    />
+                    <Input
+                      value={geminiModel}
+                      onChange={(event) => setGeminiModel(event.target.value)}
+                      placeholder="模型，如 gemini-2.5-pro"
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
+                    当前方案会直接落地 gac 改版 Gemini，不需要再填写路线 Key 或模型参数。
+                    当前方案不需要额外设置，完成后即可直接开始使用。
+                  </div>
+                )}
+              </div>
+              <ResultHint
+                target={
+                  geminiEntryOption === "gac-modified"
+                    ? "写入 gac 改版 Gemini"
+                    : "写入 Gemini · 兔子线路"
+                }
+                syncHint={
+                  geminiEntryOption === "gac-modified"
+                    ? "保留 gac 改版 Gemini 入口，并在下方列表显示当前模块"
+                    : "自动同步配置状态，并在下方列表显示对应入口"
+                }
+              />
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Button
+                  onClick={() => void runAction("gemini-install", installGeminiBusinessRoute)}
                   disabled={!!runningAction}
-                  className="mt-4 gap-2"
+                  className="gap-2"
                 >
-                  {runningAction === "gemini-upgrade" ? (
+                  {runningAction === "gemini-install" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Upload className="h-4 w-4" />
+                    <Wrench className="h-4 w-4" />
                   )}
-                  升级
+                  立即配置
                 </Button>
               </div>
             </div>
@@ -2244,7 +2202,7 @@ export function BusinessQuickAccess({
                 label="当前默认线路"
                 value={
                   openclawStatus.inferredRoute
-                    ? OPENCLAW_ROUTE_CONFIG[openclawStatus.inferredRoute].label
+                    ? OPENCLAW_ROUTE_CONFIG[openclawStatus.inferredRoute].optionLabel
                     : "--"
                 }
               />
@@ -2260,7 +2218,7 @@ export function BusinessQuickAccess({
               />
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+            <div>
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
                 <div className="font-medium">业务线路接入</div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -2343,49 +2301,6 @@ export function BusinessQuickAccess({
                   )}
                   立即配置
                 </Button>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
-                <div className="font-medium">使用建议</div>
-                <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                  <div>
-                    `Claude 方向` 更适合作为偏对话式、偏 Claude 体验的入口。
-                  </div>
-                  <div>
-                    `Codex 方向` 更适合代码生成、补全和工程类场景。
-                  </div>
-                  <div>
-                    `兔子` 与 `gac` 对应不同服务线路，可以根据你的账号和场景灵活选择。
-                  </div>
-                  <div>
-                    配置完成后，下面原有的设置面板仍然保留，方便继续调整细节。
-                  </div>
-                  <div>
-                    当前默认线路是根据默认模型和已写入配置推定出来的，用于帮助快速判断当前主要使用方向。
-                  </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-emerald-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-100/88">
-                    <CheckCircle2 className="h-4 w-4" />
-                    重点是尽快开始使用，而不是理解底层配置细节。
-                  </div>
-                  <div className="rounded-xl border border-sky-200/70 bg-sky-50/70 px-3 py-3 text-sky-900 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-100/88">
-                    <div className="text-sm font-medium">适合的选择</div>
-                    <div className="mt-2 space-y-2 text-xs leading-5 text-sky-800 dark:text-red-100/80">
-                      <div>兔子 Claude: 更适合希望统一走兔子服务的 Claude 使用场景。</div>
-                      <div>兔子 Codex: 更适合代码生成、补全和工程类工作流。</div>
-                      <div>gac 线路: 更适合已有 gac 服务基础的使用场景。</div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-3 dark:border-white/10 dark:bg-white/6">
-                    <div className="text-sm font-medium">当前可直接使用的线路</div>
-                    <div className="mt-2 text-xs leading-5 text-muted-foreground">
-                      {openclawStatus.configuredRoutes.length > 0
-                        ? openclawStatus.configuredRoutes
-                            .map((route) => OPENCLAW_ROUTE_CONFIG[route].optionLabel)
-                            .join(" / ")
-                        : "当前还没有完成配置，建议先从兔子 Claude 或兔子 Codex 开始。"}
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </>

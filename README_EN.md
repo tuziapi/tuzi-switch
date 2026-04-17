@@ -28,17 +28,17 @@ Current public releases are ready for Windows and Linux users. macOS is currentl
 
 ### One-Command Install
 
-Install the currently recommended build `v3.12.14` directly from GitHub:
+Install the currently recommended build `v3.12.15` directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.14 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.15 bash
 ```
 
 Notes:
 
 - The current release workflow still publishes builds as `prerelease`
 - GitHub `releases/latest` does not reliably resolve to the newest testing build
-- The README command stays pinned to `v3.12.14` so it installs the current recommended version reliably
+- The README command stays pinned to `v3.12.15` so it installs the current recommended version reliably
 - To install another version, replace the value in `TUZI_SWITCH_TAG=vX.Y.Z`
 
 ### macOS Unsigned Build
@@ -70,10 +70,11 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 
 ## Current Version Updates
 
-The current public release is `v3.12.14`, with this round focused on:
+The current public release is `v3.12.15`, with this round focused on:
 
 - Finishing another pass on state reliability, refresh feedback, and failure fallback across Claude, Codex, Gemini, and OpenClaw
-- Tightening the sync between the top status area and the actual active provider, with clearer mismatch hints for provider vs CLI/installer records
+- Making the Claude, Codex, and Gemini top status cards tighter, keeping the version + upgrade area more compact, and switching Gemini version display to package-metadata detection first
+- Further simplifying the Codex, Gemini, and OpenClaw quick-access areas so the onboarding copy stays lighter and less distracting
 - Changing same-route multi-key onboarding from in-place overwrite to keep-old-card plus append-new-card with automatic switching
 - Skipping repeated installs for Claude, Codex, and Gemini when the installed variant is already compatible, and only reinstalling on variant changes
 - Stabilizing the validation path and keeping the installer command pinned to the current recommended version
@@ -159,9 +160,9 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 ## Development Plan / TODO
 
 - Done: the first business-onboarding and route-management pass is in place across Claude, Codex, Gemini, and OpenClaw, including the Codex main / Coding split and the first Gemini onboarding flow
-- Done: one stabilization pass has landed for status reliability, failure fallback, and top-status vs real-provider synchronization
+- Done: another stabilization pass has landed for status reliability, failure fallback, tighter top status cards, real Gemini version detection, and continued provider synchronization
 - Done: same-route multi-key append cards, secure key input handling, skip-repeat-install flow, pinned installer versioning, and validation checks are now in place
-- In progress: keep aligning route cards, status blocks, hint blocks, and provider-list highlights across light and dark themes
+- In progress: keep aligning route cards, status blocks, provider-list highlights, and copy density across light and dark themes
 - In progress: keep improving OpenClaw onboarding wording and session-recovery boundaries
 - Next: continue refining session management and recovery strategy
 - Next: continue expanding release notes, install guidance, and customer-facing product copy

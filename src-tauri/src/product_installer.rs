@@ -1581,8 +1581,13 @@ fn build_gemini_routes(
 pub async fn get_gemini_status() -> Result<GeminiStatus, String> {
     let installed = command_exists("gemini");
     // Gemini CLI may touch ~/.gemini runtime files even for `--version`.
-    // Avoid blocking the whole quick-access panel on that side effect.
-    let version = None;
+    // Prefer package metadata to avoid CLI startup side effects while still
+    // exposing a real version when the npm package layout is available.
+    let version = if installed {
+        cli_version_from_package_metadata("gemini")
+    } else {
+        None
+    };
     let env_path = get_gemini_env_file_path()?;
     let settings_path = get_gemini_settings_file_path()?;
     let state = load_gemini_install_state();

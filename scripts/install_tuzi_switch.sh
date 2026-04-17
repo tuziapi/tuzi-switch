@@ -15,7 +15,7 @@ Usage: install_tuzi_switch.sh [options]
   --dry-run          Print the download URL and install steps without executing
   --no-open          Do not auto-open the app after installation
   --repo OWNER/REPO  Override GitHub repository (default: tuziapi/tuzi-switch)
-  --tag VERSION      Install a specific release tag such as v3.12.14
+  --tag VERSION      Install a specific release tag such as v3.12.15
   --appimage         Prefer AppImage instead of .deb on Linux
   -h, --help         Show this help
 

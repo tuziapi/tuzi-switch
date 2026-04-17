@@ -8,7 +8,7 @@ import ClaudeSvg from "@/icons/extracted/claude.svg?url";
 import OpenAISvg from "@/icons/extracted/openai.svg?url";
 import GeminiSvg from "@/icons/extracted/gemini.svg?url";
 import OpenClawSvg from "@/icons/extracted/claw.svg?url";
-import TuziRabbitIconImg from "@/assets/icons/tuzi-rabbit-icon.jpg?url";
+import TuziRabbitIconImg from "@/assets/icons/tuzi-rabbit-icon-v2.png?url";
 
 export function ClaudeIcon({ size = 16, className = "" }: IconProps) {
   return (
@@ -65,7 +65,7 @@ export function OpenClawIcon({ size = 16, className = "" }: IconProps) {
 export function TuziIcon({ size = 16, className = "" }: IconProps) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-white ring-1 ring-sky-200/80 shadow-[0_0_0_1px_rgba(255,255,255,0.45)_inset] ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white/95 ring-1 ring-sky-200/70 shadow-sm dark:bg-white/10 dark:ring-white/12 ${className}`}
       style={{ width: size, height: size }}
       aria-label="Tuzi"
     >
@@ -73,7 +73,7 @@ export function TuziIcon({ size = 16, className = "" }: IconProps) {
         src={TuziRabbitIconImg}
         width={size}
         height={size}
-        className="block h-full w-full object-cover"
+        className="block h-full w-full object-contain"
         alt="Tuzi"
         decoding="async"
         draggable={false}
@@ -82,6 +82,7 @@ export function TuziIcon({ size = 16, className = "" }: IconProps) {
           height: "100%",
           maxWidth: "none",
           maxHeight: "none",
+          objectFit: "contain",
           objectPosition: "center",
         }}
       />

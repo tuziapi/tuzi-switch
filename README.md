@@ -28,17 +28,17 @@
 
 ### 一键安装
 
-直接安装当前推荐版本 `v3.12.14`：
+直接安装当前推荐版本 `v3.12.15`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.14 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.15 bash
 ```
 
 补充说明：
 
 - 当前 Release workflow 仍使用 `prerelease` 发布策略
 - GitHub `releases/latest` 不能稳定命中当前最新测试版本
-- 当前 README 默认固定到 `v3.12.14`，这样可以确保安装到我们当前推荐版本
+- 当前 README 默认固定到 `v3.12.15`，这样可以确保安装到我们当前推荐版本
 - 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
 
 ### macOS 未签名包打开方式
@@ -70,10 +70,11 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 当前版本更新
 
-当前公开版本为 `v3.12.14`，这一轮更新重点包括：
+当前公开版本为 `v3.12.15`，这一轮更新重点包括：
 
 - 继续收尾 Claude、Codex、Gemini、OpenClaw 四个入口的状态可信度、刷新反馈与异常兜底
-- 顶部状态与下方真实 provider 的同步逻辑进一步校准，并补充 provider 与 CLI/安装器记录不一致时的提示
+- Claude、Codex、Gemini 顶部状态卡进一步压缩，版本卡与升级入口更紧凑，Gemini 版本改为优先读取包元数据
+- Codex、Gemini、OpenClaw 的业务接入区继续精简，减少提示干扰并统一更轻量的快速接入表达
 - 同路线多 Key 改为保留旧卡、追加新卡并自动切换到新卡
 - Claude、Codex、Gemini 在已安装且变体兼容时会跳过重复安装，仅在变体切换时重新安装
 - 测试链路与基础校验链路已补稳，同时继续保持一键安装命中当前推荐版本
@@ -159,9 +160,9 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 ## 开发计划 / TODO List
 
 - 已完成：四个入口的业务接入与路线管理首轮改版，包含 Codex 主线路 / Coding 特别线路拆分与 Gemini 首版业务接入
-- 已完成：状态可信度、异常兜底、顶部状态与下方真实 provider 同步完成一轮收口
+- 已完成：状态可信度、异常兜底、顶部状态区压缩、Gemini 真实版本检测与 provider 同步继续收口
 - 已完成：同路线多 Key 追加卡片、Key 安全输入、跳过重复安装、固定版本安装脚本与验证链路补稳
-- 进行中：继续统一深色 / 浅色主题下的路线卡、状态区、提示区与列表高亮
+- 进行中：继续统一深色 / 浅色主题下的路线卡、状态区、列表高亮与各入口文案密度
 - 进行中：继续优化 OpenClaw 的业务接入表达与会话恢复边界
 - 下一步：继续梳理会话管理与恢复策略
 - 下一步：继续补充 release 文案、安装提示与客户视角介绍

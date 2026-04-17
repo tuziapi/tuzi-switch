@@ -28,17 +28,17 @@
 
 ### ワンコマンドインストール
 
-現在の推奨版 `v3.12.14` を直接インストール:
+現在の推奨版 `v3.12.15` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.14 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.15 bash
 ```
 
 補足:
 
 - 現在の Release workflow は引き続き `prerelease` 方式で公開されています
 - GitHub の `releases/latest` では、最新のテスト版を安定して取得できない場合があります
-- README のコマンドは `v3.12.14` に固定し、現在の推奨版を確実に入れられるようにしています
+- README のコマンドは `v3.12.15` に固定し、現在の推奨版を確実に入れられるようにしています
 - 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
@@ -70,10 +70,11 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 現在のバージョン更新内容
 
-現在の公開版は `v3.12.14` で、今回の主な更新は以下です。
+現在の公開版は `v3.12.15` で、今回の主な更新は以下です。
 
 - Claude、Codex、Gemini、OpenClaw の各入口で、状態信頼性、更新フィードバック、異常時フォールバックの収束を継続
-- 上部ステータスと実際の有効 provider の同期をさらに調整し、provider と CLI / installer 記録の不一致ヒントも補強
+- Claude、Codex、Gemini の上部ステータスカードをさらにコンパクト化し、バージョン表示と更新導線を整理しつつ、Gemini は package metadata 優先で実バージョンを表示
+- Codex、Gemini、OpenClaw の業務接入エリアをさらに簡素化し、案内文を軽くして初回導線を見やすく調整
 - 同一路線の複数 Key は上書きではなく、既存カードを残して新カードを追加し、自動で新カードへ切り替える方式に変更
 - Claude、Codex、Gemini は既に互換変体が入っている場合、再インストールをスキップし、変体切替時のみ再インストール
 - テストと基本検証フローを安定化しつつ、ワンコマンドインストールは現在の推奨版を確実に指す状態を維持
@@ -159,9 +160,9 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 ## 開発計画 / TODO
 
 - 完了: Claude、Codex、Gemini、OpenClaw の 4 入口で、業務接入とルート管理の第 1 ラウンド改版を完了
-- 完了: 状態信頼性、異常時フォールバック、上部ステータスと実際の provider 同期の収束を 1 ラウンド完了
+- 完了: 状態信頼性、異常時フォールバック、上部ステータスの圧縮、Gemini 実バージョン表示、provider 同期の収束をさらに 1 ラウンド完了
 - 完了: 同一路線の複数 Key 追加カード、Key 入力保護、重複インストールのスキップ、固定版インストール導線、検証チェーン安定化を実装
-- 進行中: ライト / ダーク両テーマで、ルートカード、状態ブロック、ヒント領域、下部リスト高亮をさらに揃える
+- 進行中: ライト / ダーク両テーマで、ルートカード、状態ブロック、下部リスト高亮、各入口の文案密度をさらに揃える
 - 進行中: OpenClaw の接入表現とセッション復元境界をさらに整理する
 - 次: セッション管理と復元戦略を引き続き整理する
 - 次: リリース説明、インストール案内、顧客向け文案をさらに補強する
