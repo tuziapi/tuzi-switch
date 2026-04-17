@@ -37,8 +37,8 @@ curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/in
 Notes:
 
 - The current release workflow still publishes builds as `prerelease`
-- Because of that, GitHub `releases/latest` does not always point to the newest testing build
-- The README command is now pinned to `v3.12.14` so it installs the current recommended version reliably
+- GitHub `releases/latest` does not reliably resolve to the newest testing build
+- The README command stays pinned to `v3.12.14` so it installs the current recommended version reliably
 - To install another version, replace the value in `TUZI_SWITCH_TAG=vX.Y.Z`
 
 ### macOS Unsigned Build
@@ -72,11 +72,11 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 
 The current public release is `v3.12.14`, with this round focused on:
 
-- Finishing another pass on state reliability and route presentation across Claude, Codex, Gemini, and OpenClaw
-- Keeping the page-level primary state tied to the active provider, while adding mismatch hints for provider vs CLI/installer records
-- Syncing better Codex and OpenClaw session-title extraction to reduce noisy metadata and improve readability
-- Improving request-log pagination with steadier page folding and direct page jump input
-- Keeping the installer command pinned to the current recommended version for predictable one-command installs
+- Finishing another pass on state reliability, refresh feedback, and failure fallback across Claude, Codex, Gemini, and OpenClaw
+- Tightening the sync between the top status area and the actual active provider, with clearer mismatch hints for provider vs CLI/installer records
+- Changing same-route multi-key onboarding from in-place overwrite to keep-old-card plus append-new-card with automatic switching
+- Skipping repeated installs for Claude, Codex, and Gemini when the installed variant is already compatible, and only reinstalling on variant changes
+- Stabilizing the validation path and keeping the installer command pinned to the current recommended version
 
 ## Product Highlights
 
@@ -158,16 +158,13 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 
 ## Development Plan / TODO
 
-- Done: the first Tuzi route-management pass is complete across Claude, Codex, Gemini, and OpenClaw
-- Done: the Codex main / Coding route split and the first Gemini business onboarding pass are in place
-- Done: one round of fixes has landed for status cards, API key handling, installer pinning, and base visual consistency
-- Done: the first provider-vs-installer mismatch hint is now in place
-- In progress: keep improving state reliability, refresh feedback, and error hints across the four entry modules
+- Done: the first business-onboarding and route-management pass is in place across Claude, Codex, Gemini, and OpenClaw, including the Codex main / Coding split and the first Gemini onboarding flow
+- Done: one stabilization pass has landed for status reliability, failure fallback, and top-status vs real-provider synchronization
+- Done: same-route multi-key append cards, secure key input handling, skip-repeat-install flow, pinned installer versioning, and validation checks are now in place
 - In progress: keep aligning route cards, status blocks, hint blocks, and provider-list highlights across light and dark themes
-- In progress: keep improving OpenClaw onboarding and route explanation
-- Next: revisit session management and clarify the OpenClaw recovery boundary
-- Next: expand release notes, install hints, and customer-facing product copy
-- Later: connect more complete real business-data capabilities when the backend path is ready
+- In progress: keep improving OpenClaw onboarding wording and session-recovery boundaries
+- Next: continue refining session management and recovery strategy
+- Next: continue expanding release notes, install guidance, and customer-facing product copy
 
 ## Notes
 
