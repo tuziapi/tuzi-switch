@@ -17,6 +17,7 @@
     "about": "About",
     "version": "Version",
     "loading": "Loading...",
+    "installed": "Installed",
     "notInstalled": "Not installed",
     "success": "Success",
     "error": "Error",

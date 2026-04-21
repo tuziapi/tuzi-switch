@@ -130,6 +130,7 @@ fn launch_kitty(command: &str, cwd: Option<&str>) -> Result<(), String> {
 
     // 获取用户默认 shell
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell_args = build_interactive_shell_args(&shell, &full_command);
 
     let status = Command::new("open")
         .arg("-na")
@@ -137,9 +138,7 @@ fn launch_kitty(command: &str, cwd: Option<&str>) -> Result<(), String> {
         .arg("--args")
         .arg("-e")
         .arg(&shell)
-        .arg("-l")
-        .arg("-c")
-        .arg(&full_command)
+        .args(shell_args.iter().map(String::as_str))
         .status()
         .map_err(|e| format!("Failed to launch Kitty: {e}"))?;
 
@@ -165,10 +164,12 @@ fn launch_wezterm(command: &str, cwd: Option<&str>) -> Result<(), String> {
 
     // Invoke shell to run the command string (to handle pipes, etc)
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell_args = build_interactive_shell_args(&shell, &full_command);
     args.push("--");
     args.push(&shell);
-    args.push("-c");
-    args.push(&full_command);
+    for arg in &shell_args {
+        args.push(arg);
+    }
 
     let status = Command::new("open")
         .args(&args)
@@ -186,6 +187,7 @@ fn launch_alacritty(command: &str, cwd: Option<&str>) -> Result<(), String> {
     // Alacritty: open -na Alacritty --args --working-directory ... -e shell -c command
     let full_command = build_shell_command(command, None);
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell_args = build_interactive_shell_args(&shell, &full_command);
 
     let mut args = vec!["-na", "Alacritty", "--args"];
 
@@ -196,8 +198,9 @@ fn launch_alacritty(command: &str, cwd: Option<&str>) -> Result<(), String> {
 
     args.push("-e");
     args.push(&shell);
-    args.push("-c");
-    args.push(&full_command);
+    for arg in &shell_args {
+        args.push(arg);
+    }
 
     let status = Command::new("open")
         .args(&args)
@@ -257,6 +260,31 @@ fn shell_escape(value: &str) -> String {
     format!("\"{escaped}\"")
 }
 
+fn build_interactive_shell_args(shell: &str, command: &str) -> Vec<String> {
+    let shell_name = std::path::Path::new(shell)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+
+    match shell_name {
+        "zsh" => vec![
+            "-l".to_string(),
+            "-i".to_string(),
+            "-c".to_string(),
+            command.to_string(),
+        ],
+        "bash" => vec![
+            "-l".to_string(),
+            "-i".to_string(),
+            "-c".to_string(),
+            format!(
+                "[ -f \"$HOME/.bashrc\" ] && source \"$HOME/.bashrc\" >/dev/null 2>&1; {command}"
+            ),
+        ],
+        _ => vec!["-c".to_string(), command.to_string()],
+    }
+}
+
 fn escape_osascript(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
@@ -303,6 +331,32 @@ mod tests {
         assert_eq!(
             ghostty_raw_input("echo foo\\\\bar\npwd"),
             "raw:echo foo\\\\\\\\bar\\npwd\\n"
+        );
+    }
+
+    #[test]
+    fn zsh_uses_interactive_login_mode_for_resume_commands() {
+        assert_eq!(
+            build_interactive_shell_args("/bin/zsh", "claude --resume abc-123"),
+            vec![
+                "-l".to_string(),
+                "-i".to_string(),
+                "-c".to_string(),
+                "claude --resume abc-123".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn bash_sources_bashrc_before_running_resume_commands() {
+        assert_eq!(
+            build_interactive_shell_args("/bin/bash", "claude --resume abc-123"),
+            vec![
+                "-l".to_string(),
+                "-i".to_string(),
+                "-c".to_string(),
+                "[ -f \"$HOME/.bashrc\" ] && source \"$HOME/.bashrc\" >/dev/null 2>&1; claude --resume abc-123".to_string(),
+            ]
         );
     }
 }

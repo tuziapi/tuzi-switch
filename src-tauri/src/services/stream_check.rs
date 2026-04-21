@@ -6,7 +6,7 @@ use futures::StreamExt;
 use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::time::Instant;
 
 use crate::app_config::AppType;
@@ -80,6 +80,9 @@ pub struct StreamCheckResult {
 pub struct StreamCheckService;
 
 impl StreamCheckService {
+    const CODEX_TEST_INSTRUCTIONS: &'static str =
+        "You are a connectivity health check assistant. Reply briefly.";
+
     /// 执行流式健康检查（带重试）
     ///
     /// 如果 Provider 配置了单独的测试配置（meta.testConfig），则使用该配置覆盖全局配置
@@ -483,17 +486,8 @@ impl StreamCheckService {
         let os_name = Self::get_os_name();
         let arch_name = Self::get_arch_name();
 
-        // Responses API 请求体格式 (input 必须是数组)
-        let mut body = json!({
-            "model": actual_model,
-            "input": [{ "role": "user", "content": test_prompt }],
-            "stream": true
-        });
-
-        // 如果是推理模型，添加 reasoning_effort
-        if let Some(effort) = reasoning_effort {
-            body["reasoning"] = json!({ "effort": effort });
-        }
+        let body =
+            Self::build_codex_stream_body(&actual_model, test_prompt, reasoning_effort.as_deref())?;
 
         for (i, url) in urls.iter().enumerate() {
             // 严格按照 Codex CLI 请求格式设置 headers
@@ -518,11 +512,12 @@ impl StreamCheckService {
 
             if !response.status().is_success() {
                 let error_text = response.text().await.unwrap_or_default();
-                // 回退策略：仅当首选 URL 返回 404 时尝试下一个
-                if i == 0 && status == 404 && urls.len() > 1 {
+                if i + 1 < urls.len() && Self::should_try_next_codex_endpoint(status) {
                     continue;
                 }
-                return Err(AppError::Message(format!("HTTP {status}: {error_text}")));
+                return Err(AppError::Message(format!(
+                    "Codex stream check failed via {url} using {model}: HTTP {status}: {error_text}"
+                )));
             }
 
             let mut stream = response.bytes_stream();
@@ -539,6 +534,36 @@ impl StreamCheckService {
         Err(AppError::Message(
             "No valid Codex responses endpoint found".to_string(),
         ))
+    }
+
+    fn should_try_next_codex_endpoint(status: u16) -> bool {
+        matches!(status, 404 | 405) || (500..=599).contains(&status)
+    }
+
+    fn build_codex_stream_body(
+        model: &str,
+        test_prompt: &str,
+        reasoning_effort: Option<&str>,
+    ) -> Result<Value, AppError> {
+        let anthropic_body = json!({
+            "model": model,
+            "system": Self::CODEX_TEST_INSTRUCTIONS,
+            "messages": [{ "role": "user", "content": test_prompt }],
+            "stream": true
+        });
+
+        let mut body = anthropic_to_responses(anthropic_body, None)
+            .map_err(|e| AppError::Message(format!("Failed to build Codex stream request: {e}")))?;
+        body["store"] = json!(false);
+
+        if let Some(effort) = reasoning_effort
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            body["reasoning"] = json!({ "effort": effort });
+        }
+
+        Ok(body)
     }
 
     /// Gemini 流式检查
@@ -705,11 +730,23 @@ impl StreamCheckService {
             return None;
         }
 
-        let re = Regex::new(r#"^model\s*=\s*["']([^"']+)["']"#).ok()?;
-        re.captures(config_text)
+        let model = Regex::new(r#"(?m)^\s*model\s*=\s*["']([^"']+)["']"#)
+            .ok()?
+            .captures(config_text)
             .and_then(|caps| caps.get(1))
             .map(|m| m.as_str().trim().to_string())
-            .filter(|value| !value.is_empty())
+            .filter(|value| !value.is_empty())?;
+        let reasoning = Regex::new(r#"(?m)^\s*model_reasoning_effort\s*=\s*["']([^"']+)["']"#)
+            .ok()
+            .and_then(|re| re.captures(config_text))
+            .and_then(|caps| caps.get(1))
+            .map(|m| m.as_str().trim().to_string())
+            .filter(|value| !value.is_empty());
+
+        match reasoning {
+            Some(reasoning) => Some(format!("{model}@{reasoning}")),
+            None => Some(model),
+        }
     }
 
     /// 获取操作系统名称（映射为 Claude CLI 使用的格式）
@@ -994,5 +1031,49 @@ mod tests {
                 "https://api.openai.com/v1/responses",
             ]
         );
+    }
+
+    #[test]
+    fn test_extract_codex_model_reads_multiline_config() {
+        let provider = Provider::with_id(
+            "codex-test".to_string(),
+            "Codex Test".to_string(),
+            json!({
+                "config": r#"profile = "tuzi"
+model_provider = "tuzi"
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
+disable_response_storage = true
+
+[profiles.tuzi]
+model = "gpt-5.4"
+model_reasoning_effort = "medium""#
+            }),
+            None,
+        );
+
+        assert_eq!(
+            StreamCheckService::extract_codex_model(&provider).as_deref(),
+            Some("gpt-5.4@medium")
+        );
+    }
+
+    #[test]
+    fn test_build_codex_stream_body_includes_instructions_and_reasoning() {
+        let body =
+            StreamCheckService::build_codex_stream_body("gpt-5.4", "Who are you?", Some("high"))
+                .expect("codex stream body");
+
+        assert_eq!(body["model"], "gpt-5.4");
+        assert_eq!(
+            body["instructions"],
+            StreamCheckService::CODEX_TEST_INSTRUCTIONS
+        );
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["store"], false);
+        assert!(body.get("max_output_tokens").is_none());
+        assert!(body.get("prompt_cache_key").is_none());
+        assert_eq!(body["reasoning"]["effort"], "high");
+        assert_eq!(body["input"][0]["content"][0]["text"], "Who are you?");
     }
 }

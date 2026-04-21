@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -199,6 +199,8 @@ function App() {
   } | null>(null);
   const [envConflicts, setEnvConflicts] = useState<EnvConflict[]>([]);
   const [showEnvBanner, setShowEnvBanner] = useState(false);
+  const [businessQuickAccessRefreshToken, setBusinessQuickAccessRefreshToken] =
+    useState(0);
 
   const effectiveEditingProvider = useLastValidValue(editingProvider);
   const effectiveUsageProvider = useLastValidValue(usageProvider);
@@ -249,6 +251,16 @@ function App() {
     activeApp === "openclaw" ||
     activeApp === "gemini";
 
+  const handleBusinessQuickAccessRefresh = useCallback(() => {
+    if (
+      activeApp === "claude" ||
+      activeApp === "codex" ||
+      activeApp === "gemini"
+    ) {
+      setBusinessQuickAccessRefreshToken((value) => value + 1);
+    }
+  }, [activeApp]);
+
   const {
     addProvider,
     updateProvider,
@@ -256,7 +268,9 @@ function App() {
     deleteProvider,
     saveUsageScript,
     setAsDefaultModel,
-  } = useProviderActions(activeApp, isProxyRunning);
+  } = useProviderActions(activeApp, isProxyRunning, {
+    onProviderSwitched: handleBusinessQuickAccessRefresh,
+  });
 
   const disableOmoMutation = useDisableCurrentOmo();
   const handleDisableOmo = () => {
@@ -806,7 +820,11 @@ function App() {
                     transition={{ duration: 0.15 }}
                     className="space-y-4"
                   >
-                    <BusinessQuickAccess appId={activeApp} providers={providers} />
+                    <BusinessQuickAccess
+                      appId={activeApp}
+                      providers={providers}
+                      externalRefreshToken={businessQuickAccessRefreshToken}
+                    />
                     <ProviderList
                       providers={providers}
                       currentProviderId={currentProviderId}

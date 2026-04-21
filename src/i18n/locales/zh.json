@@ -17,6 +17,7 @@
     "about": "关于",
     "version": "版本",
     "loading": "加载中...",
+    "installed": "已安装",
     "notInstalled": "未安装",
     "success": "成功",
     "error": "错误",

@@ -182,8 +182,14 @@ export const settingsApi = {
   ): Promise<
     Array<{
       name: string;
+      installed: boolean;
       version: string | null;
       latest_version: string | null;
+      resolved_version?: string | null;
+      resolved_executable_path?: string | null;
+      resolved_package_name?: string | null;
+      resolved_variant?: string | null;
+      variant_conflict?: boolean;
       error: string | null;
       env_type: "windows" | "wsl" | "macos" | "linux" | "unknown";
       wsl_distro: string | null;

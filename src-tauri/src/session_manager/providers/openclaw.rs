@@ -186,7 +186,10 @@ fn load_display_names(sessions_dir: &Path) -> HashMap<String, String> {
     map
 }
 
-fn parse_session(path: &Path, display_names: Option<&HashMap<String, String>>) -> Option<SessionMeta> {
+fn parse_session(
+    path: &Path,
+    display_names: Option<&HashMap<String, String>>,
+) -> Option<SessionMeta> {
     let (head, tail) = read_head_tail_lines(path, 10, 30).ok()?;
 
     let mut session_id: Option<String> = None;
@@ -280,7 +283,11 @@ fn parse_session(path: &Path, display_names: Option<&HashMap<String, String>>) -
         .filter(|name| !name.is_empty())
         .map(|name| truncate_summary(name, TITLE_MAX_CHARS))
         .or_else(|| first_user_message.map(|text| truncate_summary(&text, TITLE_MAX_CHARS)))
-        .or_else(|| cwd.as_deref().and_then(path_basename).map(|s| s.to_string()));
+        .or_else(|| {
+            cwd.as_deref()
+                .and_then(path_basename)
+                .map(|s| s.to_string())
+        });
 
     let summary = summary.map(|text| truncate_summary(&text, 160));
 

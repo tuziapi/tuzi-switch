@@ -155,54 +155,50 @@ impl Database {
     ) -> Result<UsageSummary, AppError> {
         let conn = lock_conn!(self.conn);
 
-        let (where_clause, params_vec) = if start_date.is_some()
-            || end_date.is_some()
-            || business_line.is_some()
-        {
-            let mut conditions: Vec<String> = Vec::new();
-            let mut params = Vec::new();
+        let (where_clause, params_vec) =
+            if start_date.is_some() || end_date.is_some() || business_line.is_some() {
+                let mut conditions: Vec<String> = Vec::new();
+                let mut params = Vec::new();
 
-            if let Some(start) = start_date {
-                conditions.push("l.created_at >= ?".to_string());
-                params.push(start);
-            }
-            if let Some(end) = end_date {
-                conditions.push("l.created_at <= ?".to_string());
-                params.push(end);
-            }
-            if let Some(condition) = Self::business_line_condition(business_line, "l", "p") {
-                conditions.push(condition);
-            }
+                if let Some(start) = start_date {
+                    conditions.push("l.created_at >= ?".to_string());
+                    params.push(start);
+                }
+                if let Some(end) = end_date {
+                    conditions.push("l.created_at <= ?".to_string());
+                    params.push(end);
+                }
+                if let Some(condition) = Self::business_line_condition(business_line, "l", "p") {
+                    conditions.push(condition);
+                }
 
-            (format!("WHERE {}", conditions.join(" AND ")), params)
-        } else {
-            (String::new(), Vec::new())
-        };
+                (format!("WHERE {}", conditions.join(" AND ")), params)
+            } else {
+                (String::new(), Vec::new())
+            };
 
         // Build rollup WHERE clause using date strings (use ? for sequential binding)
-        let (rollup_where, rollup_params) = if start_date.is_some()
-            || end_date.is_some()
-            || business_line.is_some()
-        {
-            let mut conditions: Vec<String> = Vec::new();
-            let mut params = Vec::new();
+        let (rollup_where, rollup_params) =
+            if start_date.is_some() || end_date.is_some() || business_line.is_some() {
+                let mut conditions: Vec<String> = Vec::new();
+                let mut params = Vec::new();
 
-            if let Some(start) = start_date {
-                conditions.push("date >= date(?, 'unixepoch', 'localtime')".to_string());
-                params.push(start);
-            }
-            if let Some(end) = end_date {
-                conditions.push("date <= date(?, 'unixepoch', 'localtime')".to_string());
-                params.push(end);
-            }
-            if let Some(condition) = Self::business_line_condition(business_line, "r", "p2") {
-                conditions.push(condition);
-            }
+                if let Some(start) = start_date {
+                    conditions.push("date >= date(?, 'unixepoch', 'localtime')".to_string());
+                    params.push(start);
+                }
+                if let Some(end) = end_date {
+                    conditions.push("date <= date(?, 'unixepoch', 'localtime')".to_string());
+                    params.push(end);
+                }
+                if let Some(condition) = Self::business_line_condition(business_line, "r", "p2") {
+                    conditions.push(condition);
+                }
 
-            (format!("WHERE {}", conditions.join(" AND ")), params)
-        } else {
-            (String::new(), Vec::new())
-        };
+                (format!("WHERE {}", conditions.join(" AND ")), params)
+            } else {
+                (String::new(), Vec::new())
+            };
 
         let sql = format!(
             "SELECT
@@ -602,7 +598,8 @@ impl Database {
         };
 
         // UNION detail logs + rollup data
-        let sql = format!("SELECT
+        let sql = format!(
+            "SELECT
                 model,
                 SUM(request_count) as request_count,
                 SUM(total_tokens) as total_tokens,
@@ -627,7 +624,8 @@ impl Database {
                 GROUP BY model
             )
             GROUP BY model
-            ORDER BY total_cost DESC");
+            ORDER BY total_cost DESC"
+        );
 
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {

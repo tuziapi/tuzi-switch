@@ -1,10 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Loader2,
-  Upload,
-  Wrench,
-} from "lucide-react";
+import { Loader2, Upload, Wrench } from "lucide-react";
 import type { AppId } from "@/lib/api";
 import { providersApi } from "@/lib/api/providers";
 import {
@@ -15,11 +11,21 @@ import {
   type InstallerActionResult,
 } from "@/lib/api/installer";
 import { openclawApi } from "@/lib/api/openclaw";
-import { openclawKeys, useOpenClawAgentsDefaults, useOpenClawDefaultModel, useOpenClawHealth, useOpenClawLiveProviderIds, useOpenClawTools } from "@/hooks/useOpenClaw";
-import { ClaudeIcon, CodexIcon, GeminiIcon, OpenClawIcon } from "@/components/BrandIcons";
 import {
-  generateThirdPartyAuth,
-} from "@/config/codexProviderPresets";
+  openclawKeys,
+  useOpenClawAgentsDefaults,
+  useOpenClawDefaultModel,
+  useOpenClawHealth,
+  useOpenClawLiveProviderIds,
+  useOpenClawTools,
+} from "@/hooks/useOpenClaw";
+import {
+  ClaudeIcon,
+  CodexIcon,
+  GeminiIcon,
+  OpenClawIcon,
+} from "@/components/BrandIcons";
+import { generateThirdPartyAuth } from "@/config/codexProviderPresets";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,15 +36,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useProvidersQuery } from "@/lib/query/queries";
+import {
+  fetchProvidersQueryData,
+  providersQueryKey,
+  type ProvidersQueryData,
+  useProvidersQuery,
+} from "@/lib/query/queries";
 import type { OpenClawModel, Provider } from "@/types";
 import { extractErrorMessage } from "@/utils/errorUtils";
 
-type OpenClawRoute =
-  | "tuzi-claude"
-  | "tuzi-codex"
-  | "gac-claude"
-  | "gac-codex";
+type OpenClawRoute = "tuzi-claude" | "tuzi-codex" | "gac-claude" | "gac-codex";
 type ClaudeBusinessRoute = "gaccode" | "tu-zi";
 type CodexBusinessRoute = "gac" | "tuzi" | "codex";
 type GeminiBusinessRoute = "tuzi";
@@ -50,21 +57,49 @@ type BusinessProviderApp = "claude" | "codex" | "gemini" | "openclaw";
 const EMPTY_CLAUDE_STATUS: ClaudeInstallerStatus = {
   installed: false,
   version: null,
+  latest_version: null,
+  resolved_version: null,
   current_route: null,
+  route_file_current_route: null,
+  effective_base_url: null,
+  resolved_executable_path: null,
+  resolved_package_name: null,
+  resolved_variant: null,
+  variant_conflict: false,
   route_file_exists: false,
+  settings_file_exists: false,
+  sources_conflict: false,
+  process_env_route: null,
+  runtime_env_conflict: false,
   routes: [],
   env_summary: {
     anthropic_api_key_masked: null,
     anthropic_base_url: null,
     anthropic_api_token_set: false,
   },
+  settings_summary: {
+    anthropic_api_key_masked: null,
+    anthropic_base_url: null,
+    anthropic_auth_token_set: false,
+  },
+  process_env_summary: {
+    anthropic_api_key_masked: null,
+    anthropic_base_url: null,
+    anthropic_auth_token_set: false,
+  },
 };
 
 const EMPTY_CODEX_STATUS: CodexInstallerStatus = {
   installed: false,
   version: null,
+  latest_version: null,
+  resolved_version: null,
   install_type: null,
   current_route: null,
+  resolved_executable_path: null,
+  resolved_package_name: null,
+  resolved_variant: null,
+  variant_conflict: false,
   state_file_exists: false,
   config_file_exists: false,
   routes: [],
@@ -76,8 +111,14 @@ const EMPTY_CODEX_STATUS: CodexInstallerStatus = {
 const EMPTY_GEMINI_STATUS: GeminiInstallerStatus = {
   installed: false,
   version: null,
+  latest_version: null,
+  resolved_version: null,
   install_type: null,
   current_route: null,
+  resolved_executable_path: null,
+  resolved_package_name: null,
+  resolved_variant: null,
+  variant_conflict: false,
   env_file_exists: false,
   settings_file_exists: false,
   routes: [],
@@ -255,9 +296,9 @@ function escapeRegExp(value: string) {
 
 function isBusinessRouteProviderId(providerId: string, baseProviderId: string) {
   if (providerId === baseProviderId) return true;
-  return new RegExp(
-    `^${escapeRegExp(baseProviderId)}-alt-\\d+$`,
-  ).test(providerId);
+  return new RegExp(`^${escapeRegExp(baseProviderId)}-alt-\\d+$`).test(
+    providerId,
+  );
 }
 
 function getBusinessRouteProviderAltIndex(
@@ -288,8 +329,8 @@ function getBusinessRouteApiKey(
 ): string {
   if (app === "claude") {
     return (
-      provider.settingsConfig?.env?.ANTHROPIC_AUTH_TOKEN ||
       provider.settingsConfig?.env?.ANTHROPIC_API_KEY ||
+      provider.settingsConfig?.env?.ANTHROPIC_AUTH_TOKEN ||
       ""
     )
       .toString()
@@ -428,11 +469,13 @@ function hasNamedRoute(
   return Boolean(routes?.some((route) => route.name === routeName));
 }
 
-function getClaudeRouteLabel(route: ClaudeEntryOption | "modified" | "custom" | null | undefined) {
+function getClaudeRouteLabel(
+  route: ClaudeEntryOption | "modified" | "custom" | null | undefined,
+) {
   if (!route) return "--";
   if (route === "tu-zi") return CLAUDE_ROUTE_CONFIG["tu-zi"].providerName;
   if (route === "gaccode") return CLAUDE_ROUTE_CONFIG.gaccode.providerName;
-  if (route === "modified") return "兔子改版 Claude";
+  if (route === "modified") return "gac 改版 Claude";
   return "自定义线路";
 }
 
@@ -537,6 +580,18 @@ function getClaudeInstallerRoute(
   return null;
 }
 
+function getCodexInstallerRoute(
+  status: CodexInstallerStatus | null,
+): CodexEntryOption | "gac-modified" | "custom" | null {
+  if (!status) return null;
+  if (status.install_type === "gac") return "gac-modified";
+  if (status.current_route === "codex") return "tuzi-coding";
+  if (status.current_route === "gac") return "gac";
+  if (status.current_route === "tuzi") return "tuzi";
+  if (status.current_route) return "custom";
+  return null;
+}
+
 function getGeminiInstallerRoute(
   status: GeminiInstallerStatus | null,
 ): GeminiEntryOption | "gac-modified" | "custom" | null {
@@ -547,7 +602,42 @@ function getGeminiInstallerRoute(
   return null;
 }
 
-function getCodexRouteLabel(route: CodexEntryOption | "gac-modified" | "custom" | null | undefined) {
+function resolveDisplayedBusinessRoute<
+  TOriginal extends string,
+  TModified extends string,
+>({
+  providerRoute,
+  installerRoute,
+  usingModifiedVariant,
+  modifiedRoute,
+  hasCurrentProvider,
+  preferProvider = true,
+}: {
+  providerRoute: TOriginal | "custom" | null;
+  installerRoute: TOriginal | TModified | "custom" | null;
+  usingModifiedVariant: boolean;
+  modifiedRoute: TModified;
+  hasCurrentProvider: boolean;
+  preferProvider?: boolean;
+}): TOriginal | TModified | "custom" | null {
+  if (usingModifiedVariant) {
+    return modifiedRoute;
+  }
+  if (preferProvider && providerRoute) {
+    return providerRoute;
+  }
+  if (installerRoute && installerRoute !== modifiedRoute) {
+    return installerRoute;
+  }
+  if (providerRoute) {
+    return providerRoute;
+  }
+  return hasCurrentProvider ? "custom" : null;
+}
+
+function getCodexRouteLabel(
+  route: CodexEntryOption | "gac-modified" | "custom" | null | undefined,
+) {
   if (!route) return "--";
   if (route === "tuzi") return CODEX_ROUTE_CONFIG.tuzi.providerName;
   if (route === "tuzi-coding") return CODEX_ROUTE_CONFIG.codex.providerName;
@@ -556,7 +646,9 @@ function getCodexRouteLabel(route: CodexEntryOption | "gac-modified" | "custom" 
   return "自定义线路";
 }
 
-function getGeminiRouteLabel(route: GeminiEntryOption | "gac-modified" | "custom" | null | undefined) {
+function getGeminiRouteLabel(
+  route: GeminiEntryOption | "gac-modified" | "custom" | null | undefined,
+) {
   if (!route) return "--";
   if (route === "tuzi") return GEMINI_ROUTE_CONFIG.tuzi.providerName;
   if (route === "gac-modified") return "gac 改版 Gemini";
@@ -566,9 +658,48 @@ function getGeminiRouteLabel(route: GeminiEntryOption | "gac-modified" | "custom
 function getInstalledVersionLabel(
   installed: boolean,
   version: string | null | undefined,
+  latestVersion?: string | null,
 ) {
   if (!installed) return "未安装";
-  return version?.trim() || "已安装";
+  const currentVersion = version?.trim();
+  const latest = latestVersion?.trim();
+  if (!currentVersion) return "已安装";
+  if (latest && currentVersion === latest) {
+    return `${currentVersion}（最新版）`;
+  }
+  return currentVersion;
+}
+
+function isLatestInstalledVersion(
+  installed: boolean,
+  version: string | null | undefined,
+  latestVersion?: string | null,
+) {
+  if (!installed) return false;
+  const currentVersion = version?.trim();
+  const latest = latestVersion?.trim();
+  return Boolean(currentVersion && latest && currentVersion === latest);
+}
+
+function getCliVariantLabel(
+  installed: boolean,
+  resolvedVariant: string | null | undefined,
+  originalVariantValues: string[],
+  modifiedVariantValues: string[],
+) {
+  if (!installed) return "未安装";
+  const normalizedVariant = resolvedVariant?.trim().toLowerCase();
+  if (!normalizedVariant) return "已安装";
+  if (originalVariantValues.includes(normalizedVariant)) {
+    return "原版";
+  }
+  if (modifiedVariantValues.includes(normalizedVariant)) {
+    return "gac 改版";
+  }
+  if (normalizedVariant === "unknown") {
+    return "未知";
+  }
+  return normalizedVariant;
 }
 
 function getOpenClawCurrentRoute(
@@ -586,6 +717,48 @@ function getOpenClawCurrentRoute(
   }
 
   return null;
+}
+
+function getClaudeStatusBaseUrl(status: ClaudeInstallerStatus) {
+  return (
+    status.effective_base_url?.trim() ||
+    status.settings_summary?.anthropic_base_url?.trim() ||
+    status.env_summary.anthropic_base_url?.trim() ||
+    getCurrentRouteBaseUrl(status.routes) ||
+    "--"
+  );
+}
+
+function getCodexStatusBaseUrl(
+  route: CodexEntryOption | "gac-modified" | "custom" | null,
+  status: CodexInstallerStatus,
+) {
+  if (route === "gac-modified" || route === "gac") {
+    return CODEX_ROUTE_CONFIG.gac.baseUrl;
+  }
+  if (route === "tuzi") {
+    return CODEX_ROUTE_CONFIG.tuzi.baseUrl;
+  }
+  if (route === "tuzi-coding") {
+    return CODEX_ROUTE_CONFIG.codex.baseUrl;
+  }
+  return getCurrentRouteBaseUrl(status.routes);
+}
+
+function getGeminiStatusBaseUrl(
+  route: GeminiEntryOption | "gac-modified" | "custom" | null,
+  status: GeminiInstallerStatus,
+) {
+  if (route === "gac-modified") {
+    return "https://gaccode.com/gemini";
+  }
+  if (route === "tuzi") {
+    return GEMINI_ROUTE_CONFIG.tuzi.baseUrl;
+  }
+  return (
+    status.env_summary.google_gemini_base_url ||
+    getCurrentRouteBaseUrl(status.routes)
+  );
 }
 
 function getProviderBaseUrl(provider?: Provider): string | null {
@@ -665,12 +838,13 @@ function buildCodexBusinessConfig(
   route: CodexBusinessRoute,
   baseUrl: string,
   modelName = "gpt-5.4",
+  reasoningEffort = "medium",
 ) {
   const profileName = route === "gac" ? "codex" : route;
   return `profile = "${profileName}"
 model_provider = "${profileName}"
 model = "${modelName}"
-model_reasoning_effort = "high"
+model_reasoning_effort = "${reasoningEffort}"
 disable_response_storage = true
 
 [model_providers.${profileName}]
@@ -682,7 +856,7 @@ requires_openai_auth = true
 [profiles.${profileName}]
 model_provider = "${profileName}"
 model = "${modelName}"
-model_reasoning_effort = "high"
+model_reasoning_effort = "${reasoningEffort}"
 approval_policy = "on-request"`;
 }
 
@@ -737,8 +911,8 @@ function RouteCard({
   onClick,
 }: {
   title: string;
-  description: string;
-  meta: string;
+  description?: string;
+  meta?: string;
   status: string;
   selected: boolean;
   tone?: "orange" | "sky" | "pink" | "rose" | "red";
@@ -748,57 +922,60 @@ function RouteCard({
     orange: {
       selected:
         "border-orange-300 bg-orange-50/80 shadow-sm dark:border-orange-400/45 dark:bg-[linear-gradient(135deg,#4a3328,#2a2322)] dark:shadow-[0_0_0_1px_rgba(251,146,60,0.06)]",
-      idle:
-        "border-border/60 bg-background/70 hover:border-orange-200 hover:bg-orange-50/40 dark:bg-background/30 dark:hover:border-orange-400/30 dark:hover:bg-orange-500/8",
+      idle: "border-border/60 bg-background/70 hover:border-orange-200 hover:bg-orange-50/40 dark:bg-background/30 dark:hover:border-orange-400/30 dark:hover:bg-orange-500/8",
       badge:
         "bg-orange-100 text-orange-700 dark:bg-orange-500/18 dark:text-orange-200",
     },
     sky: {
       selected:
         "border-sky-300 bg-sky-50/80 shadow-sm dark:border-sky-400/45 dark:bg-[linear-gradient(135deg,#253846,#20272d)] dark:shadow-[0_0_0_1px_rgba(56,189,248,0.06)]",
-      idle:
-        "border-border/60 bg-background/70 hover:border-sky-200 hover:bg-sky-50/40 dark:bg-background/30 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/8",
-      badge:
-        "bg-sky-100 text-sky-700 dark:bg-sky-500/18 dark:text-sky-200",
+      idle: "border-border/60 bg-background/70 hover:border-sky-200 hover:bg-sky-50/40 dark:bg-background/30 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/8",
+      badge: "bg-sky-100 text-sky-700 dark:bg-sky-500/18 dark:text-sky-200",
     },
     pink: {
       selected:
         "border-pink-300 bg-pink-50/80 shadow-sm dark:border-pink-400/45 dark:bg-[linear-gradient(135deg,#4a2d3d,#282126)] dark:shadow-[0_0_0_1px_rgba(236,72,153,0.06)]",
-      idle:
-        "border-border/60 bg-background/70 hover:border-pink-200 hover:bg-pink-50/40 dark:bg-background/30 dark:hover:border-pink-400/30 dark:hover:bg-pink-500/8",
-      badge:
-        "bg-pink-100 text-pink-700 dark:bg-pink-500/18 dark:text-pink-200",
+      idle: "border-border/60 bg-background/70 hover:border-pink-200 hover:bg-pink-50/40 dark:bg-background/30 dark:hover:border-pink-400/30 dark:hover:bg-pink-500/8",
+      badge: "bg-pink-100 text-pink-700 dark:bg-pink-500/18 dark:text-pink-200",
     },
     rose: {
       selected:
         "border-rose-300 bg-rose-50/80 shadow-sm dark:border-rose-400/45 dark:bg-[linear-gradient(135deg,#492c34,#282124)] dark:shadow-[0_0_0_1px_rgba(244,63,94,0.06)]",
-      idle:
-        "border-border/60 bg-background/70 hover:border-rose-200 hover:bg-rose-50/40 dark:bg-background/30 dark:hover:border-rose-400/30 dark:hover:bg-rose-500/8",
-      badge:
-        "bg-rose-100 text-rose-700 dark:bg-rose-500/18 dark:text-rose-200",
+      idle: "border-border/60 bg-background/70 hover:border-rose-200 hover:bg-rose-50/40 dark:bg-background/30 dark:hover:border-rose-400/30 dark:hover:bg-rose-500/8",
+      badge: "bg-rose-100 text-rose-700 dark:bg-rose-500/18 dark:text-rose-200",
     },
     red: {
       selected:
         "border-red-300 bg-red-50/80 shadow-sm dark:border-red-400/45 dark:bg-[linear-gradient(135deg,#492c2c,#282121)] dark:shadow-[0_0_0_1px_rgba(239,68,68,0.06)]",
-      idle:
-        "border-border/60 bg-background/70 hover:border-red-200 hover:bg-red-50/40 dark:bg-background/30 dark:hover:border-red-400/30 dark:hover:bg-red-500/8",
-      badge:
-        "bg-red-100 text-red-700 dark:bg-red-500/18 dark:text-red-200",
+      idle: "border-border/60 bg-background/70 hover:border-red-200 hover:bg-red-50/40 dark:bg-background/30 dark:hover:border-red-400/30 dark:hover:bg-red-500/8",
+      badge: "bg-red-100 text-red-700 dark:bg-red-500/18 dark:text-red-200",
     },
   } as const;
   const activeTone = toneClasses[tone];
+  const hasDescription = Boolean(description);
+  const hasMeta = Boolean(meta);
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border px-4 py-4 text-left transition ${selected ? `${activeTone.selected} dark:text-white` : activeTone.idle}`}
+      className={`rounded-2xl border px-4 text-left transition ${
+        hasDescription || hasMeta ? "py-4" : "py-3.5"
+      } ${selected ? `${activeTone.selected} dark:text-white` : activeTone.idle}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium">{title}</div>
-          <div className={`mt-1 text-xs leading-5 ${selected ? "text-muted-foreground dark:text-white/82" : "text-muted-foreground"}`}>
-            {description}
-          </div>
+          {hasDescription ? (
+            <div
+              className={`mt-1 text-xs leading-5 ${
+                selected
+                  ? "text-muted-foreground dark:text-white/82"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {description}
+            </div>
+          ) : null}
         </div>
         <div
           className={`inline-flex min-w-[52px] items-center justify-center whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-medium ${
@@ -812,31 +989,18 @@ function RouteCard({
           {status}
         </div>
       </div>
-      <div className={`mt-3 text-xs ${selected ? "text-muted-foreground dark:text-white/78" : "text-muted-foreground"}`}>{meta}</div>
+      {hasMeta ? (
+        <div
+          className={`mt-3 text-xs ${
+            selected
+              ? "text-muted-foreground dark:text-white/78"
+              : "text-muted-foreground"
+          }`}
+        >
+          {meta}
+        </div>
+      ) : null}
     </button>
-  );
-}
-
-function ResultHint({
-  target,
-  syncHint,
-}: {
-  target: string;
-  syncHint: string;
-}) {
-  return (
-    <div className="mt-3 grid gap-2 md:grid-cols-2">
-      <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-        当前目标:
-        {" "}
-        <span className="text-foreground">{target}</span>
-      </div>
-      <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-        配置完成后:
-        {" "}
-        <span className="text-foreground">{syncHint}</span>
-      </div>
-    </div>
   );
 }
 
@@ -863,9 +1027,11 @@ async function withTimeout<T>(
 export function BusinessQuickAccess({
   appId,
   providers,
+  externalRefreshToken,
 }: {
   appId: AppId;
   providers?: Record<string, Provider>;
+  externalRefreshToken?: number;
 }) {
   const isClaude = appId === "claude";
   const isCodex = appId === "codex";
@@ -875,15 +1041,31 @@ export function BusinessQuickAccess({
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [runningAction, setRunningAction] = useState<string | null>(null);
-  const [actionResult, setActionResult] = useState<InstallerActionResult | null>(null);
+  const [actionResult, setActionResult] =
+    useState<InstallerActionResult | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
-  const [claudeStatus, setClaudeStatus] = useState<ClaudeInstallerStatus | null>(null);
-  const [codexStatus, setCodexStatus] = useState<CodexInstallerStatus | null>(null);
-  const [geminiStatus, setGeminiStatus] = useState<GeminiInstallerStatus | null>(null);
-  const [claudeEntryOption, setClaudeEntryOption] = useState<ClaudeEntryOption>("tu-zi");
-  const [codexEntryOption, setCodexEntryOption] = useState<CodexEntryOption>("tuzi");
-  const [geminiEntryOption, setGeminiEntryOption] = useState<GeminiEntryOption>("tuzi");
+  const [claudeStatus, setClaudeStatus] =
+    useState<ClaudeInstallerStatus | null>(null);
+  const [codexStatus, setCodexStatus] = useState<CodexInstallerStatus | null>(
+    null,
+  );
+  const [geminiStatus, setGeminiStatus] =
+    useState<GeminiInstallerStatus | null>(null);
+  const [claudeProvidersSnapshot, setClaudeProvidersSnapshot] =
+    useState<ProvidersQueryData | null>(null);
+  const [codexProvidersSnapshot, setCodexProvidersSnapshot] =
+    useState<ProvidersQueryData | null>(null);
+  const [geminiProvidersSnapshot, setGeminiProvidersSnapshot] =
+    useState<ProvidersQueryData | null>(null);
+  const [openclawProvidersSnapshot, setOpenclawProvidersSnapshot] =
+    useState<ProvidersQueryData | null>(null);
+  const [claudeEntryOption, setClaudeEntryOption] =
+    useState<ClaudeEntryOption>("tu-zi");
+  const [codexEntryOption, setCodexEntryOption] =
+    useState<CodexEntryOption>("tuzi");
+  const [geminiEntryOption, setGeminiEntryOption] =
+    useState<GeminiEntryOption>("tuzi");
   const [claudeSelectionTouched, setClaudeSelectionTouched] = useState(false);
   const [codexSelectionTouched, setCodexSelectionTouched] = useState(false);
   const [geminiSelectionTouched, setGeminiSelectionTouched] = useState(false);
@@ -894,8 +1076,10 @@ export function BusinessQuickAccess({
   const [codexReasoning, setCodexReasoning] = useState("medium");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [geminiModel, setGeminiModel] = useState("gemini-2.5-pro");
-  const [openclawRoute, setOpenclawRoute] = useState<OpenClawRoute>("tuzi-claude");
+  const [openclawRoute, setOpenclawRoute] =
+    useState<OpenClawRoute>("tuzi-claude");
   const [openclawApiKey, setOpenclawApiKey] = useState("");
+  const externalRefreshTokenRef = useRef(externalRefreshToken);
 
   const { data: claudeProvidersData } = useProvidersQuery("claude");
   const { data: codexProvidersData } = useProvidersQuery("codex");
@@ -904,20 +1088,27 @@ export function BusinessQuickAccess({
   const { data: openclawDefaultModel } = useOpenClawDefaultModel(isOpenClaw);
   const { data: openclawAgentsDefaults } = useOpenClawAgentsDefaults();
   const { data: openclawTools } = useOpenClawTools();
-  const { data: openclawLiveProviderIds = [] } = useOpenClawLiveProviderIds(isOpenClaw);
+  const { data: openclawLiveProviderIds = [] } =
+    useOpenClawLiveProviderIds(isOpenClaw);
   const { data: openclawHealthWarnings = [] } = useOpenClawHealth(isOpenClaw);
   const { data: openclawProvidersData } = useProvidersQuery("openclaw");
 
-  const claudeCurrentProviderId = claudeProvidersData?.currentProviderId || "";
+  const claudeProvidersView = claudeProvidersSnapshot ?? claudeProvidersData;
+  const codexProvidersView = codexProvidersSnapshot ?? codexProvidersData;
+  const geminiProvidersView = geminiProvidersSnapshot ?? geminiProvidersData;
+  const openclawProvidersView =
+    openclawProvidersSnapshot ?? openclawProvidersData;
+
+  const claudeCurrentProviderId = claudeProvidersView?.currentProviderId || "";
   const claudeCurrentProvider =
-    claudeProvidersData?.providers?.[claudeCurrentProviderId];
-  const codexCurrentProviderId = codexProvidersData?.currentProviderId || "";
+    claudeProvidersView?.providers?.[claudeCurrentProviderId];
+  const codexCurrentProviderId = codexProvidersView?.currentProviderId || "";
   const codexCurrentProvider =
-    codexProvidersData?.providers?.[codexCurrentProviderId];
-  const geminiCurrentProviderId = geminiProvidersData?.currentProviderId || "";
+    codexProvidersView?.providers?.[codexCurrentProviderId];
+  const geminiCurrentProviderId = geminiProvidersView?.currentProviderId || "";
   const geminiCurrentProvider =
-    geminiProvidersData?.providers?.[geminiCurrentProviderId];
-  const openclawProviderMap = openclawProvidersData?.providers || {};
+    geminiProvidersView?.providers?.[geminiCurrentProviderId];
+  const openclawProviderMap = openclawProvidersView?.providers || {};
   const claudeStatusView = claudeStatus ?? EMPTY_CLAUDE_STATUS;
   const codexStatusView = codexStatus ?? EMPTY_CODEX_STATUS;
   const geminiStatusView = geminiStatus ?? EMPTY_GEMINI_STATUS;
@@ -941,6 +1132,26 @@ export function BusinessQuickAccess({
     return "状态读取失败，请稍后重试。";
   };
 
+  useEffect(() => {
+    if (loading || isRefreshing || runningAction) return;
+    setClaudeProvidersSnapshot(claudeProvidersData ?? null);
+  }, [claudeProvidersData, loading, isRefreshing, runningAction]);
+
+  useEffect(() => {
+    if (loading || isRefreshing || runningAction) return;
+    setCodexProvidersSnapshot(codexProvidersData ?? null);
+  }, [codexProvidersData, loading, isRefreshing, runningAction]);
+
+  useEffect(() => {
+    if (loading || isRefreshing || runningAction) return;
+    setGeminiProvidersSnapshot(geminiProvidersData ?? null);
+  }, [geminiProvidersData, loading, isRefreshing, runningAction]);
+
+  useEffect(() => {
+    if (loading || isRefreshing || runningAction) return;
+    setOpenclawProvidersSnapshot(openclawProvidersData ?? null);
+  }, [openclawProvidersData, loading, isRefreshing, runningAction]);
+
   const loadStatus = async ({ showRefreshState = false } = {}) => {
     if (showRefreshState) {
       setIsRefreshing(true);
@@ -948,38 +1159,67 @@ export function BusinessQuickAccess({
     setPageError(null);
     try {
       if (isClaude) {
-        setClaudeStatus(
-          await withTimeout(
+        const [nextStatus, nextProviders] = await Promise.all([
+          withTimeout(
             installerApi.getClaudeStatus(),
             5000,
             "Claude 状态读取超时，请点击“刷新状态”重试。",
           ),
-        );
-        void queryClient.invalidateQueries({ queryKey: ["providers", "claude"] });
+          queryClient.fetchQuery({
+            queryKey: providersQueryKey("claude"),
+            queryFn: async () => fetchProvidersQueryData("claude"),
+            staleTime: 0,
+          }),
+        ]);
+        setClaudeStatus(nextStatus);
+        setClaudeProvidersSnapshot(nextProviders);
       } else if (isCodex) {
-        setCodexStatus(
-          await withTimeout(
+        const [nextStatus, nextProviders] = await Promise.all([
+          withTimeout(
             installerApi.getCodexStatus(),
             5000,
             "Codex 状态读取超时，请点击“刷新状态”重试。",
           ),
-        );
-        void queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
+          queryClient.fetchQuery({
+            queryKey: providersQueryKey("codex"),
+            queryFn: async () => fetchProvidersQueryData("codex"),
+            staleTime: 0,
+          }),
+        ]);
+        setCodexStatus(nextStatus);
+        setCodexProvidersSnapshot(nextProviders);
       } else if (isGemini) {
-        setGeminiStatus(
-          await withTimeout(
+        const [nextStatus, nextProviders] = await Promise.all([
+          withTimeout(
             installerApi.getGeminiStatus(),
             5000,
             "Gemini 状态读取超时，请点击“刷新状态”重试。",
           ),
-        );
-        void queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
+          queryClient.fetchQuery({
+            queryKey: providersQueryKey("gemini"),
+            queryFn: async () => fetchProvidersQueryData("gemini"),
+            staleTime: 0,
+          }),
+        ]);
+        setGeminiStatus(nextStatus);
+        setGeminiProvidersSnapshot(nextProviders);
       } else if (isOpenClaw) {
-        void Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["providers", "openclaw"] }),
-          queryClient.invalidateQueries({ queryKey: openclawKeys.liveProviderIds }),
-          queryClient.invalidateQueries({ queryKey: openclawKeys.defaultModel }),
-          queryClient.invalidateQueries({ queryKey: openclawKeys.agentsDefaults }),
+        const nextProviders = await queryClient.fetchQuery({
+          queryKey: providersQueryKey("openclaw"),
+          queryFn: async () => fetchProvidersQueryData("openclaw"),
+          staleTime: 0,
+        });
+        setOpenclawProvidersSnapshot(nextProviders);
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: openclawKeys.liveProviderIds,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: openclawKeys.defaultModel,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: openclawKeys.agentsDefaults,
+          }),
           queryClient.invalidateQueries({ queryKey: openclawKeys.tools }),
           queryClient.invalidateQueries({ queryKey: openclawKeys.health }),
         ]);
@@ -1002,6 +1242,14 @@ export function BusinessQuickAccess({
       setLoading(false);
     })();
   }, [appId]);
+
+  useEffect(() => {
+    if (externalRefreshTokenRef.current === externalRefreshToken) {
+      return;
+    }
+    externalRefreshTokenRef.current = externalRefreshToken;
+    void loadStatus();
+  }, [appId, externalRefreshToken]);
 
   const runAction = async (
     id: string,
@@ -1095,47 +1343,94 @@ export function BusinessQuickAccess({
     openclawTools?.profile,
   ]);
   const selectedOpenClawConfig = OPENCLAW_ROUTE_CONFIG[openclawRoute];
-  const activeClaudeRoute = useMemo<ClaudeEntryOption | "custom" | null>(() => {
-    const providerRoute = getClaudeRouteFromProvider(
-      claudeCurrentProviderId,
-      claudeCurrentProvider,
-    );
-    if (providerRoute) return providerRoute;
-    if (claudeStatus?.current_route === "改版") return "modified";
-    if (claudeStatus?.current_route === "gaccode") {
-      return "gaccode";
-    }
-    if (claudeStatus?.current_route) {
-      return "custom";
-    }
-    return claudeCurrentProviderId || claudeCurrentProvider ? "custom" : null;
-  }, [claudeCurrentProvider, claudeCurrentProviderId, claudeStatus]);
+  const claudeProviderRoute = useMemo(
+    () =>
+      getClaudeRouteFromProvider(
+        claudeCurrentProviderId,
+        claudeCurrentProvider,
+      ),
+    [claudeCurrentProvider, claudeCurrentProviderId],
+  );
+  const codexProviderRoute = useMemo(
+    () =>
+      getCodexRouteFromProvider(codexCurrentProviderId, codexCurrentProvider),
+    [codexCurrentProvider, codexCurrentProviderId],
+  );
+  const geminiProviderRoute = useMemo(
+    () =>
+      getGeminiRouteFromProvider(
+        geminiCurrentProviderId,
+        geminiCurrentProvider,
+      ),
+    [geminiCurrentProvider, geminiCurrentProviderId],
+  );
+  const installerClaudeRoute = getClaudeInstallerRoute(claudeStatusView);
+  const installerCodexRoute = getCodexInstallerRoute(codexStatusView);
+  const installerGeminiRoute = getGeminiInstallerRoute(geminiStatusView);
+  const claudeUsingModifiedVariant =
+    claudeStatusView.resolved_variant === "modified";
+  const codexUsingModifiedVariant = codexStatusView.resolved_variant === "gac";
+  const geminiUsingModifiedVariant =
+    geminiStatusView.resolved_variant === "gac";
+  const activeClaudeRoute = useMemo<
+    ClaudeEntryOption | "modified" | "custom" | null
+  >(() => {
+    return resolveDisplayedBusinessRoute({
+      providerRoute: claudeProviderRoute,
+      installerRoute: installerClaudeRoute,
+      usingModifiedVariant: claudeUsingModifiedVariant,
+      modifiedRoute: "modified",
+      hasCurrentProvider: Boolean(
+        claudeCurrentProviderId || claudeCurrentProvider,
+      ),
+    });
+  }, [
+    claudeCurrentProvider,
+    claudeCurrentProviderId,
+    claudeUsingModifiedVariant,
+    claudeProviderRoute,
+    installerClaudeRoute,
+  ]);
 
-  const activeCodexRoute = useMemo<CodexEntryOption | "gac-modified" | "custom" | null>(() => {
-    const providerRoute = getCodexRouteFromProvider(
-      codexCurrentProviderId,
-      codexCurrentProvider,
-    );
-    if (providerRoute) return providerRoute;
-    if (codexStatus?.install_type === "gac") return "gac-modified";
-    if (codexStatus?.current_route === "codex") return "tuzi-coding";
-    if (codexStatus?.current_route === "gac") return "gac";
-    if (codexStatus?.current_route === "tuzi") return "tuzi";
-    if (codexStatus?.current_route) return "custom";
-    return codexCurrentProviderId || codexCurrentProvider ? "custom" : null;
-  }, [codexCurrentProvider, codexCurrentProviderId, codexStatus]);
+  const activeCodexRoute = useMemo<
+    CodexEntryOption | "gac-modified" | "custom" | null
+  >(() => {
+    return resolveDisplayedBusinessRoute({
+      providerRoute: codexProviderRoute,
+      installerRoute: installerCodexRoute,
+      usingModifiedVariant: codexUsingModifiedVariant,
+      modifiedRoute: "gac-modified",
+      hasCurrentProvider: Boolean(
+        codexCurrentProviderId || codexCurrentProvider,
+      ),
+    });
+  }, [
+    codexCurrentProvider,
+    codexCurrentProviderId,
+    codexUsingModifiedVariant,
+    codexProviderRoute,
+    installerCodexRoute,
+  ]);
 
-  const activeGeminiRoute = useMemo<GeminiEntryOption | "gac-modified" | "custom" | null>(() => {
-    const providerRoute = getGeminiRouteFromProvider(
-      geminiCurrentProviderId,
-      geminiCurrentProvider,
-    );
-    if (providerRoute) return providerRoute;
-    if (geminiStatus?.install_type === "gac") return "gac-modified";
-    if (geminiStatus?.current_route === "tuzi") return "tuzi";
-    if (geminiStatus?.current_route) return "custom";
-    return geminiCurrentProviderId || geminiCurrentProvider ? "custom" : null;
-  }, [geminiCurrentProvider, geminiCurrentProviderId, geminiStatus]);
+  const activeGeminiRoute = useMemo<
+    GeminiEntryOption | "gac-modified" | "custom" | null
+  >(() => {
+    return resolveDisplayedBusinessRoute({
+      providerRoute: geminiProviderRoute,
+      installerRoute: installerGeminiRoute,
+      usingModifiedVariant: geminiUsingModifiedVariant,
+      modifiedRoute: "gac-modified",
+      hasCurrentProvider: Boolean(
+        geminiCurrentProviderId || geminiCurrentProvider,
+      ),
+    });
+  }, [
+    geminiCurrentProvider,
+    geminiCurrentProviderId,
+    geminiUsingModifiedVariant,
+    geminiProviderRoute,
+    installerGeminiRoute,
+  ]);
 
   const claudeSelectedRoute = claudeSelectionTouched
     ? claudeEntryOption
@@ -1152,71 +1447,147 @@ export function BusinessQuickAccess({
     : activeGeminiRoute === "custom"
       ? null
       : activeGeminiRoute;
+  const claudePanelRoute = claudeSelectedRoute ?? claudeEntryOption;
+  const codexPanelRoute = codexSelectedRoute ?? codexEntryOption;
+  const geminiPanelRoute = geminiSelectedRoute ?? geminiEntryOption;
   const hasClaudeTuziRoute = hasNamedRoute(claudeStatusView.routes, "tu-zi");
   const hasClaudeGacRoute = hasNamedRoute(claudeStatusView.routes, "gaccode");
   const hasCodexTuziRoute = hasNamedRoute(codexStatusView.routes, "tuzi");
   const hasCodexCodingRoute = hasNamedRoute(codexStatusView.routes, "codex");
   const hasCodexGacRoute = hasNamedRoute(codexStatusView.routes, "gac");
   const hasGeminiTuziRoute = hasNamedRoute(geminiStatusView.routes, "tuzi");
-  const installerClaudeRoute = getClaudeInstallerRoute(claudeStatusView);
-  const installerGeminiRoute = getGeminiInstallerRoute(geminiStatusView);
+  const claudeSourceConflict = Boolean(claudeStatusView.sources_conflict);
   const claudeRouteMismatch = Boolean(
-    activeClaudeRoute &&
-      installerClaudeRoute &&
-      activeClaudeRoute !== installerClaudeRoute,
+    claudeProviderRoute &&
+      activeClaudeRoute &&
+      claudeProviderRoute !== activeClaudeRoute,
+  );
+  const codexRouteMismatch = Boolean(
+    codexProviderRoute &&
+      activeCodexRoute &&
+      codexProviderRoute !== activeCodexRoute,
   );
   const geminiRouteMismatch = Boolean(
-    activeGeminiRoute &&
-      installerGeminiRoute &&
-      activeGeminiRoute !== installerGeminiRoute,
+    geminiProviderRoute &&
+      activeGeminiRoute &&
+      geminiProviderRoute !== activeGeminiRoute,
   );
+  const claudeVariantConflict = Boolean(claudeStatusView.variant_conflict);
+  const claudeRuntimeEnvConflict = Boolean(
+    claudeStatusView.runtime_env_conflict,
+  );
+  const codexVariantConflict = Boolean(codexStatusView.variant_conflict);
+  const geminiVariantConflict = Boolean(geminiStatusView.variant_conflict);
   const claudeVersionLabel = getInstalledVersionLabel(
     claudeStatusView.installed,
     claudeStatusView.version,
+    claudeStatusView.latest_version,
   );
   const codexVersionLabel = getInstalledVersionLabel(
     codexStatusView.installed,
     codexStatusView.version,
+    codexStatusView.latest_version,
   );
   const geminiVersionLabel = getInstalledVersionLabel(
     geminiStatusView.installed,
     geminiStatusView.version,
+    geminiStatusView.latest_version,
+  );
+  const claudeIsLatestVersion = isLatestInstalledVersion(
+    claudeStatusView.installed,
+    claudeStatusView.version,
+    claudeStatusView.latest_version,
+  );
+  const codexIsLatestVersion = isLatestInstalledVersion(
+    codexStatusView.installed,
+    codexStatusView.version,
+    codexStatusView.latest_version,
+  );
+  const geminiIsLatestVersion = isLatestInstalledVersion(
+    geminiStatusView.installed,
+    geminiStatusView.version,
+    geminiStatusView.latest_version,
+  );
+  const claudeCliVariantLabel = getCliVariantLabel(
+    claudeStatusView.installed,
+    claudeStatusView.resolved_variant,
+    ["original"],
+    ["modified"],
+  );
+  const codexCliVariantLabel = getCliVariantLabel(
+    codexStatusView.installed,
+    codexStatusView.resolved_variant,
+    ["openai"],
+    ["gac"],
+  );
+  const geminiCliVariantLabel = getCliVariantLabel(
+    geminiStatusView.installed,
+    geminiStatusView.resolved_variant,
+    ["official"],
+    ["gac"],
   );
   const claudeCurrentRouteLabel =
-    claudeCurrentProvider?.name || getClaudeRouteLabel(activeClaudeRoute);
+    !claudeUsingModifiedVariant &&
+    claudeCurrentProvider?.name &&
+    claudeProviderRoute &&
+    activeClaudeRoute &&
+    claudeProviderRoute === activeClaudeRoute
+      ? claudeCurrentProvider.name
+      : getClaudeRouteLabel(activeClaudeRoute);
   const codexCurrentRouteLabel =
-    codexCurrentProvider?.name || getCodexRouteLabel(activeCodexRoute);
+    !codexUsingModifiedVariant &&
+    codexCurrentProvider?.name &&
+    codexProviderRoute &&
+    activeCodexRoute &&
+    codexProviderRoute === activeCodexRoute
+      ? codexCurrentProvider.name
+      : getCodexRouteLabel(activeCodexRoute);
   const geminiCurrentRouteLabel =
-    geminiCurrentProvider?.name || getGeminiRouteLabel(activeGeminiRoute);
+    !geminiUsingModifiedVariant &&
+    geminiCurrentProvider?.name &&
+    geminiProviderRoute &&
+    activeGeminiRoute &&
+    geminiProviderRoute === activeGeminiRoute
+      ? geminiCurrentProvider.name
+      : getGeminiRouteLabel(activeGeminiRoute);
   const claudeCurrentBaseUrl =
-    getProviderBaseUrl(claudeCurrentProvider) ||
-    getCurrentRouteBaseUrl(claudeStatusView.routes);
+    !claudeUsingModifiedVariant && !claudeRouteMismatch
+      ? getProviderBaseUrl(claudeCurrentProvider) ||
+        getClaudeStatusBaseUrl(claudeStatusView)
+      : getClaudeStatusBaseUrl(claudeStatusView);
   const codexCurrentBaseUrl =
-    getProviderBaseUrl(codexCurrentProvider) ||
-    getCurrentRouteBaseUrl(codexStatusView.routes);
+    !codexUsingModifiedVariant && !codexRouteMismatch
+      ? getProviderBaseUrl(codexCurrentProvider) ||
+        getCodexStatusBaseUrl(activeCodexRoute, codexStatusView)
+      : getCodexStatusBaseUrl(activeCodexRoute, codexStatusView);
   const geminiCurrentBaseUrl =
-    getProviderBaseUrl(geminiCurrentProvider) ||
-    geminiStatusView.env_summary.google_gemini_base_url ||
-    getCurrentRouteBaseUrl(geminiStatusView.routes);
+    !geminiUsingModifiedVariant && !geminiRouteMismatch
+      ? getProviderBaseUrl(geminiCurrentProvider) ||
+        getGeminiStatusBaseUrl(activeGeminiRoute, geminiStatusView)
+      : getGeminiStatusBaseUrl(activeGeminiRoute, geminiStatusView);
 
   useEffect(() => {
     if (!isCodex || !codexStatus) return;
 
     const currentRouteName =
-      codexStatus.current_route ||
-      (activeCodexRoute === "tuzi"
+      activeCodexRoute === "tuzi"
         ? "tuzi"
         : activeCodexRoute === "tuzi-coding"
           ? "codex"
           : activeCodexRoute === "gac"
             ? "gac"
-            : null);
+            : !codexUsingModifiedVariant
+              ? codexStatus.current_route
+              : null;
 
     if (!currentRouteName) return;
 
-    const currentRoute = codexStatus.routes.find((route) => route.name === currentRouteName);
+    const currentRoute = codexStatus.routes.find(
+      (route) => route.name === currentRouteName,
+    );
     const model = currentRoute?.model_settings?.model?.trim();
-    const reasoning = currentRoute?.model_settings?.model_reasoning_effort?.trim();
+    const reasoning =
+      currentRoute?.model_settings?.model_reasoning_effort?.trim();
 
     if (model) {
       setCodexModel(model);
@@ -1345,7 +1716,7 @@ export function BusinessQuickAccess({
   ) => {
     const routeConfig = CLAUDE_ROUTE_CONFIG[route];
     const providerMap = {
-      ...(claudeProvidersData?.providers || {}),
+      ...(claudeProvidersView?.providers || {}),
       ...(providers || {}),
     };
     const target = resolveBusinessRouteProviderTarget(
@@ -1362,6 +1733,14 @@ export function BusinessQuickAccess({
       "由兔子业务一键接入自动生成",
       target.altIndex,
     );
+    const nextEnv = {
+      ...(target.existingProvider?.settingsConfig?.env || {}),
+      ANTHROPIC_BASE_URL: routeConfig.baseUrl,
+      ANTHROPIC_API_KEY: apiKey,
+    } as Record<string, unknown>;
+    delete nextEnv.ANTHROPIC_AUTH_TOKEN;
+    delete nextEnv.ANTHROPIC_API_TOKEN;
+
     const provider: Provider = {
       ...target.existingProvider,
       id: target.targetProviderId,
@@ -1377,10 +1756,8 @@ export function BusinessQuickAccess({
         businessLine: route === "gaccode" ? "gac" : "tuzi",
       },
       settingsConfig: {
-        env: {
-          ANTHROPIC_BASE_URL: routeConfig.baseUrl,
-          ANTHROPIC_AUTH_TOKEN: apiKey,
-        },
+        ...(target.existingProvider?.settingsConfig || {}),
+        env: nextEnv,
       },
     };
 
@@ -1390,7 +1767,9 @@ export function BusinessQuickAccess({
       await providersApi.update(provider, "claude", target.targetProviderId);
     }
 
-    await providersApi.switch(target.targetProviderId, "claude");
+    await providersApi.switch(target.targetProviderId, "claude", {
+      skipBackfill: true,
+    });
     await queryClient.invalidateQueries({ queryKey: ["providers", "claude"] });
   };
 
@@ -1420,10 +1799,11 @@ export function BusinessQuickAccess({
     route: CodexBusinessRoute,
     apiKey: string,
     model: string,
+    reasoningEffort: string,
   ) => {
     const routeConfig = CODEX_ROUTE_CONFIG[route];
     const providerMap = {
-      ...(codexProvidersData?.providers || {}),
+      ...(codexProvidersView?.providers || {}),
       ...(providers || {}),
     };
     const target = resolveBusinessRouteProviderTarget(
@@ -1458,7 +1838,12 @@ export function BusinessQuickAccess({
       },
       settingsConfig: {
         auth: generateThirdPartyAuth(apiKey),
-        config: buildCodexBusinessConfig(route, routeConfig.baseUrl, model),
+        config: buildCodexBusinessConfig(
+          route,
+          routeConfig.baseUrl,
+          model,
+          reasoningEffort,
+        ),
       },
     };
 
@@ -1474,40 +1859,42 @@ export function BusinessQuickAccess({
     await queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
   };
 
-  const installCodexBusinessRoute = async (): Promise<InstallerActionResult> => {
-    if (codexEntryOption === "gac-modified") {
-      return await installerApi.installCodex({ variant: "gac" });
-    }
+  const installCodexBusinessRoute =
+    async (): Promise<InstallerActionResult> => {
+      if (codexPanelRoute === "gac-modified") {
+        return await installerApi.installCodex({ variant: "gac" });
+      }
 
-    const trimmedKey = codexApiKey.trim();
-    const trimmedModel = codexModel.trim() || "gpt-5.4";
-    const trimmedReasoning = codexReasoning.trim() || "medium";
-    const selectedRoute: CodexBusinessRoute =
-      codexEntryOption === "gac"
-        ? "gac"
-        : codexEntryOption === "tuzi-coding"
-          ? "codex"
-          : "tuzi";
-    const result = await installerApi.installCodex({
-      variant: "openai",
-      route: selectedRoute,
-      apiKey: trimmedKey,
-      model: trimmedModel,
-      modelReasoningEffort: trimmedReasoning,
-    });
+      const trimmedKey = codexApiKey.trim();
+      const trimmedModel = codexModel.trim() || "gpt-5.4";
+      const trimmedReasoning = codexReasoning.trim() || "medium";
+      const selectedRoute: CodexBusinessRoute =
+        codexPanelRoute === "gac"
+          ? "gac"
+          : codexPanelRoute === "tuzi-coding"
+            ? "codex"
+            : "tuzi";
+      const result = await installerApi.installCodex({
+        variant: "openai",
+        route: selectedRoute,
+        apiKey: trimmedKey,
+        model: trimmedModel,
+        modelReasoningEffort: trimmedReasoning,
+      });
 
-    if (!result.success) {
+      if (!result.success) {
+        return result;
+      }
+
+      await syncCodexBusinessProvider(
+        selectedRoute,
+        trimmedKey,
+        trimmedModel,
+        trimmedReasoning,
+      );
+      setCodexApiKey("");
       return result;
-    }
-
-    await syncCodexBusinessProvider(
-      selectedRoute,
-      trimmedKey,
-      trimmedModel,
-    );
-    setCodexApiKey("");
-    return result;
-  };
+    };
 
   const syncGeminiBusinessProvider = async (
     route: GeminiBusinessRoute,
@@ -1516,7 +1903,7 @@ export function BusinessQuickAccess({
   ) => {
     const routeConfig = GEMINI_ROUTE_CONFIG[route];
     const providerMap = {
-      ...(geminiProvidersData?.providers || {}),
+      ...(geminiProvidersView?.providers || {}),
       ...(providers || {}),
     };
     const target = resolveBusinessRouteProviderTarget(
@@ -1568,29 +1955,55 @@ export function BusinessQuickAccess({
     await queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
   };
 
-  const installGeminiBusinessRoute = async (): Promise<InstallerActionResult> => {
-    if (geminiEntryOption === "gac-modified") {
-      return await installerApi.installGemini({ variant: "gac" });
-    }
+  const installGeminiBusinessRoute =
+    async (): Promise<InstallerActionResult> => {
+      if (geminiPanelRoute === "gac-modified") {
+        return await installerApi.installGemini({ variant: "gac" });
+      }
 
-    const trimmedKey = geminiApiKey.trim();
-    const trimmedModel = geminiModel.trim() || "gemini-2.5-pro";
-    const selectedRoute: GeminiBusinessRoute = "tuzi";
-    const result = await installerApi.installGemini({
-      variant: "official",
-      route: selectedRoute,
-      apiKey: trimmedKey,
-      model: trimmedModel,
-    });
+      const trimmedKey = geminiApiKey.trim();
+      const trimmedModel = geminiModel.trim() || "gemini-2.5-pro";
+      const selectedRoute: GeminiBusinessRoute = "tuzi";
+      const result = await installerApi.installGemini({
+        variant: "official",
+        route: selectedRoute,
+        apiKey: trimmedKey,
+        model: trimmedModel,
+      });
 
-    if (!result.success) {
+      if (!result.success) {
+        return result;
+      }
+
+      await syncGeminiBusinessProvider(selectedRoute, trimmedKey, trimmedModel);
+      setGeminiApiKey("");
       return result;
-    }
+    };
 
-    await syncGeminiBusinessProvider(selectedRoute, trimmedKey, trimmedModel);
-    setGeminiApiKey("");
+  const switchClaudeModifiedUsage =
+    async (): Promise<InstallerActionResult> => {
+      const targetVariant = claudeUsingModifiedVariant
+        ? "original"
+        : "modified";
+      const result = await installerApi.switchClaudeVariant(targetVariant);
+      setClaudeSelectionTouched(false);
+      return result;
+    };
+
+  const switchCodexModifiedUsage = async (): Promise<InstallerActionResult> => {
+    const targetVariant = codexUsingModifiedVariant ? "openai" : "gac";
+    const result = await installerApi.switchCodexVariant(targetVariant);
+    setCodexSelectionTouched(false);
     return result;
   };
+
+  const switchGeminiModifiedUsage =
+    async (): Promise<InstallerActionResult> => {
+      const targetVariant = geminiUsingModifiedVariant ? "official" : "gac";
+      const result = await installerApi.switchGeminiVariant(targetVariant);
+      setGeminiSelectionTouched(false);
+      return result;
+    };
 
   if (!isClaude && !isCodex && !isGemini && !isOpenClaw) return null;
 
@@ -1599,7 +2012,9 @@ export function BusinessQuickAccess({
       <CardContent className="space-y-5 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className={`flex items-center justify-center rounded-2xl dark:bg-black/10 ${heroIconClassName}`}>
+            <div
+              className={`flex items-center justify-center rounded-2xl dark:bg-black/10 ${heroIconClassName}`}
+            >
               {isClaude ? (
                 <ClaudeIcon size={26} />
               ) : isCodex ? (
@@ -1624,20 +2039,27 @@ export function BusinessQuickAccess({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 刷新中...
               </>
-            ) : lastRefreshedAt
-              ? `刷新状态 · ${new Date(lastRefreshedAt).toLocaleTimeString("zh-CN", {
+            ) : lastRefreshedAt ? (
+              `刷新状态 · ${new Date(lastRefreshedAt).toLocaleTimeString(
+                "zh-CN",
+                {
                   hour: "2-digit",
                   minute: "2-digit",
                   second: "2-digit",
-                })}`
-              : "刷新状态"}
+                },
+              )}`
+            ) : (
+              "刷新状态"
+            )}
           </Button>
         </div>
 
         {loading ? (
           <div className="rounded-2xl border border-border/60 bg-background/80 px-4 py-6 text-sm text-muted-foreground dark:border-white/10 dark:bg-white/4">
             正在读取当前配置状态...
-            {(isClaude || isCodex || isGemini) ? " 你现在也可以直接使用下方路线管理继续配置。" : ""}
+            {isClaude || isCodex || isGemini
+              ? " 你现在也可以直接使用下方路线管理继续配置。"
+              : ""}
           </div>
         ) : null}
 
@@ -1673,12 +2095,18 @@ export function BusinessQuickAccess({
 
         {isClaude ? (
           <>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <Stat
                 label="当前线路"
                 value={claudeCurrentRouteLabel}
                 compact
                 valueTitle={claudeCurrentRouteLabel}
+              />
+              <Stat
+                label="CLI 变体"
+                value={claudeCliVariantLabel}
+                compact
+                valueTitle={claudeCliVariantLabel}
               />
               <Stat
                 label="版本"
@@ -1691,14 +2119,21 @@ export function BusinessQuickAccess({
                       size="sm"
                       onClick={() =>
                         void runAction("claude-upgrade", () =>
-                          installerApi.upgradeClaudeCode(
-                            claudeStatusView.current_route === "改版"
-                              ? "modified"
-                              : "original",
-                          ),
+                          installerApi.upgradeClaudeCode("original"),
                         )
                       }
-                      disabled={!!runningAction}
+                      disabled={
+                        !!runningAction ||
+                        claudeUsingModifiedVariant ||
+                        claudeIsLatestVersion
+                      }
+                      title={
+                        claudeUsingModifiedVariant
+                          ? "请先退出使用改版后再升级原版"
+                          : claudeIsLatestVersion
+                            ? "当前已是最新版"
+                            : undefined
+                      }
                       className="h-7 gap-1.5 px-2 text-[11px]"
                     >
                       {runningAction === "claude-upgrade" ? (
@@ -1719,10 +2154,31 @@ export function BusinessQuickAccess({
                 valueClassName="break-all whitespace-normal leading-5"
               />
             </div>
+            {claudeVariantConflict ? (
+              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                检测到 Claude 当前业务线路记录与实际命中的 CLI
+                变体不一致。顶部“CLI 变体”和“版本”已按真实命中的 Claude
+                显示；重新执行目标线路配置后会自动纠正到对应变体。
+              </div>
+            ) : null}
+            {claudeSourceConflict ? (
+              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                检测到 Claude
+                本地配置来源不一致。这条提示仅用于诊断；顶部当前线路和 Base URL
+                仍优先按当前 provider 与实际 CLI
+                变体显示。如需收口到同一条线路，可重新执行一次配置或切换操作。
+              </div>
+            ) : null}
+            {claudeRuntimeEnvConflict ? (
+              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                当前 app/终端会话仍继承旧 Claude
+                环境；文件配置已切回原版，但需重新打开终端或重启应用后，运行时环境才会完全生效。
+              </div>
+            ) : null}
             {claudeRouteMismatch ? (
               <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                当前页面显示的线路以已切换的 provider 为准；CLI 安装器记录仍显示为
-                {` ${getClaudeRouteLabel(installerClaudeRoute)} `}
+                顶部状态已按 Claude 实际启用线路显示；当前 provider 仍停留在
+                {` ${getClaudeRouteLabel(claudeProviderRoute)} `}
                 ，两边暂时不一致。
               </div>
             ) : null}
@@ -1732,7 +2188,6 @@ export function BusinessQuickAccess({
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <RouteCard
                   title="Claude · 兔子线路"
-                  description="适合希望直接接入兔子服务的使用场景。"
                   meta="Base URL: https://api.tu-zi.com"
                   status={
                     activeClaudeRoute === "tu-zi"
@@ -1751,7 +2206,6 @@ export function BusinessQuickAccess({
                 />
                 <RouteCard
                   title="Claude · gac 线路"
-                  description="适合已经在使用 gac 服务的场景。"
                   meta="Base URL: https://gaccode.com/claudecode"
                   status={
                     activeClaudeRoute === "gaccode"
@@ -1769,9 +2223,7 @@ export function BusinessQuickAccess({
                   }}
                 />
                 <RouteCard
-                  title="兔子改版 Claude"
-                  description="适合希望直接使用改版 Claude 体验的场景。"
-                  meta="无需额外输入 Key，直接写入改版 Claude。"
+                  title="gac 改版 Claude"
                   status={
                     activeClaudeRoute === "modified"
                       ? "已接入"
@@ -1786,78 +2238,90 @@ export function BusinessQuickAccess({
                   }}
                 />
               </div>
-              <div className="mt-4 grid gap-3">
-                {claudeEntryOption === "gaccode" ? (
-                  <Input
-                    type="password"
-                    value={claudeGacKey}
-                    onChange={(event) => setClaudeGacKey(event.target.value)}
-                    placeholder="输入 gac API Key"
-                  />
-                ) : claudeEntryOption === "tu-zi" ? (
-                  <Input
-                    type="password"
-                    value={claudeTuziKey}
-                    onChange={(event) => setClaudeTuziKey(event.target.value)}
-                    placeholder="输入兔子 API Key"
-                  />
-                ) : (
-                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-                    当前方案不需要额外输入 Key，适合希望直接交付改版 Claude 的场景。
-                    当前方案不需要额外输入 Key，完成后即可直接开始使用。
-                  </div>
-                )}
-              </div>
-              <ResultHint
-                target={
-                  claudeEntryOption === "modified"
-                    ? "写入改版 Claude 客户端"
-                    : claudeEntryOption === "gaccode"
-                      ? "写入 gac Claude 线路"
-                      : "写入 Claude · 兔子线路"
-                }
-                syncHint="自动同步配置状态，并在下方列表显示对应入口"
-              />
-              <Button
-                onClick={() =>
-                  void runAction(
-                    claudeEntryOption === "modified"
-                      ? "claude-install-a"
-                      : claudeEntryOption === "gaccode"
+              {claudePanelRoute === "gaccode" ||
+              claudePanelRoute === "tu-zi" ? (
+                <div className="mt-4 grid gap-3">
+                  {claudePanelRoute === "gaccode" ? (
+                    <Input
+                      type="password"
+                      value={claudeGacKey}
+                      onChange={(event) => setClaudeGacKey(event.target.value)}
+                      placeholder="输入 gac API Key"
+                    />
+                  ) : (
+                    <Input
+                      type="password"
+                      value={claudeTuziKey}
+                      onChange={(event) => setClaudeTuziKey(event.target.value)}
+                      placeholder="输入兔子 API Key"
+                    />
+                  )}
+                </div>
+              ) : null}
+              {claudePanelRoute === "modified" ? (
+                <Button
+                  onClick={() =>
+                    void runAction(
+                      activeClaudeRoute === "modified"
+                        ? "claude-switch-original"
+                        : "claude-switch-modified",
+                      switchClaudeModifiedUsage,
+                    )
+                  }
+                  disabled={!!runningAction}
+                  className="mt-4 gap-2"
+                >
+                  {runningAction === "claude-switch-original" ||
+                  runningAction === "claude-switch-modified" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Wrench className="h-4 w-4" />
+                  )}
+                  {claudeUsingModifiedVariant ? "退出使用改版" : "选择使用改版"}
+                </Button>
+              ) : (
+                <Button
+                  onClick={() =>
+                    void runAction(
+                      claudePanelRoute === "gaccode"
                         ? "claude-install-b"
                         : "claude-install-c",
-                    () =>
-                      claudeEntryOption === "modified"
-                        ? installerApi.installClaudeCode("A")
-                        : claudeEntryOption === "gaccode"
+                      () =>
+                        claudePanelRoute === "gaccode"
                           ? installClaudeBusinessRoute("B", claudeGacKey)
                           : installClaudeBusinessRoute("C", claudeTuziKey),
-                  )
-                }
-                disabled={!!runningAction}
-                className="mt-4 gap-2"
-              >
-                {runningAction === "claude-install-a" ||
-                runningAction === "claude-install-b" ||
-                runningAction === "claude-install-c" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Wrench className="h-4 w-4" />
-                )}
-                立即配置
-              </Button>
+                    )
+                  }
+                  disabled={!!runningAction}
+                  className="mt-4 gap-2"
+                >
+                  {runningAction === "claude-install-b" ||
+                  runningAction === "claude-install-c" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Wrench className="h-4 w-4" />
+                  )}
+                  立即配置
+                </Button>
+              )}
             </div>
           </>
         ) : null}
 
         {isCodex ? (
           <>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <Stat
                 label="当前线路"
                 value={codexCurrentRouteLabel}
                 compact
                 valueTitle={codexCurrentRouteLabel}
+              />
+              <Stat
+                label="CLI 变体"
+                value={codexCliVariantLabel}
+                compact
+                valueTitle={codexCliVariantLabel}
               />
               <Stat
                 label="版本"
@@ -1870,12 +2334,21 @@ export function BusinessQuickAccess({
                       size="sm"
                       onClick={() =>
                         void runAction("codex-upgrade", () =>
-                          installerApi.upgradeCodex(
-                            codexStatusView.install_type === "gac" ? "gac" : "openai",
-                          ),
+                          installerApi.upgradeCodex("openai"),
                         )
                       }
-                      disabled={!!runningAction}
+                      disabled={
+                        !!runningAction ||
+                        codexUsingModifiedVariant ||
+                        codexIsLatestVersion
+                      }
+                      title={
+                        codexUsingModifiedVariant
+                          ? "请先退出使用改版后再升级原版"
+                          : codexIsLatestVersion
+                            ? "当前已是最新版"
+                            : undefined
+                      }
                       className="h-7 gap-1.5 px-2 text-[11px]"
                     >
                       {runningAction === "codex-upgrade" ? (
@@ -1896,13 +2369,19 @@ export function BusinessQuickAccess({
                 valueClassName="break-all whitespace-normal leading-5"
               />
             </div>
+            {codexVariantConflict ? (
+              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                检测到 Codex 当前业务线路记录与实际命中的 CLI
+                变体不一致。顶部“CLI 变体”和“版本”已按真实命中的 Codex
+                显示；重新执行目标线路配置后会自动纠正到对应变体。
+              </div>
+            ) : null}
 
             <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
               <div className="font-medium">Codex 路线管理</div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <RouteCard
                   title="Codex · 兔子线路"
-                  description="适合直接接入兔子主服务的场景。"
                   meta="Base URL: https://api.tu-zi.com/v1"
                   status={
                     activeCodexRoute === "tuzi"
@@ -1922,7 +2401,6 @@ export function BusinessQuickAccess({
                 />
                 <RouteCard
                   title="Codex · 兔子 Coding 特别线路"
-                  description="适合单独使用 Coding 业务线的场景。"
                   meta="Base URL: https://coding.tu-zi.com"
                   status={
                     activeCodexRoute === "tuzi-coding"
@@ -1942,8 +2420,7 @@ export function BusinessQuickAccess({
                 />
                 <RouteCard
                   title="Codex · gac 线路"
-                  description="适合已有 gac 使用基础的场景。"
-                  meta="沿用 gac 路线配置。"
+                  meta="Base URL: https://gaccode.com/codex/v1"
                   status={
                     activeCodexRoute === "gac"
                       ? "已接入"
@@ -1962,8 +2439,6 @@ export function BusinessQuickAccess({
                 />
                 <RouteCard
                   title="gac 改版 Codex"
-                  description="适合希望直接使用 gac 改版体验的场景。"
-                  meta="直接落地 gac 改版 Codex。"
                   status={
                     activeCodexRoute === "gac-modified"
                       ? "已接入"
@@ -1979,21 +2454,24 @@ export function BusinessQuickAccess({
                   }}
                 />
               </div>
-              <div className="mt-4 grid gap-3">
-                {codexEntryOption !== "gac-modified" ? (
+              {codexPanelRoute !== "gac-modified" ? (
+                <div className="mt-4 grid gap-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     <Input
                       type="password"
                       value={codexApiKey}
                       onChange={(event) => setCodexApiKey(event.target.value)}
-                      placeholder={`输入${codexEntryOption === "gac" ? "gac" : "兔子"} API Key`}
+                      placeholder={`输入${codexPanelRoute === "gac" ? "gac" : "兔子"} API Key`}
                     />
                     <Input
                       value={codexModel}
                       onChange={(event) => setCodexModel(event.target.value)}
                       placeholder="模型，如 gpt-5.4"
                     />
-                    <Select value={codexReasoning} onValueChange={setCodexReasoning}>
+                    <Select
+                      value={codexReasoning}
+                      onValueChange={setCodexReasoning}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="选择推理强度" />
                       </SelectTrigger>
@@ -2006,42 +2484,51 @@ export function BusinessQuickAccess({
                       </SelectContent>
                     </Select>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-                    当前方案会直接落地 gac 改版 Codex，不需要再填写路线 Key 或模型参数。
-                    当前方案不需要额外设置，完成后即可直接开始使用。
-                  </div>
-                )}
-              </div>
-              <ResultHint
-                target={
-                  codexEntryOption === "gac-modified"
-                    ? "写入 gac 改版 Codex"
-                    : codexEntryOption === "tuzi"
-                      ? "写入 Codex · 兔子线路"
-                      : codexEntryOption === "tuzi-coding"
-                        ? "写入 Codex · 兔子 Coding 特别线路"
-                        : "写入 Codex · gac 线路"
-                }
-                syncHint={
-                  codexEntryOption === "gac-modified"
-                    ? "保留 gac 改版 Codex 入口，并在下方列表显示当前模块"
-                    : "自动同步配置，并在下方列表显示对应入口"
-                }
-              />
+                </div>
+              ) : null}
               <div className="mt-3 flex flex-wrap gap-3">
-                <Button
-                  onClick={() => void runAction("codex-install-openai", installCodexBusinessRoute)}
-                  disabled={!!runningAction}
-                  className="gap-2"
-                >
-                  {runningAction === "codex-install-openai" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wrench className="h-4 w-4" />
-                  )}
-                  立即配置
-                </Button>
+                {codexPanelRoute === "gac-modified" ? (
+                  <Button
+                    onClick={() =>
+                      void runAction(
+                        activeCodexRoute === "gac-modified"
+                          ? "codex-switch-original"
+                          : "codex-switch-modified",
+                        switchCodexModifiedUsage,
+                      )
+                    }
+                    disabled={!!runningAction}
+                    className="gap-2"
+                  >
+                    {runningAction === "codex-switch-original" ||
+                    runningAction === "codex-switch-modified" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wrench className="h-4 w-4" />
+                    )}
+                    {codexUsingModifiedVariant
+                      ? "退出使用改版"
+                      : "选择使用改版"}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() =>
+                      void runAction(
+                        "codex-install-openai",
+                        installCodexBusinessRoute,
+                      )
+                    }
+                    disabled={!!runningAction}
+                    className="gap-2"
+                  >
+                    {runningAction === "codex-install-openai" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wrench className="h-4 w-4" />
+                    )}
+                    立即配置
+                  </Button>
+                )}
               </div>
             </div>
           </>
@@ -2049,12 +2536,18 @@ export function BusinessQuickAccess({
 
         {isGemini ? (
           <>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <Stat
                 label="当前线路"
                 value={geminiCurrentRouteLabel}
                 compact
                 valueTitle={geminiCurrentRouteLabel}
+              />
+              <Stat
+                label="CLI 变体"
+                value={geminiCliVariantLabel}
+                compact
+                valueTitle={geminiCliVariantLabel}
               />
               <Stat
                 label="版本"
@@ -2067,12 +2560,21 @@ export function BusinessQuickAccess({
                       size="sm"
                       onClick={() =>
                         void runAction("gemini-upgrade", () =>
-                          installerApi.upgradeGemini(
-                            geminiStatusView.install_type === "gac" ? "gac" : "official",
-                          ),
+                          installerApi.upgradeGemini("official"),
                         )
                       }
-                      disabled={!!runningAction}
+                      disabled={
+                        !!runningAction ||
+                        geminiUsingModifiedVariant ||
+                        geminiIsLatestVersion
+                      }
+                      title={
+                        geminiUsingModifiedVariant
+                          ? "请先退出使用改版后再升级原版"
+                          : geminiIsLatestVersion
+                            ? "当前已是最新版"
+                            : undefined
+                      }
                       className="h-7 gap-1.5 px-2 text-[11px]"
                     >
                       {runningAction === "gemini-upgrade" ? (
@@ -2093,10 +2595,17 @@ export function BusinessQuickAccess({
                 valueClassName="break-all whitespace-normal leading-5"
               />
             </div>
+            {geminiVariantConflict ? (
+              <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                检测到 Gemini 当前业务线路记录与实际命中的 CLI
+                变体不一致。顶部“CLI 变体”和“版本”已按真实命中的 Gemini
+                显示；重新执行目标线路配置后会自动纠正到对应变体。
+              </div>
+            ) : null}
             {geminiRouteMismatch ? (
               <div className="rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                当前页面显示的线路以已切换的 provider 为准；CLI 安装器记录仍显示为
-                {` ${getGeminiRouteLabel(installerGeminiRoute)} `}
+                顶部状态已按 CLI 实际启用线路显示；当前 provider 仍停留在
+                {` ${getGeminiRouteLabel(geminiProviderRoute)} `}
                 ，两边暂时不一致。
               </div>
             ) : null}
@@ -2106,7 +2615,6 @@ export function BusinessQuickAccess({
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <RouteCard
                   title="Gemini · 兔子线路"
-                  description="适合希望保留原版体验的场景。"
                   meta="Base URL: https://api.tu-zi.com"
                   status={
                     activeGeminiRoute === "tuzi"
@@ -2126,8 +2634,6 @@ export function BusinessQuickAccess({
                 />
                 <RouteCard
                   title="gac 改版 Gemini"
-                  description="适合希望直接使用 gac 改版体验的场景。"
-                  meta="直接落地 gac 改版 Gemini。"
                   status={
                     activeGeminiRoute === "gac-modified"
                       ? "已接入"
@@ -2143,8 +2649,8 @@ export function BusinessQuickAccess({
                   }}
                 />
               </div>
-              <div className="mt-4 grid gap-3">
-                {geminiEntryOption !== "gac-modified" ? (
+              {geminiPanelRoute !== "gac-modified" ? (
+                <div className="mt-4 grid gap-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     <Input
                       type="password"
@@ -2158,38 +2664,51 @@ export function BusinessQuickAccess({
                       placeholder="模型，如 gemini-2.5-pro"
                     />
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-                    当前方案会直接落地 gac 改版 Gemini，不需要再填写路线 Key 或模型参数。
-                    当前方案不需要额外设置，完成后即可直接开始使用。
-                  </div>
-                )}
-              </div>
-              <ResultHint
-                target={
-                  geminiEntryOption === "gac-modified"
-                    ? "写入 gac 改版 Gemini"
-                    : "写入 Gemini · 兔子线路"
-                }
-                syncHint={
-                  geminiEntryOption === "gac-modified"
-                    ? "保留 gac 改版 Gemini 入口，并在下方列表显示当前模块"
-                    : "自动同步配置状态，并在下方列表显示对应入口"
-                }
-              />
+                </div>
+              ) : null}
               <div className="mt-3 flex flex-wrap gap-3">
-                <Button
-                  onClick={() => void runAction("gemini-install", installGeminiBusinessRoute)}
-                  disabled={!!runningAction}
-                  className="gap-2"
-                >
-                  {runningAction === "gemini-install" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wrench className="h-4 w-4" />
-                  )}
-                  立即配置
-                </Button>
+                {geminiPanelRoute === "gac-modified" ? (
+                  <Button
+                    onClick={() =>
+                      void runAction(
+                        activeGeminiRoute === "gac-modified"
+                          ? "gemini-switch-original"
+                          : "gemini-switch-modified",
+                        switchGeminiModifiedUsage,
+                      )
+                    }
+                    disabled={!!runningAction}
+                    className="gap-2"
+                  >
+                    {runningAction === "gemini-switch-original" ||
+                    runningAction === "gemini-switch-modified" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wrench className="h-4 w-4" />
+                    )}
+                    {geminiUsingModifiedVariant
+                      ? "退出使用改版"
+                      : "选择使用改版"}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() =>
+                      void runAction(
+                        "gemini-install",
+                        installGeminiBusinessRoute,
+                      )
+                    }
+                    disabled={!!runningAction}
+                    className="gap-2"
+                  >
+                    {runningAction === "gemini-install" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wrench className="h-4 w-4" />
+                    )}
+                    立即配置
+                  </Button>
+                )}
               </div>
             </div>
           </>
@@ -2202,7 +2721,8 @@ export function BusinessQuickAccess({
                 label="当前默认线路"
                 value={
                   openclawStatus.inferredRoute
-                    ? OPENCLAW_ROUTE_CONFIG[openclawStatus.inferredRoute].optionLabel
+                    ? OPENCLAW_ROUTE_CONFIG[openclawStatus.inferredRoute]
+                        .optionLabel
                     : "--"
                 }
               />
@@ -2220,11 +2740,14 @@ export function BusinessQuickAccess({
 
             <div>
               <div className="rounded-2xl border border-border/60 bg-background/80 p-4 dark:border-white/10 dark:bg-white/4">
-                <div className="font-medium">业务线路接入</div>
+                <div className="font-medium">OpenClaw 路线管理</div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {(
                     Object.entries(OPENCLAW_ROUTE_CONFIG) as Array<
-                      [OpenClawRoute, (typeof OPENCLAW_ROUTE_CONFIG)[OpenClawRoute]]
+                      [
+                        OpenClawRoute,
+                        (typeof OPENCLAW_ROUTE_CONFIG)[OpenClawRoute],
+                      ]
                     >
                   ).map(([route, config]) => {
                     const isSelected = openclawRoute === route;
@@ -2241,8 +2764,7 @@ export function BusinessQuickAccess({
                       <RouteCard
                         key={route}
                         title={config.optionLabel}
-                        description={`${config.apiKeyLabel} / ${config.models[0]?.name}`}
-                        meta={config.baseUrl}
+                        meta={`Base URL: ${config.baseUrl}`}
                         status={
                           openclawStatus.inferredRoute === route
                             ? "默认使用"
@@ -2267,24 +2789,6 @@ export function BusinessQuickAccess({
                     placeholder={`输入${selectedOpenClawConfig.apiKeyLabel}`}
                   />
                 </div>
-                <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-                    将接入
-                    {` ${selectedOpenClawConfig.providerName} `}
-                    ，并同步更新默认模型指向的服务线路。
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-3 text-sm text-muted-foreground dark:bg-white/6">
-                    推荐模型共
-                    {` ${selectedOpenClawConfig.models.length} `}
-                    个，默认优先使用
-                    {` ${selectedOpenClawConfig.models[0]?.id} `}
-                    。
-                  </div>
-                </div>
-                <ResultHint
-                  target={`${selectedOpenClawConfig.label} ${selectedOpenClawConfig.baseUrl}`}
-                  syncHint="自动完成相关设置，并在下方列表显示对应入口"
-                />
                 <Button
                   onClick={() =>
                     void runAction("openclaw-configure", () =>

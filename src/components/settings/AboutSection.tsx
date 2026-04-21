@@ -35,8 +35,14 @@ interface AboutSectionProps {
 
 interface ToolVersion {
   name: string;
+  installed: boolean;
   version: string | null;
   latest_version: string | null;
+  resolved_version?: string | null;
+  resolved_executable_path?: string | null;
+  resolved_package_name?: string | null;
+  resolved_variant?: string | null;
+  variant_conflict?: boolean;
   error: string | null;
   env_type: "windows" | "wsl" | "macos" | "linux" | "unknown";
   wsl_distro: string | null;
@@ -454,7 +460,8 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
                 toolName === "opencode"
                   ? "OpenCode"
                   : toolName.charAt(0).toUpperCase() + toolName.slice(1);
-              const title = tool?.version || tool?.error || t("common.unknown");
+              const displayVersion = tool?.version || (tool?.installed ? t("common.installed") : null);
+              const title = displayVersion || tool?.error || t("common.unknown");
 
               return (
                 <motion.div
@@ -530,8 +537,9 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
                     </div>
                     {isLoadingTools || loadingTools[toolName] ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : tool?.version ? (
-                      tool.latest_version &&
+                    ) : displayVersion ? (
+                      tool?.latest_version &&
+                      tool?.version &&
                       tool.version !== tool.latest_version ? (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
                           {tool.latest_version}
@@ -549,8 +557,8 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
                   >
                     {isLoadingTools
                       ? t("common.loading")
-                      : tool?.version
-                        ? tool.version
+                      : displayVersion
+                        ? displayVersion
                         : tool?.error || t("common.notInstalled")}
                   </div>
                 </motion.div>

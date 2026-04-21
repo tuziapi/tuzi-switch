@@ -46,6 +46,33 @@ export interface ProvidersQueryData {
   currentProviderId: string;
 }
 
+export const providersQueryKey = (appId: AppId) =>
+  ["providers", appId] as const;
+
+export const fetchProvidersQueryData = async (
+  appId: AppId,
+): Promise<ProvidersQueryData> => {
+  let providers: Record<string, Provider> = {};
+  let currentProviderId = "";
+
+  try {
+    providers = await providersApi.getAll(appId);
+  } catch (error) {
+    console.error("获取供应商列表失败:", error);
+  }
+
+  try {
+    currentProviderId = await providersApi.getCurrent(appId);
+  } catch (error) {
+    console.error("获取当前供应商失败:", error);
+  }
+
+  return {
+    providers: sortProviders(providers),
+    currentProviderId,
+  };
+};
+
 export interface UseProvidersQueryOptions {
   isProxyRunning?: boolean; // 代理服务是否运行中
 }
@@ -57,32 +84,12 @@ export const useProvidersQuery = (
   const { isProxyRunning = false } = options || {};
 
   return useQuery({
-    queryKey: ["providers", appId],
+    queryKey: providersQueryKey(appId),
     placeholderData: keepPreviousData,
     // 当代理服务运行时，每 10 秒刷新一次供应商列表
     // 这样可以自动反映后端熔断器自动禁用代理目标的变更
     refetchInterval: isProxyRunning ? 10000 : false,
-    queryFn: async () => {
-      let providers: Record<string, Provider> = {};
-      let currentProviderId = "";
-
-      try {
-        providers = await providersApi.getAll(appId);
-      } catch (error) {
-        console.error("获取供应商列表失败:", error);
-      }
-
-      try {
-        currentProviderId = await providersApi.getCurrent(appId);
-      } catch (error) {
-        console.error("获取当前供应商失败:", error);
-      }
-
-      return {
-        providers: sortProviders(providers),
-        currentProviderId,
-      };
-    },
+    queryFn: async () => fetchProvidersQueryData(appId),
   });
 };
 

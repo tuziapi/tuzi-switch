@@ -348,9 +348,7 @@ pub async fn get_tuzi_workspace_summary(api_key: String) -> Result<TuziWorkspace
 
     Ok(TuziWorkspaceSummary {
         success: key_usage.success,
-        currency_symbol: key_usage
-            .currency_symbol
-            .unwrap_or_else(|| "$".to_string()),
+        currency_symbol: key_usage.currency_symbol.unwrap_or_else(|| "$".to_string()),
         balance: key_usage.balance.unwrap_or(0.0),
         used_today: 0.0,
         used_month: key_usage.used_amount.unwrap_or(0.0),
@@ -358,11 +356,9 @@ pub async fn get_tuzi_workspace_summary(api_key: String) -> Result<TuziWorkspace
         request_count_month: key_usage.request_count.unwrap_or(0),
         active_routes: 0,
         expires_at: key_usage.expires_at,
-        note: Some(
-            key_usage.note.unwrap_or_else(|| {
-                "当前工作台汇总接口仍在接入中，现阶段先复用 API Key 查询结果".to_string()
-            }),
-        ),
+        note: Some(key_usage.note.unwrap_or_else(|| {
+            "当前工作台汇总接口仍在接入中，现阶段先复用 API Key 查询结果".to_string()
+        })),
         error: key_usage.error,
     })
 }
@@ -450,7 +446,10 @@ fn read_i64(value: &Value, keys: &[&str]) -> Option<i64> {
     })
 }
 
-fn resolve_currency_symbol(status_data: &Value, quota_display_type: Option<&str>) -> Option<String> {
+fn resolve_currency_symbol(
+    status_data: &Value,
+    quota_display_type: Option<&str>,
+) -> Option<String> {
     match quota_display_type.unwrap_or("USD") {
         "CNY" => Some("¥".to_string()),
         "CUSTOM" => read_string(status_data, &["custom_currency_symbol"]).or(Some("¤".to_string())),

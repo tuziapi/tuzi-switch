@@ -12,8 +12,20 @@ export interface InstallerActionResult {
 export interface ClaudeInstallerStatus {
   installed: boolean;
   version: string | null;
+  latest_version?: string | null;
+  resolved_version?: string | null;
   current_route: string | null;
+  route_file_current_route?: string | null;
+  effective_base_url?: string | null;
+  resolved_executable_path?: string | null;
+  resolved_package_name?: string | null;
+  resolved_variant?: string | null;
+  variant_conflict?: boolean;
   route_file_exists: boolean;
+  settings_file_exists?: boolean;
+  sources_conflict?: boolean;
+  process_env_route?: string | null;
+  runtime_env_conflict?: boolean;
   routes: Array<{
     name: string;
     base_url: string | null;
@@ -26,13 +38,29 @@ export interface ClaudeInstallerStatus {
     anthropic_base_url: string | null;
     anthropic_api_token_set: boolean;
   };
+  settings_summary?: {
+    anthropic_api_key_masked: string | null;
+    anthropic_base_url: string | null;
+    anthropic_auth_token_set: boolean;
+  };
+  process_env_summary?: {
+    anthropic_api_key_masked: string | null;
+    anthropic_base_url: string | null;
+    anthropic_auth_token_set: boolean;
+  };
 }
 
 export interface CodexInstallerStatus {
   installed: boolean;
   version: string | null;
+  latest_version?: string | null;
+  resolved_version?: string | null;
   install_type: string | null;
   current_route: string | null;
+  resolved_executable_path?: string | null;
+  resolved_package_name?: string | null;
+  resolved_variant?: string | null;
+  variant_conflict?: boolean;
   state_file_exists: boolean;
   config_file_exists: boolean;
   routes: Array<{
@@ -54,8 +82,14 @@ export interface CodexInstallerStatus {
 export interface GeminiInstallerStatus {
   installed: boolean;
   version: string | null;
+  latest_version?: string | null;
+  resolved_version?: string | null;
   install_type: string | null;
   current_route: string | null;
+  resolved_executable_path?: string | null;
+  resolved_package_name?: string | null;
+  resolved_variant?: string | null;
+  variant_conflict?: boolean;
   env_file_exists: boolean;
   settings_file_exists: boolean;
   routes: Array<{
@@ -91,6 +125,15 @@ export const installerApi = {
     return await invoke("upgrade_claudecode", { targetVariant });
   },
 
+  async switchClaudeVariant(
+    targetVariant: "modified" | "original",
+  ): Promise<InstallerActionResult> {
+    return await invoke("switch_claudecode_variant", {
+      targetVariant,
+      target_variant: targetVariant,
+    });
+  },
+
   async getCodexStatus(): Promise<CodexInstallerStatus> {
     return await invoke("get_codex_status");
   },
@@ -123,6 +166,15 @@ export const installerApi = {
     });
   },
 
+  async switchCodexVariant(
+    targetVariant: "openai" | "gac",
+  ): Promise<InstallerActionResult> {
+    return await invoke("switch_codex_variant", {
+      targetVariant,
+      target_variant: targetVariant,
+    });
+  },
+
   async getGeminiStatus(): Promise<GeminiInstallerStatus> {
     return await invoke("get_gemini_status");
   },
@@ -147,6 +199,15 @@ export const installerApi = {
     targetVariant?: "official" | "gac",
   ): Promise<InstallerActionResult> {
     return await invoke("upgrade_gemini", {
+      targetVariant,
+      target_variant: targetVariant,
+    });
+  },
+
+  async switchGeminiVariant(
+    targetVariant: "official" | "gac",
+  ): Promise<InstallerActionResult> {
+    return await invoke("switch_gemini_variant", {
       targetVariant,
       target_variant: targetVariant,
     });

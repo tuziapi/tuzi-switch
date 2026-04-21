@@ -312,7 +312,8 @@ base_url = "http://localhost:8080"
 
     #[tokio::test]
     #[serial]
-    async fn update_current_claude_provider_syncs_live_when_proxy_takeover_detected_without_backup() {
+    async fn update_current_claude_provider_syncs_live_when_proxy_takeover_detected_without_backup()
+    {
         let _home = TempHome::new();
         crate::settings::reload_settings().expect("reload settings");
 
@@ -1171,8 +1172,7 @@ impl ProviderService {
             let live_taken_over = state
                 .proxy_service
                 .detect_takeover_in_live_config_for_app(&app_type);
-            let should_sync_via_proxy =
-                is_proxy_running && (has_live_backup || live_taken_over);
+            let should_sync_via_proxy = is_proxy_running && (has_live_backup || live_taken_over);
 
             if should_sync_via_proxy {
                 futures::executor::block_on(
@@ -1437,15 +1437,14 @@ impl ProviderService {
         let current_id = crate::settings::get_effective_current_provider(&state.db, &app_type)?;
 
         if !skip_backfill {
-            if let Some(current_id) = current_id {
+            if let Some(current_id) = current_id.as_deref() {
                 if current_id != id {
                     // Additive mode apps - all providers coexist in the same file,
                     // no backfill needed (backfill is for exclusive mode apps like Claude/Codex/Gemini)
                     if !app_type.is_additive_mode() {
                         // Only backfill when switching to a different provider
                         if let Ok(live_config) = read_live_settings(app_type.clone()) {
-                            if let Some(mut current_provider) = providers.get(&current_id).cloned()
-                            {
+                            if let Some(mut current_provider) = providers.get(current_id).cloned() {
                                 current_provider.settings_config =
                                     strip_common_config_from_live_settings(
                                         state.db.as_ref(),
@@ -1479,6 +1478,18 @@ impl ProviderService {
 
         // Sync to live (write_gemini_live handles security flag internally for Gemini)
         write_live_with_common_config(state.db.as_ref(), &app_type, provider)?;
+
+        if matches!(app_type, AppType::Claude) {
+            let logs = crate::product_installer::reconcile_claude_provider_switch(
+                id,
+                provider,
+                current_id.as_deref(),
+            )
+            .map_err(|error| AppError::Message(format!("Claude 线路状态收口失败: {error}")))?;
+            for line in logs {
+                log::debug!("[Claude reconcile] {line}");
+            }
+        }
 
         // For additive-mode providers that were DB-only (live_config_managed == Some(false)),
         // flip the flag to true now that the provider has been successfully written to the live

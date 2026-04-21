@@ -19,13 +19,22 @@ import {
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { openclawKeys } from "@/hooks/useOpenClaw";
 
+interface UseProviderActionsOptions {
+  onProviderSwitched?: () => void | Promise<void>;
+}
+
 /**
  * Hook for managing provider actions (add, update, delete, switch)
  * Extracts business logic from App.tsx
  */
-export function useProviderActions(activeApp: AppId, isProxyRunning?: boolean) {
+export function useProviderActions(
+  activeApp: AppId,
+  isProxyRunning?: boolean,
+  options?: UseProviderActionsOptions,
+) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { onProviderSwitched } = options || {};
 
   const addProviderMutation = useAddProviderMutation(activeApp);
   const updateProviderMutation = useUpdateProviderMutation(activeApp);
@@ -189,6 +198,16 @@ export function useProviderActions(activeApp: AppId, isProxyRunning?: boolean) {
       try {
         const result = await switchProviderMutation.mutateAsync(provider.id);
         await syncClaudePlugin(provider);
+        if (onProviderSwitched) {
+          try {
+            await onProviderSwitched();
+          } catch (error) {
+            console.error(
+              "[useProviderActions] Failed to run post-switch refresh callback",
+              error,
+            );
+          }
+        }
 
         // Show backfill warning if present
         if (result?.warnings?.length) {
@@ -239,7 +258,14 @@ export function useProviderActions(activeApp: AppId, isProxyRunning?: boolean) {
         // 错误提示由 mutation 处理
       }
     },
-    [switchProviderMutation, syncClaudePlugin, activeApp, isProxyRunning, t],
+    [
+      switchProviderMutation,
+      syncClaudePlugin,
+      activeApp,
+      isProxyRunning,
+      onProviderSwitched,
+      t,
+    ],
   );
 
   // 删除供应商

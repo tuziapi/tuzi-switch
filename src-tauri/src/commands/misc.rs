@@ -83,8 +83,14 @@ pub async fn get_skills_migration_result() -> Result<Option<SkillsMigrationPaylo
 #[derive(serde::Serialize)]
 pub struct ToolVersion {
     name: String,
+    installed: bool,
     version: Option<String>,
     latest_version: Option<String>, // 新增字段：最新版本
+    resolved_version: Option<String>,
+    resolved_executable_path: Option<String>,
+    resolved_package_name: Option<String>,
+    resolved_variant: Option<String>,
+    variant_conflict: bool,
     error: Option<String>,
     /// 工具运行环境: "windows", "wsl", "macos", "linux", "unknown"
     env_type: String,
@@ -183,6 +189,114 @@ async fn get_single_tool_version_impl(
     // 判断该工具的运行环境 & WSL distro（如有）
     let (env_type, wsl_distro) = tool_env_type_and_wsl_distro(tool);
 
+    if !matches!(tool, "opencode") {
+        return match tool {
+            "claude" => match crate::product_installer::get_claudecode_status().await {
+                Ok(status) => ToolVersion {
+                    name: tool.to_string(),
+                    installed: status.installed,
+                    version: status.version,
+                    latest_version: status.latest_version,
+                    resolved_version: status.resolved_version,
+                    resolved_executable_path: status.resolved_executable_path,
+                    resolved_package_name: status.resolved_package_name,
+                    resolved_variant: status.resolved_variant,
+                    variant_conflict: status.variant_conflict,
+                    error: if status.installed {
+                        None
+                    } else {
+                        Some("not installed or not executable".to_string())
+                    },
+                    env_type,
+                    wsl_distro,
+                },
+                Err(error) => ToolVersion {
+                    name: tool.to_string(),
+                    installed: false,
+                    version: None,
+                    latest_version: None,
+                    resolved_version: None,
+                    resolved_executable_path: None,
+                    resolved_package_name: None,
+                    resolved_variant: None,
+                    variant_conflict: false,
+                    error: Some(error),
+                    env_type,
+                    wsl_distro,
+                },
+            },
+            "codex" => match crate::product_installer::get_codex_status().await {
+                Ok(status) => ToolVersion {
+                    name: tool.to_string(),
+                    installed: status.installed,
+                    version: status.version,
+                    latest_version: status.latest_version,
+                    resolved_version: status.resolved_version,
+                    resolved_executable_path: status.resolved_executable_path,
+                    resolved_package_name: status.resolved_package_name,
+                    resolved_variant: status.resolved_variant,
+                    variant_conflict: status.variant_conflict,
+                    error: if status.installed {
+                        None
+                    } else {
+                        Some("not installed or not executable".to_string())
+                    },
+                    env_type,
+                    wsl_distro,
+                },
+                Err(error) => ToolVersion {
+                    name: tool.to_string(),
+                    installed: false,
+                    version: None,
+                    latest_version: None,
+                    resolved_version: None,
+                    resolved_executable_path: None,
+                    resolved_package_name: None,
+                    resolved_variant: None,
+                    variant_conflict: false,
+                    error: Some(error),
+                    env_type,
+                    wsl_distro,
+                },
+            },
+            "gemini" => match crate::product_installer::get_gemini_status().await {
+                Ok(status) => ToolVersion {
+                    name: tool.to_string(),
+                    installed: status.installed,
+                    version: status.version,
+                    latest_version: status.latest_version,
+                    resolved_version: status.resolved_version,
+                    resolved_executable_path: status.resolved_executable_path,
+                    resolved_package_name: status.resolved_package_name,
+                    resolved_variant: status.resolved_variant,
+                    variant_conflict: status.variant_conflict,
+                    error: if status.installed {
+                        None
+                    } else {
+                        Some("not installed or not executable".to_string())
+                    },
+                    env_type,
+                    wsl_distro,
+                },
+                Err(error) => ToolVersion {
+                    name: tool.to_string(),
+                    installed: false,
+                    version: None,
+                    latest_version: None,
+                    resolved_version: None,
+                    resolved_executable_path: None,
+                    resolved_package_name: None,
+                    resolved_variant: None,
+                    variant_conflict: false,
+                    error: Some(error),
+                    env_type,
+                    wsl_distro,
+                },
+            },
+            _ => unreachable!("validated by caller"),
+        };
+    }
+
     // 使用全局 HTTP 客户端（已包含代理配置）
     let client = crate::proxy::http_client::get();
 
@@ -190,11 +304,20 @@ async fn get_single_tool_version_impl(
     let (local_version, local_error) = if let Some(distro) = wsl_distro.as_deref() {
         try_get_version_wsl(tool, distro, wsl_shell, wsl_shell_flag)
     } else {
-        let direct_result = try_get_version(tool);
-        if direct_result.0.is_some() {
-            direct_result
+        if matches!(tool, "claude" | "gemini") {
+            match read_current_path_package_version(tool)
+                .or_else(|| scan_cli_version_from_package_metadata(tool))
+            {
+                Some(version) => (Some(version), None),
+                None => (None, Some("not installed or not executable".to_string())),
+            }
         } else {
-            scan_cli_version(tool)
+            let direct_result = try_get_version(tool);
+            if direct_result.0.is_some() {
+                direct_result
+            } else {
+                scan_cli_version(tool)
+            }
         }
     };
 
@@ -209,8 +332,14 @@ async fn get_single_tool_version_impl(
 
     ToolVersion {
         name: tool.to_string(),
+        installed: local_version.is_some(),
         version: local_version,
         latest_version,
+        resolved_version: None,
+        resolved_executable_path: None,
+        resolved_package_name: None,
+        resolved_variant: None,
+        variant_conflict: false,
         error: local_error,
         env_type,
         wsl_distro,
@@ -268,6 +397,54 @@ fn extract_version(raw: &str) -> String {
         .find(raw)
         .map(|m| m.as_str().to_string())
         .unwrap_or_else(|| raw.to_string())
+}
+
+fn find_executable_in_current_path(tool: &str) -> Option<PathBuf> {
+    let current_path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&current_path) {
+        for candidate in tool_executable_candidates(tool, &dir) {
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+fn read_version_from_package_metadata(executable_path: &Path) -> Option<String> {
+    let resolved =
+        std::fs::canonicalize(executable_path).unwrap_or_else(|_| executable_path.to_path_buf());
+
+    for ancestor in resolved.ancestors().take(8) {
+        let package_json_path = ancestor.join("package.json");
+        if !package_json_path.is_file() {
+            continue;
+        }
+
+        let Ok(content) = std::fs::read_to_string(&package_json_path) else {
+            continue;
+        };
+        let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) else {
+            continue;
+        };
+
+        let version = parsed
+            .get("version")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if let Some(version) = version {
+            return Some(version.to_string());
+        }
+    }
+
+    None
+}
+
+fn read_current_path_package_version(tool: &str) -> Option<String> {
+    find_executable_in_current_path(tool)
+        .as_deref()
+        .and_then(read_version_from_package_metadata)
 }
 
 /// 尝试直接执行命令获取版本
@@ -541,10 +718,7 @@ fn tool_executable_candidates(tool: &str, dir: &Path) -> Vec<std::path::PathBuf>
     }
 }
 
-/// 扫描常见路径查找 CLI
-fn scan_cli_version(tool: &str) -> (Option<String>, Option<String>) {
-    use std::process::Command;
-
+fn build_cli_search_paths(tool: &str) -> Vec<std::path::PathBuf> {
     let home = dirs::home_dir().unwrap_or_default();
 
     // 常见的安装路径（原生安装优先）
@@ -625,6 +799,29 @@ fn scan_cli_version(tool: &str) -> (Option<String>, Option<String>) {
         }
     }
 
+    search_paths
+}
+
+fn scan_cli_version_from_package_metadata(tool: &str) -> Option<String> {
+    for path in build_cli_search_paths(tool) {
+        for tool_path in tool_executable_candidates(tool, &path) {
+            if !tool_path.exists() {
+                continue;
+            }
+            if let Some(version) = read_version_from_package_metadata(&tool_path) {
+                return Some(version);
+            }
+        }
+    }
+
+    None
+}
+
+/// 扫描常见路径查找 CLI
+fn scan_cli_version(tool: &str) -> (Option<String>, Option<String>) {
+    use std::process::Command;
+
+    let search_paths = build_cli_search_paths(tool);
     let current_path = std::env::var("PATH").unwrap_or_default();
 
     for path in &search_paths {

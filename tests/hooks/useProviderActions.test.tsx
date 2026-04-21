@@ -194,6 +194,30 @@ describe("useProviderActions", () => {
     expect(settingsApiApplyMock).not.toHaveBeenCalled();
   });
 
+  it("runs post-switch refresh callback after provider switch succeeds", async () => {
+    switchProviderMutateAsync.mockResolvedValueOnce(undefined);
+    const onProviderSwitched = vi.fn();
+    const { wrapper } = createWrapper();
+    const provider = createProvider({ category: "custom" });
+
+    const { result } = renderHook(
+      () =>
+        useProviderActions("codex", true, {
+          onProviderSwitched,
+        }),
+      {
+        wrapper,
+      },
+    );
+
+    await act(async () => {
+      await result.current.switchProvider(provider);
+    });
+
+    expect(switchProviderMutateAsync).toHaveBeenCalledWith(provider.id);
+    expect(onProviderSwitched).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks switching providers that require proxy when proxy is not running", async () => {
     const { wrapper } = createWrapper();
     const provider = createProvider({
