@@ -28,17 +28,17 @@
 
 ### ワンコマンドインストール
 
-現在の推奨版 `v3.12.15` を直接インストール:
+現在の推奨版 `v3.12.16` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.15 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.16 bash
 ```
 
 補足:
 
 - 現在の Release workflow は引き続き `prerelease` 方式で公開されています
 - GitHub の `releases/latest` では、最新のテスト版を安定して取得できない場合があります
-- README のコマンドは `v3.12.15` に固定し、現在の推奨版を確実に入れられるようにしています
+- README のコマンドは `v3.12.16` に固定し、現在の推奨版を確実に入れられるようにしています
 - 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
@@ -70,14 +70,14 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 現在のバージョン更新内容
 
-現在の公開版は `v3.12.15` で、今回の主な更新は以下です。
+現在の公開版は `v3.12.16` で、今回の主な更新は以下です。
 
-- Claude、Codex、Gemini、OpenClaw の各入口で、状態信頼性、更新フィードバック、異常時フォールバックの収束を継続
-- Claude、Codex、Gemini の上部ステータスカードをさらにコンパクト化し、バージョン表示と更新導線を整理しつつ、Gemini は package metadata 優先で実バージョンを表示
-- Codex、Gemini、OpenClaw の業務接入エリアをさらに簡素化し、案内文を軽くして初回導線を見やすく調整
-- 同一路線の複数 Key は上書きではなく、既存カードを残して新カードを追加し、自動で新カードへ切り替える方式に変更
-- Claude、Codex、Gemini は既に互換変体が入っている場合、再インストールをスキップし、変体切替時のみ再インストール
-- テストと基本検証フローを安定化しつつ、ワンコマンドインストールは現在の推奨版を確実に指す状態を維持
+- Claude、Codex、Gemini の状態判定を、installer 記録だけではなく、実際に命中した CLI、パッケージ metadata、current provider を軸に再整理
+- Quick Access と下部 ProviderList の切替後更新を原子的に揃え、上部の `Current Route / Base URL / CLI Variant` と下部カードが長く食い違わないよう改善
+- Claude の provider 切替後に、route file、shell rc、`~/.claude/settings.json`、current provider を後端で収束させ、ルート飛びやソース衝突を減らす
+- Codex / Gemini の改版インストールに launcher 競合除去、インストール後検証、実変体チェックを追加し、Codex のモデルチェックも実際の model / reasoning effort / endpoint に合わせて修正
+- 改版切替の復元ロジックを `last original route / provider` ベースで統一し、改版突入時は原版 current provider をクリア、退出時は記録から復元
+- 現在のルート判定ロジック文書を追加し、ワンコマンドインストールも推奨版固定のまま維持
 
 ## 製品のポイント
 
@@ -159,13 +159,14 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 開発計画 / TODO
 
-- 完了: Claude、Codex、Gemini、OpenClaw の 4 入口で、業務接入とルート管理の第 1 ラウンド改版を完了
-- 完了: 状態信頼性、異常時フォールバック、上部ステータスの圧縮、Gemini 実バージョン表示、provider 同期の収束をさらに 1 ラウンド完了
-- 完了: 同一路線の複数 Key 追加カード、Key 入力保護、重複インストールのスキップ、固定版インストール導線、検証チェーン安定化を実装
+- 完了: Claude / Codex / Gemini の current route、CLI 変体、Base URL、provider 現在状態の表示優先順位と更新連動を収束
+- 完了: Claude provider 切替後の route file / shell rc / settings.json / current provider 収束と、改版状態の誤表示修正
+- 完了: Codex / Gemini 改版インストール時の launcher 競合除去、インストール後検証、実変体チェック、Codex モデルチェック経路の修正
+- 完了: README のワンコマンドインストールとインストールスクリプト例を `v3.12.16` に更新し、現在ルート文書への入口も追加
 - 進行中: ライト / ダーク両テーマで、ルートカード、状態ブロック、下部リスト高亮、各入口の文案密度をさらに揃える
-- 進行中: OpenClaw の接入表現とセッション復元境界をさらに整理する
+- 進行中: provider / proxy / openclaw 周辺に残る順序依存型 Rust flaky tests を整理して減らす
 - 次: セッション管理と復元戦略を引き続き整理する
-- 次: リリース説明、インストール案内、顧客向け文案をさらに補強する
+- 次: release workflow をより安定した `latest` 導線と署名配布体験へ寄せていく
 
 ## 補足
 

@@ -96,11 +96,12 @@
 - **配置供应商**：查看 [2.1 添加供应商](./2-providers/2.1-add.md)
 - **使用代理**：查看 [4.1 代理服务](./4-proxy/4.1-service.md)
 - **遇到问题**：查看 [5.2 FAQ](./5-faq/5.2-questions.md)
+- **三模块当前线路逻辑**：查看 [../../current-route-logic-zh.md](../../current-route-logic-zh.md)
 
 ## 版本信息
 
 - 文档版本：v3.12.0
-- 最后更新：2026-03-09
+- 最后更新：2026-04-21
 - 适用于 CC Switch v3.12.0+
 
 ## 贡献

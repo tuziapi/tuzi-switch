@@ -28,17 +28,17 @@
 
 ### 一键安装
 
-直接安装当前推荐版本 `v3.12.15`：
+直接安装当前推荐版本 `v3.12.16`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.15 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.16 bash
 ```
 
 补充说明：
 
 - 当前 Release workflow 仍使用 `prerelease` 发布策略
 - GitHub `releases/latest` 不能稳定命中当前最新测试版本
-- 当前 README 默认固定到 `v3.12.15`，这样可以确保安装到我们当前推荐版本
+- 当前 README 默认固定到 `v3.12.16`，这样可以确保安装到我们当前推荐版本
 - 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
 
 ### macOS 未签名包打开方式
@@ -70,14 +70,14 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 当前版本更新
 
-当前公开版本为 `v3.12.15`，这一轮更新重点包括：
+当前公开版本为 `v3.12.16`，这一轮更新重点包括：
 
-- 继续收尾 Claude、Codex、Gemini、OpenClaw 四个入口的状态可信度、刷新反馈与异常兜底
-- Claude、Codex、Gemini 顶部状态卡进一步压缩，版本卡与升级入口更紧凑，Gemini 版本改为优先读取包元数据
-- Codex、Gemini、OpenClaw 的业务接入区继续精简，减少提示干扰并统一更轻量的快速接入表达
-- 同路线多 Key 改为保留旧卡、追加新卡并自动切换到新卡
-- Claude、Codex、Gemini 在已安装且变体兼容时会跳过重复安装，仅在变体切换时重新安装
-- 测试链路与基础校验链路已补稳，同时继续保持一键安装命中当前推荐版本
+- Claude、Codex、Gemini 三个入口的状态读取进一步收口到真实命中的 CLI、安装包元数据与 current provider，而不是只依赖 installer 记录
+- Quick Access 与下方 ProviderList 在真实切线后改成同轮原子刷新，顶部 `当前线路 / Base URL / CLI 变体` 与下方当前卡片不再长期分叉
+- Claude provider 切换后新增后端收口，会同步 route file、shell rc、`~/.claude/settings.json` 与 current provider，减少跳线与来源冲突
+- Codex / Gemini 的改版安装补了 launcher 冲突清理、安装后复核和真实变体校验；Codex 测试模型链路也按真实 model / reasoning effort / endpoint 执行
+- 改版切换统一记录并恢复 `last original route / provider`，进入改版时清空原版 current provider，退出改版时按真实记录恢复
+- 新增三模块当前线路逻辑梳理文档，并继续保持一键安装命中当前推荐版本
 
 ## 产品亮点
 
@@ -123,6 +123,8 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 4. 在引导流程中输入你的兔子 Key。
 5. 完成一键配置后开始使用对应工具。
 
+如果你想查看 `Claude / Codex / Gemini` 当前的状态读取、一键配置、改版切换和 provider 联动逻辑，可直接阅读 [docs/current-route-logic-zh.md](./docs/current-route-logic-zh.md)。
+
 ## 主要能力
 
 ### 工具入口
@@ -159,13 +161,14 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 开发计划 / TODO List
 
-- 已完成：四个入口的业务接入与路线管理首轮改版，包含 Codex 主线路 / Coding 特别线路拆分与 Gemini 首版业务接入
-- 已完成：状态可信度、异常兜底、顶部状态区压缩、Gemini 真实版本检测与 provider 同步继续收口
-- 已完成：同路线多 Key 追加卡片、Key 安全输入、跳过重复安装、固定版本安装脚本与验证链路补稳
+- 已完成：Claude / Codex / Gemini 当前线路、CLI 变体、Base URL、provider 当前态的显示优先级与刷新联动收口
+- 已完成：Claude provider 切换后的 route file / shell rc / settings.json / current provider 收口，以及改版状态误报修正
+- 已完成：Codex / Gemini 改版安装冲突清理、安装后复核、真实变体校验与测试模型链路修正
+- 已完成：README 一键安装命令与安装脚本示例固定到 `v3.12.16`，并补充三模块当前线路逻辑文档入口
 - 进行中：继续统一深色 / 浅色主题下的路线卡、状态区、列表高亮与各入口文案密度
-- 进行中：继续优化 OpenClaw 的业务接入表达与会话恢复边界
+- 进行中：继续梳理并消除 provider / proxy / openclaw 相关的顺序依赖型 Rust flaky tests
 - 下一步：继续梳理会话管理与恢复策略
-- 下一步：继续补充 release 文案、安装提示与客户视角介绍
+- 下一步：继续推进 release workflow 向更稳定的 `latest` / 签名分发体验收口
 
 ## 说明
 
