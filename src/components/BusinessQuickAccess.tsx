@@ -277,8 +277,8 @@ const CODEX_ROUTE_CONFIG = {
   codex: {
     providerId: "tuzi.coding",
     providerName: "Codex · 兔子 Coding 特别线路",
-    baseUrl: "https://coding.tu-zi.com",
-    websiteUrl: "https://coding.tu-zi.com",
+    baseUrl: "https://api.tu-zi.com/coding",
+    websiteUrl: "https://api.tu-zi.com/coding",
     businessLine: "tuzi" as const,
   },
   gac: {
@@ -538,6 +538,7 @@ function getCodexRouteFromProvider(
     currentProviderId === CODEX_ROUTE_CONFIG.codex.providerId ||
     providerName.includes("Codex · 兔子 Coding 特别线路") ||
     providerName.includes("Coding 特别线路") ||
+    baseUrl.includes("api.tu-zi.com/coding") ||
     baseUrl.includes("coding.tu-zi.com")
   ) {
     return "tuzi-coding";
@@ -664,21 +665,96 @@ function getInstalledVersionLabel(
   const currentVersion = version?.trim();
   const latest = latestVersion?.trim();
   if (!currentVersion) return "已安装";
-  if (latest && currentVersion === latest) {
+  if (
+    latest &&
+    compareVersionMarkers(currentVersion, latest) === 0
+  ) {
     return `${currentVersion}（最新版）`;
   }
   return currentVersion;
 }
 
-function isLatestInstalledVersion(
+type VersionCheckState = "latest" | "upgrade" | "unknown" | "not-installed";
+
+function parseVersionMarker(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  const parts = normalized
+    .split(/[.-]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const firstNumberIndex = parts.findIndex((part) => /^\d+$/.test(part));
+  if (firstNumberIndex < 0) return null;
+  return parts.slice(firstNumberIndex).map((part) => {
+    if (/^\d+$/.test(part)) return Number(part);
+    return part;
+  });
+}
+
+function isGacBuildSuffix(parts: Array<number | string>) {
+  return (
+    parts.length >= 2 &&
+    parts[0] === "gac" &&
+    parts.slice(1).every((part) => typeof part === "number")
+  );
+}
+
+function compareVersionMarkers(
+  current: string | null | undefined,
+  latest: string | null | undefined,
+) {
+  const currentParts = parseVersionMarker(current);
+  const latestParts = parseVersionMarker(latest);
+  if (!currentParts || !latestParts) return null;
+  const length = Math.max(currentParts.length, latestParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const currentPart = currentParts[index];
+    const latestPart = latestParts[index];
+    if (currentPart === undefined || latestPart === undefined) {
+      const remainingCurrent = currentParts.slice(index);
+      const remainingLatest = latestParts.slice(index);
+      if (
+        (remainingCurrent.length === 0 && isGacBuildSuffix(remainingLatest)) ||
+        (remainingLatest.length === 0 && isGacBuildSuffix(remainingCurrent))
+      ) {
+        return 0;
+      }
+      return null;
+    }
+    if (currentPart === latestPart) continue;
+    if (typeof currentPart === "number" && typeof latestPart === "number") {
+      return currentPart > latestPart ? 1 : -1;
+    }
+    if (typeof currentPart === "string" && typeof latestPart === "string") {
+      return currentPart.localeCompare(latestPart);
+    }
+    return null;
+  }
+  return 0;
+}
+
+function getVersionCheckState(
   installed: boolean,
   version: string | null | undefined,
   latestVersion?: string | null,
-) {
-  if (!installed) return false;
+): VersionCheckState {
+  if (!installed) return "not-installed";
   const currentVersion = version?.trim();
   const latest = latestVersion?.trim();
-  return Boolean(currentVersion && latest && currentVersion === latest);
+  if (!currentVersion || !latest) return "unknown";
+  const compared = compareVersionMarkers(currentVersion, latest);
+  if (compared === null) return "unknown";
+  return compared >= 0 ? "latest" : "upgrade";
+}
+
+function getUpgradeButtonTitle(state: VersionCheckState) {
+  if (state === "latest") return "当前已是最新版";
+  if (state === "unknown") return "最新版检测失败，请刷新状态后重试";
+  return undefined;
+}
+
+function getUpgradeButtonLabel(state: VersionCheckState) {
+  return state === "latest" ? "已最新" : "升级";
 }
 
 function getCliVariantLabel(
@@ -1493,17 +1569,17 @@ export function BusinessQuickAccess({
     geminiStatusView.version,
     geminiStatusView.latest_version,
   );
-  const claudeIsLatestVersion = isLatestInstalledVersion(
+  const claudeVersionCheckState = getVersionCheckState(
     claudeStatusView.installed,
     claudeStatusView.version,
     claudeStatusView.latest_version,
   );
-  const codexIsLatestVersion = isLatestInstalledVersion(
+  const codexVersionCheckState = getVersionCheckState(
     codexStatusView.installed,
     codexStatusView.version,
     codexStatusView.latest_version,
   );
-  const geminiIsLatestVersion = isLatestInstalledVersion(
+  const geminiVersionCheckState = getVersionCheckState(
     geminiStatusView.installed,
     geminiStatusView.version,
     geminiStatusView.latest_version,
@@ -2119,21 +2195,18 @@ export function BusinessQuickAccess({
                       size="sm"
                       onClick={() =>
                         void runAction("claude-upgrade", () =>
-                          installerApi.upgradeClaudeCode("original"),
+                          installerApi.upgradeClaudeCode(
+                            claudeUsingModifiedVariant
+                              ? "modified"
+                              : "original",
+                          ),
                         )
                       }
                       disabled={
                         !!runningAction ||
-                        claudeUsingModifiedVariant ||
-                        claudeIsLatestVersion
+                        claudeVersionCheckState !== "upgrade"
                       }
-                      title={
-                        claudeUsingModifiedVariant
-                          ? "请先退出使用改版后再升级原版"
-                          : claudeIsLatestVersion
-                            ? "当前已是最新版"
-                            : undefined
-                      }
+                      title={getUpgradeButtonTitle(claudeVersionCheckState)}
                       className="h-7 gap-1.5 px-2 text-[11px]"
                     >
                       {runningAction === "claude-upgrade" ? (
@@ -2141,7 +2214,7 @@ export function BusinessQuickAccess({
                       ) : (
                         <Upload className="h-3.5 w-3.5" />
                       )}
-                      升级
+                      {getUpgradeButtonLabel(claudeVersionCheckState)}
                     </Button>
                   ) : null
                 }
@@ -2334,21 +2407,16 @@ export function BusinessQuickAccess({
                       size="sm"
                       onClick={() =>
                         void runAction("codex-upgrade", () =>
-                          installerApi.upgradeCodex("openai"),
+                          installerApi.upgradeCodex(
+                            codexUsingModifiedVariant ? "gac" : "openai",
+                          ),
                         )
                       }
                       disabled={
                         !!runningAction ||
-                        codexUsingModifiedVariant ||
-                        codexIsLatestVersion
+                        codexVersionCheckState !== "upgrade"
                       }
-                      title={
-                        codexUsingModifiedVariant
-                          ? "请先退出使用改版后再升级原版"
-                          : codexIsLatestVersion
-                            ? "当前已是最新版"
-                            : undefined
-                      }
+                      title={getUpgradeButtonTitle(codexVersionCheckState)}
                       className="h-7 gap-1.5 px-2 text-[11px]"
                     >
                       {runningAction === "codex-upgrade" ? (
@@ -2356,7 +2424,7 @@ export function BusinessQuickAccess({
                       ) : (
                         <Upload className="h-3.5 w-3.5" />
                       )}
-                      升级
+                      {getUpgradeButtonLabel(codexVersionCheckState)}
                     </Button>
                   ) : null
                 }
@@ -2401,7 +2469,7 @@ export function BusinessQuickAccess({
                 />
                 <RouteCard
                   title="Codex · 兔子 Coding 特别线路"
-                  meta="Base URL: https://coding.tu-zi.com"
+                  meta="Base URL: https://api.tu-zi.com/coding"
                   status={
                     activeCodexRoute === "tuzi-coding"
                       ? "已接入"
@@ -2560,21 +2628,16 @@ export function BusinessQuickAccess({
                       size="sm"
                       onClick={() =>
                         void runAction("gemini-upgrade", () =>
-                          installerApi.upgradeGemini("official"),
+                          installerApi.upgradeGemini(
+                            geminiUsingModifiedVariant ? "gac" : "official",
+                          ),
                         )
                       }
                       disabled={
                         !!runningAction ||
-                        geminiUsingModifiedVariant ||
-                        geminiIsLatestVersion
+                        geminiVersionCheckState !== "upgrade"
                       }
-                      title={
-                        geminiUsingModifiedVariant
-                          ? "请先退出使用改版后再升级原版"
-                          : geminiIsLatestVersion
-                            ? "当前已是最新版"
-                            : undefined
-                      }
+                      title={getUpgradeButtonTitle(geminiVersionCheckState)}
                       className="h-7 gap-1.5 px-2 text-[11px]"
                     >
                       {runningAction === "gemini-upgrade" ? (
@@ -2582,7 +2645,7 @@ export function BusinessQuickAccess({
                       ) : (
                         <Upload className="h-3.5 w-3.5" />
                       )}
-                      升级
+                      {getUpgradeButtonLabel(geminiVersionCheckState)}
                     </Button>
                   ) : null
                 }

@@ -15,7 +15,7 @@ Usage: install_tuzi_switch.sh [options]
   --dry-run          Print the download URL and install steps without executing
   --no-open          Do not auto-open the app after installation
   --repo OWNER/REPO  Override GitHub repository (default: tuziapi/tuzi-switch)
-  --tag VERSION      Install a specific release tag such as v3.12.16
+  --tag VERSION      Install a specific release tag such as v3.12.17
   --appimage         Prefer AppImage instead of .deb on Linux
   -h, --help         Show this help
 
@@ -92,8 +92,15 @@ case "${OS}-${ARCH}" in
   Darwin-arm64 | Darwin-aarch64) PLATFORM="darwin-arm64" ;;
   Darwin-x86_64) PLATFORM="darwin-x64" ;;
   Linux-x86_64 | Linux-amd64) PLATFORM="linux-amd64" ;;
+  MINGW*-* | MSYS*-* | CYGWIN*-*)
+    echo "This shell installer does not support Windows/Git Bash." >&2
+    echo "Please download the latest Windows installer from:" >&2
+    echo "https://github.com/${REPO}/releases" >&2
+    exit 1
+    ;;
   *)
     echo "Unsupported platform: ${OS} ${ARCH}" >&2
+    echo "Download installers from: https://github.com/${REPO}/releases" >&2
     exit 1
     ;;
 esac

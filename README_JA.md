@@ -19,26 +19,25 @@
 
 推奨パッケージ:
 
-- Windows: `.msi`
-- Windows ポータブル版: 現在の Release に含まれる場合は `Windows-Portable.zip`
+- Windows: Windows インストーラをダウンロード
 - Linux: `.AppImage`、`.deb`、`.rpm`
 - macOS: `macOS-unsigned.dmg` または `macOS-unsigned.zip`
 
 現在の公開 Release は Windows / Linux での利用を前提にしています。macOS は未署名のテストビルドです。
 
-### ワンコマンドインストール
+### macOS / Linux ワンコマンドインストール
 
-現在の推奨版 `v3.12.16` を直接インストール:
+現在の推奨版 `v3.12.17` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.16 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.17 bash
 ```
 
 補足:
 
 - 現在の Release workflow は引き続き `prerelease` 方式で公開されています
 - GitHub の `releases/latest` では、最新のテスト版を安定して取得できない場合があります
-- README のコマンドは `v3.12.16` に固定し、現在の推奨版を確実に入れられるようにしています
+- README のコマンドは `v3.12.17` に固定し、現在の推奨版を確実に入れられるようにしています
 - 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
@@ -70,14 +69,14 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 現在のバージョン更新内容
 
-現在の公開版は `v3.12.16` で、今回の主な更新は以下です。
+現在の公開版は `v3.12.17` で、今回の主な更新は以下です。
 
-- Claude、Codex、Gemini の状態判定を、installer 記録だけではなく、実際に命中した CLI、パッケージ metadata、current provider を軸に再整理
-- Quick Access と下部 ProviderList の切替後更新を原子的に揃え、上部の `Current Route / Base URL / CLI Variant` と下部カードが長く食い違わないよう改善
-- Claude の provider 切替後に、route file、shell rc、`~/.claude/settings.json`、current provider を後端で収束させ、ルート飛びやソース衝突を減らす
-- Codex / Gemini の改版インストールに launcher 競合除去、インストール後検証、実変体チェックを追加し、Codex のモデルチェックも実際の model / reasoning effort / endpoint に合わせて修正
-- 改版切替の復元ロジックを `last original route / provider` ベースで統一し、改版突入時は原版 current provider をクリア、退出時は記録から復元
-- 現在のルート判定ロジック文書を追加し、ワンコマンドインストールも推奨版固定のまま維持
+- Claude、Codex、Gemini で原版 / gac 改版の両方に最新版チェックを追加し、状態は `Upgrade / Latest / Check failed` として扱います
+- gac 改版のアップグレードは対応する install URL を直接実行し、Codex / Gemini は `INSTALL_VERSION` も記録して、ローカル版と gac suffix の差による誤判定を減らします
+- Codex Coding 特別ルートの既定 Base URL を `https://api.tu-zi.com/coding` に更新し、旧 URL も互換認識します
+- Windows のダウンロード表現を Windows インストーラに簡略化し、macOS / Linux のワンコマンド導線と Git Bash 誤用時の案内も揃えました
+- Codex の状態信頼性を強化し、installer 記録、実際の CLI 変体、現在ルートが食い違う場合に明確に提示します
+- ワンコマンドインストールは現在の推奨版固定を維持し、インストールスクリプト例も更新しました
 
 ## 製品のポイント
 
@@ -159,12 +158,12 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 開発計画 / TODO
 
-- 完了: Claude / Codex / Gemini の current route、CLI 変体、Base URL、provider 現在状態の表示優先順位と更新連動を収束
-- 完了: Claude provider 切替後の route file / shell rc / settings.json / current provider 収束と、改版状態の誤表示修正
-- 完了: Codex / Gemini 改版インストール時の launcher 競合除去、インストール後検証、実変体チェック、Codex モデルチェック経路の修正
-- 完了: README のワンコマンドインストールとインストールスクリプト例を `v3.12.16` に更新し、現在ルート文書への入口も追加
+- 完了: Claude / Codex / Gemini の最新版チェック、アップグレードボタン状態、改版アップグレード経路を統一
+- 完了: Codex Coding 特別ルートを `https://api.tu-zi.com/coding` に切り替え、旧 URL も互換認識
+- 完了: Windows ダウンロード文言を簡略化し、macOS / Linux ワンコマンド見出しと Git Bash 誤用時の案内を更新
+- 完了: README のワンコマンドインストールとインストールスクリプト例を `v3.12.17` に更新
 - 進行中: ライト / ダーク両テーマで、ルートカード、状態ブロック、下部リスト高亮、各入口の文案密度をさらに揃える
-- 進行中: provider / proxy / openclaw 周辺に残る順序依存型 Rust flaky tests を整理して減らす
+- 進行中: 実際に命中する CLI、installer 記録、外部スクリプトが書いた state file の衝突境界を引き続き整理
 - 次: セッション管理と復元戦略を引き続き整理する
 - 次: release workflow をより安定した `latest` 導線と署名配布体験へ寄せていく
 

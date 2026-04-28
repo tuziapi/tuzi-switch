@@ -19,26 +19,25 @@ Get the latest build from [GitHub Releases](https://github.com/tuziapi/tuzi-swit
 
 Recommended packages:
 
-- Windows: download the `.msi` installer
-- Windows portable: download `Windows-Portable.zip` when the current release includes it
+- Windows: download the Windows installer
 - Linux: download `.AppImage`, `.deb`, or `.rpm` based on your distro
 - macOS: download `macOS-unsigned.dmg` or `macOS-unsigned.zip`
 
 Current public releases are ready for Windows and Linux users. macOS is currently shipped as an unsigned test build.
 
-### One-Command Install
+### macOS / Linux One-Command Install
 
-Install the currently recommended build `v3.12.16` directly from GitHub:
+Install the currently recommended build `v3.12.17` directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.16 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.17 bash
 ```
 
 Notes:
 
 - The current release workflow still publishes builds as `prerelease`
 - GitHub `releases/latest` does not reliably resolve to the newest testing build
-- The README command stays pinned to `v3.12.16` so it installs the current recommended version reliably
+- The README command stays pinned to `v3.12.17` so it installs the current recommended version reliably
 - To install another version, replace the value in `TUZI_SWITCH_TAG=vX.Y.Z`
 
 ### macOS Unsigned Build
@@ -70,14 +69,14 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 
 ## Current Version Updates
 
-The current public release is `v3.12.16`, with this round focused on:
+The current public release is `v3.12.17`, with this round focused on:
 
-- Tightening Claude, Codex, and Gemini status resolution around the actual CLI on disk, package metadata, and current provider instead of trusting installer records alone
-- Switching Quick Access and the lower ProviderList to an atomic post-switch refresh so `Current Route / Base URL / CLI Variant` stay aligned with the active provider card
-- Adding backend Claude reconciliation after provider switches so the route file, shell rc, `~/.claude/settings.json`, and current provider converge to the same route
-- Adding launcher-conflict cleanup, post-install verification, and real variant checks for Codex / Gemini modified installs; Codex health checks now use the real model / reasoning effort / endpoint path
-- Standardizing modified-variant fallback memory with `last original route / provider`, clearing the original current provider on entry and restoring it on exit
-- Adding a dedicated current-route logic write-up and keeping the one-command install flow pinned to the recommended version
+- Claude, Codex, and Gemini now check latest versions for both official/original and gac modified CLIs, with status states for `Upgrade / Latest / Check failed`
+- gac modified upgrades now run the corresponding install URL directly; Codex / Gemini also record `INSTALL_VERSION` to avoid false mismatches between local package versions and remote gac suffixes
+- The Codex Coding special route now defaults to `https://api.tu-zi.com/coding` while still recognizing the previous URL for compatibility
+- Windows download wording is simplified to “Windows installer”, while macOS / Linux one-command install wording and Git Bash misuse hints are aligned
+- Codex status trust was tightened so mismatches between installer records, the actual CLI variant, and the current route are surfaced clearly
+- The one-command install flow remains pinned to the current recommended version, with installer-script examples updated accordingly
 
 ## Product Highlights
 
@@ -159,12 +158,12 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 
 ## Development Plan / TODO
 
-- Done: Claude / Codex / Gemini route display priority, CLI variant display, Base URL display, and provider-state refresh are now aligned
-- Done: Claude provider switches now reconcile the route file, shell rc, settings.json, current provider, and modified-state false positives
-- Done: Codex / Gemini modified installs now handle launcher conflicts, post-install verification, real variant validation, and Codex model-check routing fixes
-- Done: the README install command and installer-script example are now pinned to `v3.12.16`, and the current-route logic doc is linked from the docs entry points
+- Done: Claude / Codex / Gemini latest-version checks, upgrade button states, and modified-variant upgrade paths are now aligned
+- Done: the Codex Coding special route now uses `https://api.tu-zi.com/coding`, while the previous URL remains recognized for compatibility
+- Done: Windows download copy is simplified, and macOS / Linux one-command install headings plus Git Bash misuse hints are aligned
+- Done: the README install command and installer-script example are now pinned to `v3.12.17`
 - In progress: keep aligning route cards, status blocks, provider-list highlights, and copy density across light and dark themes
-- In progress: remove remaining order-dependent Rust flaky tests around provider / proxy / openclaw behavior
+- In progress: keep refining conflict boundaries between the actual CLI on PATH, installer records, and external-script state files
 - Next: continue refining session management and recovery strategy
 - Next: keep moving the release workflow toward a more stable `latest` flow and signed distribution experience
 

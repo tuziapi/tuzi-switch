@@ -19,26 +19,25 @@
 
 推荐下载方式：
 
-- Windows：下载 `.msi` 安装版
-- Windows 便携版：如当前版本提供，再下载对应的 `Windows-Portable.zip`
+- Windows：下载 Windows 安装包
 - Linux：根据发行版选择 `.AppImage`、`.deb` 或 `.rpm`
 - macOS：下载 `macOS-unsigned.dmg` 或 `macOS-unsigned.zip`
 
 目前公开 Release 已支持 Windows 和 Linux 用户下载使用。macOS 当前提供的是未签名测试包。
 
-### 一键安装
+### macOS / Linux 一键安装
 
-直接安装当前推荐版本 `v3.12.16`：
+直接安装当前推荐版本 `v3.12.17`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.16 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.17 bash
 ```
 
 补充说明：
 
 - 当前 Release workflow 仍使用 `prerelease` 发布策略
 - GitHub `releases/latest` 不能稳定命中当前最新测试版本
-- 当前 README 默认固定到 `v3.12.16`，这样可以确保安装到我们当前推荐版本
+- 当前 README 默认固定到 `v3.12.17`，这样可以确保安装到我们当前推荐版本
 - 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
 
 ### macOS 未签名包打开方式
@@ -70,14 +69,14 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 当前版本更新
 
-当前公开版本为 `v3.12.16`，这一轮更新重点包括：
+当前公开版本为 `v3.12.17`，这一轮更新重点包括：
 
-- Claude、Codex、Gemini 三个入口的状态读取进一步收口到真实命中的 CLI、安装包元数据与 current provider，而不是只依赖 installer 记录
-- Quick Access 与下方 ProviderList 在真实切线后改成同轮原子刷新，顶部 `当前线路 / Base URL / CLI 变体` 与下方当前卡片不再长期分叉
-- Claude provider 切换后新增后端收口，会同步 route file、shell rc、`~/.claude/settings.json` 与 current provider，减少跳线与来源冲突
-- Codex / Gemini 的改版安装补了 launcher 冲突清理、安装后复核和真实变体校验；Codex 测试模型链路也按真实 model / reasoning effort / endpoint 执行
-- 改版切换统一记录并恢复 `last original route / provider`，进入改版时清空原版 current provider，退出改版时按真实记录恢复
-- 新增三模块当前线路逻辑梳理文档，并继续保持一键安装命中当前推荐版本
+- Claude、Codex、Gemini 的原版与 gac 改版都接入最新版检测，状态区会区分 `升级 / 已最新 / 检测失败`
+- gac 改版升级改为直接执行对应 install URL，Codex / Gemini 会记录 `INSTALL_VERSION`，减少本地版本与远端包名后缀不一致造成的误判
+- Codex Coding 特别线路默认 Base URL 更新为 `https://api.tu-zi.com/coding`，并保留旧地址兼容识别
+- Windows 下载说明简化为“下载 Windows 安装包”，macOS / Linux 一键安装文案和脚本提示同步收口
+- Codex 状态可信度继续加强，会对 installer 记录、实际 CLI 变体与当前线路不一致的情况给出明确提醒
+- 继续保持一键安装命中当前推荐版本，并同步更新安装脚本示例
 
 ## 产品亮点
 
@@ -161,12 +160,12 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 开发计划 / TODO List
 
-- 已完成：Claude / Codex / Gemini 当前线路、CLI 变体、Base URL、provider 当前态的显示优先级与刷新联动收口
-- 已完成：Claude provider 切换后的 route file / shell rc / settings.json / current provider 收口，以及改版状态误报修正
-- 已完成：Codex / Gemini 改版安装冲突清理、安装后复核、真实变体校验与测试模型链路修正
-- 已完成：README 一键安装命令与安装脚本示例固定到 `v3.12.16`，并补充三模块当前线路逻辑文档入口
+- 已完成：Claude / Codex / Gemini 原版与 gac 改版最新版检测、升级按钮状态和改版升级路径收口
+- 已完成：Codex Coding 特别线路 Base URL 切换到 `https://api.tu-zi.com/coding`，旧地址继续兼容识别
+- 已完成：Windows 下载文案精简，macOS / Linux 一键安装标题和 Git Bash 误用提示同步更新
+- 已完成：README 一键安装命令与安装脚本示例固定到 `v3.12.17`
 - 进行中：继续统一深色 / 浅色主题下的路线卡、状态区、列表高亮与各入口文案密度
-- 进行中：继续梳理并消除 provider / proxy / openclaw 相关的顺序依赖型 Rust flaky tests
+- 进行中：继续梳理 CLI 真实命中、installer 记录与外部脚本写入状态之间的冲突提示边界
 - 下一步：继续梳理会话管理与恢复策略
 - 下一步：继续推进 release workflow 向更稳定的 `latest` / 签名分发体验收口
 

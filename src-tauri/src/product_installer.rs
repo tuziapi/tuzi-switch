@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::time::Duration;
 use tauri::State;
 
 use crate::{app_config::AppType, provider::Provider, store::AppState};
@@ -206,6 +207,7 @@ struct InstallState {
     route: Option<String>,
     last_original_route: Option<String>,
     last_original_provider_id: Option<String>,
+    install_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -340,10 +342,47 @@ fn find_executable_in_path(program: &str) -> Option<PathBuf> {
     None
 }
 
+fn resolve_npm_cmd_shim_target(command_path: &Path) -> Option<PathBuf> {
+    if !command_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.eq_ignore_ascii_case("cmd"))
+        .unwrap_or(false)
+    {
+        return None;
+    }
+
+    let command_dir = command_path.parent()?;
+    let content = fs::read_to_string(command_path).ok()?;
+    let mut quoted = content.split('"').skip(1);
+    while let Some(segment) = quoted.next() {
+        let normalized = segment.replace('\\', "/");
+        let Some(index) = normalized.to_lowercase().find("node_modules/") else {
+            let _ = quoted.next();
+            continue;
+        };
+        let suffix = normalized[index + "node_modules/".len()..].trim_matches('/');
+        if suffix.is_empty() || !suffix.ends_with(".js") {
+            let _ = quoted.next();
+            continue;
+        }
+
+        let mut target = command_dir.join("node_modules");
+        for part in suffix.split('/').filter(|part| !part.is_empty()) {
+            target.push(part);
+        }
+        return Some(target);
+    }
+
+    None
+}
+
 fn read_package_metadata(executable_path: &Path) -> ResolvedCliInfo {
     let command_path = Some(executable_path.display().to_string());
+    let launcher_target = resolve_npm_cmd_shim_target(executable_path)
+        .unwrap_or_else(|| executable_path.to_path_buf());
     let resolved =
-        fs::canonicalize(executable_path).unwrap_or_else(|_| executable_path.to_path_buf());
+        fs::canonicalize(&launcher_target).unwrap_or_else(|_| launcher_target.to_path_buf());
 
     for ancestor in resolved.ancestors().take(8) {
         let package_json_path = ancestor.join("package.json");
@@ -538,10 +577,30 @@ fn remove_conflicting_cli_launcher(
     }
 }
 
+fn remove_conflicting_claude_original_launcher(
+    resolved_cli: &ResolvedCliInfo,
+) -> Result<Vec<String>, String> {
+    if resolve_claude_cli_variant(resolved_cli).as_deref() == Some("original") {
+        return Ok(Vec::new());
+    }
+
+    remove_conflicting_cli_launcher(resolved_cli, "ClaudeCode")
+}
+
 fn remove_conflicting_codex_launcher(
     resolved_cli: &ResolvedCliInfo,
 ) -> Result<Vec<String>, String> {
     if resolve_codex_cli_variant(resolved_cli).as_deref() == Some("gac") {
+        return Ok(Vec::new());
+    }
+
+    remove_conflicting_cli_launcher(resolved_cli, "Codex")
+}
+
+fn remove_conflicting_codex_original_launcher(
+    resolved_cli: &ResolvedCliInfo,
+) -> Result<Vec<String>, String> {
+    if resolve_codex_cli_variant(resolved_cli).as_deref() == Some("openai") {
         return Ok(Vec::new());
     }
 
@@ -879,18 +938,109 @@ fn has_variant_conflict(expected_variant: Option<&str>, resolved_variant: Option
 }
 
 async fn fetch_npm_latest_version(package: &str) -> Option<String> {
-    let url = format!("https://registry.npmjs.org/{package}");
-    match crate::proxy::http_client::get().get(&url).send().await {
-        Ok(resp) => match resp.json::<Value>().await {
-            Ok(json) => json
-                .get("dist-tags")
-                .and_then(|tags| tags.get("latest"))
-                .and_then(|value| value.as_str())
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty()),
-            Err(_) => None,
-        },
-        Err(_) => None,
+    let encoded = encode_npm_package_name(package);
+    tokio::time::timeout(Duration::from_secs(6), async move {
+        if let Some(version) = fetch_npm_latest_version_direct(&encoded).await {
+            Some(version)
+        } else {
+            fetch_npm_latest_version_from_metadata(&encoded).await
+        }
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+fn encode_npm_package_name(package: &str) -> String {
+    package.replace('/', "%2F")
+}
+
+fn json_string_field(json: &Value, key: &str) -> Option<String> {
+    json.get(key)
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+async fn fetch_npm_latest_version_direct(encoded_package: &str) -> Option<String> {
+    let url = format!("https://registry.npmjs.org/{encoded_package}/latest");
+    let resp = crate::proxy::http_client::get()
+        .get(&url)
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?;
+    let json = resp.json::<Value>().await.ok()?;
+    json_string_field(&json, "version")
+}
+
+async fn fetch_npm_latest_version_from_metadata(encoded_package: &str) -> Option<String> {
+    let url = format!("https://registry.npmjs.org/{encoded_package}");
+    let resp = crate::proxy::http_client::get()
+        .get(&url)
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?;
+    let json = resp.json::<Value>().await.ok()?;
+    json.get("dist-tags")
+        .and_then(|tags| tags.get("latest"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+async fn fetch_gac_latest_version(install_url: &str) -> Option<String> {
+    tokio::time::timeout(Duration::from_secs(6), async move {
+        if let Some(version) =
+            fetch_gac_latest_version_with_method(install_url, reqwest::Method::HEAD).await
+        {
+            Some(version)
+        } else {
+            fetch_gac_latest_version_with_method(install_url, reqwest::Method::GET).await
+        }
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+async fn fetch_gac_latest_version_with_method(
+    install_url: &str,
+    method: reqwest::Method,
+) -> Option<String> {
+    let resp = crate::proxy::http_client::get()
+        .request(method, install_url)
+        .send()
+        .await
+        .ok()?;
+
+    let final_url = resp.url().to_string();
+    extract_gac_latest_marker_from_url(&final_url).or_else(|| {
+        resp.headers()
+            .get(reqwest::header::LOCATION)
+            .and_then(|value| value.to_str().ok())
+            .and_then(extract_gac_latest_marker_from_url)
+    })
+}
+
+fn extract_gac_latest_marker_from_url(url: &str) -> Option<String> {
+    let without_query = url.split('?').next().unwrap_or(url);
+    let filename = without_query.rsplit('/').next()?.trim();
+    let stem = filename.strip_suffix(".tgz")?;
+    let start = stem.find(|ch: char| ch.is_ascii_digit())?;
+    let marker = stem[start..]
+        .chars()
+        .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '.' || *ch == '-')
+        .collect::<String>()
+        .trim_matches(['.', '-'])
+        .to_string();
+    if marker.is_empty() {
+        None
+    } else {
+        Some(marker)
     }
 }
 
@@ -1973,10 +2123,10 @@ pub async fn get_claudecode_status() -> Result<ClaudeCodeStatus, String> {
                     .and_then(|route| claude_route_name_to_base_url(route, &route_data))
             })
     };
-    let latest_version = if installed && resolved_variant.as_deref() == Some("original") {
-        fetch_npm_latest_version(CLAUDE_ORIGINAL_PACKAGE).await
-    } else {
-        None
+    let latest_version = match (installed, resolved_variant.as_deref()) {
+        (true, Some("original")) => fetch_npm_latest_version(CLAUDE_ORIGINAL_PACKAGE).await,
+        (true, Some("modified")) => fetch_gac_latest_version(CLAUDE_MODIFIED_INSTALL_URL).await,
+        _ => None,
     };
     let variant_conflict = has_variant_conflict(
         claude_expected_variant(current_route.as_deref()),
@@ -2213,13 +2363,29 @@ pub async fn upgrade_claudecode(
     let resolved_variant = resolve_claude_cli_variant(&resolved_cli);
     let requested = target_variant
         .map(|v| v.trim().to_lowercase())
-        .unwrap_or_else(|| "original".to_string());
-    if matches!(requested.as_str(), "modified" | "a" | "改版")
-        || resolved_variant.as_deref() == Some("modified")
-    {
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| {
+            if resolved_variant.as_deref() == Some("modified") {
+                "modified".to_string()
+            } else {
+                "original".to_string()
+            }
+        });
+    if matches!(requested.as_str(), "modified" | "a" | "改版") {
+        let command = format!("npm install -g {CLAUDE_MODIFIED_INSTALL_URL}");
+        return match run_shell_script(&command) {
+            Ok(output) => Ok(claude_ok(
+                "ClaudeCode 改版升级成功",
+                format!("$ {command}\n{output}"),
+                true,
+            )),
+            Err(e) => Ok(claude_err("ClaudeCode 升级失败", e, String::new())),
+        };
+    }
+    if resolved_variant.as_deref() == Some("modified") {
         return Ok(claude_err(
             "ClaudeCode 升级失败",
-            "当前正在使用 gac 改版，请先退出使用改版后再升级原版 CLI".to_string(),
+            "当前正在使用 gac 改版，无法执行原版升级".to_string(),
             String::new(),
         ));
     }
@@ -2367,7 +2533,7 @@ pub async fn switch_claudecode_variant(
             resolve_claude_cli_variant,
             "ClaudeCode",
             "原版",
-            None,
+            Some(remove_conflicting_claude_original_launcher),
         ) {
             Ok(result) => result.logs,
             Err(failure) => {
@@ -2476,6 +2642,15 @@ fn normalize_gemini_route(value: &str) -> Option<String> {
     }
 }
 
+fn normalize_install_version(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() || value.eq_ignore_ascii_case("none") {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
 fn gemini_route_base_url(route: &str) -> Option<&'static str> {
     match route {
         "tuzi" => Some("https://api.tu-zi.com"),
@@ -2512,7 +2687,7 @@ fn route_base_url(route: &str) -> Option<&'static str> {
     match route {
         "gac" => Some("https://gaccode.com/codex/v1"),
         "tuzi" => Some("https://api.tu-zi.com/v1"),
-        "codex" => Some("https://coding.tu-zi.com"),
+        "codex" => Some("https://api.tu-zi.com/coding"),
         _ => None,
     }
 }
@@ -2522,6 +2697,7 @@ fn parse_install_state(content: &str) -> InstallState {
     let mut route = None;
     let mut last_original_route = None;
     let mut last_original_provider_id = None;
+    let mut install_version = None;
     for raw in content.lines() {
         let line = raw.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -2535,6 +2711,8 @@ fn parse_install_state(content: &str) -> InstallState {
             last_original_route = normalize_route_input(value);
         } else if let Some(value) = line.strip_prefix("LAST_ORIGINAL_PROVIDER_ID=") {
             last_original_provider_id = normalize_saved_provider_id(value);
+        } else if let Some(value) = line.strip_prefix("INSTALL_VERSION=") {
+            install_version = normalize_install_version(value);
         }
     }
     InstallState {
@@ -2542,6 +2720,7 @@ fn parse_install_state(content: &str) -> InstallState {
         route,
         last_original_route,
         last_original_provider_id,
+        install_version,
     }
 }
 
@@ -2554,6 +2733,15 @@ fn save_install_state(
     install_type: &str,
     route: Option<&str>,
     last_original_provider_id: Option<&str>,
+) -> Result<(), String> {
+    save_install_state_with_version(install_type, route, last_original_provider_id, None)
+}
+
+fn save_install_state_with_version(
+    install_type: &str,
+    route: Option<&str>,
+    last_original_provider_id: Option<&str>,
+    install_version: Option<&str>,
 ) -> Result<(), String> {
     let install_type = normalize_install_type(install_type)
         .ok_or_else(|| format!("非法安装类型: {install_type}"))?;
@@ -2574,11 +2762,21 @@ fn save_install_state(
         existing.last_original_provider_id.clone(),
         last_original_provider_id.and_then(normalize_saved_provider_id),
     );
+    let install_version = if install_type == "gac" {
+        install_version
+            .and_then(normalize_install_version)
+            .or(existing.install_version)
+    } else {
+        None
+    };
     let path = get_codex_state_file_path()?;
+    let install_version_line = install_version
+        .map(|value| format!("INSTALL_VERSION={value}\n"))
+        .unwrap_or_default();
     write_file(
         &path,
         &format!(
-            "INSTALL_TYPE={install_type}\nROUTE={route_value}\nLAST_ORIGINAL_ROUTE={}\nLAST_ORIGINAL_PROVIDER_ID={}\nMANAGED_BY=cc-switch\n",
+            "INSTALL_TYPE={install_type}\nROUTE={route_value}\nLAST_ORIGINAL_ROUTE={}\nLAST_ORIGINAL_PROVIDER_ID={}\n{install_version_line}MANAGED_BY=cc-switch\n",
             last_original_route.unwrap_or_else(|| "none".to_string()),
             last_original_provider_id.unwrap_or_else(|| "none".to_string())
         ),
@@ -2591,6 +2789,7 @@ fn load_gemini_install_state() -> InstallState {
     let mut route = None;
     let mut last_original_route = None;
     let mut last_original_provider_id = None;
+    let mut install_version = None;
     for raw in read_file(&path).unwrap_or_default().lines() {
         let line = raw.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -2604,6 +2803,8 @@ fn load_gemini_install_state() -> InstallState {
             last_original_route = normalize_gemini_route(value);
         } else if let Some(value) = line.strip_prefix("LAST_ORIGINAL_PROVIDER_ID=") {
             last_original_provider_id = normalize_saved_provider_id(value);
+        } else if let Some(value) = line.strip_prefix("INSTALL_VERSION=") {
+            install_version = normalize_install_version(value);
         }
     }
     InstallState {
@@ -2611,6 +2812,7 @@ fn load_gemini_install_state() -> InstallState {
         route,
         last_original_route,
         last_original_provider_id,
+        install_version,
     }
 }
 
@@ -2618,6 +2820,15 @@ fn save_gemini_install_state(
     install_type: &str,
     route: Option<&str>,
     last_original_provider_id: Option<&str>,
+) -> Result<(), String> {
+    save_gemini_install_state_with_version(install_type, route, last_original_provider_id, None)
+}
+
+fn save_gemini_install_state_with_version(
+    install_type: &str,
+    route: Option<&str>,
+    last_original_provider_id: Option<&str>,
+    install_version: Option<&str>,
 ) -> Result<(), String> {
     let install_type = normalize_gemini_install_type(install_type)
         .ok_or_else(|| format!("非法安装类型: {install_type}"))?;
@@ -2638,11 +2849,21 @@ fn save_gemini_install_state(
         existing.last_original_provider_id.clone(),
         last_original_provider_id.and_then(normalize_saved_provider_id),
     );
+    let install_version = if install_type == "gac" {
+        install_version
+            .and_then(normalize_install_version)
+            .or(existing.install_version)
+    } else {
+        None
+    };
     let path = get_gemini_state_file_path()?;
+    let install_version_line = install_version
+        .map(|value| format!("INSTALL_VERSION={value}\n"))
+        .unwrap_or_default();
     write_file(
         &path,
         &format!(
-            "INSTALL_TYPE={install_type}\nROUTE={route_value}\nLAST_ORIGINAL_ROUTE={}\nLAST_ORIGINAL_PROVIDER_ID={}\nMANAGED_BY=cc-switch\n",
+            "INSTALL_TYPE={install_type}\nROUTE={route_value}\nLAST_ORIGINAL_ROUTE={}\nLAST_ORIGINAL_PROVIDER_ID={}\n{install_version_line}MANAGED_BY=cc-switch\n",
             last_original_route.unwrap_or_else(|| "none".to_string()),
             last_original_provider_id.unwrap_or_else(|| "none".to_string())
         ),
@@ -3067,10 +3288,15 @@ pub async fn get_codex_status() -> Result<CodexStatus, String> {
         .or(config.model_provider.clone())
         .or(config.profile.clone());
     let resolved_variant = resolve_codex_cli_variant(&resolved_cli);
-    let latest_version = if installed && resolved_variant.as_deref() == Some("openai") {
-        fetch_npm_latest_version(CODEX_OPENAI_PACKAGE).await
+    let latest_version = match (installed, resolved_variant.as_deref()) {
+        (true, Some("openai")) => fetch_npm_latest_version(CODEX_OPENAI_PACKAGE).await,
+        (true, Some("gac")) => fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await,
+        _ => None,
+    };
+    let status_version = if resolved_variant.as_deref() == Some("gac") {
+        state.install_version.clone().or_else(|| version.clone())
     } else {
-        None
+        version.clone()
     };
     let variant_conflict = has_variant_conflict(
         codex_expected_variant(state.install_type.as_deref(), current_route.as_deref()),
@@ -3088,7 +3314,7 @@ pub async fn get_codex_status() -> Result<CodexStatus, String> {
     };
     Ok(CodexStatus {
         installed,
-        version,
+        version: status_version,
         latest_version,
         resolved_version: resolved_cli.package_version.clone(),
         install_type: state
@@ -3151,7 +3377,13 @@ pub async fn install_codex(
             current_state.last_original_provider_id.as_deref(),
         )?;
         if installed && is_variant_compatible(resolved_variant.as_deref(), "gac") {
-            save_install_state("gac", None, remembered_provider_id.as_deref())?;
+            let install_version = fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await;
+            save_install_state_with_version(
+                "gac",
+                None,
+                remembered_provider_id.as_deref(),
+                install_version.as_deref(),
+            )?;
             return match clear_exclusive_current_provider(state.inner(), &AppType::Codex) {
                 Ok(provider_logs) => {
                     let mut logs = vec!["已确认安装类型=gac".to_string()];
@@ -3177,7 +3409,13 @@ pub async fn install_codex(
             Some(remove_conflicting_codex_launcher),
         ) {
             Ok(mut result) => {
-                save_install_state("gac", None, remembered_provider_id.as_deref())?;
+                let install_version = fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await;
+                save_install_state_with_version(
+                    "gac",
+                    None,
+                    remembered_provider_id.as_deref(),
+                    install_version.as_deref(),
+                )?;
                 match clear_exclusive_current_provider(state.inner(), &AppType::Codex) {
                     Ok(provider_logs) => {
                         result.logs.extend(provider_logs);
@@ -3268,11 +3506,25 @@ pub async fn upgrade_codex(target_variant: Option<String>) -> Result<CodexAction
         .or_else(|| resolve_codex_cli_variant(&resolve_cli_info("codex")))
         .unwrap_or_else(|| "openai".to_string());
     if variant == "gac" {
-        return Ok(codex_err(
-            "Codex 升级失败",
-            "当前正在使用 gac 改版，请先退出使用改版后再升级原版 CLI".to_string(),
-            String::new(),
-        ));
+        let command = format!("npm install -g {CODEX_GAC_INSTALL_URL}");
+        return match run_shell_script(&command) {
+            Ok(output) => {
+                let current_state = load_install_state();
+                let install_version = fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await;
+                save_install_state_with_version(
+                    "gac",
+                    None,
+                    current_state.last_original_provider_id.as_deref(),
+                    install_version.as_deref(),
+                )?;
+                Ok(codex_ok(
+                    "Codex 改版升级成功",
+                    format!("$ {command}\n{output}\n{CODEX_GAC_RUNTIME_HINT}"),
+                    true,
+                ))
+            }
+            Err(e) => Ok(codex_err("Codex 升级失败", e, String::new())),
+        };
     }
     let command = format!("npm install -g {CODEX_OPENAI_PACKAGE}@latest");
     match run_shell_script(&command) {
@@ -3310,7 +3562,13 @@ pub async fn switch_codex_variant(
             current_state.last_original_provider_id.as_deref(),
         )?;
         if installed && is_variant_compatible(resolved_variant.as_deref(), "gac") {
-            save_install_state("gac", None, remembered_provider_id.as_deref())?;
+            let install_version = fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await;
+            save_install_state_with_version(
+                "gac",
+                None,
+                remembered_provider_id.as_deref(),
+                install_version.as_deref(),
+            )?;
             return match clear_exclusive_current_provider(state.inner(), &AppType::Codex) {
                 Ok(provider_logs) => {
                     let mut logs = vec!["已确认安装类型=gac".to_string()];
@@ -3337,7 +3595,13 @@ pub async fn switch_codex_variant(
             Some(remove_conflicting_codex_launcher),
         ) {
             Ok(mut result) => {
-                save_install_state("gac", None, remembered_provider_id.as_deref())?;
+                let install_version = fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await;
+                save_install_state_with_version(
+                    "gac",
+                    None,
+                    remembered_provider_id.as_deref(),
+                    install_version.as_deref(),
+                )?;
                 match clear_exclusive_current_provider(state.inner(), &AppType::Codex) {
                     Ok(provider_logs) => {
                         result.logs.extend(provider_logs);
@@ -3394,7 +3658,7 @@ pub async fn switch_codex_variant(
             resolve_codex_cli_variant,
             "Codex",
             "原版",
-            None,
+            Some(remove_conflicting_codex_original_launcher),
         ) {
             Ok(result) => result.logs,
             Err(failure) => {
@@ -3546,10 +3810,15 @@ pub async fn get_gemini_status() -> Result<GeminiStatus, String> {
         .clone()
         .or_else(|| infer_gemini_route(&base_url));
     let resolved_variant = resolve_gemini_cli_variant(&resolved_cli);
-    let latest_version = if installed && resolved_variant.as_deref() == Some("official") {
-        fetch_npm_latest_version(GEMINI_OFFICIAL_PACKAGE).await
+    let latest_version = match (installed, resolved_variant.as_deref()) {
+        (true, Some("official")) => fetch_npm_latest_version(GEMINI_OFFICIAL_PACKAGE).await,
+        (true, Some("gac")) => fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await,
+        _ => None,
+    };
+    let status_version = if resolved_variant.as_deref() == Some("gac") {
+        state.install_version.clone().or_else(|| version.clone())
     } else {
-        None
+        version.clone()
     };
     let variant_conflict = has_variant_conflict(
         gemini_expected_variant(state.install_type.as_deref(), current_route.as_deref()),
@@ -3563,7 +3832,7 @@ pub async fn get_gemini_status() -> Result<GeminiStatus, String> {
 
     Ok(GeminiStatus {
         installed,
-        version,
+        version: status_version,
         latest_version,
         resolved_version: resolved_cli.package_version.clone(),
         install_type: state
@@ -3679,7 +3948,13 @@ pub async fn install_gemini(
             current_state.last_original_provider_id.as_deref(),
         )?;
         if installed && is_variant_compatible(resolved_variant.as_deref(), "gac") {
-            save_gemini_install_state("gac", None, remembered_provider_id.as_deref())?;
+            let install_version = fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await;
+            save_gemini_install_state_with_version(
+                "gac",
+                None,
+                remembered_provider_id.as_deref(),
+                install_version.as_deref(),
+            )?;
             return match clear_exclusive_current_provider(state.inner(), &AppType::Gemini) {
                 Ok(provider_logs) => {
                     let mut logs = vec!["已确认安装类型=gac".to_string()];
@@ -3704,7 +3979,13 @@ pub async fn install_gemini(
             Some(remove_conflicting_gemini_modified_launcher),
         ) {
             Ok(mut result) => {
-                save_gemini_install_state("gac", None, remembered_provider_id.as_deref())?;
+                let install_version = fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await;
+                save_gemini_install_state_with_version(
+                    "gac",
+                    None,
+                    remembered_provider_id.as_deref(),
+                    install_version.as_deref(),
+                )?;
                 match clear_exclusive_current_provider(state.inner(), &AppType::Gemini) {
                     Ok(provider_logs) => {
                         result.logs.extend(provider_logs);
@@ -3783,11 +4064,25 @@ pub async fn upgrade_gemini(target_variant: Option<String>) -> Result<GeminiActi
         .or_else(|| resolve_gemini_cli_variant(&resolve_cli_info("gemini")))
         .unwrap_or_else(|| "official".to_string());
     if variant == "gac" {
-        return Ok(gemini_err(
-            "Gemini 升级失败",
-            "当前正在使用 gac 改版，请先退出使用改版后再升级原版 CLI".to_string(),
-            String::new(),
-        ));
+        let command = format!("npm install -g {GEMINI_GAC_INSTALL_URL}");
+        return match run_shell_script(&command) {
+            Ok(output) => {
+                let current_state = load_gemini_install_state();
+                let install_version = fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await;
+                save_gemini_install_state_with_version(
+                    "gac",
+                    None,
+                    current_state.last_original_provider_id.as_deref(),
+                    install_version.as_deref(),
+                )?;
+                Ok(gemini_ok(
+                    "Gemini 改版升级成功",
+                    format!("$ {command}\n{output}"),
+                    true,
+                ))
+            }
+            Err(e) => Ok(gemini_err("Gemini 升级失败", e, String::new())),
+        };
     }
     let command = format!("npm install -g {GEMINI_OFFICIAL_PACKAGE}@latest");
     match run_shell_script(&command) {
@@ -3825,7 +4120,13 @@ pub async fn switch_gemini_variant(
             current_state.last_original_provider_id.as_deref(),
         )?;
         if installed && is_variant_compatible(resolved_variant.as_deref(), "gac") {
-            save_gemini_install_state("gac", None, remembered_provider_id.as_deref())?;
+            let install_version = fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await;
+            save_gemini_install_state_with_version(
+                "gac",
+                None,
+                remembered_provider_id.as_deref(),
+                install_version.as_deref(),
+            )?;
             return match clear_exclusive_current_provider(state.inner(), &AppType::Gemini) {
                 Ok(provider_logs) => {
                     let mut logs = vec!["已确认安装类型=gac".to_string()];
@@ -3851,7 +4152,13 @@ pub async fn switch_gemini_variant(
             Some(remove_conflicting_gemini_modified_launcher),
         ) {
             Ok(mut result) => {
-                save_gemini_install_state("gac", None, remembered_provider_id.as_deref())?;
+                let install_version = fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await;
+                save_gemini_install_state_with_version(
+                    "gac",
+                    None,
+                    remembered_provider_id.as_deref(),
+                    install_version.as_deref(),
+                )?;
                 match clear_exclusive_current_provider(state.inner(), &AppType::Gemini) {
                     Ok(provider_logs) => {
                         result.logs.extend(provider_logs);
@@ -3906,21 +4213,24 @@ pub async fn switch_gemini_variant(
         }
 
         let command = format!("npm install -g {GEMINI_OFFICIAL_PACKAGE}");
-        let output = match run_shell_script(&command) {
-            Ok(value) => value,
-            Err(error) => return Ok(gemini_err("Gemini 切回原版失败", error, String::new())),
-        };
-        let mut logs = vec![format!("$ {command}"), output];
-        match ensure_gemini_official_command_target() {
-            Ok(cleanup_logs) => logs.extend(cleanup_logs),
-            Err(error) => {
+        let mut logs = match install_and_verify_cli_variant(
+            "gemini",
+            &command,
+            "official",
+            resolve_gemini_cli_variant,
+            "Gemini",
+            "官方版",
+            Some(remove_conflicting_gemini_launcher),
+        ) {
+            Ok(result) => result.logs,
+            Err(failure) => {
                 return Ok(gemini_err(
-                    "Gemini 已安装官方版，但当前命中的 CLI 仍未切回官方版",
-                    error,
-                    logs.join("\n"),
+                    "Gemini 切回官方版失败",
+                    failure.error,
+                    failure.logs.join("\n"),
                 ))
             }
-        }
+        };
         match configure_gemini_route(&restore_route, &restore_api_key, restore_model) {
             Ok(route_logs) => {
                 logs.extend(route_logs);
@@ -3957,10 +4267,13 @@ pub async fn switch_gemini_variant(
 mod tests {
     use super::{
         claude_custom_api_key_fingerprint, claude_has_modified_status_context,
-        claude_runtime_env_conflicts, claude_sources_are_conflicting, merge_claude_current_route,
-        normalize_claude_route_for_comparison, remove_conflicting_codex_launcher,
-        remove_conflicting_gemini_launcher, remove_conflicting_gemini_modified_launcher,
-        resolve_claude_cli_variant, sync_claude_json_state, ResolvedCliInfo,
+        claude_runtime_env_conflicts, claude_sources_are_conflicting,
+        extract_gac_latest_marker_from_url, merge_claude_current_route,
+        normalize_claude_route_for_comparison, parse_install_state,
+        remove_conflicting_claude_original_launcher, remove_conflicting_codex_launcher,
+        remove_conflicting_codex_original_launcher, remove_conflicting_gemini_launcher,
+        remove_conflicting_gemini_modified_launcher, resolve_claude_cli_variant,
+        sync_claude_json_state, ResolvedCliInfo, CLAUDE_ORIGINAL_PACKAGE, CODEX_OPENAI_PACKAGE,
         GEMINI_OFFICIAL_PACKAGE,
     };
     use serde_json::{json, Value};
@@ -3992,6 +4305,46 @@ mod tests {
     }
 
     #[test]
+    fn extract_gac_latest_marker_from_tgz_urls() {
+        assert_eq!(
+            extract_gac_latest_marker_from_url(
+                "https://example.com/links/anthropic-ai-claude-code-2.1.111.tgz"
+            )
+            .as_deref(),
+            Some("2.1.111")
+        );
+        assert_eq!(
+            extract_gac_latest_marker_from_url(
+                "https://example.com/links/codex-0.125.0.gac.1.tgz?download=1"
+            )
+            .as_deref(),
+            Some("0.125.0.gac.1")
+        );
+        assert_eq!(
+            extract_gac_latest_marker_from_url("https://example.com/links/gemini-0.38.1.gac.1.tgz")
+                .as_deref(),
+            Some("0.38.1.gac.1")
+        );
+        assert!(extract_gac_latest_marker_from_url("https://example.com/install").is_none());
+    }
+
+    #[test]
+    fn parse_install_state_keeps_optional_install_version() {
+        let state = parse_install_state(
+            "INSTALL_TYPE=gac\nROUTE=none\nLAST_ORIGINAL_ROUTE=tuzi\nLAST_ORIGINAL_PROVIDER_ID=provider-1\nINSTALL_VERSION=0.125.0.gac.1\nMANAGED_BY=cc-switch\n",
+        );
+
+        assert_eq!(state.install_type.as_deref(), Some("gac"));
+        assert_eq!(state.route.as_deref(), None);
+        assert_eq!(state.last_original_route.as_deref(), Some("tuzi"));
+        assert_eq!(
+            state.last_original_provider_id.as_deref(),
+            Some("provider-1")
+        );
+        assert_eq!(state.install_version.as_deref(), Some("0.125.0.gac.1"));
+    }
+
+    #[test]
     fn resolve_claude_cli_variant_detects_modified_markers() {
         let temp = tempdir().unwrap();
         fs::write(temp.path().join("relay-selector.js"), "relay").unwrap();
@@ -4007,6 +4360,51 @@ mod tests {
         });
 
         assert_eq!(variant.as_deref(), Some("modified"));
+    }
+
+    #[test]
+    fn read_package_metadata_resolves_windows_npm_cmd_shim() {
+        let temp = tempdir().unwrap();
+        let package_root = temp
+            .path()
+            .join("node_modules")
+            .join("@openai")
+            .join("codex");
+        let bin_dir = package_root.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        fs::write(bin_dir.join("codex.js"), "console.log('codex')").unwrap();
+        fs::write(
+            package_root.join("package.json"),
+            serde_json::to_string(&json!({
+                "name": "@openai/codex",
+                "version": "0.125.0"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let command_path = temp.path().join("codex.cmd");
+        fs::write(
+            &command_path,
+            r#"@ECHO off
+"node" "%dp0%\node_modules\@openai\codex\bin\codex.js" %*
+"#,
+        )
+        .unwrap();
+
+        let info = super::read_package_metadata(&command_path);
+
+        assert_eq!(
+            info.command_path.as_deref(),
+            Some(command_path.to_str().unwrap())
+        );
+        assert_eq!(info.package_name.as_deref(), Some("@openai/codex"));
+        assert_eq!(info.package_version.as_deref(), Some("0.125.0"));
+        let expected_package_root = fs::canonicalize(&package_root).unwrap();
+        assert_eq!(
+            info.package_root_path.as_deref(),
+            Some(expected_package_root.to_str().unwrap())
+        );
     }
 
     #[test]
@@ -4096,6 +4494,122 @@ mod tests {
         assert!(logs
             .iter()
             .any(|line| line.contains("已移除冲突的 Codex launcher")));
+    }
+
+    #[test]
+    fn remove_conflicting_codex_original_launcher_deletes_non_openai_command_file() {
+        let temp = tempdir().unwrap();
+        let command_path = temp.path().join("codex");
+        fs::write(&command_path, "#!/bin/sh\n").unwrap();
+
+        let logs = remove_conflicting_codex_original_launcher(&ResolvedCliInfo {
+            command_path: Some(command_path.display().to_string()),
+            executable_path: Some(command_path.display().to_string()),
+            package_root_path: None,
+            package_name: Some("gac-codex".to_string()),
+            package_version: Some("0.125.0".to_string()),
+        })
+        .unwrap();
+
+        assert!(!command_path.exists());
+        assert!(logs
+            .iter()
+            .any(|line| line.contains("已移除冲突的 Codex launcher")));
+    }
+
+    #[test]
+    fn remove_conflicting_codex_original_launcher_preserves_openai_command() {
+        let temp = tempdir().unwrap();
+        let command_path = temp.path().join("codex");
+        fs::write(&command_path, "#!/bin/sh\n").unwrap();
+
+        let logs = remove_conflicting_codex_original_launcher(&ResolvedCliInfo {
+            command_path: Some(command_path.display().to_string()),
+            executable_path: Some(command_path.display().to_string()),
+            package_root_path: None,
+            package_name: Some(CODEX_OPENAI_PACKAGE.to_string()),
+            package_version: Some("0.59.0".to_string()),
+        })
+        .unwrap();
+
+        assert!(command_path.exists());
+        assert!(logs.is_empty());
+    }
+
+    #[test]
+    fn remove_conflicting_codex_original_launcher_rejects_directory_target() {
+        let temp = tempdir().unwrap();
+        let command_dir = temp.path().join("codex");
+        fs::create_dir_all(&command_dir).unwrap();
+
+        let error = remove_conflicting_codex_original_launcher(&ResolvedCliInfo {
+            command_path: Some(command_dir.display().to_string()),
+            executable_path: Some(command_dir.display().to_string()),
+            package_root_path: None,
+            package_name: Some("gac-codex".to_string()),
+            package_version: Some("0.125.0".to_string()),
+        })
+        .unwrap_err();
+
+        assert!(error.contains("不是普通文件/符号链接"));
+    }
+
+    #[test]
+    fn remove_conflicting_claude_original_launcher_deletes_non_original_command_file() {
+        let temp = tempdir().unwrap();
+        let command_path = temp.path().join("claude");
+        fs::write(&command_path, "#!/bin/sh\n").unwrap();
+
+        let logs = remove_conflicting_claude_original_launcher(&ResolvedCliInfo {
+            command_path: Some(command_path.display().to_string()),
+            executable_path: Some(command_path.display().to_string()),
+            package_root_path: None,
+            package_name: Some("gac-claude-code".to_string()),
+            package_version: Some("2.1.112".to_string()),
+        })
+        .unwrap();
+
+        assert!(!command_path.exists());
+        assert!(logs
+            .iter()
+            .any(|line| line.contains("已移除冲突的 ClaudeCode launcher")));
+    }
+
+    #[test]
+    fn remove_conflicting_claude_original_launcher_preserves_original_command() {
+        let temp = tempdir().unwrap();
+        let command_path = temp.path().join("claude");
+        fs::write(&command_path, "#!/bin/sh\n").unwrap();
+
+        let logs = remove_conflicting_claude_original_launcher(&ResolvedCliInfo {
+            command_path: Some(command_path.display().to_string()),
+            executable_path: Some(command_path.display().to_string()),
+            package_root_path: None,
+            package_name: Some(CLAUDE_ORIGINAL_PACKAGE.to_string()),
+            package_version: Some("2.1.112".to_string()),
+        })
+        .unwrap();
+
+        assert!(command_path.exists());
+        assert!(logs.is_empty());
+    }
+
+    #[test]
+    fn remove_conflicting_claude_original_launcher_rejects_directory_target() {
+        let temp = tempdir().unwrap();
+        let command_dir = temp.path().join("claude");
+        fs::create_dir_all(&command_dir).unwrap();
+
+        let error = remove_conflicting_claude_original_launcher(&ResolvedCliInfo {
+            command_path: Some(command_dir.display().to_string()),
+            executable_path: Some(command_dir.display().to_string()),
+            package_root_path: None,
+            package_name: Some("gac-claude-code".to_string()),
+            package_version: Some("2.1.112".to_string()),
+        })
+        .unwrap_err();
+
+        assert!(error.contains("不是普通文件/符号链接"));
     }
 
     #[test]
