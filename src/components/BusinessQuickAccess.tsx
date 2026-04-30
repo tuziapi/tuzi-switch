@@ -276,7 +276,7 @@ const CODEX_ROUTE_CONFIG = {
   },
   codex: {
     providerId: "tuzi.coding",
-    providerName: "Codex · 兔子 Coding 特别线路",
+    providerName: "Codex·粉色订阅",
     baseUrl: "https://api.tu-zi.com/coding",
     websiteUrl: "https://api.tu-zi.com/coding",
     businessLine: "tuzi" as const,
@@ -536,6 +536,7 @@ function getCodexRouteFromProvider(
   }
   if (
     currentProviderId === CODEX_ROUTE_CONFIG.codex.providerId ||
+    providerName.includes("Codex·粉色订阅") ||
     providerName.includes("Codex · 兔子 Coding 特别线路") ||
     providerName.includes("Coding 特别线路") ||
     baseUrl.includes("api.tu-zi.com/coding") ||
@@ -1897,7 +1898,7 @@ export function BusinessQuickAccess({
         ? "由 gac 业务一键接入自动生成"
         : route === "tuzi"
           ? "由兔子业务一键接入自动生成（兔子线路）"
-          : "由兔子业务一键接入自动生成（Coding 特别线路）";
+          : "由兔子业务一键接入自动生成（粉色订阅）";
     const provider: Provider = {
       ...target.existingProvider,
       id: target.targetProviderId,
@@ -2468,7 +2469,7 @@ export function BusinessQuickAccess({
                   }}
                 />
                 <RouteCard
-                  title="Codex · 兔子 Coding 特别线路"
+                  title={CODEX_ROUTE_CONFIG.codex.providerName}
                   meta="Base URL: https://api.tu-zi.com/coding"
                   status={
                     activeCodexRoute === "tuzi-coding"
