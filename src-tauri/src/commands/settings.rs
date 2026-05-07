@@ -45,6 +45,7 @@ pub async fn restart_app(app: AppHandle) -> Result<bool, String> {
     // 在后台延迟重启，让函数有时间返回响应
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        crate::save_window_state_before_exit(&app);
         app.restart();
     });
     Ok(true)

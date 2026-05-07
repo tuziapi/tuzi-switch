@@ -27,17 +27,16 @@
 
 ### macOS / Linux ワンコマンドインストール
 
-現在の推奨版 `v3.12.17` を直接インストール:
+現在の推奨版 `v3.12.18` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.17 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.18 bash
 ```
 
 補足:
 
-- 現在の Release workflow は引き続き `prerelease` 方式で公開されています
-- GitHub の `releases/latest` では、最新のテスト版を安定して取得できない場合があります
-- README のコマンドは `v3.12.17` に固定し、現在の推奨版を確実に入れられるようにしています
+- 現在の Release は正式版として公開され、GitHub `releases/latest` は現在の推奨版を指す想定です
+- README のコマンドは `v3.12.18` に固定し、現在の推奨版を確実に入れられるようにしています
 - 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
@@ -69,14 +68,14 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 現在のバージョン更新内容
 
-現在の公開版は `v3.12.17` で、今回の主な更新は以下です。
+現在の公開版は `v3.12.18` で、今回の主な更新は以下です。
 
-- Claude、Codex、Gemini で原版 / gac 改版の両方に最新版チェックを追加し、状態は `Upgrade / Latest / Check failed` として扱います
-- gac 改版のアップグレードは対応する install URL を直接実行し、Codex / Gemini は `INSTALL_VERSION` も記録して、ローカル版と gac suffix の差による誤判定を減らします
-- Codex Coding 特別ルートの既定 Base URL を `https://api.tu-zi.com/coding` に更新し、旧 URL も互換認識します
-- Windows のダウンロード表現を Windows インストーラに簡略化し、macOS / Linux のワンコマンド導線と Git Bash 誤用時の案内も揃えました
-- Codex の状態信頼性を強化し、installer 記録、実際の CLI 変体、現在ルートが食い違う場合に明確に提示します
-- ワンコマンドインストールは現在の推奨版固定を維持し、インストールスクリプト例も更新しました
+- Windows の設定信頼性を強化し、CLI 検出では npm、pnpm、Volta、nvm、fnm、mise などの一般的なパスを補完します
+- Windows の Claude / Codex ルート設定では現在ユーザーの環境変数にも同期し、UI で設定済みでもターミナルで読めない状況を減らします
+- Claude、Codex、Gemini のインストールと改版終了フローで、安全な npm launcher 衝突を自動清理して再試行します
+- Claude 改版インストールで、古い `claude` launcher が原因の `EEXIST` 失敗に対応しました
+- 上流のウィンドウ状態保持と Linux drag-region 互換改善を取り込みました
+- Release を正式公開フローに切り替え、`releases/latest` と README のインストールコマンドが現在の推奨版を指すようにしました
 
 ## 製品のポイント
 
@@ -158,14 +157,15 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 開発計画 / TODO
 
-- 完了: Claude / Codex / Gemini の最新版チェック、アップグレードボタン状態、改版アップグレード経路を統一
-- 完了: Codex Coding 特別ルートを `https://api.tu-zi.com/coding` に切り替え、旧 URL も互換認識
-- 完了: Windows ダウンロード文言を簡略化し、macOS / Linux ワンコマンド見出しと Git Bash 誤用時の案内を更新
-- 完了: README のワンコマンドインストールとインストールスクリプト例を `v3.12.17` に更新
+- 完了: Windows / macOS / Linux での CLI 実解決パスと npm launcher 衝突処理を一度収束
+- 完了: Claude / Codex / Gemini のインストール、アップグレード、改版終了フローをさらに安定化
+- 完了: README のインストールコマンド、インストールスクリプト例、GitHub latest フローを `v3.12.18` に同期
+- 完了: 上流のウィンドウ状態保持、Linux drag-region 互換、JSON key 安定ソートを取り込み
 - 進行中: ライト / ダーク両テーマで、ルートカード、状態ブロック、下部リスト高亮、各入口の文案密度をさらに揃える
-- 進行中: 実際に命中する CLI、installer 記録、外部スクリプトが書いた state file の衝突境界を引き続き整理
+- 進行中: Windows 顧客環境の実フィードバックを集め、外部スクリプト、installer 記録、実際の CLI 解決の衝突境界を追跡
+- 進行中: OpenClaw の業務接入表現、セッション復元境界、デフォルトモデル連動を継続改善
 - 次: セッション管理と復元戦略を引き続き整理する
-- 次: release workflow をより安定した `latest` 導線と署名配布体験へ寄せていく
+- 次: macOS 署名配布と顧客向けインストール案内をさらに整える
 
 ## 補足
 

@@ -62,6 +62,7 @@ use tauri::image::Image;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::RunEvent;
 use tauri::{Emitter, Manager};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 fn redact_url_for_log(url_str: &str) -> String {
     match url::Url::parse(url_str) {
@@ -262,6 +263,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(window_state_flags())
+                .build(),
+        )
         .setup(|app| {
             // 预先刷新 Store 覆盖配置，确保后续路径读取正确（日志/数据库等）
             app_store::refresh_app_config_dir_override(app.handle());
@@ -1144,6 +1150,7 @@ pub fn run() {
 
             let app_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
+                save_window_state_before_exit(&app_handle);
                 cleanup_before_exit(&app_handle).await;
                 log::info!("清理完成，退出应用");
 
@@ -1549,4 +1556,15 @@ fn show_database_init_error_dialog(
             exit_text.to_string(),
         ))
         .blocking_show()
+}
+
+fn window_state_flags() -> StateFlags {
+    StateFlags::POSITION | StateFlags::SIZE | StateFlags::MAXIMIZED
+}
+
+/// 主动退出会走自定义清理并直接结束进程，这里先手动保存窗口状态。
+pub fn save_window_state_before_exit(app_handle: &tauri::AppHandle) {
+    if let Err(err) = app_handle.save_window_state(window_state_flags()) {
+        log::error!("退出前保存窗口状态失败: {err}");
+    }
 }

@@ -27,17 +27,16 @@ Current public releases are ready for Windows and Linux users. macOS is currentl
 
 ### macOS / Linux One-Command Install
 
-Install the currently recommended build `v3.12.17` directly from GitHub:
+Install the currently recommended build `v3.12.18` directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.17 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.18 bash
 ```
 
 Notes:
 
-- The current release workflow still publishes builds as `prerelease`
-- GitHub `releases/latest` does not reliably resolve to the newest testing build
-- The README command stays pinned to `v3.12.17` so it installs the current recommended version reliably
+- The current release is published as a stable GitHub Release, so `releases/latest` should resolve to the recommended build
+- The README command stays pinned to `v3.12.18` so it installs the current recommended version reliably
 - To install another version, replace the value in `TUZI_SWITCH_TAG=vX.Y.Z`
 
 ### macOS Unsigned Build
@@ -69,14 +68,14 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 
 ## Current Version Updates
 
-The current public release is `v3.12.17`, with this round focused on:
+The current public release is `v3.12.18`, with this round focused on:
 
-- Claude, Codex, and Gemini now check latest versions for both official/original and gac modified CLIs, with status states for `Upgrade / Latest / Check failed`
-- gac modified upgrades now run the corresponding install URL directly; Codex / Gemini also record `INSTALL_VERSION` to avoid false mismatches between local package versions and remote gac suffixes
-- The Codex Coding special route now defaults to `https://api.tu-zi.com/coding` while still recognizing the previous URL for compatibility
-- Windows download wording is simplified to “Windows installer”, while macOS / Linux one-command install wording and Git Bash misuse hints are aligned
-- Codex status trust was tightened so mismatches between installer records, the actual CLI variant, and the current route are surfaced clearly
-- The one-command install flow remains pinned to the current recommended version, with installer-script examples updated accordingly
+- Windows configuration reliability is improved, with CLI detection covering common npm, pnpm, Volta, nvm, fnm, and mise paths
+- Claude / Codex route setup on Windows now writes current-user environment variables to reduce cases where the UI is configured but terminals cannot read it
+- Claude, Codex, and Gemini installation plus modified-variant exit flows now clean safe npm launcher conflicts and retry
+- Claude modified installation now handles `EEXIST` failures caused by an old `claude` launcher occupying the command path
+- Upstream window-state persistence and Linux drag-region compatibility improvements were merged
+- Releases now use the stable GitHub Release path, keeping `releases/latest` and the README install command aligned with the recommended build
 
 ## Product Highlights
 
@@ -158,14 +157,15 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 
 ## Development Plan / TODO
 
-- Done: Claude / Codex / Gemini latest-version checks, upgrade button states, and modified-variant upgrade paths are now aligned
-- Done: the Codex Coding special route now uses `https://api.tu-zi.com/coding`, while the previous URL remains recognized for compatibility
-- Done: Windows download copy is simplified, and macOS / Linux one-command install headings plus Git Bash misuse hints are aligned
-- Done: the README install command and installer-script example are now pinned to `v3.12.17`
+- Done: CLI path resolution and npm launcher-conflict handling completed a reliability pass across Windows, macOS, and Linux
+- Done: Claude / Codex / Gemini installation, upgrade, and modified-variant exit flows were further hardened
+- Done: the README install command, installer-script example, and GitHub latest flow are aligned to `v3.12.18`
+- Done: upstream window-state persistence, Linux drag-region compatibility, and stable JSON key ordering were merged
 - In progress: keep aligning route cards, status blocks, provider-list highlights, and copy density across light and dark themes
-- In progress: keep refining conflict boundaries between the actual CLI on PATH, installer records, and external-script state files
+- In progress: keep collecting real Windows customer feedback around external scripts, installer records, and actual CLI resolution
+- In progress: keep refining OpenClaw onboarding language, session recovery boundaries, and default-model linkage
 - Next: continue refining session management and recovery strategy
-- Next: keep moving the release workflow toward a more stable `latest` flow and signed distribution experience
+- Next: continue improving macOS signing distribution and customer-facing install guidance
 
 ## Notes
 

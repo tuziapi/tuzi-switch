@@ -17,6 +17,7 @@ pub fn enter_lightweight_mode(app: &tauri::AppHandle) -> Result<(), String> {
     }
 
     if let Some(window) = app.get_webview_window("main") {
+        crate::save_window_state_before_exit(app);
         window
             .destroy()
             .map_err(|e| format!("销毁主窗口失败: {e}"))?;

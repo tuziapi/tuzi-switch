@@ -7,6 +7,11 @@ use std::process::{Command, Output};
 use std::time::Duration;
 use tauri::State;
 
+#[cfg(windows)]
+use winreg::enums::*;
+#[cfg(windows)]
+use winreg::RegKey;
+
 use crate::{app_config::AppType, provider::Provider, store::AppState};
 
 const CLAUDE_MODIFIED_INSTALL_URL: &str = "https://gaccode.com/claudecode/install";
@@ -265,7 +270,72 @@ enum ClaudeProviderRouteTarget {
 }
 
 fn home_dir() -> Result<PathBuf, String> {
+    if let Ok(home) = std::env::var("CC_SWITCH_TEST_HOME") {
+        let trimmed = home.trim();
+        if !trimmed.is_empty() {
+            return Ok(PathBuf::from(trimmed));
+        }
+    }
     dirs::home_dir().ok_or_else(|| "无法定位用户目录".to_string())
+}
+
+fn push_unique_path_string(paths: &mut Vec<String>, path: PathBuf) {
+    let value = path.display().to_string();
+    if value.trim().is_empty() {
+        return;
+    }
+    #[cfg(windows)]
+    if !paths
+        .iter()
+        .any(|existing| existing.eq_ignore_ascii_case(&value))
+    {
+        paths.push(value);
+    }
+    #[cfg(not(windows))]
+    if !paths.iter().any(|existing| existing == &value) {
+        paths.push(value);
+    }
+}
+
+#[cfg(not(windows))]
+fn push_existing_child_bins(paths: &mut Vec<String>, base: &Path) {
+    let Ok(entries) = fs::read_dir(base) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let bin = entry.path().join("bin");
+        if bin.is_dir() {
+            push_unique_path_string(paths, bin);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn push_existing_grandchild_bins(paths: &mut Vec<String>, base: &Path) {
+    let Ok(entries) = fs::read_dir(base) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let bin = path.join("bin");
+        if bin.is_dir() {
+            push_unique_path_string(paths, bin);
+        }
+        push_existing_child_bins(paths, &path);
+    }
+}
+
+#[cfg(not(windows))]
+fn push_fnm_installation_bins(paths: &mut Vec<String>, base: &Path) {
+    let Ok(entries) = fs::read_dir(base) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let bin = entry.path().join("installation").join("bin");
+        if bin.is_dir() {
+            push_unique_path_string(paths, bin);
+        }
+    }
 }
 
 fn extended_path() -> String {
@@ -276,14 +346,54 @@ fn extended_path() -> String {
         paths.push("/usr/local/bin".to_string());
         paths.push("/usr/bin".to_string());
         paths.push("/bin".to_string());
-        if let Some(home) = dirs::home_dir() {
-            let home = home.display().to_string();
-            paths.push(format!("{home}/.npm-global/bin"));
-            paths.push(format!("{home}/Library/pnpm"));
-            paths.push(format!("{home}/.pnpm/bin"));
-            paths.push(format!("{home}/.yarn/bin"));
-            paths.push(format!("{home}/.volta/bin"));
-            paths.push(format!("{home}/.asdf/shims"));
+        if let Ok(home) = home_dir() {
+            push_unique_path_string(&mut paths, home.join(".local/bin"));
+            push_unique_path_string(&mut paths, home.join(".npm-global/bin"));
+            push_unique_path_string(&mut paths, home.join("Library/pnpm"));
+            push_unique_path_string(&mut paths, home.join(".pnpm/bin"));
+            push_unique_path_string(&mut paths, home.join(".yarn/bin"));
+            push_unique_path_string(&mut paths, home.join(".volta/bin"));
+            push_unique_path_string(&mut paths, home.join(".asdf/shims"));
+            push_unique_path_string(&mut paths, home.join(".local/share/mise/shims"));
+            push_unique_path_string(&mut paths, home.join(".mise/shims"));
+            push_unique_path_string(&mut paths, home.join("n/bin"));
+            push_existing_grandchild_bins(&mut paths, &home.join(".nvm/versions/node"));
+            push_existing_child_bins(&mut paths, &home.join(".local/state/fnm_multishells"));
+            push_fnm_installation_bins(&mut paths, &home.join(".local/share/fnm/node-versions"));
+            push_fnm_installation_bins(&mut paths, &home.join(".fnm/node-versions"));
+        }
+        if let Some(fnm_multishell) = std::env::var_os("FNM_MULTISHELL_PATH") {
+            push_unique_path_string(&mut paths, PathBuf::from(fnm_multishell).join("bin"));
+        }
+        if let Some(n_prefix) = std::env::var_os("N_PREFIX") {
+            push_unique_path_string(&mut paths, PathBuf::from(n_prefix).join("bin"));
+        }
+    }
+    #[cfg(windows)]
+    {
+        if let Ok(home) = home_dir() {
+            push_unique_path_string(&mut paths, home.join(".npm-global"));
+            push_unique_path_string(&mut paths, home.join(".npm-global").join("bin"));
+            push_unique_path_string(&mut paths, home.join(".volta").join("bin"));
+            push_unique_path_string(&mut paths, home.join("scoop").join("shims"));
+            push_unique_path_string(&mut paths, home.join(".bun").join("bin"));
+        }
+        if let Some(appdata) = dirs::data_dir() {
+            push_unique_path_string(&mut paths, appdata.join("npm"));
+        }
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            push_unique_path_string(&mut paths, PathBuf::from(appdata).join("npm"));
+        }
+        if let Ok(local_appdata) = std::env::var("LOCALAPPDATA") {
+            let local_appdata = PathBuf::from(local_appdata);
+            push_unique_path_string(&mut paths, local_appdata.join("pnpm"));
+            push_unique_path_string(&mut paths, local_appdata.join("Volta").join("bin"));
+        }
+        if let Ok(program_files) = std::env::var("ProgramFiles") {
+            push_unique_path_string(&mut paths, PathBuf::from(program_files).join("nodejs"));
+        }
+        if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
+            push_unique_path_string(&mut paths, PathBuf::from(program_files_x86).join("nodejs"));
         }
     }
     let current = std::env::var("PATH").unwrap_or_default();
@@ -467,7 +577,7 @@ fn claude_cli_looks_modified(resolved_cli: &ResolvedCliInfo) -> bool {
             "stream-relay-manager.js",
             "stream-relay.cjs",
         ],
-    )
+    ) || package_has_files(resolved_cli, &["start.js", "_start.js", "stream-relay.cjs"])
 }
 
 fn resolve_claude_cli_variant(resolved_cli: &ResolvedCliInfo) -> Option<String> {
@@ -577,10 +687,33 @@ fn remove_conflicting_cli_launcher(
     }
 }
 
+fn cleanup_launcher_after_install_conflict(
+    resolved_cli: &ResolvedCliInfo,
+    product_name: &str,
+    cleanup_launcher: fn(&ResolvedCliInfo) -> Result<Vec<String>, String>,
+) -> Result<Vec<String>, String> {
+    let cleanup_logs = cleanup_launcher(resolved_cli)?;
+    if cleanup_logs.is_empty() {
+        remove_conflicting_cli_launcher(resolved_cli, product_name)
+    } else {
+        Ok(cleanup_logs)
+    }
+}
+
 fn remove_conflicting_claude_original_launcher(
     resolved_cli: &ResolvedCliInfo,
 ) -> Result<Vec<String>, String> {
     if resolve_claude_cli_variant(resolved_cli).as_deref() == Some("original") {
+        return Ok(Vec::new());
+    }
+
+    remove_conflicting_cli_launcher(resolved_cli, "ClaudeCode")
+}
+
+fn remove_conflicting_claude_modified_launcher(
+    resolved_cli: &ResolvedCliInfo,
+) -> Result<Vec<String>, String> {
+    if resolve_claude_cli_variant(resolved_cli).as_deref() == Some("modified") {
         return Ok(Vec::new());
     }
 
@@ -793,7 +926,11 @@ fn install_and_verify_cli_variant(
                 ));
                 let cleanup_fn = cleanup_launcher.expect("cleanup fn checked above");
                 let resolved_cli = resolve_cli_info(program);
-                match cleanup_fn(&resolved_cli) {
+                match cleanup_launcher_after_install_conflict(
+                    &resolved_cli,
+                    product_name,
+                    cleanup_fn,
+                ) {
                     Ok(cleanup_logs) => {
                         logs.extend(cleanup_logs);
                         retried_after_cleanup = true;
@@ -1092,6 +1229,34 @@ fn write_file(path: &str, content: &str) -> Result<(), String> {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     fs::write(file_path, content).map_err(|e| e.to_string())
+}
+
+#[cfg(windows)]
+fn sync_windows_user_env(vars: &[(&str, Option<&str>)]) -> Result<Vec<String>, String> {
+    let (hkcu, _) = RegKey::predef(HKEY_CURRENT_USER)
+        .create_subkey("Environment")
+        .map_err(|e| format!("打开 Windows 用户环境变量注册表失败: {e}"))?;
+    let mut logs = Vec::new();
+    for &(key, value) in vars {
+        let value = value.map(str::trim).filter(|value| !value.is_empty());
+        if let Some(value) = value {
+            hkcu.set_value(key, &value)
+                .map_err(|e| format!("写入 Windows 用户环境变量 {key} 失败: {e}"))?;
+            std::env::set_var(key, value);
+            logs.push(format!("已更新 Windows 用户环境变量: {key}"));
+        } else {
+            match hkcu.delete_value(key) {
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(format!("删除 Windows 用户环境变量 {key} 失败: {error}"));
+                }
+            }
+            std::env::remove_var(key);
+            logs.push(format!("已清理 Windows 用户环境变量: {key}"));
+        }
+    }
+    Ok(logs)
 }
 
 fn mask_key(value: &str) -> String {
@@ -1705,8 +1870,12 @@ fn sync_claude_env_to_rc(
 ) -> Result<Vec<String>, String> {
     #[cfg(windows)]
     {
-        let _ = (api_key, base_url, api_token);
-        Ok(Vec::new())
+        sync_windows_user_env(&[
+            ("ANTHROPIC_API_TOKEN", api_token),
+            ("ANTHROPIC_AUTH_TOKEN", api_token),
+            ("ANTHROPIC_API_KEY", api_key),
+            ("ANTHROPIC_BASE_URL", base_url),
+        ])
     }
     #[cfg(not(windows))]
     {
@@ -2239,7 +2408,7 @@ pub async fn install_claudecode(
             resolve_claude_cli_variant,
             "ClaudeCode",
             "gac 改版",
-            None,
+            Some(remove_conflicting_claude_modified_launcher),
         ) {
             Ok(result) => result.logs,
             Err(failure) => {
@@ -2373,13 +2542,25 @@ pub async fn upgrade_claudecode(
         });
     if matches!(requested.as_str(), "modified" | "a" | "改版") {
         let command = format!("npm install -g {CLAUDE_MODIFIED_INSTALL_URL}");
-        return match run_shell_script(&command) {
-            Ok(output) => Ok(claude_ok(
+        return match install_and_verify_cli_variant(
+            "claude",
+            &command,
+            "modified",
+            resolve_claude_cli_variant,
+            "ClaudeCode",
+            "gac 改版",
+            Some(remove_conflicting_claude_modified_launcher),
+        ) {
+            Ok(result) => Ok(claude_ok(
                 "ClaudeCode 改版升级成功",
-                format!("$ {command}\n{output}"),
+                result.logs.join("\n"),
                 true,
             )),
-            Err(e) => Ok(claude_err("ClaudeCode 升级失败", e, String::new())),
+            Err(failure) => Ok(claude_err(
+                "ClaudeCode 升级失败",
+                failure.error,
+                failure.logs.join("\n"),
+            )),
         };
     }
     if resolved_variant.as_deref() == Some("modified") {
@@ -2452,7 +2633,7 @@ pub async fn switch_claudecode_variant(
             resolve_claude_cli_variant,
             "ClaudeCode",
             "gac 改版",
-            None,
+            Some(remove_conflicting_claude_modified_launcher),
         ) {
             Ok(result) => result.logs,
             Err(failure) => {
@@ -3086,8 +3267,10 @@ fn write_codex_config_merged(
 fn apply_codex_env_to_rc(api_key: &str) -> Result<Vec<String>, String> {
     #[cfg(windows)]
     {
-        let _ = api_key;
-        Ok(Vec::new())
+        sync_windows_user_env(&[
+            ("CODEX_API_KEY", Some(api_key)),
+            ("CODEX_KEY", Some(api_key)),
+        ])
     }
     #[cfg(not(windows))]
     {
@@ -4268,13 +4451,13 @@ mod tests {
     use super::{
         claude_custom_api_key_fingerprint, claude_has_modified_status_context,
         claude_runtime_env_conflicts, claude_sources_are_conflicting,
-        extract_gac_latest_marker_from_url, merge_claude_current_route,
-        normalize_claude_route_for_comparison, parse_install_state,
-        remove_conflicting_claude_original_launcher, remove_conflicting_codex_launcher,
-        remove_conflicting_codex_original_launcher, remove_conflicting_gemini_launcher,
-        remove_conflicting_gemini_modified_launcher, resolve_claude_cli_variant,
-        sync_claude_json_state, ResolvedCliInfo, CLAUDE_ORIGINAL_PACKAGE, CODEX_OPENAI_PACKAGE,
-        GEMINI_OFFICIAL_PACKAGE,
+        cleanup_launcher_after_install_conflict, extract_gac_latest_marker_from_url,
+        merge_claude_current_route, normalize_claude_route_for_comparison, parse_install_state,
+        remove_conflicting_claude_modified_launcher, remove_conflicting_claude_original_launcher,
+        remove_conflicting_codex_launcher, remove_conflicting_codex_original_launcher,
+        remove_conflicting_gemini_launcher, remove_conflicting_gemini_modified_launcher,
+        resolve_claude_cli_variant, sync_claude_json_state, ResolvedCliInfo,
+        CLAUDE_ORIGINAL_PACKAGE, CODEX_OPENAI_PACKAGE, GEMINI_OFFICIAL_PACKAGE,
     };
     use serde_json::{json, Value};
     use std::ffi::OsString;
@@ -4405,6 +4588,66 @@ mod tests {
             info.package_root_path.as_deref(),
             Some(expected_package_root.to_str().unwrap())
         );
+    }
+
+    #[test]
+    fn extended_path_includes_windows_npm_locations_when_env_is_set() {
+        let temp = tempdir().unwrap();
+        let appdata = temp.path().join("Roaming");
+        let local_appdata = temp.path().join("Local");
+        let program_files = temp.path().join("Program Files");
+        let program_files_x86 = temp.path().join("Program Files (x86)");
+        let _appdata_guard = EnvVarGuard::set("APPDATA", &appdata);
+        let _local_appdata_guard = EnvVarGuard::set("LOCALAPPDATA", &local_appdata);
+        let _program_files_guard = EnvVarGuard::set("ProgramFiles", &program_files);
+        let _program_files_x86_guard = EnvVarGuard::set("ProgramFiles(x86)", &program_files_x86);
+
+        let path = super::extended_path();
+
+        #[cfg(windows)]
+        {
+            assert!(path.contains(&appdata.join("npm").display().to_string()));
+            assert!(path.contains(&local_appdata.join("pnpm").display().to_string()));
+            assert!(path.contains(&program_files.join("nodejs").display().to_string()));
+            assert!(path.contains(&program_files_x86.join("nodejs").display().to_string()));
+        }
+
+        #[cfg(not(windows))]
+        {
+            assert!(!path.is_empty());
+        }
+    }
+
+    #[test]
+    fn extended_path_includes_unix_node_manager_bins() {
+        let temp = tempdir().unwrap();
+        let nvm_bin = temp.path().join(".nvm/versions/node/v22.0.0/bin");
+        let fnm_bin = temp
+            .path()
+            .join(".local/share/fnm/node-versions/v22.0.0/installation/bin");
+        fs::create_dir_all(&nvm_bin).unwrap();
+        fs::create_dir_all(&fnm_bin).unwrap();
+
+        #[cfg(not(windows))]
+        {
+            let mut paths = Vec::new();
+            super::push_existing_grandchild_bins(
+                &mut paths,
+                &temp.path().join(".nvm/versions/node"),
+            );
+            super::push_fnm_installation_bins(
+                &mut paths,
+                &temp.path().join(".local/share/fnm/node-versions"),
+            );
+
+            assert!(paths.contains(&nvm_bin.display().to_string()));
+            assert!(paths.contains(&fnm_bin.display().to_string()));
+        }
+
+        #[cfg(windows)]
+        {
+            assert!(!path.is_empty());
+        }
     }
 
     #[test]
@@ -4610,6 +4853,77 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("不是普通文件/符号链接"));
+    }
+
+    #[test]
+    fn remove_conflicting_claude_modified_launcher_deletes_original_command_file() {
+        let temp = tempdir().unwrap();
+        let command_path = temp.path().join("claude");
+        fs::write(&command_path, "#!/bin/sh\n").unwrap();
+
+        let logs = remove_conflicting_claude_modified_launcher(&ResolvedCliInfo {
+            command_path: Some(command_path.display().to_string()),
+            executable_path: Some(command_path.display().to_string()),
+            package_root_path: None,
+            package_name: Some(CLAUDE_ORIGINAL_PACKAGE.to_string()),
+            package_version: Some("2.1.112".to_string()),
+        })
+        .unwrap();
+
+        assert!(!command_path.exists());
+        assert!(logs
+            .iter()
+            .any(|line| line.contains("已移除冲突的 ClaudeCode launcher")));
+    }
+
+    #[test]
+    fn remove_conflicting_claude_modified_launcher_preserves_modified_command() {
+        let temp = tempdir().unwrap();
+        fs::write(temp.path().join("relay-selector.js"), "relay").unwrap();
+        fs::write(temp.path().join("stream-relay-manager.js"), "manager").unwrap();
+        fs::write(temp.path().join("stream-relay.cjs"), "stream").unwrap();
+        let command_path = temp.path().join("claude");
+        fs::write(&command_path, "#!/bin/sh\n").unwrap();
+
+        let logs = remove_conflicting_claude_modified_launcher(&ResolvedCliInfo {
+            command_path: Some(command_path.display().to_string()),
+            executable_path: Some(temp.path().join("start.js").display().to_string()),
+            package_root_path: Some(temp.path().display().to_string()),
+            package_name: Some(CLAUDE_ORIGINAL_PACKAGE.to_string()),
+            package_version: Some("2.1.112".to_string()),
+        })
+        .unwrap();
+
+        assert!(command_path.exists());
+        assert!(logs.is_empty());
+    }
+
+    #[test]
+    fn cleanup_launcher_after_install_conflict_removes_existing_claude_modified_launcher() {
+        let temp = tempdir().unwrap();
+        fs::write(temp.path().join("start.js"), "start").unwrap();
+        fs::write(temp.path().join("_start.js"), "entry").unwrap();
+        fs::write(temp.path().join("stream-relay.cjs"), "stream").unwrap();
+        let command_path = temp.path().join("claude");
+        fs::write(&command_path, "#!/usr/bin/env node\n").unwrap();
+
+        let logs = cleanup_launcher_after_install_conflict(
+            &ResolvedCliInfo {
+                command_path: Some(command_path.display().to_string()),
+                executable_path: Some(temp.path().join("start.js").display().to_string()),
+                package_root_path: Some(temp.path().display().to_string()),
+                package_name: Some("claude".to_string()),
+                package_version: Some("2.1.123".to_string()),
+            },
+            "ClaudeCode",
+            remove_conflicting_claude_modified_launcher,
+        )
+        .unwrap();
+
+        assert!(!command_path.exists());
+        assert!(logs
+            .iter()
+            .any(|line| line.contains("已移除冲突的 ClaudeCode launcher")));
     }
 
     #[test]

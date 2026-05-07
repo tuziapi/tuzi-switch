@@ -1,6 +1,6 @@
 {
   "name": "tuzi-switch",
-  "version": "3.12.17",
+  "version": "3.12.18",
   "description": "Tuzi business assistant for Claude Code, Codex & OpenClaw",
   "type": "module",
   "scripts": {

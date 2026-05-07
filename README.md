@@ -27,17 +27,16 @@
 
 ### macOS / Linux 一键安装
 
-直接安装当前推荐版本 `v3.12.17`：
+直接安装当前推荐版本 `v3.12.18`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.17 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.18 bash
 ```
 
 补充说明：
 
-- 当前 Release workflow 仍使用 `prerelease` 发布策略
-- GitHub `releases/latest` 不能稳定命中当前最新测试版本
-- 当前 README 默认固定到 `v3.12.17`，这样可以确保安装到我们当前推荐版本
+- 当前 Release 已按正式版本发布，GitHub `releases/latest` 会优先命中当前推荐版本
+- 当前 README 默认固定到 `v3.12.18`，这样可以确保安装到我们当前推荐版本
 - 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
 
 ### macOS 未签名包打开方式
@@ -69,14 +68,14 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 当前版本更新
 
-当前公开版本为 `v3.12.17`，这一轮更新重点包括：
+当前公开版本为 `v3.12.18`，这一轮更新重点包括：
 
-- Claude、Codex、Gemini 的原版与 gac 改版都接入最新版检测，状态区会区分 `升级 / 已最新 / 检测失败`
-- gac 改版升级改为直接执行对应 install URL，Codex / Gemini 会记录 `INSTALL_VERSION`，减少本地版本与远端包名后缀不一致造成的误判
-- Codex Coding 特别线路默认 Base URL 更新为 `https://api.tu-zi.com/coding`，并保留旧地址兼容识别
-- Windows 下载说明简化为“下载 Windows 安装包”，macOS / Linux 一键安装文案和脚本提示同步收口
-- Codex 状态可信度继续加强，会对 installer 记录、实际 CLI 变体与当前线路不一致的情况给出明确提醒
-- 继续保持一键安装命中当前推荐版本，并同步更新安装脚本示例
+- Windows 配置可靠性继续加强，CLI 检测会补充常见 npm、pnpm、Volta、nvm、fnm、mise 等路径
+- Windows 下 Claude / Codex 线路配置会同步写入当前用户环境变量，减少“界面已配置但终端读不到”的情况
+- Claude、Codex、Gemini 的安装与退出改版逻辑继续收口，遇到 npm launcher 冲突时会自动清理安全入口并重试
+- Claude 改版安装补齐 `EEXIST` 兜底，能处理旧 `claude` launcher 占用导致的安装失败
+- 同步合入上游窗口状态保持与 Linux 拖拽区域兼容优化
+- Release 改为正式发布路径，`releases/latest` 与 README 一键安装默认指向当前推荐版本
 
 ## 产品亮点
 
@@ -160,14 +159,15 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 开发计划 / TODO List
 
-- 已完成：Claude / Codex / Gemini 原版与 gac 改版最新版检测、升级按钮状态和改版升级路径收口
-- 已完成：Codex Coding 特别线路 Base URL 切换到 `https://api.tu-zi.com/coding`，旧地址继续兼容识别
-- 已完成：Windows 下载文案精简，macOS / Linux 一键安装标题和 Git Bash 误用提示同步更新
-- 已完成：README 一键安装命令与安装脚本示例固定到 `v3.12.17`
+- 已完成：Windows / macOS / Linux 的 CLI 真实命中路径与 npm launcher 冲突处理完成一轮可靠性收口
+- 已完成：Claude / Codex / Gemini 安装、升级、退出改版的重复安装与冲突恢复逻辑继续补稳
+- 已完成：README 一键安装命令、安装脚本示例和 Release latest 流程同步到 `v3.12.18`
+- 已完成：同步上游窗口状态保持、Linux 拖拽区域兼容和配置 JSON 稳定排序能力
 - 进行中：继续统一深色 / 浅色主题下的路线卡、状态区、列表高亮与各入口文案密度
-- 进行中：继续梳理 CLI 真实命中、installer 记录与外部脚本写入状态之间的冲突提示边界
+- 进行中：继续收集 Windows 客户机真实反馈，跟踪外部脚本、installer 记录与实际 CLI 命中的冲突边界
+- 进行中：继续优化 OpenClaw 业务接入表达、会话恢复边界与默认模型联动体验
 - 下一步：继续梳理会话管理与恢复策略
-- 下一步：继续推进 release workflow 向更稳定的 `latest` / 签名分发体验收口
+- 下一步：继续推进 macOS 签名分发与客户视角安装提示收口
 
 ## 说明
 

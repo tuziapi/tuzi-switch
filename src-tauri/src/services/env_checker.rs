@@ -84,11 +84,12 @@ fn check_system_env(keywords: &[&str]) -> Result<Vec<EnvConflict>, String> {
     let mut conflicts = Vec::new();
 
     // Check current process environment
-    for (key, value) in std::env::vars() {
+    for (key, value) in std::env::vars_os() {
+        let key = key.to_string_lossy().to_string();
         if keywords.iter().any(|k| key.to_uppercase().contains(k)) {
             conflicts.push(EnvConflict {
                 var_name: key,
-                var_value: value,
+                var_value: value.to_string_lossy().to_string(),
                 source_type: "system".to_string(),
                 source_path: "Process Environment".to_string(),
             });
