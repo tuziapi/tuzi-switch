@@ -5,15 +5,28 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import type {
   ClaudeInstallerStatus,
+  CodexInstallerStatus,
   InstallerActionResult,
 } from "@/lib/api/installer";
 import type { Provider } from "@/types";
 import { BusinessQuickAccess } from "@/components/BusinessQuickAccess";
+
+if (!HTMLElement.prototype.hasPointerCapture) {
+  Object.defineProperty(HTMLElement.prototype, "hasPointerCapture", {
+    value: () => false,
+  });
+}
+if (!HTMLElement.prototype.scrollIntoView) {
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    value: vi.fn(),
+  });
+}
 
 type ProvidersStore = {
   providers: Record<string, Provider>;
@@ -135,11 +148,69 @@ const newClaudeStatus: ClaudeInstallerStatus = {
   },
 };
 
+const codexStatusWithBuiltInRoutes: CodexInstallerStatus = {
+  installed: true,
+  version: "0.128.0",
+  latest_version: "0.128.0",
+  resolved_version: "0.128.0",
+  install_type: "openai",
+  current_route: "codex",
+  resolved_executable_path: "/mock/codex",
+  resolved_package_name: "@openai/codex",
+  resolved_variant: "openai",
+  variant_conflict: false,
+  state_file_exists: true,
+  config_file_exists: true,
+  routes: [
+    {
+      name: "codex",
+      base_url: "https://api.tu-zi.com/coding",
+      has_key: true,
+      is_current: true,
+      api_key_masked: "sk-codex****",
+      model_settings: {
+        model: "gpt-5.5",
+        model_reasoning_effort: "xhigh",
+      },
+    },
+    {
+      name: "tuzi",
+      base_url: "https://api.tu-zi.com/v1",
+      has_key: false,
+      is_current: false,
+      api_key_masked: null,
+      model_settings: {
+        model: "gpt-5.4",
+        model_reasoning_effort: "medium",
+      },
+    },
+    {
+      name: "gac",
+      base_url: "https://gaccode.com/codex/v1",
+      has_key: false,
+      is_current: false,
+      api_key_masked: null,
+      model_settings: {
+        model: "gpt-5.4",
+        model_reasoning_effort: "medium",
+      },
+    },
+  ],
+  env_summary: {
+    codex_api_key_masked: "sk-codex****",
+  },
+};
+
 let claudeStore: ProvidersStore;
 let nextClaudeStatusDeferred: ReturnType<
   typeof createDeferred<ClaudeInstallerStatus>
 > | null = null;
 let claudeStatusCallCount = 0;
+let codexStore: ProvidersStore;
+const openclawApiMock = vi.hoisted(() => ({
+  setAgentsDefaults: vi.fn(),
+  setTools: vi.fn(),
+}));
 
 function installDefaultClaudeStatusMock() {
   installerApiMock.getClaudeStatus.mockImplementation(async () => {
@@ -163,13 +234,26 @@ const installerSuccess: InstallerActionResult = {
   restart_required: false,
 };
 
+const missingNodeNpmResult: InstallerActionResult = {
+  success: false,
+  message: "未检测到 Node.js/npm，无法安装 CLI。是否允许自动安装？",
+  error: "MISSING_NODE_NPM",
+  stdout: "安装 CLI 需要 Node.js 和 npm。",
+  stderr: "",
+  restart_required: false,
+};
+
 const { providersApiMock, installerApiMock } = vi.hoisted(() => ({
   providersApiMock: {
     getAll: vi.fn(async (appId: string) => {
+      if (appId === "openclaw") return {};
+      if (appId === "codex") return codexStore.providers;
       if (appId !== "claude") return {};
       return claudeStore.providers;
     }),
     getCurrent: vi.fn(async (appId: string) => {
+      if (appId === "openclaw") return "";
+      if (appId === "codex") return codexStore.currentProviderId;
       if (appId !== "claude") return "";
       return claudeStore.currentProviderId;
     }),
@@ -202,7 +286,7 @@ const { providersApiMock, installerApiMock } = vi.hoisted(() => ({
     installClaudeCode: vi.fn(async () => installerSuccess),
     upgradeClaudeCode: vi.fn(),
     switchClaudeVariant: vi.fn(),
-    getCodexStatus: vi.fn(async () => ({
+    getCodexStatus: vi.fn(async (): Promise<CodexInstallerStatus> => ({
       installed: false,
       version: null,
       latest_version: null,
@@ -258,19 +342,16 @@ vi.mock("@/lib/api/installer", () => ({
 }));
 
 vi.mock("@/lib/api/openclaw", () => ({
-  openclawApi: {
-    setAgentsDefaults: vi.fn(),
-    setTools: vi.fn(),
-  },
+  openclawApi: openclawApiMock,
 }));
 
 vi.mock("@/hooks/useOpenClaw", () => ({
   openclawKeys: {
-    liveProviderIds: () => ["openclaw", "live-provider-ids"],
-    defaultModel: () => ["openclaw", "default-model"],
-    agentsDefaults: () => ["openclaw", "agents-defaults"],
-    tools: () => ["openclaw", "tools"],
-    health: () => ["openclaw", "health"],
+    liveProviderIds: ["openclaw", "live-provider-ids"],
+    defaultModel: ["openclaw", "default-model"],
+    agentsDefaults: ["openclaw", "agents-defaults"],
+    tools: ["openclaw", "tools"],
+    health: ["openclaw", "health"],
   },
   useOpenClawDefaultModel: () => ({ data: undefined }),
   useOpenClawAgentsDefaults: () => ({ data: undefined }),
@@ -324,6 +405,10 @@ describe("BusinessQuickAccess", () => {
       },
       currentProviderId: "gac-claude-route",
     };
+    codexStore = {
+      providers: {},
+      currentProviderId: "",
+    };
     nextClaudeStatusDeferred = null;
     claudeStatusCallCount = 0;
     providersApiMock.getAll.mockClear();
@@ -333,6 +418,14 @@ describe("BusinessQuickAccess", () => {
     providersApiMock.switch.mockClear();
     installerApiMock.getClaudeStatus.mockClear();
     installerApiMock.installClaudeCode.mockClear();
+    installerApiMock.installCodex.mockReset();
+    installerApiMock.upgradeCodex.mockReset();
+    installerApiMock.switchCodexVariant.mockReset();
+    installerApiMock.installGemini.mockReset();
+    installerApiMock.upgradeGemini.mockReset();
+    installerApiMock.switchGeminiVariant.mockReset();
+    openclawApiMock.setAgentsDefaults.mockReset();
+    openclawApiMock.setTools.mockReset();
     installDefaultClaudeStatusMock();
   });
 
@@ -359,6 +452,7 @@ describe("BusinessQuickAccess", () => {
       expect(installerApiMock.installClaudeCode).toHaveBeenCalledWith(
         "C",
         claudeApiKey,
+        undefined,
       );
     });
 
@@ -419,6 +513,203 @@ describe("BusinessQuickAccess", () => {
     expect(
       screen.queryByText(/检测到 Claude 本地配置来源不一致/),
     ).not.toBeInTheDocument();
+  });
+
+  it("uses the selected OpenClaw quick access model as primary and keeps the rest as fallbacks", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<BusinessQuickAccess appId="openclaw" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("OpenClaw 兔子快速接入")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /兔子 · Codex 线路/ }));
+    await user.click(screen.getByLabelText("OpenClaw 默认模型"));
+    await user.click(screen.getByRole("option", { name: "GPT-5.4" }));
+    fireEvent.change(screen.getByPlaceholderText("输入兔子 API Key"), {
+      target: { value: "sk-openclaw-key" },
+    });
+    await user.click(screen.getByRole("button", { name: "立即配置" }));
+
+    await waitFor(() => {
+      expect(openclawApiMock.setAgentsDefaults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: {
+            primary: "tuzi-openclaw-codex/gpt-5.4",
+            fallbacks: ["tuzi-openclaw-codex/gpt-5.5"],
+          },
+          models: {
+            "tuzi-openclaw-codex/gpt-5.4": { alias: "GPT-5.4" },
+            "tuzi-openclaw-codex/gpt-5.5": { alias: "GPT-5.5" },
+          },
+        }),
+      );
+    });
+
+    expect(providersApiMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "tuzi-openclaw-codex",
+        settingsConfig: expect.objectContaining({
+          baseUrl: "https://api.tu-zi.com/v1",
+          apiKey: "sk-openclaw-key",
+          api: "openai-responses",
+          models: [
+            expect.objectContaining({ id: "gpt-5.4", name: "GPT-5.4" }),
+            expect.objectContaining({ id: "gpt-5.5", name: "GPT-5.5" }),
+          ],
+        }),
+      }),
+      "openclaw",
+      true,
+    );
+    expect(providersApiMock.switch).toHaveBeenCalledWith(
+      "tuzi-openclaw-codex",
+      "openclaw",
+    );
+  });
+
+  it("asks before installing Node.js/npm and retries Codex configuration after confirmation", async () => {
+    const user = userEvent.setup();
+    installerApiMock.installCodex
+      .mockResolvedValueOnce(missingNodeNpmResult)
+      .mockResolvedValueOnce(installerSuccess);
+
+    renderWithQueryClient(<BusinessQuickAccess appId="codex" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Codex 兔子快速接入")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("输入兔子 API Key"), {
+      target: { value: "sk-codex-key" },
+    });
+    await user.click(screen.getByRole("button", { name: "立即配置" }));
+
+    expect(await screen.findByText("需要安装 Node.js/npm")).toBeInTheDocument();
+    expect(installerApiMock.installCodex).toHaveBeenCalledTimes(1);
+    expect(installerApiMock.installCodex).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variant: "openai",
+        allowDependencyInstall: undefined,
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "自动安装并继续" }));
+
+    await waitFor(() => {
+      expect(installerApiMock.installCodex).toHaveBeenCalledTimes(2);
+    });
+    expect(installerApiMock.installCodex).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variant: "openai",
+        allowDependencyInstall: true,
+      }),
+    );
+  });
+
+  it("does not retry Codex configuration when dependency installation is cancelled", async () => {
+    const user = userEvent.setup();
+    installerApiMock.installCodex.mockResolvedValueOnce(missingNodeNpmResult);
+
+    renderWithQueryClient(<BusinessQuickAccess appId="codex" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Codex 兔子快速接入")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("输入兔子 API Key"), {
+      target: { value: "sk-codex-key" },
+    });
+    await user.click(screen.getByRole("button", { name: "立即配置" }));
+
+    expect(await screen.findByText("需要安装 Node.js/npm")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "取消" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText("需要安装 Node.js/npm"),
+      ).not.toBeInTheDocument();
+    });
+    expect(installerApiMock.installCodex).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not mark Codex routes as written when only installer routes exist", async () => {
+    installerApiMock.getCodexStatus.mockResolvedValueOnce(
+      codexStatusWithBuiltInRoutes,
+    );
+    codexStore = {
+      providers: {
+        "tuzi.coding": {
+          id: "tuzi.coding",
+          name: "Codex·粉色订阅",
+          settingsConfig: {
+            config:
+              'model_provider = "codex"\n[model_providers.codex]\nbase_url = "https://api.tu-zi.com/coding"',
+          },
+          category: "custom",
+          createdAt: 1,
+          notes: "由兔子业务一键接入自动生成（粉色订阅）",
+          websiteUrl: "https://api.tu-zi.com/coding",
+        },
+      },
+      currentProviderId: "tuzi.coding",
+    };
+
+    renderWithQueryClient(<BusinessQuickAccess appId="codex" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Codex 兔子快速接入")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTitle("Codex·粉色订阅")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Codex · 兔子线路/ }),
+    ).toHaveTextContent("推荐");
+    expect(
+      screen.getByRole("button", { name: /Codex · gac 线路/ }),
+    ).toHaveTextContent("可选");
+    expect(
+      screen.getByRole("button", { name: /Codex·粉色订阅/ }),
+    ).toHaveTextContent("已接入");
+  });
+
+  it("marks a Codex route as written when an alternate provider card exists", async () => {
+    installerApiMock.getCodexStatus.mockResolvedValueOnce({
+      ...codexStatusWithBuiltInRoutes,
+      current_route: "tuzi",
+      routes: codexStatusWithBuiltInRoutes.routes.map((route) => ({
+        ...route,
+        is_current: route.name === "tuzi",
+      })),
+    });
+    codexStore = {
+      providers: {
+        "tuzi.coding-alt-2": {
+          id: "tuzi.coding-alt-2",
+          name: "Codex·粉色订阅（附加 Key 2）",
+          settingsConfig: {
+            config:
+              'model_provider = "codex"\n[model_providers.codex]\nbase_url = "https://api.tu-zi.com/coding"',
+          },
+          category: "custom",
+          createdAt: 1,
+          notes: "由兔子业务一键接入自动生成（粉色订阅）（附加 Key 2）",
+          websiteUrl: "https://api.tu-zi.com/coding",
+        },
+      },
+      currentProviderId: "",
+    };
+
+    renderWithQueryClient(<BusinessQuickAccess appId="codex" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Codex 兔子快速接入")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("button", { name: /Codex·粉色订阅/ }),
+    ).toHaveTextContent("已写入");
   });
 
   it("keeps Claude aligned to the current original provider even when sources conflict", async () => {

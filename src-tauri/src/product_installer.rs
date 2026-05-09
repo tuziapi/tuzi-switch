@@ -27,6 +27,7 @@ const DEFAULT_REASONING: &str = "medium";
 const DEFAULT_GEMINI_MODEL: &str = "gemini-2.5-pro";
 const CODEX_GAC_RUNTIME_HINT: &str =
     "gac 改版 CLI 已切换完成；首次交互若出现 account/read 或 bootstrap 错误，通常仍需先完成 gac 侧登录或授权。";
+const MISSING_NODE_NPM_ERROR: &str = "MISSING_NODE_NPM";
 const CLAUDE_TUZI_PROVIDER_ID: &str = "tuzi-claude-route";
 const CLAUDE_GAC_PROVIDER_ID: &str = "gac-claude-route";
 const CLAUDE_CUSTOM_API_KEY_FINGERPRINT_LEN: usize = 20;
@@ -422,6 +423,180 @@ fn command_exists(command: &str) -> bool {
     };
     cmd.env("PATH", extended_path());
     cmd.output().map(|o| o.status.success()).unwrap_or(false)
+}
+
+fn missing_node_npm_message() -> String {
+    "未检测到 Node.js/npm，无法安装 CLI。是否允许 tuzi-switch 自动安装 Node.js/npm 后继续？"
+        .to_string()
+}
+
+fn missing_node_npm_stdout() -> String {
+    "安装 Claude / Codex / Gemini CLI 需要 Node.js 和 npm。确认后 tuzi-switch 会尝试使用系统包管理器安装 Node.js/npm，并继续当前安装配置流程。".to_string()
+}
+
+fn is_node_and_npm_available() -> bool {
+    command_exists("node") && command_exists("npm")
+}
+
+fn npm_dependency_install_command_for_platform(
+    platform: &str,
+    has_brew: bool,
+    has_apt_get: bool,
+    has_dnf: bool,
+    has_yum: bool,
+    has_winget: bool,
+) -> Result<String, String> {
+    match platform {
+        "macos" => {
+            if !has_brew {
+                return Err(
+                    "未检测到 Homebrew，无法自动安装 Node.js/npm。请先安装 Homebrew 或从 https://nodejs.org/ 安装 Node.js 后重试。"
+                        .to_string(),
+                );
+            }
+            Ok("brew install node".to_string())
+        }
+        "linux" => {
+            if has_apt_get {
+                Ok("sudo apt-get update && sudo apt-get install -y nodejs npm".to_string())
+            } else if has_dnf {
+                Ok("sudo dnf install -y nodejs npm".to_string())
+            } else if has_yum {
+                Ok("sudo yum install -y nodejs npm".to_string())
+            } else {
+                Err(
+                    "未识别到可自动安装 Node.js/npm 的包管理器。请先手动安装 Node.js/npm 后重试。"
+                        .to_string(),
+                )
+            }
+        }
+        "windows" => {
+            if !has_winget {
+                return Err(
+                    "未检测到 winget，无法自动安装 Node.js。请先从 https://nodejs.org/ 安装 Node.js 后重试。"
+                        .to_string(),
+                );
+            }
+            Ok("winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements".to_string())
+        }
+        _ => Err("当前系统暂不支持自动安装 Node.js/npm，请先手动安装后重试。".to_string()),
+    }
+}
+
+fn npm_dependency_install_command() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        npm_dependency_install_command_for_platform(
+            "macos",
+            command_exists("brew"),
+            false,
+            false,
+            false,
+            false,
+        )
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        npm_dependency_install_command_for_platform(
+            "linux",
+            false,
+            command_exists("apt-get"),
+            command_exists("dnf"),
+            command_exists("yum"),
+            false,
+        )
+    }
+
+    #[cfg(windows)]
+    {
+        npm_dependency_install_command_for_platform(
+            "windows",
+            false,
+            false,
+            false,
+            false,
+            command_exists("winget"),
+        )
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        npm_dependency_install_command_for_platform(
+            "unsupported",
+            false,
+            false,
+            false,
+            false,
+            false,
+        )
+    }
+}
+
+fn ensure_node_npm_dependencies(allow_dependency_install: bool) -> Result<Vec<String>, String> {
+    if is_node_and_npm_available() {
+        return Ok(vec!["已检测到 Node.js/npm".to_string()]);
+    }
+
+    if !allow_dependency_install {
+        return Err(MISSING_NODE_NPM_ERROR.to_string());
+    }
+
+    let command = npm_dependency_install_command()?;
+    let mut logs = vec![
+        "未检测到 Node.js/npm，准备自动安装依赖".to_string(),
+        format!("$ {command}"),
+    ];
+    match run_shell_script(&command) {
+        Ok(output) => {
+            if !output.trim().is_empty() {
+                logs.push(output);
+            }
+        }
+        Err(error) => {
+            return Err(format!("Node.js/npm 自动安装失败: {error}"));
+        }
+    }
+
+    if is_node_and_npm_available() {
+        logs.push("Node.js/npm 安装完成".to_string());
+        Ok(logs)
+    } else {
+        #[cfg(windows)]
+        {
+            Err("Node.js 可能已经安装完成，但当前 tuzi-switch 进程尚未刷新 PATH。请重启 tuzi-switch 后再试。"
+                .to_string())
+        }
+        #[cfg(not(windows))]
+        {
+            Err("Node.js/npm 安装命令已执行，但当前仍检测不到 npm。请重新打开 tuzi-switch 或终端后再试。"
+                .to_string())
+        }
+    }
+}
+
+fn missing_node_npm_claude_result() -> ClaudeActionResult {
+    claude_err(
+        &missing_node_npm_message(),
+        MISSING_NODE_NPM_ERROR.to_string(),
+        missing_node_npm_stdout(),
+    )
+}
+
+fn missing_node_npm_codex_result() -> CodexActionResult {
+    codex_err(
+        &missing_node_npm_message(),
+        MISSING_NODE_NPM_ERROR.to_string(),
+        missing_node_npm_stdout(),
+    )
+}
+
+fn missing_node_npm_gemini_result() -> GeminiActionResult {
+    gemini_err(
+        &missing_node_npm_message(),
+        MISSING_NODE_NPM_ERROR.to_string(),
+        missing_node_npm_stdout(),
+    )
 }
 
 fn executable_candidates(program: &str, dir: &Path) -> Vec<PathBuf> {
@@ -2365,6 +2540,7 @@ pub async fn install_claudecode(
     state: State<'_, AppState>,
     scheme: String,
     api_key: Option<String>,
+    allow_dependency_install: Option<bool>,
 ) -> Result<ClaudeActionResult, String> {
     let normalized = scheme.trim().to_uppercase();
     let mut data = read_route_file();
@@ -2400,6 +2576,20 @@ pub async fn install_claudecode(
                 Err(e) => Ok(claude_err("ClaudeCode 配置失败", e, String::new())),
             };
         }
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(claude_err(
+                        &missing_node_npm_message(),
+                        MISSING_NODE_NPM_ERROR.to_string(),
+                        missing_node_npm_stdout(),
+                    ))
+                }
+                Err(error) => {
+                    return Ok(claude_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {CLAUDE_MODIFIED_INSTALL_URL}");
         let mut logs = match install_and_verify_cli_variant(
             "claude",
@@ -2419,6 +2609,9 @@ pub async fn install_claudecode(
                 ))
             }
         };
+        let mut merged_logs = dependency_logs;
+        merged_logs.extend(logs);
+        logs = merged_logs;
         match configure_claude_modified_route(&mut data) {
             Ok(config_logs) => {
                 logs.extend(config_logs);
@@ -2492,6 +2685,18 @@ pub async fn install_claudecode(
             Err(e) => Ok(claude_err("ClaudeCode 配置失败", e, String::new())),
         };
     }
+    let dependency_logs =
+        match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+            Ok(logs) => logs,
+            Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                return Ok(claude_err(
+                    &missing_node_npm_message(),
+                    MISSING_NODE_NPM_ERROR.to_string(),
+                    missing_node_npm_stdout(),
+                ))
+            }
+            Err(error) => return Ok(claude_err("Node.js/npm 自动安装失败", error, String::new())),
+        };
     let command = format!("npm install -g {CLAUDE_ORIGINAL_PACKAGE}");
     let mut logs = match install_and_verify_cli_variant(
         "claude",
@@ -2511,6 +2716,9 @@ pub async fn install_claudecode(
             ))
         }
     };
+    let mut merged_logs = dependency_logs;
+    merged_logs.extend(logs);
+    logs = merged_logs;
     match configure_claude_original_route(&mut data, route_name, base_url, &final_key) {
         Ok(config_logs) => {
             logs.extend(config_logs);
@@ -2527,6 +2735,7 @@ pub async fn install_claudecode(
 #[tauri::command]
 pub async fn upgrade_claudecode(
     target_variant: Option<String>,
+    allow_dependency_install: Option<bool>,
 ) -> Result<ClaudeActionResult, String> {
     let resolved_cli = resolve_cli_info("claude");
     let resolved_variant = resolve_claude_cli_variant(&resolved_cli);
@@ -2541,6 +2750,16 @@ pub async fn upgrade_claudecode(
             }
         });
     if matches!(requested.as_str(), "modified" | "a" | "改版") {
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_claude_result())
+                }
+                Err(error) => {
+                    return Ok(claude_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {CLAUDE_MODIFIED_INSTALL_URL}");
         return match install_and_verify_cli_variant(
             "claude",
@@ -2551,11 +2770,11 @@ pub async fn upgrade_claudecode(
             "gac 改版",
             Some(remove_conflicting_claude_modified_launcher),
         ) {
-            Ok(result) => Ok(claude_ok(
-                "ClaudeCode 改版升级成功",
-                result.logs.join("\n"),
-                true,
-            )),
+            Ok(result) => {
+                let mut logs = dependency_logs;
+                logs.extend(result.logs);
+                Ok(claude_ok("ClaudeCode 改版升级成功", logs.join("\n"), true))
+            }
             Err(failure) => Ok(claude_err(
                 "ClaudeCode 升级失败",
                 failure.error,
@@ -2570,13 +2789,24 @@ pub async fn upgrade_claudecode(
             String::new(),
         ));
     }
+    let dependency_logs =
+        match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+            Ok(logs) => logs,
+            Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                return Ok(missing_node_npm_claude_result())
+            }
+            Err(error) => return Ok(claude_err("Node.js/npm 自动安装失败", error, String::new())),
+        };
     let command = format!("npm install -g {CLAUDE_ORIGINAL_PACKAGE}@latest");
     match run_shell_script(&command) {
-        Ok(output) => Ok(claude_ok(
-            "ClaudeCode 原版升级成功",
-            format!("$ {command}\n{output}"),
-            true,
-        )),
+        Ok(output) => {
+            let mut logs = dependency_logs;
+            logs.push(format!("$ {command}"));
+            if !output.trim().is_empty() {
+                logs.push(output);
+            }
+            Ok(claude_ok("ClaudeCode 原版升级成功", logs.join("\n"), true))
+        }
         Err(e) => Ok(claude_err("ClaudeCode 升级失败", e, String::new())),
     }
 }
@@ -2585,6 +2815,7 @@ pub async fn upgrade_claudecode(
 pub async fn switch_claudecode_variant(
     state: State<'_, AppState>,
     target_variant: Option<String>,
+    allow_dependency_install: Option<bool>,
 ) -> Result<ClaudeActionResult, String> {
     let target = target_variant
         .map(|value| value.trim().to_lowercase())
@@ -2625,6 +2856,16 @@ pub async fn switch_claudecode_variant(
             };
         }
 
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_claude_result())
+                }
+                Err(error) => {
+                    return Ok(claude_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {CLAUDE_MODIFIED_INSTALL_URL}");
         let mut logs = match install_and_verify_cli_variant(
             "claude",
@@ -2644,6 +2885,9 @@ pub async fn switch_claudecode_variant(
                 ))
             }
         };
+        let mut merged_logs = dependency_logs;
+        merged_logs.extend(logs);
+        logs = merged_logs;
         match configure_claude_modified_route(&mut data) {
             Ok(config_logs) => {
                 logs.extend(config_logs);
@@ -2706,6 +2950,16 @@ pub async fn switch_claudecode_variant(
             };
         }
 
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_claude_result())
+                }
+                Err(error) => {
+                    return Ok(claude_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {CLAUDE_ORIGINAL_PACKAGE}");
         let mut logs = match install_and_verify_cli_variant(
             "claude",
@@ -2725,6 +2979,9 @@ pub async fn switch_claudecode_variant(
                 ))
             }
         };
+        let mut merged_logs = dependency_logs;
+        merged_logs.extend(logs);
+        logs = merged_logs;
         match configure_claude_original_route(&mut data, &route_name, &base_url, &api_key) {
             Ok(config_logs) => {
                 logs.extend(config_logs);
@@ -3536,6 +3793,7 @@ pub async fn install_codex(
     api_key: Option<String>,
     model: Option<String>,
     model_reasoning_effort: Option<String>,
+    allow_dependency_install: Option<bool>,
 ) -> Result<CodexActionResult, String> {
     let normalized_variant = variant.trim().to_lowercase();
     let installed = command_exists("codex");
@@ -3581,6 +3839,16 @@ pub async fn install_codex(
                 Err(error) => Ok(codex_err("Codex 安装失败", error, String::new())),
             };
         }
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_codex_result())
+                }
+                Err(error) => {
+                    return Ok(codex_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {CODEX_GAC_INSTALL_URL}");
         return match install_and_verify_cli_variant(
             "codex",
@@ -3592,6 +3860,9 @@ pub async fn install_codex(
             Some(remove_conflicting_codex_launcher),
         ) {
             Ok(mut result) => {
+                let mut logs = dependency_logs;
+                logs.extend(result.logs);
+                result.logs = logs;
                 let install_version = fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await;
                 save_install_state_with_version(
                     "gac",
@@ -3640,6 +3911,14 @@ pub async fn install_codex(
             Err(e) => Ok(codex_err("Codex 配置失败", e, String::new())),
         };
     }
+    let dependency_logs =
+        match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+            Ok(logs) => logs,
+            Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                return Ok(missing_node_npm_codex_result())
+            }
+            Err(error) => return Ok(codex_err("Node.js/npm 自动安装失败", error, String::new())),
+        };
     let install_command = format!("npm install -g {CODEX_OPENAI_PACKAGE}");
     let mut logs = match install_and_verify_cli_variant(
         "codex",
@@ -3659,6 +3938,9 @@ pub async fn install_codex(
             ))
         }
     };
+    let mut merged_logs = dependency_logs;
+    merged_logs.extend(logs);
+    logs = merged_logs;
     match configure_openai_route(
         &selected_route,
         &selected_api_key,
@@ -3682,16 +3964,35 @@ pub async fn install_codex(
 }
 
 #[tauri::command]
-pub async fn upgrade_codex(target_variant: Option<String>) -> Result<CodexActionResult, String> {
+pub async fn upgrade_codex(
+    target_variant: Option<String>,
+    allow_dependency_install: Option<bool>,
+) -> Result<CodexActionResult, String> {
     let variant = target_variant
         .map(|v| v.trim().to_lowercase())
         .filter(|v| !v.is_empty())
         .or_else(|| resolve_codex_cli_variant(&resolve_cli_info("codex")))
         .unwrap_or_else(|| "openai".to_string());
     if variant == "gac" {
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_codex_result())
+                }
+                Err(error) => {
+                    return Ok(codex_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {CODEX_GAC_INSTALL_URL}");
         return match run_shell_script(&command) {
             Ok(output) => {
+                let mut logs = dependency_logs;
+                logs.push(format!("$ {command}"));
+                if !output.trim().is_empty() {
+                    logs.push(output);
+                }
+                logs.push(CODEX_GAC_RUNTIME_HINT.to_string());
                 let current_state = load_install_state();
                 let install_version = fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await;
                 save_install_state_with_version(
@@ -3700,22 +4001,29 @@ pub async fn upgrade_codex(target_variant: Option<String>) -> Result<CodexAction
                     current_state.last_original_provider_id.as_deref(),
                     install_version.as_deref(),
                 )?;
-                Ok(codex_ok(
-                    "Codex 改版升级成功",
-                    format!("$ {command}\n{output}\n{CODEX_GAC_RUNTIME_HINT}"),
-                    true,
-                ))
+                Ok(codex_ok("Codex 改版升级成功", logs.join("\n"), true))
             }
             Err(e) => Ok(codex_err("Codex 升级失败", e, String::new())),
         };
     }
+    let dependency_logs =
+        match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+            Ok(logs) => logs,
+            Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                return Ok(missing_node_npm_codex_result())
+            }
+            Err(error) => return Ok(codex_err("Node.js/npm 自动安装失败", error, String::new())),
+        };
     let command = format!("npm install -g {CODEX_OPENAI_PACKAGE}@latest");
     match run_shell_script(&command) {
-        Ok(output) => Ok(codex_ok(
-            "Codex 原版升级成功",
-            format!("$ {command}\n{output}"),
-            true,
-        )),
+        Ok(output) => {
+            let mut logs = dependency_logs;
+            logs.push(format!("$ {command}"));
+            if !output.trim().is_empty() {
+                logs.push(output);
+            }
+            Ok(codex_ok("Codex 原版升级成功", logs.join("\n"), true))
+        }
         Err(e) => Ok(codex_err("Codex 升级失败", e, String::new())),
     }
 }
@@ -3724,6 +4032,7 @@ pub async fn upgrade_codex(target_variant: Option<String>) -> Result<CodexAction
 pub async fn switch_codex_variant(
     state: State<'_, AppState>,
     target_variant: Option<String>,
+    allow_dependency_install: Option<bool>,
 ) -> Result<CodexActionResult, String> {
     let target = target_variant
         .map(|value| value.trim().to_lowercase())
@@ -3767,6 +4076,16 @@ pub async fn switch_codex_variant(
             };
         }
 
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_codex_result())
+                }
+                Err(error) => {
+                    return Ok(codex_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {CODEX_GAC_INSTALL_URL}");
         match install_and_verify_cli_variant(
             "codex",
@@ -3778,6 +4097,9 @@ pub async fn switch_codex_variant(
             Some(remove_conflicting_codex_launcher),
         ) {
             Ok(mut result) => {
+                let mut logs = dependency_logs;
+                logs.extend(result.logs);
+                result.logs = logs;
                 let install_version = fetch_gac_latest_version(CODEX_GAC_INSTALL_URL).await;
                 save_install_state_with_version(
                     "gac",
@@ -3833,6 +4155,16 @@ pub async fn switch_codex_variant(
             };
         }
 
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_codex_result())
+                }
+                Err(error) => {
+                    return Ok(codex_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {CODEX_OPENAI_PACKAGE}");
         let mut logs = match install_and_verify_cli_variant(
             "codex",
@@ -3852,6 +4184,9 @@ pub async fn switch_codex_variant(
                 ))
             }
         };
+        let mut merged_logs = dependency_logs;
+        merged_logs.extend(logs);
+        logs = merged_logs;
         match configure_openai_route(&restore_route, &restore_api_key, None, None) {
             Ok(route_logs) => {
                 logs.extend(route_logs);
@@ -4107,6 +4442,7 @@ pub async fn install_gemini(
     route: Option<String>,
     api_key: Option<String>,
     model: Option<String>,
+    allow_dependency_install: Option<bool>,
 ) -> Result<GeminiActionResult, String> {
     let normalized_variant = variant.trim().to_lowercase();
     let installed = command_exists("gemini");
@@ -4151,6 +4487,16 @@ pub async fn install_gemini(
                 Err(error) => Ok(gemini_err("Gemini 安装失败", error, String::new())),
             };
         }
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_gemini_result())
+                }
+                Err(error) => {
+                    return Ok(gemini_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {GEMINI_GAC_INSTALL_URL}");
         return match install_and_verify_cli_variant(
             "gemini",
@@ -4162,6 +4508,9 @@ pub async fn install_gemini(
             Some(remove_conflicting_gemini_modified_launcher),
         ) {
             Ok(mut result) => {
+                let mut logs = dependency_logs;
+                logs.extend(result.logs);
+                result.logs = logs;
                 let install_version = fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await;
                 save_gemini_install_state_with_version(
                     "gac",
@@ -4206,12 +4555,24 @@ pub async fn install_gemini(
         };
     }
 
+    let dependency_logs =
+        match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+            Ok(logs) => logs,
+            Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                return Ok(missing_node_npm_gemini_result())
+            }
+            Err(error) => return Ok(gemini_err("Node.js/npm 自动安装失败", error, String::new())),
+        };
     let install_command = format!("npm install -g {GEMINI_OFFICIAL_PACKAGE}");
     let install_output = match run_shell_script(&install_command) {
         Ok(v) => v,
         Err(e) => return Ok(gemini_err("Gemini 安装失败", e, String::new())),
     };
-    let mut logs = vec![format!("$ {install_command}"), install_output];
+    let mut logs = dependency_logs;
+    logs.push(format!("$ {install_command}"));
+    if !install_output.trim().is_empty() {
+        logs.push(install_output);
+    }
     match ensure_gemini_official_command_target() {
         Ok(cleanup_logs) => logs.extend(cleanup_logs),
         Err(e) => {
@@ -4240,16 +4601,34 @@ pub async fn install_gemini(
 }
 
 #[tauri::command]
-pub async fn upgrade_gemini(target_variant: Option<String>) -> Result<GeminiActionResult, String> {
+pub async fn upgrade_gemini(
+    target_variant: Option<String>,
+    allow_dependency_install: Option<bool>,
+) -> Result<GeminiActionResult, String> {
     let variant = target_variant
         .map(|v| v.trim().to_lowercase())
         .filter(|v| !v.is_empty())
         .or_else(|| resolve_gemini_cli_variant(&resolve_cli_info("gemini")))
         .unwrap_or_else(|| "official".to_string());
     if variant == "gac" {
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_gemini_result())
+                }
+                Err(error) => {
+                    return Ok(gemini_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {GEMINI_GAC_INSTALL_URL}");
         return match run_shell_script(&command) {
             Ok(output) => {
+                let mut logs = dependency_logs;
+                logs.push(format!("$ {command}"));
+                if !output.trim().is_empty() {
+                    logs.push(output);
+                }
                 let current_state = load_gemini_install_state();
                 let install_version = fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await;
                 save_gemini_install_state_with_version(
@@ -4258,22 +4637,29 @@ pub async fn upgrade_gemini(target_variant: Option<String>) -> Result<GeminiActi
                     current_state.last_original_provider_id.as_deref(),
                     install_version.as_deref(),
                 )?;
-                Ok(gemini_ok(
-                    "Gemini 改版升级成功",
-                    format!("$ {command}\n{output}"),
-                    true,
-                ))
+                Ok(gemini_ok("Gemini 改版升级成功", logs.join("\n"), true))
             }
             Err(e) => Ok(gemini_err("Gemini 升级失败", e, String::new())),
         };
     }
+    let dependency_logs =
+        match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+            Ok(logs) => logs,
+            Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                return Ok(missing_node_npm_gemini_result())
+            }
+            Err(error) => return Ok(gemini_err("Node.js/npm 自动安装失败", error, String::new())),
+        };
     let command = format!("npm install -g {GEMINI_OFFICIAL_PACKAGE}@latest");
     match run_shell_script(&command) {
-        Ok(output) => Ok(gemini_ok(
-            "Gemini 原版升级成功",
-            format!("$ {command}\n{output}"),
-            true,
-        )),
+        Ok(output) => {
+            let mut logs = dependency_logs;
+            logs.push(format!("$ {command}"));
+            if !output.trim().is_empty() {
+                logs.push(output);
+            }
+            Ok(gemini_ok("Gemini 原版升级成功", logs.join("\n"), true))
+        }
         Err(e) => Ok(gemini_err("Gemini 升级失败", e, String::new())),
     }
 }
@@ -4282,6 +4668,7 @@ pub async fn upgrade_gemini(target_variant: Option<String>) -> Result<GeminiActi
 pub async fn switch_gemini_variant(
     state: State<'_, AppState>,
     target_variant: Option<String>,
+    allow_dependency_install: Option<bool>,
 ) -> Result<GeminiActionResult, String> {
     let target = target_variant
         .map(|value| value.trim().to_lowercase())
@@ -4324,6 +4711,16 @@ pub async fn switch_gemini_variant(
             };
         }
 
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_gemini_result())
+                }
+                Err(error) => {
+                    return Ok(gemini_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {GEMINI_GAC_INSTALL_URL}");
         match install_and_verify_cli_variant(
             "gemini",
@@ -4335,6 +4732,9 @@ pub async fn switch_gemini_variant(
             Some(remove_conflicting_gemini_modified_launcher),
         ) {
             Ok(mut result) => {
+                let mut logs = dependency_logs;
+                logs.extend(result.logs);
+                result.logs = logs;
                 let install_version = fetch_gac_latest_version(GEMINI_GAC_INSTALL_URL).await;
                 save_gemini_install_state_with_version(
                     "gac",
@@ -4395,6 +4795,16 @@ pub async fn switch_gemini_variant(
             };
         }
 
+        let dependency_logs =
+            match ensure_node_npm_dependencies(allow_dependency_install.unwrap_or(false)) {
+                Ok(logs) => logs,
+                Err(error) if error == MISSING_NODE_NPM_ERROR => {
+                    return Ok(missing_node_npm_gemini_result())
+                }
+                Err(error) => {
+                    return Ok(gemini_err("Node.js/npm 自动安装失败", error, String::new()))
+                }
+            };
         let command = format!("npm install -g {GEMINI_OFFICIAL_PACKAGE}");
         let mut logs = match install_and_verify_cli_variant(
             "gemini",
@@ -4414,6 +4824,9 @@ pub async fn switch_gemini_variant(
                 ))
             }
         };
+        let mut merged_logs = dependency_logs;
+        merged_logs.extend(logs);
+        logs = merged_logs;
         match configure_gemini_route(&restore_route, &restore_api_key, restore_model) {
             Ok(route_logs) => {
                 logs.extend(route_logs);
@@ -4452,7 +4865,8 @@ mod tests {
         claude_custom_api_key_fingerprint, claude_has_modified_status_context,
         claude_runtime_env_conflicts, claude_sources_are_conflicting,
         cleanup_launcher_after_install_conflict, extract_gac_latest_marker_from_url,
-        merge_claude_current_route, normalize_claude_route_for_comparison, parse_install_state,
+        merge_claude_current_route, normalize_claude_route_for_comparison,
+        npm_dependency_install_command_for_platform, parse_install_state,
         remove_conflicting_claude_modified_launcher, remove_conflicting_claude_original_launcher,
         remove_conflicting_codex_launcher, remove_conflicting_codex_original_launcher,
         remove_conflicting_gemini_launcher, remove_conflicting_gemini_modified_launcher,
@@ -5083,5 +5497,55 @@ mod tests {
             Some("改版"),
             Some("tu-zi")
         ));
+    }
+
+    #[test]
+    fn node_npm_dependency_install_command_matches_supported_platforms() {
+        assert_eq!(
+            npm_dependency_install_command_for_platform("macos", true, false, false, false, false)
+                .unwrap(),
+            "brew install node"
+        );
+        assert_eq!(
+            npm_dependency_install_command_for_platform("linux", false, true, false, false, false)
+                .unwrap(),
+            "sudo apt-get update && sudo apt-get install -y nodejs npm"
+        );
+        assert_eq!(
+            npm_dependency_install_command_for_platform("linux", false, false, true, false, false)
+                .unwrap(),
+            "sudo dnf install -y nodejs npm"
+        );
+        assert_eq!(
+            npm_dependency_install_command_for_platform("linux", false, false, false, true, false)
+                .unwrap(),
+            "sudo yum install -y nodejs npm"
+        );
+        assert_eq!(
+            npm_dependency_install_command_for_platform(
+                "windows", false, false, false, false, true
+            )
+            .unwrap(),
+            "winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements"
+        );
+    }
+
+    #[test]
+    fn node_npm_dependency_install_command_reports_missing_manager() {
+        assert!(npm_dependency_install_command_for_platform(
+            "macos", false, false, false, false, false
+        )
+        .unwrap_err()
+        .contains("Homebrew"));
+        assert!(npm_dependency_install_command_for_platform(
+            "linux", false, false, false, false, false
+        )
+        .unwrap_err()
+        .contains("包管理器"));
+        assert!(npm_dependency_install_command_for_platform(
+            "windows", false, false, false, false, false
+        )
+        .unwrap_err()
+        .contains("winget"));
     }
 }

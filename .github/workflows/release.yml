@@ -638,7 +638,7 @@ jobs:
             ### 下载
 
             - **macOS**: 当前发布未签名测试包 `tuzi-switch-${{ github.ref_name }}-macOS-unsigned.dmg` / `.zip`
-            - **Windows**: 下载 Windows 安装包 `tuzi-switch-${{ github.ref_name }}-Windows.msi`
+            - **Windows**: 下载 Windows 安装包
             - **Linux (x86_64)**: `tuzi-switch-${{ github.ref_name }}-Linux-x86_64.AppImage` / `.deb` / `.rpm`
             - **Linux (ARM64)**: `tuzi-switch-${{ github.ref_name }}-Linux-arm64.AppImage` / `.deb` / `.rpm`
 

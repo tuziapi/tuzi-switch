@@ -27,16 +27,16 @@ Current public releases are ready for Windows and Linux users. macOS is currentl
 
 ### macOS / Linux One-Command Install
 
-Install the currently recommended build `v3.12.18` directly from GitHub:
+Install the currently recommended build `v3.12.19` directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.18 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.19 bash
 ```
 
 Notes:
 
 - The current release is published as a stable GitHub Release, so `releases/latest` should resolve to the recommended build
-- The README command stays pinned to `v3.12.18` so it installs the current recommended version reliably
+- The README command stays pinned to `v3.12.19` so it installs the current recommended version reliably
 - To install another version, replace the value in `TUZI_SWITCH_TAG=vX.Y.Z`
 
 ### macOS Unsigned Build
@@ -68,14 +68,14 @@ Users only need to enter their Tuzi key once, then complete route setup and loca
 
 ## Current Version Updates
 
-The current public release is `v3.12.18`, with this round focused on:
+The current public release is `v3.12.19`, with this round focused on:
 
-- Windows configuration reliability is improved, with CLI detection covering common npm, pnpm, Volta, nvm, fnm, and mise paths
-- Claude / Codex route setup on Windows now writes current-user environment variables to reduce cases where the UI is configured but terminals cannot read it
-- Claude, Codex, and Gemini installation plus modified-variant exit flows now clean safe npm launcher conflicts and retry
-- Claude modified installation now handles `EEXIST` failures caused by an old `claude` launcher occupying the command path
-- Upstream window-state persistence and Linux drag-region compatibility improvements were merged
-- Releases now use the stable GitHub Release path, keeping `releases/latest` and the README install command aligned with the recommended build
+- Claude / Codex / Gemini no longer expose raw `npm: command not found` failures when Node.js/npm is missing; the app asks for confirmation, installs dependencies, and continues the original setup action
+- macOS uses Homebrew for Node.js, Linux supports apt/dnf/yum for nodejs/npm, and Windows uses winget to install Node.js LTS
+- OpenClaw quick access now includes a default-model selector, writes the full model list, and syncs the selected model into primary plus fallbacks
+- The Claude / Codex / Gemini route-card `Written` state now only means the matching business provider card exists below, so deleting that card no longer leaves a misleading written badge
+- The original provider-delete behavior is preserved: non-current providers only remove the card, current providers are still protected, and the real CLI configuration remains reflected in the top status area
+- Release metadata and the pinned README install command are aligned to `v3.12.19`
 
 ## Product Highlights
 
@@ -157,15 +157,15 @@ For compatibility with the upstream ecosystem, local data currently still uses t
 
 ## Development Plan / TODO
 
-- Done: CLI path resolution and npm launcher-conflict handling completed a reliability pass across Windows, macOS, and Linux
-- Done: Claude / Codex / Gemini installation, upgrade, and modified-variant exit flows were further hardened
-- Done: the README install command, installer-script example, and GitHub latest flow are aligned to `v3.12.18`
-- Done: upstream window-state persistence, Linux drag-region compatibility, and stable JSON key ordering were merged
-- In progress: keep aligning route cards, status blocks, provider-list highlights, and copy density across light and dark themes
-- In progress: keep collecting real Windows customer feedback around external scripts, installer records, and actual CLI resolution
-- In progress: keep refining OpenClaw onboarding language, session recovery boundaries, and default-model linkage
-- Next: continue refining session management and recovery strategy
-- Next: continue improving macOS signing distribution and customer-facing install guidance
+- Done: confirmation, automatic dependency installation, and continued setup when Node.js/npm is missing
+- Done: OpenClaw default-model selection, primary/fallback writing, and default-model status sync after configuration
+- Done: quick-access `Written` semantics now match the existence of business provider cards below
+- Done: README, version metadata, and Release copy are aligned to `v3.12.19`
+- In progress: keep tracking real Windows customer feedback, especially Node/npm, PATH, winget, and CLI shim differences
+- In progress: keep refining OpenClaw session recovery, default-model selection, and business-route wording
+- In progress: keep aligning route cards, status blocks, hint areas, and provider-list highlights across light and dark themes
+- Next: keep simplifying release copy and customer-facing install guidance
+- Next: continue improving macOS signing distribution and customer-facing install notes
 
 ## Notes
 

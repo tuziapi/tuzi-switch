@@ -9,6 +9,10 @@ export interface InstallerActionResult {
   restart_required: boolean;
 }
 
+export interface InstallerActionOptions {
+  allowDependencyInstall?: boolean;
+}
+
 export interface ClaudeInstallerStatus {
   installed: boolean;
   version: string | null;
@@ -115,22 +119,38 @@ export const installerApi = {
   async installClaudeCode(
     scheme: "A" | "B" | "C",
     apiKey?: string,
+    options?: InstallerActionOptions,
   ): Promise<InstallerActionResult> {
-    return await invoke("install_claudecode", { scheme, apiKey });
+    return await invoke("install_claudecode", {
+      scheme,
+      apiKey,
+      api_key: apiKey,
+      allowDependencyInstall: options?.allowDependencyInstall,
+      allow_dependency_install: options?.allowDependencyInstall,
+    });
   },
 
   async upgradeClaudeCode(
     targetVariant?: "modified" | "original",
+    options?: InstallerActionOptions,
   ): Promise<InstallerActionResult> {
-    return await invoke("upgrade_claudecode", { targetVariant });
+    return await invoke("upgrade_claudecode", {
+      targetVariant,
+      target_variant: targetVariant,
+      allowDependencyInstall: options?.allowDependencyInstall,
+      allow_dependency_install: options?.allowDependencyInstall,
+    });
   },
 
   async switchClaudeVariant(
     targetVariant: "modified" | "original",
+    options?: InstallerActionOptions,
   ): Promise<InstallerActionResult> {
     return await invoke("switch_claudecode_variant", {
       targetVariant,
       target_variant: targetVariant,
+      allowDependencyInstall: options?.allowDependencyInstall,
+      allow_dependency_install: options?.allowDependencyInstall,
     });
   },
 
@@ -144,8 +164,16 @@ export const installerApi = {
     apiKey?: string;
     model?: string;
     modelReasoningEffort?: string;
+    allowDependencyInstall?: boolean;
   }): Promise<InstallerActionResult> {
-    const { variant, route, apiKey, model, modelReasoningEffort } = options;
+    const {
+      variant,
+      route,
+      apiKey,
+      model,
+      modelReasoningEffort,
+      allowDependencyInstall,
+    } = options;
     return await invoke("install_codex", {
       variant,
       route,
@@ -154,24 +182,32 @@ export const installerApi = {
       model,
       modelReasoningEffort,
       model_reasoning_effort: modelReasoningEffort,
+      allowDependencyInstall,
+      allow_dependency_install: allowDependencyInstall,
     });
   },
 
   async upgradeCodex(
     targetVariant?: "openai" | "gac",
+    options?: InstallerActionOptions,
   ): Promise<InstallerActionResult> {
     return await invoke("upgrade_codex", {
       targetVariant,
       target_variant: targetVariant,
+      allowDependencyInstall: options?.allowDependencyInstall,
+      allow_dependency_install: options?.allowDependencyInstall,
     });
   },
 
   async switchCodexVariant(
     targetVariant: "openai" | "gac",
+    options?: InstallerActionOptions,
   ): Promise<InstallerActionResult> {
     return await invoke("switch_codex_variant", {
       targetVariant,
       target_variant: targetVariant,
+      allowDependencyInstall: options?.allowDependencyInstall,
+      allow_dependency_install: options?.allowDependencyInstall,
     });
   },
 
@@ -184,32 +220,41 @@ export const installerApi = {
     route?: "tuzi";
     apiKey?: string;
     model?: string;
+    allowDependencyInstall?: boolean;
   }): Promise<InstallerActionResult> {
-    const { variant, route, apiKey, model } = options;
+    const { variant, route, apiKey, model, allowDependencyInstall } = options;
     return await invoke("install_gemini", {
       variant,
       route,
       apiKey,
       api_key: apiKey,
       model,
+      allowDependencyInstall,
+      allow_dependency_install: allowDependencyInstall,
     });
   },
 
   async upgradeGemini(
     targetVariant?: "official" | "gac",
+    options?: InstallerActionOptions,
   ): Promise<InstallerActionResult> {
     return await invoke("upgrade_gemini", {
       targetVariant,
       target_variant: targetVariant,
+      allowDependencyInstall: options?.allowDependencyInstall,
+      allow_dependency_install: options?.allowDependencyInstall,
     });
   },
 
   async switchGeminiVariant(
     targetVariant: "official" | "gac",
+    options?: InstallerActionOptions,
   ): Promise<InstallerActionResult> {
     return await invoke("switch_gemini_variant", {
       targetVariant,
       target_variant: targetVariant,
+      allowDependencyInstall: options?.allowDependencyInstall,
+      allow_dependency_install: options?.allowDependencyInstall,
     });
   },
 };

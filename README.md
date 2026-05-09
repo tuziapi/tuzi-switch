@@ -27,16 +27,16 @@
 
 ### macOS / Linux 一键安装
 
-直接安装当前推荐版本 `v3.12.18`：
+直接安装当前推荐版本 `v3.12.19`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.18 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.19 bash
 ```
 
 补充说明：
 
 - 当前 Release 已按正式版本发布，GitHub `releases/latest` 会优先命中当前推荐版本
-- 当前 README 默认固定到 `v3.12.18`，这样可以确保安装到我们当前推荐版本
+- 当前 README 默认固定到 `v3.12.19`，这样可以确保安装到我们当前推荐版本
 - 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
 
 ### macOS 未签名包打开方式
@@ -68,14 +68,14 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 当前版本更新
 
-当前公开版本为 `v3.12.18`，这一轮更新重点包括：
+当前公开版本为 `v3.12.19`，这一轮更新重点包括：
 
-- Windows 配置可靠性继续加强，CLI 检测会补充常见 npm、pnpm、Volta、nvm、fnm、mise 等路径
-- Windows 下 Claude / Codex 线路配置会同步写入当前用户环境变量，减少“界面已配置但终端读不到”的情况
-- Claude、Codex、Gemini 的安装与退出改版逻辑继续收口，遇到 npm launcher 冲突时会自动清理安全入口并重试
-- Claude 改版安装补齐 `EEXIST` 兜底，能处理旧 `claude` launcher 占用导致的安装失败
-- 同步合入上游窗口状态保持与 Linux 拖拽区域兼容优化
-- Release 改为正式发布路径，`releases/latest` 与 README 一键安装默认指向当前推荐版本
+- Claude / Codex / Gemini 在缺少 Node.js/npm 时不再直接暴露 `npm: command not found`，会先弹窗确认，再按平台自动安装依赖并继续原配置动作
+- macOS 通过 Homebrew 安装 Node.js，Linux 支持 apt/dnf/yum 安装 nodejs/npm，Windows 支持 winget 安装 Node.js LTS
+- OpenClaw 快速接入新增默认模型选择，配置时会写入完整模型列表，并把所选模型同步到 primary 与 fallbacks
+- Claude / Codex / Gemini 路线卡的“已写入”只表示下方业务 provider 卡片存在，删除卡片后不再被真实 CLI route 误判为已写入
+- 保持原版删除逻辑：非当前 provider 只删除下方卡片，当前 provider 仍禁止删除，真实 CLI 配置继续由顶部状态展示
+- Release 与 README 固定安装命令同步到 `v3.12.19`
 
 ## 产品亮点
 
@@ -159,15 +159,15 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 开发计划 / TODO List
 
-- 已完成：Windows / macOS / Linux 的 CLI 真实命中路径与 npm launcher 冲突处理完成一轮可靠性收口
-- 已完成：Claude / Codex / Gemini 安装、升级、退出改版的重复安装与冲突恢复逻辑继续补稳
-- 已完成：README 一键安装命令、安装脚本示例和 Release latest 流程同步到 `v3.12.18`
-- 已完成：同步上游窗口状态保持、Linux 拖拽区域兼容和配置 JSON 稳定排序能力
-- 进行中：继续统一深色 / 浅色主题下的路线卡、状态区、列表高亮与各入口文案密度
-- 进行中：继续收集 Windows 客户机真实反馈，跟踪外部脚本、installer 记录与实际 CLI 命中的冲突边界
-- 进行中：继续优化 OpenClaw 业务接入表达、会话恢复边界与默认模型联动体验
-- 下一步：继续梳理会话管理与恢复策略
-- 下一步：继续推进 macOS 签名分发与客户视角安装提示收口
+- 已完成：缺 Node.js/npm 时的确认弹窗、自动依赖安装与继续配置链路
+- 已完成：OpenClaw 默认模型选择、primary/fallbacks 写入和配置成功后的默认模型同步
+- 已完成：快速接入“已写入”状态语义与下方 provider 卡片存在性对齐
+- 已完成：README、版本号、Release 文案与 `v3.12.19` 发布同步
+- 进行中：继续跟踪 Windows 客户机真实反馈，特别是 Node/npm、PATH、winget 与 CLI shim 命中差异
+- 进行中：继续优化 OpenClaw 会话恢复、默认模型选择体验与业务线路表达
+- 进行中：继续统一深色 / 浅色主题下的路线卡、状态区、提示区和列表高亮
+- 下一步：继续精简 release 文案与客户安装提示
+- 下一步：继续推进 macOS 签名分发与客户视角安装说明收口
 
 ## 说明
 

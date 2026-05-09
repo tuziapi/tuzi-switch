@@ -27,16 +27,16 @@
 
 ### macOS / Linux ワンコマンドインストール
 
-現在の推奨版 `v3.12.18` を直接インストール:
+現在の推奨版 `v3.12.19` を直接インストール:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.18 bash
+curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/main/scripts/install_tuzi_switch.sh | env TUZI_SWITCH_TAG=v3.12.19 bash
 ```
 
 補足:
 
 - 現在の Release は正式版として公開され、GitHub `releases/latest` は現在の推奨版を指す想定です
-- README のコマンドは `v3.12.18` に固定し、現在の推奨版を確実に入れられるようにしています
+- README のコマンドは `v3.12.19` に固定し、現在の推奨版を確実に入れられるようにしています
 - 別バージョンを入れたい場合は `TUZI_SWITCH_TAG=vX.Y.Z` の値を差し替えてください
 
 ### macOS 未署名ビルド
@@ -68,14 +68,14 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 現在のバージョン更新内容
 
-現在の公開版は `v3.12.18` で、今回の主な更新は以下です。
+現在の公開版は `v3.12.19` で、今回の主な更新は以下です。
 
-- Windows の設定信頼性を強化し、CLI 検出では npm、pnpm、Volta、nvm、fnm、mise などの一般的なパスを補完します
-- Windows の Claude / Codex ルート設定では現在ユーザーの環境変数にも同期し、UI で設定済みでもターミナルで読めない状況を減らします
-- Claude、Codex、Gemini のインストールと改版終了フローで、安全な npm launcher 衝突を自動清理して再試行します
-- Claude 改版インストールで、古い `claude` launcher が原因の `EEXIST` 失敗に対応しました
-- 上流のウィンドウ状態保持と Linux drag-region 互換改善を取り込みました
-- Release を正式公開フローに切り替え、`releases/latest` と README のインストールコマンドが現在の推奨版を指すようにしました
+- Claude / Codex / Gemini で Node.js/npm がない場合、`npm: command not found` をそのまま出さず、確認後に依存関係を自動インストールして元の設定処理を続行します
+- macOS は Homebrew、Linux は apt/dnf/yum、Windows は winget を使って Node.js/npm を導入します
+- OpenClaw クイック接入にデフォルトモデル選択を追加し、完全なモデル一覧を書き込みつつ、選択モデルを primary と fallbacks に同期します
+- Claude / Codex / Gemini のルートカードの「書き込み済み」は下部の業務 provider カードが存在することだけを表すようになり、カード削除後に誤表示されません
+- 原版の削除挙動は維持し、非現在 provider はカードのみ削除、現在 provider は引き続き削除不可、実際の CLI 設定は上部ステータスで表示します
+- Release と README の固定インストールコマンドを `v3.12.19` に同期しました
 
 ## 製品のポイント
 
@@ -157,15 +157,15 @@ tuzi-switch は CC Switch をベースにした Tuzi 業務向けのカスタム
 
 ## 開発計画 / TODO
 
-- 完了: Windows / macOS / Linux での CLI 実解決パスと npm launcher 衝突処理を一度収束
-- 完了: Claude / Codex / Gemini のインストール、アップグレード、改版終了フローをさらに安定化
-- 完了: README のインストールコマンド、インストールスクリプト例、GitHub latest フローを `v3.12.18` に同期
-- 完了: 上流のウィンドウ状態保持、Linux drag-region 互換、JSON key 安定ソートを取り込み
-- 進行中: ライト / ダーク両テーマで、ルートカード、状態ブロック、下部リスト高亮、各入口の文案密度をさらに揃える
-- 進行中: Windows 顧客環境の実フィードバックを集め、外部スクリプト、installer 記録、実際の CLI 解決の衝突境界を追跡
-- 進行中: OpenClaw の業務接入表現、セッション復元境界、デフォルトモデル連動を継続改善
-- 次: セッション管理と復元戦略を引き続き整理する
-- 次: macOS 署名配布と顧客向けインストール案内をさらに整える
+- 完了: Node.js/npm 不足時の確認、自動依存インストール、元の設定処理への継続
+- 完了: OpenClaw のデフォルトモデル選択、primary/fallbacks 書き込み、設定後のデフォルトモデル同期
+- 完了: クイック接入の「書き込み済み」状態を下部の業務 provider カード存在性に合わせました
+- 完了: README、バージョン情報、Release 文案を `v3.12.19` に同期
+- 進行中: Windows 顧客環境の実フィードバックを継続収集し、Node/npm、PATH、winget、CLI shim の差異を追跡
+- 進行中: OpenClaw のセッション復元、デフォルトモデル選択、業務ルート表現を継続改善
+- 進行中: ライト / ダーク両テーマで、ルートカード、状態ブロック、ヒント領域、リスト高亮をさらに揃える
+- 次: Release 文案と顧客向けインストール案内をさらに簡潔にする
+- 次: macOS 署名配布と顧客向けインストール説明を継続整備する
 
 ## 補足
 
