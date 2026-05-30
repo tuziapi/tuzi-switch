@@ -6,6 +6,7 @@ import {
   waitFor,
   act,
 } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@/types";
 import McpFormModal from "@/components/mcp/McpFormModal";
 
