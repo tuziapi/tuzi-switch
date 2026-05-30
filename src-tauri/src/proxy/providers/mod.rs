@@ -15,6 +15,7 @@ mod adapter;
 mod auth;
 mod claude;
 mod codex;
+pub(crate) mod codex_chat_common;
 pub mod codex_oauth_auth;
 pub mod copilot_auth;
 pub mod copilot_model_map;
@@ -23,9 +24,11 @@ pub(crate) mod gemini_schema;
 pub mod gemini_shadow;
 pub mod models;
 pub mod streaming;
+pub mod streaming_codex_chat;
 pub mod streaming_gemini;
 pub mod streaming_responses;
 pub mod transform;
+pub mod transform_codex_chat;
 pub mod transform_gemini;
 pub mod transform_responses;
 
@@ -40,7 +43,12 @@ pub use claude::{
     claude_api_format_needs_transform, get_claude_api_format,
     transform_claude_request_for_api_format, ClaudeAdapter,
 };
-pub use codex::CodexAdapter;
+#[allow(unused_imports)]
+pub use codex::codex_provider_uses_chat_completions;
+pub use codex::{
+    apply_codex_chat_upstream_model, resolve_codex_chat_reasoning_config,
+    should_convert_codex_responses_to_chat, CodexAdapter,
+};
 pub use gemini::GeminiAdapter;
 
 /// 供应商类型枚举

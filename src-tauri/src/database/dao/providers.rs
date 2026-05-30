@@ -44,11 +44,14 @@ fn build_codex_official_provider(
         }),
         Some(website_url.to_string()),
     );
-    provider.icon = Some(match id {
-        "coding" => "codex-sub",
-        "gaccode" => "gaccode",
-        _ => "tuzi",
-    }.to_string());
+    provider.icon = Some(
+        match id {
+            "coding" => "codex-sub",
+            "gaccode" => "gaccode",
+            _ => "tuzi",
+        }
+        .to_string(),
+    );
     provider.icon_color = None;
     provider
 }
@@ -75,10 +78,13 @@ fn build_claude_official_provider(id: &str, name: &str, base_url: &str, model: &
         }),
         api_key_url.map(|s| s.to_string()),
     );
-    provider.icon = Some(match id {
-        "gaccode" => "gaccode",
-        _ => "tuzi",
-    }.to_string());
+    provider.icon = Some(
+        match id {
+            "gaccode" => "gaccode",
+            _ => "tuzi",
+        }
+        .to_string(),
+    );
     provider.icon_color = None;
     provider
 }
@@ -140,11 +146,14 @@ fn build_openclaw_official_provider(
         }),
         Some(api_key_url.to_string()),
     );
-    provider.icon = Some(match id {
-        "codex-coding" => "codex-sub",
-        "codex-gaccode" | "claude-gaccode" => "gaccode",
-        _ => "tuzi",
-    }.to_string());
+    provider.icon = Some(
+        match id {
+            "codex-coding" => "codex-sub",
+            "codex-gaccode" | "claude-gaccode" => "gaccode",
+            _ => "tuzi",
+        }
+        .to_string(),
+    );
     provider.icon_color = None;
     provider
 }
@@ -183,11 +192,14 @@ fn build_hermes_official_provider(
         }),
         Some(api_key_url.to_string()),
     );
-    provider.icon = Some(match id {
-        "codex-coding" => "codex-sub",
-        "codex-gaccode" | "claude-gaccode" => "gaccode",
-        _ => "tuzi",
-    }.to_string());
+    provider.icon = Some(
+        match id {
+            "codex-coding" => "codex-sub",
+            "codex-gaccode" | "claude-gaccode" => "gaccode",
+            _ => "tuzi",
+        }
+        .to_string(),
+    );
     provider.icon_color = None;
     provider
 }
@@ -784,7 +796,8 @@ impl Database {
                 .iter()
                 .enumerate()
         {
-            let provider = build_codex_official_provider(id, name, website_url, base_url, env_key, model);
+            let provider =
+                build_codex_official_provider(id, name, website_url, base_url, env_key, model);
             seeded += upsert_seed_provider(&tx, "codex", &provider, sort_index)?;
         }
 
@@ -979,7 +992,11 @@ fn seed_settings_config_update_for_existing(
         let mut next = provider.settings_config.clone();
 
         // 保留用户的 apiKey (openclaw) 或 api_key (hermes)
-        let key_field = if app_type == "openclaw" { "apiKey" } else { "api_key" };
+        let key_field = if app_type == "openclaw" {
+            "apiKey"
+        } else {
+            "api_key"
+        };
         if let Some(api_key) = existing.get(key_field).and_then(|v| v.as_str()) {
             if !api_key.is_empty() {
                 if let Some(obj) = next.as_object_mut() {

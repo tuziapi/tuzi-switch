@@ -82,7 +82,11 @@ pub async fn get_config_status(
         }
         AppType::Codex => {
             let auth_path = codex_config::get_codex_auth_path();
-            let exists = auth_path.exists();
+            let config_path = codex_config::get_codex_config_path();
+            let exists = auth_path.exists()
+                || std::fs::read_to_string(&config_path)
+                    .map(|content| !content.trim().is_empty())
+                    .unwrap_or(false);
             let path = codex_config::get_codex_config_dir()
                 .to_string_lossy()
                 .to_string();
@@ -400,7 +404,11 @@ pub async fn extract_common_config_snippet(
 #[allow(non_snake_case)]
 pub fn read_codex_env_key(envKey: String) -> Result<Option<String>, String> {
     let result = codex_config::read_managed_env_key(&envKey);
-    log::info!("[CODEX-ENV] read_codex_env_key({}) => has_value={}", envKey, result.is_some());
+    log::info!(
+        "[CODEX-ENV] read_codex_env_key({}) => has_value={}",
+        envKey,
+        result.is_some()
+    );
     Ok(result)
 }
 
@@ -433,21 +441,25 @@ pub fn save_codex_route(
     // Write route section to config.toml
     let existing = codex_config::read_codex_config_text().map_err(|e| e.to_string())?;
     let updated = codex_config::save_route_to_config(
-        &existing, &routeId, &baseUrl, &envKey, &model, &modelReasoningEffort,
-    ).map_err(|e| e.to_string())?;
+        &existing,
+        &routeId,
+        &baseUrl,
+        &envKey,
+        &model,
+        &modelReasoningEffort,
+    )
+    .map_err(|e| e.to_string())?;
 
     // Switch to this profile (with model/effort at top level)
     let final_config = codex_config::switch_codex_profile(
-        &updated, &routeId, Some(&model), Some(&modelReasoningEffort),
-    ).map_err(|e| e.to_string())?;
+        &updated,
+        &routeId,
+        Some(&model),
+        Some(&modelReasoningEffort),
+    )
+    .map_err(|e| e.to_string())?;
 
-    // Write config.toml + auth.json with current key
-    let actual_key = if !apiKey.is_empty() {
-        apiKey.clone()
-    } else {
-        codex_config::read_managed_env_key(&envKey).unwrap_or_default()
-    };
-    let auth = serde_json::json!({ "OPENAI_API_KEY": actual_key });
-    codex_config::write_codex_live_atomic(&auth, Some(&final_config))
+    let auth = serde_json::json!({});
+    codex_config::write_codex_live_for_provider(None, &auth, Some(&final_config))
         .map_err(|e| e.to_string())
 }

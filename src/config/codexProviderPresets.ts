@@ -2,6 +2,11 @@
  * Codex 预设供应商配置模板
  */
 import { ProviderCategory } from "../types";
+import type {
+  CodexApiFormat,
+  CodexCatalogModel,
+  CodexChatReasoning,
+} from "../types";
 import type { PresetTheme } from "./claudeProviderPresets";
 
 export interface CodexProviderPreset {
@@ -16,6 +21,9 @@ export interface CodexProviderPreset {
   isCustomTemplate?: boolean;
   endpointCandidates?: string[];
   envKey?: string; // 环境变量名，用于 shell rc managed block
+  apiFormat?: CodexApiFormat;
+  modelCatalog?: CodexCatalogModel[];
+  codexChatReasoning?: CodexChatReasoning;
   theme?: PresetTheme;
   icon?: string;
   iconColor?: string;
@@ -62,7 +70,12 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "",
     apiKeyUrl: "https://api.tu-zi.com",
     auth: {},
-    config: generateThirdPartyConfig("tuzi", "https://api.tu-zi.com/v1", "TUZI_CODEX_API_KEY", "gpt-5.5"),
+    config: generateThirdPartyConfig(
+      "tuzi",
+      "https://api.tu-zi.com/v1",
+      "TUZI_CODEX_API_KEY",
+      "gpt-5.5",
+    ),
     envKey: "TUZI_CODEX_API_KEY",
     category: "aggregator",
     endpointCandidates: ["https://api.tu-zi.com/v1"],
@@ -74,7 +87,12 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "",
     apiKeyUrl: "https://store.tu-zi.com/cat/11",
     auth: {},
-    config: generateThirdPartyConfig("codex", "https://api.tu-zi.com/coding", "CODING_CODEX_API_KEY", "gpt-5.5"),
+    config: generateThirdPartyConfig(
+      "codex",
+      "https://api.tu-zi.com/coding",
+      "CODING_CODEX_API_KEY",
+      "gpt-5.5",
+    ),
     envKey: "CODING_CODEX_API_KEY",
     category: "aggregator",
     endpointCandidates: ["https://api.tu-zi.com/coding"],
@@ -86,7 +104,12 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "",
     apiKeyUrl: "https://store.tu-zi.com/cat/1",
     auth: {},
-    config: generateThirdPartyConfig("gac", "https://gaccode.com/codex/v1", "GAC_CODEX_API_KEY", "gpt-5.5"),
+    config: generateThirdPartyConfig(
+      "gac",
+      "https://gaccode.com/codex/v1",
+      "GAC_CODEX_API_KEY",
+      "gpt-5.5",
+    ),
     envKey: "GAC_CODEX_API_KEY",
     category: "aggregator",
     endpointCandidates: ["https://gaccode.com/codex/v1"],
@@ -110,11 +133,17 @@ export const codexProviderPresets: CodexProviderPreset[] = [
   },
   {
     name: "Azure OpenAI",
-    websiteUrl: "https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/codex",
+    websiteUrl:
+      "https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/codex",
     category: "third_party",
     isOfficial: true,
     auth: {},
-    config: generateThirdPartyConfig("azure", "https://YOUR_RESOURCE_NAME.openai.azure.com/openai", "AZURE_CODEX_API_KEY", "gpt-5.4"),
+    config: generateThirdPartyConfig(
+      "azure",
+      "https://YOUR_RESOURCE_NAME.openai.azure.com/openai",
+      "AZURE_CODEX_API_KEY",
+      "gpt-5.4",
+    ),
     envKey: "AZURE_CODEX_API_KEY",
     endpointCandidates: ["https://YOUR_RESOURCE_NAME.openai.azure.com/openai"],
     theme: {
@@ -130,9 +159,17 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "https://aihubmix.com",
     category: "aggregator",
     auth: {},
-    config: generateThirdPartyConfig("aihubmix", "https://aihubmix.com/v1", "AIHUBMIX_CODEX_API_KEY", "gpt-5.4"),
+    config: generateThirdPartyConfig(
+      "aihubmix",
+      "https://aihubmix.com/v1",
+      "AIHUBMIX_CODEX_API_KEY",
+      "gpt-5.4",
+    ),
     envKey: "AIHUBMIX_CODEX_API_KEY",
-    endpointCandidates: ["https://aihubmix.com/v1", "https://api.aihubmix.com/v1"],
+    endpointCandidates: [
+      "https://aihubmix.com/v1",
+      "https://api.aihubmix.com/v1",
+    ],
   },
   {
     name: "RelaxyCode",
@@ -140,7 +177,12 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     apiKeyUrl: "https://www.relaxycode.com/register",
     category: "third_party",
     auth: {},
-    config: generateThirdPartyConfig("relaxycode", "https://www.relaxycode.com/v1", "RELAXYCODE_CODEX_API_KEY", "gpt-5.5"),
+    config: generateThirdPartyConfig(
+      "relaxycode",
+      "https://www.relaxycode.com/v1",
+      "RELAXYCODE_CODEX_API_KEY",
+      "gpt-5.5",
+    ),
     envKey: "RELAXYCODE_CODEX_API_KEY",
     icon: "relaxcode",
   },
@@ -149,7 +191,12 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "https://e-flowcode.cc",
     apiKeyUrl: "https://e-flowcode.cc",
     auth: {},
-    config: generateThirdPartyConfig("e_flowcode", "https://e-flowcode.cc/v1", "EFLOWCODE_CODEX_API_KEY", "gpt-5.4"),
+    config: generateThirdPartyConfig(
+      "e_flowcode",
+      "https://e-flowcode.cc/v1",
+      "EFLOWCODE_CODEX_API_KEY",
+      "gpt-5.4",
+    ),
     envKey: "EFLOWCODE_CODEX_API_KEY",
     category: "third_party",
     endpointCandidates: ["https://e-flowcode.cc/v1"],
@@ -161,7 +208,12 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "https://code.pipellm.ai",
     apiKeyUrl: "https://code.pipellm.ai/login?ref=uvw650za",
     auth: {},
-    config: generateThirdPartyConfig("pipellm", "https://cc-api.pipellm.ai/v1", "PIPELLM_CODEX_API_KEY", "gpt-5.4"),
+    config: generateThirdPartyConfig(
+      "pipellm",
+      "https://cc-api.pipellm.ai/v1",
+      "PIPELLM_CODEX_API_KEY",
+      "gpt-5.4",
+    ),
     envKey: "PIPELLM_CODEX_API_KEY",
     category: "aggregator",
     endpointCandidates: ["https://cc-api.pipellm.ai/v1"],
@@ -172,7 +224,12 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "https://openrouter.ai",
     apiKeyUrl: "https://openrouter.ai/keys",
     auth: {},
-    config: generateThirdPartyConfig("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_CODEX_API_KEY", "gpt-5.4"),
+    config: generateThirdPartyConfig(
+      "openrouter",
+      "https://openrouter.ai/api/v1",
+      "OPENROUTER_CODEX_API_KEY",
+      "gpt-5.4",
+    ),
     envKey: "OPENROUTER_CODEX_API_KEY",
     category: "aggregator",
     icon: "openrouter",
@@ -183,7 +240,12 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "https://therouter.ai",
     apiKeyUrl: "https://dashboard.therouter.ai",
     auth: {},
-    config: generateThirdPartyConfig("therouter", "https://api.therouter.ai/v1", "THEROUTER_CODEX_API_KEY", "openai/gpt-5.3-codex"),
+    config: generateThirdPartyConfig(
+      "therouter",
+      "https://api.therouter.ai/v1",
+      "THEROUTER_CODEX_API_KEY",
+      "openai/gpt-5.3-codex",
+    ),
     envKey: "THEROUTER_CODEX_API_KEY",
     endpointCandidates: ["https://api.therouter.ai/v1"],
     category: "aggregator",

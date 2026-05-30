@@ -6,10 +6,13 @@
 //! 支持检测官方 Codex 客户端 (codex_vscode, codex_cli_rs)
 
 use super::{AuthInfo, AuthStrategy, ProviderAdapter};
-use crate::provider::Provider;
+use crate::provider::{CodexChatReasoning, Provider};
 use crate::proxy::error::ProxyError;
 use regex::Regex;
+use serde_json::Value as JsonValue;
+use std::collections::HashSet;
 use std::sync::LazyLock;
+use toml::Value as TomlValue;
 
 /// 官方 Codex 客户端 User-Agent 正则
 #[allow(dead_code)]
@@ -18,6 +21,361 @@ static CODEX_CLIENT_REGEX: LazyLock<Regex> =
 
 /// Codex 适配器
 pub struct CodexAdapter;
+
+/// Whether this Codex provider's real upstream should be called through
+/// OpenAI Chat Completions, even if the local Codex client talks to tuzi-switch
+/// through the Responses API.
+pub fn codex_provider_uses_chat_completions(provider: &Provider) -> bool {
+    if let Some(api_format) = provider
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.api_format.as_deref())
+        .or_else(|| {
+            provider
+                .settings_config
+                .get("api_format")
+                .and_then(|v| v.as_str())
+        })
+        .or_else(|| {
+            provider
+                .settings_config
+                .get("apiFormat")
+                .and_then(|v| v.as_str())
+        })
+    {
+        return is_chat_wire_api(api_format);
+    }
+
+    if let Some(wire_api) = provider
+        .settings_config
+        .get("config")
+        .and_then(|v| v.as_str())
+        .and_then(extract_codex_wire_api_from_toml)
+    {
+        return is_chat_wire_api(&wire_api);
+    }
+
+    if let Some(base_url) = provider
+        .settings_config
+        .get("base_url")
+        .or_else(|| provider.settings_config.get("baseURL"))
+        .and_then(|v| v.as_str())
+    {
+        return is_chat_completions_url(base_url);
+    }
+
+    provider
+        .settings_config
+        .get("config")
+        .and_then(|v| v.as_str())
+        .and_then(extract_codex_base_url_from_toml)
+        .map(|url| is_chat_completions_url(&url))
+        .unwrap_or(false)
+}
+
+pub fn should_convert_codex_responses_to_chat(provider: &Provider, endpoint: &str) -> bool {
+    let path = endpoint
+        .split_once('?')
+        .map_or(endpoint, |(path, _query)| path);
+
+    matches!(
+        path,
+        "/responses" | "/v1/responses" | "/responses/compact" | "/v1/responses/compact"
+    ) && codex_provider_uses_chat_completions(provider)
+}
+
+fn codex_provider_upstream_model(provider: &Provider) -> Option<String> {
+    provider
+        .settings_config
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|model| !model.is_empty())
+        .map(ToString::to_string)
+        .or_else(|| {
+            provider
+                .settings_config
+                .get("config")
+                .and_then(|v| v.as_str())
+                .and_then(extract_codex_model_from_toml)
+        })
+}
+
+fn codex_provider_catalog_model_ids(provider: &Provider) -> HashSet<String> {
+    provider
+        .settings_config
+        .get("modelCatalog")
+        .and_then(|catalog| catalog.get("models"))
+        .and_then(|models| models.as_array())
+        .map(|models| {
+            models
+                .iter()
+                .filter_map(|model| model.get("model").and_then(|value| value.as_str()))
+                .map(str::trim)
+                .filter(|model| !model.is_empty())
+                .map(ToString::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// For Codex Chat providers, ensure the request uses the configured upstream
+/// model before converting the request to Chat Completions.
+pub fn apply_codex_chat_upstream_model(
+    provider: &Provider,
+    body: &mut JsonValue,
+) -> Option<String> {
+    if !codex_provider_uses_chat_completions(provider) {
+        return None;
+    }
+
+    let catalog_model_ids = codex_provider_catalog_model_ids(provider);
+    if let Some(request_model) = body
+        .get("model")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|model| !model.is_empty())
+    {
+        if catalog_model_ids.contains(request_model) {
+            return Some(request_model.to_string());
+        }
+    }
+
+    let upstream_model = codex_provider_upstream_model(provider)?;
+    body["model"] = JsonValue::String(upstream_model.clone());
+    Some(upstream_model)
+}
+
+pub fn resolve_codex_chat_reasoning_config(
+    provider: &Provider,
+    body: &JsonValue,
+) -> Option<CodexChatReasoning> {
+    if let Some(config) = provider
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.codex_chat_reasoning.clone())
+    {
+        return Some(normalize_codex_chat_reasoning_config(config));
+    }
+
+    infer_codex_chat_reasoning_config(provider, body)
+}
+
+fn normalize_codex_chat_reasoning_config(mut config: CodexChatReasoning) -> CodexChatReasoning {
+    if config.supports_effort.unwrap_or(false) && config.supports_thinking.is_none() {
+        config.supports_thinking = Some(true);
+    }
+    config
+}
+
+fn infer_codex_chat_reasoning_config(
+    provider: &Provider,
+    body: &JsonValue,
+) -> Option<CodexChatReasoning> {
+    let model = body
+        .get("model")
+        .and_then(|value| value.as_str())
+        .map(ToString::to_string)
+        .or_else(|| codex_provider_upstream_model(provider))
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let base_url = provider
+        .settings_config
+        .get("base_url")
+        .or_else(|| provider.settings_config.get("baseURL"))
+        .and_then(|v| v.as_str())
+        .map(ToString::to_string)
+        .or_else(|| {
+            provider
+                .settings_config
+                .get("config")
+                .and_then(|v| v.as_str())
+                .and_then(extract_codex_base_url_from_toml)
+        })
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let name = provider.name.to_ascii_lowercase();
+
+    if let Some(config) = infer_aggregator_platform_config(&name, &base_url) {
+        return Some(config);
+    }
+
+    let haystack = format!("{name} {base_url} {model}");
+
+    if haystack.contains("deepseek") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(true),
+            supports_effort: Some(true),
+            thinking_param: Some("thinking".to_string()),
+            effort_param: Some("reasoning_effort".to_string()),
+            effort_value_mode: Some("deepseek".to_string()),
+            output_format: Some("reasoning_content".to_string()),
+        });
+    }
+
+    if haystack.contains("stepfun") || haystack.contains("step-3.5-flash-2603") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(true),
+            supports_effort: Some(model.contains("2603")),
+            thinking_param: Some("none".to_string()),
+            effort_param: Some("reasoning_effort".to_string()),
+            effort_value_mode: Some("low_high".to_string()),
+            output_format: Some("reasoning".to_string()),
+        });
+    }
+
+    if haystack.contains("kimi") || haystack.contains("moonshot") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(true),
+            supports_effort: Some(false),
+            thinking_param: Some("thinking".to_string()),
+            effort_param: Some("none".to_string()),
+            effort_value_mode: None,
+            output_format: Some("reasoning_content".to_string()),
+        });
+    }
+
+    if haystack.contains("glm") || haystack.contains("zhipu") || haystack.contains("z.ai") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(true),
+            supports_effort: Some(false),
+            thinking_param: Some("thinking".to_string()),
+            effort_param: Some("none".to_string()),
+            effort_value_mode: None,
+            output_format: Some("reasoning_content".to_string()),
+        });
+    }
+
+    if haystack.contains("qwen") || haystack.contains("dashscope") || haystack.contains("bailian") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(true),
+            supports_effort: Some(false),
+            thinking_param: Some("enable_thinking".to_string()),
+            effort_param: Some("none".to_string()),
+            effort_value_mode: None,
+            output_format: Some("reasoning_content".to_string()),
+        });
+    }
+
+    if haystack.contains("minimax") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(true),
+            supports_effort: Some(false),
+            thinking_param: Some("reasoning_split".to_string()),
+            effort_param: Some("none".to_string()),
+            effort_value_mode: None,
+            output_format: Some("reasoning_details".to_string()),
+        });
+    }
+
+    if haystack.contains("mimo") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(true),
+            supports_effort: Some(false),
+            thinking_param: Some("thinking".to_string()),
+            effort_param: Some("none".to_string()),
+            effort_value_mode: None,
+            output_format: Some("reasoning_content".to_string()),
+        });
+    }
+
+    None
+}
+
+fn infer_aggregator_platform_config(name: &str, base_url: &str) -> Option<CodexChatReasoning> {
+    let platform = format!("{name} {base_url}");
+
+    if platform.contains("openrouter") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(false),
+            supports_effort: Some(true),
+            thinking_param: Some("none".to_string()),
+            effort_param: Some("reasoning.effort".to_string()),
+            effort_value_mode: Some("openrouter".to_string()),
+            output_format: Some("auto".to_string()),
+        });
+    }
+
+    if platform.contains("siliconflow") {
+        return Some(CodexChatReasoning {
+            supports_thinking: Some(true),
+            supports_effort: Some(false),
+            thinking_param: Some("enable_thinking".to_string()),
+            effort_param: Some("none".to_string()),
+            effort_value_mode: None,
+            output_format: Some("reasoning_content".to_string()),
+        });
+    }
+
+    None
+}
+
+fn is_chat_wire_api(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "chat"
+            | "chat_completions"
+            | "chat-completions"
+            | "openai_chat"
+            | "openai-chat"
+            | "openai_chat_completions"
+    )
+}
+
+fn is_chat_completions_url(value: &str) -> bool {
+    value
+        .trim_end_matches('/')
+        .to_ascii_lowercase()
+        .ends_with("/chat/completions")
+}
+
+fn extract_codex_wire_api_from_toml(config_text: &str) -> Option<String> {
+    let doc = config_text.parse::<TomlValue>().ok()?;
+
+    if let Some(active_provider) = doc.get("model_provider").and_then(|v| v.as_str()) {
+        if let Some(wire_api) = doc
+            .get("model_providers")
+            .and_then(|providers| providers.get(active_provider))
+            .and_then(|provider| provider.get("wire_api"))
+            .and_then(|v| v.as_str())
+        {
+            return Some(wire_api.to_string());
+        }
+    }
+
+    doc.get("wire_api")
+        .and_then(|v| v.as_str())
+        .map(ToString::to_string)
+}
+
+fn extract_codex_model_from_toml(config_text: &str) -> Option<String> {
+    let doc = config_text.parse::<TomlValue>().ok()?;
+
+    doc.get("model")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|model| !model.is_empty())
+        .map(ToString::to_string)
+}
+
+fn extract_codex_base_url_from_toml(config_text: &str) -> Option<String> {
+    let doc = config_text.parse::<TomlValue>().ok()?;
+
+    if let Some(active_provider) = doc.get("model_provider").and_then(|v| v.as_str()) {
+        if let Some(base_url) = doc
+            .get("model_providers")
+            .and_then(|providers| providers.get(active_provider))
+            .and_then(|provider| provider.get("base_url"))
+            .and_then(|v| v.as_str())
+        {
+            return Some(base_url.to_string());
+        }
+    }
+
+    doc.get("base_url")
+        .and_then(|v| v.as_str())
+        .map(ToString::to_string)
+}
 
 impl CodexAdapter {
     pub fn new() -> Self {
@@ -66,6 +424,14 @@ impl CodexAdapter {
                 .and_then(|v| v.as_str())
             {
                 return Some(key.to_string());
+            }
+
+            if let Some(config_str) = config.as_str() {
+                if let Some(key) =
+                    crate::codex_config::extract_codex_experimental_bearer_token(config_str)
+                {
+                    return Some(key);
+                }
             }
         }
 
@@ -185,6 +551,7 @@ impl ProviderAdapter for CodexAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::provider::ProviderMeta;
     use serde_json::json;
 
     fn create_provider(config: serde_json::Value) -> Provider {
@@ -202,6 +569,12 @@ mod tests {
             icon_color: None,
             in_failover_queue: false,
         }
+    }
+
+    fn create_provider_with_meta(config: serde_json::Value, meta: ProviderMeta) -> Provider {
+        let mut provider = create_provider(config);
+        provider.meta = Some(meta);
+        provider
     }
 
     #[test]
@@ -240,6 +613,110 @@ mod tests {
 
         let auth = adapter.extract_auth(&provider).unwrap();
         assert_eq!(auth.api_key, "sk-env-key-12345678");
+    }
+
+    #[test]
+    fn test_extract_auth_falls_back_to_config_bearer_token() {
+        let adapter = CodexAdapter::new();
+        let provider = create_provider(json!({
+            "auth": {},
+            "config": r#"model_provider = "tuzi"
+
+[model_providers.tuzi]
+experimental_bearer_token = "sk-live-token"
+"#
+        }));
+
+        let auth = adapter.extract_auth(&provider).unwrap();
+        assert_eq!(auth.api_key, "sk-live-token");
+    }
+
+    #[test]
+    fn test_codex_provider_uses_chat_completions_from_meta_api_format() {
+        let provider = create_provider_with_meta(
+            json!({
+                "config": r#"model_provider = "tuzi"
+
+[model_providers.tuzi]
+wire_api = "responses"
+"#
+            }),
+            ProviderMeta {
+                api_format: Some("openai_chat".to_string()),
+                ..ProviderMeta::default()
+            },
+        );
+
+        assert!(codex_provider_uses_chat_completions(&provider));
+        assert!(should_convert_codex_responses_to_chat(
+            &provider,
+            "/responses/compact?foo=bar"
+        ));
+        assert!(!should_convert_codex_responses_to_chat(
+            &provider,
+            "/chat/completions"
+        ));
+    }
+
+    #[test]
+    fn test_apply_codex_chat_upstream_model_preserves_catalog_model_selection() {
+        let provider = create_provider_with_meta(
+            json!({
+                "config": r#"model_provider = "tuzi"
+model = "deepseek-v4"
+
+[model_providers.tuzi]
+base_url = "https://relay.example/v1"
+"#,
+                "modelCatalog": {
+                    "models": [
+                        { "model": "kimi-k2" },
+                        { "model": "deepseek-v4" }
+                    ]
+                }
+            }),
+            ProviderMeta {
+                api_format: Some("openai_chat".to_string()),
+                ..ProviderMeta::default()
+            },
+        );
+        let mut body = json!({
+            "model": "kimi-k2",
+            "input": "hi"
+        });
+
+        let upstream_model = apply_codex_chat_upstream_model(&provider, &mut body);
+
+        assert_eq!(upstream_model.as_deref(), Some("kimi-k2"));
+        assert_eq!(body["model"], "kimi-k2");
+    }
+
+    #[test]
+    fn test_resolve_codex_chat_reasoning_prefers_meta_config() {
+        let provider = create_provider_with_meta(
+            json!({
+                "config": r#"model_provider = "tuzi"
+model = "deepseek-v4"
+
+[model_providers.tuzi]
+base_url = "https://relay.example/v1"
+"#
+            }),
+            ProviderMeta {
+                api_format: Some("openai_chat".to_string()),
+                codex_chat_reasoning: Some(CodexChatReasoning {
+                    supports_effort: Some(true),
+                    effort_param: Some("reasoning.effort".to_string()),
+                    ..CodexChatReasoning::default()
+                }),
+                ..ProviderMeta::default()
+            },
+        );
+
+        let config = resolve_codex_chat_reasoning_config(&provider, &json!({})).unwrap();
+
+        assert_eq!(config.supports_thinking, Some(true));
+        assert_eq!(config.effort_param.as_deref(), Some("reasoning.effort"));
     }
 
     #[test]

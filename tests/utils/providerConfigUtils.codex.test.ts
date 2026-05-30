@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   extractCodexBaseUrl,
+  extractCodexExperimentalBearerToken,
+  extractCodexModelCatalogJson,
   extractCodexModelName,
+  extractCodexWireApi,
   setCodexBaseUrl,
+  setCodexModelCatalogJson,
   setCodexModelName,
+  setCodexWireApi,
+  updateCodexExperimentalBearerToken,
 } from "@/utils/providerConfigUtils";
 
 describe("Codex TOML utils", () => {
@@ -147,5 +153,206 @@ describe("Codex TOML utils", () => {
 
     expect(extractCodexBaseUrl(input)).toBe("https://api.example.com/v1");
     expect(extractCodexModelName(input)).toBe("gpt-5");
+  });
+
+  it("reads wire_api from the active provider section and ignores inactive providers", () => {
+    const input = [
+      'model_provider = "active"',
+      'wire_api = "top-level"',
+      "",
+      "[model_providers.inactive]",
+      'wire_api = "chat"',
+      "",
+      "[model_providers.active]",
+      'wire_api = "responses"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexWireApi(input)).toBe("responses");
+  });
+
+  it("falls back to top-level wire_api when the active provider section has none", () => {
+    const input = [
+      'model_provider = "active"',
+      'wire_api = "responses"',
+      "",
+      "[model_providers.inactive]",
+      'wire_api = "chat"',
+      "",
+      "[model_providers.active]",
+      'name = "Active"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexWireApi(input)).toBe("responses");
+  });
+
+  it("writes wire_api into the active provider section without changing top-level or inactive sections", () => {
+    const input = [
+      'model_provider = "active"',
+      'wire_api = "top-level"',
+      "",
+      "[model_providers.inactive]",
+      'wire_api = "chat"',
+      "",
+      "[model_providers.active]",
+      'name = "Active"',
+      "",
+    ].join("\n");
+
+    const output = setCodexWireApi(input, "responses");
+
+    expect(output).toContain('wire_api = "top-level"');
+    expect(output).toContain('[model_providers.inactive]\nwire_api = "chat"');
+    expect(output).toContain(
+      '[model_providers.active]\nname = "Active"\nwire_api = "responses"',
+    );
+    expect(extractCodexWireApi(output)).toBe("responses");
+  });
+
+  it("clears wire_api from the active provider section and then falls back to top-level", () => {
+    const input = [
+      'model_provider = "active"',
+      'wire_api = "top-level"',
+      "",
+      "[model_providers.inactive]",
+      'wire_api = "chat"',
+      "",
+      "[model_providers.active]",
+      'wire_api = "responses"',
+      "",
+    ].join("\n");
+
+    const output = setCodexWireApi(input, "");
+
+    expect(output).toContain('wire_api = "top-level"');
+    expect(output).toContain('[model_providers.inactive]\nwire_api = "chat"');
+    expect(output).toContain("[model_providers.active]\n");
+    expect(output).not.toContain(
+      '[model_providers.active]\nwire_api = "responses"',
+    );
+    expect(extractCodexWireApi(output)).toBe("top-level");
+  });
+
+  it("reads experimental_bearer_token from the active provider section before top-level", () => {
+    const input = [
+      'model_provider = "active"',
+      'experimental_bearer_token = "top-level-token"',
+      "",
+      "[model_providers.active]",
+      'experimental_bearer_token = "active-token"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexExperimentalBearerToken(input)).toBe("active-token");
+  });
+
+  it("uses top-level experimental_bearer_token for reserved provider ids", () => {
+    const input = [
+      'model_provider = "openai"',
+      'experimental_bearer_token = "top-level-token"',
+      "",
+      "[model_providers.openai]",
+      'experimental_bearer_token = "stale-provider-token"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexExperimentalBearerToken(input)).toBe("top-level-token");
+  });
+
+  it("falls back to top-level experimental_bearer_token when active provider has none", () => {
+    const input = [
+      'model_provider = "active"',
+      'experimental_bearer_token = "top-level-token"',
+      "",
+      "[model_providers.active]",
+      'name = "Active"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexExperimentalBearerToken(input)).toBe("top-level-token");
+  });
+
+  it("ignores experimental_bearer_token from non-active provider sections", () => {
+    const input = [
+      'model_provider = "active"',
+      "",
+      "[model_providers.inactive]",
+      'experimental_bearer_token = "inactive-token"',
+      "",
+      "[model_providers.active]",
+      'name = "Active"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexExperimentalBearerToken(input)).toBeUndefined();
+  });
+
+  it("updates and removes experimental_bearer_token in the active provider section", () => {
+    const input = [
+      'model_provider = "active"',
+      'experimental_bearer_token = "top-level-token"',
+      "",
+      "[model_providers.active]",
+      'experimental_bearer_token = "old-token" # live token',
+      "",
+    ].join("\n");
+
+    const updated = updateCodexExperimentalBearerToken(input, 'new"token\\x');
+
+    expect(updated).toContain(
+      'experimental_bearer_token = "new\\"token\\\\x" # live token',
+    );
+    expect(extractCodexExperimentalBearerToken(updated)).toBe('new"token\\x');
+
+    const cleared = updateCodexExperimentalBearerToken(updated, "");
+
+    expect(extractCodexExperimentalBearerToken(cleared)).toBe(
+      "top-level-token",
+    );
+    expect(cleared).not.toContain("# live token");
+  });
+
+  it("does not add experimental_bearer_token to configs that do not already use it", () => {
+    const input = [
+      'model_provider = "active"',
+      "",
+      "[model_providers.active]",
+      'name = "Active"',
+      "",
+    ].join("\n");
+
+    expect(updateCodexExperimentalBearerToken(input, "new-token")).toBe(input);
+    expect(updateCodexExperimentalBearerToken(input, "")).toBe(input);
+  });
+
+  it("reads, writes, and removes top-level model_catalog_json", () => {
+    const input = [
+      'model_provider = "active"',
+      "",
+      "[model_providers.active]",
+      'model_catalog_json = "wrong-section.json"',
+      "",
+    ].join("\n");
+
+    const updated = setCodexModelCatalogJson(
+      input,
+      '/Users/test/catalog "quoted".json',
+    );
+
+    expect(updated).toContain(
+      'model_catalog_json = "/Users/test/catalog \\"quoted\\".json"',
+    );
+    expect(extractCodexModelCatalogJson(updated)).toBe(
+      '/Users/test/catalog "quoted".json',
+    );
+    expect(updated).toContain(
+      '[model_providers.active]\nmodel_catalog_json = "wrong-section.json"',
+    );
+
+    const cleared = setCodexModelCatalogJson(updated, "");
+
+    expect(extractCodexModelCatalogJson(cleared)).toBeUndefined();
+    expect(cleared).toContain("wrong-section.json");
   });
 });

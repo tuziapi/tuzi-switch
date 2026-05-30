@@ -289,7 +289,10 @@ export const hasApiKeyField = (
     if (appType === "codex") {
       return (
         Object.prototype.hasOwnProperty.call(config, "auth") &&
-        Object.prototype.hasOwnProperty.call(config.auth ?? {}, "OPENAI_API_KEY")
+        Object.prototype.hasOwnProperty.call(
+          config.auth ?? {},
+          "OPENAI_API_KEY",
+        )
       );
     }
 
@@ -426,11 +429,27 @@ export const hasTomlCommonConfigSnippet = (
 const TOML_SECTION_HEADER_PATTERN = /^\s*\[([^\]\r\n]+)\]\s*$/;
 const TOML_BASE_URL_PATTERN =
   /^\s*base_url\s*=\s*(["'])([^"'\r\n]*)\1\s*(?:#.*)?$/;
+const TOML_WIRE_API_PATTERN =
+  /^\s*wire_api\s*=\s*(["'])([^"'\r\n]*)\1\s*(?:#.*)?$/;
+const TOML_EXPERIMENTAL_BEARER_TOKEN_PATTERN =
+  /^\s*experimental_bearer_token\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
+const TOML_EXPERIMENTAL_BEARER_TOKEN_REPLACE_PATTERN =
+  /^(\s*experimental_bearer_token\s*=\s*)(?:"(?:\\.|[^"\\\r\n])*"|'[^'\r\n]*')(\s*(?:#.*)?)$/;
 const TOML_MODEL_PATTERN = /^\s*model\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
+const TOML_MODEL_CATALOG_JSON_PATTERN =
+  /^\s*model_catalog_json\s*=\s*(["'])([^"'\r\n]*)\1\s*(?:#.*)?$/;
+const TOML_MODEL_CATALOG_JSON_REPLACE_PATTERN =
+  /^(\s*model_catalog_json\s*=\s*)(?:"(?:\\.|[^"\\\r\n])*"|'[^'\r\n]*')(\s*(?:#.*)?)$/;
 const TOML_MODEL_PROVIDER_LINE_PATTERN =
   /^\s*model_provider\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
-const TOML_MODEL_PROVIDER_PATTERN =
-  /^\s*model_provider\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/m;
+const CODEX_RESERVED_MODEL_PROVIDER_IDS = new Set([
+  "amazon-bedrock",
+  "openai",
+  "ollama",
+  "lmstudio",
+  "oss",
+  "ollama-chat",
+]);
 
 interface TomlSectionRange {
   bodyEndIndex: number;
@@ -506,9 +525,16 @@ const getTomlSectionInsertIndex = (
 };
 
 const getCodexModelProviderName = (configText: string): string | undefined => {
-  const match = configText.match(TOML_MODEL_PROVIDER_PATTERN);
-  const providerName = match?.[2]?.trim();
-  return providerName || undefined;
+  const lines = configText.split("\n");
+  const topLevelEndIndex = getTopLevelEndIndex(lines);
+
+  for (let index = 0; index < topLevelEndIndex; index += 1) {
+    const match = lines[index].match(TOML_MODEL_PROVIDER_LINE_PATTERN);
+    const providerName = match?.[2]?.trim();
+    if (providerName) return providerName;
+  }
+
+  return undefined;
 };
 
 const getCodexProviderSectionName = (
@@ -538,6 +564,49 @@ const findTomlAssignmentInRange = (
 
   return undefined;
 };
+
+const findTomlLineInRange = (
+  lines: string[],
+  pattern: RegExp,
+  startIndex: number,
+  endIndex: number,
+): number => {
+  for (let index = startIndex; index < endIndex; index += 1) {
+    if (pattern.test(lines[index])) return index;
+  }
+  return -1;
+};
+
+const isCustomCodexModelProviderId = (providerName: string): boolean => {
+  const id = providerName.trim().toLowerCase();
+  return Boolean(id) && !CODEX_RESERVED_MODEL_PROVIDER_IDS.has(id);
+};
+
+const getCodexCustomProviderSectionName = (
+  configText: string,
+): string | undefined => {
+  const providerName = getCodexModelProviderName(configText);
+  return providerName && isCustomCodexModelProviderId(providerName)
+    ? `model_providers.${providerName}`
+    : undefined;
+};
+
+const TOML_BASIC_STRING_ESCAPES: Record<string, string> = {
+  '"': '\\"',
+  "\\": "\\\\",
+  "\b": "\\b",
+  "\t": "\\t",
+  "\n": "\\n",
+  "\f": "\\f",
+  "\r": "\\r",
+};
+
+const escapeTomlBasicString = (value: string): string =>
+  value.replace(/["\\\u0000-\u001f]/g, (ch) => {
+    const escaped = TOML_BASIC_STRING_ESCAPES[ch];
+    if (escaped) return escaped;
+    return `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`;
+  });
 
 const findTomlAssignments = (
   lines: string[],
@@ -780,6 +849,324 @@ export const setCodexBaseUrl = (
   return finalizeTomlText(lines);
 };
 
+// 从 Codex TOML 读取 active provider 的 wire_api
+export const extractCodexWireApi = (
+  configText: string | undefined | null,
+): string | undefined => {
+  try {
+    const raw = typeof configText === "string" ? configText : "";
+    const text = normalizeTomlText(raw);
+    if (!text) return undefined;
+
+    const lines = text.split("\n");
+    const targetSectionName = getCodexProviderSectionName(text);
+    if (targetSectionName) {
+      const sectionRange = getTomlSectionRange(lines, targetSectionName);
+      if (sectionRange) {
+        const match = findTomlAssignmentInRange(
+          lines,
+          TOML_WIRE_API_PATTERN,
+          sectionRange.bodyStartIndex,
+          sectionRange.bodyEndIndex,
+          targetSectionName,
+        );
+        if (match?.value) return match.value;
+      }
+    }
+
+    const topLevelMatch = findTomlAssignmentInRange(
+      lines,
+      TOML_WIRE_API_PATTERN,
+      0,
+      getTopLevelEndIndex(lines),
+    );
+    return topLevelMatch?.value;
+  } catch {
+    return undefined;
+  }
+};
+
+export const isCodexChatWireApi = (
+  value: string | undefined | null,
+): boolean => {
+  const normalized = value?.trim().toLowerCase();
+  return (
+    normalized === "chat" ||
+    normalized === "openai_chat" ||
+    normalized === "chat_completions"
+  );
+};
+
+// 写入 active provider 的 wire_api；Codex live 仍应使用 responses
+export const setCodexWireApi = (
+  configText: string,
+  wireApi: string,
+): string => {
+  const trimmed = wireApi.trim();
+  const normalizedText = normalizeTomlText(configText);
+  const lines = normalizedText ? normalizedText.split("\n") : [];
+  const targetSectionName = getCodexProviderSectionName(normalizedText);
+  const replacementLine = `wire_api = "${trimmed}"`;
+
+  if (!trimmed) {
+    if (!normalizedText) return normalizedText;
+    if (targetSectionName) {
+      const sectionRange = getTomlSectionRange(lines, targetSectionName);
+      const targetMatch = sectionRange
+        ? findTomlAssignmentInRange(
+            lines,
+            TOML_WIRE_API_PATTERN,
+            sectionRange.bodyStartIndex,
+            sectionRange.bodyEndIndex,
+            targetSectionName,
+          )
+        : undefined;
+      if (targetMatch) {
+        lines.splice(targetMatch.index, 1);
+        return finalizeTomlText(lines);
+      }
+    }
+
+    const topLevelMatch = findTomlAssignmentInRange(
+      lines,
+      TOML_WIRE_API_PATTERN,
+      0,
+      getTopLevelEndIndex(lines),
+    );
+    if (topLevelMatch) {
+      lines.splice(topLevelMatch.index, 1);
+    }
+    return finalizeTomlText(lines);
+  }
+
+  if (targetSectionName) {
+    let targetSectionRange = getTomlSectionRange(lines, targetSectionName);
+    const targetMatch = targetSectionRange
+      ? findTomlAssignmentInRange(
+          lines,
+          TOML_WIRE_API_PATTERN,
+          targetSectionRange.bodyStartIndex,
+          targetSectionRange.bodyEndIndex,
+          targetSectionName,
+        )
+      : undefined;
+    if (targetMatch) {
+      lines[targetMatch.index] = replacementLine;
+      return finalizeTomlText(lines);
+    }
+
+    if (targetSectionRange) {
+      const insertIndex = getTomlSectionInsertIndex(lines, targetSectionRange);
+      lines.splice(insertIndex, 0, replacementLine);
+      return finalizeTomlText(lines);
+    }
+
+    if (lines.length > 0 && lines[lines.length - 1].trim() !== "") {
+      lines.push("");
+    }
+    lines.push(`[${targetSectionName}]`, replacementLine);
+    return finalizeTomlText(lines);
+  }
+
+  const topLevelEndIndex = getTopLevelEndIndex(lines);
+  const topLevelMatch = findTomlAssignmentInRange(
+    lines,
+    TOML_WIRE_API_PATTERN,
+    0,
+    topLevelEndIndex,
+  );
+  if (topLevelMatch) {
+    lines[topLevelMatch.index] = replacementLine;
+    return finalizeTomlText(lines);
+  }
+
+  if (lines.length === 0) return `${replacementLine}\n`;
+  lines.splice(topLevelEndIndex, 0, replacementLine);
+  return finalizeTomlText(lines);
+};
+
+export const extractCodexExperimentalBearerToken = (
+  configText: string | undefined | null,
+): string | undefined => {
+  try {
+    const raw = typeof configText === "string" ? configText : "";
+    const text = normalizeTomlText(raw);
+    if (!text.includes("experimental_bearer_token")) return undefined;
+
+    try {
+      const parsed = parseToml(text) as Record<string, any>;
+      const providerName =
+        typeof parsed.model_provider === "string"
+          ? parsed.model_provider.trim()
+          : undefined;
+      const providerToken =
+        providerName &&
+        isCustomCodexModelProviderId(providerName) &&
+        parsed.model_providers &&
+        typeof parsed.model_providers === "object" &&
+        typeof parsed.model_providers[providerName]
+          ?.experimental_bearer_token === "string"
+          ? parsed.model_providers[
+              providerName
+            ].experimental_bearer_token.trim()
+          : undefined;
+      if (providerToken) return providerToken;
+
+      const topLevelToken =
+        typeof parsed.experimental_bearer_token === "string"
+          ? parsed.experimental_bearer_token.trim()
+          : undefined;
+      if (topLevelToken) return topLevelToken;
+    } catch {
+      // Fall back to line scanning while the user is editing invalid TOML.
+    }
+
+    const lines = text.split("\n");
+    const targetSectionName = getCodexCustomProviderSectionName(text);
+    if (targetSectionName) {
+      const sectionRange = getTomlSectionRange(lines, targetSectionName);
+      if (sectionRange) {
+        const match = findTomlAssignmentInRange(
+          lines,
+          TOML_EXPERIMENTAL_BEARER_TOKEN_PATTERN,
+          sectionRange.bodyStartIndex,
+          sectionRange.bodyEndIndex,
+          targetSectionName,
+        );
+        if (match?.value) return match.value;
+      }
+    }
+
+    return findTomlAssignmentInRange(
+      lines,
+      TOML_EXPERIMENTAL_BEARER_TOKEN_PATTERN,
+      0,
+      getTopLevelEndIndex(lines),
+    )?.value;
+  } catch {
+    return undefined;
+  }
+};
+
+// 只更新已有 experimental_bearer_token；不主动新增，避免改变普通 env_key 线路语义。
+export const updateCodexExperimentalBearerToken = (
+  configText: string,
+  token: string,
+): string => {
+  const normalizedText = normalizeTomlText(configText);
+  if (
+    !normalizedText ||
+    !normalizedText.includes("experimental_bearer_token")
+  ) {
+    return configText;
+  }
+
+  const lines = normalizedText.split("\n");
+  const targetSectionName = getCodexCustomProviderSectionName(normalizedText);
+  let tokenLineIndex = -1;
+
+  if (targetSectionName) {
+    const sectionRange = getTomlSectionRange(lines, targetSectionName);
+    if (sectionRange) {
+      tokenLineIndex = findTomlLineInRange(
+        lines,
+        TOML_EXPERIMENTAL_BEARER_TOKEN_REPLACE_PATTERN,
+        sectionRange.bodyStartIndex,
+        sectionRange.bodyEndIndex,
+      );
+    }
+  }
+
+  if (tokenLineIndex === -1) {
+    tokenLineIndex = findTomlLineInRange(
+      lines,
+      TOML_EXPERIMENTAL_BEARER_TOKEN_REPLACE_PATTERN,
+      0,
+      getTopLevelEndIndex(lines),
+    );
+  }
+
+  if (tokenLineIndex === -1) return configText;
+
+  const trimmed = token.trim();
+  if (!trimmed) {
+    lines.splice(tokenLineIndex, 1);
+  } else {
+    const escaped = escapeTomlBasicString(trimmed);
+    lines[tokenLineIndex] = lines[tokenLineIndex].replace(
+      TOML_EXPERIMENTAL_BEARER_TOKEN_REPLACE_PATTERN,
+      `$1"${escaped}"$2`,
+    );
+  }
+
+  return finalizeTomlText(lines);
+};
+
+export const extractCodexModelCatalogJson = (
+  configText: string | undefined | null,
+): string | undefined => {
+  try {
+    const raw = typeof configText === "string" ? configText : "";
+    const text = normalizeTomlText(raw);
+    if (!text) return undefined;
+
+    try {
+      const parsed = parseToml(text) as Record<string, any>;
+      const catalogPath =
+        typeof parsed.model_catalog_json === "string"
+          ? parsed.model_catalog_json.trim()
+          : undefined;
+      if (catalogPath) return catalogPath;
+    } catch {
+      // Fall back to line scanning while the user is editing invalid TOML.
+    }
+
+    const lines = text.split("\n");
+    return findTomlAssignmentInRange(
+      lines,
+      TOML_MODEL_CATALOG_JSON_PATTERN,
+      0,
+      getTopLevelEndIndex(lines),
+    )?.value;
+  } catch {
+    return undefined;
+  }
+};
+
+export const setCodexModelCatalogJson = (
+  configText: string,
+  catalogPath: string,
+): string => {
+  const trimmed = catalogPath.trim();
+  const normalizedText = normalizeTomlText(configText);
+  const lines = normalizedText ? normalizedText.split("\n") : [];
+  const topLevelEndIndex = getTopLevelEndIndex(lines);
+  const topLevelMatchIndex = findTomlLineInRange(
+    lines,
+    TOML_MODEL_CATALOG_JSON_REPLACE_PATTERN,
+    0,
+    topLevelEndIndex,
+  );
+
+  if (!trimmed) {
+    if (!normalizedText) return normalizedText;
+    if (topLevelMatchIndex !== -1) {
+      lines.splice(topLevelMatchIndex, 1);
+    }
+    return finalizeTomlText(lines);
+  }
+
+  const replacementLine = `model_catalog_json = "${escapeTomlBasicString(trimmed)}"`;
+  if (topLevelMatchIndex !== -1) {
+    lines[topLevelMatchIndex] = replacementLine;
+    return finalizeTomlText(lines);
+  }
+
+  if (lines.length === 0) return `${replacementLine}\n`;
+  lines.splice(topLevelEndIndex, 0, replacementLine);
+  return finalizeTomlText(lines);
+};
+
 // ========== Codex model name utils ==========
 
 // 从 Codex 的 TOML 配置文本中提取 model 字段（支持单/双引号）
@@ -799,16 +1186,6 @@ export const extractCodexModelName = (
       getTopLevelEndIndex(lines),
     );
     if (topLevelMatch?.value) return topLevelMatch.value;
-    // Fallback: search in [profiles.*] sections
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim().startsWith("[profiles.")) {
-        for (let j = i + 1; j < lines.length; j++) {
-          if (lines[j].trim().startsWith("[")) break;
-          const match = lines[j].match(TOML_MODEL_PATTERN);
-          if (match?.[2]) return match[2];
-        }
-      }
-    }
     return undefined;
   } catch {
     return undefined;

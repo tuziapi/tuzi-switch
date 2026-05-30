@@ -717,8 +717,7 @@ pub fn sync_codex_live_api_key(state: State<'_, AppState>) -> Result<(), String>
         return Ok(());
     }
     let auth_text = std::fs::read_to_string(&auth_path).map_err(|e| e.to_string())?;
-    let auth: serde_json::Value =
-        serde_json::from_str(&auth_text).unwrap_or_else(|_| json!({}));
+    let auth: serde_json::Value = serde_json::from_str(&auth_text).unwrap_or_else(|_| json!({}));
     let api_key = auth
         .get("OPENAI_API_KEY")
         .and_then(|v| v.as_str())
@@ -735,16 +734,14 @@ pub fn sync_codex_live_api_key(state: State<'_, AppState>) -> Result<(), String>
     let normalized_detected = detected_url.trim_end_matches('/').to_lowercase();
 
     // 3. 尝试匹配预设卡片
-    let matched_id = PRESET_CARDS
-        .iter()
-        .find_map(|(id, base_url)| {
-            let normalized = base_url.trim_end_matches('/').to_lowercase();
-            if normalized == normalized_detected {
-                Some(*id)
-            } else {
-                None
-            }
-        });
+    let matched_id = PRESET_CARDS.iter().find_map(|(id, base_url)| {
+        let normalized = base_url.trim_end_matches('/').to_lowercase();
+        if normalized == normalized_detected {
+            Some(*id)
+        } else {
+            None
+        }
+    });
 
     if let Some(provider_id) = matched_id {
         // 4a. 匹配到预设 → 读取现有 settings_config，更新 API key
@@ -802,7 +799,7 @@ pub fn sync_codex_live_api_key(state: State<'_, AppState>) -> Result<(), String>
             "model_provider = \"{card_id}\"\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{card_id}]\nname = \"{card_id}\"\nbase_url = \"{detected_url}\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n"
         );
 
-        let mut new_provider = crate::provider::Provider::with_id(
+        let new_provider = crate::provider::Provider::with_id(
             card_id.clone(),
             card_name,
             json!({
@@ -917,7 +914,7 @@ pub fn sync_claude_live_api_key(state: State<'_, AppState>) -> Result<(), String
             format!("default{}", default_count)
         };
 
-        let mut new_provider = crate::provider::Provider::with_id(
+        let new_provider = crate::provider::Provider::with_id(
             card_id.clone(),
             card_id.clone(),
             json!({
@@ -959,10 +956,7 @@ pub fn sync_gemini_live_api_key(state: State<'_, AppState>) -> Result<(), String
     }
     let env_map = read_gemini_env().unwrap_or_default();
 
-    let api_key = env_map
-        .get("GEMINI_API_KEY")
-        .cloned()
-        .unwrap_or_default();
+    let api_key = env_map.get("GEMINI_API_KEY").cloned().unwrap_or_default();
     if api_key.is_empty() {
         return Ok(());
     }
@@ -1027,7 +1021,7 @@ pub fn sync_gemini_live_api_key(state: State<'_, AppState>) -> Result<(), String
             format!("default{}", default_count)
         };
 
-        let mut new_provider = crate::provider::Provider::with_id(
+        let new_provider = crate::provider::Provider::with_id(
             card_id.clone(),
             card_id.clone(),
             json!({

@@ -238,6 +238,24 @@ pub struct ClaudeDesktopModelRoute {
     pub supports_1m: Option<bool>,
 }
 
+/// Codex Responses -> Chat Completions 本地路由 reasoning 能力元数据。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexChatReasoning {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub supports_thinking: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub supports_effort: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_param: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort_param: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort_value_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<String>,
+}
+
 /// 供应商元数据
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProviderMeta {
@@ -266,6 +284,15 @@ pub struct ProviderMeta {
     /// 请求地址管理：测速后自动选择最佳端点
     #[serde(rename = "endpointAutoSelect", skip_serializing_if = "Option::is_none")]
     pub endpoint_auto_select: Option<bool>,
+    /// 是否为官方合作伙伴
+    #[serde(rename = "isPartner", skip_serializing_if = "Option::is_none")]
+    pub is_partner: Option<bool>,
+    /// 合作伙伴促销 key，用于识别特殊供应商
+    #[serde(
+        rename = "partnerPromotionKey",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub partner_promotion_key: Option<String>,
     /// 成本倍数（用于计算实际成本）
     #[serde(rename = "costMultiplier", skip_serializing_if = "Option::is_none")]
     pub cost_multiplier: Option<String>,
@@ -307,6 +334,9 @@ pub struct ProviderMeta {
     /// Codex OAuth FAST mode: inject `service_tier = "priority"` for ChatGPT Codex requests.
     #[serde(rename = "codexFastMode", skip_serializing_if = "Option::is_none")]
     pub codex_fast_mode: Option<bool>,
+    /// Codex Chat Completions 本地路由的 reasoning 能力配置。
+    #[serde(rename = "codexChatReasoning", skip_serializing_if = "Option::is_none")]
+    pub codex_chat_reasoning: Option<CodexChatReasoning>,
     /// 累加模式应用中，该 provider 是否已写入 live config。
     /// `None` 表示旧数据/未知状态，`Some(false)` 表示明确仅存在于数据库中。
     #[serde(rename = "liveConfigManaged", skip_serializing_if = "Option::is_none")]

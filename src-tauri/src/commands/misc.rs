@@ -52,13 +52,9 @@ pub async fn copy_text_to_clipboard(text: String) -> Result<bool, String> {
 
 /// 在内嵌 WebView 窗口中打开页面，加载完成后自动填入 API key
 #[tauri::command]
-pub async fn open_webview_with_key(
-    app: AppHandle,
-    url: String,
-    key: String,
-) -> Result<(), String> {
-    use tauri::{WebviewUrl, WebviewWindowBuilder};
+pub async fn open_webview_with_key(app: AppHandle, url: String, key: String) -> Result<(), String> {
     use tauri::webview::PageLoadEvent;
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
 
     let parsed = url
         .parse::<url::Url>()

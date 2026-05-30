@@ -31,6 +31,20 @@ const PACKYCODE_KEYWORDS: [&str; 3] = ["packycode", "packyapi", "packy"];
 /// - `GeminiAuthType::Packycode`: PackyCode provider, uses API Key
 /// - `GeminiAuthType::Generic`: Other generic providers, uses API Key
 pub(crate) fn detect_gemini_auth_type(provider: &Provider) -> GeminiAuthType {
+    if let Some(key) = provider
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.partner_promotion_key.as_deref())
+    {
+        let key_lower = key.to_ascii_lowercase();
+        if key_lower == "google-official" {
+            return GeminiAuthType::GoogleOfficial;
+        }
+        if contains_packycode_keyword(&key_lower) {
+            return GeminiAuthType::Packycode;
+        }
+    }
+
     // Priority 1: Check Google Official (name matching)
     let name_lower = provider.name.to_ascii_lowercase();
     if name_lower == "google" || name_lower.starts_with("google ") {

@@ -8,6 +8,7 @@ import {
 } from "@/utils/providerConfigUtils";
 import { normalizeTomlText } from "@/utils/textNormalization";
 import { invoke } from "@tauri-apps/api/core";
+import type { CodexCatalogModel } from "@/types";
 
 interface UseCodexConfigStateProps {
   initialData?: {
@@ -23,9 +24,17 @@ interface UseCodexConfigStateProps {
 function migrateLegacyConfig(configStr: string): string {
   if (!configStr.trim()) return configStr;
   // Already has model_providers with env_key — no migration needed
-  if (configStr.match(/\[model_providers\.\w+\]/) && configStr.includes("env_key")) {
+  if (
+    configStr.match(/\[model_providers\.\w+\]/) &&
+    configStr.includes("env_key")
+  ) {
     // Remove [profiles.xxx] sections if present (deprecated in 0.134.0+)
-    return configStr.replace(/\[profiles\.[^\]]+\][^\[]*/g, "").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+    return (
+      configStr
+        .replace(/\[profiles\.[^\]]+\][^\[]*/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim() + "\n"
+    );
   }
 
   // Extract model_provider name from top-level
@@ -35,7 +44,9 @@ function migrateLegacyConfig(configStr: string): string {
 
   // Extract model and model_reasoning_effort from top-level
   const modelMatch = configStr.match(/^\s*model\s*=\s*"([^"]+)"/m);
-  const effortMatch = configStr.match(/^\s*model_reasoning_effort\s*=\s*"([^"]+)"/m);
+  const effortMatch = configStr.match(
+    /^\s*model_reasoning_effort\s*=\s*"([^"]+)"/m,
+  );
   const model = modelMatch?.[1] || "gpt-5.5";
   const effort = effortMatch?.[1] || "high";
 
@@ -61,7 +72,10 @@ function migrateLegacyConfig(configStr: string): string {
       continue;
     }
     if (inModelProviders) {
-      if (line.trim().startsWith("[") && !line.trim().startsWith("[model_providers.")) {
+      if (
+        line.trim().startsWith("[") &&
+        !line.trim().startsWith("[model_providers.")
+      ) {
         if (!hasEnvKey) {
           result.push(`env_key = "OPENAI_API_KEY"`);
         }
@@ -100,6 +114,9 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
   const [codexEnvKey, setCodexEnvKey] = useState("");
   const [codexBaseUrl, setCodexBaseUrl] = useState("");
   const [codexModelName, setCodexModelName] = useState("");
+  const [codexCatalogModels, setCodexCatalogModels] = useState<
+    CodexCatalogModel[]
+  >([]);
   const [codexAuthError, setCodexAuthError] = useState("");
 
   const isUpdatingCodexBaseUrlRef = useRef(false);
@@ -122,6 +139,29 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
       configStr = migrateLegacyConfig(configStr);
 
       setCodexConfigState(configStr);
+      const modelCatalog = (config as any).modelCatalog;
+      const models = Array.isArray(modelCatalog?.models)
+        ? modelCatalog.models
+            .map((model: any) => ({
+              model: typeof model?.model === "string" ? model.model : "",
+              displayName:
+                typeof model?.displayName === "string"
+                  ? model.displayName
+                  : typeof model?.display_name === "string"
+                    ? model.display_name
+                    : "",
+              contextWindow:
+                typeof model?.contextWindow === "string" ||
+                typeof model?.contextWindow === "number"
+                  ? model.contextWindow
+                  : typeof model?.context_window === "string" ||
+                      typeof model?.context_window === "number"
+                    ? model.context_window
+                    : "",
+            }))
+            .filter((model: CodexCatalogModel) => model.model.trim())
+        : [];
+      setCodexCatalogModels(models);
 
       const initialBaseUrl = extractCodexBaseUrl(configStr);
       if (initialBaseUrl) setCodexBaseUrl(initialBaseUrl);
@@ -139,11 +179,16 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
       // Read API key from shell rc via backend
       if (resolvedEnvKey) {
         invoke<string | null>("read_codex_env_key", { envKey: resolvedEnvKey })
-          .then((key) => { if (key) setCodexApiKey(key); })
+          .then((key) => {
+            if (key) setCodexApiKey(key);
+          })
           .catch(() => {
             // Fallback: legacy auth field
             const auth = (config as any).auth;
-            if (auth?.OPENAI_API_KEY && typeof auth.OPENAI_API_KEY === "string") {
+            if (
+              auth?.OPENAI_API_KEY &&
+              typeof auth.OPENAI_API_KEY === "string"
+            ) {
               setCodexApiKey(auth.OPENAI_API_KEY);
             }
           });
@@ -215,7 +260,9 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
       setCodexBaseUrl(sanitized);
       isUpdatingCodexBaseUrlRef.current = true;
       setCodexConfig((prev) => setCodexBaseUrlInConfig(prev, sanitized));
-      setTimeout(() => { isUpdatingCodexBaseUrlRef.current = false; }, 0);
+      setTimeout(() => {
+        isUpdatingCodexBaseUrlRef.current = false;
+      }, 0);
     },
     [setCodexConfig],
   );
@@ -226,7 +273,9 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
       setCodexModelName(trimmed);
       isUpdatingCodexModelNameRef.current = true;
       setCodexConfig((prev) => setCodexModelNameInConfig(prev, trimmed));
-      setTimeout(() => { isUpdatingCodexModelNameRef.current = false; }, 0);
+      setTimeout(() => {
+        isUpdatingCodexModelNameRef.current = false;
+      }, 0);
     },
     [setCodexConfig],
   );
@@ -242,7 +291,8 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
       }
       if (!isUpdatingCodexModelNameRef.current) {
         const extractedModel = extractCodexModelName(normalized) || "";
-        if (extractedModel !== codexModelName) setCodexModelName(extractedModel);
+        if (extractedModel !== codexModelName)
+          setCodexModelName(extractedModel);
       }
       // Sync env_key from config
       const newEnvKey = getCodexEnvKey(normalized);
@@ -264,6 +314,7 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
       const modelName = extractCodexModelName(config);
       if (modelName) setCodexModelName(modelName);
       else setCodexModelName("");
+      setCodexCatalogModels([]);
 
       const resolvedEnvKey = envKey || getCodexEnvKey(config) || "";
       setCodexEnvKey(resolvedEnvKey);
@@ -287,10 +338,12 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
     codexEnvKey,
     codexBaseUrl,
     codexModelName,
+    codexCatalogModels,
     codexAuthError,
     setCodexAuth,
     setCodexConfig,
     setCodexEnvKey,
+    setCodexCatalogModels,
     handleCodexApiKeyChange,
     handleCodexBaseUrlChange,
     handleCodexModelNameChange,

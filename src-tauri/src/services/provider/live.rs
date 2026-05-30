@@ -8,9 +8,7 @@ use serde_json::{json, Value};
 use toml_edit::{DocumentMut, Item, TableLike};
 
 use crate::app_config::AppType;
-use crate::codex_config::{
-    get_codex_auth_path, get_codex_config_path, write_codex_live_atomic_with_stable_provider,
-};
+use crate::codex_config::{get_codex_auth_path, get_codex_config_path};
 use crate::config::{delete_file, get_claude_settings_path, read_json_file, write_json_file};
 use crate::database::Database;
 use crate::error::AppError;
@@ -22,6 +20,47 @@ use super::gemini_auth::{
     detect_gemini_auth_type, ensure_google_oauth_security_flag, GeminiAuthType,
 };
 use super::normalize_claude_models_in_value;
+
+fn codex_config_doc(config_text: &str) -> Option<DocumentMut> {
+    config_text.parse::<DocumentMut>().ok()
+}
+
+fn codex_active_route_id(config_text: &str) -> Option<String> {
+    codex_config_doc(config_text)?
+        .get("model_provider")
+        .and_then(|item| item.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn codex_top_level_string_field(config_text: &str, field: &str) -> Option<String> {
+    codex_config_doc(config_text)?
+        .get(field)
+        .and_then(|item| item.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn codex_active_provider_string_field(config_text: &str, field: &str) -> Option<String> {
+    let doc = codex_config_doc(config_text)?;
+    let route_id = doc
+        .get("model_provider")
+        .and_then(|item| item.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+
+    doc.get("model_providers")
+        .and_then(|item| item.as_table())
+        .and_then(|table| table.get(route_id))
+        .and_then(|item| item.as_table())
+        .and_then(|table| table.get(field))
+        .and_then(|item| item.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
 
 pub(crate) fn sanitize_claude_settings_for_live(settings: &Value) -> Value {
     let mut v = settings.clone();
@@ -582,12 +621,18 @@ fn restore_live_settings_for_provider_backfill(
     }
 
     let mut settings = live_settings;
-    if let Err(err) = crate::codex_config::restore_codex_settings_config_model_provider_for_backfill(
+    let restore_provider_token =
+        crate::codex_config::should_restore_codex_provider_token_for_backfill(
+            provider.category.as_deref(),
+            &provider.settings_config,
+        );
+    if let Err(err) = crate::codex_config::restore_codex_settings_for_backfill(
         &mut settings,
         &provider.settings_config,
+        restore_provider_token,
     ) {
         log::warn!(
-            "Failed to restore Codex provider id while backfilling '{}': {err}",
+            "Failed to restore Codex live settings while backfilling '{}': {err}",
             provider.id
         );
     }
@@ -725,92 +770,55 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
                 .settings_config
                 .as_object()
                 .ok_or_else(|| AppError::Config("Codex 供应商配置必须是 JSON 对象".to_string()))?;
-
+            let auth = obj.get("auth").unwrap_or(&Value::Null);
             let config_str = obj.get("config").and_then(|v| v.as_str()).unwrap_or("");
 
             use crate::codex_config::{
                 read_codex_config_text, save_route_to_config, switch_codex_profile,
-                write_codex_live_atomic,
+                write_codex_provider_live_with_catalog,
             };
 
-            // Extract route_id from the provider's config TOML
-            let route_id = config_str
-                .lines()
-                .find_map(|l| {
-                    l.trim()
-                        .strip_prefix("model_provider")
-                        .and_then(|r| r.trim().strip_prefix('='))
-                        .map(|v| v.trim().trim_matches('"').trim_matches('\'').to_string())
-                })
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| "custom".to_string());
+            if config_str.trim().is_empty() {
+                write_codex_provider_live_with_catalog(
+                    &provider.settings_config,
+                    provider.category.as_deref(),
+                    auth,
+                    None,
+                )?;
+                return Ok(());
+            }
 
+            let route_id =
+                codex_active_route_id(config_str).unwrap_or_else(|| "tuziswitch".to_string());
             let existing = read_codex_config_text().unwrap_or_default();
-
-            // Check if route's [model_providers.xxx] section exists
-            let provider_header = format!("[model_providers.{}]", route_id);
-            let has_section = existing.contains(&provider_header);
 
             // Extract fields from provider's config
             // env_key must come from the correct [model_providers.<route_id>] section
-            let env_key = {
-                let section_header = format!("[model_providers.{}]", route_id);
-                let mut in_section = false;
-                let mut found = String::new();
-                for line in config_str.lines() {
-                    if line.trim() == section_header {
-                        in_section = true;
-                        continue;
-                    }
-                    if in_section && line.trim().starts_with('[') {
-                        break;
-                    }
-                    if in_section {
-                        if let Some(rest) = line.trim().strip_prefix("env_key") {
-                            if let Some(val) = rest.trim().strip_prefix('=') {
-                                found = val.trim().trim_matches('"').trim_matches('\'').to_string();
-                                break;
-                            }
-                        }
-                    }
-                }
-                found
-            };
+            let env_key =
+                codex_active_provider_string_field(config_str, "env_key").unwrap_or_default();
 
-            let model = config_str.lines().find_map(|l| {
-                l.trim().strip_prefix("model")
-                    .and_then(|r| r.trim().strip_prefix('='))
-                    .filter(|_| !l.trim().starts_with("model_provider") && !l.trim().starts_with("model_reasoning"))
-                    .map(|v| v.trim().trim_matches('"').trim_matches('\'').to_string())
-            }).unwrap_or_else(|| "gpt-5.5".to_string());
+            let model = codex_top_level_string_field(config_str, "model")
+                .unwrap_or_else(|| "gpt-5.5".to_string());
 
-            let effort = config_str.lines().find_map(|l| {
-                l.trim().strip_prefix("model_reasoning_effort")
-                    .and_then(|r| r.trim().strip_prefix('='))
-                    .map(|v| v.trim().trim_matches('"').trim_matches('\'').to_string())
-            }).unwrap_or_else(|| "high".to_string());
+            let effort = codex_top_level_string_field(config_str, "model_reasoning_effort")
+                .unwrap_or_else(|| "high".to_string());
 
-            let config_with_route = if !has_section {
-                let base_url = config_str.lines().find_map(|l| {
-                    l.trim().strip_prefix("base_url")
-                        .and_then(|r| r.trim().strip_prefix('='))
-                        .map(|v| v.trim().trim_matches('"').trim_matches('\'').to_string())
-                }).unwrap_or_default();
+            let base_url =
+                codex_active_provider_string_field(config_str, "base_url").unwrap_or_default();
 
-                save_route_to_config(&existing, &route_id, &base_url, &env_key, &model, &effort)?
-            } else {
-                existing
-            };
+            let config_with_route =
+                save_route_to_config(&existing, &route_id, &base_url, &env_key, &model, &effort)?;
 
             // Switch top-level fields (model_provider + model + effort)
-            let final_config = switch_codex_profile(
-                &config_with_route, &route_id, Some(&model), Some(&effort),
-            )?;
+            let final_config =
+                switch_codex_profile(&config_with_route, &route_id, Some(&model), Some(&effort))?;
 
-            // Write auth.json with current route's key from shell rc
-            let actual_key = crate::codex_config::read_managed_env_key(&env_key).unwrap_or_default();
-            let auth = serde_json::json!({ "OPENAI_API_KEY": actual_key });
-            write_codex_live_atomic(&auth, Some(&final_config))?;
+            write_codex_provider_live_with_catalog(
+                &provider.settings_config,
+                provider.category.as_deref(),
+                auth,
+                Some(&final_config),
+            )?;
         }
         AppType::Gemini => {
             // Delegate to write_gemini_live which handles env file writing correctly
@@ -1029,17 +1037,15 @@ pub fn sync_current_to_live(state: &AppState) -> Result<(), AppError> {
 pub fn read_live_settings(app_type: AppType) -> Result<Value, AppError> {
     match app_type {
         AppType::Codex => {
-            let auth_path = get_codex_auth_path();
-            if !auth_path.exists() {
-                return Err(AppError::localized(
-                    "codex.auth.missing",
-                    "Codex 配置文件不存在：缺少 auth.json",
-                    "Codex configuration missing: auth.json not found",
-                ));
+            let mut result = crate::codex_config::read_codex_live_settings()?;
+            if let Ok(Some(model_catalog)) =
+                crate::codex_config::read_codex_model_catalog_simplified_from_live()
+            {
+                if let Some(obj) = result.as_object_mut() {
+                    obj.insert("modelCatalog".to_string(), model_catalog);
+                }
             }
-            let auth: Value = read_json_file(&auth_path)?;
-            let cfg_text = crate::codex_config::read_and_validate_codex_config_text()?;
-            Ok(json!({ "auth": auth, "config": cfg_text }))
+            Ok(result)
         }
         AppType::Claude => {
             let path = get_claude_settings_path();

@@ -6,7 +6,14 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { providerSchema, type ProviderFormData } from "@/lib/schemas/provider";
 import { providersApi, settingsApi, type AppId } from "@/lib/api";
@@ -15,6 +22,9 @@ import type {
   ProviderMeta,
   ProviderTestConfig,
   ClaudeApiFormat,
+  CodexApiFormat,
+  CodexCatalogModel,
+  CodexChatReasoning,
   ClaudeApiKeyField,
 } from "@/types";
 import {
@@ -58,7 +68,10 @@ import {
 import type { UniversalProviderPreset } from "@/config/universalProviderPresets";
 import {
   applyTemplateValues,
+  extractCodexWireApi,
   hasApiKeyField,
+  setCodexModelName as setCodexModelNameInConfig,
+  setCodexWireApi,
 } from "@/utils/providerConfigUtils";
 import { mergeProviderMeta } from "@/utils/providerMetaUtils";
 import { getCodexCustomTemplate } from "@/config/codexTemplates";
@@ -134,6 +147,90 @@ type PresetEntry = {
     | OpenCodeProviderPreset
     | OpenClawProviderPreset
     | HermesProviderPreset;
+};
+
+const codexApiFormatFromWireApi = (
+  wireApi: string | undefined,
+): CodexApiFormat | undefined => {
+  switch (wireApi?.trim().toLowerCase()) {
+    case "chat":
+    case "chat_completions":
+    case "chat-completions":
+    case "openai_chat":
+    case "openai-chat":
+      return "openai_chat";
+    case "responses":
+    case "openai_responses":
+    case "openai-responses":
+      return "openai_responses";
+    default:
+      return undefined;
+  }
+};
+
+export const normalizeCodexCatalogModelsForSave = (
+  models: CodexCatalogModel[],
+): CodexCatalogModel[] => {
+  const seen = new Set<string>();
+  const normalized: CodexCatalogModel[] = [];
+
+  for (const item of models) {
+    const model = item.model.trim();
+    if (!model || seen.has(model)) continue;
+    seen.add(model);
+
+    const displayName = item.displayName?.trim();
+    const rawContextWindow = String(item.contextWindow ?? "").replace(
+      /[^\d]/g,
+      "",
+    );
+    const contextWindow = rawContextWindow
+      ? Number.parseInt(rawContextWindow, 10)
+      : undefined;
+
+    normalized.push({
+      model,
+      ...(displayName ? { displayName } : {}),
+      ...(contextWindow && contextWindow > 0 ? { contextWindow } : {}),
+    });
+  }
+
+  return normalized;
+};
+
+const normalizeCodexChatReasoningForSave = (
+  value?: CodexChatReasoning,
+): CodexChatReasoning | undefined => {
+  const supportsEffort = value?.supportsEffort === true;
+  const supportsThinking = value?.supportsThinking === true || supportsEffort;
+  const hasExplicitConfig = value && Object.keys(value).length > 0;
+
+  if (!supportsThinking && !supportsEffort) {
+    return hasExplicitConfig
+      ? {
+          supportsThinking: false,
+          supportsEffort: false,
+          thinkingParam: "none",
+          effortParam: "none",
+          outputFormat: value?.outputFormat ?? "auto",
+        }
+      : undefined;
+  }
+
+  return {
+    supportsThinking,
+    supportsEffort,
+    thinkingParam: supportsThinking
+      ? (value?.thinkingParam ?? "thinking")
+      : "none",
+    effortParam: supportsEffort
+      ? (value?.effortParam ?? "reasoning_effort")
+      : "none",
+    effortValueMode: supportsEffort
+      ? (value?.effortValueMode ?? "passthrough")
+      : undefined,
+    outputFormat: value?.outputFormat ?? "auto",
+  };
 };
 
 export interface ProviderFormProps {
@@ -461,14 +558,39 @@ function ProviderFormFull({
     codexEnvKey,
     codexBaseUrl,
     codexModelName,
+    codexCatalogModels,
     codexAuthError,
     setCodexAuth,
+    setCodexConfig,
+    setCodexCatalogModels,
     handleCodexApiKeyChange,
     handleCodexBaseUrlChange,
     handleCodexModelNameChange,
     handleCodexConfigChange: originalHandleCodexConfigChange,
     resetCodexConfig,
   } = useCodexConfigState({ initialData });
+  const [codexChatReasoning, setCodexChatReasoning] =
+    useState<CodexChatReasoning>(
+      () => initialData?.meta?.codexChatReasoning ?? {},
+    );
+  const [localCodexApiFormat, setLocalCodexApiFormat] =
+    useState<CodexApiFormat>(() => {
+      if (initialData?.meta?.apiFormat === "openai_chat") {
+        return "openai_chat";
+      }
+      if (initialData?.meta?.apiFormat === "openai_responses") {
+        return "openai_responses";
+      }
+      return (
+        codexApiFormatFromWireApi(
+          extractCodexWireApi(
+            typeof initialData?.settingsConfig?.config === "string"
+              ? initialData.settingsConfig.config
+              : "",
+          ),
+        ) ?? "openai_responses"
+      );
+    });
   const [fetchedModels, setFetchedModels] = useState<FetchedModel[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
 
@@ -481,6 +603,18 @@ function ProviderFormFull({
       debouncedValidate(value);
     },
     [originalHandleCodexConfigChange, debouncedValidate],
+  );
+
+  const handleCodexApiFormatChange = useCallback(
+    (format: CodexApiFormat) => {
+      setLocalCodexApiFormat(format);
+      setCodexConfig((prev) => {
+        const updated = setCodexWireApi(prev, "responses");
+        debouncedValidate(updated);
+        return updated;
+      });
+    },
+    [setCodexConfig, debouncedValidate],
   );
 
   const handleFetchModels = useCallback(() => {
@@ -514,6 +648,11 @@ function ProviderFormFull({
     if (appId === "codex" && !initialData && selectedPresetId === "custom") {
       const template = getCodexCustomTemplate();
       resetCodexConfig(template.auth, template.config, "CUSTOM_CODEX_API_KEY");
+      setCodexChatReasoning({});
+      setLocalCodexApiFormat(
+        codexApiFormatFromWireApi(extractCodexWireApi(template.config)) ??
+          "openai_responses",
+      );
     }
   }, [appId, initialData, selectedPresetId, resetCodexConfig]);
 
@@ -1138,29 +1277,62 @@ function ProviderFormFull({
 
     if (appId === "codex") {
       try {
-        // Extract route_id from config TOML
-        const routeIdMatch = (codexConfig ?? "").match(/^\s*model_provider\s*=\s*"([^"]+)"/m);
-        const routeId = routeIdMatch?.[1] || "custom";
+        let normalizedCodexConfig =
+          category !== "official" && (codexConfig ?? "").trim()
+            ? setCodexWireApi(codexConfig ?? "", "responses")
+            : (codexConfig ?? "");
+        const normalizedCatalogModels =
+          category !== "official" && localCodexApiFormat === "openai_chat"
+            ? normalizeCodexCatalogModelsForSave(codexCatalogModels)
+            : [];
 
-        // Save route to config.toml + key to shell rc via backend
+        if (normalizedCatalogModels.length > 0) {
+          normalizedCodexConfig = setCodexModelNameInConfig(
+            normalizedCodexConfig,
+            normalizedCatalogModels[0].model,
+          );
+        }
+
+        const routeIdMatch = normalizedCodexConfig.match(
+          /^\s*model_provider\s*=\s*"([^"]+)"/m,
+        );
+        const routeId = routeIdMatch?.[1] || "tuziswitch";
+
         if (codexEnvKey && codexBaseUrl) {
           await invoke("save_codex_route", {
             routeId,
             baseUrl: codexBaseUrl,
             envKey: codexEnvKey,
             apiKey: codexApiKey || "",
-            model: codexModelName || "gpt-5.5",
+            model:
+              normalizedCatalogModels[0]?.model || codexModelName || "gpt-5.5",
             modelReasoningEffort: "high",
           });
         }
-        const configObj = {
+
+        const configObj: {
+          auth: {};
+          config: string;
+          env: { envKey: string };
+          modelCatalog?: { models: CodexCatalogModel[] };
+        } = {
           auth: {},
-          config: codexConfig ?? "",
+          config: normalizedCodexConfig,
           env: { envKey: codexEnvKey },
         };
+        if (normalizedCatalogModels.length > 0) {
+          configObj.modelCatalog = { models: normalizedCatalogModels };
+        }
         settingsConfig = JSON.stringify(configObj);
       } catch (err) {
-        settingsConfig = values.settingsConfig.trim();
+        const fallbackConfig = (codexConfig ?? "").trim()
+          ? setCodexWireApi(codexConfig ?? "", "responses")
+          : (codexConfig ?? "");
+        settingsConfig = JSON.stringify({
+          auth: {},
+          config: fallbackConfig,
+          env: { envKey: codexEnvKey },
+        });
       }
     } else if (appId === "gemini") {
       try {
@@ -1317,6 +1489,14 @@ function ProviderFormFull({
       apiFormat:
         appId === "claude" && category !== "official"
           ? localApiFormat
+          : appId === "codex" && category !== "official"
+            ? localCodexApiFormat
+            : undefined,
+      codexChatReasoning:
+        appId === "codex" &&
+        category !== "official" &&
+        localCodexApiFormat === "openai_chat"
+          ? normalizeCodexChatReasoningForSave(codexChatReasoning)
           : undefined,
       apiKeyField:
         appId === "claude" &&
@@ -1390,9 +1570,15 @@ function ProviderFormFull({
       ? (selectedCodexPreset.apiKeyUrl as string | undefined)
       : appId === "codex" && !selectedPresetId && providerId
         ? // Edit mode: use provider's websiteUrl as apiKeyUrl
-          (initialData as any)?.websiteUrl || (presetEntries.find(
-            (entry) => entry.id === providerId && "apiKeyUrl" in entry.preset && (entry.preset as any).apiKeyUrl,
-          )?.preset as any)?.apiKeyUrl as string | undefined
+          (initialData as any)?.websiteUrl ||
+          ((
+            presetEntries.find(
+              (entry) =>
+                entry.id === providerId &&
+                "apiKeyUrl" in entry.preset &&
+                (entry.preset as any).apiKeyUrl,
+            )?.preset as any
+          )?.apiKeyUrl as string | undefined)
         : undefined;
 
   const {
@@ -1425,9 +1611,7 @@ function ProviderFormFull({
     formWebsiteUrl: form.watch("websiteUrl") || "",
     providerId,
   });
-  const {
-    websiteUrl: openclawApiKeyUrl,
-  } = useApiKeyLink({
+  const { websiteUrl: openclawApiKeyUrl } = useApiKeyLink({
     appId: "openclaw",
     category,
     selectedPresetId,
@@ -1465,7 +1649,16 @@ function ProviderFormFull({
 
       if (appId === "codex") {
         const template = getCodexCustomTemplate();
-        resetCodexConfig(template.auth, template.config, "CUSTOM_CODEX_API_KEY");
+        resetCodexConfig(
+          template.auth,
+          template.config,
+          "CUSTOM_CODEX_API_KEY",
+        );
+        setCodexChatReasoning({});
+        setLocalCodexApiFormat(
+          codexApiFormatFromWireApi(extractCodexWireApi(template.config)) ??
+            "openai_responses",
+        );
       }
       if (appId === "gemini") {
         resetGeminiConfig({}, {});
@@ -1503,16 +1696,27 @@ function ProviderFormFull({
       // Compute suffix: only count providers that actually have a key in shell rc
       if (existingCodexProviders) {
         const baseName = preset.nameKey ? t(preset.nameKey) : preset.name;
-        const allMatching = Object.values(existingCodexProviders).filter((p) => {
-          const nameMatches = p.name === baseName || p.name.match(new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_\\d+$`));
-          if (!nameMatches) return false;
-          // Check if actually configured: env_key exists AND has value in shell rc
-          const cfg = p.settingsConfig as Record<string, any>;
-          const envKeyName = cfg?.env?.envKey
-            || (typeof cfg?.config === "string" ? cfg.config.match(/env_key\s*=\s*"([^"]+)"/)?.[1] : undefined);
-          if (!envKeyName) return false;
-          return Boolean(shellEnvKeys?.[envKeyName]);
-        });
+        const allMatching = Object.values(existingCodexProviders).filter(
+          (p) => {
+            const nameMatches =
+              p.name === baseName ||
+              p.name.match(
+                new RegExp(
+                  `^${baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_\\d+$`,
+                ),
+              );
+            if (!nameMatches) return false;
+            // Check if actually configured: env_key exists AND has value in shell rc
+            const cfg = p.settingsConfig as Record<string, any>;
+            const envKeyName =
+              cfg?.env?.envKey ||
+              (typeof cfg?.config === "string"
+                ? cfg.config.match(/env_key\s*=\s*"([^"]+)"/)?.[1]
+                : undefined);
+            if (!envKeyName) return false;
+            return Boolean(shellEnvKeys?.[envKeyName]);
+          },
+        );
         const count = allMatching.length;
 
         if (count > 0) {
@@ -1520,8 +1724,10 @@ function ProviderFormFull({
           displayName = `${baseName}_${suffix}`;
 
           // Extract base route_id from config
-          const routeIdMatch = config.match(/^\s*model_provider\s*=\s*"([^"]+)"/m);
-          const baseRouteId = routeIdMatch?.[1] || "custom";
+          const routeIdMatch = config.match(
+            /^\s*model_provider\s*=\s*"([^"]+)"/m,
+          );
+          const baseRouteId = routeIdMatch?.[1] || "tuziswitch";
           const newRouteId = `${baseRouteId}_${suffix}`;
 
           // Generate new env_key with suffix
@@ -1539,10 +1745,19 @@ function ProviderFormFull({
       }
 
       resetCodexConfig({}, config, envKey);
+      setCodexChatReasoning({});
+      setLocalCodexApiFormat(
+        codexApiFormatFromWireApi(extractCodexWireApi(config)) ??
+          "openai_responses",
+      );
 
       form.reset({
         name: displayName,
-        settingsConfig: JSON.stringify({ auth: {}, config, env: { envKey } }, null, 2),
+        settingsConfig: JSON.stringify(
+          { auth: {}, config, env: { envKey } },
+          null,
+          2,
+        ),
         icon: preset.icon ?? "",
         iconColor: preset.iconColor ?? "",
       });
@@ -1606,7 +1821,10 @@ function ProviderFormFull({
       openclawForm.resetOpenclawState(config);
 
       openclawForm.setOpenclawProviderKey(
-        preset.name.trim().toLowerCase().replace(/[^a-z0-9-]/g, ""),
+        preset.name
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, ""),
       );
 
       // Update form fields
@@ -1626,7 +1844,10 @@ function ProviderFormFull({
 
       hermesForm.resetHermesState(config);
       hermesForm.setHermesProviderKey(
-        preset.name.trim().toLowerCase().replace(/[^a-z0-9-]/g, ""),
+        preset.name
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, ""),
       );
 
       form.reset({
@@ -1788,7 +2009,9 @@ function ProviderFormFull({
                         value={openclawForm.openclawProviderKey}
                         onChange={(e) =>
                           openclawForm.setOpenclawProviderKey(
-                            e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
+                            e.target.value
+                              .toLowerCase()
+                              .replace(/[^a-z0-9-]/g, ""),
                           )
                         }
                         placeholder={t("openclaw.providerKeyPlaceholder")}
@@ -1811,15 +2034,23 @@ function ProviderFormFull({
                     </div>
                     <div className="w-[180px] space-y-1">
                       <Label htmlFor="openclaw-api-inline">
-                        {t("openclaw.apiProtocol", { defaultValue: "API 协议" })}
+                        {t("openclaw.apiProtocol", {
+                          defaultValue: "API 协议",
+                        })}
                       </Label>
-                      <Select value={openclawForm.openclawApi} onValueChange={openclawForm.handleOpenclawApiChange}>
+                      <Select
+                        value={openclawForm.openclawApi}
+                        onValueChange={openclawForm.handleOpenclawApiChange}
+                      >
                         <SelectTrigger id="openclaw-api-inline">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {openclawApiProtocols.map((protocol) => (
-                            <SelectItem key={protocol.value} value={protocol.value}>
+                            <SelectItem
+                              key={protocol.value}
+                              value={protocol.value}
+                            >
                               {protocol.label}
                             </SelectItem>
                           ))}
@@ -1877,7 +2108,9 @@ function ProviderFormFull({
                         value={hermesForm.hermesProviderKey}
                         onChange={(e) =>
                           hermesForm.setHermesProviderKey(
-                            e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
+                            e.target.value
+                              .toLowerCase()
+                              .replace(/[^a-z0-9-]/g, ""),
                           )
                         }
                         placeholder={t("hermes.form.providerKeyPlaceholder", {
@@ -1904,7 +2137,10 @@ function ProviderFormFull({
                       <Label htmlFor="hermes-api-mode-inline">
                         {t("hermes.form.apiMode", { defaultValue: "API 模式" })}
                       </Label>
-                      <Select value={hermesForm.hermesApiMode} onValueChange={hermesForm.handleHermesApiModeChange}>
+                      <Select
+                        value={hermesForm.hermesApiMode}
+                        onValueChange={hermesForm.handleHermesApiModeChange}
+                      >
                         <SelectTrigger id="hermes-api-mode-inline">
                           <SelectValue />
                         </SelectTrigger>
@@ -2132,6 +2368,12 @@ function ProviderFormFull({
               }
               autoSelect={endpointAutoSelect}
               onAutoSelectChange={setEndpointAutoSelect}
+              apiFormat={localCodexApiFormat}
+              onApiFormatChange={handleCodexApiFormatChange}
+              codexChatReasoning={codexChatReasoning}
+              onCodexChatReasoningChange={setCodexChatReasoning}
+              catalogModels={codexCatalogModels}
+              onCatalogModelsChange={setCodexCatalogModels}
               speedTestEndpoints={speedTestEndpoints}
             />
           )}
@@ -2216,12 +2458,38 @@ function ProviderFormFull({
               onUserAgentChange={openclawForm.handleOpenclawUserAgentChange}
               advancedExtra={
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>{t("provider.name")}</FormLabel><FormControl><Input {...field} placeholder={t("provider.namePlaceholder")} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="notes" render={({ field }) => (
-                    <FormItem><FormLabel>{t("provider.notes")}</FormLabel><FormControl><Input {...field} placeholder={t("provider.notesPlaceholder")} /></FormControl><FormMessage /></FormItem>
-                  )} />
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("provider.name")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={t("provider.namePlaceholder")}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("provider.notes")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={t("provider.notesPlaceholder")}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               }
             />
@@ -2247,12 +2515,38 @@ function ProviderFormFull({
               }
               advancedExtra={
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>{t("provider.name")}</FormLabel><FormControl><Input {...field} placeholder={t("provider.namePlaceholder")} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="notes" render={({ field }) => (
-                    <FormItem><FormLabel>{t("provider.notes")}</FormLabel><FormControl><Input {...field} placeholder={t("provider.notesPlaceholder")} /></FormControl><FormMessage /></FormItem>
-                  )} />
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("provider.name")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={t("provider.namePlaceholder")}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("provider.notes")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={t("provider.notesPlaceholder")}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               }
             />
