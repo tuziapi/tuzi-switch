@@ -253,8 +253,11 @@ export function ProviderList({
       if (appId === "codex") {
         const cfg = provider.settingsConfig as Record<string, any>;
         // Check env-first: look up env_key in preloaded shell rc keys
-        const envKeyName = cfg?.env?.envKey
-          || (typeof cfg?.config === "string" ? cfg.config.match(/env_key\s*=\s*"([^"]+)"/)?.[1] : undefined);
+        const envKeyName =
+          cfg?.env?.envKey ||
+          (typeof cfg?.config === "string"
+            ? cfg.config.match(/env_key\s*=\s*"([^"]+)"/)?.[1]
+            : undefined);
         if (envKeyName && codexEnvKeys[envKeyName]) {
           return false; // Key exists in shell rc
         }
@@ -412,7 +415,7 @@ export function ProviderList({
     // 对 codex/claude/gemini 的预设卡片做二次排序：
     // 启用中(0) > 非预设有key(1) > 预设有key(2) > 预设无key(3)
     const PRESET_IDS: Partial<Record<string, string[]>> = {
-      codex:  ["tuzi-route", "coding", "gaccode"],
+      codex: ["tuzi-route", "coding", "gaccode"],
       claude: ["tuzi-route", "gaccode"],
       gemini: ["tuzi-route"],
     };
@@ -421,9 +424,13 @@ export function ProviderList({
 
     const getPresetApiKey = (provider: Provider) => {
       const cfg = provider.settingsConfig as Record<string, any>;
-      return appId === "codex"  ? cfg?.auth?.OPENAI_API_KEY :
-             appId === "claude" ? (cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY) :
-             appId === "gemini" ? cfg?.env?.GEMINI_API_KEY : "";
+      return appId === "codex"
+        ? cfg?.auth?.OPENAI_API_KEY
+        : appId === "claude"
+          ? cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY
+          : appId === "gemini"
+            ? cfg?.env?.GEMINI_API_KEY
+            : "";
     };
 
     const cardRank = (provider: Provider): number => {

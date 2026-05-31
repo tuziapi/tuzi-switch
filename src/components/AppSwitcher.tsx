@@ -54,9 +54,7 @@ export function AppSwitcher({
   };
   const appBadgeIcon: Partial<Record<AppId, React.ReactNode>> = {
     claude: <Terminal className="h-2.5 w-2.5" strokeWidth={2.4} />,
-    "claude-desktop": (
-      <Monitor className="h-2.5 w-2.5" strokeWidth={2.4} />
-    ),
+    "claude-desktop": <Monitor className="h-2.5 w-2.5" strokeWidth={2.4} />,
   };
 
   // Filter apps based on visibility settings (default all visible)

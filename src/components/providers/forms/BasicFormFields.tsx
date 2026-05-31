@@ -132,42 +132,45 @@ export function BasicFormFields({
 
       {/* 基础信息 - 网格布局 */}
       {!hideNameAndNotes && (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{t("provider.name")}</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder={t("provider.namePlaceholder")} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {hideNotes ? (
-          <FormItem>{afterNameSlot}</FormItem>
-        ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="notes"
+            name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("provider.notes")}</FormLabel>
+                <FormLabel>{t("provider.name")}</FormLabel>
                 <FormControl>
                   <Input
                     {...field}
-                    placeholder={t("provider.notesPlaceholder")}
+                    placeholder={t("provider.namePlaceholder")}
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        )}
-      </div>
+
+          {hideNotes ? (
+            <FormItem>{afterNameSlot}</FormItem>
+          ) : (
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("provider.notes")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder={t("provider.notesPlaceholder")}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+        </div>
       )}
     </>
   );

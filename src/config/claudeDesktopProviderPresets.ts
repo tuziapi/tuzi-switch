@@ -100,5 +100,4 @@ export const brandedRoutes = (
   },
 ];
 
-export const claudeDesktopProviderPresets: ClaudeDesktopProviderPreset[] = [
-];
+export const claudeDesktopProviderPresets: ClaudeDesktopProviderPreset[] = [];

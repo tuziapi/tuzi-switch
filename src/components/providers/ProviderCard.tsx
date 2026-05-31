@@ -76,7 +76,10 @@ function isOfficialProvider(provider: Provider, appId: AppId): boolean {
     // 无 OPENAI_API_KEY 且无 env.envKey → 使用 Codex CLI 内置 OAuth（官方）
     const apiKey = config?.auth?.OPENAI_API_KEY;
     const envKey = config?.env?.envKey;
-    return (!apiKey || (typeof apiKey === "string" && apiKey.trim() === "")) && !envKey;
+    return (
+      (!apiKey || (typeof apiKey === "string" && apiKey.trim() === "")) &&
+      !envKey
+    );
   }
   if (appId === "gemini") {
     // 无 GEMINI_API_KEY 且无 GOOGLE_GEMINI_BASE_URL → Google OAuth 官方模式
@@ -189,7 +192,11 @@ export function ProviderCard({
     if (appId !== "codex") return;
     let cfg = provider.settingsConfig as any;
     if (typeof cfg === "string") {
-      try { cfg = JSON.parse(cfg); } catch { return; }
+      try {
+        cfg = JSON.parse(cfg);
+      } catch {
+        return;
+      }
     }
     let envKeyName = cfg?.env?.envKey;
     if (!envKeyName) {
@@ -203,11 +210,17 @@ export function ProviderCard({
         const lines = configStr.split("\n");
         let inSection = false;
         for (const line of lines) {
-          if (line.trim() === sectionHeader) { inSection = true; continue; }
+          if (line.trim() === sectionHeader) {
+            inSection = true;
+            continue;
+          }
           if (inSection && line.trim().startsWith("[")) break;
           if (inSection) {
             const m = line.match(/^\s*env_key\s*=\s*"([^"]+)"/);
-            if (m) { envKeyName = m[1]; break; }
+            if (m) {
+              envKeyName = m[1];
+              break;
+            }
           }
         }
       }
@@ -294,7 +307,7 @@ export function ProviderCard({
 
   // 预设卡片未填 API key 时呈灰调（启用中的卡片不受影响）
   const PRESET_IDS: Partial<Record<string, string[]>> = {
-    codex:  ["tuzi-route", "coding", "gaccode"],
+    codex: ["tuzi-route", "coding", "gaccode"],
     claude: ["tuzi-route", "gaccode"],
     gemini: ["tuzi-route"],
   };
@@ -302,9 +315,13 @@ export function ProviderCard({
   const presetApiKey = isPresetCard
     ? (() => {
         const cfg = provider.settingsConfig as Record<string, any>;
-        return appId === "codex"  ? (envKeyValue || cfg?.auth?.OPENAI_API_KEY) :
-               appId === "claude" ? (cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY) :
-               appId === "gemini" ? cfg?.env?.GEMINI_API_KEY : "";
+        return appId === "codex"
+          ? envKeyValue || cfg?.auth?.OPENAI_API_KEY
+          : appId === "claude"
+            ? cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY
+            : appId === "gemini"
+              ? cfg?.env?.GEMINI_API_KEY
+              : "";
       })()
     : null;
   const isPresetMissingKey =
@@ -406,7 +423,6 @@ export function ProviderCard({
                   <FailoverPriorityBadge priority={failoverPriority} />
                 )}
 
-
               {isHermesReadOnly && (
                 <span
                   className="inline-flex items-center rounded-md bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200"
@@ -422,19 +438,51 @@ export function ProviderCard({
             </div>
 
             {(() => {
-              const codexLinks: Record<string, { recharge: string; query: string }> = {
-                "tuzi-route": { recharge: "https://api.tu-zi.com/console/topup", query: "https://check.sydney-ai.com/" },
-                "coding":     { recharge: "https://store.tu-zi.com/cat/11",      query: "https://api.tu-zi.com/reseller/" },
-                "gaccode":    { recharge: "https://store.tu-zi.com/cat/1",        query: "https://gaccode.com/credits" },
+              const codexLinks: Record<
+                string,
+                { recharge: string; query: string }
+              > = {
+                "tuzi-route": {
+                  recharge: "https://api.tu-zi.com/console/topup",
+                  query: "https://check.sydney-ai.com/",
+                },
+                coding: {
+                  recharge: "https://store.tu-zi.com/cat/11",
+                  query: "https://api.tu-zi.com/reseller/",
+                },
+                gaccode: {
+                  recharge: "https://store.tu-zi.com/cat/1",
+                  query: "https://gaccode.com/credits",
+                },
               };
-              const claudeLinks: Record<string, { recharge: string; query: string }> = {
-                "tuzi-route": { recharge: "https://api.tu-zi.com/console/topup", query: "https://check.sydney-ai.com/" },
-                "gaccode":    { recharge: "https://store.tu-zi.com/cat/1",        query: "https://gaccode.com/credits" },
+              const claudeLinks: Record<
+                string,
+                { recharge: string; query: string }
+              > = {
+                "tuzi-route": {
+                  recharge: "https://api.tu-zi.com/console/topup",
+                  query: "https://check.sydney-ai.com/",
+                },
+                gaccode: {
+                  recharge: "https://store.tu-zi.com/cat/1",
+                  query: "https://gaccode.com/credits",
+                },
               };
-              const geminiLinks: Record<string, { recharge: string; query: string }> = {
-                "tuzi-route": { recharge: "https://api.tu-zi.com/console/topup", query: "https://check.sydney-ai.com/" },
+              const geminiLinks: Record<
+                string,
+                { recharge: string; query: string }
+              > = {
+                "tuzi-route": {
+                  recharge: "https://api.tu-zi.com/console/topup",
+                  query: "https://check.sydney-ai.com/",
+                },
               };
-              const linkMap: Partial<Record<string, Record<string, { recharge: string; query: string }>>> = {
+              const linkMap: Partial<
+                Record<
+                  string,
+                  Record<string, { recharge: string; query: string }>
+                >
+              > = {
                 codex: codexLinks,
                 claude: claudeLinks,
                 gemini: geminiLinks,
@@ -442,9 +490,14 @@ export function ProviderCard({
               const links = linkMap[appId]?.[provider.id];
               const cfg = provider.settingsConfig as Record<string, any>;
               const rawKey =
-                appId === "codex"  ? (envKeyValue || cfg?.auth?.OPENAI_API_KEY) :
-                appId === "claude" ? (cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY) :
-                appId === "gemini" ? cfg?.env?.GEMINI_API_KEY : "";
+                appId === "codex"
+                  ? envKeyValue || cfg?.auth?.OPENAI_API_KEY
+                  : appId === "claude"
+                    ? cfg?.env?.ANTHROPIC_AUTH_TOKEN ||
+                      cfg?.env?.ANTHROPIC_API_KEY
+                    : appId === "gemini"
+                      ? cfg?.env?.GEMINI_API_KEY
+                      : "";
               const maskedKey =
                 typeof rawKey === "string" && rawKey.trim().length > 12
                   ? `${rawKey.slice(0, 8)}${"*".repeat(8)}${rawKey.slice(-4)}`
@@ -455,7 +508,10 @@ export function ProviderCard({
                     <>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); onOpenWebsite(links.recharge); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenWebsite(links.recharge);
+                        }}
                         className="text-blue-500 hover:underline dark:text-blue-400 cursor-pointer"
                       >
                         {t("provider.recharge", { defaultValue: "充值" })}
@@ -464,12 +520,20 @@ export function ProviderCard({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          const key = typeof rawKey === "string" && rawKey.trim() ? rawKey.trim() : "";
+                          const key =
+                            typeof rawKey === "string" && rawKey.trim()
+                              ? rawKey.trim()
+                              : "";
                           const useWebview =
                             provider.id === "tuzi-route" ||
-                            (appId === "codex" && provider.id === "coding" && key !== "");
+                            (appId === "codex" &&
+                              provider.id === "coding" &&
+                              key !== "");
                           if (useWebview) {
-                            void invoke("open_webview_with_key", { url: links.query, key });
+                            void invoke("open_webview_with_key", {
+                              url: links.query,
+                              key,
+                            });
                           } else {
                             onOpenWebsite(links.query);
                           }
@@ -481,7 +545,9 @@ export function ProviderCard({
                     </>
                   )}
                   {maskedKey ? (
-                    <span className="text-muted-foreground font-mono text-xs">{maskedKey}</span>
+                    <span className="text-muted-foreground font-mono text-xs">
+                      {maskedKey}
+                    </span>
                   ) : displayUrl ? (
                     <button
                       type="button"

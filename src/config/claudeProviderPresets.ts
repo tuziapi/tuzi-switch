@@ -15,7 +15,14 @@ export interface TemplateValueConfig {
  */
 export interface PresetTheme {
   /** 图标类型：'claude' | 'codex' | 'gemini' | 'generic' | 'tuzi' | 'codex-sub' | 'gaccode' */
-  icon?: "claude" | "codex" | "gemini" | "generic" | "tuzi" | "codex-sub" | "gaccode";
+  icon?:
+    | "claude"
+    | "codex"
+    | "gemini"
+    | "generic"
+    | "tuzi"
+    | "codex-sub"
+    | "gaccode";
   /** 背景色（选中状态），支持 Tailwind 类名或 hex 颜色 */
   backgroundColor?: string;
   /** 文字色（选中状态），支持 Tailwind 类名或 hex 颜色 */

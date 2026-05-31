@@ -38,7 +38,6 @@ const CodexConfigEditor: React.FC<CodexConfigEditorProps> = ({
   onConfigChange,
   configError,
 }) => {
-
   return (
     <div className="space-y-6">
       {/* Config TOML Section (auth.json and common config are no longer needed) */}
