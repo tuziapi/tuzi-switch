@@ -1190,8 +1190,20 @@ fn restore_codex_provider_token_for_backfill_with_env_writer(
             .filter(|value| value.is_object())
             .cloned()
             .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
-        if let Some(auth_obj) = auth.as_object_mut() {
-            auth_obj.insert("OPENAI_API_KEY".to_string(), Value::String(token));
+        // Only write the live token into auth.OPENAI_API_KEY when the template has
+        // no key of its own (e.g. OAuth providers that temporarily embed a bearer
+        // token). If the template already carries a key, it belongs to *this*
+        // provider and must not be overwritten with a token that came from a
+        // different provider's live session.
+        let template_has_key = template_settings
+            .get("auth")
+            .and_then(|a| a.get("OPENAI_API_KEY"))
+            .and_then(Value::as_str)
+            .is_some_and(|k| !k.trim().is_empty());
+        if !template_has_key {
+            if let Some(auth_obj) = auth.as_object_mut() {
+                auth_obj.insert("OPENAI_API_KEY".to_string(), Value::String(token));
+            }
         }
         obj.insert("auth".to_string(), auth);
     }
