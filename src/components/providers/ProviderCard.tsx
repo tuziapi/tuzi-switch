@@ -293,7 +293,7 @@ export function ProviderCard({
     ? (() => {
         const cfg = provider.settingsConfig as Record<string, any>;
         return appId === "codex"
-          ? envKeyValue || cfg?.auth?.OPENAI_API_KEY
+          ? cfg?.auth?.OPENAI_API_KEY || envKeyValue
           : appId === "claude"
             ? cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY
             : appId === "gemini"
@@ -468,7 +468,7 @@ export function ProviderCard({
               const cfg = provider.settingsConfig as Record<string, any>;
               const rawKey =
                 appId === "codex"
-                  ? envKeyValue || cfg?.auth?.OPENAI_API_KEY
+                  ? cfg?.auth?.OPENAI_API_KEY || envKeyValue
                   : appId === "claude"
                     ? cfg?.env?.ANTHROPIC_AUTH_TOKEN ||
                       cfg?.env?.ANTHROPIC_API_KEY

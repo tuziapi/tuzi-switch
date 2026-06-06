@@ -436,11 +436,14 @@ export function ProviderList({
     const getPresetApiKey = (provider: Provider) => {
       const cfg = provider.settingsConfig as Record<string, any>;
       if (appId === "codex") {
+        if (cfg?.auth?.OPENAI_API_KEY) {
+          return cfg.auth.OPENAI_API_KEY;
+        }
         const envKeyName = getCodexProviderEnvKey(provider);
         if (envKeyName && codexEnvKeys[envKeyName]) {
           return codexEnvKeys[envKeyName];
         }
-        return cfg?.auth?.OPENAI_API_KEY;
+        return undefined;
       }
       return appId === "claude"
         ? cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY

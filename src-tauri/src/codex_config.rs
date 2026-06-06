@@ -1029,7 +1029,10 @@ fn restore_codex_backfill_model_provider_id(
     };
 
     if live_provider_id == template_provider_id {
-        return Ok(config_text.to_string());
+        // Even when IDs match, restore base_url and wire_api from template
+        // to prevent a previously active provider's values from leaking in.
+        restore_provider_structural_fields(&mut doc, &template_provider_id, template_config_text);
+        return Ok(doc.to_string());
     }
 
     if let Some(model_providers) = doc
@@ -1047,7 +1050,59 @@ fn restore_codex_backfill_model_provider_id(
     rewrite_codex_profile_model_provider_refs(&mut doc, &live_provider_id, &template_provider_id);
     doc["model_provider"] = toml_edit::value(template_provider_id.as_str());
 
+    // Restore base_url and wire_api from the template to avoid polluting this
+    // provider's stored config with values that belonged to the previously active provider.
+    restore_provider_structural_fields(&mut doc, &template_provider_id, template_config_text);
+
     Ok(doc.to_string())
+}
+
+/// Overwrite `base_url` and `wire_api` in `[model_providers.<provider_id>]` with the
+/// values from `template_config_text`. Fields absent in the template are removed from
+/// the target so that live-only values never leak into a stored provider record.
+fn restore_provider_structural_fields(
+    doc: &mut DocumentMut,
+    provider_id: &str,
+    template_config_text: &str,
+) {
+    let template_doc = match template_config_text.parse::<DocumentMut>() {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+
+    let template_base_url = template_doc
+        .get("model_providers")
+        .and_then(|item| item.as_table())
+        .and_then(|t| t.get(provider_id))
+        .and_then(|item| item.as_table())
+        .and_then(|t| t.get("base_url"))
+        .and_then(|item| item.as_str())
+        .map(str::to_string);
+
+    let template_wire_api = template_doc
+        .get("model_providers")
+        .and_then(|item| item.as_table())
+        .and_then(|t| t.get(provider_id))
+        .and_then(|item| item.as_table())
+        .and_then(|t| t.get("wire_api"))
+        .and_then(|item| item.as_str())
+        .map(str::to_string);
+
+    if let Some(provider_table) = doc
+        .get_mut("model_providers")
+        .and_then(|item| item.as_table_mut())
+        .and_then(|t| t.get_mut(provider_id))
+        .and_then(|item| item.as_table_mut())
+    {
+        match template_base_url {
+            Some(url) => provider_table["base_url"] = toml_edit::value(url),
+            None => { provider_table.remove("base_url"); }
+        }
+        match template_wire_api {
+            Some(api) => provider_table["wire_api"] = toml_edit::value(api),
+            None => { provider_table.remove("wire_api"); }
+        }
+    }
 }
 
 /// Convert a Codex live config that was normalized for history stability back
