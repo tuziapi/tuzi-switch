@@ -1,19 +1,19 @@
 {
-  "version": "1.1.23",
-  "notes": "兔子switch v1.1.23",
-  "pub_date": "2026-06-07T19:55:06.350Z",
+  "version": "1.1.24",
+  "notes": "兔子switch v1.1.24",
+  "pub_date": "2026-06-07T20:13:32.621Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUNDliVkZlTDZRZC9NNHhCUGt4djZzdG5IcDYvMllQdEx5bklKVnFDQzNSaEJtVGdQOUtMYkVqQ3QvUmRQSkQ1R01BVjZFMVBmM2NJK0gzVGk0SnFSNG9sWjJUOEQzbmdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwODYxNzY1CWZpbGU65YWU5a2Qc3dpdGNoLmFwcC50YXIuZ3oKcnhsaU1hc1g3L0o1ZWZQalNmOGtBSHZ1NTI1dEVnYXBqd2w5aUdpeFE0YjZnMWI0RmhRVVg5K1B4dEZ6N2tidTNIemtnVW5KWS9IRUJFVjNKYVpSQ1E9PQo=",
-      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.1.23/tuzi-switch-macos-aarch64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUNDliVkZlTDZRZHlIellPQUxFVVF3Snl4eXArTTduaG1nQ2dHaVRvamY0MGlmNXVsT3RsRVJvMHpMUnZJL1lIWmNjMEVETmhVWE1jeCtldnhLL25wZFdaaFh4b2k5L3d3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwODYyNjk5CWZpbGU65YWU5a2Qc3dpdGNoLmFwcC50YXIuZ3oKS0YvMnU4dE85NjVleXJ4S0dRcEM3U2Q2T2xmNzljQlVESldvNnhGQ1VOaGliN1VCLzRZM0FKMVBPdUlkYzU1eFhySjBoVGx2N3VNdTMzdFhsY0NERHc9PQo=",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.1.24/tuzi-switch-macos-aarch64.app.tar.gz"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUNDliVkZlTDZRZHpQcDExcUxnVHJ2V1I1c3paV2VQaXJjei93QVhwclZBcFJxNEE2MllCRjBmTGVublhSL2NRU0w0ak45dGZmazBlUSt1L2tiNnhFZFJPQzJlWmVJOUEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwODYxOTY3CWZpbGU6dHV6aSBzd2l0Y2hfMS4xLjIzX3g2NF9lbi1VUy5tc2kKWklYTW1rRitmSnZiMS9XbXNBZmpzS2RzeFNLL0lRSEphQW5wVmNDUDY5RDVJUGV4YmpXeGZoaldNRVY4QWpRblJGQnplbmtGdzJheVRQSEhPV1EzQmc9PQo=",
-      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.1.23/tuzi-switch-windows-x86_64.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUNDliVkZlTDZRZDRPR2llTWpBM0Y2bklTRmRsUDZ6SURXQmJZU0gwd1pYUE5nT3BRTnVUbjJPN3VON3NlSFdXR0pBdXlpMjF4SmpYK2pYeEh4V21veUpjZEJEVWovMEFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwODYzMTI3CWZpbGU6dHV6aSBzd2l0Y2hfMS4xLjI0X3g2NF9lbi1VUy5tc2kKV2hkN1ZrQ0I4ckFVMjZmbEZMZHVIeFRWWkwva3EzbkhVdWwxSVdKMVhWd1lEMzBuUGw5WkplL29BNlV5eUdWdTV0dW9GRnJpOTlxelJQVmllR1VQRHc9PQo=",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.1.24/tuzi-switch-windows-x86_64.msi"
     },
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUNDliVkZlTDZRZC9rZGoxVnhUdG1zcGdFYk1hYWRFaEswa2pJNnBOR2tXNzhWR2dOc2huejhyaTIrWlNCOXZoUGtyRk5YNUR0RTFqcHJtNWdvZFFSN3AxdHZOUGFlamd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwODYxNzQ1CWZpbGU65YWU5a2Qc3dpdGNoXzEuMS4yM19hbWQ2NC5BcHBJbWFnZQpxRFRjbkFreXdGdFBsYVFwaW1UVVdBajQzZ0IyeWdLWnJnUHJ0b1J1UUNXSFB3WXpHMXVmODMxbWMxdTFtNGxNV1RNcFhpdVE2aDd4VXphcHFSYVpDdz09Cg==",
-      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.1.23/tuzi-switch-linux-x86_64.AppImage"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUNDliVkZlTDZRZDNNdVdHVnJENWhlYWkrRTZmL25McDJobjcxRmFxSzhCSlNXUTZNTGk0YzJkU00rTGMxU2NhRlQzLzgyN2IyZm5sc0VqaVFBcTNVV3BnL05NYjRPcWdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwODYyOTA3CWZpbGU65YWU5a2Qc3dpdGNoXzEuMS4yNF9hbWQ2NC5BcHBJbWFnZQphRkZ1aEJKMi9ucE1aOFJJcHdERjhDbUsrMzNrV2lpeld1d2FvcXRlZW8vTWtkWDBVU2hsc20vMmRxYXNncWpLeDRpTm1odmZGeDNRNzBBbWtXQmFBZz09Cg==",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.1.24/tuzi-switch-linux-x86_64.AppImage"
     }
   }
 }
