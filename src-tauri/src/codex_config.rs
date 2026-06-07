@@ -1175,7 +1175,17 @@ fn restore_codex_provider_token_for_backfill_with_env_writer(
             });
         if let Some(env_key) = env_key.as_deref() {
             validate_env_key_name(env_key)?;
-            write_env_key(env_key, &token)?;
+            // 如果模板自身已有独立的 auth.OPENAI_API_KEY，说明该供应商
+            // 有自身凭证，不应通过 env_key 路径覆盖共享环境变量，
+            // 避免 backfill 时供应商 A 的 token 覆盖供应商 B 的环境变量。
+            let template_has_own_auth_key = template_settings
+                .get("auth")
+                .and_then(|a| a.get("OPENAI_API_KEY"))
+                .and_then(Value::as_str)
+                .is_some_and(|k| !k.trim().is_empty());
+            if !template_has_own_auth_key {
+                write_env_key(env_key, &token)?;
+            }
             let cleaned_config = remove_codex_experimental_bearer_token(&config_text)?;
             obj.insert("config".to_string(), Value::String(cleaned_config));
             obj.insert("env".to_string(), json!({ "envKey": env_key }));

@@ -189,27 +189,8 @@ export function ProviderCard({
   const usageEnabled = provider.meta?.usage_script?.enabled ?? false;
   const isOfficial = isOfficialProvider(provider, appId);
 
-  // Load API key from shell rc for Codex providers
-  const [envKeyValue, setEnvKeyValue] = useState<string | null>(null);
-  useEffect(() => {
-    if (appId !== "codex") {
-      setEnvKeyValue(null);
-      return;
-    }
-    const envKeyName = getCodexProviderEnvKeyFromSettings(
-      provider.settingsConfig,
-    );
-    if (!envKeyName) {
-      setEnvKeyValue(null);
-      return;
-    }
-    const timer = setTimeout(() => {
-      invoke<string | null>("read_codex_env_key", { envKey: envKeyName })
-        .then((val) => setEnvKeyValue(val || null))
-        .catch(() => setEnvKeyValue(null));
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [appId, provider.id, provider.settingsConfig]);
+  // 不再从系统环境变量读取 API Key 显示，避免多个供应商共享同一 env_key 时
+  // 卡片显示互相污染。改用数据库存储的 auth.OPENAI_API_KEY 作为唯一显示源。
 
   const isOfficialBlockedByProxy =
     isProxyTakeover && (provider.category === "official" || isOfficial);
@@ -293,7 +274,7 @@ export function ProviderCard({
     ? (() => {
         const cfg = provider.settingsConfig as Record<string, any>;
         return appId === "codex"
-          ? cfg?.auth?.OPENAI_API_KEY || envKeyValue
+          ? cfg?.auth?.OPENAI_API_KEY
           : appId === "claude"
             ? cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY
             : appId === "gemini"
@@ -468,7 +449,7 @@ export function ProviderCard({
               const cfg = provider.settingsConfig as Record<string, any>;
               const rawKey =
                 appId === "codex"
-                  ? cfg?.auth?.OPENAI_API_KEY || envKeyValue
+                  ? cfg?.auth?.OPENAI_API_KEY
                   : appId === "claude"
                     ? cfg?.env?.ANTHROPIC_AUTH_TOKEN ||
                       cfg?.env?.ANTHROPIC_API_KEY
