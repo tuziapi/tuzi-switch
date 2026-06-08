@@ -194,8 +194,16 @@ describe("ProviderList Component", () => {
   });
 
   it("should render in order returned by useDragSort and pass through action callbacks", () => {
-    const providerA = createProvider({ id: "a", name: "A" });
-    const providerB = createProvider({ id: "b", name: "B" });
+    const providerA = createProvider({
+      id: "a",
+      name: "A",
+      settingsConfig: { env: { ANTHROPIC_API_KEY: "sk-a" } },
+    });
+    const providerB = createProvider({
+      id: "b",
+      name: "B",
+      settingsConfig: { env: { ANTHROPIC_API_KEY: "sk-b" } },
+    });
 
     const handleSwitch = vi.fn();
     const handleEdit = vi.fn();
@@ -305,5 +313,55 @@ describe("ProviderList Component", () => {
     expect(
       screen.getByText("No providers match your search."),
     ).toBeInTheDocument();
+  });
+
+  it("passes the first base URL shared by the same API key to provider cards", () => {
+    const first = createProvider({
+      id: "first",
+      name: "First",
+      settingsConfig: {
+        env: {
+          ANTHROPIC_AUTH_TOKEN: "sk-shared",
+          ANTHROPIC_BASE_URL: "https://api.tu-zi.com",
+        },
+      },
+    });
+    const second = createProvider({
+      id: "second",
+      name: "Second",
+      settingsConfig: {
+        env: {
+          ANTHROPIC_AUTH_TOKEN: "sk-shared",
+          ANTHROPIC_BASE_URL: "https://gaccode.com/claudecode",
+        },
+      },
+    });
+
+    useDragSortMock.mockReturnValue({
+      sortedProviders: [first, second],
+      sensors: [],
+      handleDragEnd: vi.fn(),
+    });
+
+    renderWithQueryClient(
+      <ProviderList
+        providers={{ first, second }}
+        currentProviderId=""
+        appId="claude"
+        onSwitch={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onDuplicate={vi.fn()}
+        onOpenWebsite={vi.fn()}
+      />,
+    );
+
+    expect(providerCardRenderSpy).toHaveBeenCalledTimes(2);
+    expect(providerCardRenderSpy.mock.calls[0][0].resolvedQueryUrl).toBe(
+      "https://api.tu-zi.com",
+    );
+    expect(providerCardRenderSpy.mock.calls[1][0].resolvedQueryUrl).toBe(
+      "https://api.tu-zi.com",
+    );
   });
 });

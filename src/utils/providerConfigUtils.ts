@@ -488,6 +488,13 @@ interface TomlAssignmentMatch {
   value: string;
 }
 
+interface CodexModelProviderSection {
+  baseUrl?: string;
+  envKey?: string;
+  headerIndex: number;
+  sectionName: string;
+}
+
 const finalizeTomlText = (lines: string[]): string =>
   lines
     .join("\n")
@@ -689,6 +696,76 @@ const getRecoverableBaseUrlAssignments = (
       !isOtherProviderSection(sectionName, targetSectionName),
   );
 
+const getCodexModelProviderSections = (
+  lines: string[],
+): CodexModelProviderSection[] => {
+  const sections: CodexModelProviderSection[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(TOML_SECTION_HEADER_PATTERN);
+    const sectionName = match?.[1];
+    if (!sectionName?.startsWith("model_providers.")) {
+      continue;
+    }
+
+    const sectionRange = getTomlSectionRange(lines, sectionName);
+    if (!sectionRange) {
+      continue;
+    }
+
+    const baseUrl = findTomlAssignmentInRange(
+      lines,
+      TOML_BASE_URL_PATTERN,
+      sectionRange.bodyStartIndex,
+      sectionRange.bodyEndIndex,
+      sectionName,
+    )?.value;
+    const envKey = findTomlAssignmentInRange(
+      lines,
+      TOML_ENV_KEY_PATTERN,
+      sectionRange.bodyStartIndex,
+      sectionRange.bodyEndIndex,
+      sectionName,
+    )?.value;
+
+    sections.push({
+      baseUrl,
+      envKey,
+      headerIndex: index,
+      sectionName,
+    });
+  }
+
+  return sections;
+};
+
+const getInheritedCodexBaseUrlByEnvKey = (
+  lines: string[],
+  targetSectionName: string | undefined,
+): string | undefined => {
+  if (!targetSectionName) return undefined;
+
+  const sections = getCodexModelProviderSections(lines);
+  const targetSection = sections.find(
+    (section) => section.sectionName === targetSectionName,
+  );
+  const targetEnvKey = targetSection?.envKey?.trim();
+  if (!targetSection || !targetEnvKey) return undefined;
+
+  const sameKeySections = sections.filter(
+    (section) =>
+      section.sectionName !== targetSectionName &&
+      section.envKey?.trim() === targetEnvKey &&
+      section.baseUrl?.trim(),
+  );
+  if (sameKeySections.length === 0) return undefined;
+
+  const previousSection = sameKeySections
+    .filter((section) => section.headerIndex < targetSection.headerIndex)
+    .at(-1);
+  return previousSection?.baseUrl || sameKeySections[0].baseUrl;
+};
+
 const getTopLevelModelProviderLineIndex = (lines: string[]): number => {
   const topLevelEndIndex = getTopLevelEndIndex(lines);
 
@@ -726,6 +803,14 @@ export const extractCodexBaseUrl = (
         if (match?.value) {
           return match.value;
         }
+      }
+
+      const inheritedBaseUrl = getInheritedCodexBaseUrlByEnvKey(
+        lines,
+        targetSectionName,
+      );
+      if (inheritedBaseUrl) {
+        return inheritedBaseUrl;
       }
     }
 

@@ -36,6 +36,7 @@ interface ProviderCardProps {
   provider: Provider;
   isCurrent: boolean;
   appId: AppId;
+  resolvedQueryUrl?: string;
   isInConfig?: boolean; // OpenCode: 是否已添加到 opencode.json
   isOmo?: boolean;
   isOmoSlim?: boolean;
@@ -132,6 +133,7 @@ export function ProviderCard({
   provider,
   isCurrent,
   appId,
+  resolvedQueryUrl,
   isInConfig = true,
   isOmo = false,
   isOmoSlim = false,
@@ -173,8 +175,8 @@ export function ProviderCard({
   });
 
   const displayUrl = useMemo(() => {
-    return extractApiUrl(provider, fallbackUrlText);
-  }, [provider, fallbackUrlText]);
+    return resolvedQueryUrl || extractApiUrl(provider, fallbackUrlText);
+  }, [provider, fallbackUrlText, resolvedQueryUrl]);
 
   const isClickableUrl = useMemo(() => {
     if (provider.notes?.trim()) {

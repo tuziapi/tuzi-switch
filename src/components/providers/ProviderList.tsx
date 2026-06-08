@@ -49,6 +49,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { settingsApi } from "@/lib/api/settings";
 import {
+  extractCodexBaseUrl,
   getApiKeyFromConfig,
   getCodexProviderEnvKeyFromSettings,
 } from "@/utils/providerConfigUtils";
@@ -74,6 +75,48 @@ interface ProviderListProps {
   activeProviderId?: string; // 代理当前实际使用的供应商 ID（用于故障转移模式下标注绿色边框）
   onSetAsDefault?: (provider: Provider) => void; // OpenClaw: set as default model
 }
+
+const normalizeProviderUrl = (rawUrl?: string): string => {
+  const url = rawUrl?.trim().replace(/\/+$/, "") ?? "";
+  return url.startsWith("http") ? url : "";
+};
+
+const getProviderBaseUrl = (provider: Provider, appId: AppId): string => {
+  const config = provider.settingsConfig as Record<string, any>;
+  if (appId === "claude") {
+    return normalizeProviderUrl(config?.env?.ANTHROPIC_BASE_URL);
+  }
+  if (appId === "gemini") {
+    return normalizeProviderUrl(config?.env?.GOOGLE_GEMINI_BASE_URL);
+  }
+  if (appId === "codex") {
+    return normalizeProviderUrl(
+      typeof config?.config === "string"
+        ? extractCodexBaseUrl(config.config)
+        : undefined,
+    );
+  }
+  return "";
+};
+
+const getProviderPlainApiKey = (
+  provider: Provider,
+  appId: AppId,
+  codexEnvKeys: Record<string, string>,
+): string => {
+  if (appId === "codex") {
+    const envKeyName = getCodexProviderEnvKeyFromSettings(
+      provider.settingsConfig,
+    );
+    const envKeyValue = envKeyName ? codexEnvKeys[envKeyName] : "";
+    if (envKeyValue?.trim()) return envKeyValue.trim();
+  }
+
+  return getApiKeyFromConfig(
+    JSON.stringify(provider.settingsConfig ?? {}),
+    appId,
+  ).trim();
+};
 
 export function ProviderList({
   providers,
@@ -129,6 +172,29 @@ export function ProviderList({
       .then((keys) => setCodexEnvKeys(keys))
       .catch(() => setCodexEnvKeys({}));
   }, [appId, providers, currentProviderId]);
+
+  const queryUrlByProviderId = useMemo(() => {
+    if (appId !== "claude" && appId !== "codex" && appId !== "gemini") {
+      return {};
+    }
+
+    const baseUrlByApiKey = new Map<string, string>();
+    const providerEntries = sortedProviders.map((provider) => {
+      const apiKey = getProviderPlainApiKey(provider, appId, codexEnvKeys);
+      const baseUrl = getProviderBaseUrl(provider, appId);
+      if (apiKey && baseUrl && !baseUrlByApiKey.has(apiKey)) {
+        baseUrlByApiKey.set(apiKey, baseUrl);
+      }
+      return { provider, apiKey, baseUrl };
+    });
+
+    return Object.fromEntries(
+      providerEntries.map(({ provider, apiKey, baseUrl }) => [
+        provider.id,
+        apiKey ? (baseUrlByApiKey.get(apiKey) ?? baseUrl) : baseUrl,
+      ]),
+    );
+  }, [appId, codexEnvKeys, sortedProviders]);
 
   // 判断供应商是否已添加到配置（累加模式应用：OpenCode/OpenClaw/Hermes）
   const isProviderInConfig = useCallback(
@@ -539,6 +605,7 @@ export function ProviderList({
                         : provider.id === currentProviderId
                 }
                 appId={appId}
+                resolvedQueryUrl={queryUrlByProviderId[provider.id]}
                 isInConfig={isProviderInConfig(provider.id)}
                 isOmo={isOmo}
                 isOmoSlim={isOmoSlim}
@@ -707,6 +774,7 @@ interface SortableProviderCardProps {
   provider: Provider;
   isCurrent: boolean;
   appId: AppId;
+  resolvedQueryUrl?: string;
   isInConfig: boolean;
   isOmo: boolean;
   isOmoSlim: boolean;
@@ -738,6 +806,7 @@ function SortableProviderCard({
   provider,
   isCurrent,
   appId,
+  resolvedQueryUrl,
   isInConfig,
   isOmo,
   isOmoSlim,
@@ -783,6 +852,7 @@ function SortableProviderCard({
         provider={provider}
         isCurrent={isCurrent}
         appId={appId}
+        resolvedQueryUrl={resolvedQueryUrl}
         isInConfig={isInConfig}
         isOmo={isOmo}
         isOmoSlim={isOmoSlim}

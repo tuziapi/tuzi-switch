@@ -62,6 +62,47 @@ fn codex_active_provider_string_field(config_text: &str, field: &str) -> Option<
         .map(ToString::to_string)
 }
 
+fn codex_inherited_base_url_by_env_key(config_text: &str) -> Option<String> {
+    let doc = codex_config_doc(config_text)?;
+    let route_id = doc
+        .get("model_provider")
+        .and_then(|item| item.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+
+    let providers = doc.get("model_providers")?.as_table()?;
+    let target_env_key = providers
+        .get(route_id)
+        .and_then(|item| item.as_table())
+        .and_then(|table| table.get("env_key"))
+        .and_then(|item| item.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+
+    let inherited = providers.iter().find_map(|(provider_id, item)| {
+        if provider_id == route_id {
+            return None;
+        }
+        let table = item.as_table()?;
+        let env_key = table
+            .get("env_key")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())?;
+        if env_key != target_env_key {
+            return None;
+        }
+        table
+            .get("base_url")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+    });
+
+    inherited
+}
+
 pub(crate) fn sanitize_claude_settings_for_live(settings: &Value) -> Value {
     let mut v = settings.clone();
     if let Some(obj) = v.as_object_mut() {
@@ -803,8 +844,9 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
             let effort = codex_top_level_string_field(config_str, "model_reasoning_effort")
                 .unwrap_or_else(|| "high".to_string());
 
-            let base_url =
-                codex_active_provider_string_field(config_str, "base_url").unwrap_or_default();
+            let base_url = codex_active_provider_string_field(config_str, "base_url")
+                .or_else(|| codex_inherited_base_url_by_env_key(config_str))
+                .unwrap_or_default();
 
             let config_with_route =
                 save_route_to_config(&existing, &route_id, &base_url, &env_key, &model, &effort)?;
@@ -814,8 +856,12 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
                 switch_codex_profile(&config_with_route, &route_id, Some(&model), Some(&effort))?;
 
             // Restore experimental_bearer_token if it exists in the provider's config
-            if let Some(token) = crate::codex_config::extract_codex_experimental_bearer_token(config_str) {
-                if let Ok(updated) = crate::codex_config::set_codex_experimental_bearer_token(&final_config, &token) {
+            if let Some(token) =
+                crate::codex_config::extract_codex_experimental_bearer_token(config_str)
+            {
+                if let Ok(updated) =
+                    crate::codex_config::set_codex_experimental_bearer_token(&final_config, &token)
+                {
                     final_config = updated;
                 }
             }
@@ -1639,6 +1685,31 @@ mod tests {
         let stripped =
             remove_common_config_from_settings(&AppType::Codex, &applied, snippet).unwrap();
         assert_eq!(stripped, settings);
+    }
+
+    #[test]
+    fn codex_base_url_inherits_from_same_env_key_provider() {
+        let config = r#"model_provider = "child"
+model = "gpt-5.5"
+
+[model_providers.parent]
+name = "parent"
+base_url = "https://parent.example/v1"
+env_key = "SHARED_CODEX_KEY"
+wire_api = "responses"
+
+[model_providers.child]
+name = "child"
+env_key = "SHARED_CODEX_KEY"
+wire_api = "responses"
+"#;
+
+        assert_eq!(
+            codex_active_provider_string_field(config, "base_url")
+                .or_else(|| codex_inherited_base_url_by_env_key(config))
+                .as_deref(),
+            Some("https://parent.example/v1")
+        );
     }
 
     #[test]

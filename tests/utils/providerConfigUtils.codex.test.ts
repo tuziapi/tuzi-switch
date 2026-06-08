@@ -168,6 +168,48 @@ describe("Codex TOML utils", () => {
     expect(extractCodexBaseUrl(output)).toBe("https://api.example.com/v1");
   });
 
+  it("inherits base_url from the previous model provider with the same env_key", () => {
+    const input = [
+      'model_provider = "child"',
+      'model = "gpt-5.4"',
+      "",
+      "[model_providers.parent]",
+      'name = "parent"',
+      'base_url = "https://parent.example/v1"',
+      'env_key = "SHARED_CODEX_KEY"',
+      'wire_api = "responses"',
+      "",
+      "[model_providers.child]",
+      'name = "child"',
+      'env_key = "SHARED_CODEX_KEY"',
+      'wire_api = "responses"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexBaseUrl(input)).toBe("https://parent.example/v1");
+  });
+
+  it("does not inherit base_url from another model provider with a different env_key", () => {
+    const input = [
+      'model_provider = "child"',
+      'model = "gpt-5.4"',
+      "",
+      "[model_providers.parent]",
+      'name = "parent"',
+      'base_url = "https://parent.example/v1"',
+      'env_key = "PARENT_CODEX_KEY"',
+      'wire_api = "responses"',
+      "",
+      "[model_providers.child]",
+      'name = "child"',
+      'env_key = "CHILD_CODEX_KEY"',
+      'wire_api = "responses"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexBaseUrl(input)).toBeUndefined();
+  });
+
   it("recovers a single misplaced base_url from another section", () => {
     const input = [
       'model_provider = "custom"',
