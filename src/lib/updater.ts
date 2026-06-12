@@ -60,6 +60,23 @@ const RELEASES_URL = "https://github.com/tuziapi/tuzi-switch/releases";
 const GITHUB_LATEST_RELEASE_API =
   "https://api.github.com/repos/tuziapi/tuzi-switch/releases/latest";
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeout: number,
+  message: string,
+): Promise<T> {
+  let timer: number | undefined;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error(message)), timeout);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+    }
+  });
+}
+
 function mapUpdateHandle(raw: Update): UpdateHandle {
   return {
     version: raw.version ?? "",
@@ -186,19 +203,27 @@ export async function checkForUpdate(
   | { status: "up-to-date" }
   | { status: "available"; info: UpdateInfo; update: UpdateHandle }
 > {
-  const { check } = await import("@tauri-apps/plugin-updater");
-  const currentVersion = await getCurrentVersion();
-
   const timeout = opts.timeout ?? 30000;
+  const currentVersion = await withTimeout(
+    getCurrentVersion(),
+    timeout,
+    "Get current app version timed out",
+  ).catch(() => "");
+
   let update: Update | null;
   try {
-    update = await check({ timeout } as any);
+    const { check } = await import("@tauri-apps/plugin-updater");
+    update = await withTimeout(
+      check({ timeout } as any),
+      timeout,
+      "Tauri updater check timed out",
+    );
   } catch (error) {
     console.warn("Tauri updater check failed, falling back to GitHub release", error);
     return await checkGitHubReleaseFallback(currentVersion, timeout);
   }
   if (!update) {
-    return { status: "up-to-date" };
+    return await checkGitHubReleaseFallback(currentVersion, timeout);
   }
 
   const mapped = mapUpdateHandle(update);

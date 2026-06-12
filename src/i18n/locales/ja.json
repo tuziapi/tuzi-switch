@@ -641,6 +641,7 @@
     "updateBadge": "更新あり",
     "updateFailed": "更新のインストールに失敗しました。ダウンロードページを開こうとしました。",
     "updatePageOpened": "ダウンロードページを開きました。新しいバージョンを手動でインストールしてください。",
+    "updateInstalledRestarting": "更新をインストールしました。アプリを再起動しています。自動で再起動しない場合は、手動で終了して開き直してください。",
     "checkUpdateFailed": "更新の確認に失敗しました。時間をおいて再試行してください。",
     "openReleaseNotesFailed": "リリースノートの表示に失敗しました",
     "releaseNotes": "リリースノート",

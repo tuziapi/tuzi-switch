@@ -641,6 +641,7 @@
     "updateBadge": "有更新可用",
     "updateFailed": "更新安装失败，已尝试打开下载页面。",
     "updatePageOpened": "已打开新版本下载页面，请下载并手动安装。",
+    "updateInstalledRestarting": "更新已安装，正在重启应用。如未自动重启，请手动退出后重新打开。",
     "checkUpdateFailed": "检查更新失败，请稍后重试。",
     "openReleaseNotesFailed": "打开更新日志失败",
     "releaseNotes": "更新日志",

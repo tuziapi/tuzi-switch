@@ -641,6 +641,7 @@
     "updateBadge": "Update available",
     "updateFailed": "Update installation failed, attempted to open download page.",
     "updatePageOpened": "Opened the download page. Please download and install the new version manually.",
+    "updateInstalledRestarting": "Update installed. Restarting the app. If it does not restart automatically, please quit and reopen it.",
     "checkUpdateFailed": "Failed to check for updates, please try again later.",
     "openReleaseNotesFailed": "Failed to open release notes",
     "releaseNotes": "Release Notes",

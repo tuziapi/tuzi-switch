@@ -170,7 +170,11 @@ jobs:
           $msi = Get-ChildItem "$bundle/msi/*.msi" | Select-Object -First 1
           if (-not $msi) { throw "MSI installer not found" }
           Copy-Item $msi.FullName "release-assets/tuzi-switch-windows-x86_64.msi"
-          if (Test-Path "$($msi.FullName).sig") {
+          $msiUpdate = Get-ChildItem "$bundle/msi/*.msi.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($msiUpdate -and (Test-Path "$($msiUpdate.FullName).sig")) {
+            Copy-Item $msiUpdate.FullName "release-assets/tuzi-switch-windows-x86_64.msi.zip"
+            Copy-Item "$($msiUpdate.FullName).sig" "release-assets/tuzi-switch-windows-x86_64.msi.zip.sig"
+          } elseif (Test-Path "$($msi.FullName).sig") {
             Copy-Item "$($msi.FullName).sig" "release-assets/tuzi-switch-windows-x86_64.msi.sig"
           }
           $setup = Get-ChildItem "$bundle/nsis/*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -345,7 +349,12 @@ jobs:
               url: `${baseUrl}/tuzi-switch-macos-aarch64.app.tar.gz`,
             };
           }
-          if (fs.existsSync("dist/tuzi-switch-windows-x86_64.msi") && hasSignature("tuzi-switch-windows-x86_64.msi")) {
+          if (fs.existsSync("dist/tuzi-switch-windows-x86_64.msi.zip") && hasSignature("tuzi-switch-windows-x86_64.msi.zip")) {
+            platforms["windows-x86_64"] = {
+              signature: signature("tuzi-switch-windows-x86_64.msi.zip"),
+              url: `${baseUrl}/tuzi-switch-windows-x86_64.msi.zip`,
+            };
+          } else if (fs.existsSync("dist/tuzi-switch-windows-x86_64.msi") && hasSignature("tuzi-switch-windows-x86_64.msi")) {
             platforms["windows-x86_64"] = {
               signature: signature("tuzi-switch-windows-x86_64.msi"),
               url: `${baseUrl}/tuzi-switch-windows-x86_64.msi`,

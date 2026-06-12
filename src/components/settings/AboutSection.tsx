@@ -291,6 +291,10 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
             closeButton: true,
           });
         } else {
+          setIsDownloading(false);
+          toast.success(t("settings.updateInstalledRestarting"), {
+            closeButton: true,
+          });
           await relaunchApp();
         }
       } catch (error) {

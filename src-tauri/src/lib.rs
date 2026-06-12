@@ -1427,6 +1427,11 @@ pub fn run() {
     app.run(|app_handle, event| {
         // 处理退出请求（所有平台）
         if let RunEvent::ExitRequested { api, code, .. } = &event {
+            if *code == Some(tauri::RESTART_EXIT_CODE) {
+                log::info!("收到应用重启请求，交由 Tauri 原生重启流程处理");
+                return;
+            }
+
             // code 为 None 表示运行时自动触发（如隐藏窗口的 WebView 被回收导致无存活窗口），
             // 此时应仅阻止退出、保持托盘后台运行；
             // code 为 Some(_) 表示用户主动调用 app.exit() 退出（如托盘菜单"退出"），
