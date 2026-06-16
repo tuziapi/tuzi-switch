@@ -1235,7 +1235,7 @@ function App() {
                   <Settings className="w-4 h-4" />
                 </Button>
                 <UpdateBadge
-                  onClick={() => {
+                  onOpenAbout={() => {
                     setSettingsDefaultTab("about");
                     setCurrentView("settings");
                   }}

@@ -468,6 +468,8 @@ const TOML_MODEL_PROVIDER_LINE_PATTERN =
   /^\s*model_provider\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
 const TOML_ENV_KEY_PATTERN =
   /^\s*env_key\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
+const TOML_ENV_KEY_REPLACE_PATTERN =
+  /^(\s*env_key\s*=\s*)(?:"(?:\\.|[^"\\\r\n])*"|'[^'\r\n]*')(\s*(?:#.*)?)$/;
 const CODEX_RESERVED_MODEL_PROVIDER_IDS = new Set([
   "amazon-bedrock",
   "openai",
@@ -1441,4 +1443,132 @@ export const getCodexProviderEnvKeyFromSettings = (
 
   const envKey = (envObj as Record<string, unknown>).envKey;
   return typeof envKey === "string" ? envKey.trim() : "";
+};
+
+export const setCodexEnvKey = (configText: string, envKey: string): string => {
+  const trimmed = envKey.trim();
+  const normalizedText = normalizeTomlText(configText);
+  const lines = normalizedText ? normalizedText.split("\n") : [];
+  const targetSectionName = getCodexProviderSectionName(normalizedText);
+  const replacementLine = `env_key = "${escapeTomlBasicString(trimmed)}"`;
+
+  if (!trimmed) {
+    if (!normalizedText) return normalizedText;
+    if (targetSectionName) {
+      const sectionRange = getTomlSectionRange(lines, targetSectionName);
+      const targetIndex = sectionRange
+        ? findTomlLineInRange(
+            lines,
+            TOML_ENV_KEY_REPLACE_PATTERN,
+            sectionRange.bodyStartIndex,
+            sectionRange.bodyEndIndex,
+          )
+        : -1;
+      if (targetIndex !== -1) {
+        lines.splice(targetIndex, 1);
+        return finalizeTomlText(lines);
+      }
+    }
+
+    const topLevelIndex = findTomlLineInRange(
+      lines,
+      TOML_ENV_KEY_REPLACE_PATTERN,
+      0,
+      getTopLevelEndIndex(lines),
+    );
+    if (topLevelIndex !== -1) {
+      lines.splice(topLevelIndex, 1);
+    }
+    return finalizeTomlText(lines);
+  }
+
+  if (targetSectionName) {
+    let targetSectionRange = getTomlSectionRange(lines, targetSectionName);
+    const targetIndex = targetSectionRange
+      ? findTomlLineInRange(
+          lines,
+          TOML_ENV_KEY_REPLACE_PATTERN,
+          targetSectionRange.bodyStartIndex,
+          targetSectionRange.bodyEndIndex,
+        )
+      : -1;
+
+    if (targetIndex !== -1) {
+      lines[targetIndex] = lines[targetIndex].replace(
+        TOML_ENV_KEY_REPLACE_PATTERN,
+        `$1"${escapeTomlBasicString(trimmed)}"$2`,
+      );
+      return finalizeTomlText(lines);
+    }
+
+    if (targetSectionRange) {
+      const insertIndex = getTomlSectionInsertIndex(lines, targetSectionRange);
+      lines.splice(insertIndex, 0, replacementLine);
+      return finalizeTomlText(lines);
+    }
+
+    if (lines.length > 0 && lines[lines.length - 1].trim() !== "") {
+      lines.push("");
+    }
+    lines.push(`[${targetSectionName}]`, replacementLine);
+    return finalizeTomlText(lines);
+  }
+
+  const topLevelEndIndex = getTopLevelEndIndex(lines);
+  const topLevelIndex = findTomlLineInRange(
+    lines,
+    TOML_ENV_KEY_REPLACE_PATTERN,
+    0,
+    topLevelEndIndex,
+  );
+  if (topLevelIndex !== -1) {
+    lines[topLevelIndex] = lines[topLevelIndex].replace(
+      TOML_ENV_KEY_REPLACE_PATTERN,
+      `$1"${escapeTomlBasicString(trimmed)}"$2`,
+    );
+    return finalizeTomlText(lines);
+  }
+
+  if (lines.length === 0) return `${replacementLine}\n`;
+  lines.splice(topLevelEndIndex, 0, replacementLine);
+  return finalizeTomlText(lines);
+};
+
+export const isCodexEnvKeyDuplicate = (
+  envKey: string,
+  options: {
+    currentEnvKey?: string;
+    currentProviderId?: string;
+    providers?: Record<string, { settingsConfig?: unknown }>;
+    shellEnvKeys?: Record<string, string>;
+  } = {},
+): boolean => {
+  const normalizedEnvKey = envKey.trim();
+  if (!normalizedEnvKey) return false;
+
+  const currentEnvKey = options.currentEnvKey?.trim();
+  const currentProviderId = options.currentProviderId;
+
+  for (const [providerId, provider] of Object.entries(
+    options.providers ?? {},
+  )) {
+    if (currentProviderId && providerId === currentProviderId) {
+      continue;
+    }
+
+    if (
+      getCodexProviderEnvKeyFromSettings(provider.settingsConfig) ===
+      normalizedEnvKey
+    ) {
+      return true;
+    }
+  }
+
+  return (
+    normalizedEnvKey !== currentEnvKey &&
+    Object.prototype.hasOwnProperty.call(
+      options.shellEnvKeys ?? {},
+      normalizedEnvKey,
+    )
+  );
 };

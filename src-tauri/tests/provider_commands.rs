@@ -83,11 +83,11 @@ requires_openai_auth = true
         .and_then(|value| value.as_str())
         .expect("imported codex config");
     assert!(
-        imported_config.contains("model_provider = \"provider-tuzi02\""),
+        imported_config.contains("model_provider = \"provider-tuzi01\""),
         "imported user tuzi config should use a tuzi-switch numbered provider"
     );
     assert!(
-        imported_config.contains("env_key = \"TUZI02_CODEX_API_KEY\""),
+        imported_config.contains("env_key = \"TUZI01_CODEX_API_KEY\""),
         "imported user tuzi config should receive a matching numbered env key"
     );
 
@@ -558,12 +558,12 @@ requires_openai_auth = true
         None,
     )
     .expect("save codex route");
-    assert_eq!(saved_route.route_id, "provider-tuzi02");
-    assert_eq!(saved_route.env_key, "TUZI02_CODEX_API_KEY");
+    assert_eq!(saved_route.route_id, "provider-tuzi01");
+    assert_eq!(saved_route.env_key, "TUZI01_CODEX_API_KEY");
     assert!(
         saved_route
             .config
-            .contains("model_provider = \"provider-tuzi02\""),
+            .contains("model_provider = \"provider-tuzi01\""),
         "returned config should match the normalized route so provider storage does not jump again"
     );
 
@@ -574,12 +574,17 @@ requires_openai_auth = true
         "existing user-owned tuzi provider must be preserved"
     );
     assert!(
-        config_text.contains("[model_providers.provider-tuzi02]"),
+        config_text.contains("[model_providers.provider-tuzi01]"),
         "save_codex_route should register the next tuzi-switch route"
     );
     assert!(
-        config_text.contains("env_key = \"TUZI02_CODEX_API_KEY\""),
+        config_text.contains("env_key = \"TUZI01_CODEX_API_KEY\""),
         "save_codex_route should write the numbered env key"
+    );
+    let zshrc = std::fs::read_to_string(_home.join(".zshrc")).expect("read managed env rc");
+    assert!(
+        zshrc.contains("export TUZI01_CODEX_API_KEY=sk-test"),
+        "save_codex_route should create the matching managed env key"
     );
 }
 

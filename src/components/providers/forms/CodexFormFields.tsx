@@ -38,6 +38,11 @@ interface EndpointCandidate {
 
 interface CodexFormFieldsProps {
   providerId?: string;
+  // Environment variable name
+  codexEnvKey: string;
+  onEnvKeyChange: (key: string) => void;
+  envKeyError?: string;
+
   // API Key
   codexApiKey: string;
   onApiKeyChange: (key: string) => void;
@@ -100,6 +105,9 @@ function catalogRowsMatchModels(
 
 export function CodexFormFields({
   providerId,
+  codexEnvKey,
+  onEnvKeyChange,
+  envKeyError,
   codexApiKey,
   onApiKeyChange,
   category,
@@ -240,6 +248,37 @@ export function CodexFormFields({
 
   return (
     <>
+      <div className="space-y-2">
+        <FormLabel htmlFor="codexEnvKey">
+          {t("providerForm.envKeyName", {
+            defaultValue: "环境变量名",
+          })}
+        </FormLabel>
+        <Input
+          id="codexEnvKey"
+          value={codexEnvKey}
+          onChange={(event) =>
+            onEnvKeyChange(event.target.value.replace(/[^A-Za-z0-9_]/g, ""))
+          }
+          placeholder="TUZI01_CODEX_API_KEY"
+          autoCapitalize="characters"
+          spellCheck={false}
+          aria-invalid={Boolean(envKeyError)}
+        />
+        {envKeyError ? (
+          <p className="text-xs leading-relaxed text-destructive">
+            {envKeyError}
+          </p>
+        ) : (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {t("providerForm.envKeyHint", {
+              defaultValue:
+                "用于写入 shell 环境变量，并同步到 config.toml 的 env_key",
+            })}
+          </p>
+        )}
+      </div>
+
       {/* Codex API Key 输入框 */}
       <ApiKeySection
         id="codexApiKey"

@@ -63,12 +63,7 @@ fn codex_active_provider_string_field(config_text: &str, field: &str) -> Option<
 }
 
 fn codex_tuzi_index(route_id: &str, env_key: &str) -> Option<u8> {
-    if let Some(suffix) = route_id.strip_prefix("provider-tuzi") {
-        if suffix.len() == 2 && suffix.chars().all(|ch| ch.is_ascii_digit()) {
-            return suffix.parse::<u8>().ok().filter(|index| *index > 0);
-        }
-    }
-
+    let env_key = env_key.trim();
     if env_key.starts_with("TUZI")
         && env_key.ends_with("_CODEX_API_KEY")
         && env_key.len() >= "TUZI01_CODEX_API_KEY".len()
@@ -76,6 +71,12 @@ fn codex_tuzi_index(route_id: &str, env_key: &str) -> Option<u8> {
         let index_part = &env_key["TUZI".len()..env_key.len() - "_CODEX_API_KEY".len()];
         if index_part.len() == 2 && index_part.chars().all(|ch| ch.is_ascii_digit()) {
             return index_part.parse::<u8>().ok().filter(|index| *index > 0);
+        }
+    }
+
+    if let Some(suffix) = route_id.strip_prefix("provider-tuzi") {
+        if suffix.len() == 2 && suffix.chars().all(|ch| ch.is_ascii_digit()) {
+            return suffix.parse::<u8>().ok().filter(|index| *index > 0);
         }
     }
 

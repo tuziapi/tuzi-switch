@@ -8,9 +8,11 @@ import {
   extractCodexModelName,
   extractCodexWireApi,
   setCodexBaseUrl,
+  setCodexEnvKey,
   setCodexModelCatalogJson,
   setCodexModelName,
   setCodexWireApi,
+  isCodexEnvKeyDuplicate,
   updateCodexExperimentalBearerToken,
 } from "@/utils/providerConfigUtils";
 
@@ -97,6 +99,100 @@ describe("Codex TOML utils", () => {
     ).toBe("LEGACY_SINGLE_KEY");
   });
 
+  it("writes env_key into the active provider section without touching inactive providers", () => {
+    const input = [
+      'model_provider = "active"',
+      'env_key = "TOP_LEVEL_KEY"',
+      "",
+      "[model_providers.inactive]",
+      'env_key = "INACTIVE_KEY"',
+      "",
+      "[model_providers.active]",
+      'name = "Active"',
+      'env_key = "OLD_ACTIVE_KEY" # keep comment',
+      "",
+    ].join("\n");
+
+    const output = setCodexEnvKey(input, "TUZI02_CODEX_API_KEY");
+
+    expect(output).toContain('env_key = "TOP_LEVEL_KEY"');
+    expect(output).toContain(
+      '[model_providers.inactive]\nenv_key = "INACTIVE_KEY"',
+    );
+    expect(output).toContain(
+      '[model_providers.active]\nname = "Active"\nenv_key = "TUZI02_CODEX_API_KEY" # keep comment',
+    );
+    expect(getCodexEnvKey(output)).toBe("TUZI02_CODEX_API_KEY");
+  });
+
+  it("adds env_key to the active provider section when it is missing", () => {
+    const input = [
+      'model_provider = "active"',
+      "",
+      "[model_providers.active]",
+      'name = "Active"',
+      'wire_api = "responses"',
+      "",
+    ].join("\n");
+
+    const output = setCodexEnvKey(input, "CUSTOM_CODEX_API_KEY");
+
+    expect(output).toContain(
+      '[model_providers.active]\nname = "Active"\nwire_api = "responses"\nenv_key = "CUSTOM_CODEX_API_KEY"',
+    );
+    expect(getCodexEnvKey(output)).toBe("CUSTOM_CODEX_API_KEY");
+  });
+
+  it("detects duplicate codex env keys across providers and shell env", () => {
+    const providers = {
+      current: {
+        settingsConfig: {
+          config: [
+            'model_provider = "current"',
+            "",
+            "[model_providers.current]",
+            'env_key = "CURRENT_CODEX_API_KEY"',
+            "",
+          ].join("\n"),
+        },
+      },
+      other: {
+        settingsConfig: {
+          config: [
+            'model_provider = "other"',
+            "",
+            "[model_providers.other]",
+            'env_key = "OTHER_CODEX_API_KEY"',
+            "",
+          ].join("\n"),
+        },
+      },
+    };
+
+    expect(
+      isCodexEnvKeyDuplicate("OTHER_CODEX_API_KEY", {
+        currentProviderId: "current",
+        providers,
+      }),
+    ).toBe(true);
+    expect(
+      isCodexEnvKeyDuplicate("SHELL_CODEX_API_KEY", {
+        currentEnvKey: "CURRENT_CODEX_API_KEY",
+        currentProviderId: "current",
+        providers,
+        shellEnvKeys: { SHELL_CODEX_API_KEY: "secret" },
+      }),
+    ).toBe(true);
+    expect(
+      isCodexEnvKeyDuplicate("CURRENT_CODEX_API_KEY", {
+        currentEnvKey: "CURRENT_CODEX_API_KEY",
+        currentProviderId: "current",
+        providers,
+        shellEnvKeys: { CURRENT_CODEX_API_KEY: "secret" },
+      }),
+    ).toBe(false);
+  });
+
   it("removes base_url line when set to empty", () => {
     const input = [
       'model_provider = "openai"',
@@ -166,6 +262,32 @@ describe("Codex TOML utils", () => {
       '[model_providers.custom]\nname = "custom"\nwire_api = "responses"\nbase_url = "https://api.example.com/v1"',
     );
     expect(extractCodexBaseUrl(output)).toBe("https://api.example.com/v1");
+  });
+
+  it("updates base_url only for the active model_provider when multiple providers exist", () => {
+    const input = [
+      'model_provider = "custom"',
+      "",
+      "[model_providers.tuzi]",
+      'name = "tuzi"',
+      'base_url = "https://api.tu-zi.com/v1"',
+      "",
+      "[model_providers.custom]",
+      'name = "custom"',
+      'base_url = "https://old.example/coding"',
+      'wire_api = "responses"',
+      "",
+    ].join("\n");
+
+    const output = setCodexBaseUrl(input, "https://api.tu-zi.com/coding");
+
+    expect(output).toContain(
+      '[model_providers.tuzi]\nname = "tuzi"\nbase_url = "https://api.tu-zi.com/v1"',
+    );
+    expect(output).toContain(
+      '[model_providers.custom]\nname = "custom"\nbase_url = "https://api.tu-zi.com/coding"',
+    );
+    expect(extractCodexBaseUrl(output)).toBe("https://api.tu-zi.com/coding");
   });
 
   it("recovers a single misplaced base_url from another section", () => {

@@ -68,9 +68,13 @@ import {
 import type { UniversalProviderPreset } from "@/config/universalProviderPresets";
 import {
   applyTemplateValues,
+  extractCodexBaseUrl,
   extractCodexWireApi,
   getCodexProviderEnvKeyFromSettings,
   hasApiKeyField,
+  isCodexEnvKeyDuplicate,
+  setCodexBaseUrl as setCodexBaseUrlInConfig,
+  setCodexEnvKey as setCodexEnvKeyInConfig,
   setCodexModelName as setCodexModelNameInConfig,
   setCodexWireApi,
 } from "@/utils/providerConfigUtils";
@@ -263,6 +267,7 @@ const extractCodexRouteId = (config: string): string => {
 
 const CODEX_TUZI_ROUTE_PREFIX = "provider-tuzi";
 const CODEX_TUZI_ENV_PATTERN = /^TUZI(\d{2})_CODEX_API_KEY$/;
+const CODEX_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const isCodexTuziPreset = (preset: CodexProviderPreset) =>
   preset.icon === "tuzi" ||
@@ -276,12 +281,13 @@ const formatCodexTuziEnvKey = (index: number) =>
   `TUZI${String(index).padStart(2, "0")}_CODEX_API_KEY`;
 
 const extractCodexTuziIndex = (routeId: string, envKey: string): number => {
-  const routeMatch = routeId.match(/^provider-tuzi(\d{2})$/);
-  if (routeMatch) {
-    return Number.parseInt(routeMatch[1], 10);
+  const trimmedEnvKey = envKey.trim();
+  const envMatch = trimmedEnvKey.match(CODEX_TUZI_ENV_PATTERN);
+  if (envMatch) {
+    return Number.parseInt(envMatch[1], 10);
   }
-  const envMatch = envKey.match(CODEX_TUZI_ENV_PATTERN);
-  return envMatch ? Number.parseInt(envMatch[1], 10) : 0;
+  const routeMatch = routeId.match(/^provider-tuzi(\d{2})$/);
+  return routeMatch ? Number.parseInt(routeMatch[1], 10) : 0;
 };
 
 const resolveNextCodexTuziRoute = (
@@ -636,7 +642,7 @@ function ProviderFormFull({
   const { data: existingCodexProviders } = useQuery({
     queryKey: ["codexProviders", appId],
     queryFn: () => providersApi.getAll(appId),
-    enabled: appId === "codex" && !initialData,
+    enabled: appId === "codex",
   });
 
   const { data: existingProvidersForNameCheck } = useQuery({
@@ -659,7 +665,7 @@ function ProviderFormFull({
   const { data: shellEnvKeys } = useQuery({
     queryKey: ["codexShellEnvKeys"],
     queryFn: () => invoke<Record<string, string>>("read_all_codex_env_keys"),
-    enabled: appId === "codex" && !initialData,
+    enabled: appId === "codex",
   });
 
   const {
@@ -673,6 +679,7 @@ function ProviderFormFull({
     codexAuthError,
     setCodexAuth,
     setCodexConfig,
+    setCodexEnvKey,
     setCodexCatalogModels,
     handleCodexApiKeyChange,
     handleCodexBaseUrlChange,
@@ -684,6 +691,7 @@ function ProviderFormFull({
     useState<CodexChatReasoning>(
       () => initialData?.meta?.codexChatReasoning ?? {},
     );
+  const [codexEnvKeyError, setCodexEnvKeyError] = useState("");
   const [localCodexApiFormat, setLocalCodexApiFormat] =
     useState<CodexApiFormat>(() => {
       if (initialData?.meta?.apiFormat === "openai_chat") {
@@ -727,6 +735,46 @@ function ProviderFormFull({
     },
     [setCodexConfig, debouncedValidate],
   );
+
+  const handleCodexEnvKeyChange = useCallback(
+    (value: string) => {
+      const sanitized = value.replace(/[^A-Za-z0-9_]/g, "");
+      setCodexEnvKey(sanitized);
+      setCodexEnvKeyError("");
+      setCodexConfig((prev) => {
+        const updated = setCodexEnvKeyInConfig(prev, sanitized);
+        debouncedValidate(updated);
+        return updated;
+      });
+    },
+    [setCodexConfig, setCodexEnvKey, debouncedValidate],
+  );
+
+  useEffect(() => {
+    if (appId !== "codex" || category === "official") return;
+
+    const selectedBaseUrl = codexBaseUrl.trim();
+    if (!selectedBaseUrl) return;
+
+    const configBaseUrl = extractCodexBaseUrl(codexConfig)?.trim() ?? "";
+    if (configBaseUrl === selectedBaseUrl) return;
+
+    setCodexConfig((prev) => {
+      const prevBaseUrl = extractCodexBaseUrl(prev)?.trim() ?? "";
+      if (prevBaseUrl === selectedBaseUrl) return prev;
+
+      const updated = setCodexBaseUrlInConfig(prev, selectedBaseUrl);
+      debouncedValidate(updated);
+      return updated;
+    });
+  }, [
+    appId,
+    category,
+    codexBaseUrl,
+    codexConfig,
+    setCodexConfig,
+    debouncedValidate,
+  ]);
 
   const handleFetchModels = useCallback(() => {
     if (!codexBaseUrl || !codexApiKey) {
@@ -1198,6 +1246,61 @@ function ProviderFormFull({
           return;
         }
       }
+
+      const submittedEnvKey = (
+        getCodexProviderEnvKeyFromSettings({
+          config: codexConfig,
+          env: { envKey: codexEnvKey },
+        }) || codexEnvKey
+      ).trim();
+
+      if (category !== "official" && !submittedEnvKey) {
+        const message = t("providerForm.envKeyRequired", {
+          defaultValue: "请填写环境变量名",
+        });
+        setCodexEnvKeyError(message);
+        toast.error(message);
+        return;
+      }
+
+      if (submittedEnvKey && !CODEX_ENV_KEY_PATTERN.test(submittedEnvKey)) {
+        const message = t("providerForm.envKeyInvalid", {
+          defaultValue:
+            "环境变量名只能以字母或下划线开头，并且只能包含字母、数字、下划线",
+        });
+        setCodexEnvKeyError(message);
+        toast.error(message);
+        return;
+      }
+
+      const initialEnvKey = getCodexProviderEnvKeyFromSettings(
+        initialData?.settingsConfig,
+      );
+      const existingExactEnvValue =
+        submittedEnvKey && submittedEnvKey !== initialEnvKey
+          ? await invoke<string | null>("read_codex_env_key", {
+              envKey: submittedEnvKey,
+            }).catch(() => null)
+          : null;
+      if (
+        submittedEnvKey &&
+        (existingExactEnvValue ||
+          isCodexEnvKeyDuplicate(submittedEnvKey, {
+            currentEnvKey: initialEnvKey,
+            currentProviderId: providerId,
+            providers: existingCodexProviders,
+            shellEnvKeys,
+          }))
+      ) {
+        const message = t("providerForm.envKeyDuplicate", {
+          envKey: submittedEnvKey,
+          defaultValue: `环境变量 ${submittedEnvKey} 已存在，请换一个环境变量名`,
+        });
+        setCodexEnvKeyError(message);
+        toast.error(message);
+        return;
+      }
+      setCodexEnvKeyError("");
     }
 
     // opencode / openclaw / hermes: providerKey 相关
@@ -1422,6 +1525,12 @@ function ProviderFormFull({
           category !== "official" && (codexConfig ?? "").trim()
             ? setCodexWireApi(codexConfig ?? "", "responses")
             : (codexConfig ?? "");
+        if (category !== "official") {
+          normalizedCodexConfig = setCodexBaseUrlInConfig(
+            normalizedCodexConfig,
+            codexBaseUrl,
+          );
+        }
         const normalizedCatalogModels =
           category !== "official" && localCodexApiFormat === "openai_chat"
             ? normalizeCodexCatalogModelsForSave(codexCatalogModels)
@@ -2534,6 +2643,9 @@ function ProviderFormFull({
           {appId === "codex" && (
             <CodexFormFields
               providerId={providerId}
+              codexEnvKey={codexEnvKey}
+              onEnvKeyChange={handleCodexEnvKeyChange}
+              envKeyError={codexEnvKeyError}
               codexApiKey={codexApiKey}
               onApiKeyChange={handleCodexApiKeyChange}
               category={category}

@@ -592,11 +592,11 @@ requires_openai_auth = true
         .and_then(|value| value.as_str())
         .expect("saved codex config");
     assert!(
-        saved_config.contains("model_provider = \"provider-tuzi02\""),
-        "new tuzi provider should avoid seeded provider-tuzi01 and legacy tuzi"
+        saved_config.contains("model_provider = \"provider-tuzi01\""),
+        "new tuzi provider should avoid existing numbered route and legacy tuzi key"
     );
     assert!(
-        saved_config.contains("env_key = \"TUZI02_CODEX_API_KEY\""),
+        saved_config.contains("env_key = \"TUZI01_CODEX_API_KEY\""),
         "new tuzi provider should receive the matching numbered env key"
     );
 
@@ -607,7 +607,7 @@ requires_openai_auth = true
         "existing user-owned tuzi provider must be preserved"
     );
     assert!(
-        live_config.contains("[model_providers.provider-tuzi02]"),
+        live_config.contains("[model_providers.provider-tuzi01]"),
         "numbered tuzi switch provider should be registered separately"
     );
 }

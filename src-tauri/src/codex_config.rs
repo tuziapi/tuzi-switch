@@ -85,25 +85,56 @@ pub fn is_new_profile_format() -> bool {
 // ---------------------------------------------------------------------------
 
 fn get_shell_rc_path() -> PathBuf {
-    let shell = std::env::var("SHELL").unwrap_or_default();
+    get_default_shell_rc_path()
+}
+
+fn get_default_shell_rc_path() -> PathBuf {
     let home = get_home_dir();
+    if cfg!(target_os = "macos") {
+        return home.join(".zshrc");
+    }
+
+    let shell = std::env::var("SHELL").unwrap_or_default();
     if shell.contains("zsh") {
         home.join(".zshrc")
-    } else {
+    } else if shell.contains("bash") {
         home.join(".bashrc")
+    } else {
+        home.join(".profile")
     }
+}
+
+fn shell_rc_candidates() -> Vec<PathBuf> {
+    if cfg!(target_os = "windows") {
+        return Vec::new();
+    }
+
+    let home = get_home_dir();
+    let primary = get_default_shell_rc_path();
+    let mut candidates = vec![
+        primary,
+        home.join(".zshrc"),
+        home.join(".bashrc"),
+        home.join(".bash_profile"),
+        home.join(".profile"),
+    ];
+    candidates.dedup();
+    candidates
 }
 
 pub fn read_managed_env_block() -> HashMap<String, String> {
     if cfg!(target_os = "windows") {
         return read_windows_env_keys();
     }
-    let rc_path = get_shell_rc_path();
-    let content = match fs::read_to_string(&rc_path) {
-        Ok(c) => c,
-        Err(_) => return HashMap::new(),
-    };
-    parse_managed_block(&content)
+    let mut result = HashMap::new();
+    for rc_path in shell_rc_candidates() {
+        let Ok(content) = fs::read_to_string(&rc_path) else {
+            continue;
+        };
+        result.extend(parse_managed_block(&content));
+        result.extend(parse_codex_env_section(&content));
+    }
+    result
 }
 
 pub fn read_managed_env_key(env_key: &str) -> Option<String> {
@@ -113,7 +144,19 @@ pub fn read_managed_env_key(env_key: &str) -> Option<String> {
     if cfg!(target_os = "windows") {
         return std::env::var(env_key).ok().filter(|v| !v.is_empty());
     }
-    read_managed_env_block().remove(env_key)
+    if let Some(value) = read_managed_env_block().remove(env_key) {
+        return Some(value);
+    }
+
+    for rc_path in shell_rc_candidates() {
+        if let Some(value) = fs::read_to_string(&rc_path)
+            .ok()
+            .and_then(|content| read_env_key_from_shell_rc(&content, env_key))
+        {
+            return Some(value);
+        }
+    }
+    None
 }
 
 pub fn write_managed_env_key(env_key: &str, value: &str) -> Result<(), AppError> {
@@ -123,9 +166,14 @@ pub fn write_managed_env_key(env_key: &str, value: &str) -> Result<(), AppError>
     }
     let rc_path = get_shell_rc_path();
     let content = fs::read_to_string(&rc_path).unwrap_or_default();
-    let mut env_map = parse_managed_block(&content);
-    env_map.insert(env_key.to_string(), value.to_string());
-    let new_content = rebuild_rc_with_managed_block(&content, &env_map);
+    let new_content = if has_codex_env_section(&content) {
+        let content = remove_managed_env_block_key_from_content(&content, env_key);
+        upsert_codex_env_section_key(&content, env_key, value)
+    } else {
+        let mut env_map = parse_managed_block(&content);
+        env_map.insert(env_key.to_string(), value.to_string());
+        rebuild_rc_with_managed_block(&content, &env_map)
+    };
     atomic_write(&rc_path, new_content.as_bytes())
 }
 
@@ -142,7 +190,11 @@ pub fn remove_managed_env_key(env_key: &str) -> Result<(), AppError> {
     };
     let mut env_map = parse_managed_block(&content);
     if env_map.remove(env_key).is_none() {
-        return Ok(());
+        if !has_codex_env_section(&content) {
+            return Ok(());
+        }
+        let new_content = remove_codex_env_section_key(&content, env_key);
+        return atomic_write(&rc_path, new_content.as_bytes());
     }
     let new_content = rebuild_rc_with_managed_block(&content, &env_map);
     atomic_write(&rc_path, new_content.as_bytes())
@@ -168,6 +220,14 @@ fn parse_managed_block(content: &str) -> HashMap<String, String> {
     result
 }
 
+fn remove_managed_env_block_key_from_content(content: &str, env_key: &str) -> String {
+    let mut env_map = parse_managed_block(content);
+    if env_map.remove(env_key).is_none() {
+        return content.to_string();
+    }
+    rebuild_rc_with_managed_block(content, &env_map)
+}
+
 fn parse_export_line(line: &str) -> Option<(String, String)> {
     let rest = line.trim().strip_prefix("export ")?;
     let (key, val_raw) = rest.split_once('=')?;
@@ -181,6 +241,131 @@ fn parse_export_line(line: &str) -> Option<(String, String)> {
         .trim_matches('\'')
         .to_string();
     Some((key.to_string(), val))
+}
+
+fn is_codex_env_section_header(line: &str) -> bool {
+    line.trim()
+        .strip_prefix('#')
+        .map(str::trim)
+        .is_some_and(|title| title.eq_ignore_ascii_case("codex"))
+}
+
+fn is_commented_export_line(line: &str) -> bool {
+    let Some(comment) = line.trim().strip_prefix('#') else {
+        return false;
+    };
+    comment.trim_start().starts_with("export ")
+}
+
+fn find_codex_env_section_range(lines: &[&str]) -> Option<(usize, usize)> {
+    let start = lines
+        .iter()
+        .position(|line| is_codex_env_section_header(line))?;
+    let mut end = lines.len();
+
+    for (index, line) in lines.iter().enumerate().skip(start + 1) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            end = index;
+            break;
+        }
+        if trimmed.starts_with('#')
+            && !is_commented_export_line(line)
+            && !is_codex_env_section_header(line)
+        {
+            end = index;
+            break;
+        }
+    }
+
+    Some((start, end))
+}
+
+fn has_codex_env_section(content: &str) -> bool {
+    content.lines().any(is_codex_env_section_header)
+}
+
+fn parse_codex_env_section(content: &str) -> HashMap<String, String> {
+    let lines: Vec<&str> = content.lines().collect();
+    let Some((start, end)) = find_codex_env_section_range(&lines) else {
+        return HashMap::new();
+    };
+
+    let mut result = HashMap::new();
+    for line in &lines[start + 1..end] {
+        if let Some((key, value)) = parse_export_line(line) {
+            result.insert(key, value);
+        }
+    }
+    result
+}
+
+fn upsert_codex_env_section_key(content: &str, env_key: &str, value: &str) -> String {
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
+    let Some((start, end)) = find_codex_env_section_range(&borrowed) else {
+        let mut result = content.to_string();
+        if !result.is_empty() && !result.ends_with('\n') {
+            result.push('\n');
+        }
+        result.push_str("# Codex\n");
+        result.push_str(&format!("export {env_key}={value}\n"));
+        return result;
+    };
+
+    let replacement = format!("export {env_key}={value}");
+    for line in lines.iter_mut().take(end).skip(start + 1) {
+        if parse_export_line(line).is_some_and(|(key, _)| key == env_key) {
+            *line = replacement;
+            return finish_shell_rc_lines(lines, content.ends_with('\n'));
+        }
+    }
+
+    lines.insert(end, replacement);
+    finish_shell_rc_lines(lines, content.ends_with('\n'))
+}
+
+fn remove_codex_env_section_key(content: &str, env_key: &str) -> String {
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
+    let Some((start, end)) = find_codex_env_section_range(&borrowed) else {
+        return content.to_string();
+    };
+
+    if let Some(index) =
+        lines
+            .iter()
+            .enumerate()
+            .take(end)
+            .skip(start + 1)
+            .find_map(|(index, line)| {
+                parse_export_line(line)
+                    .is_some_and(|(key, _)| key == env_key)
+                    .then_some(index)
+            })
+    {
+        lines.remove(index);
+    }
+
+    finish_shell_rc_lines(lines, content.ends_with('\n'))
+}
+
+fn finish_shell_rc_lines(lines: Vec<String>, had_trailing_newline: bool) -> String {
+    let mut result = lines.join("\n");
+    if had_trailing_newline || !result.is_empty() {
+        result.push('\n');
+    }
+    result
+}
+
+fn read_env_key_from_shell_rc(content: &str, env_key: &str) -> Option<String> {
+    content
+        .lines()
+        .filter_map(parse_export_line)
+        .filter(|(key, _)| key == env_key)
+        .map(|(_, value)| value)
+        .last()
+        .filter(|value| !value.is_empty())
 }
 
 fn rebuild_rc_with_managed_block(content: &str, env_map: &HashMap<String, String>) -> String {
@@ -218,7 +403,7 @@ fn rebuild_rc_with_managed_block(content: &str, env_map: &HashMap<String, String
         let mut keys: Vec<&String> = env_map.keys().collect();
         keys.sort();
         for key in keys {
-            result.push_str(&format!("export {}=\"{}\"\n", key, env_map[key]));
+            result.push_str(&format!("export {}={}\n", key, env_map[key]));
         }
         result.push_str(MANAGED_ENV_END);
         result.push('\n');
@@ -1843,6 +2028,96 @@ pub fn remove_codex_toml_base_url_if(toml_str: &str, predicate: impl Fn(&str) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codex_env_section_reads_and_upserts_custom_env_keys() {
+        let input = "# Codex\nexport CUSTOM_API_KEY=old\n#export OPENAI_BASE_URL=https://api.example\n\n# Other\nexport OTHER_KEY=value\n";
+
+        let parsed = parse_codex_env_section(input);
+        assert_eq!(
+            parsed.get("CUSTOM_API_KEY").map(String::as_str),
+            Some("old")
+        );
+
+        let updated = upsert_codex_env_section_key(input, "TUZI_CODEX_API_KEY", "sk-test");
+        assert!(updated.contains("# Codex\nexport CUSTOM_API_KEY=old\n#export OPENAI_BASE_URL=https://api.example\nexport TUZI_CODEX_API_KEY=sk-test\n\n# Other"));
+
+        let replaced = upsert_codex_env_section_key(&updated, "CUSTOM_API_KEY", "new");
+        assert!(replaced.contains("# Codex\nexport CUSTOM_API_KEY=new\n"));
+        assert_eq!(replaced.matches("export CUSTOM_API_KEY=").count(), 1);
+    }
+
+    #[test]
+    fn codex_env_section_supports_compact_header() {
+        let input = "#Codex\nexport CUSTOM_API_KEY=old\n";
+
+        let updated = upsert_codex_env_section_key(input, "NEW_CODEX_API_KEY", "sk-new");
+
+        assert!(updated
+            .contains("#Codex\nexport CUSTOM_API_KEY=old\nexport NEW_CODEX_API_KEY=sk-new\n"));
+        assert_eq!(
+            read_env_key_from_shell_rc(&updated, "NEW_CODEX_API_KEY").as_deref(),
+            Some("sk-new")
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn linux_write_managed_env_key_uses_current_shell_rc_file() {
+        let temp = tempfile::tempdir().expect("temp home");
+        let old_test_home = std::env::var_os("CC_SWITCH_TEST_HOME");
+        let old_shell = std::env::var_os("SHELL");
+
+        std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
+        std::env::set_var("SHELL", "/bin/bash");
+        fs::write(
+            temp.path().join(".zshrc"),
+            "# Codex\nexport CUSTOM_API_KEY=old\n",
+        )
+        .expect("seed zshrc");
+
+        write_managed_env_key("NEW_CODEX_API_KEY", "sk-new").expect("write env key");
+
+        let zshrc = fs::read_to_string(temp.path().join(".zshrc")).expect("read zshrc");
+        assert!(!zshrc.contains("export NEW_CODEX_API_KEY=sk-new"));
+        let bashrc = fs::read_to_string(temp.path().join(".bashrc")).expect("read bashrc");
+        assert!(bashrc.contains("export NEW_CODEX_API_KEY=sk-new"));
+
+        match old_test_home {
+            Some(value) => std::env::set_var("CC_SWITCH_TEST_HOME", value),
+            None => std::env::remove_var("CC_SWITCH_TEST_HOME"),
+        }
+        match old_shell {
+            Some(value) => std::env::set_var("SHELL", value),
+            None => std::env::remove_var("SHELL"),
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn macos_write_managed_env_key_uses_zshrc() {
+        let temp = tempfile::tempdir().expect("temp home");
+        let old_test_home = std::env::var_os("CC_SWITCH_TEST_HOME");
+        let old_shell = std::env::var_os("SHELL");
+
+        std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
+        std::env::set_var("SHELL", "/bin/bash");
+
+        write_managed_env_key("NEW_CODEX_API_KEY", "sk-new").expect("write env key");
+
+        let zshrc = fs::read_to_string(temp.path().join(".zshrc")).expect("read zshrc");
+        assert!(zshrc.contains("export NEW_CODEX_API_KEY=sk-new"));
+        assert!(!temp.path().join(".bashrc").exists());
+
+        match old_test_home {
+            Some(value) => std::env::set_var("CC_SWITCH_TEST_HOME", value),
+            None => std::env::remove_var("CC_SWITCH_TEST_HOME"),
+        }
+        match old_shell {
+            Some(value) => std::env::set_var("SHELL", value),
+            None => std::env::remove_var("SHELL"),
+        }
+    }
 
     #[test]
     fn normalize_live_config_preserves_current_custom_model_provider_id() {
