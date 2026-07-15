@@ -753,6 +753,66 @@ fn extract_codex_env_key(config_text: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+fn codex_active_provider_env_key_state(
+    config_text: &str,
+) -> Result<Option<Option<String>>, AppError> {
+    if config_text.trim().is_empty() {
+        return Ok(None);
+    }
+
+    let doc = config_text
+        .parse::<DocumentMut>()
+        .map_err(|e| AppError::Message(format!("Invalid Codex config.toml: {e}")))?;
+    let Some(provider_id) = active_codex_model_provider_id(&doc) else {
+        return Ok(None);
+    };
+    let Some(provider_table) = codex_active_provider_table(&doc, &provider_id) else {
+        return Ok(None);
+    };
+
+    let env_key = provider_table
+        .get("env_key")
+        .and_then(|item| item.as_str())
+        .map(str::trim)
+        .filter(|env_key| !env_key.is_empty())
+        .map(str::to_string);
+
+    Ok(Some(env_key))
+}
+
+fn set_codex_active_provider_env_key(
+    config_text: &str,
+    env_key: Option<&str>,
+) -> Result<String, AppError> {
+    if config_text.trim().is_empty() {
+        return Ok(config_text.to_string());
+    }
+
+    let mut doc = config_text
+        .parse::<DocumentMut>()
+        .map_err(|e| AppError::Message(format!("Invalid Codex config.toml: {e}")))?;
+    let Some(provider_id) = active_codex_model_provider_id(&doc) else {
+        return Ok(config_text.to_string());
+    };
+    let Some(provider_table) = doc
+        .get_mut("model_providers")
+        .and_then(|item| item.as_table_mut())
+        .and_then(|table| table.get_mut(provider_id.as_str()))
+        .and_then(|item| item.as_table_mut())
+    else {
+        return Ok(config_text.to_string());
+    };
+
+    if let Some(env_key) = env_key {
+        validate_env_key_name(env_key)?;
+        provider_table["env_key"] = toml_edit::value(env_key);
+    } else {
+        provider_table.remove("env_key");
+    }
+
+    Ok(doc.to_string())
+}
+
 pub fn extract_codex_experimental_bearer_token(config_text: &str) -> Option<String> {
     if !config_text.contains("experimental_bearer_token") {
         return None;
@@ -1286,12 +1346,53 @@ pub fn restore_codex_settings_config_model_provider_for_backfill(
         return Ok(());
     };
 
-    let restored = restore_codex_backfill_model_provider_id(&config_text, template_config_text)?;
+    let live_env_key = extract_codex_env_key(&config_text);
+    let template_env_key_state = codex_active_provider_env_key_state(template_config_text)?;
+    let mut restored =
+        restore_codex_backfill_model_provider_id(&config_text, template_config_text)?;
+
+    if let Some(template_env_key) = template_env_key_state {
+        restored = set_codex_active_provider_env_key(&restored, template_env_key.as_deref())?;
+        if live_env_key != template_env_key {
+            restored = remove_codex_experimental_bearer_token(&restored)?;
+        }
+    }
+
     if let Some(obj) = settings.as_object_mut() {
         obj.insert("config".to_string(), Value::String(restored));
     }
 
     Ok(())
+}
+
+fn restore_codex_stored_credentials_for_backfill(settings: &mut Value, template_settings: &Value) {
+    let Some(obj) = settings.as_object_mut() else {
+        return;
+    };
+
+    match template_settings
+        .get("env")
+        .filter(|value| value.is_object())
+    {
+        Some(env) => {
+            obj.insert("env".to_string(), env.clone());
+        }
+        None => {
+            obj.remove("env");
+        }
+    }
+
+    match template_settings
+        .get("auth")
+        .filter(|value| value.is_object())
+    {
+        Some(auth) => {
+            obj.insert("auth".to_string(), auth.clone());
+        }
+        None => {
+            obj.remove("auth");
+        }
+    }
 }
 
 pub fn restore_codex_provider_token_for_backfill(
@@ -1366,6 +1467,7 @@ pub fn restore_codex_settings_for_backfill(
     restore_provider_token: bool,
 ) -> Result<(), AppError> {
     restore_codex_settings_config_model_provider_for_backfill(settings, template_settings)?;
+    restore_codex_stored_credentials_for_backfill(settings, template_settings);
     if restore_provider_token {
         restore_codex_provider_token_for_backfill(settings, template_settings)?;
     }
@@ -2428,6 +2530,50 @@ env_key = "TUZI_BACKFILL_CODEX_API_KEY"
                 "TUZI_BACKFILL_CODEX_API_KEY".to_string(),
                 "sk-backfill".to_string()
             )]
+        );
+    }
+
+    #[test]
+    fn restore_backfill_drops_foreign_live_token_and_keeps_template_env_key() {
+        let mut live_settings = json!({
+            "auth": {},
+            "env": { "envKey": "TUZI03_CODEX_API_KEY" },
+            "config": r#"model_provider = "vendor_alpha"
+
+[model_providers.vendor_alpha]
+env_key = "TUZI03_CODEX_API_KEY"
+experimental_bearer_token = "sk-test-line"
+"#
+        });
+        let template_settings = json!({
+            "auth": {},
+            "env": { "envKey": "CODING03_CODEX_API_KEY" },
+            "config": r#"model_provider = "vendor_alpha"
+
+[model_providers.vendor_alpha]
+env_key = "CODING03_CODEX_API_KEY"
+"#
+        });
+
+        restore_codex_settings_for_backfill(&mut live_settings, &template_settings, true).unwrap();
+
+        let config = live_settings.get("config").and_then(Value::as_str).unwrap();
+        let parsed: toml::Value = toml::from_str(config).unwrap();
+        assert_eq!(
+            parsed
+                .get("model_providers")
+                .and_then(|value| value.get("vendor_alpha"))
+                .and_then(|value| value.get("env_key"))
+                .and_then(|value| value.as_str()),
+            Some("CODING03_CODEX_API_KEY")
+        );
+        assert!(
+            !config.contains("experimental_bearer_token"),
+            "foreign live token must not be saved into the previous provider"
+        );
+        assert_eq!(
+            live_settings.pointer("/env/envKey").and_then(Value::as_str),
+            Some("CODING03_CODEX_API_KEY")
         );
     }
 

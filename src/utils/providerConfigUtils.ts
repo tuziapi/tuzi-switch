@@ -468,6 +468,8 @@ const TOML_MODEL_PROVIDER_LINE_PATTERN =
   /^\s*model_provider\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
 const TOML_ENV_KEY_PATTERN =
   /^\s*env_key\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
+const TOML_ENV_KEY_REPLACE_PATTERN =
+  /^(\s*env_key\s*=\s*)(?:"(?:\\.|[^"\\\r\n])*"|'[^'\r\n]*')(\s*(?:#.*)?)$/;
 const CODEX_RESERVED_MODEL_PROVIDER_IDS = new Set([
   "amazon-bedrock",
   "openai",
@@ -1339,6 +1341,122 @@ export const removeCodexTopLevelField = (
     lines.splice(existing.index, 1);
   }
   return finalizeTomlText(lines);
+};
+
+export const setCodexEnvKey = (configText: string, envKey: string): string => {
+  const normalizedText = normalizeTomlText(configText);
+  if (!normalizedText) return configText;
+
+  const trimmed = envKey.trim();
+  if (!trimmed) return configText;
+
+  const lines = normalizedText.split("\n");
+  const escaped = escapeTomlBasicString(trimmed);
+  const targetSectionName = getCodexProviderSectionName(normalizedText);
+
+  if (targetSectionName) {
+    const sectionRange = getTomlSectionRange(lines, targetSectionName);
+    if (sectionRange) {
+      const envKeyLineIndex = findTomlLineInRange(
+        lines,
+        TOML_ENV_KEY_REPLACE_PATTERN,
+        sectionRange.bodyStartIndex,
+        sectionRange.bodyEndIndex,
+      );
+
+      if (envKeyLineIndex !== -1) {
+        lines[envKeyLineIndex] = lines[envKeyLineIndex].replace(
+          TOML_ENV_KEY_REPLACE_PATTERN,
+          `$1"${escaped}"$2`,
+        );
+        return finalizeTomlText(lines);
+      }
+
+      lines.splice(
+        getTomlSectionInsertIndex(lines, sectionRange),
+        0,
+        `env_key = "${escaped}"`,
+      );
+      return finalizeTomlText(lines);
+    }
+  }
+
+  const topLevelEndIndex = getTopLevelEndIndex(lines);
+  const topLevelEnvKeyLineIndex = findTomlLineInRange(
+    lines,
+    TOML_ENV_KEY_REPLACE_PATTERN,
+    0,
+    topLevelEndIndex,
+  );
+
+  if (topLevelEnvKeyLineIndex !== -1) {
+    lines[topLevelEnvKeyLineIndex] = lines[topLevelEnvKeyLineIndex].replace(
+      TOML_ENV_KEY_REPLACE_PATTERN,
+      `$1"${escaped}"$2`,
+    );
+    return finalizeTomlText(lines);
+  }
+
+  const insertIndex =
+    getTopLevelModelProviderLineIndex(lines) !== -1
+      ? getTopLevelModelProviderLineIndex(lines) + 1
+      : topLevelEndIndex;
+  lines.splice(insertIndex, 0, `env_key = "${escaped}"`);
+  return finalizeTomlText(lines);
+};
+
+export const generateCodexCopyEnvKey = (
+  providerName: string,
+  existingEnvKeys: string[],
+): string => {
+  const sanitizedName = providerName
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
+    .toUpperCase();
+  const prefix = sanitizedName || "CUSTOM";
+  const baseEnvKey = `${prefix}_CODEX_API_KEY`;
+  const taken = new Set(
+    existingEnvKeys.map((key) => key.trim()).filter(Boolean),
+  );
+
+  if (!taken.has(baseEnvKey)) {
+    return baseEnvKey;
+  }
+
+  let counter = 2;
+  while (taken.has(`${baseEnvKey}_${counter}`)) {
+    counter += 1;
+  }
+  return `${baseEnvKey}_${counter}`;
+};
+
+export const rewriteDuplicatedCodexSettingsConfig = (
+  settingsConfig: Record<string, any>,
+  nextEnvKey: string,
+): Record<string, any> => {
+  const nextSettingsConfig = { ...settingsConfig };
+
+  if (typeof nextSettingsConfig.config === "string") {
+    const nextConfig = setCodexEnvKey(nextSettingsConfig.config, nextEnvKey);
+    nextSettingsConfig.config = updateCodexExperimentalBearerToken(
+      updateCodexExperimentalBearerToken(nextConfig, ""),
+      "",
+    );
+  }
+
+  nextSettingsConfig.auth =
+    nextSettingsConfig.auth &&
+    typeof nextSettingsConfig.auth === "object" &&
+    !Array.isArray(nextSettingsConfig.auth)
+      ? { ...nextSettingsConfig.auth }
+      : {};
+  delete nextSettingsConfig.auth.OPENAI_API_KEY;
+
+  nextSettingsConfig.env = { envKey: nextEnvKey };
+  return nextSettingsConfig;
 };
 
 /**
