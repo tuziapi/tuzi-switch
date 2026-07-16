@@ -796,7 +796,7 @@ pub fn sync_codex_live_api_key(state: State<'_, AppState>) -> Result<(), String>
         let card_name = card_id.clone();
 
         let config_toml = format!(
-            "model_provider = \"{card_id}\"\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{card_id}]\nname = \"{card_id}\"\nbase_url = \"{detected_url}\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n"
+            "model_provider = \"{card_id}\"\nmodel = \"gpt-5.6-sol\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{card_id}]\nname = \"{card_id}\"\nbase_url = \"{detected_url}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\nhttp_headers = {{ \"x-openai-actor-authorization\" = \"http://coding.tu-zi.com\" }}\n"
         );
 
         let new_provider = crate::provider::Provider::with_id(

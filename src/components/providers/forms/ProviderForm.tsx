@@ -1311,7 +1311,9 @@ function ProviderFormFull({
             envKey: resolvedCodexEnvKey,
             apiKey: codexApiKey || "",
             model:
-              normalizedCatalogModels[0]?.model || codexModelName || "gpt-5.5",
+              normalizedCatalogModels[0]?.model ||
+              codexModelName ||
+              "gpt-5.6-sol",
             modelReasoningEffort: "high",
           });
         }
@@ -1753,7 +1755,7 @@ function ProviderFormFull({
             newRouteId,
             preset.endpointCandidates?.[0] || "",
             envKey,
-            "gpt-5.5",
+            "gpt-5.6-sol",
           );
         }
       }

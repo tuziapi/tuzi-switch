@@ -50,7 +50,7 @@ function migrateLegacyConfig(configStr: string): string {
   const effortMatch = result.match(
     /^\s*model_reasoning_effort\s*=\s*"([^"]+)"/m,
   );
-  const model = modelMatch?.[1] || "gpt-5.5";
+  const model = modelMatch?.[1] || "gpt-5.6-sol";
   const effort = effortMatch?.[1] || "high";
 
   // Build new format
@@ -100,7 +100,10 @@ function migrateLegacyConfig(configStr: string): string {
     output.push(`name = "${providerName}"`);
     output.push(`env_key = "OPENAI_API_KEY"`);
     output.push(`wire_api = "responses"`);
-    output.push(`requires_openai_auth = true`);
+    output.push(`requires_openai_auth = false`);
+    output.push(
+      `http_headers = { "x-openai-actor-authorization" = "http://coding.tu-zi.com" }`,
+    );
   }
 
   return output.join("\n");

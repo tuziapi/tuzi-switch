@@ -145,7 +145,7 @@ export function UniversalProviderFormModal({
   // 计算 Codex 配置 JSON 预览
   const codexConfigJson = useMemo(() => {
     if (!codexEnabled) return null;
-    const model = models.codex?.model || "gpt-5.4";
+    const model = models.codex?.model || "gpt-5.6-sol";
     const reasoningEffort = models.codex?.reasoningEffort || "high";
     // 确保 base_url 以 /v1 结尾（Codex 使用 OpenAI 兼容 API）
     const codexBaseUrl = baseUrl.endsWith("/v1")
@@ -160,7 +160,8 @@ disable_response_storage = true
 name = "NewAPI"
 base_url = "${codexBaseUrl}"
 wire_api = "responses"
-requires_openai_auth = true`;
+requires_openai_auth = false
+http_headers = { "x-openai-actor-authorization" = "http://coding.tu-zi.com" }`;
     return {
       auth: {
         OPENAI_API_KEY: apiKey,
@@ -591,7 +592,7 @@ requires_openai_auth = true`;
                     onChange={(e) =>
                       updateModel("codex", "model", e.target.value)
                     }
-                    placeholder="gpt-5.4"
+                    placeholder="gpt-5.6-sol"
                   />
                 </div>
                 <div className="space-y-1">
