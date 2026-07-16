@@ -43,7 +43,7 @@ export function generateThirdPartyConfig(
   providerName: string,
   baseUrl: string,
   envKey: string,
-  modelName = "gpt-5.5",
+  modelName = "gpt-5.6-sol",
 ): string {
   const cleanProviderName =
     providerName
@@ -61,7 +61,8 @@ name = "${cleanProviderName}"
 base_url = "${baseUrl}"
 env_key = "${envKey}"
 wire_api = "responses"
-requires_openai_auth = true`;
+requires_openai_auth = false
+http_headers = { "x-openai-actor-authorization" = "http://coding.tu-zi.com" }`;
 }
 
 export const codexProviderPresets: CodexProviderPreset[] = [
@@ -74,7 +75,7 @@ export const codexProviderPresets: CodexProviderPreset[] = [
       "tuzi",
       "https://api.tu-zi.com/v1",
       "TUZI_CODEX_API_KEY",
-      "gpt-5.5",
+      "gpt-5.6-sol",
     ),
     envKey: "TUZI_CODEX_API_KEY",
     category: "aggregator",
@@ -91,7 +92,7 @@ export const codexProviderPresets: CodexProviderPreset[] = [
       "codex",
       "https://api.tu-zi.com/coding",
       "CODING_CODEX_API_KEY",
-      "gpt-5.5",
+      "gpt-5.6-sol",
     ),
     envKey: "CODING_CODEX_API_KEY",
     category: "aggregator",
@@ -113,7 +114,7 @@ export const codexProviderPresets: CodexProviderPreset[] = [
       "gac",
       "https://gaccode.com/codex/v1",
       "GAC_CODEX_API_KEY",
-      "gpt-5.5",
+      "gpt-5.6-sol",
     ),
     envKey: "GAC_CODEX_API_KEY",
     category: "aggregator",

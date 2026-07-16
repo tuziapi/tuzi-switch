@@ -32,7 +32,7 @@ fn build_codex_official_provider(
         _ => id,
     };
     let config = format!(
-        "model_provider = \"{route_id}\"\nmodel = \"{model}\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{route_id}]\nname = \"{route_id}\"\nbase_url = \"{base_url}\"\nenv_key = \"{env_key}\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n"
+        "model_provider = \"{route_id}\"\nmodel = \"{model}\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{route_id}]\nname = \"{route_id}\"\nbase_url = \"{base_url}\"\nenv_key = \"{env_key}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\nhttp_headers = {{ \"x-openai-actor-authorization\" = \"http://coding.tu-zi.com\" }}\n"
     );
     let mut provider = Provider::with_id(
         id.to_string(),

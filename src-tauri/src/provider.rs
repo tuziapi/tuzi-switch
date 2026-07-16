@@ -612,7 +612,8 @@ disable_response_storage = true
 name = "NewAPI"
 base_url = "{codex_base_url}"
 wire_api = "responses"
-requires_openai_auth = true"#
+requires_openai_auth = false
+http_headers = {{ "x-openai-actor-authorization" = "http://coding.tu-zi.com" }}"#
         );
 
         let settings_config = serde_json::json!({

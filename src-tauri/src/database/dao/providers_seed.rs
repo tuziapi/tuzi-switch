@@ -22,7 +22,7 @@ pub(crate) const CODEX_OFFICIAL_PROVIDER_IDS: &[(&str, &str, &str, &str, &str, &
         "https://api.tu-zi.com",
         "https://api.tu-zi.com/v1",
         "TUZI_CODEX_API_KEY",
-        "gpt-5.5",
+        "gpt-5.6-sol",
     ),
     (
         "coding",
@@ -30,7 +30,7 @@ pub(crate) const CODEX_OFFICIAL_PROVIDER_IDS: &[(&str, &str, &str, &str, &str, &
         "https://store.tu-zi.com/cat/11",
         "https://api.tu-zi.com/coding",
         "CODING_CODEX_API_KEY",
-        "gpt-5.5",
+        "gpt-5.6-sol",
     ),
     (
         "gaccode",
@@ -38,7 +38,7 @@ pub(crate) const CODEX_OFFICIAL_PROVIDER_IDS: &[(&str, &str, &str, &str, &str, &
         "https://store.tu-zi.com/cat/1",
         "https://gaccode.com/codex/v1",
         "GAC_CODEX_API_KEY",
-        "gpt-5.5",
+        "gpt-5.6-sol",
     ),
 ];
 

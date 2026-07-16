@@ -302,7 +302,7 @@ pub fn switch_codex_profile(
     let new_format = is_new_profile_format();
 
     if config_text.trim().is_empty() {
-        let m = model.unwrap_or("gpt-5.5");
+        let m = model.unwrap_or("gpt-5.6-sol");
         let e = model_reasoning_effort.unwrap_or("high");
         let mut s = format!("model_provider = \"{route_id}\"\nmodel = \"{m}\"\nmodel_reasoning_effort = \"{e}\"\ndisable_response_storage = true\n");
         if !new_format {
@@ -346,7 +346,7 @@ pub fn save_route_to_config(
     let new_format = is_new_profile_format();
 
     let mut provider_section = format!(
-        "[model_providers.{route_id}]\nname = \"{route_id}\"\nbase_url = \"{base_url}\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n"
+        "[model_providers.{route_id}]\nname = \"{route_id}\"\nbase_url = \"{base_url}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\nhttp_headers = {{ \"x-openai-actor-authorization\" = \"http://coding.tu-zi.com\" }}\n"
     );
     if !env_key.trim().is_empty() {
         provider_section.push_str(&format!("env_key = \"{env_key}\"\n"));

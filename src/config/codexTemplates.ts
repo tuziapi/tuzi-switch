@@ -10,7 +10,7 @@ export interface CodexTemplate {
 
 export function getCodexCustomTemplate(): CodexTemplate {
   const config = `model_provider = "tuziswitch"
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 disable_response_storage = true
 
@@ -19,7 +19,8 @@ name = "tuziswitch"
 base_url = "https://your-api-endpoint.com/v1"
 env_key = "CUSTOM_CODEX_API_KEY"
 wire_api = "responses"
-requires_openai_auth = true`;
+requires_openai_auth = false
+http_headers = { "x-openai-actor-authorization" = "http://coding.tu-zi.com" }`;
 
   return {
     auth: {},
