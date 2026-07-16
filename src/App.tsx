@@ -89,6 +89,11 @@ import ToolsPanel from "@/components/openclaw/ToolsPanel";
 import AgentsDefaultsPanel from "@/components/openclaw/AgentsDefaultsPanel";
 import OpenClawHealthBanner from "@/components/openclaw/OpenClawHealthBanner";
 import HermesMemoryPanel from "@/components/hermes/HermesMemoryPanel";
+import {
+  generateCodexCopyEnvKey,
+  getCodexProviderEnvKeyFromSettings,
+  rewriteDuplicatedCodexSettingsConfig,
+} from "@/utils/providerConfigUtils";
 
 type View =
   | "providers"
@@ -209,25 +214,33 @@ function App() {
   // 切换到 Codex 时，自动把 ~/.codex 里的 API key 回填到对应的预设卡片
   useEffect(() => {
     if (activeApp !== "codex") return;
-    invoke("sync_codex_live_api_key").then(() => {
-      queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
-    }).catch(() => {/* 静默失败，不影响正常使用 */});
+    invoke("sync_codex_live_api_key")
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
+      })
+      .catch(() => {
+        /* 静默失败，不影响正常使用 */
+      });
   }, [activeApp]);
 
   // 切换到 Claude 时，自动把 ~/.claude/settings.json 里的 API key 回填到对应的预设卡片
   useEffect(() => {
     if (activeApp !== "claude") return;
-    invoke("sync_claude_live_api_key").then(() => {
-      queryClient.invalidateQueries({ queryKey: ["providers", "claude"] });
-    }).catch(() => {});
+    invoke("sync_claude_live_api_key")
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["providers", "claude"] });
+      })
+      .catch(() => {});
   }, [activeApp]);
 
   // 切换到 Gemini 时，自动把 ~/.gemini/.env 里的 API key 回填到对应的预设卡片
   useEffect(() => {
     if (activeApp !== "gemini") return;
-    invoke("sync_gemini_live_api_key").then(() => {
-      queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
-    }).catch(() => {});
+    invoke("sync_gemini_live_api_key")
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
+      })
+      .catch(() => {});
   }, [activeApp]);
 
   // Fallback from sessions view when switching to an app without session support
@@ -755,6 +768,20 @@ function App() {
       icon: provider.icon,
       iconColor: provider.iconColor,
     };
+
+    if (activeApp === "codex") {
+      const existingEnvKeys = Object.values(providers)
+        .map((item) => getCodexProviderEnvKeyFromSettings(item.settingsConfig))
+        .filter(Boolean);
+      const nextEnvKey = generateCodexCopyEnvKey(
+        duplicatedProvider.name,
+        existingEnvKeys,
+      );
+      duplicatedProvider.settingsConfig = rewriteDuplicatedCodexSettingsConfig(
+        duplicatedProvider.settingsConfig,
+        nextEnvKey,
+      );
+    }
 
     if (
       activeApp === "opencode" ||

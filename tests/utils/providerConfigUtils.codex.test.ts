@@ -2,15 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   extractCodexBaseUrl,
   extractCodexExperimentalBearerToken,
+  generateCodexCopyEnvKey,
   getCodexEnvKey,
   getCodexProviderEnvKeyFromSettings,
   extractCodexModelCatalogJson,
   extractCodexModelName,
   extractCodexWireApi,
   setCodexBaseUrl,
+  setCodexEnvKey,
   setCodexModelCatalogJson,
   setCodexModelName,
   setCodexWireApi,
+  rewriteDuplicatedCodexSettingsConfig,
   updateCodexExperimentalBearerToken,
 } from "@/utils/providerConfigUtils";
 
@@ -408,6 +411,61 @@ describe("Codex TOML utils", () => {
 
     expect(updateCodexExperimentalBearerToken(input, "new-token")).toBe(input);
     expect(updateCodexExperimentalBearerToken(input, "")).toBe(input);
+  });
+
+  it("updates env_key only for the active provider section", () => {
+    const input = [
+      'model_provider = "active"',
+      'env_key = "TOP_LEVEL_CODEX_KEY"',
+      "",
+      "[model_providers.inactive]",
+      'env_key = "INACTIVE_CODEX_KEY"',
+      "",
+      "[model_providers.active]",
+      'base_url = "https://active.example/v1"',
+      'env_key = "OLD_ACTIVE_CODEX_KEY" # managed',
+      "",
+    ].join("\n");
+
+    const output = setCodexEnvKey(input, "NEW_ACTIVE_CODEX_KEY");
+
+    expect(output).toContain('env_key = "NEW_ACTIVE_CODEX_KEY" # managed');
+    expect(output).toContain('env_key = "TOP_LEVEL_CODEX_KEY"');
+    expect(output).toContain('env_key = "INACTIVE_CODEX_KEY"');
+    expect(getCodexEnvKey(output)).toBe("NEW_ACTIVE_CODEX_KEY");
+  });
+
+  it("rewrites duplicated codex settings to an isolated env key", () => {
+    const nextEnvKey = generateCodexCopyEnvKey("codex订阅_2 copy", [
+      "CODING_CODEX_API_KEY",
+      "CODEX_2_COPY_CODEX_API_KEY",
+    ]);
+
+    expect(nextEnvKey).toBe("CODEX_2_COPY_CODEX_API_KEY_2");
+
+    const output = rewriteDuplicatedCodexSettingsConfig(
+      {
+        auth: { OPENAI_API_KEY: "sk-original" },
+        env: { envKey: "CODING_CODEX_API_KEY" },
+        config: [
+          'model_provider = "tuzi"',
+          'experimental_bearer_token = "top-level-token"',
+          "",
+          "[model_providers.tuzi]",
+          'base_url = "https://api.tu-zi.com/v1"',
+          'env_key = "CODING_CODEX_API_KEY"',
+          'experimental_bearer_token = "section-token"',
+          "",
+        ].join("\n"),
+      },
+      nextEnvKey,
+    );
+
+    expect(output.env.envKey).toBe("CODEX_2_COPY_CODEX_API_KEY_2");
+    expect(output.config).toContain('env_key = "CODEX_2_COPY_CODEX_API_KEY_2"');
+    expect(output.config).not.toContain("CODING_CODEX_API_KEY");
+    expect(output.config).not.toContain("experimental_bearer_token");
+    expect(output.auth.OPENAI_API_KEY).toBeUndefined();
   });
 
   it("reads, writes, and removes top-level model_catalog_json", () => {
