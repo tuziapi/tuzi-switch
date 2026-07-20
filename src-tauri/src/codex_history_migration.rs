@@ -502,10 +502,13 @@ fn restore_codex_official_history_inner(
 /// codex_config_dir 后拿旧目录的账本作用到新目录。
 /// 还原操作自身的备份（restore 目录）天然不会混入：那些副本里的 id 都是
 /// custom，解析后贡献为空。
+type OfficialSessionLedger = HashMap<String, String>;
+type OfficialThreadLedger = BTreeMap<String, String>;
+
 fn collect_official_ledger(
     ledger_parent: &Path,
     codex_dir_key: &str,
-) -> Result<(HashMap<String, String>, BTreeMap<String, String>), AppError> {
+) -> Result<(OfficialSessionLedger, OfficialThreadLedger), AppError> {
     let mut sessions = HashMap::new();
     let mut threads = BTreeMap::new();
     let entries = match fs::read_dir(ledger_parent) {
