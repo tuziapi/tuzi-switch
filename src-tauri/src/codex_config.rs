@@ -1696,7 +1696,7 @@ fn table_matches_codex_unified_official_provider(table: &toml_edit::Table) -> bo
 /// 使开关开启后创建的官方会话与第三方会话共用同一个 resume 历史桶。
 ///
 /// 两种情况拒绝注入、原样返回：
-/// - 配置已有显式 `model_provider`：用户手工指定的路由不被覆盖；
+/// - 配置已有非官方的显式 `model_provider`：用户手工指定的路由不被覆盖；
 /// - 配置已有形态不同的 `[model_providers.custom]` 表：设置 `model_provider`
 ///   会激活这张我们不认识的表（可能带第三方 base_url/token，会把 ChatGPT
 ///   OAuth 流量路由到错误后端），宁可让开关对该配置不生效。
@@ -1705,8 +1705,74 @@ pub fn inject_codex_unified_session_bucket(config_text: &str) -> Result<String, 
         .parse::<DocumentMut>()
         .map_err(|e| AppError::Message(format!("Invalid Codex config.toml: {e}")))?;
 
-    if doc.get("model_provider").is_some() {
-        return Ok(config_text.to_string());
+    if let Some(active_provider_id) = active_codex_model_provider_id(&doc) {
+        if active_provider_id == CC_SWITCH_CODEX_MODEL_PROVIDER_ID {
+            return Ok(config_text.to_string());
+        }
+
+        // 兼容旧版官方模板显式声明 `model_provider = "codex"` 的形态。
+        // 只转换可确认仍使用 OpenAI OAuth + Responses 的官方路由，避免把用户
+        // 恰好命名为 codex 的第三方端点误归入共享会话桶。
+        let is_official_codex_route = active_provider_id == "codex"
+            && doc
+                .get("model_providers")
+                .and_then(|item| item.as_table())
+                .and_then(|providers| providers.get("codex"))
+                .and_then(|item| item.as_table())
+                .is_some_and(|table| {
+                    table
+                        .get("requires_openai_auth")
+                        .and_then(|item| item.as_bool())
+                        == Some(true)
+                        && table.get("wire_api").and_then(|item| item.as_str()) == Some("responses")
+                        && table
+                            .get("base_url")
+                            .and_then(|item| item.as_str())
+                            .is_none_or(|base_url| {
+                                base_url
+                                    .trim_end_matches('/')
+                                    .eq_ignore_ascii_case("https://api.openai.com/v1")
+                            })
+                });
+        if !is_official_codex_route {
+            return Ok(config_text.to_string());
+        }
+
+        let Some(model_providers) = doc
+            .get_mut("model_providers")
+            .and_then(|item| item.as_table_mut())
+        else {
+            return Ok(config_text.to_string());
+        };
+        if model_providers.contains_key(CC_SWITCH_CODEX_MODEL_PROVIDER_ID) {
+            log::warn!(
+                "官方 Codex 配置已存在 [model_providers.{}]，跳过旧 codex 路由转换以避免覆盖未知配置",
+                CC_SWITCH_CODEX_MODEL_PROVIDER_ID
+            );
+            return Ok(config_text.to_string());
+        }
+        let Some(provider_table) = model_providers.remove("codex") else {
+            return Ok(config_text.to_string());
+        };
+        model_providers.insert(CC_SWITCH_CODEX_MODEL_PROVIDER_ID, provider_table);
+        if let Some(profiles) = doc
+            .get_mut("profiles")
+            .and_then(|item| item.as_table_like_mut())
+        {
+            for (_, profile) in profiles.iter_mut() {
+                if let Some(profile) = profile.as_table_like_mut() {
+                    if profile.get("model_provider").and_then(|item| item.as_str()) == Some("codex")
+                    {
+                        profile.insert(
+                            "model_provider",
+                            toml_edit::value(CC_SWITCH_CODEX_MODEL_PROVIDER_ID),
+                        );
+                    }
+                }
+            }
+        }
+        doc["model_provider"] = toml_edit::value(CC_SWITCH_CODEX_MODEL_PROVIDER_ID);
+        return Ok(doc.to_string());
     }
 
     let existing_custom_conflicts = doc
@@ -2358,6 +2424,18 @@ model_providers = { rightcode = { name = "RightCode", experimental_bearer_token 
         let explicit = "model_provider = \"openai_https\"\n";
         let unchanged = inject_codex_unified_session_bucket(explicit).expect("inject");
         assert_eq!(unchanged, explicit);
+
+        // 同名 codex 但指向第三方端点时也不能误判为官方 OAuth 路由。
+        let third_party_codex = r#"model_provider = "codex"
+
+[model_providers.codex]
+name = "Relay"
+base_url = "https://relay.example/v1"
+wire_api = "responses"
+requires_openai_auth = true
+"#;
+        let unchanged = inject_codex_unified_session_bucket(third_party_codex).expect("inject");
+        assert_eq!(unchanged, third_party_codex);
     }
 
     #[test]
