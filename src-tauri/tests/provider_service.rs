@@ -708,10 +708,15 @@ wire_api = "responses"
 fn provider_service_switch_codex_default_overwrites_official_auth_when_preservation_off() {
     let _guard = test_mutex().lock().expect("acquire test mutex");
     reset_test_fs();
-    // Intentionally do NOT enable preservation: this locks the default opt-out
-    // behavior where switching to a third-party provider rewrites auth.json,
-    // discarding the user's ChatGPT OAuth login. It is the dual of
+    // Explicitly disable the default-on preservation setting: this covers the
+    // opt-out behavior where switching to a third-party provider rewrites
+    // auth.json and discards the user's ChatGPT OAuth login. It is the dual of
     // `provider_service_switch_codex_preserves_oauth_and_backfills_api_key_from_live_token`.
+    cc_switch_lib::update_settings(cc_switch_lib::AppSettings {
+        preserve_codex_official_auth_on_switch: false,
+        ..Default::default()
+    })
+    .expect("disable Codex official auth preservation");
     let _home = ensure_test_home();
 
     let live_auth = json!({
@@ -2707,11 +2712,18 @@ fn provider_service_switch_codex_missing_auth_returns_error() {
     let err = ProviderService::switch(&state, AppType::Codex, "invalid")
         .expect_err("switching should fail without auth");
     match err {
+        AppError::Localized { key, zh, en } => {
+            assert_eq!(key, "provider.codex.auth.missing");
+            assert!(
+                zh.contains("auth") || en.contains("auth"),
+                "expected auth related message, got zh={zh}, en={en}"
+            );
+        }
         AppError::Config(msg) => assert!(
             msg.contains("auth"),
             "expected auth related message, got {msg}"
         ),
-        other => panic!("expected config error, got {other:?}"),
+        other => panic!("expected auth missing error, got {other:?}"),
     }
 }
 
