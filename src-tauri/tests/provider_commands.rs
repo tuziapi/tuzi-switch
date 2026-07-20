@@ -569,11 +569,18 @@ fn switch_provider_codex_missing_auth_returns_error_and_keeps_state() {
     let err = switch_provider_test_hook(&app_state, AppType::Codex, "invalid")
         .expect_err("switching should fail when auth missing");
     match err {
+        AppError::Localized { key, zh, en } => {
+            assert_eq!(key, "provider.codex.auth.missing");
+            assert!(
+                zh.contains("auth") || en.contains("auth"),
+                "expected auth missing error message, got zh={zh}, en={en}"
+            );
+        }
         AppError::Config(msg) => assert!(
             msg.contains("auth"),
             "expected auth missing error message, got {msg}"
         ),
-        other => panic!("expected config error, got {other:?}"),
+        other => panic!("expected auth missing error, got {other:?}"),
     }
 
     let current_id = app_state
