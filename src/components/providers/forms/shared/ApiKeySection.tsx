@@ -15,7 +15,8 @@ interface ApiKeySectionProps {
     thirdParty: string;
   };
   disabled?: boolean;
-  linkPlacement?: "below" | "right";
+  isPartner?: boolean;
+  partnerPromotionKey?: string;
 }
 
 export function ApiKeySection({
@@ -28,13 +29,13 @@ export function ApiKeySection({
   websiteUrl,
   placeholder,
   disabled,
-  linkPlacement = "below",
+  partnerPromotionKey,
 }: ApiKeySectionProps) {
   const { t } = useTranslation();
 
   const defaultPlaceholder = {
-    official: t("providerForm.apiKeyAutoFill", {
-      defaultValue: "输入 API Key，将自动填充到配置",
+    official: t("providerForm.officialNoApiKey", {
+      defaultValue: "官方供应商无需 API Key",
     }),
     thirdParty: t("providerForm.apiKeyAutoFill", {
       defaultValue: "输入 API Key，将自动填充到配置",
@@ -55,16 +56,11 @@ export function ApiKeySection({
             ? finalPlaceholder.official
             : finalPlaceholder.thirdParty
         }
-        disabled={disabled}
+        disabled={disabled ?? category === "official"}
       />
-      {shouldShowLink && websiteUrl ? (
-        <div
-          className={
-            linkPlacement === "right"
-              ? "flex justify-end pr-1 -mt-8 min-h-0"
-              : "flex justify-end pr-1"
-          }
-        >
+      {/* API Key 获取链接 */}
+      {shouldShowLink && websiteUrl && (
+        <div className="space-y-2 -mt-1 pl-1">
           <a
             href={websiteUrl}
             target="_blank"
@@ -75,8 +71,20 @@ export function ApiKeySection({
               defaultValue: "获取 API Key",
             })}
           </a>
+
+          {/* 促销信息（与 isPartner 解耦：仅凭 partnerPromotionKey 即可展示，星标仍由 isPartner 控制） */}
+          {partnerPromotionKey && (
+            <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 p-2.5 border border-blue-200 dark:border-blue-800">
+              <p className="text-xs leading-relaxed text-blue-700 dark:text-blue-300">
+                💡{" "}
+                {t(`providerForm.partnerPromotion.${partnerPromotionKey}`, {
+                  defaultValue: "",
+                })}
+              </p>
+            </div>
+          )}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

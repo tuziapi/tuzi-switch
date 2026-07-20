@@ -1,10 +1,10 @@
 //! OpenCode MCP 同步和导入模块
 //!
-//! 本模块处理 tuzi switch 统一 MCP 格式与 OpenCode 格式之间的转换。
+//! 本模块处理 CC Switch 统一 MCP 格式与 OpenCode 格式之间的转换。
 //!
 //! ## 格式差异
 //!
-//! | tuzi switch 统一格式    | OpenCode 格式       |
+//! | CC Switch 统一格式    | OpenCode 格式       |
 //! |----------------------|---------------------|
 //! | `type: "stdio"`      | `type: "local"`     |
 //! | `command` + `args`   | `command: [cmd, ...args]` |
@@ -32,10 +32,10 @@ fn should_sync_opencode_mcp() -> bool {
 }
 
 // ============================================================================
-// Format Conversion: tuzi switch → OpenCode
+// Format Conversion: CC Switch → OpenCode
 // ============================================================================
 
-/// Convert tuzi switch unified format to OpenCode format
+/// Convert CC Switch unified format to OpenCode format
 ///
 /// Conversion rules:
 /// - `stdio` → `local`, command+args → command array, env → environment
@@ -104,10 +104,10 @@ pub fn convert_to_opencode_format(spec: &Value) -> Result<Value, AppError> {
 }
 
 // ============================================================================
-// Format Conversion: OpenCode → tuzi switch
+// Format Conversion: OpenCode → CC Switch
 // ============================================================================
 
-/// Convert OpenCode format to tuzi switch unified format
+/// Convert OpenCode format to CC Switch unified format
 ///
 /// Conversion rules:
 /// - `local` → `stdio`, command array → command+args, environment → env

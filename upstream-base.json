@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "https://github.com/farion1231/cc-switch",
+    "branch": "main",
+    "releaseTag": "v3.17.0",
+    "releaseCommit": "3d176b98cc0bfd151a42882e88ab59b62083b92f",
+    "commit": "f6e37ed99443890a865669e28bf1caf5e85d466d",
+    "version": "3.17.0",
+    "committedAt": "2026-07-15T10:33:22+08:00"
+  }
+}

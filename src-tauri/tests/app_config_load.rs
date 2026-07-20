@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use tuzi_switch_lib::{AppError, MultiAppConfig};
+use cc_switch_lib::{AppError, MultiAppConfig};
 
 mod support;
 use support::{ensure_test_home, reset_test_fs, test_mutex};
@@ -101,9 +101,7 @@ fn load_valid_v2_config_succeeds() {
     let loaded = MultiAppConfig::load().expect("v2 should load successfully");
     assert_eq!(loaded.version, 2);
     assert!(loaded
-        .get_manager(&tuzi_switch_lib::AppType::Claude)
+        .get_manager(&cc_switch_lib::AppType::Claude)
         .is_some());
-    assert!(loaded
-        .get_manager(&tuzi_switch_lib::AppType::Codex)
-        .is_some());
+    assert!(loaded.get_manager(&cc_switch_lib::AppType::Codex).is_some());
 }

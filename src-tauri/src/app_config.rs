@@ -111,7 +111,7 @@ impl SkillApps {
             AppType::OpenCode => self.opencode = enabled,
             AppType::Hermes => self.hermes = enabled,
             AppType::OpenClaw => {} // OpenClaw doesn't support Skills, ignore
-            AppType::ClaudeDesktop => {} // Claude Desktop 3P profiles don't use tuzi switch skill sync
+            AppType::ClaudeDesktop => {} // Claude Desktop 3P profiles don't use CC Switch skill sync
         }
     }
 
@@ -151,7 +151,7 @@ impl SkillApps {
     /// 从来源标签列表构建启用状态
     ///
     /// 标签与 AppType::as_str() 一致时启用对应应用，
-    /// 其他标签（如 "agents", "tuzi-switch"）忽略。
+    /// 其他标签（如 "agents", "cc-switch"）忽略。
     pub fn from_labels(labels: &[String]) -> Self {
         let mut apps = Self::default();
         for label in labels {
@@ -200,7 +200,7 @@ pub struct InstalledSkill {
     pub updated_at: i64,
 }
 
-/// 未管理的 Skill（在应用目录中发现但未被 tuzi switch 管理）
+/// 未管理的 Skill（在应用目录中发现但未被 CC Switch 管理）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnmanagedSkill {
@@ -548,8 +548,8 @@ impl MultiAppConfig {
         if is_v1 {
             return Err(AppError::localized(
                 "config.unsupported_v1",
-                "检测到旧版 v1 配置格式。当前版本已不再支持运行时自动迁移。\n\n解决方案：\n1. 安装 v3.2.x 版本进行一次性自动迁移\n2. 或手动编辑 ~/.tuzi-switch/config.json，将顶层结构调整为：\n   {\"version\": 2, \"claude\": {...}, \"codex\": {...}, \"mcp\": {...}}\n\n",
-                "Detected legacy v1 config. Runtime auto-migration is no longer supported.\n\nSolutions:\n1. Install v3.2.x for one-time auto-migration\n2. Or manually edit ~/.tuzi-switch/config.json to adjust the top-level structure:\n   {\"version\": 2, \"claude\": {...}, \"codex\": {...}, \"mcp\": {...}}\n\n",
+                "检测到旧版 v1 配置格式。当前版本已不再支持运行时自动迁移。\n\n解决方案：\n1. 安装兼容版本进行一次性自动迁移\n2. 或手动编辑 ~/.tuzi-switch/config.json，将顶层结构调整为：\n   {\"version\": 2, \"claude\": {...}, \"codex\": {...}, \"mcp\": {...}}\n\n",
+                "Detected legacy v1 config. Runtime auto-migration is no longer supported.\n\nSolutions:\n1. Install a compatible version for one-time auto-migration\n2. Or manually edit ~/.tuzi-switch/config.json to adjust the top-level structure:\n   {\"version\": 2, \"claude\": {...}, \"codex\": {...}, \"mcp\": {...}}\n\n",
             ));
         }
 
@@ -561,9 +561,6 @@ impl MultiAppConfig {
         let mut config: Self =
             serde_json::from_value(value).map_err(|e| AppError::json(&config_path, e))?;
         let mut updated = false;
-        if config.apps.remove("tuzi").is_some() {
-            updated = true;
-        }
 
         if !has_skills_in_config {
             let skills_path = get_app_config_dir().join("skills.json");

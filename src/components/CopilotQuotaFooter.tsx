@@ -60,17 +60,21 @@ const CopilotQuotaFooter: React.FC<CopilotQuotaFooterProps> = ({
 
   // API 调用失败
   if (!quota.success) {
-    const errorTitle = quota.error || t("subscription.queryFailed");
     if (inline) {
       return (
-        <div
-          className="inline-flex items-center gap-1.5 rounded-full border border-red-200/70 bg-red-50/40 px-2.5 py-1 text-xs text-red-500 shadow-none dark:border-red-900/50 dark:bg-red-950/15 dark:text-red-400"
-          title={errorTitle}
-        >
-          <div className="flex min-w-0 items-center gap-1.5">
+        <div className="inline-flex items-center gap-2 text-xs rounded-lg border border-border-default bg-card px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-1.5 text-red-500 dark:text-red-400">
             <AlertCircle size={12} />
-            <span className="truncate">{t("subscription.queryFailed")}</span>
+            <span>{quota.error || t("subscription.queryFailed")}</span>
           </div>
+          <button
+            onClick={() => refetch()}
+            disabled={loading}
+            className="p-1 rounded hover:bg-muted transition-colors disabled:opacity-50 flex-shrink-0"
+            title={t("subscription.refresh")}
+          >
+            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+          </button>
         </div>
       );
     }

@@ -1,4 +1,4 @@
-//! Deep link import functionality for tuzi switch
+//! Deep link import functionality for Tuzi Switch
 //!
 //! This module implements the tuziswitch:// protocol for importing configurations
 //! via deep links. Supports importing:

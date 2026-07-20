@@ -155,7 +155,9 @@ describe("SettingsPage integration", () => {
     const appInput = await screen.findByPlaceholderText(
       "settings.browsePlaceholderApp",
     );
-    expect((appInput as HTMLInputElement).value).toBe("/home/mock/.tuzi-switch");
+    expect((appInput as HTMLInputElement).value).toBe(
+      "/home/mock/.tuzi-switch",
+    );
   });
 
   it("imports configuration and triggers success callback", async () => {

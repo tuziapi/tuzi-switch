@@ -8,6 +8,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -19,7 +20,6 @@ import {
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { IconPicker } from "@/components/IconPicker";
 import { getIconMetadata } from "@/icons/extracted/metadata";
-import { Input } from "@/components/ui/input";
 import type { UseFormReturn } from "react-hook-form";
 import type { ProviderFormData } from "@/lib/schemas/provider";
 
@@ -27,20 +27,11 @@ interface BasicFormFieldsProps {
   form: UseFormReturn<ProviderFormData>;
   /** Slot to render content between icon and name fields */
   beforeNameSlot?: ReactNode;
-  /** Slot to render in the right column next to provider name */
-  afterNameSlot?: ReactNode;
-  /** Whether to hide the notes field */
-  hideNotes?: boolean;
-  /** Whether to hide both name and notes fields (for openclaw/hermes where they go into advanced) */
-  hideNameAndNotes?: boolean;
 }
 
 export function BasicFormFields({
   form,
   beforeNameSlot,
-  afterNameSlot,
-  hideNotes = false,
-  hideNameAndNotes = false,
 }: BasicFormFieldsProps) {
   const { t } = useTranslation();
   const [iconDialogOpen, setIconDialogOpen] = useState(false);
@@ -131,7 +122,6 @@ export function BasicFormFields({
       {beforeNameSlot}
 
       {/* 基础信息 - 网格布局 */}
-      {!hideNameAndNotes && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           control={form.control}
@@ -147,28 +137,40 @@ export function BasicFormFields({
           )}
         />
 
-        {hideNotes ? (
-          <FormItem>{afterNameSlot}</FormItem>
-        ) : (
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t("provider.notes")}</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    placeholder={t("provider.notesPlaceholder")}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("provider.notes")}</FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  placeholder={t("provider.notesPlaceholder")}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </div>
-      )}
+
+      <FormField
+        control={form.control}
+        name="websiteUrl"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>{t("provider.websiteUrl")}</FormLabel>
+            <FormControl>
+              <Input
+                {...field}
+                placeholder={t("providerForm.websiteUrlPlaceholder")}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </>
   );
 }

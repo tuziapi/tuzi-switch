@@ -10,10 +10,8 @@ import {
   useMemo,
   useRef,
   useState,
-  useCallback,
   type CSSProperties,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -44,14 +42,10 @@ import {
   useCurrentOmoProviderId,
   useCurrentOmoSlimProviderId,
 } from "@/lib/query/omo";
+import { useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { settingsApi } from "@/lib/api/settings";
-import {
-  getApiKeyFromConfig,
-  getCodexProviderEnvKeyFromSettings,
-} from "@/utils/providerConfigUtils";
+import { isTextEditableTarget } from "@/utils/domUtils";
 
 interface ProviderListProps {
   providers: Record<string, Provider>;
@@ -120,15 +114,6 @@ export function ProviderList({
   // Hermes: 读取当前 model.provider，用于判断哪个供应商是"当前激活"（高亮）
   const { data: hermesModelConfig } = useHermesModelConfig(appId === "hermes");
   const hermesCurrentProviderId = hermesModelConfig?.provider;
-
-  // Preload all codex env keys for key existence check
-  const [codexEnvKeys, setCodexEnvKeys] = useState<Record<string, string>>({});
-  useEffect(() => {
-    if (appId !== "codex") return;
-    invoke<Record<string, string>>("read_all_codex_env_keys")
-      .then((keys) => setCodexEnvKeys(keys))
-      .catch(() => setCodexEnvKeys({}));
-  }, [appId, providers, currentProviderId]);
 
   // 判断供应商是否已添加到配置（累加模式应用：OpenCode/OpenClaw/Hermes）
   const isProviderInConfig = useCallback(
@@ -206,11 +191,6 @@ export function ProviderList({
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [showStreamCheckConfirm, setShowStreamCheckConfirm] = useState(false);
-  const [pendingTestProvider, setPendingTestProvider] =
-    useState<Provider | null>(null);
-  const [missingApiKeyProvider, setMissingApiKeyProvider] =
-    useState<Provider | null>(null);
   const { data: claudeDesktopStatus } = useQuery({
     queryKey: ["claudeDesktopStatus"],
     queryFn: () => providersApi.getClaudeDesktopStatus(),
@@ -218,133 +198,13 @@ export function ProviderList({
     refetchInterval: appId === "claude-desktop" ? 5000 : false,
   });
 
-  // Query settings for streamCheckConfirmed flag
-  const { data: settings } = useQuery({
-    queryKey: ["settings"],
-    queryFn: () => settingsApi.get(),
-  });
-
+  // 连通性检查不发真实请求、无封号/计费风险，直接执行（无需确认弹窗）。
   const handleTest = useCallback(
     (provider: Provider) => {
-      if (!settings?.streamCheckConfirmed) {
-        setPendingTestProvider(provider);
-        setShowStreamCheckConfirm(true);
-      } else {
-        checkProvider(provider.id, provider.name);
-      }
+      checkProvider(provider.id, provider.name);
     },
-    [checkProvider, settings?.streamCheckConfirmed],
+    [checkProvider],
   );
-
-  const getCodexProviderEnvKey = useCallback((provider: Provider) => {
-    return getCodexProviderEnvKeyFromSettings(provider.settingsConfig);
-  }, []);
-
-  const hasOpenCodeApiKey = (provider: Provider): boolean => {
-    const options = provider.settingsConfig?.options;
-    if (!options || typeof options !== "object") return false;
-    const apiKey = (options as Record<string, unknown>).apiKey;
-    return typeof apiKey === "string" && apiKey.trim() !== "";
-  };
-
-  const needsApiKey = useCallback(
-    (provider: Provider) => {
-      if (provider.category === "official") {
-        return false;
-      }
-
-      if (provider.meta?.providerType) {
-        return false;
-      }
-
-      const configString = JSON.stringify(provider.settingsConfig ?? {});
-
-      if (appId === "claude") {
-        const apiKey = getApiKeyFromConfig(configString, "claude");
-        return !apiKey.trim();
-      }
-
-      if (appId === "codex") {
-        const envKeyName = getCodexProviderEnvKey(provider);
-        if (envKeyName && codexEnvKeys[envKeyName]) {
-          return false;
-        }
-        const apiKey = getApiKeyFromConfig(configString, "codex");
-        if (apiKey.trim()) {
-          return false;
-        }
-        return true;
-      }
-
-      if (appId === "gemini") {
-        const apiKey = getApiKeyFromConfig(configString, "gemini");
-        return !apiKey.trim();
-      }
-
-      if (appId === "openclaw") {
-        return !(
-          typeof (provider.settingsConfig as Record<string, unknown>)
-            ?.apiKey === "string" &&
-          String(
-            (provider.settingsConfig as Record<string, unknown>)?.apiKey ?? "",
-          ).trim()
-        );
-      }
-
-      if (appId === "hermes") {
-        return !(
-          typeof (provider.settingsConfig as Record<string, unknown>)
-            ?.api_key === "string" &&
-          String(
-            (provider.settingsConfig as Record<string, unknown>)?.api_key ?? "",
-          ).trim()
-        );
-      }
-
-      if (appId === "opencode") {
-        return !hasOpenCodeApiKey(provider);
-      }
-
-      return false;
-    },
-    [appId, codexEnvKeys, getCodexProviderEnvKey],
-  );
-
-  const handleEnableProvider = useCallback(
-    (provider: Provider) => {
-      if (needsApiKey(provider)) {
-        setMissingApiKeyProvider(provider);
-        return;
-      }
-      onSwitch(provider);
-    },
-    [needsApiKey, onSwitch],
-  );
-
-  const handleMissingApiKeyConfirm = useCallback(() => {
-    const provider = missingApiKeyProvider;
-    setMissingApiKeyProvider(null);
-    if (provider) {
-      onEdit(provider);
-    }
-  }, [missingApiKeyProvider, onEdit]);
-
-  const handleStreamCheckConfirm = async () => {
-    setShowStreamCheckConfirm(false);
-    try {
-      if (settings) {
-        const { webdavSync: _, ...rest } = settings;
-        await settingsApi.save({ ...rest, streamCheckConfirmed: true });
-        await queryClient.invalidateQueries({ queryKey: ["settings"] });
-      }
-    } catch (error) {
-      console.error("Failed to save stream check confirmed:", error);
-    }
-    if (pendingTestProvider) {
-      checkProvider(pendingTestProvider.id, pendingTestProvider.name);
-      setPendingTestProvider(null);
-    }
-  };
 
   // Import current live config as default provider
   const queryClient = useQueryClient();
@@ -386,8 +246,13 @@ export function ProviderList({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+
       const key = event.key.toLowerCase();
       if ((event.metaKey || event.ctrlKey) && key === "f") {
+        // 正在输入框/可编辑区域中时不抢占 Ctrl+F（例如添加供应商表单里
+        // ProviderPresetSelector 的搜索框），避免与其同名快捷键冲突。
+        if (isTextEditableTarget(document.activeElement)) return;
         event.preventDefault();
         setIsSearchOpen(true);
         return;
@@ -398,8 +263,8 @@ export function ProviderList({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    globalThis.addEventListener("keydown", handleKeyDown);
+    return () => globalThis.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -414,16 +279,13 @@ export function ProviderList({
 
   const filteredProviders = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
-    const base = keyword
-      ? sortedProviders.filter((provider) => {
-          const fields = [provider.name, provider.notes, provider.websiteUrl];
-          return fields.some((field) =>
-            field?.toString().toLowerCase().includes(keyword),
-          );
-        })
-      : sortedProviders;
-
-    return base;
+    if (!keyword) return sortedProviders;
+    return sortedProviders.filter((provider) => {
+      const fields = [provider.name, provider.notes, provider.websiteUrl];
+      return fields.some((field) =>
+        field?.toString().toLowerCase().includes(keyword),
+      );
+    });
   }, [searchTerm, sortedProviders]);
 
   const claudeDesktopStatusMessages = useMemo(() => {
@@ -542,7 +404,7 @@ export function ProviderList({
                 isInConfig={isProviderInConfig(provider.id)}
                 isOmo={isOmo}
                 isOmoSlim={isOmoSlim}
-                onSwitch={handleEnableProvider}
+                onSwitch={onSwitch}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onRemoveFromConfig={onRemoveFromConfig}
@@ -670,35 +532,6 @@ export function ProviderList({
       ) : (
         renderProviderList()
       )}
-
-      <ConfirmDialog
-        isOpen={showStreamCheckConfirm}
-        variant="info"
-        title={t("confirm.streamCheck.title")}
-        message={t("confirm.streamCheck.message")}
-        confirmText={t("confirm.streamCheck.confirm")}
-        onConfirm={() => void handleStreamCheckConfirm()}
-        onCancel={() => {
-          setShowStreamCheckConfirm(false);
-          setPendingTestProvider(null);
-        }}
-      />
-
-      <ConfirmDialog
-        isOpen={Boolean(missingApiKeyProvider)}
-        variant="info"
-        title={t("provider.missingApiKeyTitle", {
-          defaultValue: "API Key 未填写",
-        })}
-        message={t("provider.missingApiKeyMessage", {
-          name: missingApiKeyProvider?.name ?? "",
-          defaultValue:
-            "供应商「{{name}}」的 API Key 还没有填写，请先去编辑后再启用。",
-        })}
-        confirmText={t("common.edit")}
-        onConfirm={handleMissingApiKeyConfirm}
-        onCancel={() => setMissingApiKeyProvider(null)}
-      />
     </div>
   );
 }

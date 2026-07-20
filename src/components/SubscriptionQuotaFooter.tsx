@@ -9,6 +9,7 @@ interface SubscriptionQuotaFooterProps {
   appId: AppId;
   inline?: boolean;
   isCurrent?: boolean;
+  autoQueryInterval?: number;
 }
 
 interface SubscriptionQuotaViewProps {
@@ -26,12 +27,16 @@ export const TIER_I18N_KEYS: Record<string, string> = {
   seven_day: "subscription.sevenDay",
   seven_day_opus: "subscription.sevenDayOpus",
   seven_day_sonnet: "subscription.sevenDaySonnet",
+  // Codex 免费方案的次要窗口是 30 天（付费方案为 7 天）
+  "30_day": "subscription.thirtyDay",
   // Gemini 模型分类
   gemini_pro: "subscription.geminiPro",
   gemini_flash: "subscription.geminiFlash",
   gemini_flash_lite: "subscription.geminiFlashLite",
   // Token Plan（five_hour 已在上方官方映射中）
   weekly_limit: "subscription.sevenDay",
+  // 火山方舟 Agent Plan / Coding Plan 的月窗口
+  monthly: "subscription.monthly",
   // GitHub Copilot
   premium: "subscription.copilotPremium",
 };
@@ -94,7 +99,7 @@ function formatRelativeTime(
  *
  * 数据源由调用方 hook 注入，方便不同的额度后端复用同一套渲染逻辑：
  * - `SubscriptionQuotaFooter`（CLI 凭据路径，by appId）
- * - `CodexOauthQuotaFooter`（tuzi-switch 自管 OAuth 路径，by ChatGPT account）
+ * - `CodexOauthQuotaFooter`（cc-switch 自管 OAuth 路径，by ChatGPT account）
  */
 export const SubscriptionQuotaView: React.FC<SubscriptionQuotaViewProps> = ({
   quota,
@@ -166,17 +171,21 @@ export const SubscriptionQuotaView: React.FC<SubscriptionQuotaViewProps> = ({
 
   // API 调用失败
   if (!quota.success) {
-    const errorTitle = quota.error || t("subscription.queryFailed");
     if (inline) {
       return (
-        <div
-          className="inline-flex items-center gap-1.5 rounded-full border border-red-200/70 bg-red-50/40 px-2.5 py-1 text-xs text-red-500 shadow-none dark:border-red-900/50 dark:bg-red-950/15 dark:text-red-400"
-          title={errorTitle}
-        >
-          <div className="flex min-w-0 items-center gap-1.5">
+        <div className="inline-flex items-center gap-2 text-xs rounded-lg border border-border-default bg-card px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-1.5 text-red-500 dark:text-red-400">
             <AlertCircle size={12} />
-            <span className="truncate">{t("subscription.queryFailed")}</span>
+            <span>{t("subscription.queryFailed")}</span>
           </div>
+          <button
+            onClick={() => refetch()}
+            disabled={loading}
+            className="p-1 rounded hover:bg-muted transition-colors disabled:opacity-50 flex-shrink-0"
+            title={t("subscription.refresh")}
+          >
+            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+          </button>
         </div>
       );
     }
@@ -305,6 +314,8 @@ export const TierBadge: React.FC<{
     : tier.name;
   const countdown = countdownStr(tier.resetsAt);
 
+  const hasUsd = tier.usedValueUsd != null && tier.maxValueUsd != null;
+
   return (
     <div className="flex items-center gap-0.5">
       <span className="text-gray-500 dark:text-gray-400">{label}:</span>
@@ -313,6 +324,11 @@ export const TierBadge: React.FC<{
       >
         {t("subscription.utilization", { value: Math.round(tier.utilization) })}
       </span>
+      {hasUsd && (
+        <span className="text-muted-foreground/60">
+          (${tier.usedValueUsd!.toFixed(2)}/${tier.maxValueUsd!.toFixed(2)})
+        </span>
+      )}
       {countdown && (
         <span className="text-muted-foreground/60 ml-0.5 flex items-center gap-px">
           <Clock size={10} />
@@ -386,12 +402,18 @@ const SubscriptionQuotaFooter: React.FC<SubscriptionQuotaFooterProps> = ({
   appId,
   inline = false,
   isCurrent = false,
+  autoQueryInterval = 5,
 }) => {
   const {
     data: quota,
     isFetching: loading,
     refetch,
-  } = useSubscriptionQuota(appId, isCurrent, isCurrent);
+  } = useSubscriptionQuota(
+    appId,
+    isCurrent,
+    isCurrent && autoQueryInterval > 0,
+    autoQueryInterval,
+  );
 
   if (!isCurrent) return null;
 

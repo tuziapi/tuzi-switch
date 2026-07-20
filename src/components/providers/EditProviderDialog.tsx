@@ -9,10 +9,6 @@ import {
   type ProviderFormValues,
 } from "@/components/providers/forms/ProviderForm";
 import { openclawApi, providersApi, vscodeApi, type AppId } from "@/lib/api";
-import {
-  extractCodexBaseUrl,
-  setCodexBaseUrl as setCodexBaseUrlInConfig,
-} from "@/utils/providerConfigUtils";
 
 interface EditProviderDialogProps {
   open: boolean;
@@ -70,12 +66,10 @@ export function EditProviderDialog({
         return;
       }
 
-      // Codex API Key is stored in managed env vars referenced by provider.settingsConfig.
-      // Live config may not carry the same env_key, so use DB config as edit source.
       // OpenCode uses additive mode - each provider's config is stored independently in DB
       // Reading live config would return the full opencode.json (with $schema, provider, mcp etc.)
       // instead of just the provider fragment, causing incorrect nested structure on save
-      if (appId === "codex" || appId === "opencode") {
+      if (appId === "opencode") {
         if (!cancelled) {
           setLiveSettings(null);
           setHasLoadedLive(true);
@@ -138,44 +132,39 @@ export function EditProviderDialog({
   }, [open, provider?.id, appId, hasLoadedLive, isProxyTakeover]); // 只依赖 provider.id，不依赖整个 provider 对象
 
   const initialSettingsConfig = useMemo(() => {
-    const config = {
-      ...((liveSettings ?? provider?.settingsConfig ?? {}) as Record<
-        string,
-        unknown
-      >),
-    };
-    if (appId === "gemini") {
-      const env = (config.env as Record<string, unknown> | undefined) ?? {};
-      if (
-        typeof env.GOOGLE_GEMINI_BASE_URL !== "string" ||
-        !env.GOOGLE_GEMINI_BASE_URL.trim()
-      ) {
-        config.env = {
-          ...env,
-          GOOGLE_GEMINI_BASE_URL: "https://api.tu-zi.com",
-        };
+    const base = (liveSettings ?? provider?.settingsConfig ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    // Codex 的 modelCatalog 是 cc-switch 私有字段，SSOT 在数据库。Live 的 config.toml
+    // 仅在写入时投影出 model_catalog_json 指针；Codex.app 改写配置、代理接管/恢复周期、
+    // 来回切换供应商都可能让 Live 丢失该投影，从而 read_live_settings 反解为空。
+    // 若放任 Live 覆盖，编辑界面会显示空映射表，保存后连同数据库里的映射一起清空（数据丢失）。
+    // 因此始终以数据库 SSOT 的 modelCatalog 为准，仅在数据库确实没有时才回退到 Live 反解结果。
+    if (
+      appId === "codex" &&
+      liveSettings &&
+      provider?.settingsConfig &&
+      typeof provider.settingsConfig === "object"
+    ) {
+      const dbCatalog = (provider.settingsConfig as Record<string, unknown>)
+        .modelCatalog;
+      if (dbCatalog !== undefined) {
+        return { ...base, modelCatalog: dbCatalog };
       }
     }
-    if (appId === "codex" && provider?.name === "兔子线路") {
-      const configStr = typeof config.config === "string" ? config.config : "";
-      const existingUrl = extractCodexBaseUrl(configStr);
-      if (!existingUrl || !existingUrl.endsWith("/v1")) {
-        config.config = setCodexBaseUrlInConfig(
-          configStr,
-          "https://api.tu-zi.com/v1",
-        );
-      }
-    }
-    return config;
-  }, [appId, liveSettings, provider?.name, provider?.settingsConfig]); // 只依赖 settingsConfig，不依赖整个 provider
+
+    return base;
+  }, [liveSettings, provider?.settingsConfig, appId]); // 只依赖 settingsConfig，不依赖整个 provider
 
   // 固定 initialData，防止 provider 对象更新时重置表单
   const initialData = useMemo(() => {
     if (!provider) return null;
     return {
       name: provider.name,
-      websiteUrl: provider.websiteUrl,
       notes: provider.notes,
+      websiteUrl: provider.websiteUrl,
       settingsConfig: initialSettingsConfig,
       category: provider.category,
       meta: provider.meta,
@@ -185,7 +174,7 @@ export function EditProviderDialog({
   }, [
     open, // 修复：编辑保存后再次打开显示旧数据，依赖 open 确保每次打开时重新读取最新 provider 数据
     provider?.id, // 只依赖 ID，provider 对象更新不会触发重新计算
-    provider?.meta, // 需要依赖 meta 以便正确初始化 testConfig
+    provider?.meta, // 供应商元数据变化时重新初始化表单
     initialSettingsConfig,
   ]);
 
@@ -210,6 +199,7 @@ export function EditProviderDialog({
         id: nextProviderId,
         name: values.name.trim(),
         notes: values.notes?.trim() || undefined,
+        websiteUrl: values.websiteUrl?.trim() || undefined,
         settingsConfig: parsedConfig,
         icon: values.icon?.trim() || undefined,
         iconColor: values.iconColor?.trim() || undefined,
@@ -257,6 +247,7 @@ export function EditProviderDialog({
         onSubmittingChange={setIsFormSubmitting}
         initialData={initialData}
         showButtons={false}
+        isProxyTakeover={isProxyTakeover}
       />
     </FullScreenPanel>
   );

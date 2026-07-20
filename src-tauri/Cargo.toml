@@ -1,8 +1,8 @@
 [package]
-name = "tu-zi-switch"
-version = "1.1.28"
-description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI - tuzi switch"
-authors = ["lkj020626-lgtm"]
+name = "tuzi-switch"
+version = "3.17.0-tuzi.1"
+description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI - Tuzi Switch"
+authors = ["tuziapi"]
 license = "MIT"
 repository = "https://github.com/tuziapi/tuzi-switch"
 edition = "2021"
@@ -11,7 +11,7 @@ rust-version = "1.85.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "tuzi_switch_lib"
+name = "cc_switch_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 doctest = false
 
@@ -44,6 +44,7 @@ arboard = "3.6"
 flate2 = "1"
 tar = "0.4"
 brotli = "7"
+zstd = "0.13"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
 futures = "0.3"
 async-stream = "0.3"
@@ -79,6 +80,7 @@ rust_decimal = "1.33"
 uuid = { version = "1.11", features = ["v4"] }
 sha2 = "0.10"
 minisign-verify = "0.2"
+hmac = "0.12"
 json5 = "0.4"
 json-five = "0.3.1"
 
@@ -90,6 +92,10 @@ webkit2gtk = { version = "2.0.1", features = ["v2_16"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.52"
+windows-sys = { version = "0.61", features = ["Win32_Globalization", "Win32_UI_Shell"] }
+
+[target.'cfg(all(target_os = "windows", target_arch = "aarch64"))'.dependencies]
+rquickjs = { version = "0.8", features = ["bindgen"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5"

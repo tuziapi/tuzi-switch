@@ -2,104 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   extractCodexBaseUrl,
   extractCodexExperimentalBearerToken,
-  generateCodexCopyEnvKey,
-  getCodexEnvKey,
-  getCodexProviderEnvKeyFromSettings,
-  extractCodexModelCatalogJson,
   extractCodexModelName,
-  extractCodexWireApi,
+  extractCodexTopLevelInt,
+  isCodexGoalModeEnabled,
+  removeCodexTopLevelField,
   setCodexBaseUrl,
-  setCodexEnvKey,
-  setCodexModelCatalogJson,
+  setCodexGoalMode,
   setCodexModelName,
-  setCodexWireApi,
-  rewriteDuplicatedCodexSettingsConfig,
+  setCodexTopLevelInt,
   updateCodexExperimentalBearerToken,
 } from "@/utils/providerConfigUtils";
 
 describe("Codex TOML utils", () => {
-  it("reads env_key from active model provider, top-level, and legacy profile config", () => {
-    expect(
-      getCodexEnvKey(
-        [
-          'model_provider = "deepseek"',
-          "",
-          "[model_providers.deepseek]",
-          'env_key = "DEEPSEEK_API_KEY"',
-          "",
-        ].join("\n"),
-      ),
-    ).toBe("DEEPSEEK_API_KEY");
-
-    expect(getCodexEnvKey('env_key = "OPENAI_API_KEY"\n')).toBe(
-      "OPENAI_API_KEY",
-    );
-
-    expect(
-      getCodexEnvKey(
-        [
-          'profile = "work"',
-          "",
-          "[profiles.work]",
-          'env_key = "LEGACY_API_KEY"',
-          "",
-        ].join("\n"),
-      ),
-    ).toBe("LEGACY_API_KEY");
-  });
-
-  it("prefers the active provider TOML env_key over legacy settings envKey", () => {
-    const config = [
-      'model_provider = "tuzi"',
-      "",
-      "[model_providers.tuzi]",
-      'base_url = "https://tuzi.example/v1"',
-      'env_key = "TUZI_CODEX_KEY"',
-      "",
-      "[model_providers.other]",
-      'base_url = "https://other.example/v1"',
-      'env_key = "OTHER_CODEX_KEY"',
-      "",
-    ].join("\n");
-
-    expect(
-      getCodexProviderEnvKeyFromSettings({
-        config,
-        env: { envKey: "STALE_CODEX_KEY" },
-      }),
-    ).toBe("TUZI_CODEX_KEY");
-  });
-
-  it("reads env_key from valid single-quoted TOML strings", () => {
-    expect(
-      getCodexEnvKey(
-        [
-          "model_provider = 'tuzi'",
-          "",
-          "[model_providers.tuzi]",
-          "env_key = 'TUZI_SINGLE_QUOTED_KEY'",
-          "",
-        ].join("\n"),
-      ),
-    ).toBe("TUZI_SINGLE_QUOTED_KEY");
-
-    expect(getCodexEnvKey("env_key = 'TOP_LEVEL_SINGLE_KEY'\n")).toBe(
-      "TOP_LEVEL_SINGLE_KEY",
-    );
-
-    expect(
-      getCodexEnvKey(
-        [
-          "profile = 'legacy'",
-          "",
-          "[profiles.legacy]",
-          "env_key = 'LEGACY_SINGLE_KEY'",
-          "",
-        ].join("\n"),
-      ),
-    ).toBe("LEGACY_SINGLE_KEY");
-  });
-
   it("removes base_url line when set to empty", () => {
     const input = [
       'model_provider = "openai"',
@@ -147,6 +61,48 @@ describe("Codex TOML utils", () => {
 
     const output2 = setCodexModelName(output1, " new-model \n");
     expect(extractCodexModelName(output2)).toBe("new-model");
+  });
+
+  it("updates a double-quoted base_url containing single quotes without duplicating it", () => {
+    const input = [
+      'model_provider = "custom"',
+      'model = "gpt-5.4"',
+      "",
+      "[model_providers.custom]",
+      'name = "custom"',
+      "base_url = \"https://su'us.codes/v1\"",
+      'wire_api = "responses"',
+      'requires_openai_auth = true',
+      "",
+    ].join("\n");
+
+    const output = setCodexBaseUrl(input, "https://su'us'd.codes/v1");
+
+    expect(extractCodexBaseUrl(output)).toBe("https://su'us'd.codes/v1");
+    expect(output.match(/^\s*base_url\s*=/gm)).toHaveLength(1);
+    expect(output).toContain("base_url = \"https://su'us'd.codes/v1\"");
+  });
+
+  it("collapses duplicate base_url lines when editing the active provider section", () => {
+    const input = [
+      'model_provider = "custom"',
+      'model = "gpt-5.4"',
+      "",
+      "[model_providers.custom]",
+      'name = "custom"',
+      'base_url = "https://old.example/v1"',
+      'base_url = "https://older.example/v1"',
+      'wire_api = "responses"',
+      'requires_openai_auth = true',
+      "",
+    ].join("\n");
+
+    const output = setCodexBaseUrl(input, "https://new.example/v1");
+
+    expect(extractCodexBaseUrl(output)).toBe("https://new.example/v1");
+    expect(output.match(/^\s*base_url\s*=/gm)).toHaveLength(1);
+    expect(output).toContain('base_url = "https://new.example/v1"');
+    expect(output).not.toContain("older.example");
   });
 
   it("reads and writes base_url in the active provider section", () => {
@@ -242,259 +198,252 @@ describe("Codex TOML utils", () => {
     expect(extractCodexModelName(input)).toBe("gpt-5");
   });
 
-  it("reads wire_api from the active provider section and ignores inactive providers", () => {
+  it("reads, writes, and removes top-level integer metadata fields", () => {
     const input = [
-      'model_provider = "active"',
-      'wire_api = "top-level"',
+      'model_provider = "custom"',
+      'model = "deepseek-v4-flash"',
       "",
-      "[model_providers.inactive]",
-      'wire_api = "chat"',
-      "",
-      "[model_providers.active]",
-      'wire_api = "responses"',
+      "[model_providers.custom]",
+      'name = "DeepSeek"',
       "",
     ].join("\n");
 
-    expect(extractCodexWireApi(input)).toBe("responses");
+    const withContext = setCodexTopLevelInt(
+      input,
+      "model_context_window",
+      128000,
+    );
+    const withCompact = setCodexTopLevelInt(
+      withContext,
+      "model_auto_compact_token_limit",
+      90000,
+    );
+
+    expect(extractCodexTopLevelInt(withCompact, "model_context_window")).toBe(
+      128000,
+    );
+    expect(
+      extractCodexTopLevelInt(withCompact, "model_auto_compact_token_limit"),
+    ).toBe(90000);
+    expect(withCompact).toMatch(/^model_context_window = 128000$/m);
+    expect(withCompact).toMatch(/^model_auto_compact_token_limit = 90000$/m);
+
+    const removed = removeCodexTopLevelField(
+      withCompact,
+      "model_context_window",
+    );
+
+    expect(
+      extractCodexTopLevelInt(removed, "model_context_window"),
+    ).toBeUndefined();
+    expect(removed).toContain("[model_providers.custom]");
   });
 
-  it("falls back to top-level wire_api when the active provider section has none", () => {
+  it("adds Goal mode under the top-level features table", () => {
     const input = [
-      'model_provider = "active"',
-      'wire_api = "responses"',
+      'model_provider = "custom"',
+      'model = "gpt-5.4"',
       "",
-      "[model_providers.inactive]",
-      'wire_api = "chat"',
-      "",
-      "[model_providers.active]",
-      'name = "Active"',
+      "[model_providers.custom]",
+      'name = "custom"',
       "",
     ].join("\n");
 
-    expect(extractCodexWireApi(input)).toBe("responses");
-  });
+    const output = setCodexGoalMode(input, true);
 
-  it("writes wire_api into the active provider section without changing top-level or inactive sections", () => {
-    const input = [
-      'model_provider = "active"',
-      'wire_api = "top-level"',
-      "",
-      "[model_providers.inactive]",
-      'wire_api = "chat"',
-      "",
-      "[model_providers.active]",
-      'name = "Active"',
-      "",
-    ].join("\n");
-
-    const output = setCodexWireApi(input, "responses");
-
-    expect(output).toContain('wire_api = "top-level"');
-    expect(output).toContain('[model_providers.inactive]\nwire_api = "chat"');
+    expect(isCodexGoalModeEnabled(output)).toBe(true);
     expect(output).toContain(
-      '[model_providers.active]\nname = "Active"\nwire_api = "responses"',
+      'model = "gpt-5.4"\n\n[features]\ngoals = true\n\n[model_providers.custom]',
     );
-    expect(extractCodexWireApi(output)).toBe("responses");
   });
 
-  it("clears wire_api from the active provider section and then falls back to top-level", () => {
+  it("removes Goal mode without deleting other feature flags", () => {
     const input = [
-      'model_provider = "active"',
-      'wire_api = "top-level"',
+      'model_provider = "custom"',
       "",
-      "[model_providers.inactive]",
-      'wire_api = "chat"',
+      "[features]",
+      "goals = true",
+      "experimental_resume = true",
       "",
-      "[model_providers.active]",
-      'wire_api = "responses"',
+      "[model_providers.custom]",
+      'name = "custom"',
       "",
     ].join("\n");
 
-    const output = setCodexWireApi(input, "");
+    const output = setCodexGoalMode(input, false);
 
-    expect(output).toContain('wire_api = "top-level"');
-    expect(output).toContain('[model_providers.inactive]\nwire_api = "chat"');
-    expect(output).toContain("[model_providers.active]\n");
-    expect(output).not.toContain(
-      '[model_providers.active]\nwire_api = "responses"',
-    );
-    expect(extractCodexWireApi(output)).toBe("top-level");
+    expect(isCodexGoalModeEnabled(output)).toBe(false);
+    expect(output).toContain("[features]\nexperimental_resume = true");
+    expect(output).not.toMatch(/^\s*goals\s*=/m);
   });
 
-  it("reads experimental_bearer_token from the active provider section before top-level", () => {
+  it("removes the features table when disabling the only Goal mode flag", () => {
     const input = [
-      'model_provider = "active"',
-      'experimental_bearer_token = "top-level-token"',
+      'model_provider = "custom"',
       "",
-      "[model_providers.active]",
-      'experimental_bearer_token = "active-token"',
+      "[features]",
+      "goals = true",
+      "",
+      "[model_providers.custom]",
+      'name = "custom"',
       "",
     ].join("\n");
 
-    expect(extractCodexExperimentalBearerToken(input)).toBe("active-token");
+    const output = setCodexGoalMode(input, false);
+
+    expect(isCodexGoalModeEnabled(output)).toBe(false);
+    expect(output).not.toContain("[features]");
+    expect(output).toContain("[model_providers.custom]");
   });
 
-  it("uses top-level experimental_bearer_token for reserved provider ids", () => {
+  it("preserves feature-section comments when disabling Goal mode", () => {
+    const input = [
+      'model_provider = "custom"',
+      "",
+      "[features]",
+      "# Keep this note",
+      "goals = true",
+      "",
+      "[model_providers.custom]",
+      'name = "custom"',
+      "",
+    ].join("\n");
+
+    const output = setCodexGoalMode(input, false);
+
+    expect(isCodexGoalModeEnabled(output)).toBe(false);
+    expect(output).toContain("[features]\n# Keep this note");
+    expect(output).not.toMatch(/^\s*goals\s*=/m);
+  });
+
+  // P3 回归: 不能在 config 没用 bearer token 模式时, 误为它新增一行
+  it("updateCodexExperimentalBearerToken leaves config without the token alone", () => {
     const input = [
       'model_provider = "openai"',
-      'experimental_bearer_token = "top-level-token"',
-      "",
-      "[model_providers.openai]",
-      'experimental_bearer_token = "stale-provider-token"',
+      'base_url = "https://api.example.com/v1"',
       "",
     ].join("\n");
 
-    expect(extractCodexExperimentalBearerToken(input)).toBe("top-level-token");
-  });
-
-  it("falls back to top-level experimental_bearer_token when active provider has none", () => {
-    const input = [
-      'model_provider = "active"',
-      'experimental_bearer_token = "top-level-token"',
-      "",
-      "[model_providers.active]",
-      'name = "Active"',
-      "",
-    ].join("\n");
-
-    expect(extractCodexExperimentalBearerToken(input)).toBe("top-level-token");
-  });
-
-  it("ignores experimental_bearer_token from non-active provider sections", () => {
-    const input = [
-      'model_provider = "active"',
-      "",
-      "[model_providers.inactive]",
-      'experimental_bearer_token = "inactive-token"',
-      "",
-      "[model_providers.active]",
-      'name = "Active"',
-      "",
-    ].join("\n");
-
-    expect(extractCodexExperimentalBearerToken(input)).toBeUndefined();
-  });
-
-  it("updates and removes experimental_bearer_token in the active provider section", () => {
-    const input = [
-      'model_provider = "active"',
-      'experimental_bearer_token = "top-level-token"',
-      "",
-      "[model_providers.active]",
-      'experimental_bearer_token = "old-token" # live token',
-      "",
-    ].join("\n");
-
-    const updated = updateCodexExperimentalBearerToken(input, 'new"token\\x');
-
-    expect(updated).toContain(
-      'experimental_bearer_token = "new\\"token\\\\x" # live token',
-    );
-    expect(extractCodexExperimentalBearerToken(updated)).toBe('new"token\\x');
-
-    const cleared = updateCodexExperimentalBearerToken(updated, "");
-
-    expect(extractCodexExperimentalBearerToken(cleared)).toBe(
-      "top-level-token",
-    );
-    expect(cleared).not.toContain("# live token");
-  });
-
-  it("does not add experimental_bearer_token to configs that do not already use it", () => {
-    const input = [
-      'model_provider = "active"',
-      "",
-      "[model_providers.active]",
-      'name = "Active"',
-      "",
-    ].join("\n");
-
-    expect(updateCodexExperimentalBearerToken(input, "new-token")).toBe(input);
+    expect(updateCodexExperimentalBearerToken(input, "new-key")).toBe(input);
     expect(updateCodexExperimentalBearerToken(input, "")).toBe(input);
   });
 
-  it("updates env_key only for the active provider section", () => {
+  // P3 回归: bearer 模式下清空 API key 必须真正擦掉 token, 让 pickCodexApiKey 的 fallback 找不到
+  it("updateCodexExperimentalBearerToken removes the token line when set to empty", () => {
     const input = [
-      'model_provider = "active"',
-      'env_key = "TOP_LEVEL_CODEX_KEY"',
+      'model_provider = "thirdparty"',
       "",
-      "[model_providers.inactive]",
-      'env_key = "INACTIVE_CODEX_KEY"',
-      "",
-      "[model_providers.active]",
-      'base_url = "https://active.example/v1"',
-      'env_key = "OLD_ACTIVE_CODEX_KEY" # managed',
+      "[model_providers.thirdparty]",
+      'name = "Thirdparty"',
+      'base_url = "https://thirdparty.example/v1"',
+      'experimental_bearer_token = "old-key"',
+      "requires_openai_auth = true",
       "",
     ].join("\n");
 
-    const output = setCodexEnvKey(input, "NEW_ACTIVE_CODEX_KEY");
+    const cleared = updateCodexExperimentalBearerToken(input, "");
 
-    expect(output).toContain('env_key = "NEW_ACTIVE_CODEX_KEY" # managed');
-    expect(output).toContain('env_key = "TOP_LEVEL_CODEX_KEY"');
-    expect(output).toContain('env_key = "INACTIVE_CODEX_KEY"');
-    expect(getCodexEnvKey(output)).toBe("NEW_ACTIVE_CODEX_KEY");
+    expect(extractCodexExperimentalBearerToken(cleared)).toBeUndefined();
+    expect(cleared).toMatch(/requires_openai_auth = true/);
+    expect(cleared).toMatch(/base_url = "https:\/\/thirdparty\.example\/v1"/);
   });
 
-  it("rewrites duplicated codex settings to an isolated env key", () => {
-    const nextEnvKey = generateCodexCopyEnvKey("codex订阅_2 copy", [
-      "CODING_CODEX_API_KEY",
-      "CODEX_2_COPY_CODEX_API_KEY",
-    ]);
+  it("updateCodexExperimentalBearerToken replaces the token inside the active model_providers section", () => {
+    const input = [
+      'model_provider = "thirdparty"',
+      "",
+      "[model_providers.thirdparty]",
+      'experimental_bearer_token = "old-key"',
+      "",
+    ].join("\n");
 
-    expect(nextEnvKey).toBe("CODEX_2_COPY_CODEX_API_KEY_2");
+    const updated = updateCodexExperimentalBearerToken(input, "new-key");
 
-    const output = rewriteDuplicatedCodexSettingsConfig(
-      {
-        auth: { OPENAI_API_KEY: "sk-original" },
-        env: { envKey: "CODING_CODEX_API_KEY" },
-        config: [
-          'model_provider = "tuzi"',
-          'experimental_bearer_token = "top-level-token"',
-          "",
-          "[model_providers.tuzi]",
-          'base_url = "https://api.tu-zi.com/v1"',
-          'env_key = "CODING_CODEX_API_KEY"',
-          'experimental_bearer_token = "section-token"',
-          "",
-        ].join("\n"),
-      },
-      nextEnvKey,
+    expect(extractCodexExperimentalBearerToken(updated)).toBe("new-key");
+    expect(updated).not.toMatch(/old-key/);
+  });
+
+  it("updateCodexExperimentalBearerToken escapes basic TOML strings and keeps comments", () => {
+    const input = [
+      'model_provider = "thirdparty"',
+      "",
+      "[model_providers.thirdparty]",
+      'experimental_bearer_token = "old-key" # vendor token',
+      "",
+    ].join("\n");
+
+    const updated = updateCodexExperimentalBearerToken(input, 'abc"def\\ghi');
+
+    expect(updated).toContain(
+      'experimental_bearer_token = "abc\\"def\\\\ghi" # vendor token',
     );
-
-    expect(output.env.envKey).toBe("CODEX_2_COPY_CODEX_API_KEY_2");
-    expect(output.config).toContain('env_key = "CODEX_2_COPY_CODEX_API_KEY_2"');
-    expect(output.config).not.toContain("CODING_CODEX_API_KEY");
-    expect(output.config).not.toContain("experimental_bearer_token");
-    expect(output.auth.OPENAI_API_KEY).toBeUndefined();
+    expect(extractCodexExperimentalBearerToken(updated)).toBe('abc"def\\ghi');
   });
 
-  it("reads, writes, and removes top-level model_catalog_json", () => {
+  it("updateCodexExperimentalBearerToken escapes all TOML control characters", () => {
     const input = [
-      'model_provider = "active"',
+      'model_provider = "thirdparty"',
       "",
-      "[model_providers.active]",
-      'model_catalog_json = "wrong-section.json"',
+      "[model_providers.thirdparty]",
+      'experimental_bearer_token = "old-key"',
       "",
     ].join("\n");
 
-    const updated = setCodexModelCatalogJson(
+    const updated = updateCodexExperimentalBearerToken(
       input,
-      '/Users/test/catalog "quoted".json',
+      "a\u0000b\u0001c\u001fd",
     );
 
     expect(updated).toContain(
-      'model_catalog_json = "/Users/test/catalog \\"quoted\\".json"',
+      'experimental_bearer_token = "a\\u0000b\\u0001c\\u001fd"',
     );
-    expect(extractCodexModelCatalogJson(updated)).toBe(
-      '/Users/test/catalog "quoted".json',
+    expect(extractCodexExperimentalBearerToken(updated)).toBe(
+      "a\u0000b\u0001c\u001fd",
     );
+  });
+
+  it("updateCodexExperimentalBearerToken can replace an already escaped basic string", () => {
+    const input = [
+      'model_provider = "thirdparty"',
+      "",
+      "[model_providers.thirdparty]",
+      'experimental_bearer_token = "old\\"key" # vendor token',
+      "",
+    ].join("\n");
+
+    const updated = updateCodexExperimentalBearerToken(input, "new-key");
+
     expect(updated).toContain(
-      '[model_providers.active]\nmodel_catalog_json = "wrong-section.json"',
+      'experimental_bearer_token = "new-key" # vendor token',
     );
+    expect(extractCodexExperimentalBearerToken(updated)).toBe("new-key");
+  });
 
-    const cleared = setCodexModelCatalogJson(updated, "");
+  it("extractCodexExperimentalBearerToken ignores reserved provider tables", () => {
+    const input = [
+      'model_provider = "openai"',
+      'experimental_bearer_token = "top-level-key"',
+      "",
+      "[model_providers.openai]",
+      'experimental_bearer_token = "stale-table-key"',
+      "",
+    ].join("\n");
 
-    expect(extractCodexModelCatalogJson(cleared)).toBeUndefined();
-    expect(cleared).toContain("wrong-section.json");
+    expect(extractCodexExperimentalBearerToken(input)).toBe("top-level-key");
+  });
+
+  it("extractCodexExperimentalBearerToken reads only top-level model_provider", () => {
+    const input = [
+      'experimental_bearer_token = "top-level-key"',
+      "",
+      "[profiles.work]",
+      'model_provider = "fake"',
+      "",
+      "[model_providers.fake]",
+      'experimental_bearer_token = "wrong-key"',
+      "",
+    ].join("\n");
+
+    expect(extractCodexExperimentalBearerToken(input)).toBe("top-level-key");
   });
 });
