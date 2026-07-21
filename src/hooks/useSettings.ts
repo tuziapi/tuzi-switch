@@ -13,6 +13,7 @@ import {
   type ResolvedDirectories,
 } from "./useDirectorySettings";
 import { useSettingsMetadata } from "./useSettingsMetadata";
+import { track } from "@/lib/analytics";
 
 type Language = "zh" | "en" | "ja";
 
@@ -224,7 +225,17 @@ export function useSettings(): UseSettingsResult {
         ) {
           try {
             await settingsApi.setAutoLaunch(payload.launchOnStartup);
+            track("setting_action", {
+              action: "startup",
+              result: "success",
+              enabled: payload.launchOnStartup ? "true" : "false",
+            });
           } catch (error) {
+            track("setting_action", {
+              action: "startup",
+              result: "failed",
+              enabled: payload.launchOnStartup ? "true" : "false",
+            });
             console.error("Failed to update auto-launch:", error);
             toast.error(
               t("settings.autoLaunchFailed", {
@@ -269,6 +280,16 @@ export function useSettings(): UseSettingsResult {
           prevPluginEnabled,
         );
 
+        if (
+          updates.preferredTerminal !== undefined &&
+          updates.preferredTerminal !== data?.preferredTerminal
+        ) {
+          track("setting_action", {
+            action: "terminal",
+            result: "success",
+          });
+        }
+
         // 持久化语言偏好
         try {
           if (typeof window !== "undefined" && updates.language) {
@@ -290,6 +311,22 @@ export function useSettings(): UseSettingsResult {
 
         return { requiresRestart: false };
       } catch (error) {
+        if (
+          updates.launchOnStartup !== undefined &&
+          updates.launchOnStartup !== data?.launchOnStartup
+        ) {
+          track("setting_action", {
+            action: "startup",
+            result: "failed",
+            enabled: updates.launchOnStartup ? "true" : "false",
+          });
+        }
+        if (updates.preferredTerminal !== undefined) {
+          track("setting_action", {
+            action: "terminal",
+            result: "failed",
+          });
+        }
         console.error("[useSettings] Failed to auto-save settings", error);
         toast.error(
           t("notifications.settingsSaveFailed", {
@@ -323,12 +360,14 @@ export function useSettings(): UseSettingsResult {
         const sanitizedOpenclawDir = sanitizeDir(
           mergedSettings.openclawConfigDir,
         );
+        const sanitizedHermesDir = sanitizeDir(mergedSettings.hermesConfigDir);
         const previousAppDir = initialAppConfigDir;
         const previousClaudeDir = sanitizeDir(data?.claudeConfigDir);
         const previousCodexDir = sanitizeDir(data?.codexConfigDir);
         const previousGeminiDir = sanitizeDir(data?.geminiConfigDir);
         const previousOpencodeDir = sanitizeDir(data?.opencodeConfigDir);
         const previousOpenclawDir = sanitizeDir(data?.openclawConfigDir);
+        const previousHermesDir = sanitizeDir(data?.hermesConfigDir);
         const { webdavSync: _ignoredWebdavSync, ...restSettings } =
           mergedSettings;
 
@@ -359,7 +398,17 @@ export function useSettings(): UseSettingsResult {
         ) {
           try {
             await settingsApi.setAutoLaunch(payload.launchOnStartup);
+            track("setting_action", {
+              action: "startup",
+              result: "success",
+              enabled: payload.launchOnStartup ? "true" : "false",
+            });
           } catch (error) {
+            track("setting_action", {
+              action: "startup",
+              result: "failed",
+              enabled: payload.launchOnStartup ? "true" : "false",
+            });
             console.error("Failed to update auto-launch:", error);
             toast.error(
               t("settings.autoLaunchFailed", {
@@ -428,13 +477,15 @@ export function useSettings(): UseSettingsResult {
         const geminiDirChanged = sanitizedGeminiDir !== previousGeminiDir;
         const opencodeDirChanged = sanitizedOpencodeDir !== previousOpencodeDir;
         const openclawDirChanged = sanitizedOpenclawDir !== previousOpenclawDir;
+        const hermesDirChanged = sanitizedHermesDir !== previousHermesDir;
         if (
           !pluginSynced &&
           (claudeDirChanged ||
             codexDirChanged ||
             geminiDirChanged ||
             opencodeDirChanged ||
-            openclawDirChanged)
+            openclawDirChanged ||
+            hermesDirChanged)
         ) {
           const syncResult = await syncCurrentProvidersLiveSafe();
           if (!syncResult.ok) {
@@ -446,6 +497,24 @@ export function useSettings(): UseSettingsResult {
         }
 
         const appDirChanged = sanitizedAppDir !== (previousAppDir ?? undefined);
+        const changedDirectories = [
+          ["app", appDirChanged],
+          ["claude", claudeDirChanged],
+          ["codex", codexDirChanged],
+          ["gemini", geminiDirChanged],
+          ["opencode", opencodeDirChanged],
+          ["openclaw", openclawDirChanged],
+          ["hermes", hermesDirChanged],
+        ] as const;
+        changedDirectories.forEach(([app, changed]) => {
+          if (changed) {
+            track("setting_action", {
+              app,
+              action: "directory",
+              result: "success",
+            });
+          }
+        });
         setRequiresRestart(appDirChanged);
 
         if (!options?.silent) {
@@ -459,6 +528,55 @@ export function useSettings(): UseSettingsResult {
 
         return { requiresRestart: appDirChanged };
       } catch (error) {
+        const failedSettings = settings ? { ...settings, ...overrides } : null;
+        const failedDirectories = failedSettings
+          ? ([
+              [
+                "app",
+                sanitizeDir(appConfigDir) !==
+                  (initialAppConfigDir ?? undefined),
+              ],
+              [
+                "claude",
+                sanitizeDir(failedSettings.claudeConfigDir) !==
+                  sanitizeDir(data?.claudeConfigDir),
+              ],
+              [
+                "codex",
+                sanitizeDir(failedSettings.codexConfigDir) !==
+                  sanitizeDir(data?.codexConfigDir),
+              ],
+              [
+                "gemini",
+                sanitizeDir(failedSettings.geminiConfigDir) !==
+                  sanitizeDir(data?.geminiConfigDir),
+              ],
+              [
+                "opencode",
+                sanitizeDir(failedSettings.opencodeConfigDir) !==
+                  sanitizeDir(data?.opencodeConfigDir),
+              ],
+              [
+                "openclaw",
+                sanitizeDir(failedSettings.openclawConfigDir) !==
+                  sanitizeDir(data?.openclawConfigDir),
+              ],
+              [
+                "hermes",
+                sanitizeDir(failedSettings.hermesConfigDir) !==
+                  sanitizeDir(data?.hermesConfigDir),
+              ],
+            ] as const)
+          : [];
+        failedDirectories.forEach(([app, changed]) => {
+          if (changed) {
+            track("setting_action", {
+              app,
+              action: "directory",
+              result: "failed",
+            });
+          }
+        });
         console.error("[useSettings] Failed to save settings", error);
         toast.error(
           t("notifications.settingsSaveFailed", {

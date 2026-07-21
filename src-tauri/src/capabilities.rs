@@ -196,6 +196,21 @@ pub async fn invoke_capability(
             "platform": platform(),
             "portable": crate::commands::is_portable_mode().await.unwrap_or(false),
         })),
+        "analytics.trackProductEvent" => {
+            let payload: crate::commands::AnalyticsEvent = match parse_payload(request.payload) {
+                Ok(payload) => payload,
+                Err(message) => {
+                    return Ok(CapabilityResponse::err(
+                        CapabilityErrorCode::InvalidPayload,
+                        message,
+                        false,
+                    ))
+                }
+            };
+            crate::commands::track_product_event(payload)
+                .await
+                .map(|_| json!(true))
+        }
         "update.checkNative" => check_native_update(&app).await,
         "update.getWebStatus" => crate::web_hot_update::get_web_hot_update_status()
             .await
@@ -257,6 +272,7 @@ fn capability_ids() -> Vec<&'static str> {
         "system.openUrl",
         "system.openPath",
         "config.getAppConfigInfo",
+        "analytics.trackProductEvent",
         "update.checkNative",
         "update.getWebStatus",
         "update.checkWeb",
@@ -274,6 +290,7 @@ fn capability_flags(id: &str) -> Vec<String> {
     match id {
         "terminal.launchProvider" | "terminal.launchCommand" => vec!["terminal".to_string()],
         "system.openUrl" | "system.openPath" => vec!["external".to_string()],
+        "analytics.trackProductEvent" => vec!["analytics".to_string()],
         "update.checkNative" | "update.getWebStatus" | "update.checkWeb" => {
             vec!["update".to_string()]
         }
@@ -458,6 +475,10 @@ mod tests {
             .capabilities
             .iter()
             .any(|cap| cap.id == "update.checkWeb"));
+        assert!(manifest
+            .capabilities
+            .iter()
+            .any(|cap| cap.id == "analytics.trackProductEvent"));
     }
 
     #[test]

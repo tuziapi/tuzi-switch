@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsQuery } from "@/lib/query";
 import type { Settings } from "@/types";
+import { setAnalyticsEnabled } from "@/lib/analytics";
 
 type Language = "zh" | "en" | "ja";
 
@@ -86,6 +87,7 @@ export function useSettingsForm(): UseSettingsFormResult {
         data.enableClaudePluginIntegration ?? false,
       silentStartup: data.silentStartup ?? false,
       skipClaudeOnboarding: data.skipClaudeOnboarding ?? false,
+      anonymousAnalyticsEnabled: data.anonymousAnalyticsEnabled ?? true,
       preserveCodexOfficialAuthOnSwitch:
         data.preserveCodexOfficialAuthOnSwitch ?? true,
       unifyCodexSessionHistory: data.unifyCodexSessionHistory ?? true,
@@ -98,6 +100,7 @@ export function useSettingsForm(): UseSettingsFormResult {
       language: normalizedLanguage,
     };
 
+    setAnalyticsEnabled(normalized.anonymousAnalyticsEnabled ?? true);
     setSettingsState(normalized);
     initialLanguageRef.current = normalizedLanguage;
     syncLanguage(normalizedLanguage);
@@ -114,6 +117,7 @@ export function useSettingsForm(): UseSettingsFormResult {
             useAppWindowControls: false,
             enableClaudePluginIntegration: false,
             skipClaudeOnboarding: false,
+            anonymousAnalyticsEnabled: true,
             preserveCodexOfficialAuthOnSwitch: true,
             unifyCodexSessionHistory: true,
             unifyCodexMigrateExisting: true,
@@ -154,11 +158,11 @@ export function useSettingsForm(): UseSettingsFormResult {
           serverData.enableClaudePluginIntegration ?? false,
         silentStartup: serverData.silentStartup ?? false,
         skipClaudeOnboarding: serverData.skipClaudeOnboarding ?? false,
+        anonymousAnalyticsEnabled: serverData.anonymousAnalyticsEnabled ?? true,
         preserveCodexOfficialAuthOnSwitch:
           serverData.preserveCodexOfficialAuthOnSwitch ?? true,
         unifyCodexSessionHistory: serverData.unifyCodexSessionHistory ?? true,
-        unifyCodexMigrateExisting:
-          serverData.unifyCodexMigrateExisting ?? true,
+        unifyCodexMigrateExisting: serverData.unifyCodexMigrateExisting ?? true,
         claudeConfigDir: sanitizeDir(serverData.claudeConfigDir),
         codexConfigDir: sanitizeDir(serverData.codexConfigDir),
         geminiConfigDir: sanitizeDir(serverData.geminiConfigDir),
@@ -167,6 +171,7 @@ export function useSettingsForm(): UseSettingsFormResult {
         language: normalizedLanguage,
       };
 
+      setAnalyticsEnabled(normalized.anonymousAnalyticsEnabled ?? true);
       setSettingsState(normalized);
       syncLanguage(initialLanguageRef.current);
     },

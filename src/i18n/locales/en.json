@@ -301,6 +301,11 @@
   },
   "settings": {
     "title": "Settings",
+    "anonymousAnalytics": {
+      "sectionTitle": "Privacy and Improvement",
+      "title": "Anonymous Usage Analytics",
+      "description": "Enabled by default and can be disabled anytime. Only the app version, operating system, and core feature usage are collected. Keys, conversations, requests, provider URLs, and file paths are never collected."
+    },
     "general": "General",
     "tabGeneral": "General",
     "tabAuth": "Auth",

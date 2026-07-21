@@ -3,6 +3,7 @@ import type { VisibleApps } from "@/types";
 import { Monitor, Terminal } from "lucide-react";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 
 interface AppSwitcherProps {
   activeApp: AppId;
@@ -30,6 +31,7 @@ export function AppSwitcher({
 }: AppSwitcherProps) {
   const handleSwitch = (app: AppId) => {
     if (app === activeApp) return;
+    track("app_selected", { app });
     localStorage.setItem(STORAGE_KEY, app);
     onSwitch(app);
   };

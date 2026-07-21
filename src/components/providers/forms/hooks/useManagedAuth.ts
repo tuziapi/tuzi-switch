@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authApi, settingsApi } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
+import { track } from "@/lib/analytics";
 import type {
   ManagedAuthProvider,
   ManagedAuthStatus,
@@ -26,6 +27,16 @@ export function useManagedAuth(
     null,
   );
   const pollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loginResultTrackedRef = useRef(false);
+
+  const trackLoginResult = useCallback(
+    (result: "success" | "failed") => {
+      if (loginResultTrackedRef.current) return;
+      loginResultTrackedRef.current = true;
+      track("auth_action", { app: authProvider, action: "login", result });
+    },
+    [authProvider],
+  );
 
   const {
     data: authStatus,
@@ -83,6 +94,7 @@ export function useManagedAuth(
           stopPolling();
           setPollingState("error");
           setError("Device code expired. Please try again.");
+          trackLoginResult("failed");
           return;
         }
 
@@ -95,6 +107,7 @@ export function useManagedAuth(
           if (newAccount) {
             stopPolling();
             setPollingState("success");
+            trackLoginResult("success");
             await refetchStatus();
             await queryClient.invalidateQueries({ queryKey });
             setPollingState("idle");
@@ -109,6 +122,7 @@ export function useManagedAuth(
             stopPolling();
             setPollingState("error");
             setError(errorMessage);
+            trackLoginResult("failed");
           }
         }
       };
@@ -119,17 +133,24 @@ export function useManagedAuth(
         stopPolling();
         setPollingState("error");
         setError("Device code expired. Please try again.");
+        trackLoginResult("failed");
       }, response.expires_in * 1000);
     },
     onError: (e) => {
       setPollingState("error");
       setError(e instanceof Error ? e.message : String(e));
+      trackLoginResult("failed");
     },
   });
 
   const logoutMutation = useMutation({
     mutationFn: () => authApi.authLogout(authProvider),
     onSuccess: async () => {
+      track("auth_action", {
+        app: authProvider,
+        action: "logout",
+        result: "success",
+      });
       setPollingState("idle");
       setDeviceCode(null);
       setError(null);
@@ -142,6 +163,11 @@ export function useManagedAuth(
       await queryClient.invalidateQueries({ queryKey });
     },
     onError: async (e) => {
+      track("auth_action", {
+        app: authProvider,
+        action: "logout",
+        result: "failed",
+      });
       console.error("[ManagedAuth] Failed to logout:", e);
       setError(e instanceof Error ? e.message : String(e));
       await refetchStatus();
@@ -152,6 +178,11 @@ export function useManagedAuth(
     mutationFn: (accountId: string) =>
       authApi.authRemoveAccount(authProvider, accountId),
     onSuccess: async () => {
+      track("auth_action", {
+        app: authProvider,
+        action: "logout",
+        result: "success",
+      });
       setPollingState("idle");
       setDeviceCode(null);
       setError(null);
@@ -159,6 +190,11 @@ export function useManagedAuth(
       await queryClient.invalidateQueries({ queryKey });
     },
     onError: (e) => {
+      track("auth_action", {
+        app: authProvider,
+        action: "logout",
+        result: "failed",
+      });
       console.error("[ManagedAuth] Failed to remove account:", e);
       setError(e instanceof Error ? e.message : String(e));
     },
@@ -178,6 +214,7 @@ export function useManagedAuth(
   });
 
   const startAuth = useCallback(() => {
+    loginResultTrackedRef.current = false;
     setPollingState("idle");
     setDeviceCode(null);
     setError(null);

@@ -3,6 +3,7 @@ import { failoverApi } from "@/lib/api/failover";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { extractErrorMessage } from "@/utils/errorUtils";
+import { track } from "@/lib/analytics";
 
 // ========== 熔断器 Hooks ==========
 
@@ -72,8 +73,11 @@ export function useUpdateCircuitBreakerConfig() {
   return useMutation({
     mutationFn: failoverApi.updateCircuitBreakerConfig,
     onSuccess: () => {
+      track("proxy_action", { action: "circuit_breaker", result: "success" });
       queryClient.invalidateQueries({ queryKey: ["circuitBreakerConfig"] });
     },
+    onError: () =>
+      track("proxy_action", { action: "circuit_breaker", result: "failed" }),
   });
 }
 
@@ -128,6 +132,11 @@ export function useAddToFailoverQueue() {
       providerId: string;
     }) => failoverApi.addToFailoverQueue(appType, providerId),
     onSuccess: (_, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "failover_queue_add",
+        result: "success",
+      });
       queryClient.invalidateQueries({
         queryKey: ["failoverQueue", variables.appType],
       });
@@ -136,6 +145,13 @@ export function useAddToFailoverQueue() {
       });
       queryClient.invalidateQueries({
         queryKey: ["providers", variables.appType],
+      });
+    },
+    onError: (_error, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "failover_queue_add",
+        result: "failed",
       });
     },
   });
@@ -156,6 +172,11 @@ export function useRemoveFromFailoverQueue() {
       providerId: string;
     }) => failoverApi.removeFromFailoverQueue(appType, providerId),
     onSuccess: (_, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "failover_queue_remove",
+        result: "success",
+      });
       queryClient.invalidateQueries({
         queryKey: ["failoverQueue", variables.appType],
       });
@@ -176,6 +197,13 @@ export function useRemoveFromFailoverQueue() {
           variables.providerId,
           variables.appType,
         ],
+      });
+    },
+    onError: (_error, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "failover_queue_remove",
+        result: "failed",
       });
     },
   });
@@ -222,6 +250,12 @@ export function useSetAutoFailoverEnabled() {
     },
 
     onSuccess: (_data, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "failover",
+        result: "success",
+        enabled: variables.enabled ? "true" : "false",
+      });
       const appLabel =
         variables.appType === "claude"
           ? "Claude"
@@ -245,6 +279,12 @@ export function useSetAutoFailoverEnabled() {
 
     // 错误时回滚
     onError: (error: Error, _variables, context) => {
+      track("proxy_action", {
+        app: _variables.appType,
+        action: "failover",
+        result: "failed",
+        enabled: _variables.enabled ? "true" : "false",
+      });
       if (context?.previousValue !== undefined) {
         queryClient.setQueryData(
           ["autoFailoverEnabled", context.appType],

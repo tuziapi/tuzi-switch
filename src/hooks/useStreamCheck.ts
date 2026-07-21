@@ -7,6 +7,7 @@ import {
 } from "@/lib/api/model-test";
 import type { AppId } from "@/lib/api";
 import { useResetCircuitBreaker } from "@/lib/query/failover";
+import { track } from "@/lib/analytics";
 
 export function useStreamCheck(appId: AppId) {
   const { t } = useTranslation();
@@ -24,6 +25,7 @@ export function useStreamCheck(appId: AppId) {
         const result = await streamCheckProvider(appId, providerId);
 
         if (result.status === "operational") {
+          track("provider_action", { app: appId, action: "test", result: "success" });
           toast.success(
             t("streamCheck.operational", {
               providerName: providerName,
@@ -36,6 +38,7 @@ export function useStreamCheck(appId: AppId) {
           // 测试通过后重置熔断器状态
           resetCircuitBreaker.mutate({ providerId, appType: appId });
         } else if (result.status === "degraded") {
+          track("provider_action", { app: appId, action: "test", result: "degraded" });
           toast.warning(
             t("streamCheck.degraded", {
               providerName: providerName,
@@ -47,6 +50,7 @@ export function useStreamCheck(appId: AppId) {
           // 降级状态也重置熔断器，因为至少能通信
           resetCircuitBreaker.mutate({ providerId, appType: appId });
         } else if (result.errorCategory === "modelNotFound") {
+          track("provider_action", { app: appId, action: "test", result: "failed" });
           // 专门处理"模型不存在/已下架"：指向配置入口，比通用 404 文案更有指导性
           toast.error(
             t("streamCheck.modelNotFound", {
@@ -63,6 +67,7 @@ export function useStreamCheck(appId: AppId) {
             },
           );
         } else if (result.errorCategory === "quotaExceeded") {
+          track("provider_action", { app: appId, action: "test", result: "rejected" });
           toast.warning(
             t("streamCheck.quotaExceeded", {
               providerName: providerName,
@@ -90,6 +95,7 @@ export function useStreamCheck(appId: AppId) {
             ([401, 403, 400, 429].includes(httpStatus) || httpStatus >= 500);
 
           if (isProbeRejection) {
+            track("provider_action", { app: appId, action: "test", result: "rejected" });
             toast.warning(
               t("streamCheck.rejected", {
                 providerName: providerName,
@@ -99,6 +105,7 @@ export function useStreamCheck(appId: AppId) {
               { description, duration: 8000, closeButton: true },
             );
           } else {
+            track("provider_action", { app: appId, action: "test", result: "failed" });
             toast.error(
               t("streamCheck.failed", {
                 providerName: providerName,
@@ -112,6 +119,7 @@ export function useStreamCheck(appId: AppId) {
 
         return result;
       } catch (e) {
+        track("provider_action", { app: appId, action: "test", result: "failed" });
         toast.error(
           t("streamCheck.error", {
             providerName: providerName,

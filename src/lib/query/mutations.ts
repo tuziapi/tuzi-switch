@@ -9,6 +9,7 @@ import { extractErrorMessage } from "@/utils/errorUtils";
 import { generateUUID } from "@/utils/uuid";
 import { openclawKeys } from "@/hooks/useOpenClaw";
 import { invalidateHermesProviderCaches } from "@/hooks/useHermes";
+import { track } from "@/lib/analytics";
 
 export const useAddProviderMutation = (appId: AppId) => {
   const queryClient = useQueryClient();
@@ -53,6 +54,7 @@ export const useAddProviderMutation = (appId: AppId) => {
       return newProvider;
     },
     onSuccess: async () => {
+      track("provider_action", { app: appId, action: "add", result: "success" });
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
 
       if (appId === "opencode") {
@@ -99,6 +101,7 @@ export const useAddProviderMutation = (appId: AppId) => {
       );
     },
     onError: (error: Error) => {
+      track("provider_action", { app: appId, action: "add", result: "failed" });
       const detail = extractErrorMessage(error) || t("common.unknown");
       toast.error(
         t("notifications.addFailed", {
@@ -126,6 +129,7 @@ export const useUpdateProviderMutation = (appId: AppId) => {
       return provider;
     },
     onSuccess: async () => {
+      track("provider_action", { app: appId, action: "edit", result: "success" });
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
       if (appId === "openclaw") {
         await queryClient.invalidateQueries({
@@ -145,6 +149,7 @@ export const useUpdateProviderMutation = (appId: AppId) => {
       );
     },
     onError: (error: Error) => {
+      track("provider_action", { app: appId, action: "edit", result: "failed" });
       const detail = extractErrorMessage(error) || t("common.unknown");
       toast.error(
         t("notifications.updateFailed", {
@@ -165,6 +170,7 @@ export const useDeleteProviderMutation = (appId: AppId) => {
       await providersApi.delete(providerId, appId);
     },
     onSuccess: async () => {
+      track("provider_action", { app: appId, action: "delete", result: "success" });
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
 
       if (appId === "opencode") {
@@ -211,6 +217,7 @@ export const useDeleteProviderMutation = (appId: AppId) => {
       );
     },
     onError: (error: Error) => {
+      track("provider_action", { app: appId, action: "delete", result: "failed" });
       const detail = extractErrorMessage(error) || t("common.unknown");
       toast.error(
         t("notifications.deleteFailed", {
@@ -231,6 +238,7 @@ export const useSwitchProviderMutation = (appId: AppId) => {
       return await providersApi.switch(providerId, appId);
     },
     onSuccess: async () => {
+      track("provider_action", { app: appId, action: "switch", result: "success", source: "manual" });
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
       if (appId === "claude-desktop") {
         await queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
@@ -276,6 +284,7 @@ export const useSwitchProviderMutation = (appId: AppId) => {
       }
     },
     onError: (error: Error) => {
+      track("provider_action", { app: appId, action: "switch", result: "failed", source: "manual" });
       const detail = extractErrorMessage(error) || t("common.unknown");
 
       toast.error(

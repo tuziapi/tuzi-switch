@@ -28,19 +28,25 @@
 ### macOS / Linux 一键安装
 
 直接安装最新版本：
+
 ```bash
 curl -fsSL https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@main/scripts/install_tuzi_switch.sh | bash
 ```
+
 ```
 open "/Applications/兔子switch.app"
 ```
+
 安装指定版本：
+
 ```
 curl -fsSL https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@v1.1.4/scripts/install_tuzi_switch.sh | TUZI_SWITCH_TAG=v1.1.4 bash
 ```
+
 ```
 open "/Applications/兔子switch.app"
 ```
+
 补充说明：
 
 - App 内自动升级不执行安装脚本，安装脚本只作为手动安装兜底
@@ -200,6 +206,10 @@ tuzi-switch 当前有两条升级链路：
 - 下一步：继续推进 macOS 签名分发与客户视角安装说明收口
 
 ## 说明
+
+正式版默认开启最小化匿名使用统计，用户可在设置中随时关闭。统计用于了解启动、供应商管理、代理启停和更新趋势，不包含 API Key、供应商名称、接口地址、对话内容、请求内容或本地文件路径。
+
+统计请求由应用直接发送至 `umami.tu-zi.com`。与任何网络服务一样，服务器及其网络基础设施在接收请求时可能处理源 IP 和 User-Agent；因此该数据仅用于产品事件趋势，不作为精确独立设备数。部署方应在 Umami、反向代理和访问日志中设置合理的数据最小化与保留策略。
 
 - 本仓库是面向兔子业务场景的定制分支。
 - 部分文档和内部兼容路径仍保留上游技术约定。

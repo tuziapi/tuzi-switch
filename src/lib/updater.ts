@@ -1,5 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { track } from "@/lib/analytics";
 
 // 可选导入：在未注册插件或非 Tauri 环境下，调用时会抛错，外层需做兜底
 // 我们按需加载并在运行时捕获错误，避免构建期类型问题
@@ -46,6 +47,7 @@ export interface UpdateHandle {
 export interface CheckOptions {
   timeout?: number;
   channel?: UpdateChannel;
+  source?: "manual" | "automatic";
 }
 
 interface GitHubRelease {
@@ -83,25 +85,47 @@ function mapUpdateHandle(raw: Update): UpdateHandle {
     notes: raw.body,
     date: raw.date,
     async downloadAndInstall(onProgress?: (e: UpdateProgressEvent) => void) {
-      await raw.downloadAndInstall((evt) => {
-        if (!onProgress) return;
-        const mapped: UpdateProgressEvent = {
-          event: evt.event,
-        };
-        if (evt.event === "Started") {
-          mapped.total = evt.data.contentLength ?? 0;
-          mapped.downloaded = 0;
-        } else if (evt.event === "Progress") {
-          mapped.downloaded = evt.data.chunkLength;
-        }
-        onProgress(mapped);
-      });
+      let downloadFinished = false;
+      try {
+        await raw.downloadAndInstall((evt) => {
+          if (evt.event === "Finished") downloadFinished = true;
+          if (!onProgress) return;
+          const mapped: UpdateProgressEvent = { event: evt.event };
+          if (evt.event === "Started") {
+            mapped.total = evt.data.contentLength ?? 0;
+            mapped.downloaded = 0;
+          } else if (evt.event === "Progress") {
+            mapped.downloaded = evt.data.chunkLength;
+          }
+          onProgress(mapped);
+        });
+        track("update_action", { action: "download", result: "success" });
+        track("update_action", { action: "install", result: "success" });
+      } catch (error) {
+        track("update_action", {
+          action: downloadFinished ? "install" : "download",
+          result: "failed",
+        });
+        throw error;
+      }
     },
     download: async () => {
-      await raw.download();
+      try {
+        await raw.download();
+        track("update_action", { action: "download", result: "success" });
+      } catch (error) {
+        track("update_action", { action: "download", result: "failed" });
+        throw error;
+      }
     },
     install: async () => {
-      await raw.install();
+      try {
+        await raw.install();
+        track("update_action", { action: "install", result: "success" });
+      } catch (error) {
+        track("update_action", { action: "install", result: "failed" });
+        throw error;
+      }
     },
   };
 }
@@ -152,12 +176,17 @@ async function checkGitHubReleaseFallback(
       },
     });
     if (!response.ok) {
-      throw new Error(`GitHub release metadata unavailable: ${response.status}`);
+      throw new Error(
+        `GitHub release metadata unavailable: ${response.status}`,
+      );
     }
 
     const release = (await response.json()) as GitHubRelease;
     const availableVersion = release.tag_name?.replace(/^v/i, "") ?? "";
-    if (!availableVersion || compareVersions(availableVersion, currentVersion) <= 0) {
+    if (
+      !availableVersion ||
+      compareVersions(availableVersion, currentVersion) <= 0
+    ) {
       return { status: "up-to-date" };
     }
 
@@ -204,6 +233,7 @@ export async function checkForUpdate(
   | { status: "available"; info: UpdateInfo; update: UpdateHandle }
 > {
   const timeout = opts.timeout ?? 30000;
+  const source = opts.source ?? "manual";
   const currentVersion = await withTimeout(
     getCurrentVersion(),
     timeout,
@@ -219,11 +249,28 @@ export async function checkForUpdate(
       "Tauri updater check timed out",
     );
   } catch (error) {
-    console.warn("Tauri updater check failed, falling back to GitHub release", error);
-    return await checkGitHubReleaseFallback(currentVersion, timeout);
+    console.warn(
+      "Tauri updater check failed, falling back to GitHub release",
+      error,
+    );
+    try {
+      const result = await checkGitHubReleaseFallback(currentVersion, timeout);
+      track("update_action", { action: "check", result: "success", source });
+      return result;
+    } catch (fallbackError) {
+      track("update_action", { action: "check", result: "failed", source });
+      throw fallbackError;
+    }
   }
   if (!update) {
-    return await checkGitHubReleaseFallback(currentVersion, timeout);
+    try {
+      const result = await checkGitHubReleaseFallback(currentVersion, timeout);
+      track("update_action", { action: "check", result: "success", source });
+      return result;
+    } catch (fallbackError) {
+      track("update_action", { action: "check", result: "failed", source });
+      throw fallbackError;
+    }
   }
 
   const mapped = mapUpdateHandle(update);
@@ -234,6 +281,7 @@ export async function checkForUpdate(
     pubDate: mapped.date,
   };
 
+  track("update_action", { action: "check", result: "success", source });
   return { status: "available", info, update: mapped };
 }
 

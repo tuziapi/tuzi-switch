@@ -13,6 +13,8 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { message } from "@tauri-apps/plugin-dialog";
 import { exit } from "@tauri-apps/plugin-process";
+import { setAnalyticsEnabled, track } from "@/lib/analytics";
+import { settingsApi } from "@/lib/api";
 
 // 根据平台添加 body class，便于平台特定样式
 try {
@@ -86,6 +88,13 @@ async function bootstrap() {
     console.error("拉取初始化错误失败", e);
   }
 
+  try {
+    const settings = await settingsApi.get();
+    setAnalyticsEnabled(settings.anonymousAnalyticsEnabled ?? true);
+  } catch {
+    // 设置读取失败时保留兼容默认值；后端发送前仍会再次检查本地开关。
+  }
+
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
@@ -98,6 +107,8 @@ async function bootstrap() {
       </QueryClientProvider>
     </React.StrictMode>,
   );
+
+  track("app_started");
 }
 
 void bootstrap();

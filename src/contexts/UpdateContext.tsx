@@ -22,7 +22,7 @@ interface UpdateContextValue {
   dismissUpdate: () => void;
 
   // 操作方法
-  checkUpdate: () => Promise<boolean>;
+  checkUpdate: (source?: "manual" | "automatic") => Promise<boolean>;
   resetDismiss: () => void;
 }
 
@@ -60,49 +60,52 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
 
   const isCheckingRef = useRef(false);
 
-  const checkUpdate = useCallback(async () => {
-    if (isCheckingRef.current) return false;
-    isCheckingRef.current = true;
-    setIsChecking(true);
-    setError(null);
+  const checkUpdate = useCallback(
+    async (source: "manual" | "automatic" = "manual") => {
+      if (isCheckingRef.current) return false;
+      isCheckingRef.current = true;
+      setIsChecking(true);
+      setError(null);
 
-    try {
-      const result = await checkForUpdate({ timeout: 30000 });
+      try {
+        const result = await checkForUpdate({ timeout: 30000, source });
 
-      if (result.status === "available") {
-        setHasUpdate(true);
-        setUpdateInfo(result.info);
-        setUpdateHandle(result.update);
+        if (result.status === "available") {
+          setHasUpdate(true);
+          setUpdateInfo(result.info);
+          setUpdateHandle(result.update);
 
-        // 检查是否已经关闭过这个版本的提醒
-        let dismissedVersion = localStorage.getItem(DISMISSED_VERSION_KEY);
-        if (!dismissedVersion) {
-          const legacy = localStorage.getItem(LEGACY_DISMISSED_KEY);
-          if (legacy) {
-            localStorage.setItem(DISMISSED_VERSION_KEY, legacy);
-            localStorage.removeItem(LEGACY_DISMISSED_KEY);
-            dismissedVersion = legacy;
+          // 检查是否已经关闭过这个版本的提醒
+          let dismissedVersion = localStorage.getItem(DISMISSED_VERSION_KEY);
+          if (!dismissedVersion) {
+            const legacy = localStorage.getItem(LEGACY_DISMISSED_KEY);
+            if (legacy) {
+              localStorage.setItem(DISMISSED_VERSION_KEY, legacy);
+              localStorage.removeItem(LEGACY_DISMISSED_KEY);
+              dismissedVersion = legacy;
+            }
           }
+          setIsDismissed(dismissedVersion === result.info.availableVersion);
+          return true; // 有更新
+        } else {
+          setHasUpdate(false);
+          setUpdateInfo(null);
+          setUpdateHandle(null);
+          setIsDismissed(false);
+          return false; // 已是最新
         }
-        setIsDismissed(dismissedVersion === result.info.availableVersion);
-        return true; // 有更新
-      } else {
+      } catch (err) {
+        console.error("检查更新失败:", err);
+        setError(err instanceof Error ? err.message : "检查更新失败");
         setHasUpdate(false);
-        setUpdateInfo(null);
-        setUpdateHandle(null);
-        setIsDismissed(false);
-        return false; // 已是最新
+        throw err; // 抛出错误让调用方处理
+      } finally {
+        setIsChecking(false);
+        isCheckingRef.current = false;
       }
-    } catch (err) {
-      console.error("检查更新失败:", err);
-      setError(err instanceof Error ? err.message : "检查更新失败");
-      setHasUpdate(false);
-      throw err; // 抛出错误让调用方处理
-    } finally {
-      setIsChecking(false);
-      isCheckingRef.current = false;
-    }
-  }, []);
+    },
+    [],
+  );
 
   const dismissUpdate = useCallback(() => {
     setIsDismissed(true);
@@ -123,7 +126,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // 延迟1秒后检查，避免影响启动体验
     const timer = setTimeout(() => {
-      checkUpdate().catch(console.error);
+      checkUpdate("automatic").catch(console.error);
     }, 1000);
 
     return () => clearTimeout(timer);

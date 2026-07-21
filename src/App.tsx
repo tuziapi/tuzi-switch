@@ -48,6 +48,7 @@ import { useAutoCompact } from "@/hooks/useAutoCompact";
 import { useUsageCacheBridge } from "@/hooks/useUsageCacheBridge";
 import { useLastValidValue } from "@/hooks/useLastValidValue";
 import { extractErrorMessage } from "@/utils/errorUtils";
+import { track } from "@/lib/analytics";
 import { isTextEditableTarget } from "@/utils/domUtils";
 import { cn } from "@/lib/utils";
 import {
@@ -373,6 +374,13 @@ function App() {
       try {
         unsubscribe = await providersApi.onSwitched(
           async (event: ProviderSwitchEvent) => {
+            const source =
+              event.source === "failover" ||
+              event.source === "failoverEnabled" ||
+              event.autoFailoverEnabled
+                ? "failover"
+                : "tray";
+            track("provider_action", { app: event.appType, action: "switch", result: "success", source });
             if (event.appType === activeApp) {
               await refetch();
             }

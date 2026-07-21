@@ -301,6 +301,11 @@
   },
   "settings": {
     "title": "设置",
+    "anonymousAnalytics": {
+      "sectionTitle": "隐私与改进",
+      "title": "匿名使用统计",
+      "description": "默认开启，可随时关闭。仅统计应用版本、系统类型和核心功能使用次数，不收集密钥、对话、请求内容、供应商地址或文件路径。"
+    },
     "general": "通用",
     "tabGeneral": "通用",
     "tabAuth": "认证",

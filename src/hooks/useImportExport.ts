@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { settingsApi } from "@/lib/api";
 import { syncCurrentProvidersLiveSafe } from "@/utils/postChangeSync";
+import { track } from "@/lib/analytics";
 
 export type ImportStatus =
   | "idle"
@@ -84,6 +85,7 @@ export function useImportExport(
     try {
       const result = await settingsApi.importConfigFromFile(selectedFile);
       if (!result.success) {
+        track("config_action", { action: "import", result: "failed" });
         setStatus("error");
         const message =
           result.message ||
@@ -103,6 +105,7 @@ export function useImportExport(
 
       const syncResult = await syncCurrentProvidersLiveSafe();
       if (syncResult.ok) {
+        track("config_action", { action: "import", result: "success" });
         setStatus("success");
         toast.success(
           t("settings.importSuccess", {
@@ -111,6 +114,7 @@ export function useImportExport(
           { closeButton: true },
         );
       } else {
+        track("config_action", { action: "import", result: "partial" });
         console.error(
           "[useImportExport] Failed to sync live config",
           syncResult.error,
@@ -124,6 +128,7 @@ export function useImportExport(
         );
       }
     } catch (error) {
+      track("config_action", { action: "import", result: "failed" });
       console.error("[useImportExport] Failed to import config", error);
       setStatus("error");
       const message =
@@ -157,6 +162,7 @@ export function useImportExport(
 
       const result = await settingsApi.exportConfigToFile(destination);
       if (result.success) {
+        track("config_action", { action: "export", result: "success" });
         const displayPath = result.filePath ?? destination;
         toast.success(
           t("settings.configExported", {
@@ -165,6 +171,7 @@ export function useImportExport(
           { closeButton: true },
         );
       } else {
+        track("config_action", { action: "export", result: "failed" });
         toast.error(
           t("settings.exportFailed", {
             defaultValue: "导出配置失败",
@@ -172,6 +179,7 @@ export function useImportExport(
         );
       }
     } catch (error) {
+      track("config_action", { action: "export", result: "failed" });
       console.error("[useImportExport] Failed to export config", error);
       toast.error(
         t("settings.exportFailedError", {
