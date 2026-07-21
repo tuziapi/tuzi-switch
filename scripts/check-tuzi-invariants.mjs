@@ -44,6 +44,7 @@ const appTsx = read("src/App.tsx");
 const appVisibilitySettings = read(
   "src/components/settings/AppVisibilitySettings.tsx",
 );
+const profileSwitcher = read("src/components/profiles/ProfileSwitcher.tsx");
 const codexAuthSettings = read("src/components/settings/CodexAuthSettings.tsx");
 const updateContext = read("src/contexts/UpdateContext.tsx");
 const aboutSection = read("src/components/settings/AboutSection.tsx");
@@ -334,11 +335,12 @@ for (const [source, text, markers] of [
   }
 }
 requireValue(
-  !appTsx.includes("ProfileSwitcher") &&
-    !appVisibilitySettings.includes("showProfileSwitcher") &&
-    !trayRs.includes("submenu_profiles") &&
-    !trayRs.includes("handle_profile_tray_event"),
-  "主界面、通用设置或托盘重新引入了项目切换入口",
+  appTsx.includes("ProfileSwitcher") &&
+    appVisibilitySettings.includes("showProfileSwitcher") &&
+    profileSwitcher.includes("data-tuzi-profile-switcher") &&
+    trayRs.includes("submenu_profiles") &&
+    trayRs.includes("handle_profile_tray_event"),
+  "主界面、通用设置或托盘缺少项目切换入口",
 );
 for (const marker of [
   "tuzi-switch-macos-universal.app.tar.gz",

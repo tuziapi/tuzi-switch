@@ -109,6 +109,7 @@ export function ProfileSwitcher({ activeApp }: ProfileSwitcherProps) {
           <button
             type="button"
             role="combobox"
+            data-tuzi-profile-switcher="enabled"
             aria-expanded={open}
             title={t(`profiles.switcherTooltip.${scope}`)}
             className={cn(

@@ -58,6 +58,7 @@ import {
   DRAG_REGION_STYLE,
 } from "@/lib/platform";
 import { AppSwitcher } from "@/components/AppSwitcher";
+import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
 import { ProviderList } from "@/components/providers/ProviderList";
 import { AddProviderDialog } from "@/components/providers/AddProviderDialog";
 import { EditProviderDialog } from "@/components/providers/EditProviderDialog";
@@ -1299,6 +1300,15 @@ function App() {
                     settingsData?.enableFailoverToggle && (
                       <FailoverToggle activeApp={activeApp} />
                     )}
+                </div>
+              )}
+            {currentView === "providers" &&
+              (settingsData?.showProfileSwitcher ?? true) && (
+                <div
+                  className="flex shrink-0 items-center"
+                  style={{ WebkitAppRegion: "no-drag" } as any}
+                >
+                  <ProfileSwitcher activeApp={activeApp} />
                 </div>
               )}
             <div

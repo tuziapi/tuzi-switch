@@ -8,6 +8,7 @@ import {
   setCurrentProviderId,
   setLiveProviderIds,
   setProviders,
+  setSettings,
 } from "../msw/state";
 import { emitTauriEvent } from "../msw/tauriMocks";
 
@@ -125,6 +126,12 @@ vi.mock("@/components/AppSwitcher", () => ({
       <button onClick={() => onSwitch("codex")}>switch-codex</button>
       <button onClick={() => onSwitch("openclaw")}>switch-openclaw</button>
     </div>
+  ),
+}));
+
+vi.mock("@/components/profiles/ProfileSwitcher", () => ({
+  ProfileSwitcher: ({ activeApp }: any) => (
+    <div data-testid="profile-switcher">{activeApp}</div>
   ),
 }));
 
@@ -260,6 +267,24 @@ describe("App integration with MSW", () => {
     await waitFor(() => {
       expect(toastErrorMock).toHaveBeenCalled();
     });
+  });
+
+  it("shows the profile switcher by default and respects the visibility setting", async () => {
+    const { default: App } = await import("@/App");
+    const firstRender = renderApp(App);
+
+    expect(await screen.findByTestId("profile-switcher")).toHaveTextContent(
+      "claude",
+    );
+    firstRender.unmount();
+
+    setSettings({ showProfileSwitcher: false });
+    renderApp(App);
+
+    await screen.findByTestId("provider-list");
+    await waitFor(() =>
+      expect(screen.queryByTestId("profile-switcher")).not.toBeInTheDocument(),
+    );
   });
 
   it("duplicates openclaw providers with a generated key that avoids live-only ids", async () => {

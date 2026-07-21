@@ -17,13 +17,15 @@ use tauri::{http, AppHandle, Manager};
 
 const WEB_UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU0REY1Nzg5OTc1ODNGMgpSV1R5ZzNXWmVQVk5EdEhGWlg0UkdSVFArcXpQUUNWWitSTTB1K25CMkNUU09yc2xRZUNqQTJKMwo=";
 const ACTIVE_VERSION_FILE: &str = "active-web-version";
-const TUZI_CONTRACT_FILE: &str = ".tuzi-contract-v1";
+// 升级契约文件名可使已安装的旧热更新资源自动失效，避免其继续覆盖新内置界面。
+const TUZI_CONTRACT_FILE: &str = ".tuzi-contract-v2";
 const MAX_ARCHIVE_BYTES: u64 = 30 * 1024 * 1024;
-const FORBIDDEN_PROJECT_SWITCHER_MARKERS: &[&str] = &["components/profiles/ProfileSwitcher"];
 const REQUIRED_TUZI_ASSET_MARKERS: &[&str] = &[
     "tuziswitch:update:dismissedVersion",
     "get_web_hot_update_status",
     "check_web_hot_update",
+    "showProfileSwitcher",
+    "data-tuzi-profile-switcher",
 ];
 
 #[derive(Debug, Clone, Serialize)]
@@ -314,15 +316,11 @@ fn install_archive(path: &Path, version: &str) -> Result<(), String> {
         return Err("界面更新包缺少 index.html".to_string());
     }
 
-    if contains_forbidden_project_switcher(&staging_dir)? {
-        let _ = fs::remove_dir_all(&staging_dir);
-        return Err("界面更新包包含不属于兔子switch的项目切换入口，已跳过".to_string());
-    }
     if !contains_required_tuzi_markers(&staging_dir)? {
         let _ = fs::remove_dir_all(&staging_dir);
         return Err("界面更新包缺少兔子switch功能契约，已跳过".to_string());
     }
-    fs::write(staging_dir.join(TUZI_CONTRACT_FILE), b"tuzi-web-v1\n")
+    fs::write(staging_dir.join(TUZI_CONTRACT_FILE), b"tuzi-web-v2\n")
         .map_err(|e| format!("写入界面功能契约失败: {e}"))?;
 
     fs::create_dir_all(&versions_dir).map_err(|e| format!("创建版本目录失败: {e}"))?;
@@ -330,39 +328,6 @@ fn install_archive(path: &Path, version: &str) -> Result<(), String> {
     fs::rename(&staging_dir, &final_dir).map_err(|e| format!("切换界面版本失败: {e}"))?;
     fs::write(root_dir().join(ACTIVE_VERSION_FILE), version)
         .map_err(|e| format!("写入界面版本状态失败: {e}"))
-}
-
-fn contains_forbidden_project_switcher(root: &Path) -> Result<bool, String> {
-    let mut stack = vec![root.to_path_buf()];
-
-    while let Some(dir) = stack.pop() {
-        let entries = fs::read_dir(&dir).map_err(|e| format!("读取界面目录失败: {e}"))?;
-        for entry in entries {
-            let entry = entry.map_err(|e| format!("读取界面目录失败: {e}"))?;
-            let path = entry.path();
-            let file_type = entry
-                .file_type()
-                .map_err(|e| format!("读取界面文件类型失败: {e}"))?;
-
-            if file_type.is_dir() {
-                stack.push(path);
-                continue;
-            }
-
-            if file_type.is_file() && should_scan_hot_asset(&path) {
-                let data = fs::read(&path).map_err(|e| format!("读取界面资源失败: {e}"))?;
-                let text = String::from_utf8_lossy(&data);
-                if FORBIDDEN_PROJECT_SWITCHER_MARKERS
-                    .iter()
-                    .any(|marker| text.contains(marker))
-                {
-                    return Ok(true);
-                }
-            }
-        }
-    }
-
-    Ok(false)
 }
 
 fn contains_required_tuzi_markers(root: &Path) -> Result<bool, String> {
@@ -474,7 +439,11 @@ fn active_version() -> Option<String> {
 
 fn active_web_root() -> Option<PathBuf> {
     let root = root_dir().join("versions").join(active_version()?);
-    (root.join("index.html").is_file() && root.join(TUZI_CONTRACT_FILE).is_file()).then_some(root)
+    is_usable_web_root(&root).then_some(root)
+}
+
+fn is_usable_web_root(root: &Path) -> bool {
+    root.join("index.html").is_file() && root.join(TUZI_CONTRACT_FILE).is_file()
 }
 
 fn cleanup_old_versions(current_version: &str) {
@@ -623,33 +592,6 @@ mod tests {
     }
 
     #[test]
-    fn hot_asset_scan_rejects_project_switcher_markers() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let assets = dir.path().join("assets");
-        fs::create_dir_all(&assets).expect("create assets");
-        fs::write(
-            assets.join("app.js"),
-            "import './components/profiles/ProfileSwitcher'",
-        )
-        .expect("write js");
-
-        assert!(contains_forbidden_project_switcher(dir.path()).expect("scan assets"));
-    }
-
-    #[test]
-    fn hot_asset_scan_allows_normal_assets() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        fs::write(dir.path().join("index.html"), "<div>兔子switch</div>").expect("write html");
-        fs::write(
-            dir.path().join("logo.png"),
-            b"components/profiles/ProfileSwitcher",
-        )
-        .expect("write png");
-
-        assert!(!contains_forbidden_project_switcher(dir.path()).expect("scan assets"));
-    }
-
-    #[test]
     fn hot_asset_scan_requires_tuzi_feature_markers() {
         let dir = tempfile::tempdir().expect("tempdir");
         fs::write(
@@ -661,6 +603,20 @@ mod tests {
 
         fs::write(dir.path().join("app.js"), "plain cc assets").expect("replace js");
         assert!(!contains_required_tuzi_markers(dir.path()).expect("scan markers"));
+    }
+
+    #[test]
+    fn current_contract_rejects_legacy_hot_assets() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join("index.html"), "<div>旧界面</div>").expect("write html");
+        fs::write(dir.path().join(".tuzi-contract-v1"), b"tuzi-web-v1\n")
+            .expect("write legacy contract");
+
+        assert!(!is_usable_web_root(dir.path()));
+
+        fs::write(dir.path().join(TUZI_CONTRACT_FILE), b"tuzi-web-v2\n")
+            .expect("write current contract");
+        assert!(is_usable_web_root(dir.path()));
     }
 
     #[test]

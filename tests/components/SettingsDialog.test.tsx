@@ -205,6 +205,19 @@ vi.mock("@/components/settings/WindowSettings", () => ({
   ),
 }));
 
+vi.mock("@/components/settings/AppVisibilitySettings", () => ({
+  AppVisibilitySettings: ({ settings, onChange }: any) => (
+    <div>
+      <span>
+        profile-switcher:{String(settings.showProfileSwitcher ?? true)}
+      </span>
+      <button onClick={() => onChange({ showProfileSwitcher: false })}>
+        hide-profile-switcher
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("@/components/settings/DirectorySettings", () => ({
   DirectorySettings: ({
     onBrowseDirectory,
@@ -336,6 +349,12 @@ describe("SettingsPage Component", () => {
     fireEvent.click(screen.getByText("window-settings"));
     expect(settingsMock.updateSettings).toHaveBeenCalledWith({
       minimizeToTrayOnClose: false,
+    });
+
+    expect(screen.getByText("profile-switcher:true")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("hide-profile-switcher"));
+    expect(settingsMock.autoSaveSettings).toHaveBeenCalledWith({
+      showProfileSwitcher: false,
     });
 
     fireEvent.click(screen.getByText("settings.tabAdvanced"));
