@@ -19,7 +19,12 @@ export function useDragSort(providers: Record<string, Provider>, appId: AppId) {
   const { t, i18n } = useTranslation();
 
   const sortedProviders = useMemo(() => {
-    const locale = i18n.language === "zh" ? "zh-CN" : "en-US";
+    const locale =
+      i18n.language === "zh"
+        ? "zh-CN"
+        : i18n.language === "zh-TW"
+          ? "zh-TW"
+          : "en-US";
     return Object.values(providers).sort((a, b) => {
       if (a.sortIndex !== undefined && b.sortIndex !== undefined) {
         return a.sortIndex - b.sortIndex;
@@ -72,7 +77,11 @@ export function useDragSort(providers: Record<string, Provider>, appId: AppId) {
 
       try {
         await providersApi.updateSortOrder(updates, appId);
-        track("provider_action", { app: appId, action: "sort", result: "success" });
+        track("provider_action", {
+          app: appId,
+          action: "sort",
+          result: "success",
+        });
         await queryClient.invalidateQueries({
           queryKey: ["providers", appId],
         });
@@ -97,7 +106,11 @@ export function useDragSort(providers: Record<string, Provider>, appId: AppId) {
           { closeButton: true },
         );
       } catch (error) {
-        track("provider_action", { app: appId, action: "sort", result: "failed" });
+        track("provider_action", {
+          app: appId,
+          action: "sort",
+          result: "failed",
+        });
         console.error("Failed to update provider sort order", error);
         toast.error(
           t("provider.sortUpdateFailed", {

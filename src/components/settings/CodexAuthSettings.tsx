@@ -99,7 +99,7 @@ export function CodexAuthSettings({
         icon={<KeyRound className="h-4 w-4 text-emerald-500" />}
         title={t("settings.preserveCodexOfficialAuthOnSwitch")}
         description={t("settings.preserveCodexOfficialAuthOnSwitchDescription")}
-        checked={settings.preserveCodexOfficialAuthOnSwitch ?? true}
+        checked={settings.preserveCodexOfficialAuthOnSwitch ?? false}
         onCheckedChange={(value) =>
           onChange({ preserveCodexOfficialAuthOnSwitch: value })
         }
@@ -109,7 +109,7 @@ export function CodexAuthSettings({
         icon={<History className="h-4 w-4 text-sky-500" />}
         title={t("settings.unifyCodexSessionHistory")}
         description={t("settings.unifyCodexSessionHistoryDescription")}
-        checked={settings.unifyCodexSessionHistory ?? true}
+        checked={settings.unifyCodexSessionHistory ?? false}
         onCheckedChange={handleUnifyHistoryChange}
       />
 
@@ -118,6 +118,7 @@ export function CodexAuthSettings({
         title={t("confirm.unifyCodexHistory.title")}
         message={t("confirm.unifyCodexHistory.message")}
         checkboxLabel={t("confirm.unifyCodexHistory.migrateExisting")}
+        checkboxDefaultChecked
         confirmText={t("confirm.unifyCodexHistory.confirm")}
         onConfirm={handleEnableConfirm}
         onCancel={() => setShowEnableConfirm(false)}

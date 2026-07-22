@@ -28,10 +28,6 @@ const CODEX_SQLITE_HOME_ENV: &str = "CODEX_SQLITE_HOME";
 pub(crate) fn codex_state_db_paths(config_dir: &Path, config_text: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     push_unique_path(&mut paths, config_dir.join(CODEX_STATE_DB_FILENAME));
-    push_unique_path(
-        &mut paths,
-        config_dir.join("sqlite").join(CODEX_STATE_DB_FILENAME),
-    );
     // Codex lets SQLite state move away from CODEX_HOME; config takes precedence.
     if let Some(sqlite_home) = sqlite_home_from_codex_config(config_text) {
         push_unique_path(&mut paths, sqlite_home.join(CODEX_STATE_DB_FILENAME));
@@ -87,7 +83,9 @@ mod tests {
     fn includes_config_sqlite_home() {
         let temp = tempdir().expect("tempdir");
         let sqlite_home = temp.path().join("sqlite-home");
-        let config_text = format!("sqlite_home = \"{}\"\n", sqlite_home.display());
+        // 用 TOML 字面量字符串(单引号)承载路径：Windows 路径含反斜杠，basic string(双引号)
+        // 会把 `\U`/`\s` 等当作非法转义导致解析失败。
+        let config_text = format!("sqlite_home = '{}'\n", sqlite_home.display());
 
         let paths = codex_state_db_paths(temp.path(), &config_text);
 
@@ -95,7 +93,6 @@ mod tests {
             paths,
             vec![
                 temp.path().join(CODEX_STATE_DB_FILENAME),
-                temp.path().join("sqlite").join(CODEX_STATE_DB_FILENAME),
                 sqlite_home.join(CODEX_STATE_DB_FILENAME),
             ]
         );

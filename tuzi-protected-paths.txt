@@ -1,0 +1,14 @@
+# Tuzi-owned product layer. Upstream synchronization must restore these paths
+# from Tuzi develop after merging a CC release.
+src/config/tuziProviderPresets.ts
+src/config/tuziProviderPresets.test.ts
+src-tauri/src/product.rs
+src-tauri/src/capabilities.rs
+src-tauri/src/web_hot_update.rs
+src-tauri/icons
+tuzi-protected-paths.txt
+scripts/check-tuzi-invariants.mjs
+scripts/install_tuzi_switch.sh
+.github/workflows/sync-cc-upstream.yml
+.github/workflows/tuzi-release.yml
+docs/tuzi-upstream-sync.md

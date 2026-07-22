@@ -15,14 +15,18 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{http, AppHandle, Manager};
 
-const WEB_UPDATE_MANIFEST_URLS: &[&str] = &[
-    "https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/latest.json",
-    "https://raw.githubusercontent.com/tuziapi/tuzi-switch/release-web/latest.json",
-];
-const WEB_UPDATE_PRIMARY_MANIFEST_URL: &str = WEB_UPDATE_MANIFEST_URLS[0];
 const WEB_UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU0REY1Nzg5OTc1ODNGMgpSV1R5ZzNXWmVQVk5EdEhGWlg0UkdSVFArcXpQUUNWWitSTTB1K25CMkNUU09yc2xRZUNqQTJKMwo=";
 const ACTIVE_VERSION_FILE: &str = "active-web-version";
+// 升级契约文件名可使已安装的旧热更新资源自动失效，避免其继续覆盖新内置界面。
+const TUZI_CONTRACT_FILE: &str = ".tuzi-contract-v2";
 const MAX_ARCHIVE_BYTES: u64 = 30 * 1024 * 1024;
+const REQUIRED_TUZI_ASSET_MARKERS: &[&str] = &[
+    "tuziswitch:update:dismissedVersion",
+    "get_web_hot_update_status",
+    "check_web_hot_update",
+    "showProfileSwitcher",
+    "data-tuzi-profile-switcher",
+];
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,11 +102,10 @@ pub async fn check_web_hot_update() -> Result<WebHotUpdateResult, String> {
         .map_err(|e| format!("初始化更新客户端失败: {e}"))?;
 
     let manifest = fetch_web_manifest(&client).await?;
-
     validate_manifest(&manifest)?;
 
     let current_app_version = env!("CARGO_PKG_VERSION");
-    if !is_app_version_compatible(current_app_version, &manifest.app_version_range) {
+    if !is_version_compatible(current_app_version, &manifest.app_version_range) {
         return Ok(WebHotUpdateResult {
             updated: false,
             version: Some(manifest.version),
@@ -117,7 +120,8 @@ pub async fn check_web_hot_update() -> Result<WebHotUpdateResult, String> {
         });
     }
 
-    if active_version().as_deref() == Some(manifest.version.as_str()) {
+    if active_version().as_deref() == Some(manifest.version.as_str()) && active_web_root().is_some()
+    {
         return Ok(WebHotUpdateResult {
             updated: false,
             version: Some(manifest.version),
@@ -144,22 +148,21 @@ fn build_status() -> WebHotUpdateStatus {
         pending_version: active.clone(),
         using_hot_assets: active_web_root().is_some(),
         active_version: active,
-        manifest_url: WEB_UPDATE_PRIMARY_MANIFEST_URL.to_string(),
+        manifest_url: crate::product::WEB_UPDATE_MANIFEST_URLS[0].to_string(),
     }
 }
 
 async fn fetch_web_manifest(client: &reqwest::Client) -> Result<WebManifest, String> {
     let mut last_error = String::new();
-    for url in WEB_UPDATE_MANIFEST_URLS {
+    for url in crate::product::WEB_UPDATE_MANIFEST_URLS {
         let result = async {
-            let response = client
+            client
                 .get(*url)
                 .send()
                 .await
                 .map_err(|e| format!("检查界面更新失败: {e}"))?
                 .error_for_status()
-                .map_err(|e| format!("界面更新清单不可用: {e}"))?;
-            response
+                .map_err(|e| format!("界面更新清单不可用: {e}"))?
                 .json()
                 .await
                 .map_err(|e| format!("解析界面更新清单失败: {e}"))
@@ -174,7 +177,6 @@ async fn fetch_web_manifest(client: &reqwest::Client) -> Result<WebManifest, Str
             }
         }
     }
-
     Err(if last_error.is_empty() {
         "界面更新清单不可用".to_string()
     } else {
@@ -188,7 +190,7 @@ fn validate_manifest(manifest: &WebManifest) -> Result<(), String> {
         || !manifest
             .archive
             .url
-            .starts_with("https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/")
+            .starts_with(crate::product::WEB_UPDATE_ARCHIVE_URL_PREFIX)
     {
         return Err("界面更新包 URL 不可信".to_string());
     }
@@ -212,11 +214,7 @@ fn validate_version(version: &str) -> Result<(), String> {
         && version
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
-    if ok {
-        Ok(())
-    } else {
-        Err("界面版本号无效".to_string())
-    }
+    ok.then_some(()).ok_or_else(|| "界面版本号无效".to_string())
 }
 
 async fn download_archive(
@@ -266,11 +264,9 @@ fn verify_archive(path: &Path, manifest: &WebManifest) -> Result<(), String> {
     let public_key = PublicKey::decode(&pubkey_text).map_err(|e| format!("公钥解析失败: {e}"))?;
     let signature_text = decode_base64_utf8(&manifest.archive.signature)?;
     let signature = Signature::decode(&signature_text).map_err(|e| format!("签名解析失败: {e}"))?;
-    let signed_payload = signature_payload(manifest);
     public_key
-        .verify(signed_payload.as_bytes(), &signature, true)
-        .map_err(|e| format!("界面更新包签名校验失败: {e}"))?;
-    Ok(())
+        .verify(signature_payload(manifest).as_bytes(), &signature, true)
+        .map_err(|e| format!("界面更新包签名校验失败: {e}"))
 }
 
 fn signature_payload(manifest: &WebManifest) -> String {
@@ -291,17 +287,17 @@ fn install_archive(path: &Path, version: &str) -> Result<(), String> {
     fs::create_dir_all(&staging_dir).map_err(|e| format!("创建解包目录失败: {e}"))?;
 
     let file = fs::File::open(path).map_err(|e| format!("打开界面更新包失败: {e}"))?;
-    let decoder = GzDecoder::new(file);
-    let mut archive = tar::Archive::new(decoder);
+    let mut archive = tar::Archive::new(GzDecoder::new(file));
     for entry in archive
         .entries()
         .map_err(|e| format!("读取界面更新包失败: {e}"))?
     {
         let mut entry = entry.map_err(|e| format!("读取界面更新条目失败: {e}"))?;
-        let entry_path = entry
-            .path()
-            .map_err(|e| format!("读取界面更新路径失败: {e}"))?;
-        let safe_path = safe_archive_path(&entry_path)?;
+        let safe_path = safe_archive_path(
+            &entry
+                .path()
+                .map_err(|e| format!("读取界面更新路径失败: {e}"))?,
+        )?;
         let target = staging_dir.join(safe_path);
         if entry.header().entry_type().is_dir() {
             fs::create_dir_all(&target).map_err(|e| format!("创建界面目录失败: {e}"))?;
@@ -320,19 +316,58 @@ fn install_archive(path: &Path, version: &str) -> Result<(), String> {
         return Err("界面更新包缺少 index.html".to_string());
     }
 
+    if !contains_required_tuzi_markers(&staging_dir)? {
+        let _ = fs::remove_dir_all(&staging_dir);
+        return Err("界面更新包缺少兔子switch功能契约，已跳过".to_string());
+    }
+    fs::write(staging_dir.join(TUZI_CONTRACT_FILE), b"tuzi-web-v2\n")
+        .map_err(|e| format!("写入界面功能契约失败: {e}"))?;
+
     fs::create_dir_all(&versions_dir).map_err(|e| format!("创建版本目录失败: {e}"))?;
     let _ = fs::remove_dir_all(&final_dir);
     fs::rename(&staging_dir, &final_dir).map_err(|e| format!("切换界面版本失败: {e}"))?;
     fs::write(root_dir().join(ACTIVE_VERSION_FILE), version)
-        .map_err(|e| format!("写入界面版本状态失败: {e}"))?;
-    Ok(())
+        .map_err(|e| format!("写入界面版本状态失败: {e}"))
+}
+
+fn contains_required_tuzi_markers(root: &Path) -> Result<bool, String> {
+    let mut found = vec![false; REQUIRED_TUZI_ASSET_MARKERS.len()];
+    let mut stack = vec![root.to_path_buf()];
+
+    while let Some(dir) = stack.pop() {
+        let entries = fs::read_dir(&dir).map_err(|e| format!("读取界面目录失败: {e}"))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("读取界面目录失败: {e}"))?;
+            let path = entry.path();
+            let file_type = entry
+                .file_type()
+                .map_err(|e| format!("读取界面文件类型失败: {e}"))?;
+            if file_type.is_dir() {
+                stack.push(path);
+            } else if file_type.is_file() && should_scan_hot_asset(&path) {
+                let data = fs::read(&path).map_err(|e| format!("读取界面资源失败: {e}"))?;
+                let text = String::from_utf8_lossy(&data);
+                for (index, marker) in REQUIRED_TUZI_ASSET_MARKERS.iter().enumerate() {
+                    found[index] |= text.contains(marker);
+                }
+            }
+        }
+    }
+
+    Ok(found.into_iter().all(|value| value))
+}
+
+fn should_scan_hot_asset(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(OsStr::to_str),
+        Some("html" | "js" | "mjs" | "css" | "json")
+    )
 }
 
 fn serve_hot_asset(path: &str) -> Result<http::Response<Vec<u8>>, http::StatusCode> {
     let root = active_web_root().ok_or(http::StatusCode::NOT_FOUND)?;
     let relative = request_path_to_relative(path)?;
     let mut target = root.join(&relative);
-
     if !target.exists() && relative.extension().is_none() {
         target = root.join("index.html");
     }
@@ -351,7 +386,6 @@ fn serve_hot_asset(path: &str) -> Result<http::Response<Vec<u8>>, http::StatusCo
     let mut body = Vec::new();
     file.read_to_end(&mut body)
         .map_err(|_| http::StatusCode::INTERNAL_SERVER_ERROR)?;
-
     http::Response::builder()
         .status(http::StatusCode::OK)
         .header(http::header::CONTENT_TYPE, content_type(&canonical))
@@ -360,8 +394,8 @@ fn serve_hot_asset(path: &str) -> Result<http::Response<Vec<u8>>, http::StatusCo
 }
 
 fn request_path_to_relative(path: &str) -> Result<PathBuf, http::StatusCode> {
-    let trimmed = path.trim_start_matches('/');
-    let decoded = percent_decode(trimmed).ok_or(http::StatusCode::BAD_REQUEST)?;
+    let decoded =
+        percent_decode(path.trim_start_matches('/')).ok_or(http::StatusCode::BAD_REQUEST)?;
     if decoded.is_empty() {
         return Ok(PathBuf::from("index.html"));
     }
@@ -404,18 +438,16 @@ fn active_version() -> Option<String> {
 }
 
 fn active_web_root() -> Option<PathBuf> {
-    let version = active_version()?;
-    let root = root_dir().join("versions").join(version);
-    if root.join("index.html").is_file() {
-        Some(root)
-    } else {
-        None
-    }
+    let root = root_dir().join("versions").join(active_version()?);
+    is_usable_web_root(&root).then_some(root)
+}
+
+fn is_usable_web_root(root: &Path) -> bool {
+    root.join("index.html").is_file() && root.join(TUZI_CONTRACT_FILE).is_file()
 }
 
 fn cleanup_old_versions(current_version: &str) {
-    let versions_dir = root_dir().join("versions");
-    let Ok(entries) = fs::read_dir(&versions_dir) else {
+    let Ok(entries) = fs::read_dir(root_dir().join("versions")) else {
         return;
     };
     for entry in entries.flatten() {
@@ -426,7 +458,7 @@ fn cleanup_old_versions(current_version: &str) {
     }
 }
 
-fn is_app_version_compatible(version: &str, range: &str) -> bool {
+fn is_version_compatible(version: &str, range: &str) -> bool {
     range.split_whitespace().all(|rule| {
         if let Some(required) = rule.strip_prefix(">=") {
             compare_versions(version, required) >= 0
@@ -538,8 +570,8 @@ mod tests {
 
     #[test]
     fn version_range_supports_basic_comparisons() {
-        assert!(is_app_version_compatible("1.2.3", ">=1.2.0 <1.3.0"));
-        assert!(!is_app_version_compatible("1.3.0", ">=1.2.0 <1.3.0"));
+        assert!(is_version_compatible("3.17.0", ">=3.17.0 <3.18.0"));
+        assert!(!is_version_compatible("3.18.0", ">=3.17.0 <3.18.0"));
     }
 
     #[test]
@@ -560,20 +592,48 @@ mod tests {
     }
 
     #[test]
+    fn hot_asset_scan_requires_tuzi_feature_markers() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(
+            dir.path().join("app.js"),
+            REQUIRED_TUZI_ASSET_MARKERS.join("\n"),
+        )
+        .expect("write js");
+        assert!(contains_required_tuzi_markers(dir.path()).expect("scan markers"));
+
+        fs::write(dir.path().join("app.js"), "plain cc assets").expect("replace js");
+        assert!(!contains_required_tuzi_markers(dir.path()).expect("scan markers"));
+    }
+
+    #[test]
+    fn current_contract_rejects_legacy_hot_assets() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join("index.html"), "<div>旧界面</div>").expect("write html");
+        fs::write(dir.path().join(".tuzi-contract-v1"), b"tuzi-web-v1\n")
+            .expect("write legacy contract");
+
+        assert!(!is_usable_web_root(dir.path()));
+
+        fs::write(dir.path().join(TUZI_CONTRACT_FILE), b"tuzi-web-v2\n")
+            .expect("write current contract");
+        assert!(is_usable_web_root(dir.path()));
+    }
+
+    #[test]
     fn signature_payload_is_stable() {
         let manifest = WebManifest {
-            version: "1.1.4-web.1".to_string(),
-            app_version_range: ">=1.1.4 <1.2.0".to_string(),
+            version: "3.17.0-tuzi.1-web.1".to_string(),
+            app_version_range: ">=3.17.0-tuzi.1 <3.18.0".to_string(),
             required_capabilities: BTreeMap::new(),
             archive: WebArchive {
-                url: "https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/v1.1.4/web.tar.gz".to_string(),
+                url: "https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/v3.17.0-tuzi.1/web.tar.gz".to_string(),
                 sha256: "ABCDEF".to_string(),
                 signature: "sig".to_string(),
             },
         };
         assert_eq!(
             signature_payload(&manifest),
-            "abcdef\n1.1.4-web.1\n>=1.1.4 <1.2.0\n"
+            "abcdef\n3.17.0-tuzi.1-web.1\n>=3.17.0-tuzi.1 <3.18.0\n"
         );
     }
 }

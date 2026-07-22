@@ -1,0 +1,626 @@
+name: Tuzi Build & Release
+run-name: "tuzi release: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+
+on:
+  push:
+    tags:
+      - "v*-tuzi.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tuzi release tag, for example v3.17.0-tuzi.2"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tuzi-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "10.12.3"
+
+jobs:
+  prepare:
+    if: github.repository == 'tuziapi/tuzi-switch'
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.release-tag.outputs.tag }}
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+      - name: Resolve release tag
+        id: release-tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-tuzi\.[0-9]+$ ]]; then
+            echo "Invalid Tuzi release tag: $TAG" >&2
+            exit 1
+          fi
+          EXPECTED_VERSION="${TAG#v}"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          CARGO_VERSION="$(sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' src-tauri/Cargo.toml | head -1)"
+          for entry in \
+            "package.json:$PACKAGE_VERSION" \
+            "src-tauri/tauri.conf.json:$TAURI_VERSION" \
+            "src-tauri/Cargo.toml:$CARGO_VERSION"; do
+            file="${entry%%:*}"
+            version="${entry#*:}"
+            if [[ "$version" != "$EXPECTED_VERSION" ]]; then
+              echo "Version mismatch: $file is $version, release tag is $TAG" >&2
+              exit 1
+            fi
+          done
+          node scripts/check-tuzi-invariants.mjs
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  build-native:
+    needs: prepare
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    environment: release
+    env:
+      GEMINI_OAUTH_CLIENT_ID: ${{ secrets.GEMINI_OAUTH_CLIENT_ID }}
+      GEMINI_OAUTH_CLIENT_SECRET: ${{ secrets.GEMINI_OAUTH_CLIENT_SECRET }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS Universal
+            os: macos-14
+            platform: macos
+            arch: universal
+          - label: Windows x64
+            os: windows-2022
+            platform: windows
+            arch: x86_64
+          - label: Windows ARM64
+            os: windows-11-arm
+            platform: windows
+            arch: aarch64
+            target: aarch64-pc-windows-msvc
+          - label: Linux x64
+            os: ubuntu-22.04
+            platform: linux
+            arch: x86_64
+          - label: Linux ARM64
+            os: ubuntu-22.04-arm
+            platform: linux
+            arch: aarch64
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS universal targets
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Add Windows ARM64 target
+        if: matrix.platform == 'windows' && matrix.arch == 'aarch64'
+        shell: pwsh
+        run: rustup target add aarch64-pc-windows-msvc
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config curl wget file patchelf libssl-dev rpm \
+            libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev \
+            || sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.0-dev
+          sudo apt-get install -y --no-install-recommends libsoup-3.0-dev \
+            || sudo apt-get install -y --no-install-recommends libsoup2.4-dev
+
+      - name: Setup pnpm
+        if: matrix.platform != 'windows' || matrix.arch != 'aarch64'
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Setup pnpm on Windows ARM64
+        if: matrix.platform == 'windows' && matrix.arch == 'aarch64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+          pnpm --version
+
+      - name: Setup LLVM on Windows ARM64
+        if: matrix.platform == 'windows' && matrix.arch == 'aarch64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $llvmRoot = 'C:\Program Files\LLVM'
+          if (-not (Test-Path $llvmRoot)) {
+            throw "LLVM not found at $llvmRoot"
+          }
+          $llvmBin = Join-Path $llvmRoot 'bin'
+          "LIBCLANG_PATH=$llvmBin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "CLANG_PATH=$(Join-Path $llvmBin 'clang.exe')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $llvmBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare updater signing key
+        env:
+          RAW_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${RAW_SIGNING_KEY:-}" ]]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY is required for a public Tuzi release." >&2
+            exit 1
+          fi
+
+          KEY_PATH="$RUNNER_TEMP/tauri-signing.key"
+          if printf '%s' "$RAW_SIGNING_KEY" | head -n1 | grep -q '^untrusted comment:'; then
+            printf '%s\n' "$RAW_SIGNING_KEY" > "$KEY_PATH"
+          elif DECODED=$(printf '%s' "$RAW_SIGNING_KEY" | (base64 --decode 2>/dev/null || base64 -D 2>/dev/null)) \
+            && printf '%s' "$DECODED" | head -n1 | grep -q '^untrusted comment:'; then
+            printf '%s\n' "$DECODED" > "$KEY_PATH"
+          elif printf '%s' "$RAW_SIGNING_KEY" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
+            printf '%s\n%s\n' "untrusted comment: tauri signing key" "$RAW_SIGNING_KEY" > "$KEY_PATH"
+          else
+            echo "Unrecognized TAURI_SIGNING_PRIVATE_KEY format" >&2
+            exit 1
+          fi
+
+          KEY_B64=$(base64 < "$KEY_PATH" | tr -d '\r\n')
+          echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_B64" >> "$GITHUB_ENV"
+          if [[ -n "${SIGNING_PASSWORD:-}" ]]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+          fi
+
+      - name: Prepare optional Apple signing identity
+        if: matrix.platform == 'macos'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_CERTIFICATE:-}" || -z "${APPLE_CERTIFICATE_PASSWORD:-}" \
+            || -z "${KEYCHAIN_PASSWORD:-}" ]]; then
+            echo "APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD and KEYCHAIN_PASSWORD are required for macOS release." >&2
+            exit 1
+          fi
+
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          printf '%s' "$APPLE_CERTIFICATE" | (base64 --decode 2>/dev/null || base64 -D) > "$CERT_PATH"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          ORIGINAL_DEFAULT_KEYCHAIN=$(security default-keychain -d user | tr -d '"' | xargs)
+          echo "ORIGINAL_DEFAULT_KEYCHAIN=$ORIGINAL_DEFAULT_KEYCHAIN" >> "$GITHUB_ENV"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep "Developer ID Application" | grep -oE '"[^"]+"' | head -1 | tr -d '"')
+          test -n "$IDENTITY"
+          echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          rm -f "$CERT_PATH"
+
+      - name: Build macOS Universal
+        if: matrix.platform == 'macos'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_ID:-}" || -z "${APPLE_PASSWORD:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
+            echo "APPLE_ID, APPLE_PASSWORD and APPLE_TEAM_ID are required for notarization." >&2
+            exit 1
+          fi
+          pnpm tauri build --target universal-apple-darwin
+
+      - name: Build Windows
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $targetArgs = @()
+          if ($env:TARGET) { $targetArgs = @('--target', $env:TARGET) }
+          pnpm tauri build @targetArgs --bundles "msi,nsis"
+
+      - name: Build Linux
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm tauri build --bundles appimage,deb,rpm
+
+      - name: Collect macOS assets
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          BUNDLE="src-tauri/target/universal-apple-darwin/release/bundle"
+          APP=$(find "$BUNDLE/macos" -maxdepth 1 -name "*.app" -type d -print -quit)
+          DMG=$(find "$BUNDLE/dmg" -maxdepth 1 -name "*.dmg" -type f -print -quit)
+          test -n "$APP" && test -n "$DMG"
+          cp "$DMG" "release-assets/tuzi-switch-macos-universal.dmg"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" \
+            "release-assets/tuzi-switch-macos-universal.zip"
+          UPDATE=$(find "$BUNDLE/macos" -maxdepth 1 -name "*.tar.gz" -type f -print -quit || true)
+          test -n "${UPDATE:-}" && test -f "$UPDATE.sig"
+          cp "$UPDATE" "release-assets/tuzi-switch-macos-universal.app.tar.gz"
+          cp "$UPDATE.sig" "release-assets/tuzi-switch-macos-universal.app.tar.gz.sig"
+
+      - name: Collect Windows assets
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          $targetRoot = if ('${{ matrix.arch }}' -eq 'aarch64') {
+            'src-tauri/target/aarch64-pc-windows-msvc/release'
+          } else {
+            'src-tauri/target/release'
+          }
+          $arch = '${{ matrix.arch }}'
+          $msi = Get-ChildItem -Path (Join-Path $targetRoot 'bundle') -Recurse -Include *.msi |
+            Select-Object -First 1
+          if (-not $msi) { throw "MSI installer not found" }
+          $msiName = "tuzi-switch-windows-$arch.msi"
+          Copy-Item $msi.FullName "release-assets/$msiName"
+          if (-not (Test-Path "$($msi.FullName).sig")) { throw "MSI signature not found" }
+          Copy-Item "$($msi.FullName).sig" "release-assets/$msiName.sig"
+          $setup = Get-ChildItem -Path (Join-Path $targetRoot 'bundle/nsis') -Filter '*-setup.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($setup) {
+            Copy-Item $setup.FullName "release-assets/tuzi-switch-windows-$arch-setup.exe"
+          }
+          $exe = @(
+            (Join-Path $targetRoot 'tuzi-switch.exe'),
+            (Join-Path $targetRoot 'cc-switch.exe')
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ($exe) {
+            $portable = 'release-assets/tuzi-switch-portable'
+            New-Item -ItemType Directory -Force -Path $portable | Out-Null
+            Copy-Item $exe (Join-Path $portable 'tuzi-switch.exe')
+            @('portable=true', "arch=$arch") |
+              Set-Content -Path (Join-Path $portable 'portable.ini') -Encoding utf8
+            Compress-Archive -Path "$portable/*" -DestinationPath "release-assets/tuzi-switch-windows-$arch-portable.zip"
+            Remove-Item -Recurse -Force $portable
+          }
+
+      - name: Collect Linux assets
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          BUNDLE="src-tauri/target/release/bundle"
+          ARCH="${{ matrix.arch }}"
+          APPIMAGE=$(find "$BUNDLE" -name "*.AppImage" -type f -print -quit)
+          test -n "$APPIMAGE"
+          APPIMAGE_NAME="tuzi-switch-linux-${ARCH}.AppImage"
+          cp "$APPIMAGE" "release-assets/$APPIMAGE_NAME"
+          test -f "$APPIMAGE.sig"
+          cp "$APPIMAGE.sig" "release-assets/$APPIMAGE_NAME.sig"
+          DEB=$(find "$BUNDLE" -name "*.deb" -type f -print -quit || true)
+          RPM=$(find "$BUNDLE" -name "*.rpm" -type f -print -quit || true)
+          [[ -z "${DEB:-}" ]] || cp "$DEB" "release-assets/tuzi-switch-linux-${ARCH}.deb"
+          [[ -z "${RPM:-}" ]] || cp "$RPM" "release-assets/tuzi-switch-linux-${ARCH}.rpm"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: tuzi-release-${{ matrix.platform }}-${{ matrix.arch }}
+          path: release-assets/*
+          if-no-files-found: error
+
+      - name: Clean up Apple signing keychain
+        if: matrix.platform == 'macos' && always()
+        shell: bash
+        run: |
+          if [[ -n "${ORIGINAL_DEFAULT_KEYCHAIN:-}" ]]; then
+            security default-keychain -s "$ORIGINAL_DEFAULT_KEYCHAIN" || true
+          fi
+          if [[ -f "$RUNNER_TEMP/build.keychain-db" ]]; then
+            security delete-keychain "$RUNNER_TEMP/build.keychain-db" || true
+          fi
+
+  publish-release:
+    needs: [prepare, build-native]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Download all native assets
+        uses: actions/download-artifact@v8
+        with:
+          pattern: tuzi-release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Validate platform matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            tuzi-switch-macos-universal.dmg
+            tuzi-switch-windows-x86_64.msi
+            tuzi-switch-windows-aarch64.msi
+            tuzi-switch-linux-x86_64.AppImage
+            tuzi-switch-linux-aarch64.AppImage
+            tuzi-switch-macos-universal.app.tar.gz
+            tuzi-switch-macos-universal.app.tar.gz.sig
+            tuzi-switch-windows-x86_64.msi.sig
+            tuzi-switch-windows-aarch64.msi.sig
+            tuzi-switch-linux-x86_64.AppImage.sig
+            tuzi-switch-linux-aarch64.AppImage.sig
+          )
+          for file in "${required[@]}"; do
+            test -f "dist/$file" || { echo "Missing release asset: $file" >&2; exit 1; }
+          done
+
+      - name: Generate latest.json
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("fs");
+          const tag = process.env.TAG;
+          const version = tag.replace(/^v/, "");
+          const baseUrl = `https://github.com/tuziapi/tuzi-switch/releases/download/${tag}`;
+          const platforms = {};
+          const add = (keys, name) => {
+            const sigPath = `dist/${name}.sig`;
+            if (!fs.existsSync(`dist/${name}`) || !fs.existsSync(sigPath)) return;
+            const item = {
+              signature: fs.readFileSync(sigPath, "utf8").trim(),
+              url: `${baseUrl}/${name}`,
+            };
+            for (const key of keys) platforms[key] = item;
+          };
+          add(
+            ["darwin-aarch64", "darwin-x86_64"],
+            "tuzi-switch-macos-universal.app.tar.gz",
+          );
+          add(["windows-x86_64"], "tuzi-switch-windows-x86_64.msi");
+          add(["windows-aarch64"], "tuzi-switch-windows-aarch64.msi");
+          add(["linux-x86_64"], "tuzi-switch-linux-x86_64.AppImage");
+          add(["linux-aarch64"], "tuzi-switch-linux-aarch64.AppImage");
+          if (Object.keys(platforms).length === 0) {
+            console.log("No signed updater artifacts; GitHub API fallback will offer manual downloads.");
+            process.exit(0);
+          }
+          fs.writeFileSync(
+            "latest.json",
+            `${JSON.stringify({
+              version,
+              notes: `兔子switch ${tag}`,
+              pub_date: new Date().toISOString(),
+              platforms,
+            }, null, 2)}\n`,
+          );
+          NODE
+
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOTES=$(mktemp)
+          cat > "$NOTES" <<EOF
+          ## 兔子switch $TAG
+
+          基于最新 CC Switch 上游发布能力的 Tuzi 增强版。
+
+          - macOS：Universal（Intel + Apple Silicon）
+          - Windows：x64 / ARM64
+          - Linux：x64 / ARM64
+
+          ### macOS / Linux 一键安装
+
+          \`\`\`bash
+          curl -fsSL https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@${TAG}/scripts/install_tuzi_switch.sh | TUZI_SWITCH_TAG=${TAG} bash
+          \`\`\`
+          EOF
+          sed -i 's/^          //' "$NOTES"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "兔子switch $TAG" --notes-file "$NOTES" --draft
+          else
+            gh release create "$TAG" --title "兔子switch $TAG" --notes-file "$NOTES" --draft
+          fi
+          files=(dist/* scripts/install_tuzi_switch.sh)
+          [[ ! -f latest.json ]] || files+=(latest.json)
+          gh release upload "$TAG" "${files[@]}" --clobber
+          gh release edit "$TAG" --draft=false --prerelease=false --latest
+
+      - name: Publish updater manifest branch
+        if: hashFiles('latest.json') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKTREE=$(mktemp -d)
+          if git ls-remote --exit-code --heads origin release-manifest >/dev/null 2>&1; then
+            git clone --branch release-manifest --single-branch \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$WORKTREE"
+          else
+            git init "$WORKTREE"
+            git -C "$WORKTREE" checkout --orphan release-manifest
+            git -C "$WORKTREE" remote add origin \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          fi
+          cp latest.json "$WORKTREE/latest.json"
+          cd "$WORKTREE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add latest.json
+          if git diff --cached --quiet; then
+            echo "latest.json is unchanged"
+          else
+            git commit -m "发布更新清单 ${TAG}"
+            git push origin release-manifest
+          fi
+
+      - name: Purge jsDelivr cache
+        shell: bash
+        run: |
+          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@release-manifest/latest.json" || true
+          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@${{ needs.prepare.outputs.tag }}/scripts/install_tuzi_switch.sh" || true
+
+  publish-web:
+    needs: [prepare, publish-release]
+    runs-on: ubuntu-22.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - name: Install minisign
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y minisign
+      - name: Build signed web assets
+        id: build-web-assets
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          WEB_UPDATE_MINISIGN_PRIVATE_KEY: ${{ secrets.WEB_UPDATE_MINISIGN_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${WEB_UPDATE_MINISIGN_PRIVATE_KEY:-}" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          pnpm run build:renderer
+          mkdir -p web-release
+          ARCHIVE="web-release/web.tar.gz"
+          tar --sort=name --mtime="@0" --owner=0 --group=0 --numeric-owner -czf "$ARCHIVE" -C dist .
+          export SHA256=$(sha256sum "$ARCHIVE" | awk '{print $1}')
+          export VERSION="${TAG#v}-web.1"
+          export APP_VERSION="${TAG#v}"
+          export APP_VERSION_RANGE=">=${APP_VERSION} <$(node -e 'const p=process.env.APP_VERSION.split("-")[0].split(".").map(Number); console.log(`${p[0]}.${p[1]+1}.0`)')"
+          printf '%s\n' "$SHA256" "$VERSION" "$APP_VERSION_RANGE" > web-release/signature-payload.txt
+          printf '%s\n' "$WEB_UPDATE_MINISIGN_PRIVATE_KEY" > web-release/minisign.key
+          chmod 600 web-release/minisign.key
+          minisign -Sm web-release/signature-payload.txt -s web-release/minisign.key -x "$ARCHIVE.sig" -W
+          export SIGNATURE=$(base64 -w0 "$ARCHIVE.sig")
+          node <<'NODE'
+          const fs = require("fs");
+          const tag = process.env.TAG;
+          const manifest = {
+            version: process.env.VERSION,
+            appVersionRange: process.env.APP_VERSION_RANGE,
+            requiredCapabilities: {
+              "terminal.launchProvider": ">=1.0.0",
+              "terminal.launchCommand": ">=1.0.0",
+              "config.getAppConfigInfo": ">=1.0.0",
+              "update.getWebStatus": ">=1.0.0",
+              "update.checkWeb": ">=1.0.0",
+            },
+            pubDate: new Date().toISOString(),
+            archive: {
+              url: `https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/${tag}/web.tar.gz`,
+              sha256: process.env.SHA256,
+              signature: process.env.SIGNATURE,
+            },
+          };
+          fs.writeFileSync("web-release/latest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+      - name: Publish web assets branch
+        if: steps.build-web-assets.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKTREE=$(mktemp -d)
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$REMOTE" release-web >/dev/null 2>&1; then
+            git clone --branch release-web --single-branch "$REMOTE" "$WORKTREE"
+          else
+            git init "$WORKTREE"
+            git -C "$WORKTREE" checkout --orphan release-web
+            git -C "$WORKTREE" remote add origin "$REMOTE"
+          fi
+          mkdir -p "$WORKTREE/versions/${TAG}"
+          cp web-release/web.tar.gz "$WORKTREE/versions/${TAG}/web.tar.gz"
+          cp web-release/web.tar.gz.sig "$WORKTREE/versions/${TAG}/web.tar.gz.sig"
+          sha256sum web-release/web.tar.gz | awk '{print $1}' > "$WORKTREE/versions/${TAG}/web.tar.gz.sha256"
+          cp web-release/latest.json "$WORKTREE/latest.json"
+          cd "$WORKTREE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add latest.json versions
+          if git diff --cached --quiet; then
+            echo "Web assets for ${TAG} are unchanged"
+          else
+            git commit -m "发布前端资源 ${TAG}"
+            git push origin HEAD:release-web
+          fi
+      - name: Purge web jsDelivr cache
+        if: steps.build-web-assets.outputs.skip != 'true'
+        shell: bash
+        run: |
+          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/latest.json" || true
+          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/${{ needs.prepare.outputs.tag }}/web.tar.gz" || true

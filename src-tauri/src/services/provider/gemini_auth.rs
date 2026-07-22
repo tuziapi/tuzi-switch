@@ -18,6 +18,10 @@ pub(crate) enum GeminiAuthType {
     Generic,
 }
 
+// Partner Promotion Key constants
+const PACKYCODE_PARTNER_KEY: &str = "packycode";
+const GOOGLE_OFFICIAL_PARTNER_KEY: &str = "google-official";
+
 // PackyCode keyword constants
 const PACKYCODE_KEYWORDS: [&str; 3] = ["packycode", "packyapi", "packy"];
 
@@ -31,27 +35,27 @@ const PACKYCODE_KEYWORDS: [&str; 3] = ["packycode", "packyapi", "packy"];
 /// - `GeminiAuthType::Packycode`: PackyCode provider, uses API Key
 /// - `GeminiAuthType::Generic`: Other generic providers, uses API Key
 pub(crate) fn detect_gemini_auth_type(provider: &Provider) -> GeminiAuthType {
+    // Priority 1: Check partner_promotion_key (most reliable)
     if let Some(key) = provider
         .meta
         .as_ref()
         .and_then(|meta| meta.partner_promotion_key.as_deref())
     {
-        let key_lower = key.to_ascii_lowercase();
-        if key_lower == "google-official" {
+        if key.eq_ignore_ascii_case(GOOGLE_OFFICIAL_PARTNER_KEY) {
             return GeminiAuthType::GoogleOfficial;
         }
-        if contains_packycode_keyword(&key_lower) {
+        if key.eq_ignore_ascii_case(PACKYCODE_PARTNER_KEY) {
             return GeminiAuthType::Packycode;
         }
     }
 
-    // Priority 1: Check Google Official (name matching)
+    // Priority 2: Check Google Official (name matching)
     let name_lower = provider.name.to_ascii_lowercase();
     if name_lower == "google" || name_lower.starts_with("google ") {
         return GeminiAuthType::GoogleOfficial;
     }
 
-    // Priority 2: Check PackyCode keywords
+    // Priority 3: Check PackyCode keywords
     if contains_packycode_keyword(&provider.name) {
         return GeminiAuthType::Packycode;
     }
@@ -117,7 +121,7 @@ pub(crate) fn is_google_official_gemini(provider: &Provider) -> bool {
 /// # OAuth authentication flow
 ///
 /// 1. User switches to Google Official provider
-/// 2. tuzi-switch sets `selectedType = "oauth-personal"`
+/// 2. CC-Switch sets `selectedType = "oauth-personal"`
 /// 3. User's first use of Gemini CLI will auto-open browser for OAuth login
 /// 4. After successful login, credentials saved in Gemini credential store
 /// 5. Subsequent requests auto-use saved credentials

@@ -91,7 +91,7 @@ const baseConfig: WebDavSyncSettings = {
   baseUrl: "https://dav.example.com/dav/",
   username: "alice",
   password: "secret",
-  remoteRoot: "tuzi-switch-sync",
+  remoteRoot: "cc-switch-sync",
   profile: "default",
   autoSync: false,
   status: {},

@@ -10,19 +10,21 @@ use zip::DateTime;
 use crate::error::AppError;
 use crate::services::skill::SkillService;
 
-use super::{io_context_localized, localized, MAX_SYNC_ARTIFACT_BYTES, REMOTE_SKILLS_ZIP};
+use crate::services::sync_protocol::{
+    io_context_localized, localized, MAX_SYNC_ARTIFACT_BYTES, REMOTE_SKILLS_ZIP,
+};
 
 /// Maximum number of entries allowed in a zip archive.
 const MAX_EXTRACT_ENTRIES: usize = 10_000;
 
-pub(super) struct SkillsBackup {
+pub(crate) struct SkillsBackup {
     _tmp: TempDir,
     backup_dir: PathBuf,
     ssot_path: PathBuf,
     existed: bool,
 }
 
-pub(super) fn zip_skills_ssot(dest_path: &Path) -> Result<(), AppError> {
+pub(crate) fn zip_skills_ssot(dest_path: &Path) -> Result<(), AppError> {
     let source = SkillService::get_ssot_dir().map_err(|e| {
         localized(
             "webdav.sync.skills_ssot_dir_failed",
@@ -63,7 +65,7 @@ pub(super) fn zip_skills_ssot(dest_path: &Path) -> Result<(), AppError> {
     Ok(())
 }
 
-pub(super) fn restore_skills_zip(raw: &[u8]) -> Result<(), AppError> {
+pub(crate) fn restore_skills_zip(raw: &[u8]) -> Result<(), AppError> {
     let tmp = tempdir().map_err(|e| {
         io_context_localized(
             "webdav.sync.skills_extract_tmpdir_failed",
@@ -159,7 +161,7 @@ pub(super) fn restore_skills_zip(raw: &[u8]) -> Result<(), AppError> {
     Ok(())
 }
 
-pub(super) fn backup_current_skills() -> Result<SkillsBackup, AppError> {
+pub(crate) fn backup_current_skills() -> Result<SkillsBackup, AppError> {
     let ssot = SkillService::get_ssot_dir().map_err(|e| {
         localized(
             "webdav.sync.skills_ssot_dir_failed",
@@ -190,7 +192,7 @@ pub(super) fn backup_current_skills() -> Result<SkillsBackup, AppError> {
     })
 }
 
-pub(super) fn restore_skills_from_backup(backup: &SkillsBackup) -> Result<(), AppError> {
+pub(crate) fn restore_skills_from_backup(backup: &SkillsBackup) -> Result<(), AppError> {
     if backup.ssot_path.exists() {
         fs::remove_dir_all(&backup.ssot_path).map_err(|e| AppError::io(&backup.ssot_path, e))?;
     }
@@ -275,12 +277,14 @@ fn zip_dir_recursive(
                 )
             })?;
             let mut file = fs::File::open(&real_path).map_err(|e| AppError::io(&real_path, e))?;
-            std::io::copy(&mut file, writer).map_err(|e| {
-                io_context_localized(
+            let mut buf = Vec::new();
+            file.read_to_end(&mut buf)
+                .map_err(|e| AppError::io(&real_path, e))?;
+            writer.write_all(&buf).map_err(|e| {
+                localized(
                     "webdav.sync.zip_write_file_failed",
-                    format!("写入 ZIP 文件内容失败: {}", real_path.display()),
-                    format!("Failed to write ZIP file content: {}", real_path.display()),
-                    e,
+                    format!("写入 ZIP 文件内容失败: {e}"),
+                    format!("Failed to write ZIP file content: {e}"),
                 )
             })?;
         }

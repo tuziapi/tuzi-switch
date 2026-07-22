@@ -16,10 +16,11 @@ export const settingsSchema = z.object({
   launchOnStartup: z.boolean().optional(),
   enableLocalProxy: z.boolean().optional(),
   anonymousAnalyticsEnabled: z.boolean().optional(),
+  usageDashboardRefreshIntervalMs: z.number().optional(),
   preserveCodexOfficialAuthOnSwitch: z.boolean().optional(),
   unifyCodexSessionHistory: z.boolean().optional(),
   unifyCodexMigrateExisting: z.boolean().optional(),
-  language: z.enum(["en", "zh", "ja"]).optional(),
+  language: z.enum(["en", "zh", "zh-TW", "ja"]).optional(),
 
   // 设备级目录覆盖
   claudeConfigDir: directorySchema.nullable().optional(),
@@ -36,7 +37,7 @@ export const settingsSchema = z.object({
 
   // Skill 同步设置
   skillSyncMethod: z.enum(["auto", "symlink", "copy"]).optional(),
-  skillStorageLocation: z.enum(["tuzi_switch", "unified"]).optional(),
+  skillStorageLocation: z.enum(["cc_switch", "unified"]).optional(),
 
   // WebDAV v2 同步设置（通过专用命令保存，schema 仅用于读取）
   webdavSync: z
@@ -56,6 +57,21 @@ export const settingsSchema = z.object({
           lastRemoteEtag: z.string().nullable().optional(),
           lastLocalManifestHash: z.string().nullable().optional(),
           lastRemoteManifestHash: z.string().nullable().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+
+  // 本机自动迁移状态（后端维护且保存时后端忽略前端值，仅供读取展示）
+  localMigrations: z
+    .object({
+      codexThirdPartyHistoryProviderBucketV1: z
+        .object({
+          completedAt: z.string(),
+          targetProviderId: z.string(),
+          sourceProviderIds: z.array(z.string()).optional(),
+          migratedJsonlFiles: z.number().optional(),
+          migratedStateRows: z.number().optional(),
         })
         .optional(),
     })

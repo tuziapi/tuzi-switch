@@ -20,7 +20,8 @@ export function useBackupManager() {
       track("config_action", { action: "backup", result: "success" });
       return refetch();
     },
-    onError: () => track("config_action", { action: "backup", result: "failed" }),
+    onError: () =>
+      track("config_action", { action: "backup", result: "failed" }),
   });
 
   const restoreMutation = useMutation({
@@ -32,7 +33,8 @@ export function useBackupManager() {
       // Refetch backup list
       await refetch();
     },
-    onError: () => track("config_action", { action: "restore", result: "failed" }),
+    onError: () =>
+      track("config_action", { action: "restore", result: "failed" }),
   });
 
   const renameMutation = useMutation({

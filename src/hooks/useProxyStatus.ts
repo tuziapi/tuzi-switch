@@ -132,7 +132,12 @@ export function useProxyStatus() {
     mutationFn: ({ appType, enabled }: { appType: string; enabled: boolean }) =>
       invoke("set_proxy_takeover_for_app", { appType, enabled }),
     onSuccess: (_data, variables) => {
-      track("proxy_action", { app: variables.appType, action: "route", result: "success", enabled: variables.enabled ? "true" : "false" });
+      track("proxy_action", {
+        app: variables.appType,
+        action: "route",
+        result: "success",
+        enabled: variables.enabled ? "true" : "false",
+      });
       const appLabel =
         variables.appType === "claude"
           ? "Claude"
@@ -159,7 +164,12 @@ export function useProxyStatus() {
       queryClient.invalidateQueries({ queryKey: ["proxyTakeoverStatus"] });
     },
     onError: (error: Error, variables) => {
-      track("proxy_action", { app: variables.appType, action: "route", result: "failed", enabled: variables.enabled ? "true" : "false" });
+      track("proxy_action", {
+        app: variables.appType,
+        action: "route",
+        result: "failed",
+        enabled: variables.enabled ? "true" : "false",
+      });
       const detail =
         extractErrorMessage(error) ||
         t("common.unknown", { defaultValue: "未知错误" });
@@ -182,11 +192,19 @@ export function useProxyStatus() {
       providerId: string;
     }) => invoke("switch_proxy_provider", { appType, providerId }),
     onSuccess: (_data, variables) => {
-      track("proxy_action", { app: variables.appType, action: "switch", result: "success" });
+      track("proxy_action", {
+        app: variables.appType,
+        action: "switch",
+        result: "success",
+      });
       queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
     },
     onError: (error: Error, variables) => {
-      track("proxy_action", { app: variables.appType, action: "switch", result: "failed" });
+      track("proxy_action", {
+        app: variables.appType,
+        action: "switch",
+        result: "failed",
+      });
       const detail =
         extractErrorMessage(error) ||
         t("common.unknown", { defaultValue: "未知错误" });

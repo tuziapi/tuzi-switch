@@ -1,0 +1,376 @@
+name: Sync CC Upstream
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-cc-upstream
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare upstream merge
+    if: github.repository == 'tuziapi/tuzi-switch'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.sync.outputs.changed }}
+      branch: ${{ steps.sync.outputs.branch }}
+      upstream_sha: ${{ steps.sync.outputs.upstream_sha }}
+      upstream_short_sha: ${{ steps.sync.outputs.upstream_short_sha }}
+      upstream_version: ${{ steps.sync.outputs.upstream_version }}
+      upstream_tag: ${{ steps.sync.outputs.upstream_tag }}
+    steps:
+      - name: Checkout Tuzi develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "tuzi-switch-upstream-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch and merge latest CC release
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_REPOSITORY: https://github.com/farion1231/cc-switch.git
+        run: |
+          set -euo pipefail
+
+          upstream_tag="$(curl -fsSL \
+            -H 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/farion1231/cc-switch/releases/latest \
+            | node -e "let data=''; process.stdin.on('data', c => data += c); process.stdin.on('end', () => process.stdout.write(JSON.parse(data).tag_name || ''));")"
+          if [[ ! "$upstream_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid CC release tag: $upstream_tag" >&2
+            exit 1
+          fi
+          git fetch --force "$UPSTREAM_REPOSITORY" \
+            "refs/tags/$upstream_tag:refs/tags/cc-$upstream_tag"
+          upstream_ref="refs/tags/cc-$upstream_tag"
+          upstream_sha="$(git rev-list -n1 "$upstream_ref")"
+          upstream_short_sha="$(git rev-parse --short=12 "$upstream_sha")"
+          upstream_version="$(git show "$upstream_ref:package.json" | node -e \
+            "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(data).version));")"
+          upstream_committed_at="$(git show -s --format=%cI "$upstream_sha")"
+          recorded_sha="$(node -p "require('./upstream-base.json').upstream.commit")"
+          branch="sync/cc-release-${upstream_tag#v}"
+
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+          echo "upstream_short_sha=$upstream_short_sha" >> "$GITHUB_OUTPUT"
+          echo "upstream_version=$upstream_version" >> "$GITHUB_OUTPUT"
+          echo "upstream_tag=$upstream_tag" >> "$GITHUB_OUTPUT"
+
+          recorded_tag="$(node -p "require('./upstream-base.json').upstream.releaseTag || ''")"
+          if [[ "$recorded_tag" == "$upstream_tag" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "CC release $upstream_tag is already recorded."
+            exit 0
+          fi
+          if ! git merge-base --is-ancestor "$recorded_sha" "$upstream_sha"; then
+            echo "::error title=Non-linear CC release::The new CC release does not contain the previously integrated upstream commit $recorded_sha. Manual review is required."
+            exit 1
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git switch --force-create "$branch" origin/develop
+
+          if ! git merge --no-edit --no-ff "$upstream_ref"; then
+            conflicts="$(git diff --name-only --diff-filter=U | paste -sd ', ' -)"
+            git merge --abort
+            echo "::error title=CC upstream merge conflict::Resolve the sync locally. Conflicting files: ${conflicts:-unknown}"
+            exit 1
+          fi
+
+          # The protection policy itself must come from the pre-merge Tuzi develop;
+          # otherwise upstream could accidentally weaken the restore boundary.
+          protected_paths_file="$RUNNER_TEMP/tuzi-protected-paths.txt"
+          git show origin/develop:tuzi-protected-paths.txt > "$protected_paths_file"
+
+          # CC is the complete upstream base, but Tuzi-owned product files are
+          # immutable during upstream sync. Restore them byte-for-byte from the
+          # pre-merge Tuzi develop before applying version metadata.
+          while IFS= read -r protected_path; do
+            [[ -z "$protected_path" || "$protected_path" == \#* ]] && continue
+            git restore --source=origin/develop --staged --worktree -- "$protected_path"
+          done < "$protected_paths_file"
+
+          UPSTREAM_SHA="$upstream_sha" \
+          UPSTREAM_VERSION="$upstream_version" \
+          UPSTREAM_COMMITTED_AT="$upstream_committed_at" \
+          UPSTREAM_TAG="$upstream_tag" \
+          node <<'NODE'
+          const fs = require("node:fs");
+          const normalizeVersion = (version) => version.replace(/-tuzi\.\d+$/, "");
+          const baseline = {
+            schemaVersion: 1,
+            upstream: {
+              repository: "https://github.com/farion1231/cc-switch",
+              branch: "main",
+              releaseTag: process.env.UPSTREAM_TAG,
+              releaseCommit: process.env.UPSTREAM_SHA,
+              commit: process.env.UPSTREAM_SHA,
+              version: process.env.UPSTREAM_VERSION,
+              committedAt: process.env.UPSTREAM_COMMITTED_AT,
+            },
+          };
+          fs.writeFileSync("upstream-base.json", `${JSON.stringify(baseline, null, 2)}\n`);
+
+          for (const file of ["package.json", "src-tauri/tauri.conf.json"]) {
+            const data = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (normalizeVersion(data.version) !== process.env.UPSTREAM_VERSION) {
+              data.version = `${process.env.UPSTREAM_VERSION}-tuzi.1`;
+              fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
+            }
+          }
+
+          const cargoPath = "src-tauri/Cargo.toml";
+          const cargo = fs.readFileSync(cargoPath, "utf8");
+          const packageSection = cargo.match(/\[package\][\s\S]*?(?=\n\[|$)/)?.[0];
+          const cargoVersion = packageSection?.match(/^version\s*=\s*"([^"]+)"$/m)?.[1];
+          if (cargoVersion && normalizeVersion(cargoVersion) !== process.env.UPSTREAM_VERSION) {
+            const updatedSection = packageSection.replace(
+              /^version\s*=\s*"[^"]+"$/m,
+              `version = "${process.env.UPSTREAM_VERSION}-tuzi.1"`,
+            );
+            fs.writeFileSync(cargoPath, cargo.replace(packageSection, updatedSection));
+
+            const lockPath = "src-tauri/Cargo.lock";
+            const lock = fs.readFileSync(lockPath, "utf8");
+            const lockPackage = lock.match(
+              /\[\[package\]\]\nname = "tuzi-switch"\nversion = "[^"]+"/,
+            )?.[0];
+            if (!lockPackage) throw new Error("tuzi-switch package not found in Cargo.lock");
+            fs.writeFileSync(
+              lockPath,
+              lock.replace(
+                lockPackage,
+                `[[package]]\nname = "tuzi-switch"\nversion = "${process.env.UPSTREAM_VERSION}-tuzi.1"`,
+              ),
+            );
+          }
+          NODE
+
+          git add upstream-base.json package.json src-tauri/tauri.conf.json \
+            src-tauri/Cargo.toml src-tauri/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "同步 CC 基线 ${upstream_version} (${upstream_short_sha})" \
+              -m "问题描述：Tuzi 需要持续跟随 CC 正式版本，同时保持产品扩展层独立。" \
+              -m "修复思路：记录新的上游版本与提交，所有变更仅进入同步分支并经过完整门禁。" \
+              -m "更新代码架构：CC 主线 + Tuzi 产品扩展层 + 自动同步 PR。"
+          fi
+
+          node scripts/check-tuzi-invariants.mjs
+          git diff --exit-code origin/develop -- $(grep -Ev '^($|#)' tuzi-protected-paths.txt) \
+            || { echo "::error title=Tuzi product layer changed::Protected Tuzi paths must remain byte-identical during CC sync."; exit 1; }
+          git status --porcelain --untracked-files=all | tee "$RUNNER_TEMP/sync-worktree-status"
+          test ! -s "$RUNNER_TEMP/sync-worktree-status"
+          remote_branch_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"
+          if [[ -n "$remote_branch_sha" ]]; then
+            remote_upstream_sha="$(git show "$remote_branch_sha:upstream-base.json" 2>/dev/null \
+              | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(data).upstream.commit));" \
+              || true)"
+            if [[ "$remote_upstream_sha" != "$upstream_sha" ]]; then
+              echo "::error title=Unexpected sync branch::Remote $branch does not match the recorded CC baseline; refusing to reuse it."
+              exit 1
+            fi
+            echo "Sync branch $branch already exists and matches the CC baseline."
+          else
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+
+  checks:
+    name: Validate sync branch
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.prepare.outputs.branch }}
+
+  open-pr:
+    name: Create or update sync PR
+    needs: [prepare, checks]
+    if: >-
+      needs.prepare.outputs.changed == 'true' &&
+      needs.checks.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pull-request.outputs.pr_number }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SYNC_BRANCH: ${{ needs.prepare.outputs.branch }}
+      UPSTREAM_SHA: ${{ needs.prepare.outputs.upstream_sha }}
+      UPSTREAM_SHORT_SHA: ${{ needs.prepare.outputs.upstream_short_sha }}
+      UPSTREAM_VERSION: ${{ needs.prepare.outputs.upstream_version }}
+      UPSTREAM_TAG: ${{ needs.prepare.outputs.upstream_tag }}
+    steps:
+      - name: Checkout sync branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.branch }}
+          fetch-depth: 0
+
+      - name: Create or update pull request
+        id: pull-request
+        run: |
+          set -euo pipefail
+          body_file="$RUNNER_TEMP/cc-upstream-sync-pr.md"
+          cat > "$body_file" <<EOF
+          ## CC 上游同步
+
+          - 上游版本：\`${UPSTREAM_VERSION}\`
+          - 上游提交：\`${UPSTREAM_SHA}\`
+          - 上游发布：\`${UPSTREAM_TAG}\`
+
+          此分支由自动同步流程生成，不会直接写入 Tuzi \`develop\`。
+
+          合并前门禁已运行：
+
+          - Tuzi 产品不变量检查
+          - TypeScript 类型检查、Prettier、单元测试
+          - Linux / Windows / macOS 的 Rust 格式、Clippy、测试
+          EOF
+
+          pr_number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base develop \
+            --head "$SYNC_BRANCH" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          title="同步 CC ${UPSTREAM_VERSION} (${UPSTREAM_SHORT_SHA})"
+          if [[ -n "$pr_number" ]]; then
+            gh pr edit "$pr_number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --body-file "$body_file"
+          elif [[ "$(gh pr view "$SYNC_BRANCH" --repo "$GITHUB_REPOSITORY" --json state --jq .state 2>/dev/null || true)" == "MERGED" ]]; then
+            echo "Sync PR for $SYNC_BRANCH was already merged; no new PR needed."
+          else
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base develop \
+              --head "$SYNC_BRANCH" \
+              --title "$title" \
+              --body-file "$body_file"
+          fi
+
+          pr_number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base develop \
+            --head "$SYNC_BRANCH" \
+            --state open \
+            --json number \
+            --jq '.[0].number')"
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+          gh pr merge "$pr_number" \
+            --repo "$GITHUB_REPOSITORY" \
+            --merge \
+            --auto \
+            --delete-branch
+
+          gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base develop \
+            --state open \
+            --json headRefName \
+            --jq '.[] | select(.headRefName | startswith("sync/cc-")).headRefName' \
+            | while IFS= read -r previous_branch; do
+                if [[ -n "$previous_branch" && "$previous_branch" != "$SYNC_BRANCH" ]]; then
+                  git push origin --delete "$previous_branch" || true
+                fi
+              done
+
+  release:
+    name: Tag and release synced Tuzi build
+    needs: [prepare, checks, open-pr]
+    if: >-
+      needs.prepare.outputs.changed == 'true' &&
+      needs.checks.result == 'success' &&
+      needs.open-pr.result == 'success'
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SYNC_BRANCH: ${{ needs.prepare.outputs.branch }}
+      UPSTREAM_VERSION: ${{ needs.prepare.outputs.upstream_version }}
+      PR_NUMBER: ${{ needs.open-pr.outputs.pr_number }}
+    steps:
+      - name: Wait for sync PR merge
+        id: wait-merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 40); do
+            pr_json="$(gh pr view "$PR_NUMBER" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json state,mergeCommit 2>/dev/null || true)"
+            state="$(node -e 'const value=JSON.parse(process.argv[1] || "{}"); process.stdout.write(value.state || "")' "$pr_json")"
+            if [[ "$state" == "MERGED" ]]; then
+              merge_sha="$(node -e 'const value=JSON.parse(process.argv[1] || "{}"); process.stdout.write(value.mergeCommit?.oid || "")' "$pr_json")"
+              test -n "$merge_sha"
+              echo "merge_sha=$merge_sha" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [[ "$state" == "CLOSED" ]]; then
+              echo "Sync PR was closed without merging" >&2
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for sync PR merge" >&2
+          exit 1
+
+      - name: Checkout merged Tuzi develop
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.wait-merge.outputs.merge_sha }}
+          fetch-depth: 0
+
+      - name: Create release tag and dispatch full native build
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v${UPSTREAM_VERSION}-tuzi.1"
+          EXPECTED_SHA="${{ steps.wait-merge.outputs.merge_sha }}"
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_SHA" ]] || {
+            echo "Release checkout is not the validated PR merge commit" >&2
+            exit 1
+          }
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          RECORDED_VERSION="$(node -p "require('./upstream-base.json').upstream.version")"
+          if [[ "$PACKAGE_VERSION" != "${UPSTREAM_VERSION}-tuzi.1" \
+            || "$RECORDED_VERSION" != "$UPSTREAM_VERSION" ]]; then
+            echo "Merged develop is not the expected Tuzi release: package=$PACKAGE_VERSION recorded=$RECORDED_VERSION" >&2
+            exit 1
+          fi
+          node scripts/check-tuzi-invariants.mjs
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            [[ "$(git rev-list -n1 "$TAG")" == "$EXPECTED_SHA" ]] || {
+              echo "Existing release tag $TAG does not point to the validated merge commit" >&2
+              exit 1
+            }
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" \
+              -m "发布兔子switch ${TAG#v}" \
+              -m "问题描述：跟随 CC Switch v${UPSTREAM_VERSION} 完整源码发布。" \
+              -m "修复思路：基于已通过全量门禁的 Tuzi develop 合并提交构建全平台安装包。" \
+              -m "更新代码架构：CC Release 完整底座 + Tuzi 产品扩展层。"
+            git push origin "$TAG"
+          fi
+          gh workflow run tuzi-release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            -f tag="$TAG"

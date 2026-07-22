@@ -1,13 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use tuzi_switch_lib::{update_settings, AppSettings, AppState, Database, MultiAppConfig};
+use cc_switch_lib::{update_settings, AppSettings, AppState, Database, MultiAppConfig};
 
 /// 为测试设置隔离的 HOME 目录，避免污染真实用户数据。
 pub fn ensure_test_home() -> &'static Path {
     static HOME: OnceLock<PathBuf> = OnceLock::new();
     HOME.get_or_init(|| {
-        let base = std::env::temp_dir().join("tuzi-switch-test-home");
+        let base = std::env::temp_dir().join("cc-switch-test-home");
         if base.exists() {
             let _ = std::fs::remove_dir_all(&base);
         }
@@ -33,6 +33,7 @@ pub fn reset_test_fs() {
         ".gemini",
         ".config",
         ".openclaw",
+        "profiles",
     ] {
         let path = home.join(sub);
         if path.exists() {
@@ -48,6 +49,15 @@ pub fn reset_test_fs() {
 
     // 重置内存中的设置缓存，确保测试环境不受上一次调用影响
     let _ = update_settings(AppSettings::default());
+}
+
+#[allow(dead_code)]
+pub fn enable_codex_official_auth_preservation() {
+    update_settings(AppSettings {
+        preserve_codex_official_auth_on_switch: true,
+        ..Default::default()
+    })
+    .expect("enable Codex official auth preservation");
 }
 
 /// 全局互斥锁，避免多测试并发写入相同的 HOME 目录。

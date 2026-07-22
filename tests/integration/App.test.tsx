@@ -8,6 +8,7 @@ import {
   setCurrentProviderId,
   setLiveProviderIds,
   setProviders,
+  setSettings,
 } from "../msw/state";
 import { emitTauriEvent } from "../msw/tauriMocks";
 
@@ -128,6 +129,12 @@ vi.mock("@/components/AppSwitcher", () => ({
   ),
 }));
 
+vi.mock("@/components/profiles/ProfileSwitcher", () => ({
+  ProfileSwitcher: ({ activeApp }: any) => (
+    <div data-testid="profile-switcher">{activeApp}</div>
+  ),
+}));
+
 vi.mock("@/components/UpdateBadge", () => ({
   UpdateBadge: ({ onClick }: any) => (
     <button onClick={onClick}>update-badge</button>
@@ -230,6 +237,11 @@ describe("App integration with MSW", () => {
       ),
     );
 
+    expect(() => {
+      emitTauriEvent("webdav-sync-status-updated", null);
+    }).not.toThrow();
+    expect(toastErrorMock).not.toHaveBeenCalled();
+
     emitTauriEvent("webdav-sync-status-updated", {
       source: "auto",
       status: "error",
@@ -239,6 +251,40 @@ describe("App integration with MSW", () => {
     await waitFor(() => {
       expect(toastErrorMock).toHaveBeenCalled();
     });
+
+    toastErrorMock.mockReset();
+    expect(() => {
+      emitTauriEvent("s3-sync-status-updated", null);
+    }).not.toThrow();
+    expect(toastErrorMock).not.toHaveBeenCalled();
+
+    emitTauriEvent("s3-sync-status-updated", {
+      source: "auto",
+      status: "error",
+      error: "s3 timeout",
+    });
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalled();
+    });
+  });
+
+  it("shows the profile switcher by default and respects the visibility setting", async () => {
+    const { default: App } = await import("@/App");
+    const firstRender = renderApp(App);
+
+    expect(await screen.findByTestId("profile-switcher")).toHaveTextContent(
+      "claude",
+    );
+    firstRender.unmount();
+
+    setSettings({ showProfileSwitcher: false });
+    renderApp(App);
+
+    await screen.findByTestId("provider-list");
+    await waitFor(() =>
+      expect(screen.queryByTestId("profile-switcher")).not.toBeInTheDocument(),
+    );
   });
 
   it("duplicates openclaw providers with a generated key that avoids live-only ids", async () => {

@@ -16,7 +16,20 @@ fn main() {
         if std::env::var("WEBKIT_DISABLE_COMPOSITING_MODE").is_err() {
             std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
         }
+
+        // AppImage 的 GTK 启动钩子 (linuxdeploy-plugin-gtk.sh) 会无条件
+        // `export GDK_BACKEND=x11` 强制走 XWayland，以规避历史上的 Wayland 崩溃
+        // (tauri-apps/tauri#8541)。但在较新的 Wayland + NVIDIA 环境下，强制 XWayland
+        // 反而使 WebKitGTK 的 webview 收不到指针事件（标题栏可点、网页内容点不动），
+        // resize 后黑屏；改回原生 Wayland 即可解决，且该崩溃在 WebKitGTK 2.52 上已不复现。
+        // Tuzi 变量优先；保留 CC 旧变量，避免上游用户升级后现有启动脚本失效。
+        let backend = std::env::var("TUZI_SWITCH_GDK_BACKEND")
+            .ok()
+            .or_else(|| std::env::var("CC_SWITCH_GDK_BACKEND").ok());
+        if let Some(backend) = backend.filter(|value| !value.is_empty()) {
+            std::env::set_var("GDK_BACKEND", backend);
+        }
     }
 
-    tuzi_switch_lib::run();
+    cc_switch_lib::run();
 }

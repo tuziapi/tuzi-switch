@@ -8,16 +8,20 @@ release/
 *.tsbuildinfo
 .npmrc
 CLAUDE.md
+AGENTS.md
 GEMINI.md
 /.claude
 /.codex
 /.gemini
+/.cc-switch
 /.tuzi-switch
 /.idea
 /.vscode
 vitest-report.json
 nul
 
+# Flatpak build artifacts
+flatpak/cc-switch.deb
 flatpak-build/
 flatpak-repo/
 .worktrees/

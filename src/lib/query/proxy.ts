@@ -267,8 +267,12 @@ export function useUpdateAppProxyConfig() {
       queryClient.invalidateQueries({
         queryKey: ["appProxyConfig", variables.appType],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["autoFailoverEnabled", variables.appType],
+      });
       queryClient.invalidateQueries({ queryKey: ["proxyConfig"] });
       queryClient.invalidateQueries({ queryKey: ["circuitBreakerConfig"] });
+      queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
     },
     onError: (error: Error, variables) => {
       track("proxy_action", {

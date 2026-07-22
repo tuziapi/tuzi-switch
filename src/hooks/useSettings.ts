@@ -15,8 +15,6 @@ import {
 import { useSettingsMetadata } from "./useSettingsMetadata";
 import { track } from "@/lib/analytics";
 
-type Language = "zh" | "en" | "ja";
-
 interface SaveResult {
   requiresRestart: boolean;
 }
@@ -196,8 +194,11 @@ export function useSettings(): UseSettingsResult {
         const sanitizedOpenclawDir = sanitizeDir(
           mergedSettings.openclawConfigDir,
         );
-        const { webdavSync: _ignoredWebdavSync, ...restSettings } =
-          mergedSettings;
+        const {
+          webdavSync: _ignoredWebdavSync,
+          s3Sync: _ignoredS3Sync,
+          ...restSettings
+        } = mergedSettings;
 
         const payload: Settings = {
           ...restSettings,
@@ -360,16 +361,17 @@ export function useSettings(): UseSettingsResult {
         const sanitizedOpenclawDir = sanitizeDir(
           mergedSettings.openclawConfigDir,
         );
-        const sanitizedHermesDir = sanitizeDir(mergedSettings.hermesConfigDir);
         const previousAppDir = initialAppConfigDir;
         const previousClaudeDir = sanitizeDir(data?.claudeConfigDir);
         const previousCodexDir = sanitizeDir(data?.codexConfigDir);
         const previousGeminiDir = sanitizeDir(data?.geminiConfigDir);
         const previousOpencodeDir = sanitizeDir(data?.opencodeConfigDir);
         const previousOpenclawDir = sanitizeDir(data?.openclawConfigDir);
-        const previousHermesDir = sanitizeDir(data?.hermesConfigDir);
-        const { webdavSync: _ignoredWebdavSync, ...restSettings } =
-          mergedSettings;
+        const {
+          webdavSync: _ignoredWebdavSync,
+          s3Sync: _ignoredS3Sync,
+          ...restSettings
+        } = mergedSettings;
 
         const payload: Settings = {
           ...restSettings,
@@ -451,11 +453,8 @@ export function useSettings(): UseSettingsResult {
         );
 
         try {
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem(
-              "language",
-              payload.language as Language,
-            );
+          if (typeof window !== "undefined" && payload.language) {
+            window.localStorage.setItem("language", payload.language);
           }
         } catch (error) {
           console.warn(
@@ -477,15 +476,13 @@ export function useSettings(): UseSettingsResult {
         const geminiDirChanged = sanitizedGeminiDir !== previousGeminiDir;
         const opencodeDirChanged = sanitizedOpencodeDir !== previousOpencodeDir;
         const openclawDirChanged = sanitizedOpenclawDir !== previousOpenclawDir;
-        const hermesDirChanged = sanitizedHermesDir !== previousHermesDir;
         if (
           !pluginSynced &&
           (claudeDirChanged ||
             codexDirChanged ||
             geminiDirChanged ||
             opencodeDirChanged ||
-            openclawDirChanged ||
-            hermesDirChanged)
+            openclawDirChanged)
         ) {
           const syncResult = await syncCurrentProvidersLiveSafe();
           if (!syncResult.ok) {
@@ -504,7 +501,6 @@ export function useSettings(): UseSettingsResult {
           ["gemini", geminiDirChanged],
           ["opencode", opencodeDirChanged],
           ["openclaw", openclawDirChanged],
-          ["hermes", hermesDirChanged],
         ] as const;
         changedDirectories.forEach(([app, changed]) => {
           if (changed) {
@@ -560,11 +556,6 @@ export function useSettings(): UseSettingsResult {
                 "openclaw",
                 sanitizeDir(failedSettings.openclawConfigDir) !==
                   sanitizeDir(data?.openclawConfigDir),
-              ],
-              [
-                "hermes",
-                sanitizeDir(failedSettings.hermesConfigDir) !==
-                  sanitizeDir(data?.hermesConfigDir),
               ],
             ] as const)
           : [];
