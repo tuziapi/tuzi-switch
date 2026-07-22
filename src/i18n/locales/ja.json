@@ -97,6 +97,35 @@
     "windowRestore": "ウィンドウを元に戻す",
     "windowClose": "ウィンドウを閉じる"
   },
+  "versionHistory": {
+    "title": "バージョン履歴",
+    "open": "バージョン履歴を表示",
+    "close": "バージョン履歴を閉じる",
+    "summary": "正式リリース {{count}} 件を収録",
+    "currentVersion": "インストール済み",
+    "latestVersion": "最新リリース",
+    "updateAvailable": "v{{version}} に更新可能",
+    "searchPlaceholder": "バージョン、機能、問題を検索",
+    "filterLabel": "変更種別で絞り込む",
+    "resetFilters": "絞り込みをリセット",
+    "current": "現在",
+    "latest": "最新",
+    "changeCount": "{{count}} 件の変更",
+    "viewRelease": "GitHub Release を表示",
+    "empty": "該当するリリースはありません",
+    "categories": {
+      "all": "すべて",
+      "feature": "新機能",
+      "enhancement": "機能強化",
+      "fix": "不具合修正",
+      "performance": "性能改善",
+      "compatibility": "互換性調整",
+      "security": "セキュリティ",
+      "architecture": "アーキテクチャ",
+      "engineering": "エンジニアリング",
+      "documentation": "ドキュメント"
+    }
+  },
   "provider": {
     "connectivityCheck": "接続チェック",
     "tabProvider": "プロバイダー",

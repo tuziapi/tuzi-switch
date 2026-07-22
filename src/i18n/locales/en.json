@@ -97,6 +97,35 @@
     "windowRestore": "Restore window",
     "windowClose": "Close window"
   },
+  "versionHistory": {
+    "title": "Version History",
+    "open": "View version history",
+    "close": "Close version history",
+    "summary": "{{count}} official releases recorded",
+    "currentVersion": "Installed version",
+    "latestVersion": "Latest release",
+    "updateAvailable": "Update available: v{{version}}",
+    "searchPlaceholder": "Search versions, features, or issues",
+    "filterLabel": "Filter by change type",
+    "resetFilters": "Reset filters",
+    "current": "Installed",
+    "latest": "Latest",
+    "changeCount": "{{count}} changes",
+    "viewRelease": "View GitHub Release",
+    "empty": "No matching release records",
+    "categories": {
+      "all": "All types",
+      "feature": "New Features",
+      "enhancement": "Enhancements",
+      "fix": "Bug Fixes",
+      "performance": "Performance",
+      "compatibility": "Compatibility",
+      "security": "Security",
+      "architecture": "Architecture",
+      "engineering": "Engineering",
+      "documentation": "Documentation"
+    }
+  },
   "provider": {
     "connectivityCheck": "Connectivity check",
     "tabProvider": "Provider",

@@ -97,6 +97,35 @@
     "windowRestore": "还原窗口",
     "windowClose": "关闭窗口"
   },
+  "versionHistory": {
+    "title": "版本历程",
+    "open": "查看版本历程",
+    "close": "关闭版本历程",
+    "summary": "共收录 {{count}} 个正式版本",
+    "currentVersion": "当前安装版本",
+    "latestVersion": "最新正式版本",
+    "updateAvailable": "可更新至 v{{version}}",
+    "searchPlaceholder": "搜索版本号、功能或问题",
+    "filterLabel": "按变更类型筛选",
+    "resetFilters": "重置筛选",
+    "current": "当前版本",
+    "latest": "最新版本",
+    "changeCount": "{{count}} 项变更",
+    "viewRelease": "查看 GitHub Release",
+    "empty": "未找到符合条件的版本记录",
+    "categories": {
+      "all": "全部类型",
+      "feature": "新增功能",
+      "enhancement": "功能增强",
+      "fix": "缺陷修复",
+      "performance": "性能优化",
+      "compatibility": "兼容性调整",
+      "security": "安全加固",
+      "architecture": "架构调整",
+      "engineering": "工程化改进",
+      "documentation": "文档与规范"
+    }
+  },
   "provider": {
     "connectivityCheck": "检测连通",
     "tabProvider": "供应商",
