@@ -33,6 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { settingsApi } from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { SettingsFormState } from "@/hooks/useSettings";
 import type {
@@ -478,8 +479,16 @@ export function WebdavSyncSection({
     setActionState("testing");
     try {
       await settingsApi.webdavTestConnection(settings, !passwordTouched);
+      track("webdav_action", {
+        action: "test",
+        result: "success",
+      });
       toast.success(t("settings.webdavSync.testSuccess"));
     } catch (error) {
+      track("webdav_action", {
+        action: "test",
+        result: "failed",
+      });
       toast.error(
         t("settings.webdavSync.testFailed", {
           error: (error as Error)?.message ?? String(error),
@@ -576,9 +585,17 @@ export function WebdavSyncSection({
     setActionState("uploading");
     try {
       await settingsApi.webdavSyncUpload();
+      track("webdav_action", {
+        action: "upload",
+        result: "success",
+      });
       toast.success(t("settings.webdavSync.uploadSuccess"));
       await queryClient.invalidateQueries();
     } catch (error) {
+      track("webdav_action", {
+        action: "upload",
+        result: "failed",
+      });
       toast.error(
         t("settings.webdavSync.uploadFailed", {
           error: (error as Error)?.message ?? String(error),
@@ -636,9 +653,17 @@ export function WebdavSyncSection({
     setActionState("downloading");
     try {
       await settingsApi.webdavSyncDownload();
+      track("webdav_action", {
+        action: "download",
+        result: "success",
+      });
       toast.success(t("settings.webdavSync.downloadSuccess"));
       await queryClient.invalidateQueries();
     } catch (error) {
+      track("webdav_action", {
+        action: "download",
+        result: "failed",
+      });
       toast.error(
         t("settings.webdavSync.downloadFailed", {
           error: (error as Error)?.message ?? String(error),

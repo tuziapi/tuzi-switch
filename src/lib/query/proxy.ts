@@ -3,6 +3,7 @@ import { proxyApi } from "@/lib/api/proxy";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import type { GlobalProxyConfig, AppProxyConfig } from "@/types/proxy";
+import { track } from "@/lib/analytics";
 
 // ========== 代理服务器状态 Hooks ==========
 
@@ -95,9 +96,23 @@ export function useSetProxyTakeoverForApp() {
   return useMutation({
     mutationFn: ({ appType, enabled }: { appType: string; enabled: boolean }) =>
       proxyApi.setProxyTakeoverForApp(appType, enabled),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "route",
+        result: "success",
+        enabled: variables.enabled ? "true" : "false",
+      });
       queryClient.invalidateQueries({ queryKey: ["proxyTakeoverStatus"] });
       queryClient.invalidateQueries({ queryKey: ["liveTakeoverActive"] });
+    },
+    onError: (_error, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "route",
+        result: "failed",
+        enabled: variables.enabled ? "true" : "false",
+      });
     },
   });
 }
@@ -118,12 +133,22 @@ export function useSwitchProxyProvider() {
       providerId: string;
     }) => proxyApi.switchProxyProvider(appType, providerId),
     onSuccess: (_, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "switch",
+        result: "success",
+      });
       queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
       queryClient.invalidateQueries({
         queryKey: ["providers", variables.appType],
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "switch",
+        result: "failed",
+      });
       toast.error(t("proxy.switchFailed", { error: error.message }));
     },
   });
@@ -188,12 +213,22 @@ export function useUpdateGlobalProxyConfig() {
     mutationFn: (config: GlobalProxyConfig) =>
       proxyApi.updateGlobalProxyConfig(config),
     onSuccess: () => {
+      track("proxy_action", {
+        app: "app",
+        action: "route_config",
+        result: "success",
+      });
       toast.success(t("proxy.settings.toast.saved"), { closeButton: true });
       queryClient.invalidateQueries({ queryKey: ["globalProxyConfig"] });
       queryClient.invalidateQueries({ queryKey: ["proxyConfig"] });
       queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
     },
     onError: (error: Error) => {
+      track("proxy_action", {
+        app: "app",
+        action: "route_config",
+        result: "failed",
+      });
       toast.error(
         t("proxy.settings.toast.saveFailed", { error: error.message }),
       );
@@ -223,6 +258,11 @@ export function useUpdateAppProxyConfig() {
     mutationFn: (config: AppProxyConfig) =>
       proxyApi.updateProxyConfigForApp(config),
     onSuccess: (_, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "route_config",
+        result: "success",
+      });
       toast.success(t("proxy.settings.toast.saved"), { closeButton: true });
       queryClient.invalidateQueries({
         queryKey: ["appProxyConfig", variables.appType],
@@ -234,7 +274,12 @@ export function useUpdateAppProxyConfig() {
       queryClient.invalidateQueries({ queryKey: ["circuitBreakerConfig"] });
       queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "route_config",
+        result: "failed",
+      });
       toast.error(
         t("proxy.settings.toast.saveFailed", { error: error.message }),
       );

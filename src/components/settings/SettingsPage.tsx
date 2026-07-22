@@ -38,6 +38,7 @@ import { LanguageSettings } from "@/components/settings/LanguageSettings";
 import { ThemeSettings } from "@/components/settings/ThemeSettings";
 import { WindowSettings } from "@/components/settings/WindowSettings";
 import { AppVisibilitySettings } from "@/components/settings/AppVisibilitySettings";
+import { AnonymousAnalyticsSettings } from "@/components/settings/AnonymousAnalyticsSettings";
 import { SkillStorageLocationSettings } from "@/components/settings/SkillStorageLocationSettings";
 import { SkillSyncMethodSettings } from "@/components/settings/SkillSyncMethodSettings";
 import { TerminalSettings } from "@/components/settings/TerminalSettings";
@@ -57,6 +58,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useImportExport } from "@/hooks/useImportExport";
 import { useTranslation } from "react-i18next";
 import type { SettingsFormState } from "@/hooks/useSettings";
+import { setAnalyticsEnabled } from "@/lib/analytics";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -281,6 +283,17 @@ export function SettingsPage({
                     <WindowSettings
                       settings={settings}
                       onChange={handleAutoSave}
+                    />
+                    <AnonymousAnalyticsSettings
+                      settings={settings}
+                      onEnabledChange={(enabled) => {
+                        setAnalyticsEnabled(enabled);
+                        void handleAutoSave({
+                          anonymousAnalyticsEnabled: enabled,
+                        }).then((saved) => {
+                          if (!saved) setAnalyticsEnabled(!enabled);
+                        });
+                      }}
                     />
                     <TerminalSettings
                       value={settings.preferredTerminal}

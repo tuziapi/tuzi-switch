@@ -359,6 +359,9 @@ pub struct AppSettings {
     /// 是否在主页面启用本地代理功能（默认关闭）
     #[serde(default)]
     pub enable_local_proxy: bool,
+    /// 是否发送最小化匿名产品统计（默认开启，用户可关闭）
+    #[serde(default = "default_true")]
+    pub anonymous_analytics_enabled: bool,
     /// User has confirmed the local proxy first-run notice
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proxy_confirmed: Option<bool>,
@@ -504,6 +507,7 @@ impl Default for AppSettings {
             launch_on_startup: false,
             silent_startup: false,
             enable_local_proxy: false,
+            anonymous_analytics_enabled: true,
             proxy_confirmed: None,
             usage_confirmed: None,
             usage_dashboard_refresh_interval_ms: None,
@@ -1147,6 +1151,19 @@ mod tests {
         .expect("visible apps");
 
         assert!(!visible.is_visible(&AppType::ClaudeDesktop));
+    }
+
+    #[test]
+    fn analytics_defaults_on_but_preserves_explicit_opt_out() {
+        let old_settings: AppSettings =
+            serde_json::from_value(serde_json::json!({})).expect("settings");
+        assert!(old_settings.anonymous_analytics_enabled);
+
+        let opted_out: AppSettings = serde_json::from_value(serde_json::json!({
+            "anonymousAnalyticsEnabled": false
+        }))
+        .expect("settings");
+        assert!(!opted_out.anonymous_analytics_enabled);
     }
 
     #[test]

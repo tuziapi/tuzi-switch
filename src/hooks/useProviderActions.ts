@@ -26,6 +26,7 @@ import {
   isCodexChatWireApi,
 } from "@/utils/providerConfigUtils";
 import { supportsOfficialProxyTakeover } from "@/utils/providerCapabilities";
+import { track } from "@/lib/analytics";
 
 /**
  * Hook for managing provider actions (add, update, delete, switch)
@@ -382,6 +383,12 @@ export function useProviderActions(
 
       try {
         await openclawApi.setDefaultModel(model);
+        track("provider_action", {
+          app: "openclaw",
+          action: "switch",
+          result: "success",
+          source: "manual",
+        });
         await queryClient.invalidateQueries({
           queryKey: openclawKeys.defaultModel,
         });
@@ -395,6 +402,12 @@ export function useProviderActions(
           { closeButton: true },
         );
       } catch (error) {
+        track("provider_action", {
+          app: "openclaw",
+          action: "switch",
+          result: "failed",
+          source: "manual",
+        });
         const detail =
           extractErrorMessage(error) ||
           t("notifications.openclawDefaultModelSetFailed", {

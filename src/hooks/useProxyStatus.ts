@@ -12,6 +12,7 @@ import type {
   ProxyTakeoverStatus,
 } from "@/types/proxy";
 import { extractErrorMessage } from "@/utils/errorUtils";
+import { track } from "@/lib/analytics";
 
 /**
  * 代理服务状态管理
@@ -41,6 +42,7 @@ export function useProxyStatus() {
   const startProxyServerMutation = useMutation({
     mutationFn: () => invoke<ProxyServerInfo>("start_proxy_server"),
     onSuccess: (info) => {
+      track("proxy_action", { action: "start", result: "success" });
       toast.success(
         t("proxy.server.started", {
           address: info.address,
@@ -52,6 +54,7 @@ export function useProxyStatus() {
       queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
     },
     onError: (error: Error) => {
+      track("proxy_action", { action: "start", result: "failed" });
       const detail =
         extractErrorMessage(error) ||
         t("common.unknown", { defaultValue: "未知错误" });
@@ -68,6 +71,7 @@ export function useProxyStatus() {
   const stopProxyServerMutation = useMutation({
     mutationFn: () => invoke("stop_proxy_server"),
     onSuccess: () => {
+      track("proxy_action", { action: "stop", result: "success" });
       toast.success(
         t("proxy.server.stopped", {
           defaultValue: "代理服务已停止",
@@ -77,6 +81,7 @@ export function useProxyStatus() {
       queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
     },
     onError: (error: Error) => {
+      track("proxy_action", { action: "stop", result: "failed" });
       const detail =
         extractErrorMessage(error) ||
         t("common.unknown", { defaultValue: "未知错误" });
@@ -93,6 +98,7 @@ export function useProxyStatus() {
   const stopWithRestoreMutation = useMutation({
     mutationFn: () => invoke("stop_proxy_with_restore"),
     onSuccess: () => {
+      track("proxy_action", { action: "stop", result: "success" });
       toast.success(
         t("proxy.stoppedWithRestore", {
           defaultValue: "代理服务已关闭，已恢复所有接管配置",
@@ -108,6 +114,7 @@ export function useProxyStatus() {
       // 注意：故障转移队列和开关状态会保留，不需要刷新
     },
     onError: (error: Error) => {
+      track("proxy_action", { action: "stop", result: "failed" });
       const detail =
         extractErrorMessage(error) ||
         t("common.unknown", { defaultValue: "未知错误" });
@@ -125,6 +132,12 @@ export function useProxyStatus() {
     mutationFn: ({ appType, enabled }: { appType: string; enabled: boolean }) =>
       invoke("set_proxy_takeover_for_app", { appType, enabled }),
     onSuccess: (_data, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "route",
+        result: "success",
+        enabled: variables.enabled ? "true" : "false",
+      });
       const appLabel =
         variables.appType === "claude"
           ? "Claude"
@@ -150,7 +163,13 @@ export function useProxyStatus() {
       queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
       queryClient.invalidateQueries({ queryKey: ["proxyTakeoverStatus"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "route",
+        result: "failed",
+        enabled: variables.enabled ? "true" : "false",
+      });
       const detail =
         extractErrorMessage(error) ||
         t("common.unknown", { defaultValue: "未知错误" });
@@ -172,10 +191,20 @@ export function useProxyStatus() {
       appType: string;
       providerId: string;
     }) => invoke("switch_proxy_provider", { appType, providerId }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "switch",
+        result: "success",
+      });
       queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      track("proxy_action", {
+        app: variables.appType,
+        action: "switch",
+        result: "failed",
+      });
       const detail =
         extractErrorMessage(error) ||
         t("common.unknown", { defaultValue: "未知错误" });

@@ -6,6 +6,7 @@ import {
   type StreamCheckResult,
 } from "@/lib/api/connectivity-check";
 import type { AppId } from "@/lib/api";
+import { track } from "@/lib/analytics";
 
 /**
  * 供应商连通性检查。
@@ -29,6 +30,11 @@ export function useStreamCheck(appId: AppId) {
         const result = await streamCheckProvider(appId, providerId);
 
         if (result.status === "operational") {
+          track("provider_action", {
+            app: appId,
+            action: "test",
+            result: "success",
+          });
           toast.success(
             t("streamCheck.reachable", {
               providerName: providerName,
@@ -38,6 +44,11 @@ export function useStreamCheck(appId: AppId) {
             { closeButton: true },
           );
         } else if (result.status === "degraded") {
+          track("provider_action", {
+            app: appId,
+            action: "test",
+            result: "degraded",
+          });
           toast.warning(
             t("streamCheck.reachableSlow", {
               providerName: providerName,
@@ -46,6 +57,11 @@ export function useStreamCheck(appId: AppId) {
             }),
           );
         } else {
+          track("provider_action", {
+            app: appId,
+            action: "test",
+            result: "failed",
+          });
           // 仅当无法建立连接（DNS / 连接被拒 / TLS / 超时）才会到这里
           toast.error(
             t("streamCheck.unreachable", {
@@ -66,6 +82,11 @@ export function useStreamCheck(appId: AppId) {
 
         return result;
       } catch (e) {
+        track("provider_action", {
+          app: appId,
+          action: "test",
+          result: "failed",
+        });
         toast.error(
           t("streamCheck.error", {
             providerName: providerName,

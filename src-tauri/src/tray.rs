@@ -531,7 +531,8 @@ fn handle_auto_click(app: &tauri::AppHandle, app_type: &AppType) -> Result<(), A
             "appType": app_type_str,
             "proxyEnabled": true,
             "autoFailoverEnabled": true,
-            "providerId": p1_provider_id
+            "providerId": p1_provider_id,
+            "source": "tray"
         });
         if let Err(e) = app.emit("proxy-flags-changed", event_data.clone()) {
             log::error!("发射 proxy-flags-changed 事件失败: {e}");
@@ -575,7 +576,8 @@ fn handle_provider_click(
             "appType": app_type_str,
             "proxyEnabled": proxy_enabled,
             "autoFailoverEnabled": false,
-            "providerId": provider_id
+            "providerId": provider_id,
+            "source": "tray"
         });
         if let Err(e) = app.emit("proxy-flags-changed", event_data.clone()) {
             log::error!("发射 proxy-flags-changed 事件失败: {e}");

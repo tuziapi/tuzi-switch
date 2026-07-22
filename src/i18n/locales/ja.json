@@ -315,6 +315,11 @@
   },
   "settings": {
     "title": "設定",
+    "anonymousAnalytics": {
+      "sectionTitle": "プライバシーと改善",
+      "title": "匿名利用統計",
+      "description": "デフォルトで有効ですが、いつでも無効にできます。アプリのバージョン、OS、主要機能の利用回数のみを収集し、キー、会話、リクエスト、プロバイダーURL、ファイルパスは収集しません。"
+    },
     "general": "一般",
     "tabGeneral": "一般",
     "tabAuth": "認証",

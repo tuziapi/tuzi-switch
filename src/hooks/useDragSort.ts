@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import type { Provider } from "@/types";
 import { providersApi, type AppId } from "@/lib/api";
+import { track } from "@/lib/analytics";
 
 export function useDragSort(providers: Record<string, Provider>, appId: AppId) {
   const queryClient = useQueryClient();
@@ -76,6 +77,11 @@ export function useDragSort(providers: Record<string, Provider>, appId: AppId) {
 
       try {
         await providersApi.updateSortOrder(updates, appId);
+        track("provider_action", {
+          app: appId,
+          action: "sort",
+          result: "success",
+        });
         await queryClient.invalidateQueries({
           queryKey: ["providers", appId],
         });
@@ -100,6 +106,11 @@ export function useDragSort(providers: Record<string, Provider>, appId: AppId) {
           { closeButton: true },
         );
       } catch (error) {
+        track("provider_action", {
+          app: appId,
+          action: "sort",
+          result: "failed",
+        });
         console.error("Failed to update provider sort order", error);
         toast.error(
           t("provider.sortUpdateFailed", {

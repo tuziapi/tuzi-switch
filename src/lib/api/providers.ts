@@ -15,6 +15,8 @@ export interface ProviderSortUpdate {
 export interface ProviderSwitchEvent {
   appType: AppId;
   providerId: string;
+  source?: string;
+  autoFailoverEnabled?: boolean;
 }
 
 export interface SwitchResult {

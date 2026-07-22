@@ -1,5 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { compareVersions } from "./version";
+import { track } from "@/lib/analytics";
 
 export type UpdateChannel = "stable" | "beta";
 
@@ -80,6 +81,7 @@ async function checkGitHubReleaseFallback(
 export interface CheckOptions {
   timeout?: number;
   channel?: UpdateChannel;
+  source?: "manual" | "automatic";
 }
 
 export async function getCurrentVersion(): Promise<string> {
@@ -99,6 +101,7 @@ export async function checkForUpdate(
   const { check } = await import("@tauri-apps/plugin-updater");
 
   const timeout = opts.timeout ?? 30000;
+  const source = opts.source ?? "manual";
   const currentVersion = await withTimeout(
     getCurrentVersion(),
     timeout,
@@ -129,24 +132,33 @@ export async function checkForUpdate(
       pubDate: (update as any).date,
     };
 
+    track("update_action", { action: "check", result: "success", source });
     return { status: "available", info };
   }
 
   if (!canCompareReleaseVersion) {
-    if (nativeError) throw nativeError;
+    if (nativeError) {
+      track("update_action", { action: "check", result: "failed", source });
+      throw nativeError;
+    }
+    track("update_action", { action: "check", result: "success", source });
     return { status: "up-to-date" };
   }
 
   try {
-    return await checkGitHubReleaseFallback(currentVersion, timeout);
+    const result = await checkGitHubReleaseFallback(currentVersion, timeout);
+    track("update_action", { action: "check", result: "success", source });
+    return result;
   } catch (fallbackError) {
     if (nativeError) {
+      track("update_action", { action: "check", result: "failed", source });
       throw new Error(
         `原生更新清单与 GitHub Release API 均不可用：${String(nativeError)}；${String(fallbackError)}`,
       );
     }
     // 原生更新器已成功确认没有更新；GitHub API 只作为补充发现通道。
     console.warn("GitHub Release API 兜底检查失败", fallbackError);
+    track("update_action", { action: "check", result: "success", source });
     return { status: "up-to-date" };
   }
 }

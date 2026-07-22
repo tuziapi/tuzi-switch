@@ -51,6 +51,7 @@ import { extractErrorMessage } from "@/utils/errorUtils";
 import { isTextEditableTarget } from "@/utils/domUtils";
 import { deepClone } from "@/utils/deepClone";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import {
   isWindows,
   isLinux,
@@ -376,6 +377,20 @@ function App() {
       try {
         const off = await providersApi.onSwitched(
           async (event: ProviderSwitchEvent) => {
+            const source =
+              event.source === "profile"
+                ? "profile"
+                : event.source === "failover" ||
+                    event.source === "failoverEnabled" ||
+                    event.autoFailoverEnabled
+                  ? "failover"
+                  : "tray";
+            track("provider_action", {
+              app: event.appType,
+              action: "switch",
+              result: "success",
+              source,
+            });
             if (event.appType === activeApp) {
               await refetch();
             }

@@ -41,6 +41,7 @@ import type { AppId } from "@/lib/api/types";
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { isWindows } from "@/lib/platform";
 import { isUpdateAvailable } from "@/lib/version";
+import { track } from "@/lib/analytics";
 import { ToolUpgradeConfirmDialog } from "./ToolUpgradeConfirmDialog";
 import { ToolInstallRow } from "./ToolInstallRow";
 
@@ -493,9 +494,14 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
         resetDismiss();
         const installed = await settingsApi.installUpdateAndRestart();
         if (!installed) {
+          track("update_action", { action: "install", result: "failed" });
           toast.success(t("settings.upToDate"), { closeButton: true });
+        } else {
+          track("update_action", { action: "download", result: "success" });
+          track("update_action", { action: "install", result: "success" });
         }
       } catch (error) {
+        track("update_action", { action: "install", result: "failed" });
         console.error("[AboutSection] Update failed", error);
         toast.error(t("settings.updateFailed"), {
           description: extractErrorMessage(error) || undefined,

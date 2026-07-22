@@ -556,6 +556,12 @@ pnpm test:unit --coverage
 
 ## Contributing
 
+## Privacy and Improvement
+
+Release builds enable minimal anonymous usage analytics by default, and users can disable it at any time in Settings. Only fixed-enum product events such as app, provider, proxy, authentication, sync, update, and setting actions are counted. API keys, account identifiers, provider names or URLs, conversations, request content, file paths, configuration content, and error details are never collected.
+
+Analytics requests are sent directly to `umami.tu-zi.com`. Operators should configure reasonable IP minimization, log redaction, and data-retention policies on Umami and reverse-proxy infrastructure.
+
 Issues and suggestions are welcome!
 
 Before submitting PRs, please ensure:
