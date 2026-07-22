@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -16,7 +15,6 @@ import {
   Book,
   Brain,
   Wrench,
-  RefreshCw,
   History,
   BarChart2,
   Download,
@@ -46,9 +44,12 @@ import { hermesApi } from "@/lib/api/hermes";
 import { useProxyStatus } from "@/hooks/useProxyStatus";
 import { useAutoCompact } from "@/hooks/useAutoCompact";
 import { useUsageCacheBridge } from "@/hooks/useUsageCacheBridge";
+import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { useLastValidValue } from "@/hooks/useLastValidValue";
+import { useScanUnmanagedSkills } from "@/hooks/useSkills";
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { isTextEditableTarget } from "@/utils/domUtils";
+import { deepClone } from "@/utils/deepClone";
 import { cn } from "@/lib/utils";
 import {
   isWindows,
@@ -57,6 +58,7 @@ import {
   DRAG_REGION_STYLE,
 } from "@/lib/platform";
 import { AppSwitcher } from "@/components/AppSwitcher";
+import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
 import { ProviderList } from "@/components/providers/ProviderList";
 import { AddProviderDialog } from "@/components/providers/AddProviderDialog";
 import { EditProviderDialog } from "@/components/providers/EditProviderDialog";
@@ -70,7 +72,11 @@ import { FailoverToggle } from "@/components/proxy/FailoverToggle";
 import UsageScriptModal from "@/components/UsageScriptModal";
 import UnifiedMcpPanel from "@/components/mcp/UnifiedMcpPanel";
 import PromptPanel from "@/components/prompts/PromptPanel";
-import { SkillsPage } from "@/components/skills/SkillsPage";
+import {
+  SkillsPage,
+  getSkillsPageHeaderActions,
+  type SkillsPageSource,
+} from "@/components/skills/SkillsPage";
 import UnifiedSkillsPanel from "@/components/skills/UnifiedSkillsPanel";
 import { DeepLinkImportDialog } from "@/components/DeepLinkImportDialog";
 import { FirstRunNoticeDialog } from "@/components/FirstRunNoticeDialog";
@@ -111,7 +117,7 @@ type View =
   | "openclawAgents"
   | "hermesMemory";
 
-interface WebDavSyncStatusUpdatedPayload {
+interface SyncStatusUpdatedPayload {
   source?: string;
   status?: string;
   error?: string;
@@ -170,7 +176,11 @@ function App() {
   const queryClient = useQueryClient();
 
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
+  const sharedFeatureApp: AppId =
+    activeApp === "claude-desktop" ? "claude" : activeApp;
   const [currentView, setCurrentView] = useState<View>(getInitialView);
+  const [skillsDiscoverySource, setSkillsDiscoverySource] =
+    useState<SkillsPageSource>("repos");
   const [settingsDefaultTab, setSettingsDefaultTab] = useState("general");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
@@ -211,52 +221,40 @@ function App() {
     }
   }, [visibleApps, activeApp]);
 
-  // 切换到 Codex 时，自动把 ~/.codex 里的 API key 回填到对应的预设卡片
+  // Keep the active Tuzi card's credential aligned with the client live config.
+  // The backend only backfills when normalized endpoints match, preventing
+  // credentials from one business route from crossing into another.
   useEffect(() => {
-    if (activeApp !== "codex") return;
-    invoke("sync_codex_live_api_key")
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
+    if (!["claude", "codex", "gemini"].includes(activeApp)) return;
+    void invoke<boolean>("sync_current_provider_key_from_live", {
+      app: activeApp,
+    })
+      .then((updated) => {
+        if (updated) {
+          void queryClient.invalidateQueries({
+            queryKey: ["providers", activeApp],
+          });
+        }
       })
       .catch(() => {
-        /* 静默失败，不影响正常使用 */
+        // Missing/invalid live config is expected before the CLI is configured.
       });
-  }, [activeApp]);
-
-  // 切换到 Claude 时，自动把 ~/.claude/settings.json 里的 API key 回填到对应的预设卡片
-  useEffect(() => {
-    if (activeApp !== "claude") return;
-    invoke("sync_claude_live_api_key")
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["providers", "claude"] });
-      })
-      .catch(() => {});
-  }, [activeApp]);
-
-  // 切换到 Gemini 时，自动把 ~/.gemini/.env 里的 API key 回填到对应的预设卡片
-  useEffect(() => {
-    if (activeApp !== "gemini") return;
-    invoke("sync_gemini_live_api_key")
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
-      })
-      .catch(() => {});
-  }, [activeApp]);
+  }, [activeApp, queryClient]);
 
   // Fallback from sessions view when switching to an app without session support
   useEffect(() => {
     if (
       currentView === "sessions" &&
-      activeApp !== "claude" &&
-      activeApp !== "codex" &&
-      activeApp !== "opencode" &&
-      activeApp !== "openclaw" &&
-      activeApp !== "gemini" &&
-      activeApp !== "hermes"
+      sharedFeatureApp !== "claude" &&
+      sharedFeatureApp !== "codex" &&
+      sharedFeatureApp !== "opencode" &&
+      sharedFeatureApp !== "openclaw" &&
+      sharedFeatureApp !== "gemini" &&
+      sharedFeatureApp !== "hermes"
     ) {
       setCurrentView("providers");
     }
-  }, [activeApp, currentView]);
+  }, [sharedFeatureApp, currentView]);
 
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [usageProvider, setUsageProvider] = useState<Provider | null>(null);
@@ -279,6 +277,10 @@ function App() {
   const mcpPanelRef = useRef<any>(null);
   const skillsPageRef = useRef<any>(null);
   const unifiedSkillsPanelRef = useRef<any>(null);
+  // 订阅未管理 Skill 的共享缓存（实际扫描由 UnifiedSkillsPanel 进入页面时触发）。
+  // 这里 enabled 默认 false，仅用于「导入」按钮的绿点提示，不主动发起扫描。
+  const { data: unmanagedSkills } = useScanUnmanagedSkills();
+  const hasUnmanagedSkills = (unmanagedSkills?.length ?? 0) > 0;
   const addActionButtonClass =
     "bg-orange-500 hover:bg-orange-600 dark:bg-orange-500 dark:hover:bg-orange-600 text-white shadow-lg shadow-orange-500/30 dark:shadow-orange-500/40 rounded-full w-8 h-8";
 
@@ -310,14 +312,14 @@ function App() {
       currentView === "openclawAgents");
   const { data: openclawHealthWarnings = [] } =
     useOpenClawHealth(isOpenClawView);
-  const hasSkillsSupport = activeApp !== "claude-desktop";
+  const hasSkillsSupport = sharedFeatureApp !== "openclaw";
   const hasSessionSupport =
-    activeApp === "claude" ||
-    activeApp === "codex" ||
-    activeApp === "opencode" ||
-    activeApp === "openclaw" ||
-    activeApp === "gemini" ||
-    activeApp === "hermes";
+    sharedFeatureApp === "claude" ||
+    sharedFeatureApp === "codex" ||
+    sharedFeatureApp === "opencode" ||
+    sharedFeatureApp === "openclaw" ||
+    sharedFeatureApp === "gemini" ||
+    sharedFeatureApp === "hermes";
 
   const {
     addProvider,
@@ -368,77 +370,15 @@ function App() {
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-
-    const setupListener = async () => {
-      try {
-        unsubscribe = await providersApi.onSwitched(
-          async (event: ProviderSwitchEvent) => {
-            if (event.appType === activeApp) {
-              await refetch();
-            }
-          },
-        );
-      } catch (error) {
-        console.error("[App] Failed to subscribe provider switch event", error);
-      }
-    };
-
-    setupListener();
-    return () => {
-      unsubscribe?.();
-    };
-  }, [activeApp, refetch]);
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-
-    const setupListener = async () => {
-      try {
-        const { listen } = await import("@tauri-apps/api/event");
-        unsubscribe = await listen("universal-provider-synced", async () => {
-          await queryClient.invalidateQueries({ queryKey: ["providers"] });
-          try {
-            await providersApi.updateTrayMenu();
-          } catch (error) {
-            console.error("[App] Failed to update tray menu", error);
-          }
-        });
-      } catch (error) {
-        console.error(
-          "[App] Failed to subscribe universal-provider-synced event",
-          error,
-        );
-      }
-    };
-
-    setupListener();
-    return () => {
-      unsubscribe?.();
-    };
-  }, [queryClient]);
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
     let active = true;
 
     const setupListener = async () => {
       try {
-        const off = await listen(
-          "webdav-sync-status-updated",
-          async (event) => {
-            const payload = (event.payload ??
-              {}) as WebDavSyncStatusUpdatedPayload;
-            await queryClient.invalidateQueries({ queryKey: ["settings"] });
-
-            if (payload.source !== "auto" || payload.status !== "error") {
-              return;
+        const off = await providersApi.onSwitched(
+          async (event: ProviderSwitchEvent) => {
+            if (event.appType === activeApp) {
+              await refetch();
             }
-
-            toast.error(
-              t("settings.webdavSync.autoSyncFailedToast", {
-                error: payload.error || t("common.unknown"),
-              }),
-            );
           },
         );
         if (!active) {
@@ -447,10 +387,7 @@ function App() {
         }
         unsubscribe = off;
       } catch (error) {
-        console.error(
-          "[App] Failed to subscribe webdav-sync-status-updated event",
-          error,
-        );
+        console.error("[App] Failed to subscribe provider switch event", error);
       }
     };
 
@@ -459,33 +396,74 @@ function App() {
       active = false;
       unsubscribe?.();
     };
-  }, [queryClient, t]);
+  }, [activeApp, refetch]);
 
-  // Listen for proxy-official-warning: warn when takeover is enabled with an official provider
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
+  useTauriEvent("universal-provider-synced", async () => {
+    await queryClient.invalidateQueries({ queryKey: ["providers"] });
+    try {
+      await providersApi.updateTrayMenu();
+    } catch (error) {
+      console.error("[App] Failed to update tray menu", error);
+    }
+  });
 
-    const setup = async () => {
-      unsubscribe = await listen("proxy-official-warning", (event) => {
-        const { providerName } = event.payload as {
-          appType: string;
-          providerName: string;
-        };
-        toast.warning(
-          t("notifications.proxyOfficialWarning", {
-            name: providerName,
-            defaultValue: `当前供应商 ${providerName} 是官方供应商，建议切换到第三方供应商后再使用代理接管`,
-          }),
-          { duration: 8000 },
-        );
-      });
-    };
+  // 应用项目后刷新相关缓存（providers 由既有 provider-switched 监听承接；
+  // proxy 状态由后端直接改 DB，不走 mutation，必须显式刷新）
+  useTauriEvent("profile-applied", async () => {
+    await queryClient.invalidateQueries({ queryKey: ["profiles"] });
+    await queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
+    await queryClient.invalidateQueries({ queryKey: ["skills"] });
+    await queryClient.invalidateQueries({ queryKey: ["proxyTakeoverStatus"] });
+    await queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
+    await queryClient.invalidateQueries({
+      queryKey: ["providers", "claude-desktop"],
+    });
+  });
 
-    void setup();
-    return () => {
-      unsubscribe?.();
-    };
-  }, [t]);
+  useTauriEvent<SyncStatusUpdatedPayload | null | undefined>(
+    "webdav-sync-status-updated",
+    async (payload) => {
+      const statusPayload = payload ?? {};
+      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      if (statusPayload.source !== "auto" || statusPayload.status !== "error") {
+        return;
+      }
+      toast.error(
+        t("settings.webdavSync.autoSyncFailedToast", {
+          error: statusPayload.error || t("common.unknown"),
+        }),
+      );
+    },
+  );
+
+  useTauriEvent<SyncStatusUpdatedPayload | null | undefined>(
+    "s3-sync-status-updated",
+    async (payload) => {
+      const statusPayload = payload ?? {};
+      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      if (statusPayload.source !== "auto" || statusPayload.status !== "error") {
+        return;
+      }
+      toast.error(
+        t("settings.s3Sync.autoSyncFailedToast", {
+          error: statusPayload.error || t("common.unknown"),
+        }),
+      );
+    },
+  );
+
+  useTauriEvent<{ appType: string; providerName: string }>(
+    "proxy-official-warning",
+    (payload) => {
+      toast.warning(
+        t("notifications.proxyOfficialWarning", {
+          name: payload.providerName,
+          defaultValue: `当前供应商 ${payload.providerName} 是官方供应商，建议切换到第三方供应商后再使用代理接管`,
+        }),
+        { duration: 8000 },
+      );
+    },
+  );
 
   useEffect(() => {
     let active = true;
@@ -758,13 +736,11 @@ function App() {
       addToLive?: boolean;
     } = {
       name: `${provider.name} copy`,
-      settingsConfig: JSON.parse(JSON.stringify(provider.settingsConfig)), // 深拷贝
+      settingsConfig: deepClone(provider.settingsConfig),
       websiteUrl: provider.websiteUrl,
       category: provider.category,
       sortIndex: newSortIndex, // 复制原 sortIndex + 1
-      meta: provider.meta
-        ? JSON.parse(JSON.stringify(provider.meta))
-        : undefined, // 深拷贝
+      meta: provider.meta ? deepClone(provider.meta) : undefined,
       icon: provider.icon,
       iconColor: provider.iconColor,
     };
@@ -778,7 +754,7 @@ function App() {
         existingEnvKeys,
       );
       duplicatedProvider.settingsConfig = rewriteDuplicatedCodexSettingsConfig(
-        duplicatedProvider.settingsConfig,
+        duplicatedProvider.settingsConfig as Record<string, any>,
         nextEnvKey,
       );
     }
@@ -944,6 +920,11 @@ function App() {
     }
   };
 
+  const handleOpenSkillsDiscovery = () => {
+    setSkillsDiscoverySource("repos");
+    setCurrentView("skillsDiscovery");
+  };
+
   const renderContent = () => {
     const content = (() => {
       switch (currentView) {
@@ -962,7 +943,7 @@ function App() {
               ref={promptPanelRef}
               open={true}
               onOpenChange={() => setCurrentView("providers")}
-              appId={activeApp}
+              appId={sharedFeatureApp}
             />
           );
         case "hermesMemory":
@@ -971,15 +952,20 @@ function App() {
           return (
             <UnifiedSkillsPanel
               ref={unifiedSkillsPanelRef}
-              onOpenDiscovery={() => setCurrentView("skillsDiscovery")}
-              currentApp={activeApp === "openclaw" ? "claude" : activeApp}
+              onOpenDiscovery={handleOpenSkillsDiscovery}
+              currentApp={
+                sharedFeatureApp === "openclaw" ? "claude" : sharedFeatureApp
+              }
             />
           );
         case "skillsDiscovery":
           return (
             <SkillsPage
               ref={skillsPageRef}
-              initialApp={activeApp === "openclaw" ? "claude" : activeApp}
+              initialApp={
+                sharedFeatureApp === "openclaw" ? "claude" : sharedFeatureApp
+              }
+              onSourceChange={setSkillsDiscoverySource}
             />
           );
         case "mcp":
@@ -1001,7 +987,12 @@ function App() {
           );
 
         case "sessions":
-          return <SessionManagerPage key={activeApp} appId={activeApp} />;
+          return (
+            <SessionManagerPage
+              key={sharedFeatureApp}
+              appId={sharedFeatureApp}
+            />
+          );
         case "workspace":
           return <WorkspaceFilesPanel />;
         case "openclawEnv":
@@ -1214,7 +1205,9 @@ function App() {
                 <h1 className="text-lg font-semibold">
                   {currentView === "settings" && t("settings.title")}
                   {currentView === "prompts" &&
-                    t("prompts.title", { appName: t(`apps.${activeApp}`) })}
+                    t("prompts.title", {
+                      appName: t(`apps.${sharedFeatureApp}`),
+                    })}
                   {currentView === "skills" && t("skills.title")}
                   {currentView === "skillsDiscovery" && t("skills.title")}
                   {currentView === "mcp" && t("mcp.unifiedPanel.title")}
@@ -1309,6 +1302,15 @@ function App() {
                     )}
                 </div>
               )}
+            {currentView === "providers" &&
+              (settingsData?.showProfileSwitcher ?? true) && (
+                <div
+                  className="flex shrink-0 items-center"
+                  style={{ WebkitAppRegion: "no-drag" } as any}
+                >
+                  <ProfileSwitcher activeApp={activeApp} />
+                </div>
+              )}
             <div
               ref={toolbarRef}
               className="flex flex-1 min-w-0 overflow-x-hidden items-center py-4 pr-2"
@@ -1380,15 +1382,26 @@ function App() {
                       onClick={() =>
                         unifiedSkillsPanelRef.current?.openImport()
                       }
-                      className="hover:bg-black/5 dark:hover:bg-white/5"
+                      className="relative hover:bg-black/5 dark:hover:bg-white/5"
+                      title={
+                        hasUnmanagedSkills
+                          ? t("skills.unmanagedAvailable")
+                          : undefined
+                      }
                     >
                       <Download className="w-4 h-4 mr-2" />
                       {t("skills.import")}
+                      {hasUnmanagedSkills && (
+                        <span
+                          className="absolute top-1 right-1 h-2 w-2 rounded-full bg-green-500"
+                          aria-hidden="true"
+                        />
+                      )}
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setCurrentView("skillsDiscovery")}
+                      onClick={handleOpenSkillsDiscovery}
                       className="hover:bg-black/5 dark:hover:bg-white/5"
                     >
                       <Search className="w-4 h-4 mr-2" />
@@ -1398,24 +1411,20 @@ function App() {
                 )}
                 {currentView === "skillsDiscovery" && (
                   <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => skillsPageRef.current?.refresh()}
-                      className="hover:bg-black/5 dark:hover:bg-white/5"
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      {t("skills.refresh")}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => skillsPageRef.current?.openRepoManager()}
-                      className="hover:bg-black/5 dark:hover:bg-white/5"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      {t("skills.repoManager")}
-                    </Button>
+                    {getSkillsPageHeaderActions(skillsDiscoverySource).map(
+                      ({ key, labelKey, Icon, execute }) => (
+                        <Button
+                          key={key}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => execute(skillsPageRef.current)}
+                          className="hover:bg-black/5 dark:hover:bg-white/5"
+                        >
+                          <Icon className="w-4 h-4 mr-2" />
+                          {t(labelKey)}
+                        </Button>
+                      ),
+                    )}
                   </>
                 )}
                 {currentView === "providers" && (
@@ -1547,17 +1556,15 @@ function App() {
                               >
                                 <Wrench className="flex-shrink-0 w-4 h-4" />
                               </Button>
-                              {activeApp !== "claude-desktop" && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setCurrentView("prompts")}
-                                  className="text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 w-8 px-2"
-                                  title={t("prompts.manage")}
-                                >
-                                  <Book className="w-4 h-4" />
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCurrentView("prompts")}
+                                className="text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 w-8 px-2"
+                                title={t("prompts.manage")}
+                              >
+                                <Book className="w-4 h-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1573,17 +1580,15 @@ function App() {
                               >
                                 <History className="flex-shrink-0 w-4 h-4" />
                               </Button>
-                              {activeApp !== "claude-desktop" && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setCurrentView("mcp")}
-                                  className="text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 w-8 px-2"
-                                  title={t("mcp.title")}
-                                >
-                                  <McpIcon size={16} />
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCurrentView("mcp")}
+                                className="text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 w-8 px-2"
+                                title={t("mcp.title")}
+                              >
+                                <McpIcon size={16} />
+                              </Button>
                             </>
                           )}
                         </motion.div>
@@ -1629,7 +1634,7 @@ function App() {
         }}
         onSubmit={handleEditProvider}
         appId={activeApp}
-        isProxyTakeover={isProxyRunning && isCurrentAppTakeoverActive}
+        isProxyTakeover={isCurrentAppTakeoverActive}
       />
 
       {effectiveUsageProvider && (

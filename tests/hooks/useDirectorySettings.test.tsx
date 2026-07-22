@@ -212,7 +212,9 @@ describe("useDirectorySettings", () => {
     });
     expect(result.current.resolvedDirs.claude).toBe("/home/mock/.claude");
     expect(result.current.resolvedDirs.codex).toBe("/home/mock/.codex");
-    expect(result.current.resolvedDirs.appConfig).toBe("/home/mock/.tuzi-switch");
+    expect(result.current.resolvedDirs.appConfig).toBe(
+      "/home/mock/.tuzi-switch",
+    );
   });
 
   it("updates openclaw directory when browsing succeeds", async () => {

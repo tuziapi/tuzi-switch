@@ -15,7 +15,6 @@ interface EndpointFieldProps {
   showManageButton?: boolean;
   onManageClick?: () => void;
   manageButtonLabel?: string;
-  hideInput?: boolean;
   showFullUrlToggle?: boolean;
   isFullUrl?: boolean;
   onFullUrlChange?: (value: boolean) => void;
@@ -32,7 +31,6 @@ export function EndpointField({
   showManageButton = true,
   onManageClick,
   manageButtonLabel,
-  hideInput = false,
   showFullUrlToggle = false,
   isFullUrl = false,
   onFullUrlChange,
@@ -94,16 +92,14 @@ export function EndpointField({
           </button>
         ) : null}
       </div>
-      {!hideInput ? (
-        <Input
-          id={id}
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          autoComplete="off"
-        />
-      ) : null}
+      <Input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
       {effectiveHint ? (
         <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
           <p className="text-xs text-amber-600 dark:text-amber-400">

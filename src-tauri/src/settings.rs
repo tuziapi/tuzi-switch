@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{OnceLock, RwLock};
 
@@ -176,6 +175,106 @@ impl WebDavSyncSettings {
     }
 }
 
+/// S3 同步设置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct S3SyncSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub auto_sync: bool,
+    #[serde(default)]
+    pub region: String,
+    #[serde(default)]
+    pub bucket: String,
+    #[serde(default)]
+    pub access_key_id: String,
+    #[serde(default)]
+    pub secret_access_key: String,
+    #[serde(default)]
+    pub endpoint: String,
+    #[serde(default = "default_remote_root")]
+    pub remote_root: String,
+    #[serde(default = "default_profile")]
+    pub profile: String,
+    #[serde(default)]
+    pub status: WebDavSyncStatus,
+}
+
+impl Default for S3SyncSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            auto_sync: false,
+            region: String::new(),
+            bucket: String::new(),
+            access_key_id: String::new(),
+            secret_access_key: String::new(),
+            endpoint: String::new(),
+            remote_root: default_remote_root(),
+            profile: default_profile(),
+            status: WebDavSyncStatus::default(),
+        }
+    }
+}
+
+impl S3SyncSettings {
+    pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        if self.bucket.trim().is_empty() {
+            return Err(crate::error::AppError::localized(
+                "s3.bucket.required",
+                "S3 存储桶不能为空",
+                "S3 bucket is required.",
+            ));
+        }
+        if self.region.trim().is_empty() {
+            return Err(crate::error::AppError::localized(
+                "s3.region.required",
+                "S3 区域不能为空",
+                "S3 region is required.",
+            ));
+        }
+        if self.access_key_id.trim().is_empty() {
+            return Err(crate::error::AppError::localized(
+                "s3.access_key_id.required",
+                "S3 Access Key ID 不能为空",
+                "S3 Access Key ID is required.",
+            ));
+        }
+        if self.secret_access_key.trim().is_empty() {
+            return Err(crate::error::AppError::localized(
+                "s3.secret_access_key.required",
+                "S3 Secret Access Key 不能为空",
+                "S3 Secret Access Key is required.",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn normalize(&mut self) {
+        self.region = self.region.trim().to_string();
+        self.bucket = self.bucket.trim().to_string();
+        self.access_key_id = self.access_key_id.trim().to_string();
+        self.endpoint = self.endpoint.trim().to_string();
+        self.remote_root = self.remote_root.trim().to_string();
+        self.profile = self.profile.trim().to_string();
+        if self.remote_root.is_empty() {
+            self.remote_root = default_remote_root();
+        }
+        if self.profile.is_empty() {
+            self.profile = default_profile();
+        }
+    }
+
+    /// Returns true if all credential fields are blank (no config to persist).
+    fn is_empty(&self) -> bool {
+        self.bucket.is_empty()
+            && self.region.is_empty()
+            && self.access_key_id.is_empty()
+            && self.secret_access_key.is_empty()
+    }
+}
+
 /// 本机自动迁移状态。
 ///
 /// 这里记录的是本机启动时执行过的一次性迁移；标记不随数据库同步。
@@ -187,6 +286,8 @@ pub struct LocalMigrations {
         Option<CodexThirdPartyHistoryProviderBucketMigration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_provider_template_v1: Option<CodexProviderTemplateMigration>,
+    /// 统一会话开关的官方历史迁移标记。开关关闭时会被清除，
+    /// 这样重新开启能把"关闭期间"落入 openai 桶的官方会话补迁进来。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_official_history_unify_v1: Option<CodexOfficialHistoryUnifyMigration>,
 }
@@ -223,6 +324,8 @@ pub struct CodexOfficialHistoryUnifyMigration {
     pub migrated_jsonl_files: usize,
     #[serde(default)]
     pub migrated_state_rows: usize,
+    /// 迁移时的规范化 Codex 目录。标记只对同一目录生效：
+    /// 切换 codex_config_dir 后旧标记不会挡住新目录的迁移。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_config_dir: Option<String>,
 }
@@ -262,20 +365,26 @@ pub struct AppSettings {
     /// User has confirmed the usage query first-run notice
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_confirmed: Option<bool>,
-    /// User has confirmed the stream check first-run notice
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_check_confirmed: Option<bool>,
+    pub usage_dashboard_refresh_interval_ms: Option<u32>,
     /// Whether to show the failover toggle independently on the main page
     #[serde(default)]
     pub enable_failover_toggle: bool,
+    /// Whether to show the project profile switcher on the main page header
+    #[serde(default = "default_show_profile_switcher")]
+    pub show_profile_switcher: bool,
     /// Keep Codex ChatGPT login material in auth.json when switching to third-party providers.
+    /// Missing fields in settings from older Tuzi versions must keep this protection enabled.
     #[serde(default = "default_true")]
     pub preserve_codex_official_auth_on_switch: bool,
-    /// Run official Codex providers under the shared model_provider id so official
-    /// sessions share one resume-history bucket with third-party providers.
+    /// Run official Codex providers under the shared "custom" model_provider id
+    /// so official sessions share one resume-history bucket with third-party
+    /// providers. Missing fields in older settings default to the Tuzi-safe behavior.
     #[serde(default = "default_true")]
     pub unify_codex_session_history: bool,
-    /// User opted in to migrate existing official sessions into the shared bucket.
+    /// User opted in (via the enable dialog checkbox) to migrate existing
+    /// official sessions ("openai" bucket) into the shared bucket. Persisted so
+    /// a failed migration retries at startup; cleared when the toggle turns off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unify_codex_migrate_existing: Option<bool>,
     /// User has confirmed the failover toggle first-run notice
@@ -335,13 +444,17 @@ pub struct AppSettings {
     /// Skill 同步方式：auto（默认，优先 symlink）、symlink、copy
     #[serde(default)]
     pub skill_sync_method: SyncMethod,
-    /// Skill 存储位置：tuzi_switch（默认）或 unified（~/.agents/skills/）
+    /// Skill 存储位置：cc_switch（Tuzi 产品目录，序列化兼容名）或 unified。
     #[serde(default)]
     pub skill_storage_location: SkillStorageLocation,
 
     // ===== WebDAV 同步设置 =====
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub webdav_sync: Option<WebDavSyncSettings>,
+
+    // ===== S3 同步设置 =====
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub s3_sync: Option<S3SyncSettings>,
 
     // ===== WebDAV 备份设置（旧版，保留向后兼容）=====
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -376,6 +489,10 @@ fn default_minimize_to_tray_on_close() -> bool {
     true
 }
 
+fn default_show_profile_switcher() -> bool {
+    true
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -389,8 +506,9 @@ impl Default for AppSettings {
             enable_local_proxy: false,
             proxy_confirmed: None,
             usage_confirmed: None,
-            stream_check_confirmed: None,
+            usage_dashboard_refresh_interval_ms: None,
             enable_failover_toggle: false,
+            show_profile_switcher: true,
             preserve_codex_official_auth_on_switch: true,
             unify_codex_session_history: true,
             unify_codex_migrate_existing: None,
@@ -415,6 +533,7 @@ impl Default for AppSettings {
             skill_sync_method: SyncMethod::default(),
             skill_storage_location: SkillStorageLocation::default(),
             webdav_sync: None,
+            s3_sync: None,
             webdav_backup: None,
             backup_interval_hours: None,
             backup_retain_count: None,
@@ -427,11 +546,7 @@ impl Default for AppSettings {
 impl AppSettings {
     fn settings_path() -> Option<PathBuf> {
         // settings.json 保留用于旧版本迁移和无数据库场景
-        Some(
-            crate::config::get_home_dir()
-                .join(".tuzi-switch")
-                .join("settings.json"),
-        )
+        Some(crate::product::default_app_config_dir().join("settings.json"))
     }
 
     fn normalize_paths(&mut self) {
@@ -481,7 +596,7 @@ impl AppSettings {
             .language
             .as_ref()
             .map(|s| s.trim())
-            .filter(|s| matches!(*s, "en" | "zh" | "ja"))
+            .filter(|s| matches!(*s, "en" | "zh" | "zh-TW" | "ja"))
             .map(|s| s.to_string());
 
         if let Some(sync) = &mut self.webdav_sync {
@@ -490,11 +605,13 @@ impl AppSettings {
                 self.webdav_sync = None;
             }
         }
-    }
 
-    fn reset_codex_enhancement_toggles_on(&mut self) {
-        self.preserve_codex_official_auth_on_switch = true;
-        self.unify_codex_session_history = true;
+        if let Some(s3) = &mut self.s3_sync {
+            s3.normalize();
+            if s3.is_empty() {
+                self.s3_sync = None;
+            }
+        }
     }
 
     fn load_from_file() -> Self {
@@ -525,7 +642,6 @@ impl AppSettings {
 fn save_settings_file(settings: &AppSettings) -> Result<(), AppError> {
     let mut normalized = settings.clone();
     normalized.normalize_paths();
-    normalized.reset_codex_enhancement_toggles_on();
     let Some(path) = AppSettings::settings_path() else {
         return Err(AppError::Config("无法获取用户主目录".to_string()));
     };
@@ -539,6 +655,7 @@ fn save_settings_file(settings: &AppSettings) -> Result<(), AppError> {
     #[cfg(unix)]
     {
         use std::fs::OpenOptions;
+        use std::io::Write;
         use std::os::unix::fs::OpenOptionsExt;
 
         let mut file = OpenOptions::new()
@@ -599,6 +716,9 @@ pub fn get_settings_for_frontend() -> AppSettings {
     if let Some(sync) = &mut settings.webdav_sync {
         sync.password.clear();
     }
+    if let Some(s3) = &mut settings.s3_sync {
+        s3.secret_access_key.clear();
+    }
     settings.webdav_backup = None;
     settings
 }
@@ -612,6 +732,22 @@ pub fn update_settings(mut new_settings: AppSettings) -> Result<(), AppError> {
         e.into_inner()
     });
     *guard = new_settings;
+    Ok(())
+}
+
+fn mutate_settings<F>(mutator: F) -> Result<(), AppError>
+where
+    F: FnOnce(&mut AppSettings),
+{
+    let mut guard = settings_store().write().unwrap_or_else(|e| {
+        log::warn!("设置锁已毒化，使用恢复值: {e}");
+        e.into_inner()
+    });
+    let mut next = guard.clone();
+    mutator(&mut next);
+    next.normalize_paths();
+    save_settings_file(&next)?;
+    *guard = next;
     Ok(())
 }
 
@@ -657,6 +793,8 @@ pub fn mark_codex_provider_template_migrated(
     })
 }
 
+/// 统一会话迁移标记是否覆盖指定目录。标记里没记目录（不应出现的旧格式）
+/// 视为不匹配——重跑迁移是幂等的，宁可重迁也不漏迁。
 pub fn is_codex_official_history_unify_migrated_for_dir(codex_dir: &str) -> bool {
     get_settings()
         .local_migrations
@@ -665,13 +803,17 @@ pub fn is_codex_official_history_unify_migrated_for_dir(codex_dir: &str) -> bool
         .is_some_and(|migration| migration.codex_config_dir.as_deref() == Some(codex_dir))
 }
 
+/// 条件写入迁移完成标记：仅当此刻开关仍开启且迁移意愿仍在时才写。
+/// 检查与写入在 settings 写锁内原子完成，与关闭开关路径
+/// （`update_settings` / 清标记）串行，消除"迁移线程复查开关后、写标记前
+/// 用户恰好关闭开关"的竞态窗口。返回是否实际写入。
 pub fn mark_codex_official_history_unify_migrated_if_enabled(
     migration: CodexOfficialHistoryUnifyMigration,
 ) -> Result<bool, AppError> {
     let mut written = false;
     mutate_settings(|settings| {
         if settings.unify_codex_session_history
-            && settings.unify_codex_migrate_existing.unwrap_or(false)
+            && settings.unify_codex_migrate_existing.unwrap_or(true)
         {
             settings
                 .local_migrations
@@ -692,9 +834,8 @@ pub fn clear_codex_official_history_unify_migration() -> Result<(), AppError> {
 }
 
 pub fn unify_codex_migrate_existing_requested() -> bool {
-    // 统一历史由升级逻辑默认开启时，旧版本没有该字段。此时若默认不迁移，
-    // live 会先切到共享桶，而全部存量历史仍留在官方桶，用户看到的就是空列表。
-    // 明确选择“不迁移”仍会落盘为 Some(false)，只有缺字段的升级用户默认补迁。
+    // 升级用户的旧设置没有该字段；统一历史默认开启时应补迁既有官方会话。
+    // 只有明确选择不迁移（Some(false)）才跳过。
     get_settings().unify_codex_migrate_existing.unwrap_or(true)
 }
 
@@ -702,22 +843,6 @@ pub fn clear_codex_unify_migrate_existing() -> Result<(), AppError> {
     mutate_settings(|settings| {
         settings.unify_codex_migrate_existing = None;
     })
-}
-
-fn mutate_settings<F>(mutator: F) -> Result<(), AppError>
-where
-    F: FnOnce(&mut AppSettings),
-{
-    let mut guard = settings_store().write().unwrap_or_else(|e| {
-        log::warn!("设置锁已毒化，使用恢复值: {e}");
-        e.into_inner()
-    });
-    let mut next = guard.clone();
-    mutator(&mut next);
-    next.normalize_paths();
-    save_settings_file(&next)?;
-    *guard = next;
-    Ok(())
 }
 
 /// 从文件重新加载设置到内存缓存
@@ -778,6 +903,26 @@ pub fn get_hermes_override_dir() -> Option<PathBuf> {
         .hermes_config_dir
         .as_ref()
         .map(|p| resolve_override_path(p))
+}
+
+pub fn preserve_codex_official_auth_on_switch() -> bool {
+    settings_store()
+        .read()
+        .unwrap_or_else(|e| {
+            log::warn!("设置锁已毒化，使用恢复值: {e}");
+            e.into_inner()
+        })
+        .preserve_codex_official_auth_on_switch
+}
+
+pub fn unify_codex_session_history() -> bool {
+    settings_store()
+        .read()
+        .unwrap_or_else(|e| {
+            log::warn!("设置锁已毒化，使用恢复值: {e}");
+            e.into_inner()
+        })
+        .unify_codex_session_history
 }
 
 // ===== 当前供应商管理函数 =====
@@ -925,26 +1070,6 @@ pub fn get_preferred_terminal() -> Option<String> {
         .clone()
 }
 
-pub fn preserve_codex_official_auth_on_switch() -> bool {
-    settings_store()
-        .read()
-        .unwrap_or_else(|e| {
-            log::warn!("设置锁已毒化，使用恢复值: {e}");
-            e.into_inner()
-        })
-        .preserve_codex_official_auth_on_switch
-}
-
-pub fn unify_codex_session_history() -> bool {
-    settings_store()
-        .read()
-        .unwrap_or_else(|e| {
-            log::warn!("设置锁已毒化，使用恢复值: {e}");
-            e.into_inner()
-        })
-        .unify_codex_session_history
-}
-
 // ===== WebDAV 同步设置管理函数 =====
 
 /// 获取 WebDAV 同步设置
@@ -964,6 +1089,26 @@ pub fn update_webdav_sync_status(status: WebDavSyncStatus) -> Result<(), AppErro
     mutate_settings(|current| {
         if let Some(sync) = current.webdav_sync.as_mut() {
             sync.status = status;
+        }
+    })
+}
+
+// ===== S3 同步设置管理函数 =====
+
+pub fn get_s3_sync_settings() -> Option<S3SyncSettings> {
+    settings_store().read().ok()?.s3_sync.clone()
+}
+
+pub fn set_s3_sync_settings(settings: Option<S3SyncSettings>) -> Result<(), AppError> {
+    mutate_settings(|current| {
+        current.s3_sync = settings;
+    })
+}
+
+pub fn update_s3_sync_status(status: WebDavSyncStatus) -> Result<(), AppError> {
+    mutate_settings(|current| {
+        if let Some(s3) = current.s3_sync.as_mut() {
+            s3.status = status;
         }
     })
 }
@@ -1005,43 +1150,21 @@ mod tests {
     }
 
     #[test]
-    fn old_settings_default_codex_enhancement_toggles_on() {
-        let settings: AppSettings = serde_json::from_value(serde_json::json!({
-            "showInTray": true,
-            "minimizeToTrayOnClose": true
-        }))
-        .expect("settings");
-
-        assert!(settings.preserve_codex_official_auth_on_switch);
-        assert!(settings.unify_codex_session_history);
-        assert!(settings.unify_codex_migrate_existing.is_none());
-    }
-
-    #[test]
     fn missing_codex_migration_choice_defaults_to_safe_stock_migration() {
         let settings: AppSettings =
             serde_json::from_value(serde_json::json!({})).expect("settings");
-
+        assert!(settings.preserve_codex_official_auth_on_switch);
+        assert!(settings.unify_codex_session_history);
         assert!(settings.unify_codex_migrate_existing.unwrap_or(true));
 
         let explicit_opt_out: AppSettings = serde_json::from_value(serde_json::json!({
+            "preserveCodexOfficialAuthOnSwitch": false,
+            "unifyCodexSessionHistory": false,
             "unifyCodexMigrateExisting": false
         }))
         .expect("settings");
+        assert!(!explicit_opt_out.preserve_codex_official_auth_on_switch);
+        assert!(!explicit_opt_out.unify_codex_session_history);
         assert_eq!(explicit_opt_out.unify_codex_migrate_existing, Some(false));
-    }
-
-    #[test]
-    fn codex_enhancement_toggles_reset_on_before_persisting() {
-        let mut settings: AppSettings = serde_json::from_value(serde_json::json!({
-            "preserveCodexOfficialAuthOnSwitch": false,
-            "unifyCodexSessionHistory": false
-        }))
-        .expect("settings");
-
-        settings.reset_codex_enhancement_toggles_on();
-
-        assert!(settings.preserve_codex_official_auth_on_switch);
-        assert!(settings.unify_codex_session_history);
     }
 }

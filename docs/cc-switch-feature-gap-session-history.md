@@ -1,11 +1,10 @@
-
 # tuzi-switch 对比 cc-switch 功能差距分析：会话保存
 
 ## 背景
 
 本次以 `cc-switch` 为主，对比 `tuzi-switch` 的功能缺口，重点关注 Codex 会话保存、会话历史归属、会话恢复能力。
 
-结论：`tuzi-switch` 已具备基础 Session Manager 与 Codex `model_provider` 稳定化能力，但缺少 `cc-switch` 中围绕 Codex 会话历史的完整闭环：会话归桶迁移、官方与第三方历史统一、SQLite state DB 同步迁移、备份账本、关闭后的精确还原。
+当前状态：会话归桶迁移、官方与第三方历史统一、SQLite state DB 同步迁移、备份账本、关闭后的精确还原，以及项目 Profile 均已补齐。本文保留原始差距与实施路线，已完成项以当前状态为准。
 
 ## 项目位置
 
@@ -174,7 +173,12 @@ Codex 会话历史不是只靠 jsonl 文件保存。Codex 还会在 `state_5.sql
 - `cc-switch/src/components/profiles/`
 - `cc-switch/src/lib/api/profiles.ts`
 
-`tuzi-switch` 未发现同等的项目级快照编排服务。
+`tuzi-switch` 已补齐同等的项目级快照编排服务，并恢复主页、通用设置和托盘入口：
+
+- `src-tauri/src/services/profile.rs`
+- `src-tauri/src/commands/profile.rs`
+- `src/components/profiles/`
+- `src/lib/api/profiles.ts`
 
 ## tuzi-switch 建议补齐路线
 
@@ -238,15 +242,15 @@ Session Manager 读取 Codex 会话时：
 - 读取所有候选 `state_5.sqlite`。
 - 将 thread title 合并到 session meta。
 
-### P2：补项目 Profile
+### P2：补项目 Profile（已完成）
 
-如果产品目标是追平 `cc-switch`，可以补项目配置快照：
+已补齐项目配置快照：
 
 - Profile 实体。
 - 按 app/scope 保存 provider、MCP、Skills、Prompt。
 - 切换项目时保存当前快照并应用目标快照。
 
-这个功能和会话历史不是同一层，建议排在会话保存闭环之后。
+这个功能和会话历史不是同一层，当前已在会话保存闭环之后完成。
 
 ## 风险点
 
@@ -277,6 +281,6 @@ Session Manager 读取 Codex 会话时：
 3. Session Manager 标题读取增强。
 4. 统一官方/第三方 Codex 会话历史开关。
 5. 备份账本恢复 UI。
-6. 项目 Profile。
+6. 项目 Profile（已完成）。
 
 这样可以先解决用户最容易感知的“会话不见了 / 会话没有保存 / 切换后无法统一 resume”的问题，再扩展项目级配置快照。

@@ -6,7 +6,6 @@
 //! - **Gemini**: API Key 认证 (x-goog-api-key)
 //! - **GeminiCli**: OAuth Bearer 认证 (用于 Gemini CLI)
 
-use super::adapter::auth_header_value;
 use super::{AuthInfo, AuthStrategy, ProviderAdapter, ProviderType};
 use crate::provider::Provider;
 use crate::proxy::error::ProxyError;
@@ -229,33 +228,31 @@ impl ProviderAdapter for GeminiAdapter {
         url
     }
 
-    fn get_auth_headers(&self, auth: &AuthInfo) -> Vec<(http::HeaderName, http::HeaderValue)> {
+    fn get_auth_headers(
+        &self,
+        auth: &AuthInfo,
+    ) -> Result<Vec<(http::HeaderName, http::HeaderValue)>, ProxyError> {
+        use super::adapter::auth_header_value as hv;
         use http::{HeaderName, HeaderValue};
-        match auth.strategy {
+        Ok(match auth.strategy {
             AuthStrategy::GoogleOAuth => {
                 let token = auth.access_token.as_ref().unwrap_or(&auth.api_key);
-                let mut headers = Vec::new();
-                if let Some(header) = auth_header_value(
-                    self.name(),
-                    HeaderName::from_static("authorization"),
-                    &format!("Bearer {token}"),
-                ) {
-                    headers.push(header);
-                }
-                headers.push((
-                    HeaderName::from_static("x-goog-api-client"),
-                    HeaderValue::from_static("GeminiCLI/1.0"),
-                ));
-                headers
+                vec![
+                    (
+                        HeaderName::from_static("authorization"),
+                        hv(&format!("Bearer {token}"))?,
+                    ),
+                    (
+                        HeaderName::from_static("x-goog-api-client"),
+                        HeaderValue::from_static("GeminiCLI/1.0"),
+                    ),
+                ]
             }
-            _ => auth_header_value(
-                self.name(),
+            _ => vec![(
                 HeaderName::from_static("x-goog-api-key"),
-                &auth.api_key,
-            )
-            .into_iter()
-            .collect(),
-        }
+                hv(&auth.api_key)?,
+            )],
+        })
     }
 }
 

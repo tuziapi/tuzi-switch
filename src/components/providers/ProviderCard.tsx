@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
 import type {
   DraggableAttributes,
   DraggableSyntheticListeners,
@@ -15,16 +14,21 @@ import UsageFooter from "@/components/UsageFooter";
 import SubscriptionQuotaFooter from "@/components/SubscriptionQuotaFooter";
 import CopilotQuotaFooter from "@/components/CopilotQuotaFooter";
 import CodexOauthQuotaFooter from "@/components/CodexOauthQuotaFooter";
-import { PROVIDER_TYPES } from "@/config/constants";
+import { PROVIDER_TYPES, TEMPLATE_TYPES } from "@/config/constants";
 import { isHermesReadOnlyProvider } from "@/config/hermesProviderPresets";
 import { ProviderHealthBadge } from "@/components/providers/ProviderHealthBadge";
 import { FailoverPriorityBadge } from "@/components/providers/FailoverPriorityBadge";
 import {
   extractCodexBaseUrl,
-  getCodexProviderEnvKeyFromSettings,
+  extractCodexExperimentalBearerToken,
+  extractCodexWireApi,
+  isCodexAnthropicWireApi,
+  isCodexChatWireApi,
 } from "@/utils/providerConfigUtils";
+import { supportsOfficialProxyTakeover } from "@/utils/providerCapabilities";
 import { useProviderHealth } from "@/lib/query/failover";
 import { useUsageQuery } from "@/lib/query/queries";
+import { invoke } from "@tauri-apps/api/core";
 
 interface DragHandleProps {
   attributes: DraggableAttributes;
@@ -76,12 +80,15 @@ function isOfficialProvider(provider: Provider, appId: AppId): boolean {
     return !baseUrl || (typeof baseUrl === "string" && baseUrl.trim() === "");
   }
   if (appId === "codex") {
-    // 无 OPENAI_API_KEY 且无有效 env_key → 使用 Codex CLI 内置 OAuth（官方）
+    // 无 OPENAI_API_KEY → 使用 Codex CLI 内置 OAuth（官方）
     const apiKey = config?.auth?.OPENAI_API_KEY;
-    const envKey = getCodexProviderEnvKeyFromSettings(provider.settingsConfig);
+    const bearerToken =
+      typeof config?.config === "string"
+        ? extractCodexExperimentalBearerToken(config.config)
+        : undefined;
     return (
-      (!apiKey || (typeof apiKey === "string" && apiKey.trim() === "")) &&
-      !envKey
+      !bearerToken &&
+      (!apiKey || (typeof apiKey === "string" && apiKey.trim() === ""))
     );
   }
   if (appId === "gemini") {
@@ -97,6 +104,14 @@ function isOfficialProvider(provider: Provider, appId: AppId): boolean {
 }
 
 const extractApiUrl = (provider: Provider, fallbackText: string) => {
+  if (provider.notes?.trim()) {
+    return provider.notes.trim();
+  }
+
+  if (provider.websiteUrl) {
+    return provider.websiteUrl;
+  }
+
   const config = provider.settingsConfig;
 
   if (config && typeof config === "object") {
@@ -117,15 +132,41 @@ const extractApiUrl = (provider: Provider, fallbackText: string) => {
     }
   }
 
-  if (provider.notes?.trim()) {
-    return provider.notes.trim();
-  }
-
-  if (provider.websiteUrl) {
-    return provider.websiteUrl;
-  }
-
   return fallbackText;
+};
+
+const resolveTuziBusinessLinks = (displayUrl: string) => {
+  try {
+    const parsed = new URL(
+      displayUrl.startsWith("http") ? displayUrl : `https://${displayUrl}`,
+    );
+    const normalized = `${parsed.origin}${parsed.pathname}`.replace(/\/$/, "");
+    if (
+      normalized === "https://api.tu-zi.com" ||
+      normalized === "https://api.tu-zi.com/v1" ||
+      normalized === "https://apius.tu-zi.com"
+    ) {
+      return {
+        recharge: "https://api.tu-zi.com/console/topup",
+        query: "https://check.sydney-ai.com/",
+      };
+    }
+    if (
+      normalized === "https://coding.tu-zi.com" ||
+      normalized === "https://api.tu-zi.com/coding"
+    ) {
+      return {
+        recharge: "https://store.tu-zi.com/cat/11",
+        query: "https://api.tu-zi.com/reseller/",
+      };
+    }
+    if (parsed.hostname === "gaccode.com") {
+      return { recharge: "https://store.tu-zi.com/cat/1" };
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 };
 
 export function ProviderCard({
@@ -185,34 +226,48 @@ export function ProviderCard({
     }
     return true;
   }, [provider.notes, displayUrl, fallbackUrlText]);
+  const tuziLinks = useMemo(
+    () => resolveTuziBusinessLinks(displayUrl),
+    [displayUrl],
+  );
+  const providerApiKey = useMemo(() => {
+    const config = provider.settingsConfig as Record<string, any>;
+    const key =
+      appId === "codex"
+        ? config?.auth?.OPENAI_API_KEY
+        : appId === "claude"
+          ? config?.env?.ANTHROPIC_AUTH_TOKEN || config?.env?.ANTHROPIC_API_KEY
+          : appId === "gemini"
+            ? config?.env?.GEMINI_API_KEY
+            : config?.apiKey || config?.api_key;
+    return typeof key === "string" ? key.trim() : "";
+  }, [appId, provider.settingsConfig]);
 
   const usageEnabled = provider.meta?.usage_script?.enabled ?? false;
   const isOfficial = isOfficialProvider(provider, appId);
-
-  // Load API key from shell rc for Codex providers
-  const [envKeyValue, setEnvKeyValue] = useState<string | null>(null);
-  useEffect(() => {
-    if (appId !== "codex") {
-      setEnvKeyValue(null);
-      return;
-    }
-    const envKeyName = getCodexProviderEnvKeyFromSettings(
-      provider.settingsConfig,
-    );
-    if (!envKeyName) {
-      setEnvKeyValue(null);
-      return;
-    }
-    const timer = setTimeout(() => {
-      invoke<string | null>("read_codex_env_key", { envKey: envKeyName })
-        .then((val) => setEnvKeyValue(val || null))
-        .catch(() => setEnvKeyValue(null));
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [appId, provider.id, provider.settingsConfig]);
-
+  const supportsOfficialSubscription =
+    isOfficial && ["claude", "codex", "gemini"].includes(appId);
+  const isOfficialSubscriptionUsage =
+    provider.meta?.usage_script?.templateType ===
+    TEMPLATE_TYPES.OFFICIAL_SUBSCRIPTION;
+  const officialSubscriptionEnabled =
+    supportsOfficialSubscription && usageEnabled && isOfficialSubscriptionUsage;
+  // 官方判定只认显式 category === "official"（SSOT），不回退 isOfficial 的空字段启发式。
+  // 理由（此判定曾在「纯 category ↔ category+isOfficial 回退」间反复，结论钉死于此）：
+  //  1) 封号保护是高代价决策，不该建立在「base_url/key 缺失」这种脆弱信号上——它无法区分
+  //     「想直连官方」与「自定义但还没填完」，两者都表现为字段为空，必然误伤后者。
+  //  2) 启发式在 UI 多拦的部分，执行层 useProviderActions.ts 也只认 category === "official"、
+  //     并不兑现（绕过 UI 即可切换）→ 属虚保护，却以误伤 category 缺失的自定义供应商为代价。
+  //  3) 预设导入的官方一定带 category="official"，category 缺失的「真官方」现实中≈不存在。
+  // 真官方就该有显式 category；手动新建官方应引导标注，而不是靠空字段猜。
+  const supportsOfficialRouting = supportsOfficialProxyTakeover(
+    appId,
+    provider,
+  );
   const isOfficialBlockedByProxy =
-    isProxyTakeover && (provider.category === "official" || isOfficial);
+    isProxyTakeover &&
+    provider.category === "official" &&
+    !supportsOfficialRouting;
   const isCopilot =
     provider.meta?.providerType === PROVIDER_TYPES.GITHUB_COPILOT ||
     provider.meta?.usage_script?.templateType === "github_copilot";
@@ -222,7 +277,25 @@ export function ProviderCard({
     appId === "hermes" && isHermesReadOnlyProvider(provider.settingsConfig);
   const isCodexOauth =
     provider.meta?.providerType === PROVIDER_TYPES.CODEX_OAUTH;
-
+  const codexNeedsRouting = useMemo(() => {
+    if (appId !== "codex" || provider.category === "official") return false;
+    if (
+      provider.meta?.apiFormat === "openai_chat" ||
+      provider.meta?.apiFormat === "anthropic"
+    )
+      return true;
+    const config = (provider.settingsConfig as Record<string, any>)?.config;
+    return (
+      typeof config === "string" &&
+      (isCodexChatWireApi(extractCodexWireApi(config)) ||
+        isCodexAnthropicWireApi(extractCodexWireApi(config)))
+    );
+  }, [
+    appId,
+    provider.category,
+    provider.meta?.apiFormat,
+    (provider.settingsConfig as Record<string, any>)?.config,
+  ]);
   // 获取用量数据以判断是否有多套餐
   // 累加模式应用（OpenCode/OpenClaw/Hermes）：使用 isInConfig 代替 isCurrent
   const shouldAutoQuery =
@@ -234,7 +307,7 @@ export function ProviderCard({
     : 0;
 
   const { data: usage } = useUsageQuery(provider.id, appId, {
-    enabled: usageEnabled,
+    enabled: usageEnabled && !isOfficial && !isOfficialSubscriptionUsage,
     autoQueryInterval,
   });
 
@@ -282,30 +355,6 @@ export function ProviderCard({
       !isProxyTakeover &&
       (isActiveProvider || hasPersistentConfigHighlight));
 
-  // 预设卡片未填 API key 时呈灰调（启用中的卡片不受影响）
-  const PRESET_IDS: Partial<Record<string, string[]>> = {
-    codex: ["tuzi-route", "coding", "gaccode"],
-    claude: ["tuzi-route", "gaccode"],
-    gemini: ["tuzi-route"],
-  };
-  const isPresetCard = PRESET_IDS[appId]?.includes(provider.id) ?? false;
-  const presetApiKey = isPresetCard
-    ? (() => {
-        const cfg = provider.settingsConfig as Record<string, any>;
-        return appId === "codex"
-          ? envKeyValue || cfg?.auth?.OPENAI_API_KEY
-          : appId === "claude"
-            ? cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY
-            : appId === "gemini"
-              ? cfg?.env?.GEMINI_API_KEY
-              : "";
-      })()
-    : null;
-  const isPresetMissingKey =
-    isPresetCard &&
-    !isActiveProvider &&
-    (typeof presetApiKey !== "string" || presetApiKey.trim() === "");
-
   return (
     <div
       className={cn(
@@ -321,7 +370,6 @@ export function ProviderCard({
           "hover:shadow-sm",
         dragHandleProps?.isDragging &&
           "cursor-grabbing border-primary shadow-lg scale-105 z-10",
-        isPresetMissingKey && "opacity-50 grayscale",
       )}
     >
       <div
@@ -336,7 +384,7 @@ export function ProviderCard({
         )}
       />
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             type="button"
             className={cn(
@@ -351,7 +399,7 @@ export function ProviderCard({
             <GripVertical className="h-4 w-4" />
           </button>
 
-          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center border border-border group-hover:scale-105 transition-transform duration-300">
+          <div className="h-8 w-8 flex-shrink-0 rounded-lg bg-muted flex items-center justify-center border border-border group-hover:scale-105 transition-transform duration-300">
             <ProviderIcon
               icon={provider.icon}
               name={provider.name}
@@ -360,7 +408,7 @@ export function ProviderCard({
             />
           </div>
 
-          <div className="space-y-1">
+          <div className="min-w-0 flex-1 space-y-1">
             <div className="flex flex-wrap items-center gap-2 min-h-7">
               <h3 className="text-base font-semibold leading-none">
                 {provider.name}
@@ -388,9 +436,59 @@ export function ProviderCard({
                   </span>
                 )}
 
+              {appId === "claude" &&
+                provider.category !== "official" &&
+                provider.meta?.apiFormat &&
+                provider.meta.apiFormat !== "anthropic" && (
+                  <span className="inline-flex items-center rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                    {t("claudeCode.needsRouting", {
+                      defaultValue: "需要路由",
+                    })}
+                  </span>
+                )}
+
+              {codexNeedsRouting && (
+                <span className="inline-flex items-center rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                  {t("codex.needsRouting", {
+                    defaultValue: "需要路由",
+                  })}
+                </span>
+              )}
+
+              {appId === "claude" && provider.category === "official" && (
+                <span className="inline-flex items-center rounded-md bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
+                  {t("claudeCode.noRoutingSupport", {
+                    defaultValue: "不支持路由",
+                  })}
+                </span>
+              )}
+
+              {appId === "codex" && supportsOfficialRouting && (
+                <span className="inline-flex items-center rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                  {isProxyTakeover
+                    ? t("codex.officialRouting", {
+                        defaultValue: "官方账号路由",
+                      })
+                    : t("codex.nativeLogin", {
+                        defaultValue: "Codex 登录",
+                      })}
+                </span>
+              )}
+
+              {appId === "codex" &&
+                provider.category === "official" &&
+                !supportsOfficialRouting && (
+                  <span className="inline-flex items-center rounded-md bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
+                    {t("codex.noRoutingSupport", {
+                      defaultValue: "不支持路由",
+                    })}
+                  </span>
+                )}
+
               {isProxyRunning && isInFailoverQueue && health && (
                 <ProviderHealthBadge
                   consecutiveFailures={health.consecutive_failures}
+                  isHealthy={health.is_healthy}
                 />
               )}
 
@@ -398,6 +496,18 @@ export function ProviderCard({
                 isInFailoverQueue &&
                 failoverPriority && (
                   <FailoverPriorityBadge priority={failoverPriority} />
+                )}
+
+              {provider.category === "third_party" &&
+                provider.meta?.isPartner && (
+                  <span
+                    className="text-yellow-500 dark:text-yellow-400"
+                    title={t("provider.officialPartner", {
+                      defaultValue: "官方合作伙伴",
+                    })}
+                  >
+                    ⭐
+                  </span>
                 )}
 
               {isHermesReadOnly && (
@@ -414,174 +524,57 @@ export function ProviderCard({
               )}
             </div>
 
-            {(() => {
-              const codexLinks: Record<
-                string,
-                { recharge: string; query: string }
-              > = {
-                "tuzi-route": {
-                  recharge: "https://api.tu-zi.com/console/topup",
-                  query: "https://check.sydney-ai.com/",
-                },
-                coding: {
-                  recharge: "https://store.tu-zi.com/cat/11",
-                  query: "https://api.tu-zi.com/reseller/",
-                },
-                gaccode: {
-                  recharge: "https://store.tu-zi.com/cat/1",
-                  query: "https://gaccode.com/credits",
-                },
-              };
-              const claudeLinks: Record<
-                string,
-                { recharge: string; query: string }
-              > = {
-                "tuzi-route": {
-                  recharge: "https://api.tu-zi.com/console/topup",
-                  query: "https://check.sydney-ai.com/",
-                },
-                gaccode: {
-                  recharge: "https://store.tu-zi.com/cat/1",
-                  query: "https://gaccode.com/credits",
-                },
-              };
-              const geminiLinks: Record<
-                string,
-                { recharge: string; query: string }
-              > = {
-                "tuzi-route": {
-                  recharge: "https://api.tu-zi.com/console/topup",
-                  query: "https://check.sydney-ai.com/",
-                },
-              };
-              const linkMap: Partial<
-                Record<
-                  string,
-                  Record<string, { recharge: string; query: string }>
+            <div className="flex max-w-full flex-wrap items-center gap-2 text-sm">
+              {tuziLinks?.recharge && (
+                <button
+                  type="button"
+                  className="text-blue-500 hover:underline dark:text-blue-400"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenWebsite(tuziLinks.recharge);
+                  }}
                 >
-              > = {
-                codex: codexLinks,
-                claude: claudeLinks,
-                gemini: geminiLinks,
-              };
-              let links = linkMap[appId]?.[provider.id];
-
-              if (displayUrl && displayUrl !== fallbackUrlText) {
-                try {
-                  const urlStr = displayUrl.startsWith("http")
-                    ? displayUrl
-                    : `https://${displayUrl}`;
-                  const urlObj = new URL(urlStr);
-                  const normalizedUrl =
-                    `${urlObj.origin}${urlObj.pathname}`.replace(/\/$/, "");
-
-                  if (
-                    normalizedUrl === "https://apius.tu-zi.com" ||
-                    normalizedUrl === "https://api.tu-zi.com" ||
-                    normalizedUrl === "https://api.tu-zi.com/v1"
-                  ) {
-                    links = {
-                      recharge: "https://api.tu-zi.com/console/topup",
-                      query: "https://check.sydney-ai.com/",
-                    };
-                  } else if (
-                    normalizedUrl === "https://coding.tu-zi.com" ||
-                    normalizedUrl === "https://api.tu-zi.com/coding" ||
-                    normalizedUrl === "https://coding.opentu.ai" ||
-                    normalizedUrl === "https://coding.sydney-ai.com"
-                  ) {
-                    links = {
-                      recharge: "https://store.tu-zi.com/cat/11",
-                      query: "https://api.tu-zi.com/reseller/",
-                    };
-                  }
-                } catch (e) {
-                  // ignore invalid url
-                }
-              }
-              const cfg = provider.settingsConfig as Record<string, any>;
-              const rawKey =
-                appId === "codex"
-                  ? envKeyValue || cfg?.auth?.OPENAI_API_KEY
-                  : appId === "claude"
-                    ? cfg?.env?.ANTHROPIC_AUTH_TOKEN ||
-                      cfg?.env?.ANTHROPIC_API_KEY
-                    : appId === "gemini"
-                      ? cfg?.env?.GEMINI_API_KEY
-                      : "";
-              const maskedKey =
-                typeof rawKey === "string" && rawKey.trim().length > 12
-                  ? `${rawKey.slice(0, 8)}***${rawKey.slice(-4)}`
-                  : null;
-              return (
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  {links && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenWebsite(links.recharge);
-                        }}
-                        className="text-blue-500 hover:underline dark:text-blue-400 cursor-pointer"
-                      >
-                        {t("provider.recharge", { defaultValue: "充值" })}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const key =
-                            typeof rawKey === "string" && rawKey.trim()
-                              ? rawKey.trim()
-                              : "";
-                          const useWebview =
-                            links.query === "https://check.sydney-ai.com/" ||
-                            (links.query ===
-                              "https://api.tu-zi.com/reseller/" &&
-                              key !== "");
-                          if (useWebview) {
-                            void invoke("open_webview_with_key", {
-                              url: links.query,
-                              key,
-                            });
-                          } else {
-                            onOpenWebsite(links.query);
-                          }
-                        }}
-                        className="text-blue-500 hover:underline dark:text-blue-400 cursor-pointer"
-                      >
-                        {t("provider.query", { defaultValue: "查询" })}
-                      </button>
-                    </>
+                  充值
+                </button>
+              )}
+              {tuziLinks?.query && (
+                <button
+                  type="button"
+                  className={cn(
+                    "hover:underline",
+                    providerApiKey
+                      ? "text-blue-500 dark:text-blue-400"
+                      : "text-amber-600 dark:text-amber-400",
                   )}
-                  {maskedKey ? (
-                    <span
-                      className="inline-flex max-w-[220px] items-center rounded-full border border-border/70 bg-muted/35 px-2.5 py-1 font-mono text-xs leading-none text-muted-foreground"
-                      title={maskedKey}
-                    >
-                      {maskedKey}
-                    </span>
-                  ) : null}
-                  {displayUrl && displayUrl !== fallbackUrlText ? (
-                    <button
-                      type="button"
-                      onClick={handleOpenWebsite}
-                      className={cn(
-                        "inline-flex min-w-0 max-w-[340px] items-center rounded-full border border-border/50 bg-transparent px-2.5 py-0.5 text-xs leading-5 shadow-none",
-                        isClickableUrl
-                          ? "text-muted-foreground/80 transition-colors hover:border-blue-400/45 hover:bg-blue-50/40 hover:text-blue-600 dark:hover:bg-blue-950/20 dark:hover:text-blue-300 cursor-pointer"
-                          : "text-muted-foreground cursor-default",
-                      )}
-                      title={displayUrl}
-                      disabled={!isClickableUrl}
-                    >
-                      <span className="truncate">{displayUrl}</span>
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })()}
+                  title={providerApiKey ? "携带当前 Key 查询" : "未配置 Key"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void invoke("open_webview_with_key", {
+                      url: tuziLinks.query,
+                      key: providerApiKey,
+                    });
+                  }}
+                >
+                  查询{providerApiKey ? "" : "（缺少 Key）"}
+                </button>
+              )}
+              {displayUrl && (
+                <button
+                  type="button"
+                  onClick={handleOpenWebsite}
+                  className={cn(
+                    "inline-flex max-w-full items-center overflow-hidden text-left",
+                    isClickableUrl
+                      ? "text-blue-500 transition-colors hover:underline dark:text-blue-400 cursor-pointer"
+                      : "text-muted-foreground cursor-default",
+                  )}
+                  title={displayUrl}
+                  disabled={!isClickableUrl}
+                >
+                  <span className="min-w-0 truncate">{displayUrl}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -601,11 +594,16 @@ export function ProviderCard({
                   isCurrent={isCurrent}
                 />
               ) : isOfficial ? (
-                <SubscriptionQuotaFooter
-                  appId={appId}
-                  inline={true}
-                  isCurrent={isCurrent}
-                />
+                officialSubscriptionEnabled ? (
+                  <SubscriptionQuotaFooter
+                    appId={appId}
+                    inline={true}
+                    isCurrent={isCurrent}
+                    autoQueryInterval={
+                      provider.meta?.usage_script?.autoQueryInterval ?? 0
+                    }
+                  />
+                ) : null
               ) : hasMultiplePlans ? (
                 <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                   <span className="font-medium">
@@ -663,12 +661,19 @@ export function ProviderCard({
               onEdit={() => onEdit(provider)}
               onDuplicate={() => onDuplicate(provider)}
               onTest={
-                onTest && !isOfficial && !isCopilot && !isCodexOauth
+                // 连通检测对第三方/自定义/Copilot/Codex-OAuth 供应商开放（这些正是旧的
+                // 真实请求探测会误报、而可达性探测能正确处理的对象）。官方供应商
+                // (category === "official") 一律隐藏：它们 base_url 故意留空、走客户端
+                // 默认/OAuth 端点，cc-switch 没有可靠的探测目标（尤其 Claude Desktop
+                // 官方是原生 1P 模式，根本不在请求路径上）。
+                onTest && provider.category !== "official"
                   ? () => onTest(provider)
                   : undefined
               }
               onConfigureUsage={
-                isOfficial || isCopilot || isCodexOauth
+                (isOfficial && !supportsOfficialSubscription) ||
+                isCopilot ||
+                isCodexOauth
                   ? undefined
                   : () => onConfigureUsage(provider)
               }

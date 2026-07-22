@@ -5,8 +5,7 @@ import type { ProviderPreset } from "@/config/claudeProviderPresets";
 import type { CodexProviderPreset } from "@/config/codexProviderPresets";
 import type { GeminiProviderPreset } from "@/config/geminiProviderPresets";
 import type { OpenCodeProviderPreset } from "@/config/opencodeProviderPresets";
-import type { OpenClawProviderPreset } from "@/config/openclawProviderPresets";
-import type { HermesProviderPreset } from "@/config/hermesProviderPresets";
+import type { ClaudeDesktopProviderPreset } from "@/config/claudeDesktopProviderPresets";
 
 type PresetEntry = {
   id: string;
@@ -15,8 +14,7 @@ type PresetEntry = {
     | CodexProviderPreset
     | GeminiProviderPreset
     | OpenCodeProviderPreset
-    | OpenClawProviderPreset
-    | HermesProviderPreset;
+    | ClaudeDesktopProviderPreset;
 };
 
 interface UseApiKeyLinkProps {
@@ -25,7 +23,6 @@ interface UseApiKeyLinkProps {
   selectedPresetId: string | null;
   presetEntries: PresetEntry[];
   formWebsiteUrl: string;
-  providerId?: string;
 }
 
 /**
@@ -37,7 +34,6 @@ export function useApiKeyLink({
   selectedPresetId,
   presetEntries,
   formWebsiteUrl,
-  providerId,
 }: UseApiKeyLinkProps) {
   // 判断是否显示 API Key 获取链接
   const shouldShowApiKeyLink = useMemo(() => {
@@ -71,31 +67,22 @@ export function useApiKeyLink({
       }
       return preset.websiteUrl || "";
     }
-    // 编辑模式下 selectedPresetId 为 null
-    // 优先按 providerId 精确匹配预设的 apiKeyUrl
-    if (!formWebsiteUrl && providerId) {
-      const matchedPreset = presetEntries.find(
-        (entry) => entry.id === providerId && (entry.preset as any).apiKeyUrl,
-      );
-      if (matchedPreset) {
-        return (matchedPreset.preset as any).apiKeyUrl || "";
-      }
-    }
-    // 再按 category 模糊匹配
-    if (!formWebsiteUrl && category) {
-      const matchedPreset = presetEntries.find(
-        (entry) => entry.preset.category === category && (entry.preset as any).apiKeyUrl,
-      );
-      if (matchedPreset) {
-        return (matchedPreset.preset as any).apiKeyUrl || "";
-      }
-    }
     return formWebsiteUrl || "";
-  }, [currentPresetEntry, formWebsiteUrl, category, presetEntries, providerId]);
+  }, [currentPresetEntry, formWebsiteUrl]);
+
+  // 提取合作伙伴信息
+  const isPartner = useMemo(() => {
+    return currentPresetEntry?.preset.isPartner ?? false;
+  }, [currentPresetEntry]);
+
+  const partnerPromotionKey = useMemo(() => {
+    return currentPresetEntry?.preset.partnerPromotionKey;
+  }, [currentPresetEntry]);
 
   return {
     shouldShowApiKeyLink:
       appId === "claude" ||
+      appId === "claude-desktop" ||
       appId === "codex" ||
       appId === "gemini" ||
       appId === "opencode" ||
@@ -104,5 +91,7 @@ export function useApiKeyLink({
         ? shouldShowApiKeyLink
         : false,
     websiteUrl: getWebsiteUrl,
+    isPartner,
+    partnerPromotionKey,
   };
 }

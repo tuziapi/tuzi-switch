@@ -1,72 +1,69 @@
 import { describe, expect, it } from "vitest";
+import { providerPresets } from "@/config/claudeProviderPresets";
 import { codexProviderPresets } from "@/config/codexProviderPresets";
 import { geminiProviderPresets } from "@/config/geminiProviderPresets";
 
-describe("Provider presets", () => {
-  it("provides the requested Codex presets with OpenAI-compatible endpoints", () => {
-    expect(codexProviderPresets.map((item) => item.name)).toEqual([
-      "兔子线路",
-      "coding",
-      "gaccode",
-    ]);
-
-    const expectedPresets = [
-      {
-        name: "兔子线路",
-        provider: "tuzi_route",
-        baseUrl: "https://api.tu-zi.com",
-        model: "gpt-5.5",
-      },
-      {
-        name: "coding",
-        provider: "coding",
-        baseUrl: "https://api.tu-zi.com/coding",
-        model: "gpt-5.5",
-      },
-      {
-        name: "gaccode",
-        provider: "gaccode",
-        baseUrl: "https://gaccode.com/codex/v1",
-        model: "gpt-5.5",
-      },
-    ];
-
-    expectedPresets.forEach(({ name, provider, baseUrl, model }) => {
-      const preset = codexProviderPresets.find((item) => item.name === name);
-
-      expect(preset).toBeDefined();
-      expect(preset?.websiteUrl).toBe("");
-      expect(preset?.apiKeyUrl).toBe(
-        name === "兔子线路"
-          ? "https://api.tu-zi.com"
-          : name === "coding"
-            ? "https://store.tu-zi.com/cat/11"
-            : "https://store.tu-zi.com/cat/1",
-      );
-      expect(preset?.category).toBe("aggregator");
-      expect(preset?.endpointCandidates).toEqual([baseUrl]);
-      expect(preset?.auth).toEqual({ OPENAI_API_KEY: "" });
-      expect(preset?.config).toContain(`model_provider = "${provider}"`);
-      expect(preset?.config).toContain(`model = "${model}"`);
-      expect(preset?.config).toContain(`base_url = "${baseUrl}"`);
-      expect(preset?.config).toContain('wire_api = "responses"');
-      expect(preset?.config).toContain("disable_response_storage = true");
-    });
-  });
-
-  it("uses the requested Gemini rabbit route preset", () => {
-    const preset = geminiProviderPresets.find((item) => item.name === "兔子线路");
+describe("TheRouter provider presets", () => {
+  it("uses the Anthropic-compatible root endpoint for Claude", () => {
+    const preset = providerPresets.find((item) => item.name === "TheRouter");
 
     expect(preset).toBeDefined();
-    expect(preset?.websiteUrl).toBe("");
-    expect(preset?.apiKeyUrl).toBe("https://api.tu-zi.com");
+    expect(preset?.websiteUrl).toBe("https://therouter.ai");
+    expect(preset?.apiKeyUrl).toBe("https://dashboard.therouter.ai");
     expect(preset?.category).toBe("aggregator");
-    expect(preset?.endpointCandidates).toEqual(["https://api.tu-zi.com"]);
-    expect(preset?.baseURL).toBe("https://api.tu-zi.com");
-    expect(preset?.model).toBe("gemini-3.1-pro");
+    expect(preset?.endpointCandidates).toEqual(["https://api.therouter.ai"]);
 
     const env = (preset?.settingsConfig as { env: Record<string, string> }).env;
-    expect(env.GOOGLE_GEMINI_BASE_URL).toBe("https://api.tu-zi.com");
-    expect(env.GEMINI_MODEL).toBe("gemini-3.1-pro");
+    expect(env.ANTHROPIC_BASE_URL).toBe("https://api.therouter.ai");
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("");
+    expect(env.ANTHROPIC_API_KEY).toBe("");
+    expect(env.ANTHROPIC_MODEL).toBe("anthropic/claude-sonnet-5");
+    expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe(
+      "anthropic/claude-haiku-4.5",
+    );
+    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe(
+      "anthropic/claude-sonnet-5",
+    );
+    expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe("anthropic/claude-opus-4.8");
+  });
+
+  it("uses the OpenAI-compatible v1 endpoint for Codex", () => {
+    const preset = codexProviderPresets.find(
+      (item) => item.name === "TheRouter",
+    );
+
+    expect(preset).toBeDefined();
+    expect(preset?.websiteUrl).toBe("https://therouter.ai");
+    expect(preset?.apiKeyUrl).toBe("https://dashboard.therouter.ai");
+    expect(preset?.category).toBe("aggregator");
+    expect(preset?.endpointCandidates).toEqual(["https://api.therouter.ai/v1"]);
+    expect(preset?.auth).toEqual({ OPENAI_API_KEY: "" });
+    expect(preset?.config).toContain('model_provider = "custom"');
+    expect(preset?.config).toContain("[model_providers.custom]");
+    expect(preset?.config).toContain('name = "therouter"');
+    expect(preset?.config).toContain('model = "openai/gpt-5.3-codex"');
+    expect(preset?.config).not.toContain("goals = true");
+    expect(preset?.config).toContain(
+      'base_url = "https://api.therouter.ai/v1"',
+    );
+    expect(preset?.config).toContain('wire_api = "responses"');
+  });
+
+  it("uses the Gemini-native root endpoint for Gemini", () => {
+    const preset = geminiProviderPresets.find(
+      (item) => item.name === "TheRouter",
+    );
+
+    expect(preset).toBeDefined();
+    expect(preset?.websiteUrl).toBe("https://therouter.ai");
+    expect(preset?.apiKeyUrl).toBe("https://dashboard.therouter.ai");
+    expect(preset?.category).toBe("aggregator");
+    expect(preset?.endpointCandidates).toEqual(["https://api.therouter.ai"]);
+    expect(preset?.baseURL).toBe("https://api.therouter.ai");
+    expect(preset?.model).toBe("gemini-3.5-flash");
+
+    const env = (preset?.settingsConfig as { env: Record<string, string> }).env;
+    expect(env.GOOGLE_GEMINI_BASE_URL).toBe("https://api.therouter.ai");
+    expect(env.GEMINI_MODEL).toBe("gemini-3.5-flash");
   });
 });

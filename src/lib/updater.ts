@@ -1,51 +1,15 @@
 import { getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
-
-// 可选导入：在未注册插件或非 Tauri 环境下，调用时会抛错，外层需做兜底
-// 我们按需加载并在运行时捕获错误，避免构建期类型问题
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import type { Update } from "@tauri-apps/plugin-updater";
+import { compareVersions } from "./version";
 
 export type UpdateChannel = "stable" | "beta";
-
-export type UpdaterPhase =
-  | "idle"
-  | "checking"
-  | "available"
-  | "downloading"
-  | "installing"
-  | "restarting"
-  | "upToDate"
-  | "error";
 
 export interface UpdateInfo {
   currentVersion: string;
   availableVersion: string;
   notes?: string;
   pubDate?: string;
-}
-
-export interface UpdateProgressEvent {
-  event: "Started" | "Progress" | "Finished";
-  total?: number;
-  downloaded?: number;
-}
-
-export interface UpdateHandle {
-  version: string;
-  notes?: string;
-  date?: string;
+  /** 原生更新清单不可用时，仅提示用户前往 Release 页手动安装。 */
   manual?: boolean;
-  downloadAndInstall: (
-    onProgress?: (e: UpdateProgressEvent) => void,
-  ) => Promise<void>;
-  download?: () => Promise<void>;
-  install?: () => Promise<void>;
-}
-
-export interface CheckOptions {
-  timeout?: number;
-  channel?: UpdateChannel;
 }
 
 interface GitHubRelease {
@@ -53,10 +17,8 @@ interface GitHubRelease {
   name?: string;
   body?: string;
   published_at?: string;
-  html_url?: string;
 }
 
-const RELEASES_URL = "https://github.com/tuziapi/tuzi-switch/releases";
 const GITHUB_LATEST_RELEASE_API =
   "https://api.github.com/repos/tuziapi/tuzi-switch/releases/latest";
 
@@ -65,128 +27,59 @@ function withTimeout<T>(
   timeout: number,
   message: string,
 ): Promise<T> {
-  let timer: number | undefined;
+  let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
   const timeoutPromise = new Promise<T>((_, reject) => {
-    timer = window.setTimeout(() => reject(new Error(message)), timeout);
+    timer = globalThis.setTimeout(() => reject(new Error(message)), timeout);
   });
-
   return Promise.race([promise, timeoutPromise]).finally(() => {
-    if (timer !== undefined) {
-      window.clearTimeout(timer);
-    }
+    if (timer !== undefined) globalThis.clearTimeout(timer);
   });
-}
-
-function mapUpdateHandle(raw: Update): UpdateHandle {
-  return {
-    version: raw.version ?? "",
-    notes: raw.body,
-    date: raw.date,
-    async downloadAndInstall(onProgress?: (e: UpdateProgressEvent) => void) {
-      await raw.downloadAndInstall((evt) => {
-        if (!onProgress) return;
-        const mapped: UpdateProgressEvent = {
-          event: evt.event,
-        };
-        if (evt.event === "Started") {
-          mapped.total = evt.data.contentLength ?? 0;
-          mapped.downloaded = 0;
-        } else if (evt.event === "Progress") {
-          mapped.downloaded = evt.data.chunkLength;
-        }
-        onProgress(mapped);
-      });
-    },
-    download: async () => {
-      await raw.download();
-    },
-    install: async () => {
-      await raw.install();
-    },
-  };
-}
-
-function parseVersionParts(version: string): [number, number, number] {
-  const core = version.replace(/^v/i, "").split("-")[0] ?? "";
-  const [major, minor, patch] = core.split(".");
-  return [
-    Number.parseInt(major ?? "0", 10) || 0,
-    Number.parseInt(minor ?? "0", 10) || 0,
-    Number.parseInt(patch ?? "0", 10) || 0,
-  ];
-}
-
-function compareVersions(a: string, b: string): number {
-  const left = parseVersionParts(a);
-  const right = parseVersionParts(b);
-  for (let i = 0; i < left.length; i += 1) {
-    if (left[i] !== right[i]) return left[i] > right[i] ? 1 : -1;
-  }
-  return 0;
-}
-
-async function openReleasePage(version?: string): Promise<void> {
-  const tag = version
-    ? version.startsWith("v")
-      ? version
-      : `v${version}`
-    : "";
-  const url = tag ? `${RELEASES_URL}/tag/${tag}` : RELEASES_URL;
-  await invoke("open_external", { url });
 }
 
 async function checkGitHubReleaseFallback(
   currentVersion: string,
   timeout: number,
 ): Promise<
-  | { status: "up-to-date" }
-  | { status: "available"; info: UpdateInfo; update: UpdateHandle }
+  { status: "up-to-date" } | { status: "available"; info: UpdateInfo }
 > {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeout);
+  const timer = globalThis.setTimeout(() => controller.abort(), timeout);
   try {
     const response = await fetch(GITHUB_LATEST_RELEASE_API, {
       signal: controller.signal,
-      headers: {
-        Accept: "application/vnd.github+json",
-      },
+      headers: { Accept: "application/vnd.github+json" },
     });
     if (!response.ok) {
-      throw new Error(`GitHub release metadata unavailable: ${response.status}`);
+      throw new Error(`GitHub Release API 返回 ${response.status}`);
     }
 
     const release = (await response.json()) as GitHubRelease;
     const availableVersion = release.tag_name?.replace(/^v/i, "") ?? "";
-    if (!availableVersion || compareVersions(availableVersion, currentVersion) <= 0) {
+    if (
+      !availableVersion ||
+      compareVersions(availableVersion, currentVersion) <= 0
+    ) {
       return { status: "up-to-date" };
     }
 
-    const info: UpdateInfo = {
-      currentVersion,
-      availableVersion,
-      notes: release.body ?? release.name,
-      pubDate: release.published_at,
-    };
-    const update: UpdateHandle = {
-      version: availableVersion,
-      notes: info.notes,
-      date: info.pubDate,
-      manual: true,
-      async downloadAndInstall() {
-        await openReleasePage(availableVersion);
-      },
-      download: async () => {
-        await openReleasePage(availableVersion);
-      },
-      install: async () => {
-        await openReleasePage(availableVersion);
+    return {
+      status: "available",
+      info: {
+        currentVersion,
+        availableVersion,
+        notes: release.body ?? release.name,
+        pubDate: release.published_at,
+        manual: true,
       },
     };
-
-    return { status: "available", info, update };
   } finally {
-    window.clearTimeout(timer);
+    globalThis.clearTimeout(timer);
   }
+}
+
+export interface CheckOptions {
+  timeout?: number;
+  channel?: UpdateChannel;
 }
 
 export async function getCurrentVersion(): Promise<string> {
@@ -200,47 +93,60 @@ export async function getCurrentVersion(): Promise<string> {
 export async function checkForUpdate(
   opts: CheckOptions = {},
 ): Promise<
-  | { status: "up-to-date" }
-  | { status: "available"; info: UpdateInfo; update: UpdateHandle }
+  { status: "up-to-date" } | { status: "available"; info: UpdateInfo }
 > {
+  // 动态引入，避免在未安装插件时导致打包期问题
+  const { check } = await import("@tauri-apps/plugin-updater");
+
   const timeout = opts.timeout ?? 30000;
   const currentVersion = await withTimeout(
     getCurrentVersion(),
     timeout,
-    "Get current app version timed out",
+    "读取当前版本超时",
   ).catch(() => "");
-
-  let update: Update | null;
+  const canCompareReleaseVersion = currentVersion.length > 0;
+  let update;
+  let nativeError: unknown = null;
   try {
-    const { check } = await import("@tauri-apps/plugin-updater");
     update = await withTimeout(
       check({ timeout } as any),
       timeout,
-      "Tauri updater check timed out",
+      "原生更新检查超时",
     );
   } catch (error) {
-    console.warn("Tauri updater check failed, falling back to GitHub release", error);
-    return await checkGitHubReleaseFallback(currentVersion, timeout);
+    nativeError = error;
+    console.warn(
+      "Tauri updater 检查失败，改用 GitHub Release API 发现版本",
+      error,
+    );
   }
-  if (!update) {
-    return await checkGitHubReleaseFallback(currentVersion, timeout);
+
+  if (update) {
+    const info: UpdateInfo = {
+      currentVersion,
+      availableVersion: (update as any).version ?? "",
+      notes: (update as any).body ?? (update as any).notes,
+      pubDate: (update as any).date,
+    };
+
+    return { status: "available", info };
   }
 
-  const mapped = mapUpdateHandle(update);
-  const info: UpdateInfo = {
-    currentVersion,
-    availableVersion: mapped.version,
-    notes: mapped.notes,
-    pubDate: mapped.date,
-  };
+  if (!canCompareReleaseVersion) {
+    if (nativeError) throw nativeError;
+    return { status: "up-to-date" };
+  }
 
-  return { status: "available", info, update: mapped };
+  try {
+    return await checkGitHubReleaseFallback(currentVersion, timeout);
+  } catch (fallbackError) {
+    if (nativeError) {
+      throw new Error(
+        `原生更新清单与 GitHub Release API 均不可用：${String(nativeError)}；${String(fallbackError)}`,
+      );
+    }
+    // 原生更新器已成功确认没有更新；GitHub API 只作为补充发现通道。
+    console.warn("GitHub Release API 兜底检查失败", fallbackError);
+    return { status: "up-to-date" };
+  }
 }
-
-export async function relaunchApp(): Promise<void> {
-  const { relaunch } = await import("@tauri-apps/plugin-process");
-  await relaunch();
-}
-
-// 旧的聚合更新流程已由调用方直接使用 updateHandle 取代
-// 如需单函数封装，可在需要时基于 checkForUpdate + updateHandle 复合调用

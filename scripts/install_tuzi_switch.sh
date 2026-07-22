@@ -16,16 +16,15 @@ ARCH="$(uname -m)"
 case "$OS" in
   Darwin)
     case "$ARCH" in
-      arm64|aarch64) FILE="tuzi-switch-macos-aarch64.dmg" ;;
-      x86_64)        echo "macOS x86_64 installer is not published yet." >&2; exit 1 ;;
-      *)             echo "Unsupported macOS arch: $ARCH" >&2; exit 1 ;;
+      arm64|aarch64|x86_64) FILE="tuzi-switch-macos-universal.dmg" ;;
+      *) echo "Unsupported macOS arch: $ARCH" >&2; exit 1 ;;
     esac
     ;;
   Linux)
     case "$ARCH" in
-      x86_64|amd64)  FILE="tuzi-switch-linux-x86_64.AppImage" ;;
-      aarch64|arm64) echo "Linux aarch64 installer is not published yet." >&2; exit 1 ;;
-      *)             echo "Unsupported Linux arch: $ARCH" >&2; exit 1 ;;
+      x86_64|amd64) FILE="tuzi-switch-linux-x86_64.AppImage" ;;
+      aarch64|arm64) FILE="tuzi-switch-linux-aarch64.AppImage" ;;
+      *) echo "Unsupported Linux arch: $ARCH" >&2; exit 1 ;;
     esac
     ;;
   *)
@@ -51,7 +50,7 @@ case "$(echo "$FILE" | tr '[:upper:]' '[:lower:]')" in
   *.dmg)
     MOUNT_DIR="$(mktemp -d)"
     hdiutil attach "$TMP_DIR/$FILE" -mountpoint "$MOUNT_DIR" -nobrowse -quiet
-    app_path="$(find "$MOUNT_DIR" -name '*.app' -maxdepth 1 | head -n 1)"
+    app_path="$(find "$MOUNT_DIR" -maxdepth 1 -name '*.app' | head -n 1)"
     if [[ -z "${app_path:-}" ]]; then
       hdiutil detach "$MOUNT_DIR" -quiet || true
       echo "No .app found in DMG" >&2

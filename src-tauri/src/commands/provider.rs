@@ -15,6 +15,7 @@ use std::str::FromStr;
 const TEMPLATE_TYPE_GITHUB_COPILOT: &str = "github_copilot";
 const TEMPLATE_TYPE_TOKEN_PLAN: &str = "token_plan";
 const TEMPLATE_TYPE_BALANCE: &str = "balance";
+const TEMPLATE_TYPE_OFFICIAL_SUBSCRIPTION: &str = "official_subscription";
 const COPILOT_UNIT_PREMIUM: &str = "requests";
 
 /// 获取所有供应商
@@ -184,16 +185,6 @@ pub fn import_claude_desktop_providers_from_claude(
             continue;
         }
 
-        if matches!(
-            provider
-                .meta
-                .as_ref()
-                .and_then(|meta| meta.provider_type.as_deref()),
-            Some("github_copilot") | Some("codex_oauth")
-        ) {
-            continue;
-        }
-
         let mut desktop_provider = provider.clone();
         desktop_provider.in_failover_queue = false;
         let meta = desktop_provider.meta.get_or_insert_with(Default::default);
@@ -216,7 +207,36 @@ pub fn import_claude_desktop_providers_from_claude(
         imported += 1;
     }
 
+    // Safety net: 用户可能手动删除过 claude-desktop-official seed。
+    // 用户主动点 import 是"重新整理 ClaudeDesktop 表"的隐式信号，把官方入口补回来。
+    // 失败只 warn，不影响 imported 主流程；imported 计数语义保持纯净。
+    if let Err(e) = state.db.ensure_official_seed_by_id(
+        crate::database::CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID,
+        AppType::ClaudeDesktop,
+    ) {
+        log::warn!("Failed to ensure claude-desktop-official seed during import: {e}");
+    }
+
     Ok(imported)
+}
+
+#[tauri::command]
+pub fn ensure_claude_desktop_official_provider(state: State<'_, AppState>) -> Result<bool, String> {
+    state
+        .db
+        .ensure_official_seed_by_id(
+            crate::database::CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID,
+            AppType::ClaudeDesktop,
+        )
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn ensure_codex_official_provider(state: State<'_, AppState>) -> Result<bool, String> {
+    state
+        .db
+        .ensure_official_seed_by_id(crate::database::CODEX_OFFICIAL_PROVIDER_ID, AppType::Codex)
+        .map_err(|e| e.to_string())
 }
 
 fn claude_provider_models_are_claude_safe(provider: &Provider) -> bool {
@@ -241,7 +261,7 @@ fn claude_provider_models_are_claude_safe(provider: &Provider) -> bool {
     .all(crate::claude_desktop_config::is_claude_safe_model_id)
 }
 
-fn suggested_claude_desktop_routes(
+pub(crate) fn suggested_claude_desktop_routes(
     provider: &Provider,
 ) -> Option<std::collections::HashMap<String, crate::provider::ClaudeDesktopModelRoute>> {
     let env = provider
@@ -249,29 +269,88 @@ fn suggested_claude_desktop_routes(
         .get("env")
         .and_then(|value| value.as_object())?;
     let mut routes = std::collections::HashMap::new();
+    let supports_1m_default = !matches!(
+        provider
+            .meta
+            .as_ref()
+            .and_then(|meta| meta.provider_type.as_deref()),
+        Some("github_copilot") | Some("codex_oauth")
+    );
 
     fn add_route(
         routes: &mut std::collections::HashMap<String, crate::provider::ClaudeDesktopModelRoute>,
         env: &serde_json::Map<String, serde_json::Value>,
-        route_id: &str,
+        route_key: &str,
         env_key: &str,
-        display_name: &str,
+        supports_1m_default: bool,
     ) {
-        if let Some(model) = env
+        let Some(raw_model) = env
             .get(env_key)
             .and_then(|value| value.as_str())
             .map(str::trim)
             .filter(|value| !value.is_empty())
-        {
-            routes.insert(
-                route_id.to_string(),
-                crate::provider::ClaudeDesktopModelRoute {
-                    model: model.to_string(),
-                    display_name: Some(display_name.to_string()),
-                    supports_1m: Some(true),
-                },
-            );
+        else {
+            return;
+        };
+
+        // Claude 端 env 值可能带 [1M] 后缀；Claude Desktop schema 不接受后缀，
+        // 改用 supports1m 字段表达 1M 能力。在 import 边界做单向翻译。
+        let marker = crate::claude_desktop_config::ONE_M_CONTEXT_MARKER.as_bytes();
+        let raw_bytes = raw_model.as_bytes();
+        let has_1m_marker = raw_bytes.len() >= marker.len()
+            && raw_bytes[raw_bytes.len() - marker.len()..].eq_ignore_ascii_case(marker);
+        let stripped_model: &str = if has_1m_marker {
+            raw_model[..raw_model.len() - marker.len()].trim_end()
+        } else {
+            raw_model
+        };
+        if stripped_model.is_empty() {
+            return;
         }
+        let effective_supports_1m = supports_1m_default || has_1m_marker;
+        let explicit_label_override = env
+            .get(&format!("{env_key}_NAME"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let label_override = explicit_label_override.clone().or_else(|| {
+            (!crate::claude_desktop_config::is_claude_safe_model_id(stripped_model))
+                .then(|| stripped_model.to_string())
+        });
+
+        // 何时覆盖既有 label_override：原本为空 / 这次来的是 explicit _NAME /
+        // 既有值只是 stripped_model 派生的占位（被 explicit 或更具体的值挤掉）。
+        let should_overwrite = |existing: Option<&str>| {
+            existing.is_none()
+                || explicit_label_override.is_some()
+                || existing == Some(stripped_model)
+        };
+
+        let merge_into = |existing: &mut crate::provider::ClaudeDesktopModelRoute| {
+            let merged = existing.supports_1m.unwrap_or(false) || effective_supports_1m;
+            existing.supports_1m = Some(merged);
+            if should_overwrite(existing.label_override.as_deref()) {
+                existing.label_override = label_override.clone();
+            }
+        };
+
+        if let Some(existing) = routes
+            .values_mut()
+            .find(|existing| existing.model == stripped_model)
+        {
+            merge_into(existing);
+            return;
+        }
+
+        routes
+            .entry(route_key.to_string())
+            .and_modify(merge_into)
+            .or_insert_with(|| crate::provider::ClaudeDesktopModelRoute {
+                model: stripped_model.to_string(),
+                label_override,
+                supports_1m: Some(effective_supports_1m),
+            });
     }
 
     for spec in crate::claude_desktop_config::DEFAULT_PROXY_ROUTES {
@@ -280,18 +359,19 @@ fn suggested_claude_desktop_routes(
             env,
             spec.route_id,
             spec.env_key,
-            spec.display_name,
+            supports_1m_default,
         );
     }
 
-    let primary_route = crate::claude_desktop_config::DEFAULT_PROXY_ROUTES[0];
-    if !routes.contains_key(primary_route.route_id) {
+    // 三个 default env_key 全空时用 ANTHROPIC_MODEL 派生兜底路由。
+    if routes.is_empty() {
+        let primary_route = crate::claude_desktop_config::DEFAULT_PROXY_ROUTES[0].route_id;
         add_route(
             &mut routes,
             env,
-            primary_route.route_id,
+            primary_route,
             "ANTHROPIC_MODEL",
-            primary_route.display_name,
+            supports_1m_default,
         );
     }
 
@@ -309,33 +389,75 @@ pub async fn queryProviderUsage(
 ) -> Result<crate::provider::UsageResult, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
     // inner 可能以两种形式失败：
-    //   1) 返回 Ok(UsageResult { success: false, .. }) —— 业务失败（401、脚本报错等）
-    //   2) 返回 Err(String) —— RPC/DB/Copilot fetch_usage 等 transport 层失败
-    // 两种都要把"失败"写进 UsageCache 并刷新托盘，让 format_script_summary 的
-    // success 守卫生效、suffix 自然消失，避免旧 success 快照长期滞留。
-    // 同时保持原始 Err 返回给前端 React Query 的 onError 回调，不吞错误。
+    //   1) 返回 Ok(UsageResult { success: false, .. }) —— 确定性失败（401、脚本
+    //      报错、未知供应商等）。写进 UsageCache 并刷新托盘，让
+    //      format_script_summary 的 success 守卫生效、suffix 自然消失。
+    //   2) 返回 Err(String) —— 瞬时传输失败（网络/超时）及 DB/Copilot fetch 等。
+    //      不写失败快照、不 emit：保留上一份托盘快照，与前端 react-query reject
+    //      保留上次 data 的语义一致；否则失败快照会经 useUsageCacheBridge 盲写
+    //      回 query 缓存，抹掉 reject 本该保留的旧值。
     let inner =
         query_provider_usage_inner(&state, &copilot_state, app_type.clone(), &providerId).await;
-    let snapshot = match &inner {
-        Ok(r) => r.clone(),
-        Err(err_msg) => crate::provider::UsageResult {
-            success: false,
-            data: None,
-            error: Some(err_msg.clone()),
-        },
-    };
-    let payload = serde_json::json!({
-        "kind": "script",
-        "appType": app_type.as_str(),
-        "providerId": &providerId,
-        "data": &snapshot,
-    });
-    if let Err(e) = app_handle.emit("usage-cache-updated", payload) {
-        log::error!("emit usage-cache-updated (script) 失败: {e}");
+    if let Ok(snapshot) = &inner {
+        let payload = serde_json::json!({
+            "kind": "script",
+            "appType": app_type.as_str(),
+            "providerId": &providerId,
+            "data": snapshot,
+        });
+        if let Err(e) = app_handle.emit("usage-cache-updated", payload) {
+            log::error!("emit usage-cache-updated (script) 失败: {e}");
+        }
+        state
+            .usage_cache
+            .put_script(app_type, providerId, snapshot.clone());
+        crate::tray::schedule_tray_refresh(&app_handle);
     }
-    state.usage_cache.put_script(app_type, providerId, snapshot);
-    crate::tray::schedule_tray_refresh(&app_handle);
     inner
+}
+
+/// Resolve `(base_url, api_key)` for native usage queries, delegating to the
+/// per-app resolver on `Provider`. Missing provider → empty credentials.
+fn resolve_native_credentials(app_type: &AppType, provider: Option<&Provider>) -> (String, String) {
+    provider
+        .map(|p| p.resolve_usage_credentials(app_type))
+        .unwrap_or_default()
+}
+
+fn resolve_coding_plan_credentials(
+    app_type: &AppType,
+    provider: Option<&Provider>,
+    usage_script: Option<&crate::provider::UsageScript>,
+) -> (String, String) {
+    let is_zenmux = usage_script
+        .and_then(|s| s.coding_plan_provider.as_deref())
+        .map(|provider| provider.eq_ignore_ascii_case("zenmux"))
+        .unwrap_or(false);
+
+    if !is_zenmux {
+        return resolve_native_credentials(app_type, provider);
+    }
+
+    let script_base_url = usage_script
+        .and_then(|s| s.base_url.as_deref())
+        .unwrap_or("")
+        .trim_end_matches('/')
+        .to_string();
+    let script_api_key = usage_script
+        .and_then(|s| s.api_key.as_deref())
+        .unwrap_or("")
+        .to_string();
+
+    if !script_base_url.is_empty() && !script_api_key.is_empty() {
+        return (script_base_url, script_api_key);
+    }
+
+    let native = resolve_native_credentials(app_type, provider);
+    if !native.0.is_empty() && !native.1.is_empty() {
+        native
+    } else {
+        (script_base_url, script_api_key)
+    }
 }
 
 async fn query_provider_usage_inner(
@@ -395,27 +517,30 @@ async fn query_provider_usage_inner(
 
     // ── Coding Plan 专用路径 ──
     if template_type == TEMPLATE_TYPE_TOKEN_PLAN {
-        // 从供应商配置中提取 API Key 和 Base URL
-        let settings_config = provider
-            .map(|p| &p.settings_config)
-            .cloned()
-            .unwrap_or_default();
-        let env = settings_config.get("env");
-        let base_url = env
-            .and_then(|e| e.get("ANTHROPIC_BASE_URL"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let api_key = env
-            .and_then(|e| {
-                e.get("ANTHROPIC_AUTH_TOKEN")
-                    .or_else(|| e.get("ANTHROPIC_API_KEY"))
-            })
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let (base_url, api_key) =
+            resolve_coding_plan_credentials(&app_type, provider, usage_script);
 
-        let quota = crate::services::coding_plan::get_coding_plan_quota(base_url, api_key)
-            .await
-            .map_err(|e| format!("Failed to query coding plan: {e}"))?;
+        // 火山方舟用账号 AK/SK 签名查询用量（存于 usage_script，与推理 api_key 分离）；
+        // 其他供应商为 None，service 层沿用 api_key。
+        let access_key_id = usage_script.and_then(|s| s.access_key_id.clone());
+        let secret_access_key = usage_script.and_then(|s| s.secret_access_key.clone());
+        // 智谱团队版：显式 provider 标识 + 组织/项目 ID（与个人版智谱 base_url 相同，
+        // 靠 coding_plan_provider == "zhipu_team" 在 service 层路由）。
+        let coding_plan_provider = usage_script.and_then(|s| s.coding_plan_provider.clone());
+        let team_organization_id = usage_script.and_then(|s| s.team_organization_id.clone());
+        let team_project_id = usage_script.and_then(|s| s.team_project_id.clone());
+
+        let quota = crate::services::coding_plan::get_coding_plan_quota(
+            &base_url,
+            &api_key,
+            access_key_id.as_deref(),
+            secret_access_key.as_deref(),
+            coding_plan_provider.as_deref(),
+            team_organization_id.as_deref(),
+            team_project_id.as_deref(),
+        )
+        .await
+        .map_err(|e| format!("Failed to query coding plan: {e}"))?;
 
         // 将 SubscriptionQuota 转换为 UsageResult
         if !quota.success {
@@ -426,6 +551,19 @@ async fn query_provider_usage_inner(
             });
         }
 
+        // ZenMux 的 tier 携带 USD 额度信息，需要编码为 JSON extra
+        let has_usd = quota
+            .tiers
+            .first()
+            .map(|t| t.used_value_usd.is_some())
+            .unwrap_or(false);
+        let plan_label = quota
+            .credential_message
+            .as_deref()
+            .and_then(|msg| msg.split(' ').next())
+            .map(|tier| format!("ZenMux·{}", tier.to_uppercase()));
+        let mut first_tier = true;
+
         let data: Vec<crate::provider::UsageData> = quota
             .tiers
             .iter()
@@ -433,6 +571,26 @@ async fn query_provider_usage_inner(
                 let total = 100.0;
                 let used = tier.utilization;
                 let remaining = total - used;
+                let extra = if has_usd {
+                    let mut extra_json = serde_json::json!({
+                        "resetsAt": tier.resets_at,
+                    });
+                    if let Some(v) = tier.used_value_usd {
+                        extra_json["usedValueUsd"] = serde_json::json!(v);
+                    }
+                    if let Some(v) = tier.max_value_usd {
+                        extra_json["maxValueUsd"] = serde_json::json!(v);
+                    }
+                    if first_tier {
+                        if let Some(ref label) = plan_label {
+                            extra_json["planLabel"] = serde_json::json!(label);
+                        }
+                        first_tier = false;
+                    }
+                    Some(extra_json.to_string())
+                } else {
+                    tier.resets_at.clone()
+                };
                 crate::provider::UsageData {
                     plan_name: Some(tier.name.clone()),
                     remaining: Some(remaining),
@@ -441,7 +599,7 @@ async fn query_provider_usage_inner(
                     unit: Some("%".to_string()),
                     is_valid: Some(true),
                     invalid_message: None,
-                    extra: tier.resets_at.clone(),
+                    extra,
                 }
             })
             .collect();
@@ -455,26 +613,56 @@ async fn query_provider_usage_inner(
 
     // ── 官方余额查询路径 ──
     if template_type == TEMPLATE_TYPE_BALANCE {
-        let settings_config = provider
-            .map(|p| &p.settings_config)
-            .cloned()
-            .unwrap_or_default();
-        let env = settings_config.get("env");
-        let base_url = env
-            .and_then(|e| e.get("ANTHROPIC_BASE_URL"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let api_key = env
-            .and_then(|e| {
-                e.get("ANTHROPIC_AUTH_TOKEN")
-                    .or_else(|| e.get("ANTHROPIC_API_KEY"))
-            })
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        // 按 app 区分的凭据存储格式提取 Base URL 与 API Key
+        let (base_url, api_key) = resolve_native_credentials(&app_type, provider);
 
-        return crate::services::balance::get_balance(base_url, api_key)
+        return crate::services::balance::get_balance(&base_url, &api_key)
             .await
             .map_err(|e| format!("Failed to query balance: {e}"));
+    }
+
+    // ── 官方订阅额度查询路径 ──
+    if template_type == TEMPLATE_TYPE_OFFICIAL_SUBSCRIPTION {
+        if !usage_script.map(|s| s.enabled).unwrap_or(false) {
+            return Ok(crate::provider::UsageResult {
+                success: false,
+                data: None,
+                error: Some("Usage query is disabled".to_string()),
+            });
+        }
+
+        let quota = crate::services::subscription::get_subscription_quota(app_type.as_str())
+            .await
+            .map_err(|e| format!("Failed to query subscription quota: {e}"))?;
+
+        if !quota.success {
+            return Ok(crate::provider::UsageResult {
+                success: false,
+                data: None,
+                error: quota.error.or(quota.credential_message),
+            });
+        }
+
+        let data: Vec<crate::provider::UsageData> = quota
+            .tiers
+            .iter()
+            .map(|tier| crate::provider::UsageData {
+                plan_name: Some(tier.name.clone()),
+                remaining: Some(100.0 - tier.utilization),
+                total: Some(100.0),
+                used: Some(tier.utilization),
+                unit: Some("%".to_string()),
+                is_valid: Some(true),
+                invalid_message: None,
+                extra: tier.resets_at.clone(),
+            })
+            .collect();
+
+        return Ok(crate::provider::UsageResult {
+            success: true,
+            data: if data.is_empty() { None } else { Some(data) },
+            error: None,
+        });
     }
 
     // ── 通用 JS 脚本路径 ──
@@ -519,6 +707,82 @@ pub async fn testUsageScript(
 pub fn read_live_provider_settings(app: String) -> Result<serde_json::Value, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
     ProviderService::read_live_settings(app_type).map_err(|e| e.to_string())
+}
+
+/// Refresh the current provider from live config through CC's existing
+/// backfill path. This reuses its auth/TOML preservation and key-isolation
+/// safeguards instead of maintaining a second parser for Tuzi presets.
+#[tauri::command]
+pub fn sync_current_provider_key_from_live(
+    state: State<'_, AppState>,
+    app: String,
+) -> Result<bool, String> {
+    let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
+    if app_type.is_additive_mode() || matches!(app_type, AppType::ClaudeDesktop) {
+        return Ok(false);
+    }
+    let provider_id = ProviderService::current(state.inner(), app_type.clone())?;
+    if provider_id.is_empty() {
+        return Ok(false);
+    }
+    let provider = state
+        .db
+        .get_provider_by_id(&provider_id, app_type.as_str())
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("provider not found: {provider_id}"))?;
+    let live = ProviderService::read_live_settings(app_type.clone()).map_err(|e| e.to_string())?;
+
+    let live_base = match app_type {
+        AppType::Codex => live
+            .get("config")
+            .and_then(serde_json::Value::as_str)
+            .and_then(crate::codex_config::extract_codex_base_url),
+        AppType::Claude => live
+            .pointer("/env/ANTHROPIC_BASE_URL")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string),
+        AppType::Gemini => live
+            .pointer("/env/GOOGLE_GEMINI_BASE_URL")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string),
+        _ => None,
+    };
+    let provider_base = match app_type {
+        AppType::Codex => provider
+            .settings_config
+            .get("config")
+            .and_then(serde_json::Value::as_str)
+            .and_then(crate::codex_config::extract_codex_base_url),
+        AppType::Claude => provider
+            .settings_config
+            .pointer("/env/ANTHROPIC_BASE_URL")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string),
+        AppType::Gemini => provider
+            .settings_config
+            .pointer("/env/GOOGLE_GEMINI_BASE_URL")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string),
+        _ => None,
+    };
+    let normalize = |url: Option<String>| {
+        url.unwrap_or_default()
+            .trim()
+            .trim_end_matches('/')
+            .to_ascii_lowercase()
+    };
+    if normalize(live_base) != normalize(provider_base) {
+        return Ok(false);
+    }
+
+    let restored = crate::services::provider::restore_live_settings_for_provider_backfill(
+        &app_type, &provider, live,
+    );
+    state
+        .db
+        .update_provider_settings_config(app_type.as_str(), &provider_id, &restored)
+        .map_err(|e| e.to_string())?;
+    Ok(true)
 }
 
 #[tauri::command]
@@ -679,368 +943,309 @@ pub fn get_opencode_live_provider_ids() -> Result<Vec<String>, String> {
         .map_err(|e| e.to_string())
 }
 
-/// 从 TOML 字符串中提取 base_url：
-/// 优先从 [model_providers.<name>] 段读取，fallback 到顶层 base_url。
-fn extract_base_url_from_toml_str(toml_str: &str) -> Option<String> {
-    let doc: toml::Value = toml_str.parse().ok()?;
-    if let Some(providers) = doc.get("model_providers").and_then(|v| v.as_table()) {
-        for (_, provider) in providers.iter() {
-            if let Some(url) = provider.get("base_url").and_then(|v| v.as_str()) {
-                return Some(url.to_string());
-            }
-        }
-    }
-    doc.get("base_url")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-}
-
-/// 检测 ~/.codex/auth.json 和 config.toml，把 API key 回填到数据库里对应的预设卡片。
-/// - base_url 匹配预设 → 更新对应卡片的 OPENAI_API_KEY
-/// - base_url 不匹配 → 生成一张新的 default 卡片（多个则 default1、default2...）
-#[tauri::command]
-pub fn sync_codex_live_api_key(state: State<'_, AppState>) -> Result<(), String> {
-    use crate::codex_config::{get_codex_auth_path, read_codex_config_text};
-    use crate::services::provider::ProviderService;
-    use serde_json::json;
-
-    // 预设卡片：(id, base_url)
-    const PRESET_CARDS: &[(&str, &str)] = &[
-        ("tuzi-route", "https://api.tu-zi.com"),
-        ("coding", "https://api.tu-zi.com/coding"),
-        ("gaccode", "https://gaccode.com/codex/v1"),
-    ];
-
-    // 1. 读取 auth.json
-    let auth_path = get_codex_auth_path();
-    if !auth_path.exists() {
-        return Ok(());
-    }
-    let auth_text = std::fs::read_to_string(&auth_path).map_err(|e| e.to_string())?;
-    let auth: serde_json::Value = serde_json::from_str(&auth_text).unwrap_or_else(|_| json!({}));
-    let api_key = auth
-        .get("OPENAI_API_KEY")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-
-    if api_key.is_empty() {
-        return Ok(());
-    }
-
-    // 2. 读取 config.toml，提取 base_url
-    let config_text = read_codex_config_text().unwrap_or_default();
-    let detected_url = extract_base_url_from_toml_str(&config_text).unwrap_or_default();
-    let normalized_detected = detected_url.trim_end_matches('/').to_lowercase();
-
-    // 3. 尝试匹配预设卡片
-    let matched_id = PRESET_CARDS.iter().find_map(|(id, base_url)| {
-        let normalized = base_url.trim_end_matches('/').to_lowercase();
-        if normalized == normalized_detected {
-            Some(*id)
-        } else {
-            None
-        }
-    });
-
-    if let Some(provider_id) = matched_id {
-        // 4a. 匹配到预设 → 读取现有 settings_config，更新 API key
-        let existing = state
-            .db
-            .get_provider_by_id(provider_id, "codex")
-            .map_err(|e| e.to_string())?;
-        if let Some(mut provider) = existing {
-            if let Some(auth_obj) = provider
-                .settings_config
-                .get_mut("auth")
-                .and_then(|v| v.as_object_mut())
-            {
-                auth_obj.insert("OPENAI_API_KEY".to_string(), json!(api_key));
-            }
-            state
-                .db
-                .update_provider_settings_config("codex", provider_id, &provider.settings_config)
-                .map_err(|e| e.to_string())?;
-        }
-    } else if !normalized_detected.is_empty() {
-        // 4b. 未匹配 → 生成 default 卡片
-        let existing_providers = state
-            .db
-            .get_all_providers("codex")
-            .map_err(|e| e.to_string())?;
-
-        // 检查是否已有相同 base_url 的卡片，避免重复创建
-        let already_exists = existing_providers.values().any(|p| {
-            let config_str = p
-                .settings_config
-                .get("config")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let url = extract_base_url_from_toml_str(config_str).unwrap_or_default();
-            url.trim_end_matches('/').to_lowercase() == normalized_detected
-        });
-
-        if already_exists {
-            return Ok(());
-        }
-
-        let default_count = existing_providers
-            .keys()
-            .filter(|id| id.starts_with("default"))
-            .count();
-        let card_id = if default_count == 0 {
-            "default".to_string()
-        } else {
-            format!("default{}", default_count)
-        };
-        let card_name = card_id.clone();
-
-        let config_toml = format!(
-            "model_provider = \"{card_id}\"\nmodel = \"gpt-5.6-sol\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{card_id}]\nname = \"{card_id}\"\nbase_url = \"{detected_url}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\nhttp_headers = {{ \"x-openai-actor-authorization\" = \"http://coding.tu-zi.com\" }}\n"
-        );
-
-        let new_provider = crate::provider::Provider::with_id(
-            card_id.clone(),
-            card_name,
-            json!({
-                "auth": { "OPENAI_API_KEY": api_key },
-                "config": config_toml,
-            }),
-            None,
-        );
-
-        ProviderService::add(state.inner(), AppType::Codex, new_provider, false)
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
-/// 检测 ~/.claude/settings.json，把 API key 回填到数据库里对应的预设卡片。
-/// - ANTHROPIC_BASE_URL 匹配预设 → 更新对应卡片的 ANTHROPIC_API_KEY
-/// - 不匹配 → 生成 default 卡片
-#[tauri::command]
-pub fn sync_claude_live_api_key(state: State<'_, AppState>) -> Result<(), String> {
-    use crate::app_config::AppType;
-    use crate::config::{get_claude_settings_path, read_json_file};
-    use crate::services::provider::ProviderService;
-    use serde_json::json;
-
-    const PRESET_CARDS: &[(&str, &str)] = &[
-        ("tuzi-route", "https://api.tu-zi.com"),
-        ("gaccode", "https://gaccode.com/claudecode"),
-    ];
-
-    let settings_path = get_claude_settings_path();
-    if !settings_path.exists() {
-        return Ok(());
-    }
-    let live: serde_json::Value = read_json_file(&settings_path).unwrap_or_else(|_| json!({}));
-
-    let env = match live.get("env").and_then(|v| v.as_object()) {
-        Some(e) => e.clone(),
-        None => return Ok(()),
-    };
-
-    let api_key = env
-        .get("ANTHROPIC_API_KEY")
-        .or_else(|| env.get("ANTHROPIC_AUTH_TOKEN"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    if api_key.is_empty() || api_key == "PROXY_MANAGED" {
-        return Ok(());
-    }
-
-    let detected_url = env
-        .get("ANTHROPIC_BASE_URL")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let normalized_detected = detected_url.trim_end_matches('/').to_lowercase();
-
-    let matched_id = PRESET_CARDS.iter().find_map(|(id, base_url)| {
-        if base_url.trim_end_matches('/').to_lowercase() == normalized_detected {
-            Some(*id)
-        } else {
-            None
-        }
-    });
-
-    if let Some(provider_id) = matched_id {
-        let existing = state
-            .db
-            .get_provider_by_id(provider_id, "claude")
-            .map_err(|e| e.to_string())?;
-        if let Some(mut provider) = existing {
-            if let Some(env_obj) = provider
-                .settings_config
-                .get_mut("env")
-                .and_then(|v| v.as_object_mut())
-            {
-                env_obj.insert("ANTHROPIC_API_KEY".to_string(), json!(&api_key));
-                env_obj.insert("ANTHROPIC_AUTH_TOKEN".to_string(), json!(&api_key));
-            }
-            state
-                .db
-                .update_provider_settings_config("claude", provider_id, &provider.settings_config)
-                .map_err(|e| e.to_string())?;
-        }
-    } else if !normalized_detected.is_empty() {
-        let existing_providers = state
-            .db
-            .get_all_providers("claude")
-            .map_err(|e| e.to_string())?;
-
-        let already_exists = existing_providers.values().any(|p| {
-            p.settings_config
-                .get("env")
-                .and_then(|e| e.get("ANTHROPIC_BASE_URL"))
-                .and_then(|v| v.as_str())
-                .map(|u| u.trim_end_matches('/').to_lowercase() == normalized_detected)
-                .unwrap_or(false)
-        });
-        if already_exists {
-            return Ok(());
-        }
-
-        let default_count = existing_providers
-            .keys()
-            .filter(|id| id.starts_with("default"))
-            .count();
-        let card_id = if default_count == 0 {
-            "default".to_string()
-        } else {
-            format!("default{}", default_count)
-        };
-
-        let new_provider = crate::provider::Provider::with_id(
-            card_id.clone(),
-            card_id.clone(),
-            json!({
-                "env": {
-                    "ANTHROPIC_BASE_URL": detected_url,
-                    "ANTHROPIC_AUTH_TOKEN": &api_key,
-                    "ANTHROPIC_API_KEY": &api_key,
-                    "ANTHROPIC_MODEL": "anthropic/claude-sonnet-4.6",
-                    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "anthropic/claude-haiku-4.5",
-                    "ANTHROPIC_DEFAULT_SONNET_MODEL": "anthropic/claude-sonnet-4.6",
-                    "ANTHROPIC_DEFAULT_OPUS_MODEL": "anthropic/claude-opus-4.7",
-                }
-            }),
-            None,
-        );
-
-        ProviderService::add(state.inner(), AppType::Claude, new_provider, false)
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
-/// 检测 ~/.gemini/.env，把 API key 回填到数据库里对应的预设卡片。
-/// - GOOGLE_GEMINI_BASE_URL 匹配预设 → 更新对应卡片的 GEMINI_API_KEY
-/// - 不匹配 → 生成 default 卡片
-#[tauri::command]
-pub fn sync_gemini_live_api_key(state: State<'_, AppState>) -> Result<(), String> {
-    use crate::app_config::AppType;
-    use crate::gemini_config::{get_gemini_env_path, read_gemini_env};
-    use crate::services::provider::ProviderService;
-    use serde_json::json;
-
-    const PRESET_CARDS: &[(&str, &str)] = &[("tuzi-route", "https://api.tu-zi.com")];
-
-    let env_path = get_gemini_env_path();
-    if !env_path.exists() {
-        return Ok(());
-    }
-    let env_map = read_gemini_env().unwrap_or_default();
-
-    let api_key = env_map.get("GEMINI_API_KEY").cloned().unwrap_or_default();
-    if api_key.is_empty() {
-        return Ok(());
-    }
-
-    let detected_url = env_map
-        .get("GOOGLE_GEMINI_BASE_URL")
-        .cloned()
-        .unwrap_or_default();
-    let normalized_detected = detected_url.trim_end_matches('/').to_lowercase();
-
-    let matched_id = PRESET_CARDS.iter().find_map(|(id, base_url)| {
-        if base_url.trim_end_matches('/').to_lowercase() == normalized_detected {
-            Some(*id)
-        } else {
-            None
-        }
-    });
-
-    if let Some(provider_id) = matched_id {
-        let existing = state
-            .db
-            .get_provider_by_id(provider_id, "gemini")
-            .map_err(|e| e.to_string())?;
-        if let Some(mut provider) = existing {
-            if let Some(env_obj) = provider
-                .settings_config
-                .get_mut("env")
-                .and_then(|v| v.as_object_mut())
-            {
-                env_obj.insert("GEMINI_API_KEY".to_string(), json!(api_key));
-            }
-            state
-                .db
-                .update_provider_settings_config("gemini", provider_id, &provider.settings_config)
-                .map_err(|e| e.to_string())?;
-        }
-    } else if !normalized_detected.is_empty() {
-        let existing_providers = state
-            .db
-            .get_all_providers("gemini")
-            .map_err(|e| e.to_string())?;
-
-        let already_exists = existing_providers.values().any(|p| {
-            p.settings_config
-                .get("env")
-                .and_then(|e| e.get("GOOGLE_GEMINI_BASE_URL"))
-                .and_then(|v| v.as_str())
-                .map(|u| u.trim_end_matches('/').to_lowercase() == normalized_detected)
-                .unwrap_or(false)
-        });
-        if already_exists {
-            return Ok(());
-        }
-
-        let default_count = existing_providers
-            .keys()
-            .filter(|id| id.starts_with("default"))
-            .count();
-        let card_id = if default_count == 0 {
-            "default".to_string()
-        } else {
-            format!("default{}", default_count)
-        };
-
-        let new_provider = crate::provider::Provider::with_id(
-            card_id.clone(),
-            card_id.clone(),
-            json!({
-                "env": {
-                    "GOOGLE_GEMINI_BASE_URL": detected_url,
-                    "GEMINI_API_KEY": api_key,
-                    "GEMINI_MODEL": "gemini-3.1-pro",
-                }
-            }),
-            None,
-        );
-
-        ProviderService::add(state.inner(), AppType::Gemini, new_provider, false)
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
 // ============================================================================
 // OpenClaw 专属命令 → 已迁移至 commands/openclaw.rs
 // ============================================================================
+
+#[cfg(test)]
+mod import_claude_desktop_tests {
+    use super::suggested_claude_desktop_routes;
+    use crate::provider::{Provider, ProviderMeta};
+    use serde_json::json;
+
+    fn make_provider(env: serde_json::Value, provider_type: Option<&str>) -> Provider {
+        let mut p = Provider::with_id(
+            "test-claude".to_string(),
+            "Test".to_string(),
+            json!({ "env": env }),
+            None,
+        );
+        if let Some(pt) = provider_type {
+            p.meta = Some(ProviderMeta {
+                provider_type: Some(pt.to_string()),
+                ..ProviderMeta::default()
+            });
+        }
+        p
+    }
+
+    #[test]
+    fn route_strips_1m_suffix_and_sets_supports_1m() {
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-5-20250929[1M]",
+            }),
+            None,
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        let r = routes.get("claude-sonnet-5").expect("sonnet route present");
+        assert_eq!(r.model, "claude-sonnet-4-5-20250929");
+        assert!(
+            !r.model.to_ascii_lowercase().contains("[1m]"),
+            "model must not contain [1m] suffix"
+        );
+        assert_eq!(r.label_override, None);
+        assert_eq!(r.supports_1m, Some(true));
+    }
+
+    #[test]
+    fn route_preserves_model_without_suffix() {
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "kimi-k2",
+            }),
+            None,
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        let r = routes.get("claude-sonnet-5").expect("sonnet route present");
+        assert_eq!(r.model, "kimi-k2");
+        assert_eq!(r.label_override.as_deref(), Some("kimi-k2"));
+        // 默认 provider_type 缺省 → supports_1m_default = true
+        assert_eq!(r.supports_1m, Some(true));
+    }
+
+    #[test]
+    fn route_uses_claude_code_model_name_as_label_override() {
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "kimi-k2",
+                "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME": "Kimi K2",
+            }),
+            None,
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        let r = routes.get("claude-sonnet-5").expect("sonnet route present");
+        assert_eq!(r.model, "kimi-k2");
+        assert_eq!(r.label_override.as_deref(), Some("Kimi K2"));
+    }
+
+    #[test]
+    fn route_1m_suffix_overrides_provider_type_default() {
+        // github_copilot 默认 supports_1m_default = false，但 [1M] 后缀应强制 true
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5-codex[1M]",
+            }),
+            Some("github_copilot"),
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        let r = routes.get("claude-sonnet-5").expect("sonnet route present");
+        assert_eq!(r.model, "gpt-5-codex");
+        assert_eq!(r.label_override.as_deref(), Some("gpt-5-codex"));
+        assert_eq!(r.supports_1m, Some(true));
+    }
+
+    #[test]
+    fn route_github_copilot_without_suffix_keeps_false() {
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5-codex",
+            }),
+            Some("github_copilot"),
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        let r = routes.get("claude-sonnet-5").expect("sonnet route present");
+        assert_eq!(r.model, "gpt-5-codex");
+        assert_eq!(r.label_override.as_deref(), Some("gpt-5-codex"));
+        assert_eq!(r.supports_1m, Some(false));
+    }
+
+    #[test]
+    fn same_upstream_across_three_aliases_merges_to_one_route() {
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M2",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M2",
+                "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M2",
+            }),
+            None,
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        assert_eq!(routes.len(), 1, "three aliases → one merged route");
+        let r = routes.get("claude-sonnet-5").expect("merged route present");
+        assert_eq!(r.model, "MiniMax-M2");
+        assert_eq!(r.label_override.as_deref(), Some("MiniMax-M2"));
+    }
+
+    #[test]
+    fn same_upstream_with_partial_1m_marker_takes_or_aggregation() {
+        // sonnet 带 [1M]，opus/haiku 不带 → 合并后 supports_1m == Some(true)
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M2[1M]",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M2",
+                "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M2",
+            }),
+            None,
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        assert_eq!(routes.len(), 1);
+        let r = routes.get("claude-sonnet-5").expect("merged route present");
+        assert_eq!(r.supports_1m, Some(true));
+    }
+
+    #[test]
+    fn different_upstream_models_produce_separate_routes() {
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "GLM-4.6",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": "GLM-4-Air",
+                "ANTHROPIC_DEFAULT_HAIKU_MODEL": "GLM-4-Flash",
+            }),
+            None,
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        assert_eq!(routes.len(), 3);
+        assert_eq!(routes.get("claude-sonnet-5").unwrap().model, "GLM-4.6");
+        assert_eq!(routes.get("claude-opus-4-8").unwrap().model, "GLM-4-Air");
+        assert_eq!(routes.get("claude-haiku-4-5").unwrap().model, "GLM-4-Flash");
+        assert_eq!(
+            routes
+                .get("claude-sonnet-5")
+                .unwrap()
+                .label_override
+                .as_deref(),
+            Some("GLM-4.6")
+        );
+    }
+
+    #[test]
+    fn anthropic_model_fallback_only_triggers_when_empty() {
+        // 三个 default env_key 都不填，仅 ANTHROPIC_MODEL
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_MODEL": "kimi-k2",
+            }),
+            None,
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        assert_eq!(routes.len(), 1);
+        let r = routes
+            .get("claude-sonnet-5")
+            .expect("fallback route present");
+        assert_eq!(r.model, "kimi-k2");
+        assert_eq!(r.label_override.as_deref(), Some("kimi-k2"));
+    }
+
+    #[test]
+    fn existing_claude_prefix_not_duplicated() {
+        let p = make_provider(
+            json!({
+                "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-5-20250929",
+            }),
+            None,
+        );
+        let routes = suggested_claude_desktop_routes(&p).expect("routes built");
+        assert!(routes.contains_key("claude-sonnet-5"));
+        assert!(!routes.contains_key("claude-claude-sonnet-4-5-20250929"));
+        assert_eq!(
+            routes.get("claude-sonnet-5").expect("route").label_override,
+            None
+        );
+    }
+}
+
+#[cfg(test)]
+mod native_query_credentials_tests {
+    use super::{resolve_coding_plan_credentials, resolve_native_credentials};
+    use crate::app_config::AppType;
+    use crate::provider::{Provider, UsageScript};
+    use serde_json::json;
+
+    fn usage_script(
+        coding_plan_provider: Option<&str>,
+        base_url: Option<&str>,
+        api_key: Option<&str>,
+    ) -> UsageScript {
+        UsageScript {
+            enabled: true,
+            language: "javascript".to_string(),
+            code: String::new(),
+            timeout: Some(10),
+            api_key: api_key.map(str::to_string),
+            base_url: base_url.map(str::to_string),
+            access_token: None,
+            user_id: None,
+            template_type: Some("token_plan".to_string()),
+            auto_query_interval: None,
+            coding_plan_provider: coding_plan_provider.map(str::to_string),
+            access_key_id: None,
+            secret_access_key: None,
+            team_organization_id: None,
+            team_project_id: None,
+        }
+    }
+
+    #[test]
+    fn delegates_to_provider_for_codex() {
+        let provider = Provider::with_id(
+            "test".to_string(),
+            "Test".to_string(),
+            json!({
+                "auth": { "OPENAI_API_KEY": "sk-codex" },
+                "config": "model_provider = \"deepseek\"\n\
+                           [model_providers.deepseek]\n\
+                           base_url = \"https://api.deepseek.com\"\n",
+            }),
+            None,
+        );
+        let (base_url, api_key) = resolve_native_credentials(&AppType::Codex, Some(&provider));
+        assert_eq!(base_url, "https://api.deepseek.com");
+        assert_eq!(api_key, "sk-codex");
+    }
+
+    #[test]
+    fn missing_provider_yields_empty() {
+        let (base_url, api_key) = resolve_native_credentials(&AppType::Codex, None);
+        assert!(base_url.is_empty());
+        assert!(api_key.is_empty());
+    }
+
+    #[test]
+    fn zenmux_coding_plan_uses_script_credentials_first() {
+        let provider = Provider::with_id(
+            "test".to_string(),
+            "Test".to_string(),
+            json!({
+                "env": {
+                    "ANTHROPIC_BASE_URL": "https://provider.zenmux.example/v1",
+                    "ANTHROPIC_AUTH_TOKEN": "sk-provider"
+                }
+            }),
+            None,
+        );
+        let script = usage_script(
+            Some("zenmux"),
+            Some("https://script.zenmux.example/api/usage/"),
+            Some("sk-script"),
+        );
+
+        let (base_url, api_key) =
+            resolve_coding_plan_credentials(&AppType::Claude, Some(&provider), Some(&script));
+
+        assert_eq!(base_url, "https://script.zenmux.example/api/usage");
+        assert_eq!(api_key, "sk-script");
+    }
+
+    #[test]
+    fn zenmux_coding_plan_falls_back_to_provider_credentials() {
+        let provider = Provider::with_id(
+            "test".to_string(),
+            "Test".to_string(),
+            json!({
+                "env": {
+                    "ANTHROPIC_BASE_URL": "https://provider.zenmux.example/v1",
+                    "ANTHROPIC_AUTH_TOKEN": "sk-provider"
+                }
+            }),
+            None,
+        );
+        let script = usage_script(Some("zenmux"), Some("https://script.zenmux.example"), None);
+
+        let (base_url, api_key) =
+            resolve_coding_plan_credentials(&AppType::Claude, Some(&provider), Some(&script));
+
+        assert_eq!(base_url, "https://provider.zenmux.example/v1");
+        assert_eq!(api_key, "sk-provider");
+    }
+}

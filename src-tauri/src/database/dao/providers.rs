@@ -3,7 +3,6 @@ use crate::error::AppError;
 use crate::provider::{Provider, ProviderMeta};
 use indexmap::IndexMap;
 use rusqlite::params;
-use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 
 type OmoProviderRow = (
@@ -16,193 +15,6 @@ type OmoProviderRow = (
     Option<String>,
     String,
 );
-
-fn build_codex_official_provider(
-    id: &str,
-    name: &str,
-    website_url: &str,
-    base_url: &str,
-    env_key: &str,
-    model: &str,
-) -> Provider {
-    let route_id = match id {
-        "coding" => "codex",
-        "gaccode" => "gac",
-        "tuzi-route" => "tuzi",
-        _ => id,
-    };
-    let config = format!(
-        "model_provider = \"{route_id}\"\nmodel = \"{model}\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{route_id}]\nname = \"{route_id}\"\nbase_url = \"{base_url}\"\nenv_key = \"{env_key}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\nhttp_headers = {{ \"x-openai-actor-authorization\" = \"http://coding.tu-zi.com\" }}\n"
-    );
-    let mut provider = Provider::with_id(
-        id.to_string(),
-        name.to_string(),
-        json!({
-            "auth": {},
-            "config": config,
-            "env": { "envKey": env_key },
-        }),
-        Some(website_url.to_string()),
-    );
-    provider.icon = Some(
-        match id {
-            "coding" => "codex-sub",
-            "gaccode" => "gaccode",
-            _ => "tuzi",
-        }
-        .to_string(),
-    );
-    provider.icon_color = None;
-    provider
-}
-
-fn build_claude_official_provider(id: &str, name: &str, base_url: &str, model: &str) -> Provider {
-    let api_key_url = match id {
-        "tuzi-route" => Some("https://api.tu-zi.com"),
-        "gaccode" => Some("https://store.tu-zi.com/cat/1"),
-        _ => None,
-    };
-    let mut provider = Provider::with_id(
-        id.to_string(),
-        name.to_string(),
-        json!({
-            "env": {
-                "ANTHROPIC_BASE_URL": base_url,
-                "ANTHROPIC_AUTH_TOKEN": "",
-                "ANTHROPIC_API_KEY": "",
-                "ANTHROPIC_MODEL": model,
-                "ANTHROPIC_DEFAULT_HAIKU_MODEL": "anthropic/claude-haiku-4.5",
-                "ANTHROPIC_DEFAULT_SONNET_MODEL": model,
-                "ANTHROPIC_DEFAULT_OPUS_MODEL": "anthropic/claude-opus-4.7",
-            },
-        }),
-        api_key_url.map(|s| s.to_string()),
-    );
-    provider.icon = Some(
-        match id {
-            "gaccode" => "gaccode",
-            _ => "tuzi",
-        }
-        .to_string(),
-    );
-    provider.icon_color = None;
-    provider
-}
-
-fn build_gemini_official_provider(id: &str, name: &str, base_url: &str, model: &str) -> Provider {
-    let api_key_url = match id {
-        "tuzi-route" => Some("https://api.tu-zi.com"),
-        _ => None,
-    };
-    let mut provider = Provider::with_id(
-        id.to_string(),
-        name.to_string(),
-        json!({
-            "env": {
-                "GOOGLE_GEMINI_BASE_URL": base_url,
-                "GEMINI_API_KEY": "",
-                "GEMINI_MODEL": model,
-            },
-        }),
-        api_key_url.map(|s| s.to_string()),
-    );
-    provider.icon = Some("tuzi".to_string());
-    provider.icon_color = None;
-    provider
-}
-
-fn build_openclaw_official_provider(
-    id: &str,
-    name: &str,
-    api_key_url: &str,
-    base_url: &str,
-    api: &str,
-) -> Provider {
-    let mut provider = Provider::with_id(
-        id.to_string(),
-        name.to_string(),
-        json!({
-            "baseUrl": base_url,
-            "apiKey": "",
-            "api": api,
-            "models": match api {
-                "anthropic-messages" => vec![
-                    json!({
-                        "id": "claude-sonnet-4-6",
-                        "name": "Claude Sonnet 4.6",
-                        "contextWindow": 1000000,
-                        "cost": { "input": 3, "output": 15 },
-                    })
-                ],
-                _ => vec![
-                    json!({
-                        "id": "gpt-5.5",
-                        "name": "GPT-5.5",
-                        "contextWindow": 200000,
-                        "cost": { "input": 5, "output": 15 },
-                    })
-                ],
-            },
-        }),
-        Some(api_key_url.to_string()),
-    );
-    provider.icon = Some(
-        match id {
-            "codex-coding" => "codex-sub",
-            "codex-gaccode" | "claude-gaccode" => "gaccode",
-            _ => "tuzi",
-        }
-        .to_string(),
-    );
-    provider.icon_color = None;
-    provider
-}
-
-fn build_hermes_official_provider(
-    id: &str,
-    name: &str,
-    api_key_url: &str,
-    base_url: &str,
-    api_mode: &str,
-) -> Provider {
-    let mut provider = Provider::with_id(
-        id.to_string(),
-        name.to_string(),
-        json!({
-            "name": name,
-            "base_url": base_url,
-            "api_key": "",
-            "api_mode": api_mode,
-            "models": match api_mode {
-                "anthropic_messages" => vec![
-                    json!({
-                        "id": "claude-sonnet-4-6",
-                        "name": "Claude Sonnet 4.6",
-                        "context_length": 1000000,
-                    })
-                ],
-                _ => vec![
-                    json!({
-                        "id": "gpt-5.5",
-                        "name": "GPT-5.5",
-                        "context_length": 200000,
-                    })
-                ],
-            },
-        }),
-        Some(api_key_url.to_string()),
-    );
-    provider.icon = Some(
-        match id {
-            "codex-coding" => "codex-sub",
-            "codex-gaccode" | "claude-gaccode" => "gaccode",
-            _ => "tuzi",
-        }
-        .to_string(),
-    );
-    provider.icon_color = None;
-    provider
-}
 
 impl Database {
     pub fn get_all_providers(
@@ -359,7 +171,36 @@ impl Database {
         );
 
         match result {
-            Ok(provider) => Ok(Some(provider)),
+            Ok(mut provider) => {
+                let mut stmt_endpoints = conn
+                    .prepare(
+                        "SELECT url, added_at FROM provider_endpoints
+                         WHERE provider_id = ?1 AND app_type = ?2
+                         ORDER BY added_at ASC, url ASC",
+                    )
+                    .map_err(|e| AppError::Database(e.to_string()))?;
+                let endpoints = stmt_endpoints
+                    .query_map(params![id, app_type], |row| {
+                        let url: String = row.get(0)?;
+                        let added_at: Option<i64> = row.get(1)?;
+                        Ok((url, added_at.unwrap_or(0)))
+                    })
+                    .map_err(|e| AppError::Database(e.to_string()))?;
+                let meta = provider.meta.get_or_insert_with(ProviderMeta::default);
+                for endpoint in endpoints {
+                    let (url, added_at) =
+                        endpoint.map_err(|e| AppError::Database(e.to_string()))?;
+                    meta.custom_endpoints.insert(
+                        url.clone(),
+                        crate::settings::CustomEndpoint {
+                            url,
+                            added_at,
+                            last_used: None,
+                        },
+                    );
+                }
+                Ok(Some(provider))
+            }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(AppError::Database(e.to_string())),
         }
@@ -739,374 +580,364 @@ impl Database {
         Ok(exists)
     }
 
-    /// 删除旧版蓝兔子预设及其相关残留。
+    /// 判断指定 app 下是否存在非官方种子的供应商。
     ///
-    /// 只清理明确的历史 ID，避免误删新版 Codex 的 `tuzi-route` 预设。
-    pub fn purge_legacy_tuzi_providers(&self) -> Result<usize, AppError> {
-        let mut conn = lock_conn!(self.conn);
-        let tx = conn
-            .transaction()
+    /// 比 `get_all_providers` 轻量得多：只读 id 列、无 endpoint 子查询、首条命中即返回。
+    /// 用于 `import_default_config` 决定是否跳过 live 导入。
+    pub fn has_non_official_seed_provider(&self, app_type: &str) -> Result<bool, AppError> {
+        use crate::database::dao::providers_seed::is_official_seed_id;
+        let conn = lock_conn!(self.conn);
+        let mut stmt = conn
+            .prepare("SELECT id FROM providers WHERE app_type = ?1")
             .map_err(|e| AppError::Database(e.to_string()))?;
-
-        let deleted = tx
-            .execute(
-                "DELETE FROM providers WHERE id IN ('tuzi-claude', 'tuzi-codex', 'tuzi-gemini')",
-                [],
-            )
+        let mut rows = stmt
+            .query(params![app_type])
             .map_err(|e| AppError::Database(e.to_string()))?;
-
-        tx.execute(
-            "DELETE FROM settings WHERE key = 'official_providers_seeded'",
-            [],
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
-
-        tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
-        Ok(deleted)
+        while let Some(row) = rows.next().map_err(|e| AppError::Database(e.to_string()))? {
+            let id: String = row.get(0).map_err(|e| AppError::Database(e.to_string()))?;
+            if !is_official_seed_id(&id) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
+    /// 计算指定 app 下一个可用的 sort_index（追加到末尾）。
+    fn next_sort_index_for_app(&self, app_type: &str) -> Result<usize, AppError> {
+        let conn = lock_conn!(self.conn);
+        let max: Option<i64> = conn
+            .query_row(
+                "SELECT MAX(sort_index) FROM providers WHERE app_type = ?1",
+                params![app_type],
+                |row| row.get(0),
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        Ok(max.map(|v| (v + 1) as usize).unwrap_or(0))
+    }
+
+    /// 启动时调用：补齐缺失的官方预设供应商（Claude / Codex / Gemini）。
+    ///
+    /// 使用 settings flag `official_providers_seeded` 保证每个数据库只执行一次：
+    /// - 全新用户：seed 三条官方预设
+    /// - 老用户升级：同样会触发一次（flag 不存在），追加到末尾，不影响已有排序
+    /// - 用户删除 seed 后：不再重建（flag 已为 true），尊重用户意图
+    ///
+    /// 与 `Database::save_provider` 的 UPSERT 语义配合，即使被意外重复调用
+    /// 也不会覆盖用户当前激活的供应商（is_current 字段会被保留）。
     pub fn init_default_official_providers(&self) -> Result<usize, AppError> {
-        let previous_claude_current = self.get_current_provider("claude")?;
-        let previous_codex_current = self.get_current_provider("codex")?;
-        let previous_gemini_current = self.get_current_provider("gemini")?;
-        let mut conn = lock_conn!(self.conn);
-        let tx = conn
-            .transaction()
-            .map_err(|e| AppError::Database(e.to_string()))?;
+        use crate::database::dao::providers_seed::OFFICIAL_SEEDS;
 
-        tx.execute(
-            "DELETE FROM providers WHERE app_type IN ('claude', 'codex', 'gemini') AND id IN ('default', 'codex-official')",
-            [],
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
-
-        let mut seeded = 0usize;
-
-        for (sort_index, (id, name, base_url, model)) in
-            crate::database::dao::providers_seed::CLAUDE_OFFICIAL_PROVIDER_IDS
-                .iter()
-                .enumerate()
+        if self
+            .get_bool_flag("official_providers_seeded")
+            .unwrap_or(false)
         {
-            let provider = build_claude_official_provider(id, name, base_url, model);
-            seeded += upsert_seed_provider(&tx, "claude", &provider, sort_index)?;
-        }
-        migrate_claude_tuzi_route_base_url(&tx)?;
-
-        for (sort_index, (id, name, website_url, base_url, env_key, model)) in
-            crate::database::dao::providers_seed::CODEX_OFFICIAL_PROVIDER_IDS
-                .iter()
-                .enumerate()
-        {
-            let provider =
-                build_codex_official_provider(id, name, website_url, base_url, env_key, model);
-            seeded += upsert_seed_provider(&tx, "codex", &provider, sort_index)?;
-        }
-
-        for (sort_index, (id, name, base_url, model)) in
-            crate::database::dao::providers_seed::GEMINI_OFFICIAL_PROVIDER_IDS
-                .iter()
-                .enumerate()
-        {
-            let provider = build_gemini_official_provider(id, name, base_url, model);
-            seeded += upsert_seed_provider(&tx, "gemini", &provider, sort_index)?;
-        }
-
-        for (sort_index, (id, name, api_key_url, base_url, api)) in
-            crate::database::dao::providers_seed::OPENCLAW_OFFICIAL_PROVIDER_IDS
-                .iter()
-                .enumerate()
-        {
-            let provider = build_openclaw_official_provider(id, name, api_key_url, base_url, api);
-            seeded += upsert_seed_provider(&tx, "openclaw", &provider, sort_index)?;
-        }
-
-        for (sort_index, (id, name, api_key_url, base_url, api_mode)) in
-            crate::database::dao::providers_seed::HERMES_OFFICIAL_PROVIDER_IDS
-                .iter()
-                .enumerate()
-        {
-            let provider =
-                build_hermes_official_provider(id, name, api_key_url, base_url, api_mode);
-            seeded += upsert_seed_provider(&tx, "hermes", &provider, sort_index)?;
-        }
-
-        ensure_seed_current_provider(&tx, "claude", previous_claude_current.as_deref())?;
-        ensure_seed_current_provider(&tx, "codex", previous_codex_current.as_deref())?;
-        ensure_seed_current_provider(&tx, "gemini", previous_gemini_current.as_deref())?;
-        ensure_seed_current_provider(&tx, "openclaw", None)?;
-        ensure_seed_current_provider(&tx, "hermes", None)?;
-
-        tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
-        Ok(seeded)
-    }
-}
-
-fn upsert_seed_provider(
-    tx: &rusqlite::Transaction<'_>,
-    app_type: &str,
-    provider: &Provider,
-    sort_index: usize,
-) -> Result<usize, AppError> {
-    let exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM providers WHERE app_type = ?1 AND id = ?2)",
-            params![app_type, provider.id],
-            |row| row.get(0),
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
-
-    if exists {
-        let next_settings_config =
-            seed_settings_config_update_for_existing(tx, app_type, provider)?;
-
-        if let Some(settings_config) = next_settings_config {
-            tx.execute(
-                "UPDATE providers SET
-                    name = ?1,
-                    settings_config = ?2,
-                    website_url = ?3,
-                    category = 'aggregator',
-                    sort_index = ?4,
-                    icon = ?5,
-                    icon_color = ?6
-                WHERE app_type = ?7 AND id = ?8",
-                params![
-                    provider.name,
-                    serde_json::to_string(&settings_config).map_err(|e| {
-                        AppError::Database(format!("Failed to serialize settings_config: {e}"))
-                    })?,
-                    provider.website_url,
-                    sort_index,
-                    provider.icon,
-                    provider.icon_color,
-                    app_type,
-                    provider.id,
-                ],
-            )
-            .map_err(|e| AppError::Database(e.to_string()))?;
             return Ok(0);
         }
 
-        tx.execute(
-            "UPDATE providers SET
-                name = ?1,
-                website_url = ?2,
-                category = 'aggregator',
-                sort_index = ?3,
-                icon = ?4,
-                icon_color = ?5
-            WHERE app_type = ?6 AND id = ?7",
-            params![
-                provider.name,
-                provider.website_url,
-                sort_index,
-                provider.icon,
-                provider.icon_color,
-                app_type,
-                provider.id,
-            ],
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
-        return Ok(0);
-    }
+        let mut inserted = 0_usize;
+        let now_ms = chrono::Utc::now().timestamp_millis();
 
-    tx.execute(
-        "INSERT INTO providers (
-            id, app_type, name, settings_config, website_url, category,
-            created_at, sort_index, notes, icon, icon_color, meta, is_current, in_failover_queue
-        ) VALUES (?1, ?2, ?3, ?4, ?5, 'aggregator', strftime('%s','now'), ?6, NULL, ?7, ?8, '{}', 0, 0)",
-        params![
-            provider.id,
-            app_type,
-            provider.name,
-            serde_json::to_string(&provider.settings_config)
-                .map_err(|e| AppError::Database(format!("Failed to serialize settings_config: {e}")))?,
-            provider.website_url,
-            sort_index,
-            provider.icon,
-            provider.icon_color,
-        ],
-    )
-    .map_err(|e| AppError::Database(e.to_string()))?;
+        for seed in OFFICIAL_SEEDS {
+            let app_type_str = seed.app_type.as_str();
 
-    Ok(1)
-}
+            // 若该 id 已存在（极端情况：用户曾手动用过同 id），跳过
+            if self.get_provider_by_id(seed.id, app_type_str)?.is_some() {
+                continue;
+            }
 
-fn seed_settings_config_update_for_existing(
-    tx: &rusqlite::Transaction<'_>,
-    app_type: &str,
-    provider: &Provider,
-) -> Result<Option<Value>, AppError> {
-    // Claude 兔子线路：仅迁移历史默认域名，其他用户配置原样保留。
-    if app_type == "claude" && provider.id == "tuzi-route" {
-        let existing_settings_config = tx
-            .query_row(
-                "SELECT settings_config FROM providers WHERE app_type = ?1 AND id = ?2",
-                params![app_type, provider.id],
-                |row| row.get::<_, String>(0),
-            )
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            let next_sort_index = self.next_sort_index_for_app(app_type_str)?;
 
-        let Ok(mut existing) = serde_json::from_str::<Value>(&existing_settings_config) else {
-            log::warn!(
-                "跳过 Claude 兔子线路默认域名迁移：provider {} 的 settings_config 不是有效 JSON",
-                provider.id
+            let settings_config: serde_json::Value =
+                serde_json::from_str(seed.settings_config_json).map_err(|e| {
+                    AppError::Database(format!("Seed JSON parse failed for {}: {e}", seed.id))
+                })?;
+
+            let mut provider = Provider::with_id(
+                seed.id.to_string(),
+                seed.name.to_string(),
+                settings_config,
+                Some(seed.website_url.to_string()),
             );
-            return Ok(None);
-        };
-        let Some(env) = existing.get_mut("env").and_then(Value::as_object_mut) else {
-            return Ok(None);
-        };
-        let is_old_default = env
-            .get("ANTHROPIC_BASE_URL")
-            .and_then(Value::as_str)
-            .is_some_and(|value| value.trim().trim_end_matches('/') == "https://api.tu-zi.com");
-        if !is_old_default {
-            return Ok(None);
+            provider.category = Some("official".to_string());
+            provider.icon = Some(seed.icon.to_string());
+            provider.icon_color = Some(seed.icon_color.to_string());
+            provider.sort_index = Some(next_sort_index);
+            provider.created_at = Some(now_ms);
+
+            self.save_provider(app_type_str, &provider)?;
+            inserted += 1;
+            log::info!(
+                "✓ Seeded official provider: {} ({})",
+                seed.name,
+                app_type_str
+            );
         }
 
-        env.insert(
-            "ANTHROPIC_BASE_URL".to_string(),
-            json!("https://apius.tu-zi.com"),
+        // 即使 inserted=0（例如用户手动创建过同 id）也设置 flag 防止反复检查
+        self.set_setting("official_providers_seeded", "true")?;
+
+        Ok(inserted)
+    }
+
+    /// Add missing Tuzi product routes without replacing CC official seeds or
+    /// touching an existing user's keys, endpoints, models, metadata or order.
+    pub fn init_default_tuzi_providers(&self) -> Result<usize, AppError> {
+        use crate::database::dao::providers_seed::TUZI_SEEDS;
+
+        let mut inserted = 0_usize;
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        for seed in TUZI_SEEDS {
+            let app_type = seed.app_type.as_str();
+            if self.get_provider_by_id(seed.id, app_type)?.is_none() {
+                let settings_config =
+                    serde_json::from_str(seed.settings_config_json).map_err(|e| {
+                        AppError::Database(format!(
+                            "Tuzi seed JSON parse failed for {}: {e}",
+                            seed.id
+                        ))
+                    })?;
+                let mut provider = Provider::with_id(
+                    seed.id.to_string(),
+                    seed.name.to_string(),
+                    settings_config,
+                    Some(seed.website_url.to_string()),
+                );
+                provider.category = Some("aggregator".to_string());
+                provider.icon = Some(seed.icon.to_string());
+                provider.sort_index = Some(self.next_sort_index_for_app(app_type)?);
+                provider.created_at = Some(now_ms);
+                self.save_provider(app_type, &provider)?;
+                inserted += 1;
+            }
+            self.ensure_provider_endpoints(app_type, seed.id, seed.endpoint_candidates(), now_ms)?;
+        }
+        Ok(inserted)
+    }
+
+    fn ensure_provider_endpoints(
+        &self,
+        app_type: &str,
+        provider_id: &str,
+        urls: &[&str],
+        added_at: i64,
+    ) -> Result<usize, AppError> {
+        if urls.is_empty() {
+            return Ok(0);
+        }
+        let mut conn = lock_conn!(self.conn);
+        let tx = conn
+            .transaction()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let mut inserted = 0;
+        for url in urls {
+            inserted += tx
+                .execute(
+                    "INSERT INTO provider_endpoints (provider_id, app_type, url, added_at)
+                     SELECT ?1, ?2, ?3, ?4
+                     WHERE NOT EXISTS (
+                         SELECT 1 FROM provider_endpoints
+                         WHERE provider_id = ?1 AND app_type = ?2 AND url = ?3
+                     )",
+                    params![provider_id, app_type, url, added_at],
+                )
+                .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+        tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
+        Ok(inserted)
+    }
+
+    /// 按 id 兜底插入单条 official seed（仅当目标表中该 id 不存在时插入）。
+    ///
+    /// 与 `init_default_official_providers` 不同：
+    /// - 不触碰 `official_providers_seeded` 全局 flag，是 on-demand 修复
+    /// - 只处理一条 seed，由调用方决定 id + app_type
+    /// - 已存在则尊重用户自定义，不覆盖
+    ///
+    /// 返回 Ok(true) 表示插入了新行，Ok(false) 表示已存在被跳过。
+    pub fn ensure_official_seed_by_id(
+        &self,
+        seed_id: &str,
+        app_type: crate::app_config::AppType,
+    ) -> Result<bool, AppError> {
+        use crate::database::dao::providers_seed::OFFICIAL_SEEDS;
+
+        let seed = OFFICIAL_SEEDS
+            .iter()
+            .find(|s| s.id == seed_id && s.app_type == app_type)
+            .ok_or_else(|| {
+                AppError::Database(format!(
+                    "unknown official seed: id={seed_id}, app_type={}",
+                    app_type.as_str()
+                ))
+            })?;
+
+        let app_type_str = seed.app_type.as_str();
+
+        if self.get_provider_by_id(seed_id, app_type_str)?.is_some() {
+            return Ok(false);
+        }
+
+        let settings_config: serde_json::Value = serde_json::from_str(seed.settings_config_json)
+            .map_err(|e| {
+                AppError::Database(format!("Seed JSON parse failed for {}: {e}", seed.id))
+            })?;
+
+        let next_sort_index = self.next_sort_index_for_app(app_type_str)?;
+        let now_ms = chrono::Utc::now().timestamp_millis();
+
+        let mut provider = Provider::with_id(
+            seed.id.to_string(),
+            seed.name.to_string(),
+            settings_config,
+            Some(seed.website_url.to_string()),
         );
-        return Ok(Some(existing));
-    }
+        provider.category = Some("official".to_string());
+        provider.icon = Some(seed.icon.to_string());
+        provider.icon_color = Some(seed.icon_color.to_string());
+        provider.sort_index = Some(next_sort_index);
+        provider.created_at = Some(now_ms);
 
-    // Codex: 保留用户已填的 API key，其余字段用种子数据覆盖
-    if app_type == "codex"
-        && crate::database::dao::providers_seed::CODEX_OFFICIAL_PROVIDER_IDS
-            .iter()
-            .any(|(id, _, _, _, _, _)| *id == provider.id)
-    {
-        let existing_settings_config = tx
-            .query_row(
-                "SELECT settings_config FROM providers WHERE app_type = ?1 AND id = ?2",
-                params![app_type, provider.id],
-                |row| row.get::<_, String>(0),
+        self.save_provider(app_type_str, &provider)?;
+
+        Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod ensure_official_seed_tests {
+    use crate::app_config::AppType;
+    use crate::database::{
+        Database, CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID, CODEX_OFFICIAL_PROVIDER_ID,
+    };
+
+    #[test]
+    fn ensure_inserts_when_missing() {
+        let db = Database::memory().expect("memory db");
+        let inserted = db
+            .ensure_official_seed_by_id(CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID, AppType::ClaudeDesktop)
+            .expect("ensure ok");
+        assert!(inserted, "should insert when missing");
+
+        let provider = db
+            .get_provider_by_id(
+                CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID,
+                AppType::ClaudeDesktop.as_str(),
             )
-            .map_err(|e| AppError::Database(e.to_string()))?;
+            .expect("query ok")
+            .expect("provider exists after ensure");
 
-        let existing: Value =
-            serde_json::from_str(&existing_settings_config).unwrap_or_else(|_| json!({}));
-        let mut next = provider.settings_config.clone();
-
-        let api_key_opt = existing
-            .get("auth")
-            .and_then(|auth| auth.get("OPENAI_API_KEY"))
-            .and_then(|value| value.as_str())
-            .or_else(|| {
-                // 仅作为旧数据迁移来源；目标配置仍使用每个官方供应商自己的 env_key。
-                existing
-                    .get("env")
-                    .and_then(|env| env.get("CODEX_API_KEY"))
-                    .and_then(|value| value.as_str())
-            });
-
-        if let Some(api_key) = api_key_opt {
-            if let Some(auth) = next.get_mut("auth").and_then(|value| value.as_object_mut()) {
-                auth.insert("OPENAI_API_KEY".to_string(), json!(api_key));
-            }
-        }
-
-        return Ok(Some(next));
+        assert_eq!(provider.id, CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID);
+        assert_eq!(provider.name, "Claude Desktop Official");
+        assert_eq!(provider.category.as_deref(), Some("official"));
+        assert_eq!(provider.icon.as_deref(), Some("anthropic"));
+        assert_eq!(provider.icon_color.as_deref(), Some("#D4915D"));
     }
 
-    // OpenClaw / Hermes: 保留用户已填的 apiKey / api_key，其余字段用种子数据覆盖
-    if (app_type == "openclaw" || app_type == "hermes")
-        && (crate::database::dao::providers_seed::OPENCLAW_OFFICIAL_PROVIDER_IDS
-            .iter()
-            .any(|(id, _, _, _, _)| *id == provider.id)
-            || crate::database::dao::providers_seed::HERMES_OFFICIAL_PROVIDER_IDS
+    #[test]
+    fn ensure_skips_when_present_and_preserves_customization() {
+        let db = Database::memory().expect("memory db");
+        db.init_default_official_providers().expect("seed");
+
+        let mut renamed = db
+            .get_provider_by_id(
+                CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID,
+                AppType::ClaudeDesktop.as_str(),
+            )
+            .expect("query ok")
+            .expect("seed present");
+        renamed.name = "My Custom Backup".to_string();
+        db.save_provider(AppType::ClaudeDesktop.as_str(), &renamed)
+            .expect("save customization");
+
+        let inserted = db
+            .ensure_official_seed_by_id(CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID, AppType::ClaudeDesktop)
+            .expect("ensure ok");
+        assert!(!inserted, "should skip when present");
+
+        let after = db
+            .get_provider_by_id(
+                CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID,
+                AppType::ClaudeDesktop.as_str(),
+            )
+            .expect("query ok")
+            .expect("still present");
+        assert_eq!(
+            after.name, "My Custom Backup",
+            "customization must not be overwritten"
+        );
+    }
+
+    #[test]
+    fn ensure_recreates_codex_official_seed_after_deletion() {
+        let db = Database::memory().expect("memory db");
+        db.init_default_official_providers().expect("seed");
+        db.delete_provider(AppType::Codex.as_str(), CODEX_OFFICIAL_PROVIDER_ID)
+            .expect("delete Codex official");
+
+        let inserted = db
+            .ensure_official_seed_by_id(CODEX_OFFICIAL_PROVIDER_ID, AppType::Codex)
+            .expect("ensure Codex official");
+        assert!(inserted);
+        let provider = db
+            .get_provider_by_id(CODEX_OFFICIAL_PROVIDER_ID, AppType::Codex.as_str())
+            .expect("query")
+            .expect("Codex official restored");
+        assert_eq!(provider.category.as_deref(), Some("official"));
+        assert_eq!(provider.settings_config["auth"], serde_json::json!({}));
+    }
+
+    #[test]
+    fn ensure_rejects_unknown_seed() {
+        let db = Database::memory().expect("memory db");
+        let result = db.ensure_official_seed_by_id("nonexistent-id", AppType::ClaudeDesktop);
+        assert!(result.is_err(), "unknown seed id should be Err");
+    }
+
+    #[test]
+    fn ensure_rejects_seed_app_type_mismatch() {
+        let db = Database::memory().expect("memory db");
+        let result =
+            db.ensure_official_seed_by_id(CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID, AppType::Claude);
+        assert!(result.is_err(), "(id, app_type) mismatch should be Err");
+    }
+
+    #[test]
+    fn tuzi_seeds_are_additive_and_preserve_existing_provider() {
+        let db = Database::memory().expect("memory db");
+        let mut existing = crate::provider::Provider::with_id(
+            "tuzi-route".to_string(),
+            "我的兔子线路".to_string(),
+            serde_json::json!({"auth":{"OPENAI_API_KEY":"sk-user"},"config":"model = \"custom\""}),
+            Some("https://user.example".to_string()),
+        );
+        existing.category = Some("custom".to_string());
+        db.save_provider(AppType::Codex.as_str(), &existing)
+            .expect("save existing");
+
+        let inserted = db.init_default_tuzi_providers().expect("seed Tuzi");
+        assert!(inserted > 0);
+        let after = db
+            .get_provider_by_id("tuzi-route", AppType::Codex.as_str())
+            .expect("query")
+            .expect("existing provider");
+        assert_eq!(after.name, "我的兔子线路");
+        assert_eq!(after.website_url.as_deref(), Some("https://user.example"));
+        assert_eq!(
+            after.settings_config.pointer("/auth/OPENAI_API_KEY"),
+            Some(&serde_json::json!("sk-user"))
+        );
+        let endpoints = after
+            .meta
+            .expect("provider meta")
+            .custom_endpoints
+            .into_keys()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            endpoints,
+            crate::database::dao::providers_seed::TUZI_CODEX_ROUTE_ENDPOINTS
                 .iter()
-                .any(|(id, _, _, _, _)| *id == provider.id))
-    {
-        let existing_settings_config = tx
-            .query_row(
-                "SELECT settings_config FROM providers WHERE app_type = ?1 AND id = ?2",
-                params![app_type, provider.id],
-                |row| row.get::<_, String>(0),
-            )
-            .map_err(|e| AppError::Database(e.to_string()))?;
-
-        let existing: Value =
-            serde_json::from_str(&existing_settings_config).unwrap_or_else(|_| json!({}));
-        let mut next = provider.settings_config.clone();
-
-        // 保留用户的 apiKey (openclaw) 或 api_key (hermes)
-        let key_field = if app_type == "openclaw" {
-            "apiKey"
-        } else {
-            "api_key"
-        };
-        if let Some(api_key) = existing.get(key_field).and_then(|v| v.as_str()) {
-            if !api_key.is_empty() {
-                if let Some(obj) = next.as_object_mut() {
-                    obj.insert(key_field.to_string(), json!(api_key));
-                }
-            }
-        }
-
-        return Ok(Some(next));
+                .map(|url| (*url).to_string())
+                .collect()
+        );
     }
-
-    Ok(None)
-}
-
-fn migrate_claude_tuzi_route_base_url(tx: &rusqlite::Transaction<'_>) -> Result<(), AppError> {
-    tx.execute(
-        "UPDATE providers
-         SET settings_config = json_set(
-             settings_config,
-             '$.env.ANTHROPIC_BASE_URL',
-             'https://apius.tu-zi.com'
-         )
-         WHERE app_type = 'claude'
-           AND name = '兔子线路'
-           AND rtrim(
-               CASE
-                   WHEN json_valid(settings_config)
-                   THEN json_extract(settings_config, '$.env.ANTHROPIC_BASE_URL')
-                   ELSE NULL
-               END,
-               '/ ' || char(9) || char(10) || char(13)
-           ) = 'https://api.tu-zi.com'",
-        [],
-    )
-    .map_err(|e| AppError::Database(e.to_string()))?;
-    Ok(())
-}
-
-fn ensure_seed_current_provider(
-    tx: &rusqlite::Transaction<'_>,
-    app_type: &str,
-    previous_current: Option<&str>,
-) -> Result<(), AppError> {
-    let current_exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM providers WHERE app_type = ?1 AND is_current = 1)",
-            params![app_type],
-            |row| row.get(0),
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
-
-    if current_exists && !matches!(previous_current, Some("default") | Some("codex-official")) {
-        return Ok(());
-    }
-
-    let current_id = tx
-        .query_row(
-            "SELECT id FROM providers WHERE app_type = ?1 ORDER BY COALESCE(sort_index, 999999), created_at ASC, id ASC LIMIT 1",
-            params![app_type],
-            |row| row.get::<_, String>(0),
-        )
-        .ok();
-    if let Some(id) = current_id {
-        tx.execute(
-            "UPDATE providers SET is_current = CASE WHEN id = ?1 THEN 1 ELSE 0 END WHERE app_type = ?2",
-            params![id, app_type],
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
-    }
-
-    Ok(())
 }

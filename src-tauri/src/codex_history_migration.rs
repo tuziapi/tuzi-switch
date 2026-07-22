@@ -8,7 +8,7 @@ use crate::codex_config::{
 };
 use crate::codex_state_db::codex_state_db_paths;
 use crate::config::{atomic_write, copy_file, get_app_config_dir};
-use crate::database::Database;
+use crate::database::{is_official_seed_id, Database};
 use crate::error::AppError;
 use crate::settings::{
     CodexOfficialHistoryUnifyMigration, CodexProviderTemplateMigration,
@@ -52,6 +52,10 @@ const LEGACY_CC_SWITCH_CODEX_MODEL_PROVIDER_ID: &str = "ccswitch";
 // so local history can be bucketed under the current custom provider id.
 const CC_SWITCH_LEGACY_CODEX_MODEL_PROVIDER_IDS: &[&str] = &[
     LEGACY_CC_SWITCH_CODEX_MODEL_PROVIDER_ID,
+    "custom",
+    "tuzi",
+    "coding",
+    "gac",
     "aicodemirror",
     "aicoding",
     "aigocode",
@@ -175,9 +179,8 @@ pub fn maybe_migrate_codex_third_party_history_provider_bucket(
 
 /// 补迁 state DB 中仍残留的本机自定义 Codex provider 桶。
 ///
-/// 旧版迁移可能已经写入 marker，但当时只识别了部分 provider id 或只扫描了
-/// 一个 state DB。这个入口不依赖 marker，只处理 tuzi-switch 数据库里定义过
-/// 的自定义 provider id，且复用原有 SQLite 备份和事务更新。
+/// 旧版迁移可能已有完成标记，但只扫描过部分 provider id 或旧 state DB 路径。
+/// 此入口不依赖标记，只处理 Tuzi 数据库中定义过的可信 provider id。
 pub fn migrate_codex_defined_state_history_to_unified_bucket(
     db: &Database,
 ) -> Result<CodexHistoryProviderBucketMigrationOutcome, AppError> {
@@ -189,10 +192,6 @@ pub fn migrate_codex_defined_state_history_to_unified_bucket(
     }
 
     let source_provider_ids = collect_source_model_provider_ids(db)?;
-    log::info!(
-        "Codex defined state history migration sources: {:?}",
-        source_provider_ids
-    );
     if source_provider_ids.is_empty() {
         return Ok(CodexHistoryProviderBucketMigrationOutcome {
             skipped_reason: Some("no_defined_state_provider_ids".to_string()),
@@ -211,14 +210,14 @@ pub fn migrate_codex_defined_state_history_to_unified_bucket(
     let backup_root = migration_backup_root(MIGRATION_NAME);
     let migrated_state_rows =
         migrate_codex_state_dbs(&codex_dir, &source_provider_ids, &backup_root)?;
-    let source_provider_ids_vec: Vec<String> = source_provider_ids.iter().cloned().collect();
+    let source_provider_ids: Vec<String> = source_provider_ids.into_iter().collect();
 
     if migrated_state_rows > 0 {
         crate::settings::mark_codex_third_party_history_provider_bucket_migrated(
             CodexThirdPartyHistoryProviderBucketMigration {
                 completed_at: Utc::now().to_rfc3339(),
                 target_provider_id: CC_SWITCH_CODEX_MODEL_PROVIDER_ID.to_string(),
-                source_provider_ids: source_provider_ids_vec.clone(),
+                source_provider_ids: source_provider_ids.clone(),
                 migrated_jsonl_files: 0,
                 migrated_state_rows,
                 scanned_history_files: true,
@@ -227,7 +226,7 @@ pub fn migrate_codex_defined_state_history_to_unified_bucket(
     }
 
     Ok(CodexHistoryProviderBucketMigrationOutcome {
-        source_provider_ids: source_provider_ids_vec,
+        source_provider_ids,
         migrated_jsonl_files: 0,
         migrated_state_rows,
         skipped_reason: None,
@@ -261,7 +260,7 @@ pub fn maybe_migrate_codex_provider_template_bucket(
 /// 重新开启并再次勾选即可补迁关闭期间产生的官方会话。
 /// custom 桶里官方与第三方会话无法区分，自动逻辑绝不反向搬回；
 /// 用户可在关闭开关时选择按备份账本精确还原（见 `restore_codex_official_history_from_backups`）。
-/// 迁移前 jsonl / state DB 均备份到 `~/.cc-switch/backups/codex-official-history-unify-v1/`。
+/// 迁移前 jsonl / state DB 均备份到 `~/.tuzi-switch/backups/codex-official-history-unify-v1/`。
 pub fn maybe_migrate_codex_official_history_to_unified_bucket(
 ) -> Result<CodexHistoryProviderBucketMigrationOutcome, AppError> {
     if !crate::settings::unify_codex_session_history() {
@@ -503,10 +502,13 @@ fn restore_codex_official_history_inner(
 /// codex_config_dir 后拿旧目录的账本作用到新目录。
 /// 还原操作自身的备份（restore 目录）天然不会混入：那些副本里的 id 都是
 /// custom，解析后贡献为空。
+type OfficialSessionLedger = HashMap<String, String>;
+type OfficialThreadLedger = BTreeMap<String, String>;
+
 fn collect_official_ledger(
     ledger_parent: &Path,
     codex_dir_key: &str,
-) -> Result<(HashMap<String, String>, BTreeMap<String, String>), AppError> {
+) -> Result<(OfficialSessionLedger, OfficialThreadLedger), AppError> {
     let mut sessions = HashMap::new();
     let mut threads = BTreeMap::new();
     let entries = match fs::read_dir(ledger_parent) {
@@ -554,15 +556,15 @@ fn backup_generation_matches_dir(generation: &Path, codex_dir_key: &str) -> bool
 }
 
 fn collect_official_sessions_from_backup(path: &Path, sessions: &mut HashMap<String, String>) {
-    let Ok(content) = fs::read_to_string(path) else {
+    let Ok(file) = fs::File::open(path) else {
         log::debug!("Failed to read unify backup file {}", path.display());
         return;
     };
-    for line in content.lines() {
+    for line in BufReader::new(file).lines().map_while(Result::ok) {
         if !line.contains("\"session_meta\"") || !line.contains("\"model_provider\"") {
             continue;
         }
-        let Ok(value) = serde_json::from_str::<Value>(line) else {
+        let Ok(value) = serde_json::from_str::<Value>(&line) else {
             continue;
         };
         if value.get("type").and_then(Value::as_str) != Some("session_meta") {
@@ -754,8 +756,8 @@ fn migrate_codex_provider_templates_to_custom(
 
     for (_, provider) in providers {
         if provider.category.as_deref() == Some("official")
+            || is_official_seed_id(&provider.id)
             || provider.is_codex_oauth()
-            || crate::database::is_codex_official_seed_id(&provider.id)
         {
             continue;
         }
@@ -799,8 +801,8 @@ fn collect_source_model_provider_ids(db: &Database) -> Result<BTreeSet<String>, 
 
     for provider in providers.values() {
         if provider.category.as_deref() == Some("official")
+            || is_official_seed_id(&provider.id)
             || provider.is_codex_oauth()
-            || crate::database::is_codex_official_seed_id(&provider.id)
         {
             continue;
         }
@@ -858,8 +860,6 @@ fn existing_state_db_provider_ids(
         return Ok(BTreeSet::new());
     }
 
-    // 枚举 provider 只读即可；使用读写打开会尝试创建 WAL/SHM，
-    // 对只读挂载或无写权限的历史库会误判为整次迁移失败。
     let conn = Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|e| AppError::Database(format!("打开 Codex state DB 失败: {e}")))?;
     conn.busy_timeout(Duration::from_secs(5))
@@ -916,14 +916,26 @@ fn legacy_codex_model_provider_id_from_normalized_config(config_text: &str) -> O
         .map(str::trim)?;
     if provider_id != CC_SWITCH_CODEX_MODEL_PROVIDER_ID
         && provider_id != LEGACY_CC_SWITCH_CODEX_MODEL_PROVIDER_ID
+        && provider_id != "custom"
     {
         return None;
     }
 
+    // Older Tuzi builds could retain `model_provider = "custom"` while the
+    // normalized provider table had already moved to the stable `tuziswitch`
+    // bucket. Prefer the referenced table, then fall back to the current
+    // shared bucket so the original preset id can still be recovered.
+    let model_providers = doc
+        .get("model_providers")
+        .and_then(|item| item.as_table())?;
     let name = doc
         .get("model_providers")
         .and_then(|item| item.as_table())
-        .and_then(|table| table.get(provider_id))
+        .and_then(|table| {
+            table
+                .get(provider_id)
+                .or_else(|| model_providers.get(CC_SWITCH_CODEX_MODEL_PROVIDER_ID))
+        })
         .and_then(|item| item.as_table())
         .and_then(|table| table.get("name"))
         .and_then(|item| item.as_str())?
@@ -1328,7 +1340,7 @@ fn codex_state_db_has_provider_ids(
         return Ok(false);
     }
 
-    let conn = Connection::open(db_path)
+    let conn = Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|e| AppError::Database(format!("打开 Codex state DB 失败: {e}")))?;
     conn.busy_timeout(Duration::from_secs(5))
         .map_err(|e| AppError::Database(format!("设置 Codex state DB busy_timeout 失败: {e}")))?;
@@ -1383,12 +1395,6 @@ fn migrate_codex_state_db_provider_bucket(
             |row| row.get(0),
         )
         .map_err(|e| AppError::Database(format!("统计 Codex state DB 待迁移行失败: {e}")))?;
-    log::info!(
-        "Codex state DB migration candidate rows: path={}, rows={}, sources={:?}",
-        db_path.display(),
-        matching_rows,
-        source_provider_ids
-    );
     if matching_rows == 0 {
         return Ok(0);
     }
@@ -1406,11 +1412,6 @@ fn migrate_codex_state_db_provider_bucket(
     let changed = tx
         .execute(&update_sql, params_from_iter(values.iter()))
         .map_err(|e| AppError::Database(format!("迁移 Codex state DB provider 失败: {e}")))?;
-    log::info!(
-        "Codex state DB migration changed rows: path={}, rows={}",
-        db_path.display(),
-        changed
-    );
     tx.commit()
         .map_err(|e| AppError::Database(format!("提交 Codex state DB 迁移事务失败: {e}")))?;
     Ok(changed)
@@ -1445,13 +1446,14 @@ fn backup_codex_state_db(
     if let Some(parent) = backup_path.parent() {
         fs::create_dir_all(parent).map_err(|e| AppError::io(parent, e))?;
     }
-    let mut destination = Connection::open(&backup_path)
+
+    let mut backup_conn = Connection::open(&backup_path)
         .map_err(|e| AppError::Database(format!("创建 Codex state DB 备份失败: {e}")))?;
-    let backup = Backup::new(source_conn, &mut destination)
-        .map_err(|e| AppError::Database(format!("初始化 Codex state DB 在线备份失败: {e}")))?;
+    let backup = Backup::new(source_conn, &mut backup_conn)
+        .map_err(|e| AppError::Database(format!("初始化 Codex state DB 备份失败: {e}")))?;
     backup
-        .run_to_completion(128, Duration::from_millis(10), None)
-        .map_err(|e| AppError::Database(format!("执行 Codex state DB 在线备份失败: {e}")))?;
+        .run_to_completion(5, Duration::from_millis(25), None)
+        .map_err(|e| AppError::Database(format!("写入 Codex state DB 备份失败: {e}")))?;
     Ok(())
 }
 
@@ -1883,7 +1885,7 @@ base_url = "https://proxy.example/v1"
             &session_path,
             concat!(
                 "{\"type\":\"session_meta\",\"payload\":{\"id\":\"s1\",\"model_provider\":\"openai\"}}\n",
-                "{\"type\":\"session_meta\",\"payload\":{\"id\":\"s-new\",\"model_provider\":\"codex\"}}\n",
+                "{\"type\":\"session_meta\",\"payload\":{\"id\":\"s-codex\",\"model_provider\":\"codex\"}}\n",
                 "{\"type\":\"session_meta\",\"payload\":{\"id\":\"s2\",\"model_provider\":\"tuziswitch\"}}\n",
                 "{\"type\":\"session_meta\",\"payload\":{\"id\":\"s3\",\"model_provider\":\"my-private-relay\"}}\n",
                 "{\"type\":\"response_item\",\"payload\":{\"text\":\"openai\"}}\n",
@@ -2388,7 +2390,6 @@ base_url = "https://proxy.example/v1"
             paths,
             vec![
                 codex_dir.join(CODEX_STATE_DB_FILENAME),
-                codex_dir.join("sqlite").join(CODEX_STATE_DB_FILENAME),
                 sqlite_home.join(CODEX_STATE_DB_FILENAME),
             ]
         );
@@ -2402,7 +2403,8 @@ base_url = "https://proxy.example/v1"
         let env_sqlite_home = dir.path().join("env-sqlite-home");
         let config_sqlite_home = dir.path().join("config-sqlite-home");
         let _guard = EnvVarGuard::set("CODEX_SQLITE_HOME", &env_sqlite_home);
-        let config_text = format!("sqlite_home = \"{}\"\n", config_sqlite_home.display());
+        // TOML 字面量字符串(单引号)：Windows 路径含反斜杠，basic string 会解析失败。
+        let config_text = format!("sqlite_home = '{}'\n", config_sqlite_home.display());
 
         let paths = codex_state_db_paths(&codex_dir, &config_text);
 
@@ -2410,7 +2412,6 @@ base_url = "https://proxy.example/v1"
             paths,
             vec![
                 codex_dir.join(CODEX_STATE_DB_FILENAME),
-                codex_dir.join("sqlite").join(CODEX_STATE_DB_FILENAME),
                 config_sqlite_home.join(CODEX_STATE_DB_FILENAME),
             ]
         );
@@ -2523,7 +2524,7 @@ model_provider = "my-private-relay"
             "AIHubMix".to_string(),
             serde_json::json!({
                 "auth": {},
-                "config": "model_provider = \"tuziswitch\"\n\n[model_providers.tuziswitch]\nname = \"AIHubMix\"\nbase_url = \"https://aihubmix.example/v1\""
+                "config": "model_provider = \"custom\"\n\n[model_providers.tuziswitch]\nname = \"AIHubMix\"\nbase_url = \"https://aihubmix.example/v1\""
             }),
             None,
         );

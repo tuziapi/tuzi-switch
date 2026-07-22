@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::timeout;
 
 use crate::app_config::{AppType, InstalledSkill, SkillApps, UnmanagedSkill};
@@ -38,34 +39,11 @@ pub enum SyncMethod {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SkillStorageLocation {
-    /// tuzi switch 管理目录 (~/.tuzi-switch/skills/)
+    /// Tuzi Switch 管理目录 (~/.tuzi-switch/skills/)
     #[default]
     CcSwitch,
     /// Agent Skills 统一标准目录 (~/.agents/skills/)
     Unified,
-}
-
-impl SkillStorageLocation {
-    pub fn as_command_target(&self) -> &'static str {
-        match self {
-            SkillStorageLocation::CcSwitch => "cc_switch",
-            SkillStorageLocation::Unified => "unified",
-        }
-    }
-}
-
-impl std::str::FromStr for SkillStorageLocation {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "cc_switch" | "tuzi_switch" => Ok(SkillStorageLocation::CcSwitch),
-            "unified" => Ok(SkillStorageLocation::Unified),
-            other => Err(format!(
-                "invalid skill storage location `{other}`: expected `cc_switch`, `tuzi_switch`, or `unified`"
-            )),
-        }
-    }
 }
 
 /// 可发现的技能（来自仓库）
@@ -396,20 +374,15 @@ fn parse_branch_from_source_url(source_url: Option<&str>) -> Option<String> {
 
 /// 获取 `~/.agents/skills/` 目录（存在时返回）
 fn get_agents_skills_dir() -> Option<PathBuf> {
-    dirs::home_dir()
-        .map(|h| h.join(".agents").join("skills"))
-        .filter(|p| p.exists())
+    let dir = crate::config::get_home_dir().join(".agents").join("skills");
+    dir.exists().then_some(dir)
 }
 
 /// 解析 `~/.agents/.skill-lock.json`，返回 skill_name -> 仓库信息
 fn parse_agents_lock() -> HashMap<String, LockRepoInfo> {
-    let path = match dirs::home_dir() {
-        Some(h) => h.join(".agents").join(".skill-lock.json"),
-        None => {
-            log::warn!("无法获取 HOME 目录，跳过解析 agents lock 文件");
-            return HashMap::new();
-        }
-    };
+    let path = crate::config::get_home_dir()
+        .join(".agents")
+        .join(".skill-lock.json");
     let content = match fs::read_to_string(&path) {
         Ok(c) => c,
         Err(e) => {
@@ -504,12 +477,7 @@ impl SkillService {
         let dir = match location {
             SkillStorageLocation::CcSwitch => get_app_config_dir().join("skills"),
             SkillStorageLocation::Unified => {
-                let home = dirs::home_dir().context(format_skill_error(
-                    "GET_HOME_DIR_FAILED",
-                    &[],
-                    Some("checkPermission"),
-                ))?;
-                home.join(".agents").join("skills")
+                crate::config::get_home_dir().join(".agents").join("skills")
             }
         };
         fs::create_dir_all(&dir)?;
@@ -560,12 +528,10 @@ impl SkillService {
             }
         }
 
-        // 默认路径：回退到用户主目录下的标准位置
-        let home = dirs::home_dir().context(format_skill_error(
-            "GET_HOME_DIR_FAILED",
-            &[],
-            Some("checkPermission"),
-        ))?;
+        // 默认路径：回退到用户主目录下的标准位置。
+        // 必须走 get_home_dir()（可被 CC_SWITCH_TEST_HOME 覆盖）：Windows 上 dirs::home_dir()
+        // 走 Known Folder API，测试无法隔离真实用户目录。
+        let home = crate::config::get_home_dir();
 
         Ok(match app {
             AppType::Claude => home.join(".claude").join("skills"),
@@ -1189,8 +1155,7 @@ impl SkillService {
         let new_dir = match target {
             SkillStorageLocation::CcSwitch => get_app_config_dir().join("skills"),
             SkillStorageLocation::Unified => {
-                let home = dirs::home_dir().context("Cannot determine home directory")?;
-                home.join(".agents").join("skills")
+                crate::config::get_home_dir().join(".agents").join("skills")
             }
         };
         fs::create_dir_all(&new_dir)?;
@@ -1402,7 +1367,7 @@ impl SkillService {
 
     /// 扫描未管理的 Skills
     ///
-    /// 扫描各应用目录，找出未被 tuzi switch 管理的 Skills
+    /// 扫描各应用目录，找出未被 CC Switch 管理的 Skills
     pub fn scan_unmanaged(db: &Arc<Database>) -> Result<Vec<UnmanagedSkill>> {
         let managed_skills = db.get_all_installed_skills()?;
         let managed_dirs: HashSet<String> = managed_skills
@@ -1421,7 +1386,7 @@ impl SkillService {
             scan_sources.push((agents_dir, "agents".to_string()));
         }
         if let Ok(ssot_dir) = Self::get_ssot_dir() {
-            scan_sources.push((ssot_dir, "tuzi-switch".to_string()));
+            scan_sources.push((ssot_dir, "cc-switch".to_string()));
         }
 
         let mut unmanaged: HashMap<String, UnmanagedSkill> = HashMap::new();
@@ -1465,7 +1430,7 @@ impl SkillService {
 
     /// 从应用目录导入 Skills
     ///
-    /// 将未管理的 Skills 导入到 tuzi switch 统一管理
+    /// 将未管理的 Skills 导入到 CC Switch 统一管理
     pub fn import_from_apps(
         db: &Arc<Database>,
         imports: Vec<ImportSkillSelection>,
@@ -1491,7 +1456,7 @@ impl SkillService {
         if let Some(agents_dir) = get_agents_skills_dir() {
             search_sources.push((agents_dir, "agents".to_string()));
         }
-        search_sources.push((ssot_dir.clone(), "tuzi-switch".to_string()));
+        search_sources.push((ssot_dir.clone(), "cc-switch".to_string()));
 
         for selection in imports {
             let dir_name = selection.directory;
@@ -1613,24 +1578,27 @@ impl SkillService {
         let ssot_dir = Self::get_ssot_dir()?;
         let source = ssot_dir.join(directory);
 
-        if !source.exists() {
-            return Err(anyhow!("Skill 不存在于 SSOT: {directory}"));
-        }
+        Self::validate_sync_source_dir(&source, directory)?;
 
         let app_dir = Self::get_app_skills_dir(app)?;
         fs::create_dir_all(&app_dir)?;
 
         let dest = app_dir.join(directory);
 
-        // 如果已存在则先删除（无论是 symlink 还是真实目录）
-        if dest.exists() || Self::is_symlink(&dest) {
-            Self::remove_path(&dest)?;
-        }
-
         let sync_method = Self::get_sync_method();
 
         match sync_method {
             SyncMethod::Auto => {
+                if dest.exists() && !Self::is_symlink(&dest) {
+                    Self::replace_dest_with_copy(&source, &dest, directory)?;
+                    log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
+                    return Ok(());
+                }
+
+                if Self::is_symlink(&dest) {
+                    Self::remove_path(&dest)?;
+                }
+
                 // 优先尝试 symlink
                 match Self::create_symlink(&source, &dest) {
                     Ok(()) => {
@@ -1646,15 +1614,18 @@ impl SkillService {
                     }
                 }
                 // Fallback 到 copy
-                Self::copy_dir_recursive(&source, &dest)?;
+                Self::replace_dest_with_copy(&source, &dest, directory)?;
                 log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
             }
             SyncMethod::Symlink => {
+                if dest.exists() || Self::is_symlink(&dest) {
+                    Self::remove_path(&dest)?;
+                }
                 Self::create_symlink(&source, &dest)?;
                 log::debug!("Skill {directory} 已通过 symlink 同步到 {app:?}");
             }
             SyncMethod::Copy => {
-                Self::copy_dir_recursive(&source, &dest)?;
+                Self::replace_dest_with_copy(&source, &dest, directory)?;
                 log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
             }
         }
@@ -1683,6 +1654,63 @@ impl SkillService {
             // 普通文件
             fs::remove_file(path)?;
         }
+        Ok(())
+    }
+
+    fn validate_sync_source_dir(source: &Path, directory: &str) -> Result<()> {
+        if !source.is_dir() {
+            return Err(anyhow!("Skill 不存在于 SSOT: {directory}"));
+        }
+
+        let manifest = source.join("SKILL.md");
+        if !manifest.is_file() {
+            return Err(anyhow!(
+                "Skill 源目录缺少 SKILL.md，拒绝同步以避免覆盖目标目录: {}",
+                source.display()
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn replace_dest_with_copy(source: &Path, dest: &Path, directory: &str) -> Result<()> {
+        Self::validate_sync_source_dir(source, directory)?;
+
+        let parent = dest
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid skill destination: {}", dest.display()))?;
+        fs::create_dir_all(parent)?;
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let tmp_name = Self::sanitize_backup_segment(directory);
+        let tmp = parent.join(format!(".{tmp_name}.tmp-{}-{nonce}", std::process::id()));
+
+        if tmp.exists() || Self::is_symlink(&tmp) {
+            Self::remove_path(&tmp)?;
+        }
+
+        let copy_result = Self::copy_dir_recursive(source, &tmp);
+        if let Err(err) = copy_result {
+            let _ = Self::remove_path(&tmp);
+            return Err(err);
+        }
+
+        if dest.exists() || Self::is_symlink(dest) {
+            Self::remove_path(dest)?;
+        }
+
+        fs::rename(&tmp, dest).with_context(|| {
+            let _ = Self::remove_path(&tmp);
+            format!(
+                "替换 Skill 目录失败: {} -> {}",
+                tmp.display(),
+                dest.display()
+            )
+        })?;
+
         Ok(())
     }
 
@@ -1923,7 +1951,7 @@ impl SkillService {
                     .strip_prefix(base_dir)
                     .unwrap_or(current_dir)
                     .to_string_lossy()
-                    .to_string()
+                    .replace('\\', "/")
             };
 
             let doc_path = skill_md
@@ -3029,6 +3057,36 @@ mod tests {
     }
 
     #[test]
+    // serial：与 backup/s3_sync/deeplink 等同样读写进程级 CC_SWITCH_TEST_HOME 的测试互斥，
+    // EnvGuard 只负责恢复不提供互斥。
+    #[serial_test::serial]
+    fn get_app_skills_dir_honors_test_home_override() {
+        // 回归：曾直呼 dirs::home_dir() 绕过 CC_SWITCH_TEST_HOME——Unix 上碰巧跟 $HOME
+        // 一致所以测试能过，Windows 上 dirs 走 Known Folder API，测试隔离整体失效
+        // （tests/skill_sync.rs 扫到 runner 真实用户目录）。
+        struct EnvGuard(Option<std::ffi::OsString>);
+        impl Drop for EnvGuard {
+            fn drop(&mut self) {
+                match self.0.take() {
+                    Some(value) => std::env::set_var("CC_SWITCH_TEST_HOME", value),
+                    None => std::env::remove_var("CC_SWITCH_TEST_HOME"),
+                }
+            }
+        }
+        let temp = tempdir().expect("tempdir");
+        let _guard = EnvGuard(std::env::var_os("CC_SWITCH_TEST_HOME"));
+        std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
+
+        let dir =
+            SkillService::get_app_skills_dir(&AppType::Claude).expect("resolve claude skills dir");
+        assert!(
+            dir.starts_with(temp.path()),
+            "skills dir must live under the overridden test home, got {}",
+            dir.display()
+        );
+    }
+
+    #[test]
     fn resolve_skill_source_dir_returns_repo_root_for_root_level_skill() {
         let temp = tempdir().expect("tempdir");
         write_skill(temp.path(), "Root Skill");
@@ -3061,5 +3119,26 @@ mod tests {
             .expect("install name should fall back to the matching discovered skill directory");
 
         assert_eq!(resolved, nested);
+    }
+
+    #[test]
+    fn replace_dest_with_copy_rejects_empty_source_without_touching_existing_dest() {
+        let temp = tempdir().expect("tempdir");
+        let source = temp.path().join("source-skill");
+        let dest = temp.path().join("app-skills").join("source-skill");
+        fs::create_dir_all(&source).expect("create empty source");
+        write_skill(&dest, "Existing Skill");
+
+        let err = SkillService::replace_dest_with_copy(&source, &dest, "source-skill")
+            .expect_err("empty source should not replace existing app skill");
+
+        assert!(
+            err.to_string().contains("SKILL.md"),
+            "unexpected error: {err:#}"
+        );
+        assert!(
+            dest.join("SKILL.md").is_file(),
+            "existing destination skill should be preserved"
+        );
     }
 }

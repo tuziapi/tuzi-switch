@@ -1,8 +1,9 @@
 {
-  "name": "tu-zi-switch",
-  "version": "1.1.28",
+  "name": "tuzi-switch",
+  "version": "3.17.0-tuzi.1",
   "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI - 兔子switch",
   "type": "module",
+  "packageManager": "pnpm@10.12.3",
   "scripts": {
     "dev": "pnpm tauri dev",
     "build": "pnpm tauri build",
@@ -12,14 +13,12 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,css,json}\"",
+    "check:tuzi": "node scripts/check-tuzi-invariants.mjs",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest watch",
-    "release": "npm run release:patch",
-    "release:patch": "npm version patch",
-    "release:minor": "npm version minor",
-    "release:major": "npm version major",
-    "version": "node scripts/bump-version.cjs",
-    "postversion": "git push && git push origin --tags"
+    "release": "pnpm run version:tuzi",
+    "version:tuzi": "node scripts/bump-version.cjs",
+    "version:tuzi:dry-run": "node scripts/bump-version.cjs --dry-run"
   },
   "keywords": [],
   "author": "Jason Young",

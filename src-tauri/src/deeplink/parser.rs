@@ -19,9 +19,10 @@ pub fn parse_deeplink_url(url_str: &str) -> Result<DeepLinkImportRequest, AppErr
 
     // Validate scheme
     let scheme = url.scheme();
-    if scheme != "tuziswitch" {
+    if scheme != crate::product::DEEP_LINK_SCHEME {
         return Err(AppError::InvalidInput(format!(
-            "Invalid scheme: expected 'tuziswitch', got '{scheme}'"
+            "Invalid scheme: expected '{}', got '{scheme}'",
+            crate::product::DEEP_LINK_SCHEME
         )));
     }
 

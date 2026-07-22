@@ -89,7 +89,7 @@ export const ProviderIcon: React.FC<ProviderIconProps> = ({
         alt={name}
         title={name}
         className={cn(
-          "inline-flex items-center justify-center flex-shrink-0 object-contain rounded-md bg-background/70 ring-1 ring-border/50",
+          "inline-flex items-center justify-center flex-shrink-0 object-contain",
           className,
         )}
         style={{ width: sizeStyle.width, height: sizeStyle.height }}
