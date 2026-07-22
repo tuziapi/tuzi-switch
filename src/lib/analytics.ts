@@ -37,7 +37,13 @@ export interface AnalyticsProperties {
   app?: string;
   action?: string;
   result?: "success" | "failed" | "partial" | "degraded" | "rejected";
-  source?: "manual" | "automatic" | "tray" | "failover" | "health_check";
+  source?:
+    | "manual"
+    | "automatic"
+    | "tray"
+    | "profile"
+    | "failover"
+    | "health_check";
   enabled?: "true" | "false";
 }
 

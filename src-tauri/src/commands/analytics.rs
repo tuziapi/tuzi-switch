@@ -155,7 +155,7 @@ fn validate_event(event: &AnalyticsEvent) -> Result<(), String> {
     if data.source.as_deref().is_some_and(|value| {
         !matches!(
             value,
-            "manual" | "automatic" | "tray" | "failover" | "health_check"
+            "manual" | "automatic" | "tray" | "profile" | "failover" | "health_check"
         )
     }) {
         return Err("不支持的切换来源".to_string());
@@ -335,6 +335,21 @@ mod tests {
                 action: Some("switch".to_string()),
                 result: Some("success".to_string()),
                 source: Some("manual".to_string()),
+                ..Default::default()
+            },
+        };
+        assert!(validate_event(&event).is_ok());
+    }
+
+    #[test]
+    fn accepts_profile_as_provider_switch_source() {
+        let event = AnalyticsEvent {
+            event: "provider_action".to_string(),
+            data: AnalyticsEventData {
+                app: Some("codex".to_string()),
+                action: Some("switch".to_string()),
+                result: Some("success".to_string()),
+                source: Some("profile".to_string()),
                 ..Default::default()
             },
         };

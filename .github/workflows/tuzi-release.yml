@@ -574,6 +574,7 @@ jobs:
               "terminal.launchProvider": ">=1.0.0",
               "terminal.launchCommand": ">=1.0.0",
               "config.getAppConfigInfo": ">=1.0.0",
+              "analytics.trackProductEvent": ">=1.0.0",
               "update.getWebStatus": ">=1.0.0",
               "update.checkWeb": ">=1.0.0",
             },

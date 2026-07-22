@@ -78,6 +78,7 @@ pub fn emit_profile_apply_events(
             "proxyEnabled": proxy_enabled,
             "autoFailoverEnabled": auto_failover_enabled,
             "providerId": provider_id,
+            "source": "profile",
         });
         if let Err(e) = app.emit("provider-switched", event_data) {
             log::error!("发射 provider-switched 事件失败: {e}");

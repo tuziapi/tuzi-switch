@@ -378,11 +378,13 @@ function App() {
         const off = await providersApi.onSwitched(
           async (event: ProviderSwitchEvent) => {
             const source =
-              event.source === "failover" ||
-              event.source === "failoverEnabled" ||
-              event.autoFailoverEnabled
-                ? "failover"
-                : "tray";
+              event.source === "profile"
+                ? "profile"
+                : event.source === "failover" ||
+                    event.source === "failoverEnabled" ||
+                    event.autoFailoverEnabled
+                  ? "failover"
+                  : "tray";
             track("provider_action", {
               app: event.appType,
               action: "switch",

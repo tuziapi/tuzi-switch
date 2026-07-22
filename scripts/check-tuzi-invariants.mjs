@@ -350,6 +350,7 @@ for (const marker of [
   "tuzi-switch-linux-x86_64.AppImage.sig",
   "tuzi-switch-linux-aarch64.AppImage.sig",
   "requiredCapabilities",
+  '"analytics.trackProductEvent"',
   '"update.checkWeb"',
 ]) {
   requireValue(
