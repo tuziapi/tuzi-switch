@@ -166,17 +166,9 @@ pub fn get_claude_mcp_path() -> PathBuf {
 /// 获取 Claude Code 主配置文件路径
 pub fn get_claude_settings_path() -> PathBuf {
     let dir = get_claude_config_dir();
-    let settings = dir.join("settings.json");
-    if settings.exists() {
-        return settings;
-    }
-    // 兼容旧版命名：若存在旧文件则继续使用
-    let legacy = dir.join("claude.json");
-    if legacy.exists() {
-        return legacy;
-    }
-    // 默认新建：回落到标准文件名 settings.json（不再生成 claude.json）
-    settings
+    // Claude Code 新版只读取 settings.json。旧版 claude.json 仅保留给导入/迁移逻辑，
+    // live 写入始终落到标准路径，避免重启 Claude 后继续读到旧配置。
+    dir.join("settings.json")
 }
 
 /// 获取应用配置目录路径 (~/.tuzi-switch)

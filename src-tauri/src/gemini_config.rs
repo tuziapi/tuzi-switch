@@ -37,7 +37,7 @@ pub fn parse_env_file(content: &str) -> HashMap<String, String> {
         // 解析 KEY=VALUE
         if let Some((key, value)) = line.split_once('=') {
             let key = key.trim().to_string();
-            let value = value.trim().to_string();
+            let value = parse_env_value(value.trim());
 
             // 验证 key 是否有效（不为空，只包含字母、数字和下划线）
             if !key.is_empty() && key.chars().all(|c| c.is_alphanumeric() || c == '_') {
@@ -132,11 +132,65 @@ pub fn serialize_env_file(map: &HashMap<String, String>) -> String {
 
     for key in keys {
         if let Some(value) = map.get(key) {
-            lines.push(format!("{key}={value}"));
+            lines.push(format!("{key}={}", serialize_env_value(value)));
         }
     }
 
     lines.join("\n")
+}
+
+fn parse_env_value(value: &str) -> String {
+    let value = value.trim();
+    if value.len() < 2 || !value.starts_with('"') || !value.ends_with('"') {
+        return value.to_string();
+    }
+
+    let inner = &value[1..value.len() - 1];
+    let mut result = String::new();
+    let mut chars = inner.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            result.push(ch);
+            continue;
+        }
+
+        match chars.next() {
+            Some('n') => result.push('\n'),
+            Some('r') => result.push('\r'),
+            Some('t') => result.push('\t'),
+            Some('"') => result.push('"'),
+            Some('\\') => result.push('\\'),
+            Some(other) => {
+                result.push('\\');
+                result.push(other);
+            }
+            None => result.push('\\'),
+        }
+    }
+    result
+}
+
+fn serialize_env_value(value: &str) -> String {
+    if !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | '/' | ':' | '@'))
+    {
+        return value.to_string();
+    }
+
+    let mut escaped = String::new();
+    for ch in value.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            other => escaped.push(other),
+        }
+    }
+    format!("\"{escaped}\"")
 }
 
 /// 读取 Gemini .env 文件
@@ -409,6 +463,32 @@ GEMINI_MODEL=gemini-3.5-flash
 
         assert!(content.contains("GEMINI_API_KEY=sk-test"));
         assert!(content.contains("GEMINI_MODEL=gemini-3.5-flash"));
+    }
+
+    #[test]
+    fn test_serialize_env_file_quotes_special_values_and_round_trips() {
+        let mut map = HashMap::new();
+        map.insert(
+            "GEMINI_API_KEY".to_string(),
+            "sk test \"quoted\"\nnext".to_string(),
+        );
+        map.insert(
+            "GOOGLE_GEMINI_BASE_URL".to_string(),
+            "https://example.com/gemini api".to_string(),
+        );
+
+        let content = serialize_env_file(&map);
+        assert!(
+            content.contains("GEMINI_API_KEY=\"sk test \\\"quoted\\\"\\nnext\""),
+            "API key with spaces, quotes and newline should be escaped"
+        );
+        assert!(
+            content.contains("GOOGLE_GEMINI_BASE_URL=\"https://example.com/gemini api\""),
+            "base URL with spaces should be quoted"
+        );
+
+        let parsed = parse_env_file(&content);
+        assert_eq!(parsed, map);
     }
 
     #[test]

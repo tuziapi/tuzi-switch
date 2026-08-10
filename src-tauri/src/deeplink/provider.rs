@@ -415,7 +415,7 @@ disable_response_storage = true
 name = {provider_display_name}
 base_url = {endpoint}
 wire_api = "responses"
-requires_openai_auth = true
+requires_openai_auth = false
 "#
     );
 
