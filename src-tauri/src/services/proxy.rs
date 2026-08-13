@@ -1376,6 +1376,11 @@ impl ProxyService {
 
         if let Some(cfg_str) = config.get("config").and_then(|v| v.as_str()) {
             let updated = Self::remove_local_toml_base_url(cfg_str);
+            let updated = crate::codex_config::remove_active_codex_http_header(
+                &updated,
+                crate::proxy::codex_images::IMAGE_AUTH_HEADER,
+            )
+            .map_err(|error| format!("清理 Codex 图片鉴权头失败: {error}"))?;
             config["config"] = json!(updated);
         }
 
@@ -2115,6 +2120,75 @@ requires_openai_auth = false
             .and_then(|v| v.as_str())
             .expect("model_providers.any.wire_api should exist");
         assert_eq!(wire_api, "responses");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn codex_fallback_cleanup_removes_stale_image_token_without_backup_or_ssot() {
+        let _home = TempHome::new();
+        crate::settings::reload_settings().expect("reload settings");
+        let mut settings = crate::settings::get_settings();
+        settings.codex_config_dir = Some(
+            _home
+                .dir
+                .path()
+                .join("isolated-codex")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        settings.current_provider_codex = None;
+        crate::settings::update_settings(settings).expect("isolate Codex home");
+
+        let db = Arc::new(Database::memory().expect("init db"));
+        db.clear_current_provider("codex")
+            .expect("clear default Codex provider");
+        let service = ProxyService::new(db);
+        service
+            .write_codex_live(&json!({
+                "auth": {
+                    "OPENAI_API_KEY": PROXY_TOKEN_PLACEHOLDER
+                },
+                "config": r#"model_provider = "vendor"
+
+[model_providers.vendor]
+base_url = "http://127.0.0.1:15721/v1"
+http_headers = { X-Tuzi-Image-Token = "stale-token", X-User-Header = "keep" }
+"#
+            }))
+            .expect("seed taken-over Codex live config");
+
+        service
+            .restore_live_config_for_app_with_fallback(&AppType::Codex)
+            .await
+            .expect("fallback cleanup");
+
+        let live = service.read_codex_live().expect("read cleaned live config");
+        assert!(
+            live.get("auth")
+                .and_then(|auth| auth.get("OPENAI_API_KEY"))
+                .is_none(),
+            "cleaned live config: {live}"
+        );
+        let parsed: toml::Value = toml::from_str(
+            live.get("config")
+                .and_then(Value::as_str)
+                .expect("config text"),
+        )
+        .expect("valid TOML");
+        let provider = parsed
+            .get("model_providers")
+            .and_then(|providers| providers.get("vendor"))
+            .expect("vendor provider");
+        assert!(provider.get("base_url").is_none());
+        let headers = provider
+            .get("http_headers")
+            .and_then(toml::Value::as_table)
+            .expect("user headers retained");
+        assert!(headers.get("X-Tuzi-Image-Token").is_none());
+        assert_eq!(
+            headers.get("X-User-Header").and_then(toml::Value::as_str),
+            Some("keep")
+        );
     }
 
     #[test]

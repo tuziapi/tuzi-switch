@@ -2815,6 +2815,56 @@ pub(crate) fn set_active_codex_http_header(
     Ok(doc.to_string())
 }
 
+pub(crate) fn remove_active_codex_http_header(
+    config_text: &str,
+    header_name: &str,
+) -> Result<String, AppError> {
+    let mut doc = config_text
+        .parse::<DocumentMut>()
+        .map_err(|e| AppError::Message(format!("Invalid Codex config.toml: {e}")))?;
+    let Some(provider_id) = active_codex_model_provider_id(&doc) else {
+        return Ok(doc.to_string());
+    };
+    let Some(provider_table) = doc
+        .get_mut("model_providers")
+        .and_then(|item| item.as_table_mut())
+        .and_then(|table| table.get_mut(provider_id.as_str()))
+        .and_then(|item| item.as_table_mut())
+    else {
+        return Ok(doc.to_string());
+    };
+
+    let remove_empty_headers = match provider_table.get_mut("http_headers") {
+        Some(toml_edit::Item::Value(toml_edit::Value::InlineTable(table))) => {
+            let names: Vec<String> = table
+                .iter()
+                .map(|(name, _)| name.to_string())
+                .filter(|name| name.eq_ignore_ascii_case(header_name))
+                .collect();
+            for name in names {
+                table.remove(&name);
+            }
+            table.is_empty()
+        }
+        Some(toml_edit::Item::Table(table)) => {
+            let names: Vec<String> = table
+                .iter()
+                .map(|(name, _)| name.to_string())
+                .filter(|name| name.eq_ignore_ascii_case(header_name))
+                .collect();
+            for name in names {
+                table.remove(&name);
+            }
+            table.is_empty()
+        }
+        _ => false,
+    };
+    if remove_empty_headers {
+        provider_table.remove("http_headers");
+    }
+    Ok(doc.to_string())
+}
+
 /// Remove `base_url` from the active model_provider section only if it matches `predicate`.
 /// Also removes top-level `base_url` if it matches.
 /// Used by proxy cleanup to strip local proxy URLs without touching user-configured URLs.
@@ -4053,6 +4103,53 @@ base_url = "https://production.api/v1"
             .and_then(|v| v.get("base_url"))
             .and_then(|v| v.as_str());
         assert_eq!(base_url, Some("https://production.api/v1"));
+    }
+
+    #[test]
+    fn remove_active_http_header_handles_inline_table_case_insensitively() {
+        let input = r#"model_provider = "any"
+
+[model_providers.any]
+http_headers = { X-Tuzi-Image-Token = "stale", X-User-Header = "keep" }
+"#;
+
+        let result = remove_active_codex_http_header(input, "x-tuzi-image-token").unwrap();
+        let parsed: toml::Value = toml::from_str(&result).unwrap();
+        let headers = parsed
+            .get("model_providers")
+            .and_then(|value| value.get("any"))
+            .and_then(|value| value.get("http_headers"))
+            .and_then(toml::Value::as_table)
+            .unwrap();
+        assert!(headers.get("X-Tuzi-Image-Token").is_none());
+        assert_eq!(
+            headers.get("X-User-Header").and_then(toml::Value::as_str),
+            Some("keep")
+        );
+    }
+
+    #[test]
+    fn remove_active_http_header_handles_table_and_removes_empty_section() {
+        let input = r#"model_provider = "any"
+
+[model_providers.any]
+base_url = "https://production.api/v1"
+
+[model_providers.any.http_headers]
+X-TUZI-IMAGE-TOKEN = "stale"
+"#;
+
+        let result = remove_active_codex_http_header(input, "x-tuzi-image-token").unwrap();
+        let parsed: toml::Value = toml::from_str(&result).unwrap();
+        let provider = parsed
+            .get("model_providers")
+            .and_then(|value| value.get("any"))
+            .unwrap();
+        assert!(provider.get("http_headers").is_none());
+        assert_eq!(
+            provider.get("base_url").and_then(toml::Value::as_str),
+            Some("https://production.api/v1")
+        );
     }
 
     #[test]
