@@ -39,6 +39,30 @@ export interface CodexUnifyHistoryRestoreResult {
   skippedReason?: string;
 }
 
+export type CodexImageCompatReadinessReason =
+  | "disabled"
+  | "no_provider"
+  | "unsupported_provider"
+  | "provider_config_invalid"
+  | "missing_credential"
+  | "managed_credential_unreadable"
+  | "managed_files_missing"
+  | "local_route_inactive"
+  | "ready";
+
+export interface CodexImageCompatStatus {
+  requested: boolean;
+  ready: boolean;
+  reason: CodexImageCompatReadinessReason;
+  providerBaseUrl: string | null;
+  providerEnvKey: string | null;
+  liveBaseUrl: string | null;
+  imageKeyEnv: string;
+  imageUpstream: string;
+  imageModel: string;
+  personalizationInstruction: string;
+}
+
 export const settingsApi = {
   async get(): Promise<Settings> {
     return await invoke("get_settings");
@@ -46,6 +70,10 @@ export const settingsApi = {
 
   async save(settings: Settings): Promise<boolean> {
     return await invoke("save_settings", { settings });
+  },
+
+  async getCodexImageCompatStatus(): Promise<CodexImageCompatStatus> {
+    return await invoke("get_codex_image_compat_status");
   },
 
   async hasCodexUnifyHistoryBackup(): Promise<boolean> {

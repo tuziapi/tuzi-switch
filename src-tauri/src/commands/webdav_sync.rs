@@ -135,6 +135,10 @@ pub async fn webdav_sync_download(state: State<'_, AppState>) -> Result<Value, S
     }
     result = attach_warning(result, warning);
 
+    if let Err(error) = crate::services::codex_image_compat::reconcile(state.inner()).await {
+        log::warn!("[WebDAV] Codex 图片兼容状态收敛失败: {error}");
+    }
+
     Ok(result)
 }
 

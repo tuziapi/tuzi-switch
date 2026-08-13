@@ -45,7 +45,7 @@ pub async fn import_config_from_file(
 ) -> Result<Value, String> {
     let db = state.db.clone();
     let db_for_sync = db.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let path_buf = PathBuf::from(&filePath);
         let backup_id = db.import_sql(&path_buf)?;
         let warning = post_sync_warning_from_result(Ok(run_post_import_sync(db_for_sync)));
@@ -56,13 +56,18 @@ pub async fn import_config_from_file(
     })
     .await
     .map_err(|e| format!("导入配置失败: {e}"))?
-    .map_err(|e: AppError| e.to_string())
+    .map_err(|e: AppError| e.to_string())?;
+
+    if let Err(error) = crate::services::codex_image_compat::reconcile(state.inner()).await {
+        log::warn!("[Import] Codex 图片兼容状态收敛失败: {error}");
+    }
+    Ok(result)
 }
 
 #[tauri::command]
 pub async fn sync_current_providers_live(state: State<'_, AppState>) -> Result<Value, String> {
     let db = state.db.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let app_state = AppState::new(db);
         ProviderService::sync_current_to_live(&app_state)?;
         Ok::<_, AppError>(json!({
@@ -72,7 +77,12 @@ pub async fn sync_current_providers_live(state: State<'_, AppState>) -> Result<V
     })
     .await
     .map_err(|e| format!("同步当前供应商失败: {e}"))?
-    .map_err(|e: AppError| e.to_string())
+    .map_err(|e: AppError| e.to_string())?;
+
+    crate::services::codex_image_compat::reconcile(state.inner())
+        .await
+        .map_err(|e| format!("同步 Codex 图片兼容状态失败: {e}"))?;
+    Ok(result)
 }
 
 // ─── File dialogs ────────────────────────────────────────────

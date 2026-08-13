@@ -7,6 +7,7 @@ export interface ToggleRowProps {
   checked: boolean;
   onCheckedChange: (value: boolean) => void;
   disabled?: boolean;
+  badge?: string;
 }
 
 export function ToggleRow({
@@ -16,6 +17,7 @@ export function ToggleRow({
   checked,
   onCheckedChange,
   disabled,
+  badge,
 }: ToggleRowProps) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-muted/50">
@@ -24,7 +26,14 @@ export function ToggleRow({
           {icon}
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-medium leading-none">{title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium leading-none">{title}</p>
+            {badge ? (
+              <span className="rounded-sm border border-rose-500/50 bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-rose-600 dark:text-rose-300">
+                {badge}
+              </span>
+            ) : null}
+          </div>
           {description ? (
             <p className="text-xs text-muted-foreground">{description}</p>
           ) : null}

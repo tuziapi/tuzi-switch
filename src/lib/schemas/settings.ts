@@ -16,6 +16,7 @@ export const settingsSchema = z.object({
   launchOnStartup: z.boolean().optional(),
   enableLocalProxy: z.boolean().optional(),
   preserveCodexOfficialAuthOnSwitch: z.boolean().optional(),
+  codexImageRenderCompat: z.boolean().optional(),
   unifyCodexSessionHistory: z.boolean().optional(),
   unifyCodexMigrateExisting: z.boolean().optional(),
   language: z.enum(["en", "zh", "ja"]).optional(),

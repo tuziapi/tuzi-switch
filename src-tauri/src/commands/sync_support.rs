@@ -8,9 +8,9 @@ use crate::settings;
 use crate::store::AppState;
 
 pub(crate) fn run_post_import_sync(db: Arc<Database>) -> Result<(), AppError> {
+    settings::reload_settings()?;
     let app_state = AppState::new(db);
     ProviderService::sync_current_to_live(&app_state)?;
-    settings::reload_settings()?;
     Ok(())
 }
 

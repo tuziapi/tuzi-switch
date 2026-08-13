@@ -1061,6 +1061,10 @@ pub fn run() {
                 // 检查 settings 表中的代理状态，自动恢复代理服务
                 restore_proxy_state_on_startup(&state).await;
 
+                if let Err(e) = crate::services::codex_image_compat::reconcile(&state).await {
+                    log::warn!("启动时收敛 Codex 图片兼容模式失败: {e}");
+                }
+
                 // Periodic backup check (on startup)
                 if let Err(e) = state.db.periodic_backup_if_needed() {
                     log::warn!("Periodic backup failed on startup: {e}");
@@ -1221,6 +1225,7 @@ pub fn run() {
             commands::save_codex_route,
             commands::read_live_provider_settings,
             commands::get_settings,
+            commands::get_codex_image_compat_status,
             commands::save_settings,
             commands::has_codex_unify_history_backup,
             commands::restore_codex_unified_history,

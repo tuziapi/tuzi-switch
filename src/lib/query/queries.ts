@@ -94,6 +94,13 @@ export const useSettingsQuery = (): UseQueryResult<Settings> => {
   });
 };
 
+export const useCodexImageCompatStatusQuery = () => {
+  return useQuery({
+    queryKey: ["settings", "codex-image-compat-status"],
+    queryFn: async () => settingsApi.getCodexImageCompatStatus(),
+  });
+};
+
 export interface UseUsageQueryOptions {
   enabled?: boolean;
   autoQueryInterval?: number; // 自动查询间隔（分钟），0 表示禁用

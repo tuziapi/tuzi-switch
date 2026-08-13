@@ -39,6 +39,7 @@ const CLAUDE_MODEL_OVERRIDE_ENV_KEYS: [&str; 6] = [
 pub struct ProxyService {
     db: Arc<Database>,
     server: Arc<RwLock<Option<ProxyServer>>>,
+    image_auth_token: Arc<str>,
     /// AppHandle，用于传递给 ProxyServer 以支持故障转移时的 UI 更新
     app_handle: Arc<RwLock<Option<tauri::AppHandle>>>,
     switch_locks: SwitchLockManager,
@@ -54,6 +55,7 @@ impl ProxyService {
         Self {
             db,
             server: Arc::new(RwLock::new(None)),
+            image_auth_token: Arc::from(uuid::Uuid::new_v4().simple().to_string()),
             app_handle: Arc::new(RwLock::new(None)),
             switch_locks: SwitchLockManager::new(),
         }
@@ -153,6 +155,13 @@ impl ProxyService {
         });
     }
 
+    pub(crate) fn has_app_handle(&self) -> bool {
+        self.app_handle
+            .try_read()
+            .map(|handle| handle.is_some())
+            .unwrap_or(false)
+    }
+
     /// 启动代理服务器
     pub async fn start(&self) -> Result<ProxyServerInfo, String> {
         // 1. 启动时自动设置 proxy_enabled = true
@@ -190,7 +199,12 @@ impl ProxyService {
 
         // 4. 创建并启动服务器
         let app_handle = self.app_handle.read().await.clone();
-        let server = ProxyServer::new(config.clone(), self.db.clone(), app_handle);
+        let server = ProxyServer::new(
+            config.clone(),
+            self.db.clone(),
+            app_handle,
+            self.image_auth_token.clone(),
+        );
         let info = server
             .start()
             .await
@@ -931,6 +945,12 @@ impl ProxyService {
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             let updated_config = Self::update_toml_base_url(config_str, &proxy_codex_base_url);
+            let updated_config = crate::codex_config::set_active_codex_http_header(
+                &updated_config,
+                crate::proxy::codex_images::IMAGE_AUTH_HEADER,
+                self.image_auth_token.as_ref(),
+            )
+            .map_err(|error| format!("写入 Codex 图片路由凭据失败: {error}"))?;
             live_config["config"] = json!(updated_config);
 
             self.write_codex_live(&live_config)?;
@@ -979,6 +999,12 @@ impl ProxyService {
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
                 let updated_config = Self::update_toml_base_url(config_str, &proxy_codex_base_url);
+                let updated_config = crate::codex_config::set_active_codex_http_header(
+                    &updated_config,
+                    crate::proxy::codex_images::IMAGE_AUTH_HEADER,
+                    self.image_auth_token.as_ref(),
+                )
+                .map_err(|error| format!("写入 Codex 图片路由凭据失败: {error}"))?;
                 live_config["config"] = json!(updated_config);
 
                 self.write_codex_live(&live_config)?;
@@ -1030,6 +1056,12 @@ impl ProxyService {
                         .unwrap_or("");
                     let updated_config =
                         Self::update_toml_base_url(config_str, &proxy_codex_base_url);
+                    let updated_config = crate::codex_config::set_active_codex_http_header(
+                        &updated_config,
+                        crate::proxy::codex_images::IMAGE_AUTH_HEADER,
+                        self.image_auth_token.as_ref(),
+                    )
+                    .map_err(|error| format!("写入 Codex 图片路由凭据失败: {error}"))?;
                     live_config["config"] = json!(updated_config);
 
                     let _ = self.write_codex_live(&live_config);
@@ -1197,6 +1229,53 @@ impl ProxyService {
             },
             _ => false,
         }
+    }
+
+    pub(crate) async fn codex_live_takeover_matches_current_proxy(&self) -> Result<bool, String> {
+        let (_, expected_base_url) = self.build_proxy_urls().await?;
+        let live = self.read_codex_live()?;
+        if !Self::is_codex_live_taken_over(&live) {
+            return Ok(false);
+        }
+        let Some(config_text) = live.get("config").and_then(Value::as_str) else {
+            return Ok(false);
+        };
+        let Ok(document) = toml::from_str::<toml::Value>(config_text) else {
+            return Ok(false);
+        };
+        let Some(provider_id) = document
+            .get("model_provider")
+            .and_then(toml::Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return Ok(false);
+        };
+        let Some(provider) = document
+            .get("model_providers")
+            .and_then(|providers| providers.get(provider_id))
+            .and_then(toml::Value::as_table)
+        else {
+            return Ok(false);
+        };
+        let base_url_matches = provider
+            .get("base_url")
+            .and_then(toml::Value::as_str)
+            .is_some_and(|value| {
+                value.trim_end_matches('/') == expected_base_url.trim_end_matches('/')
+            });
+        let image_token_matches = provider
+            .get("http_headers")
+            .and_then(toml::Value::as_table)
+            .and_then(|headers| {
+                headers.iter().find_map(|(name, value)| {
+                    name.eq_ignore_ascii_case(crate::proxy::codex_images::IMAGE_AUTH_HEADER)
+                        .then(|| value.as_str())
+                        .flatten()
+                })
+            })
+            .is_some_and(|value| value == self.image_auth_token.as_ref());
+        Ok(base_url_matches && image_token_matches)
     }
 
     /// 当 Live 备份缺失时，尝试用 SSOT（当前供应商）写回 Live，以解除占位符接管。
@@ -1853,7 +1932,12 @@ impl ProxyService {
             }
 
             let app_handle = self.app_handle.read().await.clone();
-            let new_server = ProxyServer::new(new_config, self.db.clone(), app_handle);
+            let new_server = ProxyServer::new(
+                new_config,
+                self.db.clone(),
+                app_handle,
+                self.image_auth_token.clone(),
+            );
             new_server
                 .start()
                 .await

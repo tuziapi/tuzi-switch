@@ -1,4 +1,6 @@
 pub mod balance;
+pub(crate) mod codex_image_compat;
+pub(crate) mod codex_image_config;
 pub mod coding_plan;
 pub mod config;
 pub mod env_checker;

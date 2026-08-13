@@ -271,6 +271,9 @@ pub struct AppSettings {
     /// Keep Codex ChatGPT login material in auth.json when switching to third-party providers.
     #[serde(default = "default_true")]
     pub preserve_codex_official_auth_on_switch: bool,
+    /// Enable Codex built-in image API compatibility and local rendering fallback.
+    #[serde(default = "default_true")]
+    pub codex_image_render_compat: bool,
     /// Run official Codex providers under the shared model_provider id so official
     /// sessions share one resume-history bucket with third-party providers.
     #[serde(default = "default_true")]
@@ -392,6 +395,7 @@ impl Default for AppSettings {
             stream_check_confirmed: None,
             enable_failover_toggle: false,
             preserve_codex_official_auth_on_switch: true,
+            codex_image_render_compat: true,
             unify_codex_session_history: true,
             unify_codex_migrate_existing: None,
             failover_confirmed: None,
@@ -935,6 +939,16 @@ pub fn preserve_codex_official_auth_on_switch() -> bool {
         .preserve_codex_official_auth_on_switch
 }
 
+pub fn codex_image_render_compat() -> bool {
+    settings_store()
+        .read()
+        .unwrap_or_else(|e| {
+            log::warn!("设置锁已毒化，使用恢复值: {e}");
+            e.into_inner()
+        })
+        .codex_image_render_compat
+}
+
 pub fn unify_codex_session_history() -> bool {
     settings_store()
         .read()
@@ -1013,6 +1027,7 @@ mod tests {
         .expect("settings");
 
         assert!(settings.preserve_codex_official_auth_on_switch);
+        assert!(settings.codex_image_render_compat);
         assert!(settings.unify_codex_session_history);
         assert!(settings.unify_codex_migrate_existing.is_none());
     }

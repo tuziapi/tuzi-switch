@@ -42,6 +42,8 @@ pub struct ProxyState {
     pub app_handle: Option<tauri::AppHandle>,
     /// 故障转移切换管理器
     pub failover_manager: Arc<FailoverSwitchManager>,
+    /// Per-process secret required by the local Codex Images API route.
+    pub image_auth_token: Arc<str>,
 }
 
 /// 代理HTTP服务器
@@ -58,6 +60,7 @@ impl ProxyServer {
         config: ProxyConfig,
         db: Arc<Database>,
         app_handle: Option<tauri::AppHandle>,
+        image_auth_token: Arc<str>,
     ) -> Self {
         // 创建共享的 ProviderRouter（熔断器状态将跨所有请求保持）
         let provider_router = Arc::new(ProviderRouter::new(db.clone()));
@@ -74,6 +77,7 @@ impl ProxyServer {
             gemini_shadow: Arc::new(GeminiShadowStore::default()),
             app_handle,
             failover_manager,
+            image_auth_token,
         };
 
         Self {
@@ -132,7 +136,7 @@ impl ProxyServer {
             loop {
                 tokio::select! {
                     result = listener.accept() => {
-                        let (stream, _remote_addr) = match result {
+                        let (stream, remote_addr) = match result {
                             Ok(v) => v,
                             Err(e) => {
                                 log::error!("[{SRV}] accept 失败: {e}", SRV = log_srv::ACCEPT_ERR);
@@ -173,6 +177,9 @@ impl ProxyServer {
 
                                     // Insert our own header case map alongside hyper's internal one
                                     parts.extensions.insert(cases);
+                                    // Images API carries a managed upstream credential. Its handler
+                                    // verifies this TCP peer before accepting a request.
+                                    parts.extensions.insert(remote_addr);
 
                                     let body = axum::body::Body::new(body);
                                     let axum_req = http::Request::from_parts(parts, body);
@@ -307,6 +314,27 @@ impl ProxyServer {
             .route(
                 "/codex/v1/chat/completions",
                 post(handlers::handle_chat_completions),
+            )
+            // Codex built-in imagegen uses Images API, not Responses tools.
+            .route("/images/generations", post(handlers::handle_codex_images))
+            .route(
+                "/v1/images/generations",
+                post(handlers::handle_codex_images),
+            )
+            .route(
+                "/v1/v1/images/generations",
+                post(handlers::handle_codex_images),
+            )
+            .route(
+                "/codex/v1/images/generations",
+                post(handlers::handle_codex_images),
+            )
+            .route("/images/edits", post(handlers::handle_codex_images))
+            .route("/v1/images/edits", post(handlers::handle_codex_images))
+            .route("/v1/v1/images/edits", post(handlers::handle_codex_images))
+            .route(
+                "/codex/v1/images/edits",
+                post(handlers::handle_codex_images),
             )
             // OpenAI Responses API (Codex CLI，支持带前缀和不带前缀)
             .route("/responses", post(handlers::handle_responses))

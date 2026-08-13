@@ -367,9 +367,15 @@ fn handle_auto_click(app: &tauri::AppHandle, app_type: &AppType) -> Result<(), A
 
         // 2) 执行 Live 配置接管（确保该 app 被代理接管）
         log::info!("[Tray] Auto 模式：对 {app_type_str} 执行接管");
-        if let Err(e) =
+        let takeover_result = if matches!(app_type, AppType::Codex) {
+            futures::executor::block_on(crate::services::codex_image_compat::set_manual_takeover(
+                app_state.inner(),
+                true,
+            ))
+        } else {
             futures::executor::block_on(proxy_service.set_takeover_for_app(app_type_str, true))
-        {
+        };
+        if let Err(e) = takeover_result {
             log::error!("[Tray] 执行接管失败: {e}");
             return Err(AppError::Message(format!("执行接管失败: {e}")));
         }

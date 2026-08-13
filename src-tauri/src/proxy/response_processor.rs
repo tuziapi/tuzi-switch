@@ -847,6 +847,7 @@ mod tests {
             gemini_shadow: Arc::new(GeminiShadowStore::default()),
             app_handle: None,
             failover_manager: Arc::new(FailoverSwitchManager::new(db)),
+            image_auth_token: Arc::from("test-image-token"),
         }
     }
 

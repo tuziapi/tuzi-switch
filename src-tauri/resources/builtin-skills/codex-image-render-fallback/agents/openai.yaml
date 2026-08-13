@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Image Render Fallback"
+  short_description: "Safely publish missing Codex image previews"
+  default_prompt: "Use $codex-image-render-fallback to publish generated images with local previews and download links."

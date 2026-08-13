@@ -119,16 +119,19 @@ export const handlers = [
     return success(true);
   }),
 
-  http.post(`${TAURI_ENDPOINT}/clear_provider_live_config`, async ({ request }) => {
-    const { id, app } = await withJson<{ id: string; app: AppId }>(request);
-    if (app === "opencode" || app === "openclaw" || app === "hermes") {
-      setLiveProviderIds(
-        app,
-        getLiveProviderIds(app).filter((providerId) => providerId !== id),
-      );
-    }
-    return success(true);
-  }),
+  http.post(
+    `${TAURI_ENDPOINT}/clear_provider_live_config`,
+    async ({ request }) => {
+      const { id, app } = await withJson<{ id: string; app: AppId }>(request);
+      if (app === "opencode" || app === "openclaw" || app === "hermes") {
+        setLiveProviderIds(
+          app,
+          getLiveProviderIds(app).filter((providerId) => providerId !== id),
+        );
+      }
+      return success(true);
+    },
+  ),
 
   http.post(`${TAURI_ENDPOINT}/sync_claude_live_api_key`, () => success(true)),
 
@@ -227,6 +230,22 @@ export const handlers = [
   http.post(`${TAURI_ENDPOINT}/restart_app`, () => success(true)),
 
   http.post(`${TAURI_ENDPOINT}/get_settings`, () => success(getSettings())),
+
+  http.post(`${TAURI_ENDPOINT}/get_codex_image_compat_status`, () =>
+    success({
+      requested: true,
+      ready: true,
+      reason: "ready",
+      providerBaseUrl: "https://api.tu-zi.com/v1",
+      providerEnvKey: "TUZI01_CODEX_API_KEY",
+      liveBaseUrl: "http://127.0.0.1:15721/v1",
+      imageKeyEnv: "TUZI_CODEX_IMAGE_API_KEY",
+      imageUpstream: "https://api.tu-zi.com/coding",
+      imageModel: "gpt-image-2",
+      personalizationInstruction:
+        "只要是生成图片相关的需求，都使用 API Key 中内置的 gpt-image-2 生成，接口地址使用 https://api.tu-zi.com/v1。",
+    }),
+  ),
 
   http.post(`${TAURI_ENDPOINT}/check_env_conflicts`, () => success([])),
 

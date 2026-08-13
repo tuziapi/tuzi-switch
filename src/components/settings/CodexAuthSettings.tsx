@@ -1,11 +1,19 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { History, KeyRound } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  FileCode2,
+  History,
+  ImageIcon,
+  KeyRound,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { SettingsFormState } from "@/hooks/useSettings";
 import { ToggleRow } from "@/components/ui/toggle-row";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { settingsApi } from "@/lib/api";
+import { useCodexImageCompatStatusQuery } from "@/lib/query";
 
 interface CodexAuthSettingsProps {
   settings: SettingsFormState;
@@ -23,6 +31,19 @@ export function CodexAuthSettings({
   const [showEnableConfirm, setShowEnableConfirm] = useState(false);
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
   const [hasUnifyBackup, setHasUnifyBackup] = useState(false);
+  const imageCompatStatus = useCodexImageCompatStatusQuery();
+  const imageCompatRequested = settings.codexImageRenderCompat ?? true;
+  const imageCompatNotReadyReason =
+    imageCompatRequested &&
+    imageCompatStatus.data?.requested === true &&
+    !imageCompatStatus.data.ready
+      ? imageCompatStatus.data.reason
+      : null;
+
+  const handleImageCompatChange = async (value: boolean) => {
+    const saved = await onChange({ codexImageRenderCompat: value });
+    if (saved !== false) void imageCompatStatus.refetch();
+  };
 
   const handleUnifyHistoryChange = (checked: boolean) => {
     if (checked) {
@@ -106,6 +127,122 @@ export function CodexAuthSettings({
       />
 
       <ToggleRow
+        icon={<ImageIcon className="h-4 w-4 text-rose-500" />}
+        title={t("settings.codexImageRenderCompat")}
+        badge={t("settings.codexImageRenderCompatBadge")}
+        description={t("settings.codexImageRenderCompatDescription")}
+        checked={imageCompatRequested}
+        onCheckedChange={(value) => void handleImageCompatChange(value)}
+      />
+      {imageCompatNotReadyReason ? (
+        <p
+          className="flex items-start gap-2 text-xs leading-5 text-amber-700 dark:text-amber-300"
+          role="status"
+        >
+          <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {t("settings.codexImageRenderCompatNotReady", {
+            reason: t(
+              `settings.codexImageRenderCompatReason.${imageCompatNotReadyReason}`,
+            ),
+          })}
+        </p>
+      ) : null}
+      {imageCompatRequested ? (
+        <div
+          className="ml-11 space-y-3 border-l-2 border-rose-500/60 pl-4"
+          data-testid="codex-image-compat-details"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {imageCompatStatus.data?.ready ? (
+              <CircleCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <FileCode2 className="h-4 w-4 text-muted-foreground" />
+            )}
+            <p className="text-xs font-medium">
+              {t("settings.codexImageRenderCompatDetails.title")}
+            </p>
+            <span
+              className={
+                imageCompatStatus.data?.ready
+                  ? "rounded-sm bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300"
+                  : "rounded-sm bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
+              }
+            >
+              {t(
+                imageCompatStatus.data?.ready
+                  ? "settings.codexImageRenderCompatDetails.ready"
+                  : "settings.codexImageRenderCompatDetails.pending",
+              )}
+            </span>
+          </div>
+
+          <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-[9rem_minmax(0,1fr)_auto]">
+            <CompatDetail
+              label={t(
+                "settings.codexImageRenderCompatDetails.providerBaseUrl",
+              )}
+              value={imageCompatStatus.data?.providerBaseUrl}
+              fallback={t("settings.codexImageRenderCompatDetails.notDetected")}
+              badge={t("settings.codexImageRenderCompatDetails.unchanged")}
+              badgeClassName="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+            />
+            <CompatDetail
+              label={t("settings.codexImageRenderCompatDetails.providerEnvKey")}
+              value={imageCompatStatus.data?.providerEnvKey}
+              fallback={t("settings.codexImageRenderCompatDetails.notDetected")}
+              badge={t("settings.codexImageRenderCompatDetails.unchanged")}
+              badgeClassName="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+            />
+            <CompatDetail
+              label={t("settings.codexImageRenderCompatDetails.liveBaseUrl")}
+              value={imageCompatStatus.data?.liveBaseUrl}
+              fallback={t(
+                "settings.codexImageRenderCompatDetails.waitingForRoute",
+              )}
+              badge={t("settings.codexImageRenderCompatDetails.temporary")}
+              badgeClassName="bg-amber-500/15 text-amber-700 dark:text-amber-300"
+            />
+            <CompatDetail
+              label={t("settings.codexImageRenderCompatDetails.imageKeyEnv")}
+              value={imageCompatStatus.data?.imageKeyEnv}
+              fallback="TUZI_CODEX_IMAGE_API_KEY"
+              badge={t("settings.codexImageRenderCompatDetails.privateDerived")}
+              badgeClassName="bg-sky-500/15 text-sky-700 dark:text-sky-300"
+            />
+            <CompatDetail
+              label={t("settings.codexImageRenderCompatDetails.imageUpstream")}
+              value={imageCompatStatus.data?.imageUpstream}
+              fallback="https://api.tu-zi.com/coding"
+              badge={t("settings.codexImageRenderCompatDetails.fixed")}
+              badgeClassName="bg-rose-500/15 text-rose-700 dark:text-rose-300"
+            />
+            <CompatDetail
+              label={t("settings.codexImageRenderCompatDetails.imageModel")}
+              value={imageCompatStatus.data?.imageModel}
+              fallback="gpt-image-2"
+              badge={t("settings.codexImageRenderCompatDetails.fixed")}
+              badgeClassName="bg-rose-500/15 text-rose-700 dark:text-rose-300"
+            />
+          </dl>
+
+          <div className="space-y-1 text-xs">
+            <p className="text-muted-foreground">
+              {t("settings.codexImageRenderCompatDetails.personalization")}
+            </p>
+            <code className="block whitespace-pre-wrap break-words border-l-2 border-sky-500/60 pl-3 font-mono leading-5 text-foreground">
+              {imageCompatStatus.data?.personalizationInstruction ??
+                t(
+                  "settings.codexImageRenderCompatDetails.personalizationInstruction",
+                )}
+            </code>
+          </div>
+          <p className="text-[11px] leading-4 text-muted-foreground">
+            {t("settings.codexImageRenderCompatDetails.securityNote")}
+          </p>
+        </div>
+      ) : null}
+
+      <ToggleRow
         icon={<History className="h-4 w-4 text-sky-500" />}
         title={t("settings.unifyCodexSessionHistory")}
         description={t("settings.unifyCodexSessionHistoryDescription")}
@@ -138,5 +275,35 @@ export function CodexAuthSettings({
         onCancel={() => setShowDisableConfirm(false)}
       />
     </section>
+  );
+}
+
+function CompatDetail({
+  label,
+  value,
+  fallback,
+  badge,
+  badgeClassName,
+}: {
+  label: string;
+  value?: string | null;
+  fallback: string;
+  badge: string;
+  badgeClassName: string;
+}) {
+  return (
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-all font-mono text-foreground">
+        {value || fallback}
+      </dd>
+      <dd className="justify-self-start sm:justify-self-end">
+        <span
+          className={`rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${badgeClassName}`}
+        >
+          {badge}
+        </span>
+      </dd>
+    </>
   );
 }

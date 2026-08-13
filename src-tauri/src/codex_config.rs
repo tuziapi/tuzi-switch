@@ -1,9 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use crate::config::{
-    atomic_write, delete_file, get_home_dir, read_json_file, sanitize_provider_name,
-    write_json_file, write_text_file,
+    atomic_write, delete_file, get_app_config_dir, get_home_dir, read_json_file,
+    sanitize_provider_name, write_json_file, write_text_file,
 };
 use crate::error::AppError;
 use crate::gemini_config::{parse_env_file, serialize_env_file};
@@ -31,6 +33,8 @@ const CODEX_RESERVED_MODEL_PROVIDER_IDS: &[&str] = &[
 const MANAGED_ENV_BEGIN: &str = "# >>> tuzi-switch codex env >>>";
 const MANAGED_ENV_END: &str = "# <<< tuzi-switch codex env <<<";
 const CODEX_ENV_MANAGED_MARKER_PREFIX: &str = "# tuzi-switch managed env:";
+const MAX_MANAGED_ENV_FILE_BYTES: u64 = 256 * 1024;
+static MANAGED_ENV_FILE_LOCK: Mutex<()> = Mutex::new(());
 
 fn is_valid_env_key_name(env_key: &str) -> bool {
     let mut chars = env_key.chars();
@@ -48,6 +52,153 @@ fn validate_env_key_name(env_key: &str) -> Result<(), AppError> {
     Err(AppError::Message(format!(
         "Invalid Codex env_key name: {env_key}"
     )))
+}
+
+fn managed_env_file_path() -> PathBuf {
+    get_app_config_dir().join("codex-env")
+}
+
+fn read_managed_env_file_entries() -> Result<BTreeMap<String, String>, AppError> {
+    let path = managed_env_file_path();
+    let mut entries = BTreeMap::new();
+    let file = match fs::File::open(&path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(entries),
+        Err(error) => return Err(AppError::io(&path, error)),
+    };
+    let size = file
+        .metadata()
+        .map_err(|error| AppError::io(&path, error))?
+        .len();
+    if size > MAX_MANAGED_ENV_FILE_BYTES {
+        return Err(AppError::Config(
+            "Codex 受管环境文件超过大小限制".to_string(),
+        ));
+    }
+
+    let mut content = String::with_capacity(size as usize);
+    file.take(MAX_MANAGED_ENV_FILE_BYTES + 1)
+        .read_to_string(&mut content)
+        .map_err(|error| AppError::io(&path, error))?;
+    if content.len() as u64 > MAX_MANAGED_ENV_FILE_BYTES {
+        return Err(AppError::Config(
+            "Codex 受管环境文件超过大小限制".to_string(),
+        ));
+    }
+    for line in content.lines() {
+        if let Some((key, value)) = line.split_once('=') {
+            if is_valid_env_key_name(key) {
+                entries.insert(key.to_string(), value.to_string());
+            }
+        }
+    }
+    Ok(entries)
+}
+
+pub(crate) fn read_managed_env_key_file(env_key: &str) -> Result<Option<String>, AppError> {
+    if !is_valid_env_key_name(env_key) {
+        return Ok(None);
+    }
+    Ok(read_managed_env_file_entries()?.remove(env_key))
+}
+
+pub(crate) fn write_managed_env_key_file(env_key: &str, value: &str) -> Result<bool, AppError> {
+    validate_env_key_name(env_key)?;
+    if value.is_empty() || value.contains(['\r', '\n']) {
+        return Err(AppError::InvalidInput(
+            "Codex API Key 为空或包含换行符".to_string(),
+        ));
+    }
+    let _guard = MANAGED_ENV_FILE_LOCK.lock()?;
+    let mut entries = read_managed_env_file_entries()?;
+    if entries
+        .get(env_key)
+        .is_some_and(|existing| existing == value)
+    {
+        ensure_managed_env_file_private()?;
+        return Ok(false);
+    }
+    entries.insert(env_key.to_string(), value.to_string());
+    write_managed_env_file_entries(&entries)?;
+    Ok(true)
+}
+
+pub(crate) fn remove_managed_env_key_file(env_key: &str) -> Result<bool, AppError> {
+    validate_env_key_name(env_key)?;
+    let _guard = MANAGED_ENV_FILE_LOCK.lock()?;
+    let mut entries = read_managed_env_file_entries()?;
+    if entries.remove(env_key).is_none() {
+        return Ok(false);
+    }
+    write_managed_env_file_entries(&entries)?;
+    Ok(true)
+}
+
+fn ensure_managed_env_file_private() -> Result<(), AppError> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let path = managed_env_file_path();
+        if path.exists() {
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+                .map_err(|error| AppError::io(&path, error))?;
+        }
+    }
+    Ok(())
+}
+
+fn write_managed_env_file_entries(entries: &BTreeMap<String, String>) -> Result<(), AppError> {
+    let path = managed_env_file_path();
+    let mut output = String::new();
+    output.push_str(MANAGED_ENV_BEGIN);
+    output.push('\n');
+    for (key, value) in entries {
+        output.push_str(key);
+        output.push('=');
+        output.push_str(value);
+        output.push('\n');
+    }
+    output.push_str(MANAGED_ENV_END);
+    output.push('\n');
+    if output.len() as u64 > MAX_MANAGED_ENV_FILE_BYTES {
+        return Err(AppError::Config(
+            "Codex 受管环境文件超过大小限制".to_string(),
+        ));
+    }
+    secure_atomic_write(&path, output.as_bytes())
+}
+
+pub(crate) fn secure_atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| AppError::Config("无效的路径".to_string()))?;
+    fs::create_dir_all(parent).map_err(|error| AppError::io(parent, error))?;
+    let mut temporary =
+        tempfile::NamedTempFile::new_in(parent).map_err(|error| AppError::io(parent, error))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o600))
+            .map_err(|error| AppError::io(temporary.path(), error))?;
+    }
+    temporary
+        .write_all(data)
+        .map_err(|error| AppError::io(temporary.path(), error))?;
+    temporary
+        .flush()
+        .map_err(|error| AppError::io(temporary.path(), error))?;
+    temporary
+        .as_file()
+        .sync_all()
+        .map_err(|error| AppError::io(temporary.path(), error))?;
+    #[cfg(windows)]
+    if path.exists() {
+        fs::remove_file(path).map_err(|error| AppError::io(path, error))?;
+    }
+    temporary
+        .persist(path)
+        .map_err(|error| AppError::io(path, error.error))?;
+    Ok(())
 }
 
 fn shell_single_quote(value: &str) -> Result<String, AppError> {
@@ -2604,6 +2755,63 @@ pub fn update_codex_toml_field(toml_str: &str, field: &str, value: &str) -> Resu
         _ => return Err(format!("unsupported field: {field}")),
     }
 
+    Ok(doc.to_string())
+}
+
+pub(crate) fn set_active_codex_http_header(
+    config_text: &str,
+    header_name: &str,
+    header_value: &str,
+) -> Result<String, AppError> {
+    let mut doc = config_text
+        .parse::<DocumentMut>()
+        .map_err(|e| AppError::Message(format!("Invalid Codex config.toml: {e}")))?;
+    let provider_id = active_codex_model_provider_id(&doc).ok_or_else(|| {
+        AppError::Message("Codex config.toml has no active model_provider".into())
+    })?;
+    let provider_table = doc
+        .get_mut("model_providers")
+        .and_then(|item| item.as_table_mut())
+        .and_then(|table| table.get_mut(provider_id.as_str()))
+        .and_then(|item| item.as_table_mut())
+        .ok_or_else(|| AppError::Message("Codex active model provider table is missing".into()))?;
+
+    let headers = provider_table.entry("http_headers").or_insert_with(|| {
+        toml_edit::Item::Value(toml_edit::Value::InlineTable(Default::default()))
+    });
+    match headers {
+        toml_edit::Item::Value(toml_edit::Value::InlineTable(table)) => {
+            let stale_names: Vec<String> = table
+                .iter()
+                .map(|(name, _)| name.to_string())
+                .filter(|name| {
+                    name.eq_ignore_ascii_case(header_name) && name.as_str() != header_name
+                })
+                .collect();
+            for name in stale_names {
+                table.remove(&name);
+            }
+            table.insert(header_name, toml_edit::Value::from(header_value));
+        }
+        toml_edit::Item::Table(table) => {
+            let stale_names: Vec<String> = table
+                .iter()
+                .map(|(name, _)| name.to_string())
+                .filter(|name| {
+                    name.eq_ignore_ascii_case(header_name) && name.as_str() != header_name
+                })
+                .collect();
+            for name in stale_names {
+                table.remove(&name);
+            }
+            table[header_name] = toml_edit::value(header_value);
+        }
+        _ => {
+            let mut table = toml_edit::InlineTable::new();
+            table.insert(header_name, toml_edit::Value::from(header_value));
+            *headers = toml_edit::Item::Value(toml_edit::Value::InlineTable(table));
+        }
+    }
     Ok(doc.to_string())
 }
 

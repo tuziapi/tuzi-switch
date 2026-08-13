@@ -436,6 +436,15 @@ fn endpoint_with_query(uri: &axum::http::Uri, endpoint: &str) -> String {
 // Codex API 处理器
 // ============================================================================
 
+/// Codex 内置 imagegen 直接调用 Images API。该旁路不会进入文本模型映射、
+/// 媒体改写、usage 解析或请求/响应体日志。
+pub async fn handle_codex_images(
+    State(state): State<ProxyState>,
+    request: axum::extract::Request,
+) -> Result<axum::response::Response, ProxyError> {
+    super::codex_images::handle(&state, request).await
+}
+
 /// 处理 /v1/chat/completions 请求（OpenAI Chat Completions API - Codex CLI）
 pub async fn handle_chat_completions(
     State(state): State<ProxyState>,

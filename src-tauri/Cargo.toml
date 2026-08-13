@@ -44,7 +44,8 @@ arboard = "3.6"
 flate2 = "1"
 tar = "0.4"
 brotli = "7"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
+zstd = "0.13"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "fs", "io-util"] }
 futures = "0.3"
 async-stream = "0.3"
 bytes = "1.5"
@@ -57,6 +58,7 @@ hyper-rustls = { version = "0.27", features = ["http1", "tls12", "ring", "webpki
 http = "1"
 http-body = "1"
 http-body-util = "0.1"
+multer = "3"
 httparse = "1"
 tokio-rustls = "0.26"
 rustls = "0.23"

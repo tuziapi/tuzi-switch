@@ -36,7 +36,7 @@ pub async fn stop_proxy_server(state: tauri::State<'_, AppState>) -> Result<(), 
 /// 停止代理服务器（恢复 Live 配置）
 #[tauri::command]
 pub async fn stop_proxy_with_restore(state: tauri::State<'_, AppState>) -> Result<(), String> {
-    state.proxy_service.stop_with_restore().await
+    crate::services::codex_image_compat::stop_proxy_with_manual_suppression(state.inner()).await
 }
 
 /// 获取各应用接管状态
@@ -54,10 +54,15 @@ pub async fn set_proxy_takeover_for_app(
     app_type: String,
     enabled: bool,
 ) -> Result<(), String> {
-    state
-        .proxy_service
-        .set_takeover_for_app(&app_type, enabled)
-        .await
+    if app_type == crate::app_config::AppType::Codex.as_str() {
+        crate::services::codex_image_compat::set_manual_takeover(state.inner(), enabled).await?;
+    } else {
+        state
+            .proxy_service
+            .set_takeover_for_app(&app_type, enabled)
+            .await?;
+    }
+    Ok(())
 }
 
 /// 获取代理服务器状态

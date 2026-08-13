@@ -327,6 +327,8 @@ export interface Settings {
   enableFailoverToggle?: boolean;
   // 切换第三方 Codex 供应商时保留官方登录材料
   preserveCodexOfficialAuthOnSwitch?: boolean;
+  // 启用 Codex 内置图片接口兼容与本地渲染兜底
+  codexImageRenderCompat?: boolean;
   // 统一官方/第三方 Codex 会话历史桶
   unifyCodexSessionHistory?: boolean;
   // 开启统一历史时是否迁入既有官方会话

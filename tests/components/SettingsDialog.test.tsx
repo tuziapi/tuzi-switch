@@ -140,6 +140,20 @@ vi.mock("@/hooks/useImportExport", () => ({
 vi.mock("@/lib/api", () => ({
   settingsApi: {
     restart: vi.fn().mockResolvedValue(true),
+    getCodexImageCompatStatus: vi.fn().mockResolvedValue({
+      requested: true,
+      ready: true,
+      reason: "ready",
+      providerBaseUrl: "https://api.tu-zi.com/v1",
+      providerEnvKey: "TUZI01_CODEX_API_KEY",
+      liveBaseUrl: "http://127.0.0.1:15721/v1",
+      imageKeyEnv: "TUZI_CODEX_IMAGE_API_KEY",
+      imageUpstream: "https://api.tu-zi.com/coding",
+      imageModel: "gpt-image-2",
+      personalizationInstruction:
+        "只要是生成图片相关的需求，都使用 API Key 中内置的 gpt-image-2 生成，接口地址使用 https://api.tu-zi.com/v1。",
+    }),
+    hasCodexUnifyHistoryBackup: vi.fn().mockResolvedValue(false),
   },
 }));
 
@@ -344,9 +358,7 @@ describe("SettingsPage Component", () => {
     fireEvent.click(screen.getByText("settings.advanced.data.title"));
 
     // 有文件时，点击导入按钮执行 importConfig
-    fireEvent.click(
-      screen.getByRole("button", { name: /settings\.import/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /settings\.import/ }));
     expect(importExportMock.importConfig).toHaveBeenCalled();
 
     fireEvent.click(

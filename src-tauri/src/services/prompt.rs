@@ -18,6 +18,26 @@ fn get_unix_timestamp() -> Result<i64, AppError> {
 pub struct PromptService;
 
 impl PromptService {
+    fn clean_live_content(app: &AppType, content: String) -> String {
+        if matches!(app, AppType::Codex) {
+            crate::services::codex_image_config::strip_valid_image_personalization(&content)
+        } else {
+            content
+        }
+    }
+
+    fn write_live_prompt(state: &AppState, app: &AppType, content: &str) -> Result<(), AppError> {
+        if matches!(app, AppType::Codex) {
+            let compat_enabled =
+                crate::services::codex_image_compat::reconcile_files_and_key(state)?;
+            return crate::services::codex_image_config::write_codex_prompt_preserving_personalization(
+                content,
+                compat_enabled,
+            );
+        }
+        write_text_file(&prompt_file_path(app)?, content)
+    }
+
     pub fn get_prompts(
         state: &AppState,
         app: AppType,
@@ -38,8 +58,7 @@ impl PromptService {
 
         if is_enabled {
             // 启用提示词：写入内容到文件
-            let target_path = prompt_file_path(&app)?;
-            write_text_file(&target_path, &prompt.content)?;
+            Self::write_live_prompt(state, &app, &prompt.content)?;
         } else {
             // 禁用提示词：检查是否还有其他已启用的提示词
             let prompts = state.db.get_prompts(app.as_str())?;
@@ -49,7 +68,7 @@ impl PromptService {
                 // 所有提示词都已禁用，清空文件
                 let target_path = prompt_file_path(&app)?;
                 if target_path.exists() {
-                    write_text_file(&target_path, "")?;
+                    Self::write_live_prompt(state, &app, "")?;
                 }
             }
         }
@@ -75,6 +94,7 @@ impl PromptService {
         let target_path = prompt_file_path(&app)?;
         if target_path.exists() {
             if let Ok(live_content) = std::fs::read_to_string(&target_path) {
+                let live_content = Self::clean_live_content(&app, live_content);
                 if !live_content.trim().is_empty() {
                     let mut prompts = state.db.get_prompts(app.as_str())?;
 
@@ -129,7 +149,7 @@ impl PromptService {
 
         if let Some(prompt) = prompts.get_mut(id) {
             prompt.enabled = true;
-            write_text_file(&target_path, &prompt.content)?; // 原子写入
+            Self::write_live_prompt(state, &app, &prompt.content)?;
             state.db.save_prompt(app.as_str(), prompt)?;
         } else {
             return Err(AppError::InvalidInput(format!("提示词 {id} 不存在")));
@@ -152,6 +172,7 @@ impl PromptService {
 
         let content =
             std::fs::read_to_string(&file_path).map_err(|e| AppError::io(&file_path, e))?;
+        let content = Self::clean_live_content(&app, content);
         let timestamp = get_unix_timestamp()?;
 
         let id = format!("imported-{timestamp}");
@@ -179,6 +200,7 @@ impl PromptService {
         }
         let content =
             std::fs::read_to_string(&file_path).map_err(|e| AppError::io(&file_path, e))?;
+        let content = Self::clean_live_content(&app, content);
         Ok(Some(content))
     }
 
@@ -209,6 +231,7 @@ impl PromptService {
                 return Ok(0);
             }
         };
+        let content = Self::clean_live_content(&app, content);
 
         // 检查内容是否为空
         if content.trim().is_empty() {

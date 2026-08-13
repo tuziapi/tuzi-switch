@@ -30,6 +30,35 @@ use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::RwLock;
 
+pub(crate) const PROXY_AUTH_PLACEHOLDER: &str = "PROXY_MANAGED";
+
+/// Tracks a proxy connection until the response body has been fully consumed.
+pub(crate) struct ActiveConnectionGuard {
+    status: Arc<RwLock<ProxyStatus>>,
+}
+
+impl ActiveConnectionGuard {
+    pub(crate) async fn acquire(status: Arc<RwLock<ProxyStatus>>) -> Self {
+        {
+            let mut proxy_status = status.write().await;
+            proxy_status.active_connections = proxy_status.active_connections.saturating_add(1);
+        }
+        Self { status }
+    }
+}
+
+impl Drop for ActiveConnectionGuard {
+    fn drop(&mut self) {
+        let status = self.status.clone();
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                let mut proxy_status = status.write().await;
+                proxy_status.active_connections = proxy_status.active_connections.saturating_sub(1);
+            });
+        }
+    }
+}
+
 pub struct ForwardResult {
     pub response: ProxyResponse,
     pub provider: Provider,
@@ -1300,6 +1329,7 @@ impl RequestForwarder {
                     | "x-b3-sampled"
                     | "traceparent"
                     | "tracestate"
+                    | super::codex_images::IMAGE_AUTH_HEADER
             ) {
                 continue;
             }

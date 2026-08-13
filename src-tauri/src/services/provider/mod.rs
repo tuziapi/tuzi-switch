@@ -1096,6 +1096,14 @@ wire_api = "responses"
 }
 
 impl ProviderService {
+    fn reconcile_codex_image_compat_after_change(state: &AppState, app_type: &AppType) {
+        if matches!(app_type, AppType::Codex) {
+            if let Err(error) = crate::services::codex_image_compat::schedule_reconcile(state) {
+                log::warn!("Codex Provider 变更后图片兼容收敛失败: {error}");
+            }
+        }
+    }
+
     fn normalize_provider_if_claude(app_type: &AppType, provider: &mut Provider) {
         if matches!(app_type, AppType::Claude) {
             let mut v = provider.settings_config.clone();
@@ -1209,6 +1217,8 @@ impl ProviderService {
                 .set_current_provider(app_type.as_str(), &provider.id)?;
             write_live_with_common_config(state.db.as_ref(), &app_type, &provider)?;
         }
+
+        Self::reconcile_codex_image_compat_after_change(state, &app_type);
 
         Ok(true)
     }
@@ -1417,6 +1427,8 @@ impl ProviderService {
                 McpService::sync_all_enabled(state)?;
             }
         }
+
+        Self::reconcile_codex_image_compat_after_change(state, &app_type);
 
         Ok(true)
     }
@@ -1881,12 +1893,16 @@ impl ProviderService {
         // Sync MCP
         McpService::sync_all_enabled(state)?;
 
+        Self::reconcile_codex_image_compat_after_change(state, &app_type);
+
         Ok(result)
     }
 
     /// Sync current provider to live configuration (re-export)
     pub fn sync_current_to_live(state: &AppState) -> Result<(), AppError> {
-        sync_current_to_live(state)
+        sync_current_to_live(state)?;
+        Self::reconcile_codex_image_compat_after_change(state, &AppType::Codex);
+        Ok(())
     }
 
     pub fn sync_current_provider_for_app(
@@ -1925,10 +1941,13 @@ impl ProviderService {
                     .update_live_backup_from_provider(app_type.as_str(), provider),
             )
             .map_err(|e| AppError::Message(format!("更新 Live 备份失败: {e}")))?;
+            Self::reconcile_codex_image_compat_after_change(state, &app_type);
             return Ok(());
         }
 
-        sync_current_provider_for_app_to_live(state, &app_type)
+        sync_current_provider_for_app_to_live(state, &app_type)?;
+        Self::reconcile_codex_image_compat_after_change(state, &app_type);
+        Ok(())
     }
 
     pub fn migrate_legacy_common_config_usage(

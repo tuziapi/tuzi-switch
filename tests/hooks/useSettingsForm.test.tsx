@@ -51,6 +51,7 @@ describe("useSettingsForm Hook", () => {
     expect(settings.showInTray).toBe(true);
     expect(settings.minimizeToTrayOnClose).toBe(true);
     expect(settings.enableClaudePluginIntegration).toBe(false);
+    expect(settings.codexImageRenderCompat).toBe(true);
     expect(settings.claudeConfigDir).toBe("/Users/demo");
     expect(settings.codexConfigDir).toBeUndefined();
     expect(settings.language).toBe("en");
@@ -64,6 +65,7 @@ describe("useSettingsForm Hook", () => {
         showInTray: true,
         minimizeToTrayOnClose: true,
         enableClaudePluginIntegration: false,
+        codexImageRenderCompat: false,
         claudeConfigDir: "/Users/demo",
         codexConfigDir: null,
         language: "ja",
@@ -78,6 +80,7 @@ describe("useSettingsForm Hook", () => {
     });
 
     expect(result.current.initialLanguage).toBe("ja");
+    expect(result.current.settings?.codexImageRenderCompat).toBe(false);
     expect(changeLanguageSpy).toHaveBeenCalledWith("ja");
   });
 
@@ -155,6 +158,7 @@ describe("useSettingsForm Hook", () => {
     expect(settings.showInTray).toBe(false);
     expect(settings.minimizeToTrayOnClose).toBe(false);
     expect(settings.enableClaudePluginIntegration).toBe(true);
+    expect(settings.codexImageRenderCompat).toBe(true);
     expect(settings.claudeConfigDir).toBe("/reset");
     expect(settings.codexConfigDir).toBeUndefined();
     expect(settings.language).toBe("zh");

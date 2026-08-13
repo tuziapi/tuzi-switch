@@ -25,6 +25,44 @@ fn merge_settings_for_save(
     incoming
 }
 
+async fn rollback_settings_and_image_compat(
+    state: &crate::store::AppState,
+    existing: &crate::settings::AppSettings,
+    new_codex_home: &std::path::Path,
+    codex_dir_changed: bool,
+    restore_image_compat: bool,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+
+    if restore_image_compat && codex_dir_changed {
+        if let Err(error) =
+            crate::services::codex_image_compat::cleanup_managed_artifacts_at(new_codex_home)
+        {
+            errors.push(format!("清理新 Codex 目录失败: {error}"));
+        }
+    }
+
+    if let Err(error) = crate::settings::update_settings(existing.clone()) {
+        errors.push(format!("回滚设置失败: {error}"));
+    }
+
+    if restore_image_compat {
+        if let Err(error) = crate::services::codex_image_compat::reconcile(state).await {
+            errors.push(format!("恢复旧 Codex 图片兼容状态失败: {error}"));
+        }
+    }
+
+    errors
+}
+
+fn append_rollback_errors(message: String, errors: Vec<String>) -> String {
+    if errors.is_empty() {
+        message
+    } else {
+        format!("{message}；{}", errors.join("；"))
+    }
+}
+
 /// 获取设置
 #[tauri::command]
 pub async fn get_settings() -> Result<crate::settings::AppSettings, String> {
@@ -38,20 +76,70 @@ pub async fn save_settings(
     settings: crate::settings::AppSettings,
 ) -> Result<bool, String> {
     let existing = crate::settings::get_settings();
+    let old_codex_home = crate::services::codex_image_config::effective_codex_home();
     let merged = merge_settings_for_save(settings, &existing);
     let unify_codex_changed =
         merged.unify_codex_session_history != existing.unify_codex_session_history;
     let unify_codex_enabled = merged.unify_codex_session_history;
+    let image_compat_changed =
+        merged.codex_image_render_compat != existing.codex_image_render_compat;
     crate::settings::update_settings(merged).map_err(|e| e.to_string())?;
+    let new_codex_home = crate::services::codex_image_config::effective_codex_home();
+    let codex_dir_changed = old_codex_home != new_codex_home;
+    let image_state_changed = image_compat_changed || codex_dir_changed;
+
+    if codex_dir_changed {
+        if let Err(err) =
+            crate::services::codex_image_compat::cleanup_managed_artifacts_at(&old_codex_home)
+        {
+            log::warn!("清理旧 Codex 目录的图片兼容文件失败，回滚设置: {err}");
+            let rollback_errors = rollback_settings_and_image_compat(
+                state.inner(),
+                &existing,
+                &new_codex_home,
+                true,
+                true,
+            )
+            .await;
+            return Err(append_rollback_errors(
+                format!("切换 Codex 配置目录失败: {err}"),
+                rollback_errors,
+            ));
+        }
+    }
+
+    if image_state_changed {
+        if let Err(err) = crate::services::codex_image_compat::reconcile(state.inner()).await {
+            log::warn!("Codex 图片兼容模式变更失败，回滚设置: {err}");
+            let rollback_errors = rollback_settings_and_image_compat(
+                state.inner(),
+                &existing,
+                &new_codex_home,
+                codex_dir_changed,
+                true,
+            )
+            .await;
+            return Err(append_rollback_errors(
+                format!("Codex 图片渲染兼容模式未生效: {err}"),
+                rollback_errors,
+            ));
+        }
+    }
 
     if unify_codex_changed {
         if let Err(err) = crate::services::provider::reapply_current_codex_live(state.inner()) {
             log::warn!("统一 Codex 会话历史开关变更后重写 live 配置失败，回滚设置: {err}");
-            if let Err(rollback_err) = crate::settings::update_settings(existing) {
-                log::error!("回滚统一会话开关设置失败: {rollback_err}");
-            }
-            return Err(format!(
-                "统一 Codex 会话历史开关未生效（live 配置重写失败）: {err}"
+            let rollback_errors = rollback_settings_and_image_compat(
+                state.inner(),
+                &existing,
+                &new_codex_home,
+                codex_dir_changed,
+                image_state_changed,
+            )
+            .await;
+            return Err(append_rollback_errors(
+                format!("统一 Codex 会话历史开关未生效（live 配置重写失败）: {err}"),
+                rollback_errors,
             ));
         }
 
