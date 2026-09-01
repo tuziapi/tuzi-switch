@@ -3,6 +3,7 @@
 //! 使用高精度 Decimal 类型避免浮点数精度问题
 
 use super::parser::TokenUsage;
+use crate::services::sql_helpers::fresh_input_tokens;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
@@ -46,10 +47,25 @@ impl CostCalculator {
         pricing: &ModelPricing,
         cost_multiplier: Decimal,
     ) -> CostBreakdown {
+        Self::calculate_with_input_semantics(usage, pricing, cost_multiplier, 0)
+    }
+
+    pub fn calculate_with_input_semantics(
+        usage: &TokenUsage,
+        pricing: &ModelPricing,
+        cost_multiplier: Decimal,
+        input_token_semantics: i64,
+    ) -> CostBreakdown {
         let million = Decimal::from(1_000_000);
 
         // 计算实际需要按输入价格计费的 token 数（减去缓存命中部分）
-        let billable_input_tokens = usage.input_tokens.saturating_sub(usage.cache_read_tokens);
+        let billable_input_tokens = fresh_input_tokens(
+            usage.input_tokens,
+            usage.cache_read_tokens,
+            usage.cache_creation_tokens,
+            input_token_semantics,
+            true,
+        );
 
         // 各项基础成本（不含倍率）
         let input_cost =

@@ -39,9 +39,18 @@ export interface CodexUnifyHistoryRestoreResult {
   skippedReason?: string;
 }
 
+export interface CodexHistoryAnchorStatus {
+  providerId: string;
+  source: string;
+  configDir: string;
+  cwd: string | null;
+  resolvedAt: string;
+}
+
 export type CodexImageCompatReadinessReason =
   | "disabled"
   | "no_provider"
+  | "native_route"
   | "unsupported_provider"
   | "provider_config_invalid"
   | "missing_credential"
@@ -63,6 +72,12 @@ export interface CodexImageCompatStatus {
   personalizationInstruction: string;
 }
 
+export interface CodexSubagentSettings {
+  maxConcurrentThreadsPerSession: number | null;
+  configPath: string;
+  usedLegacyAlias: boolean;
+}
+
 export const settingsApi = {
   async get(): Promise<Settings> {
     return await invoke("get_settings");
@@ -74,6 +89,22 @@ export const settingsApi = {
 
   async getCodexImageCompatStatus(): Promise<CodexImageCompatStatus> {
     return await invoke("get_codex_image_compat_status");
+  },
+
+  async getCodexSubagentSettings(): Promise<CodexSubagentSettings> {
+    return await invoke("get_codex_subagent_settings");
+  },
+
+  async setCodexSubagentMaxConcurrentThreads(
+    value: number | null,
+  ): Promise<CodexSubagentSettings> {
+    return await invoke("set_codex_subagent_max_concurrent_threads", {
+      value,
+    });
+  },
+
+  async getCodexHistoryAnchorStatus(): Promise<CodexHistoryAnchorStatus> {
+    return await invoke("get_codex_history_anchor_status");
   },
 
   async hasCodexUnifyHistoryBackup(): Promise<boolean> {

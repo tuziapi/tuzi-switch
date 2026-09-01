@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 
 use crate::app_config::AppType;
 use crate::commands::copilot::CopilotAuthState;
@@ -34,27 +34,42 @@ pub fn get_current_provider(state: State<'_, AppState>, app: String) -> Result<S
 }
 
 #[tauri::command]
-pub fn add_provider(
-    state: State<'_, AppState>,
+pub async fn add_provider(
+    app_handle: tauri::AppHandle,
     app: String,
     provider: Provider,
     #[allow(non_snake_case)] addToLive: Option<bool>,
 ) -> Result<bool, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::add(state.inner(), app_type, provider, addToLive.unwrap_or(true))
-        .map_err(|e| e.to_string())
+    let add_to_live = addToLive.unwrap_or(true);
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle
+            .try_state::<AppState>()
+            .ok_or_else(|| "应用状态不可用".to_string())?;
+        ProviderService::add(state.inner(), app_type, provider, add_to_live)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("供应商添加任务执行失败: {e}"))?
 }
 
 #[tauri::command]
-pub fn update_provider(
-    state: State<'_, AppState>,
+pub async fn update_provider(
+    app_handle: tauri::AppHandle,
     app: String,
     provider: Provider,
     #[allow(non_snake_case)] originalId: Option<String>,
 ) -> Result<bool, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::update(state.inner(), app_type, originalId.as_deref(), provider)
-        .map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle
+            .try_state::<AppState>()
+            .ok_or_else(|| "应用状态不可用".to_string())?;
+        ProviderService::update(state.inner(), app_type, originalId.as_deref(), provider)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("供应商更新任务执行失败: {e}"))?
 }
 
 #[tauri::command]
@@ -120,13 +135,20 @@ pub fn switch_provider_test_hook(
 }
 
 #[tauri::command]
-pub fn switch_provider(
-    state: State<'_, AppState>,
+pub async fn switch_provider(
+    app_handle: tauri::AppHandle,
     app: String,
     id: String,
 ) -> Result<SwitchResult, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    switch_provider_internal(&state, app_type, &id).map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle
+            .try_state::<AppState>()
+            .ok_or_else(|| "应用状态不可用".to_string())?;
+        switch_provider_internal(state.inner(), app_type, &id).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("供应商切换任务执行失败: {e}"))?
 }
 
 fn import_default_config_internal(state: &AppState, app_type: AppType) -> Result<bool, AppError> {
@@ -700,141 +722,105 @@ pub fn get_opencode_live_provider_ids() -> Result<Vec<String>, String> {
         .map_err(|e| e.to_string())
 }
 
-/// 从 TOML 字符串中提取 base_url：
-/// 优先从 [model_providers.<name>] 段读取，fallback 到顶层 base_url。
-fn extract_base_url_from_toml_str(toml_str: &str) -> Option<String> {
-    let doc: toml::Value = toml_str.parse().ok()?;
-    if let Some(providers) = doc.get("model_providers").and_then(|v| v.as_table()) {
-        for (_, provider) in providers.iter() {
-            if let Some(url) = provider.get("base_url").and_then(|v| v.as_str()) {
-                return Some(url.to_string());
-            }
-        }
-    }
-    doc.get("base_url")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
+fn codex_provider_env_key(settings: &serde_json::Value) -> Option<String> {
+    settings
+        .get("config")
+        .and_then(serde_json::Value::as_str)
+        .and_then(crate::codex_config::extract_codex_env_key)
+        .or_else(|| {
+            settings
+                .pointer("/env/envKey")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        })
 }
 
-/// 检测 ~/.codex/auth.json 和 config.toml，把 API key 回填到数据库里对应的预设卡片。
-/// - base_url 匹配预设 → 更新对应卡片的 OPENAI_API_KEY
-/// - base_url 不匹配 → 生成一张新的 default 卡片（多个则 default1、default2...）
-#[tauri::command]
-pub fn sync_codex_live_api_key(state: State<'_, AppState>) -> Result<(), String> {
-    use crate::codex_config::{get_codex_auth_path, read_codex_config_text};
-    use crate::services::provider::ProviderService;
-    use serde_json::json;
-
-    // 预设卡片：(id, base_url)
-    const PRESET_CARDS: &[(&str, &str)] = &[
-        ("tuzi-route", "https://api.tu-zi.com"),
-        ("coding", "https://api.tu-zi.com/coding"),
-        ("gaccode", "https://gaccode.com/codex/v1"),
+fn codex_login_api_keys() -> std::collections::HashSet<String> {
+    let mut auth_paths = vec![
+        crate::codex_config::get_codex_auth_path(),
+        crate::config::get_home_dir()
+            .join(".codex")
+            .join("auth.json"),
     ];
-
-    // 1. 读取 auth.json
-    let auth_path = get_codex_auth_path();
-    if !auth_path.exists() {
-        return Ok(());
-    }
-    let auth_text = std::fs::read_to_string(&auth_path).map_err(|e| e.to_string())?;
-    let auth: serde_json::Value = serde_json::from_str(&auth_text).unwrap_or_else(|_| json!({}));
-    let api_key = auth
-        .get("OPENAI_API_KEY")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-
-    if api_key.is_empty() {
-        return Ok(());
+    if let Some(codex_home) = std::env::var_os("CODEX_HOME") {
+        auth_paths.push(std::path::PathBuf::from(codex_home).join("auth.json"));
     }
 
-    // 2. 读取 config.toml，提取 base_url
-    let config_text = read_codex_config_text().unwrap_or_default();
-    let detected_url = extract_base_url_from_toml_str(&config_text).unwrap_or_default();
-    let normalized_detected = detected_url.trim_end_matches('/').to_lowercase();
+    auth_paths
+        .into_iter()
+        .filter_map(|auth_path| std::fs::read_to_string(auth_path).ok())
+        .filter_map(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .filter_map(|auth| crate::codex_config::extract_codex_auth_api_key(&auth))
+        .collect()
+}
 
-    // 3. 尝试匹配预设卡片
-    let matched_id = PRESET_CARDS.iter().find_map(|(id, base_url)| {
-        let normalized = base_url.trim_end_matches('/').to_lowercase();
-        if normalized == normalized_detected {
-            Some(*id)
-        } else {
-            None
+fn sanitize_codex_provider_credentials_internal(state: &AppState) -> Result<usize, AppError> {
+    let login_api_keys = codex_login_api_keys();
+    if login_api_keys.is_empty() {
+        return Ok(0);
+    }
+
+    let providers = state.db.get_all_providers(AppType::Codex.as_str())?;
+    let mut updated_count = 0usize;
+
+    for (provider_id, mut provider) in providers {
+        let stored_api_key = provider
+            .settings_config
+            .pointer("/auth/OPENAI_API_KEY")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+
+        let env_key = codex_provider_env_key(&provider.settings_config);
+        let env_contains_login_key = env_key
+            .as_deref()
+            .and_then(crate::codex_config::read_managed_env_key)
+            .is_some_and(|value| login_api_keys.contains(value.trim()));
+        let stored_login_key = stored_api_key
+            .as_deref()
+            .is_some_and(|value| login_api_keys.contains(value));
+
+        if env_contains_login_key {
+            if let Some(env_key) = env_key.as_deref() {
+                crate::codex_config::remove_managed_env_key(env_key)?;
+            }
         }
-    });
 
-    if let Some(provider_id) = matched_id {
-        // 4a. 匹配到预设 → 读取现有 settings_config，更新 API key
-        let existing = state
-            .db
-            .get_provider_by_id(provider_id, "codex")
-            .map_err(|e| e.to_string())?;
-        if let Some(mut provider) = existing {
-            if let Some(auth_obj) = provider
+        if stored_login_key {
+            if let Some(auth) = provider
                 .settings_config
                 .get_mut("auth")
-                .and_then(|v| v.as_object_mut())
+                .and_then(serde_json::Value::as_object_mut)
             {
-                auth_obj.insert("OPENAI_API_KEY".to_string(), json!(api_key));
+                auth.remove("OPENAI_API_KEY");
             }
-            state
-                .db
-                .update_provider_settings_config("codex", provider_id, &provider.settings_config)
-                .map_err(|e| e.to_string())?;
-        }
-    } else if !normalized_detected.is_empty() {
-        // 4b. 未匹配 → 生成 default 卡片
-        let existing_providers = state
-            .db
-            .get_all_providers("codex")
-            .map_err(|e| e.to_string())?;
-
-        // 检查是否已有相同 base_url 的卡片，避免重复创建
-        let already_exists = existing_providers.values().any(|p| {
-            let config_str = p
-                .settings_config
-                .get("config")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let url = extract_base_url_from_toml_str(config_str).unwrap_or_default();
-            url.trim_end_matches('/').to_lowercase() == normalized_detected
-        });
-
-        if already_exists {
-            return Ok(());
+            state.db.update_provider_settings_config(
+                AppType::Codex.as_str(),
+                &provider_id,
+                &provider.settings_config,
+            )?;
         }
 
-        let default_count = existing_providers
-            .keys()
-            .filter(|id| id.starts_with("default"))
-            .count();
-        let card_id = if default_count == 0 {
-            "default".to_string()
-        } else {
-            format!("default{}", default_count)
-        };
-        let card_name = card_id.clone();
-
-        let config_toml = format!(
-            "model_provider = \"{card_id}\"\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{card_id}]\nname = \"{card_id}\"\nbase_url = \"{detected_url}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\n"
-        );
-
-        let new_provider = crate::provider::Provider::with_id(
-            card_id.clone(),
-            card_name,
-            json!({
-                "auth": { "OPENAI_API_KEY": api_key },
-                "config": config_toml,
-            }),
-            None,
-        );
-
-        ProviderService::add(state.inner(), AppType::Codex, new_provider, false)
-            .map_err(|e| e.to_string())?;
+        if env_contains_login_key || stored_login_key {
+            updated_count += 1;
+        }
     }
 
-    Ok(())
+    Ok(updated_count)
+}
+
+#[cfg_attr(not(feature = "test-hooks"), doc(hidden))]
+pub fn sanitize_codex_provider_credentials_test_hook(state: &AppState) -> Result<usize, AppError> {
+    sanitize_codex_provider_credentials_internal(state)
+}
+
+/// Remove Codex login keys copied into provider storage without trusting legacy auth as a source.
+#[tauri::command]
+pub fn sanitize_codex_provider_credentials(state: State<'_, AppState>) -> Result<usize, String> {
+    sanitize_codex_provider_credentials_internal(state.inner()).map_err(|e| e.to_string())
 }
 
 /// 检测 ~/.claude/settings.json，把 API key 回填到数据库里对应的预设卡片。

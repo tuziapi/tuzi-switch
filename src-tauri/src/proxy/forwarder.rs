@@ -10,8 +10,8 @@ use super::{
     log_codes::fwd as log_fwd,
     provider_router::ProviderRouter,
     providers::{
-        gemini_shadow::GeminiShadowStore, get_adapter, AuthInfo, AuthStrategy, ProviderAdapter,
-        ProviderType,
+        gemini_shadow::GeminiShadowStore, get_adapter, resolve_codex_auth, AuthInfo, AuthStrategy,
+        ProviderAdapter, ProviderType,
     },
     thinking_budget_rectifier::{rectify_thinking_budget, should_rectify_thinking_budget},
     thinking_rectifier::{
@@ -1065,7 +1065,12 @@ impl RequestForwarder {
         let mut should_send_codex_oauth_session_headers = false;
 
         // 获取认证头（提前准备，用于内联替换）
-        let mut auth_headers = if let Some(mut auth) = adapter.extract_auth(provider) {
+        let resolved_auth = if matches!(app_type, AppType::Codex) {
+            resolve_codex_auth(provider).await
+        } else {
+            adapter.extract_auth(provider)
+        };
+        let mut auth_headers = if let Some(mut auth) = resolved_auth {
             // GitHub Copilot 特殊处理：从 CopilotAuthManager 获取真实 token
             if auth.strategy == AuthStrategy::GitHubCopilot {
                 if let Some(app_handle) = &self.app_handle {

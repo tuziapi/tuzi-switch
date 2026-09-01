@@ -9,6 +9,16 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+fn openai_cache_read_tokens(usage: &Value) -> u32 {
+    usage
+        .get("cache_read_input_tokens")
+        .or_else(|| usage.pointer("/input_tokens_details/cached_tokens"))
+        .or_else(|| usage.pointer("/prompt_tokens_details/cached_tokens"))
+        .or_else(|| usage.get("prompt_cache_hit_tokens"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as u32
+}
+
 /// Session 日志 request_id 前缀，与 `session_usage.rs` 中的格式保持一致
 pub const SESSION_REQUEST_ID_PREFIX: &str = "session:";
 
@@ -180,7 +190,7 @@ impl TokenUsage {
         Some(Self {
             input_tokens: usage.get("prompt_tokens")?.as_u64()? as u32,
             output_tokens: usage.get("completion_tokens")?.as_u64()? as u32,
-            cache_read_tokens: 0,
+            cache_read_tokens: openai_cache_read_tokens(usage),
             cache_creation_tokens: 0,
             model: None,
             message_id: None,
@@ -354,11 +364,7 @@ impl TokenUsage {
         let completion_tokens = usage.get("completion_tokens").and_then(|v| v.as_u64())?;
 
         // 获取 cached_tokens (可能在 prompt_tokens_details 中)
-        let cached_tokens = usage
-            .get("prompt_tokens_details")
-            .and_then(|d| d.get("cached_tokens"))
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as u32;
+        let cached_tokens = openai_cache_read_tokens(usage);
 
         // 提取响应中的模型名称
         let model = body
@@ -851,6 +857,39 @@ mod tests {
         assert_eq!(usage.output_tokens, 500);
         assert_eq!(usage.cache_read_tokens, 200);
         assert_eq!(usage.model, Some("gpt-4o".to_string()));
+    }
+
+    #[test]
+    fn test_openai_response_reads_deepseek_cache_hit_tokens() {
+        let response = json!({
+            "model": "deepseek-chat",
+            "usage": {
+                "prompt_tokens": 1000,
+                "completion_tokens": 100,
+                "prompt_cache_hit_tokens": 600,
+                "prompt_cache_miss_tokens": 400
+            }
+        });
+
+        let usage = TokenUsage::from_openai_response(&response).unwrap();
+        assert_eq!(usage.input_tokens, 1000);
+        assert_eq!(usage.output_tokens, 100);
+        assert_eq!(usage.cache_read_tokens, 600);
+    }
+
+    #[test]
+    fn test_openai_response_prefers_standard_cache_field() {
+        let response = json!({
+            "usage": {
+                "prompt_tokens": 1000,
+                "completion_tokens": 100,
+                "prompt_tokens_details": { "cached_tokens": 200 },
+                "prompt_cache_hit_tokens": 600
+            }
+        });
+
+        let usage = TokenUsage::from_openai_response(&response).unwrap();
+        assert_eq!(usage.cache_read_tokens, 200);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { UsageSummaryCards } from "./UsageSummaryCards";
+import { UsageHero } from "./UsageHero";
 import { UsageTrendChart } from "./UsageTrendChart";
 import { RequestLogTable } from "./RequestLogTable";
 import { ProviderStatsTable } from "./ProviderStatsTable";
@@ -29,6 +29,14 @@ import { getLocaleFromLanguage } from "./format";
 import { getUsageRangePresetLabel, resolveUsageRange } from "@/lib/usageRange";
 import { UsageDateRangePicker } from "./UsageDateRangePicker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useModelStats, useProviderStats } from "@/lib/query/usage";
 
 const APP_FILTER_OPTIONS: AppTypeFilter[] = [
   "all",
@@ -37,11 +45,20 @@ const APP_FILTER_OPTIONS: AppTypeFilter[] = [
   "gemini",
 ];
 
+const FILTER_ALL = "all:";
+const encodeFilterValue = (value: string) => `value:${value}`;
+const decodeFilterValue = (value: string) =>
+  value === FILTER_ALL ? undefined : value.slice("value:".length);
+
 export function UsageDashboard() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [range, setRange] = useState<UsageRangeSelection>({ preset: "today" });
   const [appType, setAppType] = useState<AppTypeFilter>("all");
+  const [providerName, setProviderName] = useState<string | undefined>(
+    undefined,
+  );
+  const [model, setModel] = useState<string | undefined>(undefined);
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(30000);
 
   const refreshIntervalOptionsMs = [0, 5000, 10000, 30000, 60000] as const;
@@ -69,6 +86,39 @@ export function UsageDashboard() {
     ).toLocaleString(locale)}`;
   }, [locale, range, resolvedRange.endDate, resolvedRange.startDate, t]);
 
+  const providerStats =
+    useProviderStats(
+      range,
+      appType,
+      { model: undefined },
+      { refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false },
+    ).data ?? [];
+  const providerOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(providerStats.map((provider) => provider.providerName)),
+      ),
+    [providerStats],
+  );
+  const modelOptions =
+    useModelStats(
+      range,
+      appType,
+      { providerName },
+      { refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false },
+    ).data ?? [];
+
+  const changeAppType = (next: AppTypeFilter) => {
+    setAppType(next);
+    setProviderName(undefined);
+    setModel(undefined);
+  };
+  const changeProvider = (next: string) => {
+    const value = decodeFilterValue(next);
+    setProviderName(value);
+    setModel(undefined);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -92,7 +142,7 @@ export function UsageDashboard() {
               <button
                 key={type}
                 type="button"
-                onClick={() => setAppType(type)}
+                onClick={() => changeAppType(type)}
                 className={cn(
                   "px-4 py-1.5 rounded-lg text-sm font-medium transition-all",
                   appType === type
@@ -104,7 +154,53 @@ export function UsageDashboard() {
               </button>
             ))}
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <Select
+                value={
+                  providerName ? encodeFilterValue(providerName) : FILTER_ALL
+                }
+                onValueChange={changeProvider}
+              >
+                <SelectTrigger className="h-8 w-full bg-background text-xs sm:w-[160px]">
+                  <SelectValue
+                    placeholder={t("usage.allProviders", "全部供应商")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FILTER_ALL}>
+                    {t("usage.allProviders", "全部供应商")}
+                  </SelectItem>
+                  {providerOptions.map((provider) => (
+                    <SelectItem
+                      key={provider}
+                      value={encodeFilterValue(provider)}
+                    >
+                      {provider}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={model ? encodeFilterValue(model) : FILTER_ALL}
+                onValueChange={(value) => setModel(decodeFilterValue(value))}
+              >
+                <SelectTrigger className="h-8 w-full bg-background text-xs sm:w-[180px]">
+                  <SelectValue placeholder={t("usage.allModels", "全部模型")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FILTER_ALL}>
+                    {t("usage.allModels", "全部模型")}
+                  </SelectItem>
+                  {modelOptions.map((item) => (
+                    <SelectItem
+                      key={item.model}
+                      value={encodeFilterValue(item.model)}
+                    >
+                      {item.model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 type="button"
                 variant="ghost"
@@ -127,9 +223,11 @@ export function UsageDashboard() {
         </div>
       </div>
 
-      <UsageSummaryCards
+      <UsageHero
         range={range}
         appType={appType}
+        providerName={providerName}
+        model={model}
         refreshIntervalMs={refreshIntervalMs}
       />
 
@@ -137,6 +235,8 @@ export function UsageDashboard() {
         range={range}
         rangeLabel={rangeLabel}
         appType={appType}
+        providerName={providerName}
+        model={model}
         refreshIntervalMs={refreshIntervalMs}
       />
 
@@ -169,6 +269,8 @@ export function UsageDashboard() {
                 range={range}
                 rangeLabel={rangeLabel}
                 appType={appType}
+                providerName={providerName}
+                model={model}
                 refreshIntervalMs={refreshIntervalMs}
                 onRangeChange={setRange}
               />
@@ -178,6 +280,8 @@ export function UsageDashboard() {
               <ProviderStatsTable
                 range={range}
                 appType={appType}
+                providerName={providerName}
+                model={model}
                 refreshIntervalMs={refreshIntervalMs}
               />
             </TabsContent>
@@ -186,6 +290,8 @@ export function UsageDashboard() {
               <ModelStatsTable
                 range={range}
                 appType={appType}
+                providerName={providerName}
+                model={model}
                 refreshIntervalMs={refreshIntervalMs}
               />
             </TabsContent>

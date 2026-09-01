@@ -2,8 +2,10 @@ use serde_json::json;
 
 use tuzi_switch_lib::{
     clear_provider_live_config_test_hook, get_codex_config_path, import_default_config_test_hook,
-    read_json_file, save_codex_route_test_hook, switch_provider_test_hook, write_codex_live_atomic,
-    AppError, AppType, McpApps, McpServer, MultiAppConfig, Provider, ProviderService,
+    read_all_codex_env_keys, read_json_file, sanitize_codex_provider_credentials_test_hook,
+    save_codex_route_test_hook, switch_provider_test_hook, write_codex_env_key,
+    write_codex_live_atomic, AppError, AppType, McpApps, McpServer, MultiAppConfig, Provider,
+    ProviderService,
 };
 
 #[path = "support.rs"]
@@ -66,14 +68,15 @@ requires_openai_auth = false
     assert!(!providers.contains_key("default"));
     assert!(!providers.contains_key("codex-official"));
     for provider_id in ["tuzi-route", "coding", "gaccode"] {
+        let config = providers[provider_id]
+            .settings_config
+            .get("config")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        assert!(config.contains("model = \"gpt-5.5\""));
         assert!(
-            providers[provider_id]
-                .settings_config
-                .get("config")
-                .and_then(|value| value.as_str())
-                .unwrap_or_default()
-                .contains("model = \"gpt-5.5\""),
-            "{provider_id} should default to gpt-5.5"
+            config.contains("model_provider = \"custom\""),
+            "{provider_id} should use custom when no live Codex route exists"
         );
     }
     let imported_config = providers["codex-live-config"]
@@ -82,12 +85,20 @@ requires_openai_auth = false
         .and_then(|value| value.as_str())
         .expect("imported codex config");
     assert!(
-        imported_config.contains("model_provider = \"provider-tuzi01\""),
-        "imported user tuzi config should use a tuzi-switch numbered provider"
+        imported_config.contains("model_provider = \"tuzi\""),
+        "imported live config must preserve its existing provider id"
     );
     assert!(
-        imported_config.contains("env_key = \"TUZI01_CODEX_API_KEY\""),
-        "imported user tuzi config should receive a matching numbered env key"
+        imported_config.contains("env_key = \"TUZI_CODEX_API_KEY\""),
+        "imported live config must preserve its existing env key"
+    );
+    assert!(
+        providers["codex-live-config"]
+            .settings_config
+            .get("auth")
+            .and_then(serde_json::Value::as_object)
+            .is_some_and(|auth| auth.is_empty()),
+        "third-party imports must not store the live login key as provider credentials"
     );
 
     let current_id = state
@@ -100,6 +111,113 @@ requires_openai_auth = false
         !ProviderService::should_import_default_config_on_startup(&state, &AppType::Codex)
             .expect("re-check startup import eligibility"),
         "subsequent startup should skip once Codex live config has been imported"
+    );
+}
+
+#[test]
+fn codex_provider_credential_cleanup_removes_login_key_without_trusting_legacy_auth() {
+    let _guard = test_mutex().lock().expect("acquire test mutex");
+    reset_test_fs();
+    let home = ensure_test_home();
+
+    let codex_dir = home.join(".codex");
+    std::fs::create_dir_all(&codex_dir).expect("create codex dir");
+    std::fs::write(
+        codex_dir.join("auth.json"),
+        serde_json::to_vec(&json!({ "OPENAI_API_KEY": "login-key" })).expect("serialize auth"),
+    )
+    .expect("write auth.json");
+
+    let state = create_test_state().expect("create test state");
+
+    let copied_login_provider = Provider::with_id(
+        "copied-login".to_string(),
+        "Copied Login".to_string(),
+        json!({
+            "auth": { "OPENAI_API_KEY": "login-key" },
+            "env": { "envKey": "COPIED_LOGIN_CODEX_API_KEY" },
+            "config": r#"model_provider = "copied-login"
+
+[model_providers.copied-login]
+name = "Copied Login"
+base_url = "https://copied.example/v1"
+env_key = "COPIED_LOGIN_CODEX_API_KEY"
+"#,
+        }),
+        None,
+    );
+    state
+        .db
+        .save_provider(AppType::Codex.as_str(), &copied_login_provider)
+        .expect("save copied login provider");
+
+    let real_legacy_provider = Provider::with_id(
+        "real-legacy".to_string(),
+        "Real Legacy".to_string(),
+        json!({
+            "auth": { "OPENAI_API_KEY": "real-provider-key" },
+            "env": { "envKey": "REAL_LEGACY_CODEX_API_KEY" },
+            "config": r#"model_provider = "real-legacy"
+
+[model_providers.real-legacy]
+name = "Real Legacy"
+base_url = "https://legacy.example/v1"
+env_key = "REAL_LEGACY_CODEX_API_KEY"
+"#,
+        }),
+        None,
+    );
+    state
+        .db
+        .save_provider(AppType::Codex.as_str(), &real_legacy_provider)
+        .expect("save real legacy provider");
+    write_codex_env_key(
+        "COPIED_LOGIN_CODEX_API_KEY".to_string(),
+        "login-key".to_string(),
+    )
+    .expect("seed copied login env key");
+
+    assert_eq!(
+        sanitize_codex_provider_credentials_test_hook(&state)
+            .expect("sanitize codex provider credentials"),
+        1
+    );
+
+    let copied_login = state
+        .db
+        .get_provider_by_id("copied-login", AppType::Codex.as_str())
+        .expect("read copied login provider")
+        .expect("copied login provider exists");
+    assert!(
+        copied_login
+            .settings_config
+            .pointer("/auth/OPENAI_API_KEY")
+            .is_none(),
+        "the copied login key should be removed from provider auth"
+    );
+
+    let real_legacy = state
+        .db
+        .get_provider_by_id("real-legacy", AppType::Codex.as_str())
+        .expect("read real legacy provider")
+        .expect("real legacy provider exists");
+    assert_eq!(
+        real_legacy
+            .settings_config
+            .pointer("/auth/OPENAI_API_KEY")
+            .and_then(serde_json::Value::as_str),
+        Some("real-provider-key"),
+        "unverified legacy auth must be preserved but never auto-migrated"
+    );
+
+    let env_keys = read_all_codex_env_keys().expect("read sanitized codex env keys");
+    assert!(
+        !env_keys.contains_key("COPIED_LOGIN_CODEX_API_KEY"),
+        "the copied Codex login key should be removed from provider env storage"
+    );
+    assert!(
+        !env_keys.contains_key("REAL_LEGACY_CODEX_API_KEY"),
+        "legacy provider auth must not be copied into env storage automatically"
     );
 }
 
@@ -974,6 +1092,11 @@ command = "say"
     );
 
     let app_state = create_test_state_with_config(&config).expect("create test state");
+    write_codex_env_key(
+        "FRESH_CODEX_API_KEY".to_string(),
+        "real-provider-key".to_string(),
+    )
+    .expect("seed provider env key");
 
     switch_provider_test_hook(&app_state, AppType::Codex, "new-provider")
         .expect("switch provider should succeed");
@@ -984,13 +1107,17 @@ command = "say"
         "live Codex config should not expose API key values"
     );
     assert!(
-        !config_text.contains("env_key = \"FRESH_CODEX_API_KEY\""),
-        "live Codex config should not expose managed env_key"
+        config_text.contains("env_key = \"FRESH_CODEX_API_KEY\""),
+        "live Codex config should retain the stable provider env_key"
     );
     let zshrc = std::fs::read_to_string(_home.join(".zshrc")).expect("read managed env rc");
     assert!(
-        zshrc.contains("export FRESH_CODEX_API_KEY='fresh-key'"),
-        "managed env rc should contain the provider token"
+        zshrc.contains("export FRESH_CODEX_API_KEY='real-provider-key'"),
+        "switching must preserve the env-backed provider token"
+    );
+    assert!(
+        !zshrc.contains("export FRESH_CODEX_API_KEY='fresh-key'"),
+        "stored auth must never overwrite the env-backed provider token"
     );
     assert!(
         config_text.contains("mcp_servers.echo-server"),
@@ -1038,6 +1165,135 @@ command = "say"
         legacy_auth_value, "legacy-key",
         "previous provider should be backfilled with live auth"
     );
+}
+
+#[test]
+fn repeated_codex_switches_preserve_each_provider_api_key() {
+    let _guard = test_mutex().lock().expect("acquire test mutex");
+    reset_test_fs();
+    let _home = ensure_test_home();
+
+    fn settings(route: &str, env_key: &str, base_url: &str) -> serde_json::Value {
+        json!({
+            "auth": {},
+            "env": { "envKey": env_key },
+            "config": format!(r#"model_provider = "{route}"
+model = "gpt-5.5"
+
+[model_providers.{route}]
+name = "{route}"
+base_url = "{base_url}"
+env_key = "{env_key}"
+wire_api = "responses"
+requires_openai_auth = false
+"#)
+        })
+    }
+
+    let routes = [
+        (
+            "provider-a",
+            "PROVIDER_A_CODEX_API_KEY",
+            "sk-provider-a",
+            "https://same.example/v1",
+        ),
+        (
+            "provider-b",
+            "PROVIDER_B_CODEX_API_KEY",
+            "sk-provider-b",
+            "https://same.example/v1",
+        ),
+        (
+            "provider-c",
+            "PROVIDER_C_CODEX_API_KEY",
+            "sk-provider-c",
+            "https://different.example/v1",
+        ),
+    ];
+
+    let mut config = MultiAppConfig::default();
+    let manager = config
+        .get_manager_mut(&AppType::Codex)
+        .expect("codex manager");
+    manager.current = "provider-a".to_string();
+    for (route, env_key, _, base_url) in routes {
+        manager.providers.insert(
+            route.to_string(),
+            Provider::with_id(
+                route.to_string(),
+                route.to_string(),
+                settings(route, env_key, base_url),
+                None,
+            ),
+        );
+    }
+
+    let state = create_test_state_with_config(&config).expect("create test state");
+    for (_, env_key, token, _) in routes {
+        write_codex_env_key(env_key.to_string(), token.to_string()).expect("seed provider key");
+    }
+    let initial = settings(
+        "provider-a",
+        "PROVIDER_A_CODEX_API_KEY",
+        "https://same.example/v1",
+    );
+    write_codex_live_atomic(
+        &json!({}),
+        initial.get("config").and_then(serde_json::Value::as_str),
+    )
+    .expect("seed provider A live config");
+
+    for target in [
+        "provider-b",
+        "provider-c",
+        "provider-a",
+        "provider-b",
+        "provider-a",
+        "provider-c",
+        "provider-a",
+    ] {
+        switch_provider_test_hook(&state, AppType::Codex, target)
+            .unwrap_or_else(|error| panic!("switch to {target}: {error}"));
+
+        let keys = read_all_codex_env_keys().expect("read managed keys");
+        for (_, env_key, token, _) in routes {
+            assert_eq!(
+                keys.get(env_key).map(String::as_str),
+                Some(token),
+                "switching to {target} must not overwrite {env_key}"
+            );
+        }
+
+        let (_, target_env_key, _, target_base_url) = routes
+            .iter()
+            .find(|(route, _, _, _)| *route == target)
+            .expect("target route");
+        let live = std::fs::read_to_string(get_codex_config_path()).expect("read live config");
+        assert!(
+            live.contains("model_provider = \"provider-a\""),
+            "the session-history provider id should remain stable"
+        );
+        assert!(live.contains(&format!("base_url = \"{target_base_url}\"")));
+        assert!(live.contains(&format!("env_key = \"{target_env_key}\"")));
+    }
+
+    let providers = state
+        .db
+        .get_all_providers(AppType::Codex.as_str())
+        .expect("read providers");
+    for (route, env_key, _, base_url) in routes {
+        let stored = providers[route].settings_config["config"]
+            .as_str()
+            .expect("stored provider config");
+        assert!(
+            stored.contains(&format!("env_key = \"{env_key}\"")),
+            "backfill must restore the provider-specific env_key for {route}"
+        );
+        assert!(
+            stored.contains(&format!("base_url = \"{base_url}\"")),
+            "backfill must preserve the provider-specific base_url for {route}"
+        );
+    }
 }
 
 #[test]

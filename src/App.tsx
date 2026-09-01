@@ -54,6 +54,7 @@ import { useLastValidValue } from "@/hooks/useLastValidValue";
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { isTextEditableTarget } from "@/utils/domUtils";
 import { cn } from "@/lib/utils";
+import { REPOSITORY_URL } from "@/lib/releaseRepository";
 import {
   isWindows,
   isLinux,
@@ -210,28 +211,36 @@ function App() {
     }
   }, [visibleApps, activeApp]);
 
-  // 切换到 Codex 时，自动把 ~/.codex 里的 API key 回填到对应的预设卡片
+  // Remove copied Codex login keys without importing legacy auth into providers.
   useEffect(() => {
     if (activeApp !== "codex") return;
-    invoke("sync_codex_live_api_key").then(() => {
-      queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
-    }).catch(() => {/* 静默失败，不影响正常使用 */});
+    invoke("sanitize_codex_provider_credentials")
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["providers", "codex"] });
+      })
+      .catch(() => {
+        /* 静默失败，不影响正常使用 */
+      });
   }, [activeApp]);
 
   // 切换到 Claude 时，自动把 ~/.claude/settings.json 里的 API key 回填到对应的预设卡片
   useEffect(() => {
     if (activeApp !== "claude") return;
-    invoke("sync_claude_live_api_key").then(() => {
-      queryClient.invalidateQueries({ queryKey: ["providers", "claude"] });
-    }).catch(() => {});
+    invoke("sync_claude_live_api_key")
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["providers", "claude"] });
+      })
+      .catch(() => {});
   }, [activeApp]);
 
   // 切换到 Gemini 时，自动把 ~/.gemini/.env 里的 API key 回填到对应的预设卡片
   useEffect(() => {
     if (activeApp !== "gemini") return;
-    invoke("sync_gemini_live_api_key").then(() => {
-      queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
-    }).catch(() => {});
+    invoke("sync_gemini_live_api_key")
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["providers", "gemini"] });
+      })
+      .catch(() => {});
   }, [activeApp]);
 
   // Fallback from sessions view when switching to an app without session support
@@ -317,6 +326,7 @@ function App() {
     switchProvider,
     saveUsageScript,
     setAsDefaultModel,
+    switchingProviderId,
   } = useProviderActions(
     activeApp,
     isProxyRunning,
@@ -1075,6 +1085,7 @@ function App() {
                         isProxyRunning && isCurrentAppTakeoverActive
                       }
                       activeProviderId={activeProviderId}
+                      switchingProviderId={switchingProviderId}
                       onSwitch={switchProvider}
                       onEdit={(provider) => {
                         setEditingProvider(provider);
@@ -1298,7 +1309,7 @@ function App() {
               <div className="flex items-center gap-2">
                 <div className="relative inline-flex items-center">
                   <a
-                    href="https://github.com/tuziapi/tuzi-switch"
+                    href={REPOSITORY_URL}
                     target="_blank"
                     rel="noreferrer"
                     className={cn(
@@ -1731,7 +1742,7 @@ function App() {
                   ? t("confirm.clearCodexProviderConfigMessage", {
                       name: confirmAction.provider.name,
                       defaultValue:
-                        "是否清除“{{name}}”的当前 Codex 配置？\n\n将清除：\n- ~/.codex/config.toml 中该供应商对应的 model_provider/profile 配置段；\n- 如果当前 model_provider 指向该供应商，会改为 model_provider = \"\"；\n- tuzi-switch 为该供应商创建的 Codex profile 文件；\n- env_key 对应的环境变量；\n- 卡片中保存的 API Key / env_key / 写入状态。\n\n不会删除：\n- 供应商卡片；\n- ~/.codex/auth.json；\n- 其他供应商配置。\n\n清除后如需继续使用，需要重新填写 Key 并保存/启用。",
+                        '是否清除“{{name}}”的当前 Codex 配置？\n\n将清除：\n- ~/.codex/config.toml 中该供应商对应的 model_provider/profile 配置段；\n- 如果当前 model_provider 指向该供应商，会改为 model_provider = ""；\n- tuzi-switch 为该供应商创建的 Codex profile 文件；\n- env_key 对应的环境变量；\n- 卡片中保存的 API Key / env_key / 写入状态。\n\n不会删除：\n- 供应商卡片；\n- ~/.codex/auth.json；\n- 其他供应商配置。\n\n清除后如需继续使用，需要重新填写 Key 并保存/启用。',
                     })
                   : confirmAction.appId === "claude" ||
                       confirmAction.appId === "gemini"
@@ -1740,14 +1751,14 @@ function App() {
                         defaultValue:
                           "是否清除“{{name}}”写入客户端的环境变量配置？\n\n将清除：\n- 该供应商写入客户端配置文件中的 API Key / Base URL 等环境变量；\n- 卡片中保存的 API Key / 环境变量配置；\n- 如果它是当前供应商，会清空当前使用状态。\n\n不会删除：\n- 供应商卡片；\n- 其他供应商配置。\n\n清除后如需继续使用，需要重新填写 Key 并保存/启用。",
                       })
-                  : t("confirm.clearProviderConfigMessage", {
-                      name: confirmAction.provider.name,
-                      defaultValue:
-                        "是否清除“{{name}}”写入真实客户端的相关配置？\n\n将从客户端配置中移除该供应商，并清空卡片的写入状态；不会删除供应商卡片。清除后如需继续使用，需要重新保存/启用。",
-                    })
-              : t("confirm.deleteProviderMessage", {
-                  name: confirmAction.provider.name,
-                })
+                    : t("confirm.clearProviderConfigMessage", {
+                        name: confirmAction.provider.name,
+                        defaultValue:
+                          "是否清除“{{name}}”写入真实客户端的相关配置？\n\n将从客户端配置中移除该供应商，并清空卡片的写入状态；不会删除供应商卡片。清除后如需继续使用，需要重新保存/启用。",
+                      })
+                : t("confirm.deleteProviderMessage", {
+                    name: confirmAction.provider.name,
+                  })
             : ""
         }
         onConfirm={() => void handleConfirmAction()}

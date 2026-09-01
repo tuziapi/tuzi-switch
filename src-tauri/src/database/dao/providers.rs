@@ -25,14 +25,9 @@ fn build_codex_official_provider(
     env_key: &str,
     model: &str,
 ) -> Provider {
-    let route_id = match id {
-        "coding" => "provider-coding01",
-        "gaccode" => "gac",
-        "tuzi-route" => "tuzi",
-        _ => id,
-    };
+    let route_id = "custom";
     let config = format!(
-        "model_provider = \"{route_id}\"\nmodel = \"{model}\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{route_id}]\nname = \"{route_id}\"\nbase_url = \"{base_url}\"\nenv_key = \"{env_key}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\n"
+        "model_provider = \"{route_id}\"\nmodel = \"{model}\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.{route_id}]\nname = \"{name}\"\nbase_url = \"{base_url}\"\nenv_key = \"{env_key}\"\nwire_api = \"responses\"\nrequires_openai_auth = false\n"
     );
     let mut provider = Provider::with_id(
         id.to_string(),

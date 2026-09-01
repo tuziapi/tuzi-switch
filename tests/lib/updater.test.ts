@@ -45,6 +45,12 @@ describe("checkForUpdate", () => {
       expect(result.info.availableVersion).toBe("1.1.27");
       expect(result.update.manual).toBe(true);
     }
+    expect(fetch).toHaveBeenCalledWith(
+      `https://api.github.com/repos/${__RELEASE_REPOSITORY__}/releases/latest`,
+      expect.objectContaining({
+        headers: { Accept: "application/vnd.github+json" },
+      }),
+    );
   });
 
   it("falls back to GitHub release when Tauri updater reports no update", async () => {
@@ -59,6 +65,10 @@ describe("checkForUpdate", () => {
       expect(result.info.currentVersion).toBe("1.1.26");
       expect(result.info.availableVersion).toBe("1.1.27");
     }
+    expect(fetch).toHaveBeenCalledWith(
+      `https://api.github.com/repos/${__RELEASE_REPOSITORY__}/releases/latest`,
+      expect.any(Object),
+    );
   });
 });
 

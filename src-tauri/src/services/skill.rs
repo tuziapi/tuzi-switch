@@ -892,6 +892,25 @@ impl SkillService {
         Ok(())
     }
 
+    fn local_hash_for_update_check(
+        ssot_dir: &Path,
+        directory: &str,
+        cached_hash: Option<&str>,
+    ) -> Option<(String, bool)> {
+        let local_dir = ssot_dir.join(directory);
+        if !local_dir.exists() {
+            return None;
+        }
+
+        if let Some(hash) = cached_hash {
+            return Some((hash.to_string(), false));
+        }
+
+        Self::compute_dir_hash(&local_dir)
+            .ok()
+            .map(|hash| (hash, true))
+    }
+
     /// 检查所有已安装 Skill 的更新
     ///
     /// 仅检查有 repo_owner 的 Skill（本地 Skill 跳过），
@@ -974,23 +993,18 @@ impl SkillService {
                     }
                 };
 
-                // 本地哈希：优先数据库，否则实时计算
-                let local_hash = match &skill.content_hash {
-                    Some(h) => Some(h.clone()),
-                    None => {
-                        let local_dir = ssot_dir.join(&skill.directory);
-                        if local_dir.exists() {
-                            match Self::compute_dir_hash(&local_dir) {
-                                Ok(h) => {
-                                    let _ = db.update_skill_hash(&skill.id, &h, 0);
-                                    Some(h)
-                                }
-                                Err(_) => None,
-                            }
-                        } else {
-                            None
+                let local_hash = match Self::local_hash_for_update_check(
+                    &ssot_dir,
+                    &skill.directory,
+                    skill.content_hash.as_deref(),
+                ) {
+                    Some((hash, freshly_computed)) => {
+                        if freshly_computed {
+                            let _ = db.update_skill_hash(&skill.id, &hash, 0);
                         }
+                        Some(hash)
                     }
+                    None => None,
                 };
 
                 if local_hash.as_deref() != Some(&remote_hash) {
@@ -3061,5 +3075,32 @@ mod tests {
             .expect("install name should fall back to the matching discovered skill directory");
 
         assert_eq!(resolved, nested);
+    }
+
+    #[test]
+    fn update_check_ignores_cached_hash_when_ssot_directory_is_missing() {
+        let ssot = tempdir().expect("tempdir");
+        assert_eq!(
+            SkillService::local_hash_for_update_check(
+                ssot.path(),
+                "missing-skill",
+                Some("cached-hash")
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn update_check_uses_cached_hash_when_ssot_directory_exists() {
+        let ssot = tempdir().expect("tempdir");
+        fs::create_dir(ssot.path().join("installed-skill")).expect("create skill dir");
+        assert_eq!(
+            SkillService::local_hash_for_update_check(
+                ssot.path(),
+                "installed-skill",
+                Some("cached-hash")
+            ),
+            Some(("cached-hash".to_string(), false))
+        );
     }
 }

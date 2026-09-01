@@ -201,7 +201,6 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
     let parent = path
         .parent()
         .ok_or_else(|| AppError::Config("无效的路径".to_string()))?;
-    let mut tmp = parent.to_path_buf();
     let file_name = path
         .file_name()
         .ok_or_else(|| AppError::Config("无效的文件名".to_string()))?
@@ -211,13 +210,38 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    tmp.push(format!("{file_name}.tmp.{ts}"));
+    static TEMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let (tmp, mut file) = (|| -> Result<(PathBuf, fs::File), AppError> {
+        let mut last_collision = None;
+        for _ in 0..16 {
+            let counter = TEMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let candidate = parent.join(format!(
+                "{file_name}.tmp.{}.{ts}.{counter}",
+                std::process::id()
+            ));
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&candidate)
+            {
+                Ok(file) => return Ok((candidate, file)),
+                Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => {
+                    last_collision = Some((candidate, source));
+                }
+                Err(source) => return Err(AppError::io(&candidate, source)),
+            }
+        }
 
-    {
-        let mut f = fs::File::create(&tmp).map_err(|e| AppError::io(&tmp, e))?;
-        f.write_all(data).map_err(|e| AppError::io(&tmp, e))?;
-        f.flush().map_err(|e| AppError::io(&tmp, e))?;
+        let (candidate, source) = last_collision.expect("temporary filename loop must run");
+        Err(AppError::io(&candidate, source))
+    })()?;
+
+    if let Err(source) = file.write_all(data).and_then(|_| file.flush()) {
+        drop(file);
+        let _ = fs::remove_file(&tmp);
+        return Err(AppError::io(&tmp, source));
     }
+    drop(file);
 
     #[cfg(unix)]
     {
@@ -230,14 +254,76 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
 
     #[cfg(windows)]
     {
-        // Windows 上 rename 目标存在会失败，先移除再重命名（尽量接近原子性）
-        if path.exists() {
-            let _ = fs::remove_file(path);
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::{
+            Foundation::ERROR_NOT_SUPPORTED, Storage::FileSystem::ReplaceFileW,
+        };
+
+        let replaced: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let replacement: Vec<u16> = tmp
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let mut completed = false;
+        let mut last_error = None;
+
+        for _ in 0..3 {
+            let replaced_ok = unsafe {
+                ReplaceFileW(
+                    replaced.as_ptr(),
+                    replacement.as_ptr(),
+                    std::ptr::null(),
+                    0,
+                    std::ptr::null(),
+                    std::ptr::null(),
+                )
+            };
+            if replaced_ok != 0 {
+                completed = true;
+                break;
+            }
+
+            let replace_error = std::io::Error::last_os_error();
+            let replace_not_supported =
+                replace_error.raw_os_error() == Some(ERROR_NOT_SUPPORTED as i32);
+            if replace_error.kind() != std::io::ErrorKind::NotFound && !replace_not_supported {
+                last_error = Some(replace_error);
+                break;
+            }
+
+            match fs::rename(&tmp, path) {
+                Ok(()) => {
+                    completed = true;
+                    break;
+                }
+                Err(source)
+                    if matches!(
+                        source.kind(),
+                        std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::PermissionDenied
+                    ) =>
+                {
+                    last_error = Some(source);
+                }
+                Err(source) => {
+                    last_error = Some(source);
+                    break;
+                }
+            }
         }
-        fs::rename(&tmp, path).map_err(|e| AppError::IoContext {
-            context: format!("原子替换失败: {} -> {}", tmp.display(), path.display()),
-            source: e,
-        })?;
+
+        if !completed {
+            let source = last_error.unwrap_or_else(std::io::Error::last_os_error);
+            let _ = fs::remove_file(&tmp);
+            return Err(AppError::IoContext {
+                context: format!("原子替换失败: {} -> {}", tmp.display(), path.display()),
+                source,
+            });
+        }
     }
 
     #[cfg(not(windows))]
@@ -260,6 +346,31 @@ mod tests {
         let derived = derive_mcp_path_from_override(&override_dir)
             .expect("should derive path for nested dir");
         assert_eq!(derived, PathBuf::from("/tmp/profile/.claude.json"));
+    }
+
+    #[test]
+    fn atomic_write_replaces_existing_file_without_temp_leftovers() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("atomic-write-contract.json");
+        std::fs::write(&path, b"old contents").unwrap();
+
+        atomic_write(&path, b"new contents").unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), b"new contents");
+        let leftovers: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap())
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("atomic-write-contract.json.tmp.")
+            })
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "temporary files remain: {leftovers:?}"
+        );
     }
 
     #[test]

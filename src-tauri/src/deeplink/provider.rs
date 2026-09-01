@@ -115,6 +115,32 @@ pub fn import_provider_from_deeplink(
     // Use ProviderService to add the provider
     ProviderService::add(state, app_type.clone(), provider, true)?;
 
+    // A Codex deep link carries an explicit provider credential. Persist it in
+    // the env_key selected by provider normalization before switching live.
+    // Do not source this value from auth.json: that file may contain an expired
+    // Codex login token rather than the third-party provider key.
+    if matches!(app_type, AppType::Codex) {
+        let stored_provider = state
+            .db
+            .get_provider_by_id(&provider_id, AppType::Codex.as_str())?
+            .ok_or_else(|| AppError::Config("Imported Codex provider was not saved".to_string()))?;
+        if let Some(env_key) = stored_provider
+            .settings_config
+            .get("config")
+            .and_then(serde_json::Value::as_str)
+            .and_then(crate::codex_config::extract_codex_env_key)
+            .or_else(|| {
+                stored_provider
+                    .settings_config
+                    .pointer("/env/envKey")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+            })
+        {
+            crate::codex_config::write_managed_env_key(&env_key, api_key)?;
+        }
+    }
+
     // Add extra endpoints as custom endpoints (skip first one as it's the primary)
     for ep in all_endpoints.iter().skip(1) {
         let normalized = ep.trim().trim_end_matches('/').to_string();

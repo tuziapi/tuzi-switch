@@ -45,6 +45,7 @@ pub use claude::{
 };
 #[allow(unused_imports)]
 pub use codex::codex_provider_uses_chat_completions;
+pub(crate) use codex::resolve_codex_auth;
 pub use codex::{
     apply_codex_chat_upstream_model, resolve_codex_chat_reasoning_config,
     should_convert_codex_responses_to_chat, CodexAdapter,

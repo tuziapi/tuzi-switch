@@ -22,6 +22,8 @@ import type { AppId } from "@/lib/api";
 interface ProviderActionsProps {
   appId?: AppId;
   isCurrent: boolean;
+  isSwitching?: boolean;
+  isSwitchDisabled?: boolean;
   isInConfig?: boolean;
   isTesting?: boolean;
   isProxyTakeover?: boolean;
@@ -50,6 +52,8 @@ interface ProviderActionsProps {
 export function ProviderActions({
   appId,
   isCurrent,
+  isSwitching = false,
+  isSwitchDisabled = false,
   isInConfig = false,
   isTesting,
   isProxyTakeover = false,
@@ -210,6 +214,7 @@ export function ProviderActions({
   };
 
   const buttonState = getMainButtonState();
+  const mainButtonDisabled = buttonState.disabled || isSwitchDisabled;
 
   const canDelete =
     !isReadOnly && (isOmo || isAdditiveMode ? true : !isCurrent);
@@ -265,10 +270,15 @@ export function ProviderActions({
         size="sm"
         variant={buttonState.variant}
         onClick={handleMainButtonClick}
-        disabled={buttonState.disabled}
+        disabled={mainButtonDisabled}
+        aria-busy={isSwitching}
         className={cn("w-[4.5rem] px-2.5", buttonState.className)}
       >
-        {buttonState.icon}
+        {isSwitching ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          buttonState.icon
+        )}
         {buttonState.text}
       </Button>
 

@@ -856,6 +856,7 @@ pub(crate) fn chat_usage_to_responses_usage(usage: Option<&Value>) -> Value {
     if let Some(cached) = usage
         .pointer("/prompt_tokens_details/cached_tokens")
         .or_else(|| usage.pointer("/input_tokens_details/cached_tokens"))
+        .or_else(|| usage.get("prompt_cache_hit_tokens"))
         .and_then(|value| value.as_u64())
     {
         result["input_tokens_details"] = json!({ "cached_tokens": cached });
@@ -1031,6 +1032,22 @@ mod tests {
         assert_eq!(result["output"][2]["type"], "function_call");
         assert_eq!(result["usage"]["input_tokens"], 10);
         assert_eq!(result["usage"]["input_tokens_details"]["cached_tokens"], 3);
+    }
+
+    #[test]
+    fn chat_usage_maps_deepseek_cache_hit_tokens() {
+        let usage = json!({
+            "prompt_tokens": 1000,
+            "completion_tokens": 100,
+            "total_tokens": 1100,
+            "prompt_cache_hit_tokens": 600,
+            "prompt_cache_miss_tokens": 400
+        });
+
+        let result = chat_usage_to_responses_usage(Some(&usage));
+        assert_eq!(result["input_tokens"], 1000);
+        assert_eq!(result["output_tokens"], 100);
+        assert_eq!(result["input_tokens_details"]["cached_tokens"], 600);
     }
 
     #[test]

@@ -50,7 +50,9 @@ describe("Provider presets", () => {
         expect(preset?.category).toBe("aggregator");
         expect(preset?.endpointCandidates).toEqual(endpointCandidates);
         expect(preset?.auth).toEqual({});
-        expect(preset?.config).toContain(`model_provider = "${provider}"`);
+        expect(preset?.config).toContain('model_provider = "custom"');
+        expect(preset?.config).toContain("[model_providers.custom]");
+        expect(preset?.config).toContain(`name = "${provider}"`);
         expect(preset?.config).toContain(`model = "${model}"`);
         expect(preset?.config).toContain(`base_url = "${baseUrl}"`);
         expect(preset?.config).toContain('wire_api = "responses"');

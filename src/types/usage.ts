@@ -71,6 +71,13 @@ export interface UsageSummary {
   totalCacheCreationTokens: number;
   totalCacheReadTokens: number;
   successRate: number;
+  realTotalTokens: number;
+  cacheHitRate: number;
+}
+
+export interface UsageSummaryByApp {
+  appType: string;
+  summary: UsageSummary;
 }
 
 export interface DailyStats {
@@ -106,6 +113,8 @@ export interface LogFilters {
   appType?: string;
   providerName?: string;
   model?: string;
+  providerNameExact?: boolean;
+  modelExact?: boolean;
   statusCode?: number;
   startDate?: number;
   endDate?: number;

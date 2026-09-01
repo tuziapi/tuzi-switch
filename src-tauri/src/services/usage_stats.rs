@@ -4,6 +4,7 @@
 
 use crate::database::{lock_conn, Database};
 use crate::error::AppError;
+use crate::services::sql_helpers::{fresh_input_sql, fresh_input_tokens, is_cache_inclusive_app};
 use chrono::{Local, NaiveDate, TimeZone, Timelike};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,29 @@ pub struct UsageSummary {
     pub total_cache_creation_tokens: u64,
     pub total_cache_read_tokens: u64,
     pub success_rate: f32,
+    pub real_total_tokens: u64,
+    pub cache_hit_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageSummaryByApp {
+    pub app_type: String,
+    pub summary: UsageSummary,
+}
+
+fn derive_real_total_and_hit_rate(input: u64, output: u64, creation: u64, read: u64) -> (u64, f64) {
+    let real_total = input
+        .saturating_add(output)
+        .saturating_add(creation)
+        .saturating_add(read);
+    let denominator = input.saturating_add(creation).saturating_add(read);
+    let hit_rate = if denominator == 0 {
+        0.0
+    } else {
+        read as f64 / denominator as f64
+    };
+    (real_total, hit_rate)
 }
 
 /// 每日统计
@@ -69,6 +93,10 @@ pub struct LogFilters {
     pub app_type: Option<String>,
     pub provider_name: Option<String>,
     pub model: Option<String>,
+    #[serde(default)]
+    pub provider_name_exact: bool,
+    #[serde(default)]
+    pub model_exact: bool,
     pub status_code: Option<u16>,
     pub start_date: Option<i64>,
     pub end_date: Option<i64>,
@@ -101,6 +129,8 @@ pub struct RequestLogDetail {
     pub output_tokens: u32,
     pub cache_read_tokens: u32,
     pub cache_creation_tokens: u32,
+    #[serde(skip)]
+    pub input_token_semantics: i64,
     pub input_cost_usd: String,
     pub output_cost_usd: String,
     pub cache_read_cost_usd: String,
@@ -117,15 +147,15 @@ pub struct RequestLogDetail {
     pub data_source: Option<String>,
 }
 
-/// 把 24 列的查询结果映射为 `RequestLogDetail`。
+/// 把 25 列的查询结果映射为 `RequestLogDetail`。
 ///
-/// 调用方的 SELECT **必须**按以下顺序返回 24 列：
+/// 调用方的 SELECT **必须**按以下顺序返回 25 列：
 /// `request_id, provider_id, provider_name, app_type, model, request_model,
 ///  cost_multiplier, input_tokens, output_tokens, cache_read_tokens,
 ///  cache_creation_tokens, input_cost_usd, output_cost_usd, cache_read_cost_usd,
 ///  cache_creation_cost_usd, total_cost_usd, is_streaming, latency_ms,
 ///  first_token_ms, duration_ms, status_code, error_message, created_at,
-///  data_source`
+///  data_source, input_token_semantics`
 ///
 /// 不需要 provider_name 时（如 backfill）SELECT `NULL AS provider_name` 占位即可。
 fn row_to_request_log_detail(row: &rusqlite::Row<'_>) -> rusqlite::Result<RequestLogDetail> {
@@ -156,6 +186,7 @@ fn row_to_request_log_detail(row: &rusqlite::Row<'_>) -> rusqlite::Result<Reques
         error_message: row.get(21)?,
         created_at: row.get(22)?,
         data_source: row.get(23)?,
+        input_token_semantics: row.get(24)?,
     })
 }
 
@@ -171,6 +202,35 @@ fn provider_name_coalesce(log_alias: &str, provider_alias: &str) -> String {
          WHEN '_gemini_session' THEN 'Gemini (Session)' \
          ELSE {log_alias}.provider_id END)"
     )
+}
+
+fn providers_join(log_alias: &str, provider_alias: &str) -> String {
+    format!(
+        "LEFT JOIN providers {provider_alias} \
+         ON {log_alias}.provider_id = {provider_alias}.id \
+         AND {log_alias}.app_type = {provider_alias}.app_type"
+    )
+}
+
+fn push_provider_model_filters(
+    conditions: &mut Vec<String>,
+    params: &mut Vec<Box<dyn rusqlite::ToSql>>,
+    log_alias: &str,
+    provider_alias: &str,
+    provider_name: Option<&str>,
+    model: Option<&str>,
+) {
+    if let Some(name) = provider_name {
+        conditions.push(format!(
+            "{} = ?",
+            provider_name_coalesce(log_alias, provider_alias)
+        ));
+        params.push(Box::new(name.to_string()));
+    }
+    if let Some(model) = model {
+        conditions.push(format!("{log_alias}.model = ?"));
+        params.push(Box::new(model.to_string()));
+    }
 }
 
 pub(crate) const SESSION_PROXY_DEDUP_WINDOW_SECONDS: i64 = 10 * 60;
@@ -397,12 +457,167 @@ fn local_day_start_rfc3339(day: NaiveDate) -> String {
 }
 
 impl Database {
+    /// 按应用类型拆分汇总，供 Dashboard Hero 使用。
+    pub fn get_usage_summary_by_app(
+        &self,
+        start_date: Option<i64>,
+        end_date: Option<i64>,
+        provider_name: Option<&str>,
+        model: Option<&str>,
+    ) -> Result<Vec<UsageSummaryByApp>, AppError> {
+        let conn = lock_conn!(self.conn);
+
+        let mut detail_conditions = vec![effective_usage_log_filter("l")];
+        let mut detail_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        if let Some(start) = start_date {
+            detail_conditions.push("l.created_at >= ?".to_string());
+            detail_params.push(Box::new(start));
+        }
+        if let Some(end) = end_date {
+            detail_conditions.push("l.created_at <= ?".to_string());
+            detail_params.push(Box::new(end));
+        }
+        push_provider_model_filters(
+            &mut detail_conditions,
+            &mut detail_params,
+            "l",
+            "p",
+            provider_name,
+            model,
+        );
+        let detail_where = format!("WHERE {}", detail_conditions.join(" AND "));
+        let detail_join = if provider_name.is_some() {
+            providers_join("l", "p")
+        } else {
+            String::new()
+        };
+
+        let rollup_bounds = compute_rollup_date_bounds(start_date, end_date)?;
+        let mut rollup_conditions = Vec::new();
+        let mut rollup_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        push_rollup_date_filters(
+            &mut rollup_conditions,
+            &mut rollup_params,
+            "r.date",
+            &rollup_bounds,
+        );
+        push_provider_model_filters(
+            &mut rollup_conditions,
+            &mut rollup_params,
+            "r",
+            "p2",
+            provider_name,
+            model,
+        );
+        let rollup_where = if rollup_conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", rollup_conditions.join(" AND "))
+        };
+        let rollup_join = if provider_name.is_some() {
+            providers_join("r", "p2")
+        } else {
+            String::new()
+        };
+
+        let fresh_detail = fresh_input_sql("l");
+        let fresh_rollup = fresh_input_sql("r");
+        let sql = format!(
+            "SELECT app_type,
+                SUM(request_count), SUM(total_cost), SUM(input_tokens),
+                SUM(output_tokens), SUM(cache_creation_tokens),
+                SUM(cache_read_tokens), SUM(success_count)
+             FROM (
+                SELECT l.app_type, COUNT(*) AS request_count,
+                    COALESCE(SUM(CAST(l.total_cost_usd AS REAL)), 0) AS total_cost,
+                    COALESCE(SUM({fresh_detail}), 0) AS input_tokens,
+                    COALESCE(SUM(l.output_tokens), 0) AS output_tokens,
+                    COALESCE(SUM(l.cache_creation_tokens), 0) AS cache_creation_tokens,
+                    COALESCE(SUM(l.cache_read_tokens), 0) AS cache_read_tokens,
+                    COALESCE(SUM(CASE WHEN l.status_code >= 200 AND l.status_code < 300 THEN 1 ELSE 0 END), 0) AS success_count
+                FROM proxy_request_logs l {detail_join} {detail_where}
+                GROUP BY l.app_type
+                UNION ALL
+                SELECT r.app_type, COALESCE(SUM(r.request_count), 0),
+                    COALESCE(SUM(CAST(r.total_cost_usd AS REAL)), 0),
+                    COALESCE(SUM({fresh_rollup}), 0),
+                    COALESCE(SUM(r.output_tokens), 0),
+                    COALESCE(SUM(r.cache_creation_tokens), 0),
+                    COALESCE(SUM(r.cache_read_tokens), 0),
+                    COALESCE(SUM(r.success_count), 0)
+                FROM usage_daily_rollups r {rollup_join} {rollup_where}
+                GROUP BY r.app_type
+             )
+             GROUP BY app_type"
+        );
+
+        let mut all_params = detail_params;
+        all_params.extend(rollup_params);
+        let param_refs: Vec<&dyn rusqlite::ToSql> =
+            all_params.iter().map(|param| param.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(param_refs.as_slice(), |row| {
+            let total_requests: i64 = row.get(1)?;
+            let total_cost: f64 = row.get(2)?;
+            let input: i64 = row.get(3)?;
+            let output: i64 = row.get(4)?;
+            let creation: i64 = row.get(5)?;
+            let read: i64 = row.get(6)?;
+            let success_count: i64 = row.get(7)?;
+            let (real_total_tokens, cache_hit_rate) = derive_real_total_and_hit_rate(
+                input as u64,
+                output as u64,
+                creation as u64,
+                read as u64,
+            );
+            Ok(UsageSummaryByApp {
+                app_type: row.get(0)?,
+                summary: UsageSummary {
+                    total_requests: total_requests as u64,
+                    total_cost: format!("{total_cost:.6}"),
+                    total_input_tokens: input as u64,
+                    total_output_tokens: output as u64,
+                    total_cache_creation_tokens: creation as u64,
+                    total_cache_read_tokens: read as u64,
+                    success_rate: if total_requests > 0 {
+                        (success_count as f32 / total_requests as f32) * 100.0
+                    } else {
+                        0.0
+                    },
+                    real_total_tokens,
+                    cache_hit_rate,
+                },
+            })
+        })?;
+
+        let mut summaries = rows.collect::<Result<Vec<_>, _>>()?;
+        summaries
+            .retain(|item| item.summary.total_requests > 0 || item.summary.real_total_tokens > 0);
+        summaries.sort_by(|a, b| {
+            b.summary
+                .real_total_tokens
+                .cmp(&a.summary.real_total_tokens)
+        });
+        Ok(summaries)
+    }
+
     /// 获取使用量汇总
     pub fn get_usage_summary(
         &self,
         start_date: Option<i64>,
         end_date: Option<i64>,
         app_type: Option<&str>,
+    ) -> Result<UsageSummary, AppError> {
+        self.get_usage_summary_filtered(start_date, end_date, app_type, None, None)
+    }
+
+    pub fn get_usage_summary_filtered(
+        &self,
+        start_date: Option<i64>,
+        end_date: Option<i64>,
+        app_type: Option<&str>,
+        provider_name: Option<&str>,
+        model: Option<&str>,
     ) -> Result<UsageSummary, AppError> {
         let conn = lock_conn!(self.conn);
 
@@ -422,6 +637,14 @@ impl Database {
             conditions.push("l.app_type = ?".to_string());
             params_vec.push(Box::new(at.to_string()));
         }
+        push_provider_model_filters(
+            &mut conditions,
+            &mut params_vec,
+            "l",
+            "p",
+            provider_name,
+            model,
+        );
 
         let where_clause = if conditions.is_empty() {
             String::new()
@@ -437,13 +660,21 @@ impl Database {
         push_rollup_date_filters(
             &mut rollup_conditions,
             &mut rollup_params,
-            "date",
+            "r.date",
             &rollup_bounds,
         );
         if let Some(at) = app_type {
-            rollup_conditions.push("app_type = ?".to_string());
+            rollup_conditions.push("r.app_type = ?".to_string());
             rollup_params.push(Box::new(at.to_string()));
         }
+        push_provider_model_filters(
+            &mut rollup_conditions,
+            &mut rollup_params,
+            "r",
+            "p2",
+            provider_name,
+            model,
+        );
 
         let rollup_where = if rollup_conditions.is_empty() {
             String::new()
@@ -451,6 +682,8 @@ impl Database {
             format!("WHERE {}", rollup_conditions.join(" AND "))
         };
 
+        let fresh_detail = fresh_input_sql("l");
+        let fresh_rollup = fresh_input_sql("r");
         let sql = format!(
             "SELECT
                 COALESCE(d.total_requests, 0) + COALESCE(r.total_requests, 0),
@@ -464,21 +697,23 @@ impl Database {
                 (SELECT
                     COUNT(*) as total_requests,
                     COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0) as total_cost,
-                    COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+                    COALESCE(SUM({fresh_detail}), 0) as total_input_tokens,
                     COALESCE(SUM(output_tokens), 0) as total_output_tokens,
                     COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
                     COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens,
                     COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0) as success_count
-                 FROM proxy_request_logs l {where_clause}) d,
+                 FROM proxy_request_logs l {} {where_clause}) d,
                 (SELECT
                     COALESCE(SUM(request_count), 0) as total_requests,
                     COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0) as total_cost,
-                    COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+                    COALESCE(SUM({fresh_rollup}), 0) as total_input_tokens,
                     COALESCE(SUM(output_tokens), 0) as total_output_tokens,
                     COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
                     COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens,
                     COALESCE(SUM(success_count), 0) as success_count
-                 FROM usage_daily_rollups {rollup_where}) r"
+                 FROM usage_daily_rollups r {} {rollup_where}) r",
+            if provider_name.is_some() { providers_join("l", "p") } else { String::new() },
+            if provider_name.is_some() { providers_join("r", "p2") } else { String::new() }
         );
 
         // Combine params: detail params first, then rollup params
@@ -500,6 +735,12 @@ impl Database {
             } else {
                 0.0
             };
+            let (real_total_tokens, cache_hit_rate) = derive_real_total_and_hit_rate(
+                total_input_tokens as u64,
+                total_output_tokens as u64,
+                total_cache_creation_tokens as u64,
+                total_cache_read_tokens as u64,
+            );
 
             Ok(UsageSummary {
                 total_requests: total_requests as u64,
@@ -509,6 +750,8 @@ impl Database {
                 total_cache_creation_tokens: total_cache_creation_tokens as u64,
                 total_cache_read_tokens: total_cache_read_tokens as u64,
                 success_rate,
+                real_total_tokens,
+                cache_hit_rate,
             })
         })?;
 
@@ -521,6 +764,8 @@ impl Database {
         start_date: Option<i64>,
         end_date: Option<i64>,
         app_type: Option<&str>,
+        provider_name: Option<&str>,
+        model: Option<&str>,
     ) -> Result<Vec<DailyStats>, AppError> {
         let conn = lock_conn!(self.conn);
 
@@ -544,26 +789,46 @@ impl Database {
                 bucket_count = 1;
             }
 
-            let app_type_filter = if app_type.is_some() {
-                "AND l.app_type = ?4"
+            let mut extra_conditions = Vec::new();
+            let mut extra_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+            if let Some(at) = app_type {
+                extra_conditions.push("l.app_type = ?".to_string());
+                extra_params.push(Box::new(at.to_string()));
+            }
+            push_provider_model_filters(
+                &mut extra_conditions,
+                &mut extra_params,
+                "l",
+                "p",
+                provider_name,
+                model,
+            );
+            let extra_filter = extra_conditions
+                .iter()
+                .map(|condition| format!("AND {condition}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let detail_join = if provider_name.is_some() {
+                providers_join("l", "p")
             } else {
-                ""
+                String::new()
             };
 
             let effective_filter = effective_usage_log_filter("l");
+            let fresh_input = fresh_input_sql("l");
             let sql = format!(
                 "SELECT
                     CAST((l.created_at - ?1) / ?3 AS INTEGER) as bucket_idx,
                     COUNT(*) as request_count,
                     COALESCE(SUM(CAST(l.total_cost_usd AS REAL)), 0) as total_cost,
-                    COALESCE(SUM(l.input_tokens + l.output_tokens), 0) as total_tokens,
-                    COALESCE(SUM(l.input_tokens), 0) as total_input_tokens,
+                    COALESCE(SUM({fresh_input} + l.output_tokens + l.cache_creation_tokens + l.cache_read_tokens), 0) as total_tokens,
+                    COALESCE(SUM({fresh_input}), 0) as total_input_tokens,
                     COALESCE(SUM(l.output_tokens), 0) as total_output_tokens,
                     COALESCE(SUM(l.cache_creation_tokens), 0) as total_cache_creation_tokens,
                     COALESCE(SUM(l.cache_read_tokens), 0) as total_cache_read_tokens
-                FROM proxy_request_logs l
+                FROM proxy_request_logs l {detail_join}
                 WHERE l.created_at >= ?1 AND l.created_at <= ?2
-                  AND {effective_filter} {app_type_filter}
+                  AND {effective_filter} {extra_filter}
                 GROUP BY bucket_idx
                 ORDER BY bucket_idx ASC"
             );
@@ -587,11 +852,15 @@ impl Database {
 
             let mut map: HashMap<i64, DailyStats> = HashMap::new();
 
-            let rows = if let Some(at) = app_type {
-                stmt.query_map(params![start_ts, end_ts, bucket_seconds, at], row_mapper)?
-            } else {
-                stmt.query_map(params![start_ts, end_ts, bucket_seconds], row_mapper)?
-            };
+            let mut all_params: Vec<Box<dyn rusqlite::ToSql>> = vec![
+                Box::new(start_ts),
+                Box::new(end_ts),
+                Box::new(bucket_seconds),
+            ];
+            all_params.extend(extra_params);
+            let param_refs: Vec<&dyn rusqlite::ToSql> =
+                all_params.iter().map(|param| param.as_ref()).collect();
+            let rows = stmt.query_map(param_refs.as_slice(), row_mapper)?;
             for row in rows {
                 let (mut bucket_idx, stat) = row?;
                 if bucket_idx < 0 {
@@ -633,26 +902,46 @@ impl Database {
         let end_day = local_datetime_from_timestamp(end_ts)?.date_naive();
         let bucket_count = (end_day.signed_duration_since(start_day).num_days() + 1) as usize;
 
-        let app_type_filter = if app_type.is_some() {
-            "AND l.app_type = ?3"
+        let mut extra_conditions = Vec::new();
+        let mut extra_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        if let Some(at) = app_type {
+            extra_conditions.push("l.app_type = ?".to_string());
+            extra_params.push(Box::new(at.to_string()));
+        }
+        push_provider_model_filters(
+            &mut extra_conditions,
+            &mut extra_params,
+            "l",
+            "p",
+            provider_name,
+            model,
+        );
+        let extra_filter = extra_conditions
+            .iter()
+            .map(|condition| format!("AND {condition}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let detail_join = if provider_name.is_some() {
+            providers_join("l", "p")
         } else {
-            ""
+            String::new()
         };
 
         let effective_filter = effective_usage_log_filter("l");
+        let fresh_input = fresh_input_sql("l");
         let detail_sql = format!(
             "SELECT
                 date(l.created_at, 'unixepoch', 'localtime') as bucket_date,
                 COUNT(*) as request_count,
                 COALESCE(SUM(CAST(l.total_cost_usd AS REAL)), 0) as total_cost,
-                COALESCE(SUM(l.input_tokens + l.output_tokens), 0) as total_tokens,
-                COALESCE(SUM(l.input_tokens), 0) as total_input_tokens,
+                COALESCE(SUM({fresh_input} + l.output_tokens + l.cache_creation_tokens + l.cache_read_tokens), 0) as total_tokens,
+                COALESCE(SUM({fresh_input}), 0) as total_input_tokens,
                 COALESCE(SUM(l.output_tokens), 0) as total_output_tokens,
                 COALESCE(SUM(l.cache_creation_tokens), 0) as total_cache_creation_tokens,
                 COALESCE(SUM(l.cache_read_tokens), 0) as total_cache_read_tokens
-            FROM proxy_request_logs l
+            FROM proxy_request_logs l {detail_join}
             WHERE l.created_at >= ?1 AND l.created_at <= ?2
-              AND {effective_filter} {app_type_filter}
+              AND {effective_filter} {extra_filter}
             GROUP BY bucket_date
             ORDER BY bucket_date ASC"
         );
@@ -675,11 +964,12 @@ impl Database {
         };
 
         let mut map: HashMap<NaiveDate, DailyStats> = HashMap::new();
-        let detail_rows = if let Some(at) = app_type {
-            detail_stmt.query_map(params![start_ts, end_ts, at], detail_row_mapper)?
-        } else {
-            detail_stmt.query_map(params![start_ts, end_ts], detail_row_mapper)?
-        };
+        let mut detail_params: Vec<Box<dyn rusqlite::ToSql>> =
+            vec![Box::new(start_ts), Box::new(end_ts)];
+        detail_params.extend(extra_params);
+        let detail_param_refs: Vec<&dyn rusqlite::ToSql> =
+            detail_params.iter().map(|param| param.as_ref()).collect();
+        let detail_rows = detail_stmt.query_map(detail_param_refs.as_slice(), detail_row_mapper)?;
 
         for row in detail_rows {
             let (bucket_date, stat) = row?;
@@ -694,13 +984,21 @@ impl Database {
         push_rollup_date_filters(
             &mut rollup_conditions,
             &mut rollup_params,
-            "date",
+            "r.date",
             &rollup_bounds,
         );
         if let Some(at) = app_type {
-            rollup_conditions.push("app_type = ?".to_string());
+            rollup_conditions.push("r.app_type = ?".to_string());
             rollup_params.push(Box::new(at.to_string()));
         }
+        push_provider_model_filters(
+            &mut rollup_conditions,
+            &mut rollup_params,
+            "r",
+            "p2",
+            provider_name,
+            model,
+        );
 
         let rollup_where = if rollup_conditions.is_empty() {
             String::new()
@@ -708,20 +1006,26 @@ impl Database {
             format!("WHERE {}", rollup_conditions.join(" AND "))
         };
 
+        let rollup_join = if provider_name.is_some() {
+            providers_join("r", "p2")
+        } else {
+            String::new()
+        };
+        let fresh_rollup = fresh_input_sql("r");
         let rollup_sql = format!(
             "SELECT
-                date,
-                COALESCE(SUM(request_count), 0),
-                COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0),
-                COALESCE(SUM(input_tokens + output_tokens), 0),
-                COALESCE(SUM(input_tokens), 0),
-                COALESCE(SUM(output_tokens), 0),
-                COALESCE(SUM(cache_creation_tokens), 0),
-                COALESCE(SUM(cache_read_tokens), 0)
-            FROM usage_daily_rollups
+                r.date,
+                COALESCE(SUM(r.request_count), 0),
+                COALESCE(SUM(CAST(r.total_cost_usd AS REAL)), 0),
+                COALESCE(SUM({fresh_rollup} + r.output_tokens + r.cache_creation_tokens + r.cache_read_tokens), 0),
+                COALESCE(SUM({fresh_rollup}), 0),
+                COALESCE(SUM(r.output_tokens), 0),
+                COALESCE(SUM(r.cache_creation_tokens), 0),
+                COALESCE(SUM(r.cache_read_tokens), 0)
+            FROM usage_daily_rollups r {rollup_join}
             {rollup_where}
-            GROUP BY date
-            ORDER BY date ASC"
+            GROUP BY r.date
+            ORDER BY r.date ASC"
         );
 
         let mut rollup_stmt = conn.prepare(&rollup_sql)?;
@@ -800,6 +1104,8 @@ impl Database {
         start_date: Option<i64>,
         end_date: Option<i64>,
         app_type: Option<&str>,
+        provider_name: Option<&str>,
+        model: Option<&str>,
     ) -> Result<Vec<ProviderStats>, AppError> {
         let conn = lock_conn!(self.conn);
 
@@ -817,6 +1123,15 @@ impl Database {
             detail_conditions.push("l.app_type = ?".to_string());
             detail_params.push(Box::new(at.to_string()));
         }
+        push_provider_model_filters(
+            &mut detail_conditions,
+            &mut detail_params,
+            "l",
+            "p",
+            provider_name,
+            model,
+        );
+        let fresh_input_detail = fresh_input_sql("l");
         let detail_where = if detail_conditions.is_empty() {
             String::new()
         } else {
@@ -836,6 +1151,15 @@ impl Database {
             rollup_conditions.push("r.app_type = ?".to_string());
             rollup_params.push(Box::new(at.to_string()));
         }
+        push_provider_model_filters(
+            &mut rollup_conditions,
+            &mut rollup_params,
+            "r",
+            "p2",
+            provider_name,
+            model,
+        );
+        let fresh_input_rollup = fresh_input_sql("r");
         let rollup_where = if rollup_conditions.is_empty() {
             String::new()
         } else {
@@ -859,7 +1183,7 @@ impl Database {
                 SELECT l.provider_id, l.app_type,
                     {detail_pname} as provider_name,
                     COUNT(*) as request_count,
-                    COALESCE(SUM(l.input_tokens + l.output_tokens), 0) as total_tokens,
+                    COALESCE(SUM({fresh_input_detail} + l.output_tokens + l.cache_creation_tokens + l.cache_read_tokens), 0) as total_tokens,
                     COALESCE(SUM(CAST(l.total_cost_usd AS REAL)), 0) as total_cost,
                     COALESCE(SUM(CASE WHEN l.status_code >= 200 AND l.status_code < 300 THEN 1 ELSE 0 END), 0) as success_count,
                     COALESCE(SUM(l.latency_ms), 0) as latency_sum
@@ -871,7 +1195,7 @@ impl Database {
                 SELECT r.provider_id, r.app_type,
                     {rollup_pname} as provider_name,
                     COALESCE(SUM(r.request_count), 0),
-                    COALESCE(SUM(r.input_tokens + r.output_tokens), 0),
+                    COALESCE(SUM({fresh_input_rollup} + r.output_tokens + r.cache_creation_tokens + r.cache_read_tokens), 0),
                     COALESCE(SUM(CAST(r.total_cost_usd AS REAL)), 0),
                     COALESCE(SUM(r.success_count), 0),
                     COALESCE(SUM(r.avg_latency_ms * r.request_count), 0)
@@ -924,6 +1248,8 @@ impl Database {
         start_date: Option<i64>,
         end_date: Option<i64>,
         app_type: Option<&str>,
+        provider_name: Option<&str>,
+        model: Option<&str>,
     ) -> Result<Vec<ModelStats>, AppError> {
         let conn = lock_conn!(self.conn);
 
@@ -941,6 +1267,20 @@ impl Database {
             detail_conditions.push("l.app_type = ?".to_string());
             detail_params.push(Box::new(at.to_string()));
         }
+        push_provider_model_filters(
+            &mut detail_conditions,
+            &mut detail_params,
+            "l",
+            "p",
+            provider_name,
+            model,
+        );
+        let detail_join = if provider_name.is_some() {
+            providers_join("l", "p")
+        } else {
+            String::new()
+        };
+        let fresh_input_detail = fresh_input_sql("l");
         let detail_where = if detail_conditions.is_empty() {
             String::new()
         } else {
@@ -960,6 +1300,20 @@ impl Database {
             rollup_conditions.push("r.app_type = ?".to_string());
             rollup_params.push(Box::new(at.to_string()));
         }
+        push_provider_model_filters(
+            &mut rollup_conditions,
+            &mut rollup_params,
+            "r",
+            "p2",
+            provider_name,
+            model,
+        );
+        let rollup_join = if provider_name.is_some() {
+            providers_join("r", "p2")
+        } else {
+            String::new()
+        };
+        let fresh_input_rollup = fresh_input_sql("r");
         let rollup_where = if rollup_conditions.is_empty() {
             String::new()
         } else {
@@ -976,17 +1330,17 @@ impl Database {
             FROM (
                 SELECT l.model,
                     COUNT(*) as request_count,
-                    COALESCE(SUM(l.input_tokens + l.output_tokens), 0) as total_tokens,
+                    COALESCE(SUM({fresh_input_detail} + l.output_tokens + l.cache_creation_tokens + l.cache_read_tokens), 0) as total_tokens,
                     COALESCE(SUM(CAST(l.total_cost_usd AS REAL)), 0) as total_cost
-                FROM proxy_request_logs l
+                FROM proxy_request_logs l {detail_join}
                 {detail_where}
                 GROUP BY l.model
                 UNION ALL
                 SELECT r.model,
                     COALESCE(SUM(request_count), 0),
-                    COALESCE(SUM(input_tokens + output_tokens), 0),
+                    COALESCE(SUM({fresh_input_rollup} + r.output_tokens + r.cache_creation_tokens + r.cache_read_tokens), 0),
                     COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0)
-                FROM usage_daily_rollups r
+                FROM usage_daily_rollups r {rollup_join}
                 {rollup_where}
                 GROUP BY r.model
             )
@@ -1043,12 +1397,22 @@ impl Database {
             params.push(Box::new(app_type.clone()));
         }
         if let Some(ref provider_name) = filters.provider_name {
-            conditions.push("p.name LIKE ?".to_string());
-            params.push(Box::new(format!("%{provider_name}%")));
+            if filters.provider_name_exact {
+                conditions.push(format!("{} = ?", provider_name_coalesce("l", "p")));
+                params.push(Box::new(provider_name.clone()));
+            } else {
+                conditions.push(format!("{} LIKE ?", provider_name_coalesce("l", "p")));
+                params.push(Box::new(format!("%{provider_name}%")));
+            }
         }
         if let Some(ref model) = filters.model {
-            conditions.push("l.model LIKE ?".to_string());
-            params.push(Box::new(format!("%{model}%")));
+            if filters.model_exact {
+                conditions.push("l.model = ?".to_string());
+                params.push(Box::new(model.clone()));
+            } else {
+                conditions.push("l.model LIKE ?".to_string());
+                params.push(Box::new(format!("%{model}%")));
+            }
         }
         if let Some(status) = filters.status_code {
             conditions.push("l.status_code = ?".to_string());
@@ -1092,7 +1456,8 @@ impl Database {
                     l.input_tokens, l.output_tokens, l.cache_read_tokens, l.cache_creation_tokens,
                     l.input_cost_usd, l.output_cost_usd, l.cache_read_cost_usd, l.cache_creation_cost_usd, l.total_cost_usd,
                     l.is_streaming, l.latency_ms, l.first_token_ms, l.duration_ms,
-                    l.status_code, l.error_message, l.created_at, l.data_source
+                    l.status_code, l.error_message, l.created_at, l.data_source,
+                    l.input_token_semantics
              FROM proxy_request_logs l
              LEFT JOIN providers p ON l.provider_id = p.id AND l.app_type = p.app_type
              {where_clause}
@@ -1141,7 +1506,8 @@ impl Database {
                     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
                     input_cost_usd, output_cost_usd, cache_read_cost_usd, cache_creation_cost_usd, total_cost_usd,
                     is_streaming, latency_ms, first_token_ms, duration_ms,
-                    status_code, error_message, created_at, l.data_source
+                    status_code, error_message, created_at, l.data_source,
+                    l.input_token_semantics
              FROM proxy_request_logs l
              LEFT JOIN providers p ON l.provider_id = p.id AND l.app_type = p.app_type
              WHERE l.request_id = ?"
@@ -1292,7 +1658,7 @@ impl Database {
                         input_cost_usd, output_cost_usd, cache_read_cost_usd,
                         cache_creation_cost_usd, total_cost_usd, is_streaming, latency_ms,
                         first_token_ms, duration_ms, status_code, error_message, created_at,
-                        data_source
+                        data_source, input_token_semantics
                  FROM proxy_request_logs
                  WHERE CAST(total_cost_usd AS REAL) <= 0
                    AND (input_tokens > 0 OR output_tokens > 0
@@ -1365,8 +1731,13 @@ impl Database {
         // 1. input_cost 需要扣除 cache_read_tokens（避免缓存部分被重复计费）
         // 2. 各项成本是基础成本（不含倍率）
         // 3. 倍率只作用于最终总价
-        let billable_input_tokens =
-            (log.input_tokens as u64).saturating_sub(log.cache_read_tokens as u64);
+        let billable_input_tokens = fresh_input_tokens(
+            log.input_tokens,
+            log.cache_read_tokens,
+            log.cache_creation_tokens,
+            log.input_token_semantics,
+            is_cache_inclusive_app(&log.app_type),
+        );
         let input_cost =
             rust_decimal::Decimal::from(billable_input_tokens) * pricing.input / million;
         let output_cost =
@@ -1962,21 +2333,30 @@ mod tests {
 
         let summary = db.get_usage_summary(None, None, None)?;
         assert_eq!(summary.total_requests, 4);
-        assert_eq!(summary.total_input_tokens, 650);
+        assert_eq!(summary.total_input_tokens, 610);
         assert_eq!(summary.total_output_tokens, 125);
         assert_eq!(summary.total_cache_read_tokens, 60);
         assert_eq!(summary.total_cache_creation_tokens, 12);
+        assert_eq!(summary.real_total_tokens, 807);
+        assert!((summary.cache_hit_rate - (60.0 / 682.0)).abs() < 1e-12);
 
-        let trends = db.get_daily_trends(Some(0), Some(40_000), None)?;
+        let trends = db.get_daily_trends(Some(0), Some(40_000), None, None, None)?;
         assert_eq!(trends.iter().map(|stat| stat.request_count).sum::<u64>(), 4);
 
-        let provider_stats = db.get_provider_stats(None, None, None)?;
+        let provider_stats = db.get_provider_stats(None, None, None, None, None)?;
         assert_eq!(
             provider_stats
                 .iter()
                 .map(|stat| stat.request_count)
                 .sum::<u64>(),
             4
+        );
+        assert_eq!(
+            provider_stats
+                .iter()
+                .map(|stat| stat.total_tokens)
+                .sum::<u64>(),
+            summary.real_total_tokens
         );
         assert!(provider_stats
             .iter()
@@ -1988,13 +2368,20 @@ mod tests {
             .iter()
             .any(|stat| stat.provider_id == "_session"));
 
-        let model_stats = db.get_model_stats(None, None, None)?;
+        let model_stats = db.get_model_stats(None, None, None, None, None)?;
         assert_eq!(
             model_stats
                 .iter()
                 .map(|stat| stat.request_count)
                 .sum::<u64>(),
             4
+        );
+        assert_eq!(
+            model_stats
+                .iter()
+                .map(|stat| stat.total_tokens)
+                .sum::<u64>(),
+            summary.real_total_tokens
         );
 
         let logs = db.get_request_logs(&LogFilters::default(), 0, 10)?;
@@ -2033,6 +2420,105 @@ mod tests {
         assert_eq!(codex_session_count, Some(1));
         assert_eq!(gemini_session_count, None);
         assert_eq!(session_log_count, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_usage_aggregates_share_exact_provider_and_model_filters() -> Result<(), AppError> {
+        let db = Database::memory()?;
+
+        {
+            let conn = lock_conn!(db.conn);
+            conn.execute(
+                "INSERT INTO providers (id, app_type, name, settings_config)
+                 VALUES ('p-alpha', 'codex', 'Alpha', '{}'),
+                        ('p-beta', 'codex', 'Beta', '{}')",
+                [],
+            )?;
+            insert_usage_log(
+                &conn,
+                "alpha-detail",
+                "codex",
+                "p-alpha",
+                "gpt-alpha",
+                "proxy",
+                10_000,
+                100,
+                20,
+                10,
+                5,
+                200,
+                "0.10",
+            )?;
+            insert_usage_log(
+                &conn,
+                "beta-detail",
+                "codex",
+                "p-beta",
+                "gpt-beta",
+                "proxy",
+                20_000,
+                200,
+                30,
+                20,
+                0,
+                200,
+                "0.20",
+            )?;
+            conn.execute(
+                "INSERT INTO usage_daily_rollups (
+                    date, app_type, provider_id, model,
+                    request_count, success_count, input_tokens, output_tokens,
+                    cache_read_tokens, cache_creation_tokens, total_cost_usd, avg_latency_ms
+                ) VALUES ('2024-01-01', 'codex', 'p-alpha', 'gpt-alpha',
+                          2, 2, 300, 40, 30, 10, '0.30', 120)",
+                [],
+            )?;
+        }
+
+        let summary = db.get_usage_summary_filtered(
+            None,
+            None,
+            Some("codex"),
+            Some("Alpha"),
+            Some("gpt-alpha"),
+        )?;
+        assert_eq!(summary.total_requests, 3);
+        assert_eq!(summary.total_input_tokens, 360);
+        assert_eq!(summary.real_total_tokens, 475);
+
+        let by_app = db.get_usage_summary_by_app(None, None, Some("Alpha"), Some("gpt-alpha"))?;
+        assert_eq!(by_app.len(), 1);
+        assert_eq!(by_app[0].app_type, "codex");
+        assert_eq!(by_app[0].summary.real_total_tokens, 475);
+
+        let trends = db.get_daily_trends(
+            Some(0),
+            Some(40_000),
+            Some("codex"),
+            Some("Alpha"),
+            Some("gpt-alpha"),
+        )?;
+        assert_eq!(trends.iter().map(|item| item.request_count).sum::<u64>(), 1);
+        assert_eq!(
+            trends.iter().map(|item| item.total_tokens).sum::<u64>(),
+            125
+        );
+
+        let providers =
+            db.get_provider_stats(None, None, Some("codex"), Some("Alpha"), Some("gpt-alpha"))?;
+        assert_eq!(providers.len(), 1);
+        assert_eq!(providers[0].provider_name, "Alpha");
+        assert_eq!(providers[0].request_count, 3);
+        assert_eq!(providers[0].total_tokens, 475);
+
+        let models =
+            db.get_model_stats(None, None, Some("codex"), Some("Alpha"), Some("gpt-alpha"))?;
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].model, "gpt-alpha");
+        assert_eq!(models[0].request_count, 3);
+        assert_eq!(models[0].total_tokens, 475);
 
         Ok(())
     }
@@ -2228,7 +2714,7 @@ mod tests {
             )?;
         }
 
-        let stats = db.get_model_stats(None, None, None)?;
+        let stats = db.get_model_stats(None, None, None, None, None)?;
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].model, "claude-3-sonnet");
         assert_eq!(stats[0].request_count, 1);
@@ -2260,7 +2746,7 @@ mod tests {
             )?;
         }
 
-        let stats = db.get_provider_stats(Some(1500), Some(2500), Some("claude"))?;
+        let stats = db.get_provider_stats(Some(1500), Some(2500), Some("claude"), None, None)?;
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].provider_id, "p1");
         assert_eq!(stats[0].request_count, 1);
@@ -2342,7 +2828,7 @@ mod tests {
             )?;
         }
 
-        let stats = db.get_provider_stats(Some(start), Some(end), Some("claude"))?;
+        let stats = db.get_provider_stats(Some(start), Some(end), Some("claude"), None, None)?;
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].provider_id, "p-rollup");
         assert_eq!(stats[0].request_count, 8);
@@ -2378,7 +2864,7 @@ mod tests {
             )?;
         }
 
-        let stats = db.get_daily_trends(Some(0), Some(15 * 60 * 60), Some("claude"))?;
+        let stats = db.get_daily_trends(Some(0), Some(15 * 60 * 60), Some("claude"), None, None)?;
         assert_eq!(stats.len(), 15);
         assert_eq!(stats[3].request_count, 1);
 
@@ -2455,7 +2941,7 @@ mod tests {
             )?;
         }
 
-        let stats = db.get_daily_trends(Some(start), Some(end), Some("claude"))?;
+        let stats = db.get_daily_trends(Some(start), Some(end), Some("claude"), None, None)?;
         assert_eq!(stats.len(), 3);
         assert_eq!(stats[0].request_count, 1);
         assert_eq!(stats[0].total_tokens, 150);
@@ -2540,7 +3026,7 @@ mod tests {
             )?;
         }
 
-        let stats = db.get_model_stats(Some(start), Some(end), Some("claude"))?;
+        let stats = db.get_model_stats(Some(start), Some(end), Some("claude"), None, None)?;
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].model, "claude-3-haiku");
         assert_eq!(stats[0].request_count, 9);

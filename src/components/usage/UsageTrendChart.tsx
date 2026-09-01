@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AreaChart,
@@ -24,20 +25,138 @@ interface UsageTrendChartProps {
   range: UsageRangeSelection;
   rangeLabel: string;
   appType?: string;
+  providerName?: string;
+  model?: string;
   refreshIntervalMs: number;
+}
+
+export interface UsageTrendStatLike {
+  date: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCacheCreationTokens: number;
+  totalCacheReadTokens: number;
+  totalCost: string | number;
+}
+
+export interface UsageTrendChartPoint {
+  xKey: string;
+  rawDate: string;
+  label: string;
+  tooltipLabel: string;
+  hour: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  cost: number | null;
+}
+
+export function buildUsageTrendChartData(
+  trends: UsageTrendStatLike[] | undefined,
+  options: {
+    isHourly: boolean;
+    dateLocale: string;
+    startDate: number;
+    endDate: number;
+  },
+): UsageTrendChartPoint[] {
+  const { isHourly, dateLocale, startDate, endDate } = options;
+  const spansMultipleYears =
+    new Date(startDate * 1000).getFullYear() !==
+    new Date(endDate * 1000).getFullYear();
+
+  return (
+    trends?.map((stat) => {
+      const pointDate = new Date(stat.date);
+      const cost = parseFiniteNumber(stat.totalCost);
+      const tooltipLabel = isHourly
+        ? pointDate.toLocaleString(dateLocale, {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : pointDate.toLocaleDateString(dateLocale, {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          });
+      const label = isHourly
+        ? pointDate.toLocaleString(dateLocale, {
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : spansMultipleYears
+          ? pointDate.toLocaleDateString(dateLocale, {
+              year: "2-digit",
+              month: "2-digit",
+              day: "2-digit",
+            })
+          : pointDate.toLocaleDateString(dateLocale, {
+              month: "2-digit",
+              day: "2-digit",
+            });
+
+      return {
+        xKey: stat.date,
+        rawDate: stat.date,
+        label,
+        tooltipLabel,
+        hour: pointDate.getHours(),
+        inputTokens: stat.totalInputTokens,
+        outputTokens: stat.totalOutputTokens,
+        cacheCreationTokens: stat.totalCacheCreationTokens,
+        cacheReadTokens: stat.totalCacheReadTokens,
+        cost: cost ?? null,
+      };
+    }) || []
+  );
+}
+
+export function formatUsageTrendTickLabel(
+  xKey: string,
+  chartData: UsageTrendChartPoint[],
+): string {
+  return chartData.find((point) => point.xKey === xKey)?.label ?? xKey;
 }
 
 export function UsageTrendChart({
   range,
   rangeLabel,
   appType,
+  providerName,
+  model,
   refreshIntervalMs,
 }: UsageTrendChartProps) {
   const { t, i18n } = useTranslation();
   const { startDate, endDate } = resolveUsageRange(range);
-  const { data: trends, isLoading } = useUsageTrends(range, appType, {
-    refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
-  });
+  const { data: trends, isLoading } = useUsageTrends(
+    range,
+    appType,
+    { providerName, model },
+    {
+      refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
+    },
+  );
+
+  const durationSeconds = Math.max(endDate - startDate, 0);
+  const isHourly = durationSeconds <= 24 * 60 * 60;
+  const language = i18n.resolvedLanguage || i18n.language || "en";
+  const dateLocale = getLocaleFromLanguage(language);
+  const chartData = useMemo(
+    () =>
+      buildUsageTrendChartData(trends, {
+        isHourly,
+        dateLocale,
+        startDate,
+        endDate,
+      }),
+    [trends, isHourly, dateLocale, startDate, endDate],
+  );
 
   if (isLoading) {
     return (
@@ -47,43 +166,14 @@ export function UsageTrendChart({
     );
   }
 
-  const durationSeconds = Math.max(endDate - startDate, 0);
-  const isHourly = durationSeconds <= 24 * 60 * 60;
-  const language = i18n.resolvedLanguage || i18n.language || "en";
-  const dateLocale = getLocaleFromLanguage(language);
-  const chartData =
-    trends?.map((stat) => {
-      const pointDate = new Date(stat.date);
-      const cost = parseFiniteNumber(stat.totalCost);
-      return {
-        rawDate: stat.date,
-        label: isHourly
-          ? pointDate.toLocaleString(dateLocale, {
-              month: "2-digit",
-              day: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : pointDate.toLocaleDateString(dateLocale, {
-              month: "2-digit",
-              day: "2-digit",
-            }),
-        hour: pointDate.getHours(),
-        inputTokens: stat.totalInputTokens,
-        outputTokens: stat.totalOutputTokens,
-        cacheCreationTokens: stat.totalCacheCreationTokens,
-        cacheReadTokens: stat.totalCacheReadTokens,
-        cost: cost ?? null,
-      };
-    }) || [];
-
-  const displayData = chartData;
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+      const point = payload[0]?.payload as UsageTrendChartPoint | undefined;
       return (
         <div className="rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur-md">
-          <p className="mb-2 font-medium">{label}</p>
+          <p className="mb-2 font-medium">
+            {point?.tooltipLabel ?? point?.label ?? ""}
+          </p>
           {payload.map((entry: any, index: number) => (
             <div
               key={index}
@@ -120,7 +210,7 @@ export function UsageTrendChart({
       <div className="h-[350px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
-            data={displayData}
+            data={chartData}
             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
           >
             <defs>
@@ -154,11 +244,15 @@ export function UsageTrendChart({
               opacity={0.4}
             />
             <XAxis
-              dataKey="label"
+              dataKey="xKey"
               axisLine={false}
               tickLine={false}
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
               dy={10}
+              tickFormatter={(value) =>
+                formatUsageTrendTickLabel(String(value), chartData)
+              }
+              allowDuplicatedCategory={false}
             />
             <YAxis
               yAxisId="tokens"

@@ -209,6 +209,8 @@ export interface ProviderMeta {
   promptCacheKey?: string;
   // Codex OAuth FAST mode: injects service_tier="priority" on ChatGPT Codex requests
   codexFastMode?: boolean;
+  // Codex 子代理并发线程覆盖；未设置时跟随设备级全局默认值
+  codexSubagentThreads?: number;
   // Codex Responses -> Chat Completions reasoning capability metadata
   codexChatReasoning?: CodexChatReasoning;
   // 供应商类型（用于识别 Copilot 等特殊供应商）
@@ -333,6 +335,9 @@ export interface Settings {
   unifyCodexSessionHistory?: boolean;
   // 开启统一历史时是否迁入既有官方会话
   unifyCodexMigrateExisting?: boolean;
+  // Codex 子代理并发的设备级默认值（由专用设置命令维护）
+  codexSubagentDefaultThreads?: number;
+  codexSubagentDefaultInitialized?: boolean;
   // User has confirmed the failover toggle first-run notice
   failoverConfirmed?: boolean;
   // User has confirmed the first-run welcome notice

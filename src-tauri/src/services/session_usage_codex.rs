@@ -19,6 +19,7 @@ use crate::error::AppError;
 use crate::proxy::usage::calculator::{CostCalculator, ModelPricing};
 use crate::proxy::usage::parser::TokenUsage;
 use crate::services::session_usage::{get_sync_state, update_sync_state, SessionSyncResult};
+use crate::services::sql_helpers::INPUT_TOKEN_SEMANTICS_TOTAL;
 use crate::services::usage_stats::{should_skip_session_insert, DedupKey};
 use rust_decimal::Decimal;
 use std::fs;
@@ -480,7 +481,12 @@ fn insert_codex_session_entry(
     let (input_cost, output_cost, cache_read_cost, cache_creation_cost, total_cost) = match pricing
     {
         Some(p) => {
-            let cost = CostCalculator::calculate(&usage, &p, multiplier);
+            let cost = CostCalculator::calculate_with_input_semantics(
+                &usage,
+                &p,
+                multiplier,
+                INPUT_TOKEN_SEMANTICS_TOTAL,
+            );
             (
                 cost.input_cost.to_string(),
                 cost.output_cost.to_string(),
@@ -504,8 +510,8 @@ fn insert_codex_session_entry(
             input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
             input_cost_usd, output_cost_usd, cache_read_cost_usd, cache_creation_cost_usd, total_cost_usd,
             latency_ms, first_token_ms, status_code, error_message, session_id,
-            provider_type, is_streaming, cost_multiplier, created_at, data_source
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+            provider_type, is_streaming, cost_multiplier, created_at, data_source, input_token_semantics
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
         rusqlite::params![
             request_id,
             "_codex_session",    // provider_id
@@ -531,6 +537,7 @@ fn insert_codex_session_entry(
             "1.0",               // cost_multiplier
             created_at,
             "codex_session",     // data_source
+            INPUT_TOKEN_SEMANTICS_TOTAL,
         ],
     )
     .map_err(|e| AppError::Database(format!("插入 Codex 会话日志失败: {e}")))?;

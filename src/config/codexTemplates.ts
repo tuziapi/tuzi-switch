@@ -9,13 +9,13 @@ export interface CodexTemplate {
 }
 
 export function getCodexCustomTemplate(): CodexTemplate {
-  const config = `model_provider = "tuziswitch"
+  const config = `model_provider = "custom"
 model = "gpt-5.5"
 model_reasoning_effort = "high"
 disable_response_storage = true
 
-[model_providers.tuziswitch]
-name = "tuziswitch"
+[model_providers.custom]
+name = "custom"
 base_url = "https://your-api-endpoint.com/v1"
 env_key = "CUSTOM_CODEX_API_KEY"
 wire_api = "responses"

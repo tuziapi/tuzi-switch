@@ -27,6 +27,7 @@ import {
 } from "./state";
 
 const TAURI_ENDPOINT = "http://tauri.local";
+let codexSubagentThreads: number | null = null;
 
 const withJson = async <T>(request: Request): Promise<T> => {
   try {
@@ -135,7 +136,9 @@ export const handlers = [
 
   http.post(`${TAURI_ENDPOINT}/sync_claude_live_api_key`, () => success(true)),
 
-  http.post(`${TAURI_ENDPOINT}/sync_codex_live_api_key`, () => success(true)),
+  http.post(`${TAURI_ENDPOINT}/sanitize_codex_provider_credentials`, () =>
+    success(0),
+  ),
 
   http.post(`${TAURI_ENDPOINT}/import_default_config`, async () => {
     resetProviderState();
@@ -236,7 +239,7 @@ export const handlers = [
       requested: true,
       ready: true,
       reason: "ready",
-      providerBaseUrl: "https://api.tu-zi.com/v1",
+      providerBaseUrl: "https://api.tu-zi.com/coding",
       providerEnvKey: "TUZI01_CODEX_API_KEY",
       liveBaseUrl: "http://127.0.0.1:15721/v1",
       imageKeyEnv: "TUZI_CODEX_IMAGE_API_KEY",
@@ -245,6 +248,27 @@ export const handlers = [
       personalizationInstruction:
         "只要是生成图片相关的需求，都使用 API Key 中内置的 gpt-image-2 生成，接口地址使用 https://api.tu-zi.com/v1。",
     }),
+  ),
+
+  http.post(`${TAURI_ENDPOINT}/get_codex_subagent_settings`, () =>
+    success({
+      maxConcurrentThreadsPerSession: codexSubagentThreads,
+      configPath: "/home/mock/.codex/config.toml",
+      usedLegacyAlias: false,
+    }),
+  ),
+
+  http.post(
+    `${TAURI_ENDPOINT}/set_codex_subagent_max_concurrent_threads`,
+    async ({ request }) => {
+      const { value } = await withJson<{ value: number | null }>(request);
+      codexSubagentThreads = value;
+      return success({
+        maxConcurrentThreadsPerSession: codexSubagentThreads,
+        configPath: "/home/mock/.codex/config.toml",
+        usedLegacyAlias: false,
+      });
+    },
   ),
 
   http.post(`${TAURI_ENDPOINT}/check_env_conflicts`, () => success([])),

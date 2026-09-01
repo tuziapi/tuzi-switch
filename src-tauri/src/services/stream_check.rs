@@ -17,7 +17,7 @@ use crate::proxy::providers::transform::anthropic_to_openai;
 use crate::proxy::providers::transform_gemini::anthropic_to_gemini;
 use crate::proxy::providers::transform_responses::anthropic_to_responses;
 use crate::proxy::providers::{
-    get_adapter, AuthInfo, AuthStrategy, ClaudeAdapter, ProviderAdapter,
+    get_adapter, resolve_codex_auth, AuthInfo, AuthStrategy, ClaudeAdapter, ProviderAdapter,
 };
 
 /// 健康状态枚举
@@ -228,9 +228,12 @@ impl StreamCheckService {
                 .map_err(|e| AppError::Message(format!("Failed to extract base_url: {e}")))?,
         };
 
-        let auth = auth_override
-            .or_else(|| adapter.extract_auth(provider))
-            .ok_or_else(|| AppError::Message("API Key not found".to_string()))?;
+        let auth = match auth_override {
+            Some(auth) => Some(auth),
+            None if matches!(app_type, AppType::Codex) => resolve_codex_auth(provider).await,
+            None => adapter.extract_auth(provider),
+        }
+        .ok_or_else(|| AppError::Message("API Key not found".to_string()))?;
 
         // 获取 HTTP 客户端
         let client = crate::proxy::http_client::get();

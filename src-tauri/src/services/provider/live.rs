@@ -298,6 +298,12 @@ pub(crate) fn normalize_codex_managed_provider_for_storage(
     let route_id = codex_active_route_id(config_str).unwrap_or_default();
     let env_key = codex_active_provider_string_field(config_str, "env_key").unwrap_or_default();
     let base_url = codex_active_provider_string_field(config_str, "base_url").unwrap_or_default();
+    if route_id == "custom" {
+        if !env_key.is_empty() {
+            obj.insert("env".to_string(), json!({ "envKey": env_key }));
+        }
+        return Ok(());
+    }
     let Some(family) = detect_codex_managed_route_family(&route_id, &env_key, &base_url) else {
         return Ok(());
     };
@@ -327,6 +333,43 @@ pub(crate) fn normalize_codex_managed_provider_for_storage(
     }
 
     Ok(())
+}
+
+pub(crate) fn codex_provider_env_key(provider: &Provider) -> Option<String> {
+    provider
+        .settings_config
+        .get("config")
+        .and_then(Value::as_str)
+        .and_then(codex_active_provider_string_field_for_env)
+        .or_else(|| {
+            provider
+                .settings_config
+                .pointer("/env/envKey")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToString::to_string)
+        })
+}
+
+fn codex_active_provider_string_field_for_env(config_text: &str) -> Option<String> {
+    codex_active_provider_string_field(config_text, "env_key")
+}
+
+pub(crate) fn migrate_codex_provider_credential(
+    previous: Option<&Provider>,
+    normalized: &Provider,
+) -> Result<bool, AppError> {
+    let Some(previous) = previous else {
+        return Ok(false);
+    };
+    let Some(previous_env_key) = codex_provider_env_key(previous) else {
+        return Ok(false);
+    };
+    let Some(normalized_env_key) = codex_provider_env_key(normalized) else {
+        return Ok(false);
+    };
+    crate::codex_config::copy_managed_env_key_if_missing(&previous_env_key, &normalized_env_key)
 }
 
 pub(crate) fn ensure_codex_provider_registered(provider: &Provider) -> Result<(), AppError> {
@@ -852,6 +895,18 @@ pub(crate) fn build_effective_settings_with_common_config(
         }
     }
 
+    if matches!(app_type, AppType::Codex) {
+        let override_threads = provider
+            .meta
+            .as_ref()
+            .and_then(|meta| meta.codex_subagent_threads);
+        let resolved = crate::codex_config::resolved_codex_subagent_threads(override_threads)?;
+        crate::codex_config::apply_codex_subagent_threads_to_settings(
+            &mut effective_settings,
+            resolved,
+        )?;
+    }
+
     Ok(effective_settings)
 }
 
@@ -941,6 +996,16 @@ fn restore_live_settings_for_provider_backfill(
     ) {
         log::warn!(
             "Failed to restore Codex live settings while backfilling '{}': {err}",
+            provider.id
+        );
+    }
+
+    // The concurrency value belongs to the device-level live config. It must
+    // not be copied from the previous provider into the provider being saved.
+    if let Err(err) = crate::codex_config::strip_codex_subagent_threads_from_settings(&mut settings)
+    {
+        log::warn!(
+            "Failed to strip Codex subagent override while backfilling '{}': {err}",
             provider.id
         );
     }
@@ -1084,15 +1149,21 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
             use crate::codex_config::{
                 read_codex_config_text, save_route_to_config_with_provider_config,
                 switch_codex_profile, write_codex_profile_config,
-                write_codex_provider_live_with_catalog,
             };
 
             if config_str.trim().is_empty() {
-                write_codex_provider_live_with_catalog(
+                let threads = crate::codex_config::resolved_codex_subagent_threads(
+                    provider
+                        .meta
+                        .as_ref()
+                        .and_then(|meta| meta.codex_subagent_threads),
+                )?;
+                crate::codex_config::write_codex_provider_live_with_catalog_for_provider(
                     &provider.settings_config,
                     provider.category.as_deref(),
                     auth,
                     None,
+                    threads,
                 )?;
                 return Ok(());
             }
@@ -1150,11 +1221,18 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
                 }
             }
 
-            write_codex_provider_live_with_catalog(
+            let threads = crate::codex_config::resolved_codex_subagent_threads(
+                provider
+                    .meta
+                    .as_ref()
+                    .and_then(|meta| meta.codex_subagent_threads),
+            )?;
+            crate::codex_config::write_codex_provider_live_with_catalog_for_provider(
                 &provider.settings_config,
                 provider.category.as_deref(),
                 auth,
                 Some(&final_config),
+                threads,
             )?;
         }
         AppType::Gemini => {
@@ -1321,7 +1399,7 @@ pub(crate) fn sync_current_provider_for_app_to_live(
         }
     }
 
-    McpService::sync_all_enabled(state)?;
+    McpService::sync_enabled_for_app(state, app_type)?;
 
     Ok(())
 }
@@ -1500,7 +1578,7 @@ pub fn import_default_config(state: &AppState, app_type: AppType) -> Result<bool
         }
 
         let auth_path = get_codex_auth_path();
-        let auth: Value = if auth_path.exists() {
+        let live_auth: Value = if auth_path.exists() {
             read_json_file(&auth_path)?
         } else {
             json!({})
@@ -1510,18 +1588,36 @@ pub fn import_default_config(state: &AppState, app_type: AppType) -> Result<bool
             return Ok(false);
         }
 
+        let uses_custom_provider =
+            crate::codex_config::codex_config_uses_custom_provider(&config_str);
+        let auth = if uses_custom_provider {
+            json!({})
+        } else {
+            live_auth
+        };
+        let mut settings = json!({ "auth": auth, "config": config_str });
+        if let Some(env_key) = settings
+            .get("config")
+            .and_then(Value::as_str)
+            .and_then(crate::codex_config::extract_codex_env_key)
+        {
+            settings["env"] = json!({ "envKey": env_key });
+        }
+
         let mut provider = Provider::with_id(
             "codex-live-config".to_string(),
             "当前 Codex 配置".to_string(),
-            json!({ "auth": auth, "config": config_str }),
+            settings,
             None,
         );
-        provider.category = Some("custom".to_string());
-        normalize_codex_managed_provider_for_storage(
-            state.db.as_ref(),
-            &mut provider,
-            Some("codex-live-config"),
-        )?;
+        provider.category = Some(
+            if uses_custom_provider {
+                "custom"
+            } else {
+                "official"
+            }
+            .to_string(),
+        );
 
         state.db.save_provider(app_type.as_str(), &provider)?;
         state
@@ -1968,6 +2064,7 @@ pub fn remove_openclaw_provider_from_live(provider_id: &str) -> Result<(), AppEr
 mod tests {
     use super::*;
     use serde_json::json;
+    use serial_test::serial;
     use std::sync::{Mutex, OnceLock};
 
     fn test_guard() -> std::sync::MutexGuard<'static, ()> {
@@ -2123,6 +2220,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn normalize_codex_managed_provider_assigns_unique_coding_route_indexes() {
         with_test_home(|| {
             let db = Database::memory().expect("memory db");

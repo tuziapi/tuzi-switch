@@ -32,6 +32,8 @@ interface RequestLogTableProps {
   range: UsageRangeSelection;
   rangeLabel: string;
   appType?: string;
+  providerName?: string;
+  model?: string;
   refreshIntervalMs: number;
   onRangeChange?: (range: UsageRangeSelection) => void;
 }
@@ -40,6 +42,8 @@ export function RequestLogTable({
   range,
   rangeLabel,
   appType: dashboardAppType,
+  providerName: dashboardProviderName,
+  model: dashboardModel,
   refreshIntervalMs,
   onRangeChange,
 }: RequestLogTableProps) {
@@ -53,8 +57,21 @@ export function RequestLogTable({
 
   const dashboardAppTypeActive = dashboardAppType && dashboardAppType !== "all";
   const effectiveFilters: LogFilters = dashboardAppTypeActive
-    ? { ...appliedFilters, appType: dashboardAppType }
-    : appliedFilters;
+    ? {
+        ...appliedFilters,
+        appType: dashboardAppType,
+        providerName: dashboardProviderName ?? appliedFilters.providerName,
+        model: dashboardModel ?? appliedFilters.model,
+        providerNameExact: !!dashboardProviderName,
+        modelExact: !!dashboardModel,
+      }
+    : {
+        ...appliedFilters,
+        providerName: dashboardProviderName ?? appliedFilters.providerName,
+        model: dashboardModel ?? appliedFilters.model,
+        providerNameExact: !!dashboardProviderName,
+        modelExact: !!dashboardModel,
+      };
 
   const { data: result, isLoading } = useRequestLogs({
     filters: effectiveFilters,
@@ -74,6 +91,8 @@ export function RequestLogTable({
     setPage(0);
   }, [
     dashboardAppType,
+    dashboardProviderName,
+    dashboardModel,
     range.customEndDate,
     range.customStartDate,
     range.preset,
@@ -177,7 +196,8 @@ export function RequestLogTable({
             <Input
               placeholder={t("usage.searchProviderPlaceholder")}
               className="h-8 bg-background pl-7 text-xs"
-              value={draftFilters.providerName || ""}
+              value={dashboardProviderName ?? draftFilters.providerName ?? ""}
+              disabled={!!dashboardProviderName}
               onChange={(e) =>
                 setDraftFilters({
                   ...draftFilters,
@@ -195,7 +215,8 @@ export function RequestLogTable({
             <Input
               placeholder={t("usage.searchModelPlaceholder")}
               className="h-8 bg-background text-xs"
-              value={draftFilters.model || ""}
+              value={dashboardModel ?? draftFilters.model ?? ""}
+              disabled={!!dashboardModel}
               onChange={(e) =>
                 setDraftFilters({
                   ...draftFilters,

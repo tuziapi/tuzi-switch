@@ -8,21 +8,29 @@ use std::{
 };
 
 pub(crate) const IMAGE_API_KEY_ENV: &str = "TUZI_CODEX_IMAGE_API_KEY";
-const TUZI_IMAGE_HOST: &str = "api.tu-zi.com";
-const PROCESS_ENV_KEY_ALLOWLIST: &[&str] = &[
-    "OPENAI_API_KEY",
-    "TUZI_CODEX_API_KEY",
-    "CODING_CODEX_API_KEY",
-    "TUZI01_CODEX_API_KEY",
-];
+const PROCESS_ENV_KEY_ALLOWLIST: &[&str] = &["CODING_CODEX_API_KEY"];
 const MAX_API_KEY_BYTES: usize = 64 * 1024;
+const PROXY_MANAGED_PLACEHOLDER: &str = "PROXY_MANAGED";
 const MAX_AGENTS_BYTES: u64 = 2 * 1024 * 1024;
 const AGENTS_FILE: &str = "AGENTS.md";
 const AGENTS_OVERRIDE_FILE: &str = "AGENTS.override.md";
 const MANAGED_START: &str = "<!-- TUZI_SWITCH_CODEX_IMAGE_COMPAT_START -->";
 const MANAGED_END: &str = "<!-- TUZI_SWITCH_CODEX_IMAGE_COMPAT_END -->";
-pub(crate) const MANAGED_INSTRUCTION: &str = "只要是生成图片相关的需求，都使用 API Key 中内置的 gpt-image-2 生成，接口地址使用 https://api.tu-zi.com/v1。";
+pub(crate) const MANAGED_INSTRUCTION: &str = "只要是生成图片相关的需求，都使用 API Key 中内置的 gpt-image-2 生成，接口地址使用 https://api.tu-zi.com/v1。每次图片生成或编辑完成后，必须调用 $codex-image-render-fallback 发布结果，并将其输出中的每个 markdown 值原样返回。";
 static PERSONALIZATION_LOCK: Mutex<()> = Mutex::new(());
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TuziImageRouteKind {
+    NativeV1,
+    Coding,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct TuziImageSource {
+    pub base_url: String,
+    pub env_key: String,
+    pub route_kind: TuziImageRouteKind,
+}
 
 /// Derive the dedicated image credential from one effective Codex provider.
 /// `None` or an ineligible provider clears only Tuzi Switch's managed image key.
@@ -65,13 +73,24 @@ fn derive_image_api_key(settings_config: Option<&Value>) -> Result<Option<String
 
     let auth_token = settings_config
         .get("auth")
-        .and_then(codex_config::extract_codex_auth_api_key);
-    let managed_token = if auth_token.is_none() && env_key != IMAGE_API_KEY_ENV {
+        .and_then(codex_config::extract_codex_auth_api_key)
+        .filter(|token| token != PROXY_MANAGED_PLACEHOLDER);
+    let codex_env_token = if auth_token.is_none() {
+        read_eligible_tuzi_codex_env_api_key(settings_config)?
+    } else {
+        None
+    };
+    let managed_token = if auth_token.is_none()
+        && codex_env_token.is_none()
+        && env_key != IMAGE_API_KEY_ENV
+        && image_source_env_key_allowed(&env_key)
+    {
         codex_config::read_managed_env_key_file(&env_key)?
     } else {
         None
     };
     let process_token = if auth_token.is_none()
+        && codex_env_token.is_none()
         && managed_token.is_none()
         && env_key != IMAGE_API_KEY_ENV
         && process_env_key_allowed(&env_key)
@@ -80,26 +99,67 @@ fn derive_image_api_key(settings_config: Option<&Value>) -> Result<Option<String
     } else {
         None
     };
-    let token = auth_token.or(managed_token).or(process_token);
+    let token = auth_token
+        .or(codex_env_token)
+        .or(managed_token)
+        .or(process_token);
     let Some(token) = token else {
         return Ok(None);
     };
     Ok(Some(validate_api_key(&token)?.to_string()))
 }
 
+fn read_eligible_tuzi_codex_env_api_key(
+    settings_config: &Value,
+) -> Result<Option<String>, AppError> {
+    let Some(env_key) = eligible_tuzi_env_key_from_settings(settings_config)? else {
+        return Ok(None);
+    };
+    if env_key == IMAGE_API_KEY_ENV || !image_source_env_key_allowed(&env_key) {
+        return Ok(None);
+    }
+    codex_config::read_codex_env_key_file(&env_key)?
+        .map(|token| validate_api_key(&token).map(str::to_string))
+        .transpose()
+}
+
 pub(crate) fn eligible_tuzi_env_key_from_settings(
     settings_config: &Value,
 ) -> Result<Option<String>, AppError> {
-    Ok(eligible_tuzi_image_source_from_settings(settings_config)?.map(|(_, env_key)| env_key))
+    Ok(eligible_tuzi_image_source_from_settings(settings_config)?.map(|source| source.env_key))
 }
 
 pub(crate) fn eligible_tuzi_image_source_from_settings(
     settings_config: &Value,
-) -> Result<Option<(String, String)>, AppError> {
+) -> Result<Option<TuziImageSource>, AppError> {
+    Ok(tuzi_image_source_from_settings(settings_config)?
+        .filter(|source| source.route_kind == TuziImageRouteKind::Coding))
+}
+
+pub(crate) fn tuzi_image_source_from_settings(
+    settings_config: &Value,
+) -> Result<Option<TuziImageSource>, AppError> {
     let Some(config_text) = settings_config.get("config").and_then(Value::as_str) else {
         return Ok(None);
     };
-    eligible_tuzi_image_source(config_text)
+    let Some(mut source) = tuzi_image_source(config_text)? else {
+        return Ok(None);
+    };
+
+    // Keep eligibility aligned with CodexAdapter::extract_base_url: a top-level
+    // URL overrides the TOML route used to identify the provider.
+    if let Some(base_url) = settings_config
+        .get("base_url")
+        .and_then(Value::as_str)
+        .or_else(|| settings_config.get("baseURL").and_then(Value::as_str))
+    {
+        let Some(route_kind) = classify_tuzi_image_route(base_url) else {
+            return Ok(None);
+        };
+        source.base_url = base_url.to_string();
+        source.route_kind = route_kind;
+    }
+    Ok(Some(source))
 }
 
 pub(crate) fn read_managed_image_api_key() -> Result<Option<String>, AppError> {
@@ -109,7 +169,7 @@ pub(crate) fn read_managed_image_api_key() -> Result<Option<String>, AppError> {
         .transpose()
 }
 
-fn eligible_tuzi_image_source(config_text: &str) -> Result<Option<(String, String)>, AppError> {
+fn tuzi_image_source(config_text: &str) -> Result<Option<TuziImageSource>, AppError> {
     if config_text.trim().is_empty() {
         return Ok(None);
     }
@@ -134,9 +194,9 @@ fn eligible_tuzi_image_source(config_text: &str) -> Result<Option<(String, Strin
     let Some(base_url) = provider.get("base_url").and_then(toml::Value::as_str) else {
         return Ok(None);
     };
-    if !is_supported_tuzi_image_source(base_url) {
+    let Some(route_kind) = classify_tuzi_image_route(base_url) else {
         return Ok(None);
-    }
+    };
     let Some(env_key) = provider
         .get("env_key")
         .and_then(toml::Value::as_str)
@@ -146,24 +206,23 @@ fn eligible_tuzi_image_source(config_text: &str) -> Result<Option<(String, Strin
         return Ok(None);
     };
     validate_env_key(env_key)?;
-    Ok(Some((base_url.to_string(), env_key.to_string())))
+    Ok(Some(TuziImageSource {
+        base_url: base_url.to_string(),
+        env_key: env_key.to_string(),
+        route_kind,
+    }))
 }
 
-fn is_supported_tuzi_image_source(raw: &str) -> bool {
-    let Ok(url) = url::Url::parse(raw.trim()) else {
-        return false;
-    };
-    if url.scheme() != "https"
-        || url.host_str() != Some(TUZI_IMAGE_HOST)
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.port().is_some_and(|port| port != 443)
-        || url.query().is_some()
-        || url.fragment().is_some()
-    {
-        return false;
+fn classify_tuzi_image_route(raw: &str) -> Option<TuziImageRouteKind> {
+    match raw {
+        "https://api.tu-zi.com/v1" | "https://api.tu-zi.com/v1/" => {
+            Some(TuziImageRouteKind::NativeV1)
+        }
+        "https://api.tu-zi.com/coding" | "https://api.tu-zi.com/coding/" => {
+            Some(TuziImageRouteKind::Coding)
+        }
+        _ => None,
     }
-    matches!(url.path(), "/v1" | "/v1/" | "/coding" | "/coding/")
 }
 
 fn validate_env_key(env_key: &str) -> Result<(), AppError> {
@@ -180,14 +239,30 @@ fn validate_env_key(env_key: &str) -> Result<(), AppError> {
 }
 
 fn process_env_key_allowed(env_key: &str) -> bool {
+    image_source_env_key_allowed(env_key)
+}
+
+fn image_source_env_key_allowed(env_key: &str) -> bool {
     PROCESS_ENV_KEY_ALLOWLIST
         .iter()
-        .any(|allowed| env_key.eq_ignore_ascii_case(allowed))
+        .any(|allowed| env_key == *allowed)
+        || managed_numbered_coding_env_key(env_key)
+}
+
+fn managed_numbered_coding_env_key(env_key: &str) -> bool {
+    let Some(index) = env_key
+        .strip_prefix("CODING")
+        .and_then(|value| value.strip_suffix("_CODEX_API_KEY"))
+    else {
+        return false;
+    };
+    index.len() == 2 && index.bytes().all(|byte| byte.is_ascii_digit()) && index != "00"
 }
 
 fn validate_api_key(value: &str) -> Result<&str, AppError> {
     let value = value.trim();
     if value.is_empty()
+        || value == PROXY_MANAGED_PLACEHOLDER
         || value.len() > MAX_API_KEY_BYTES
         || value.bytes().any(|byte| byte.is_ascii_control())
         || http::HeaderValue::from_str(value).is_err()
@@ -456,26 +531,162 @@ mod tests {
     }
 
     #[test]
-    fn tuzi_source_accepts_only_exact_v1_and_coding_routes() {
+    fn tuzi_source_classifies_only_exact_v1_and_coding_routes() {
+        for accepted in ["https://api.tu-zi.com/v1", "https://api.tu-zi.com/v1/"] {
+            assert_eq!(
+                classify_tuzi_image_route(accepted),
+                Some(TuziImageRouteKind::NativeV1),
+                "{accepted}"
+            );
+        }
         for accepted in [
-            "https://api.tu-zi.com/v1",
-            "https://api.tu-zi.com/v1/",
             "https://api.tu-zi.com/coding",
             "https://api.tu-zi.com/coding/",
         ] {
-            assert!(is_supported_tuzi_image_source(accepted), "{accepted}");
+            assert_eq!(
+                classify_tuzi_image_route(accepted),
+                Some(TuziImageRouteKind::Coding),
+                "{accepted}"
+            );
         }
         for rejected in [
+            " https://api.tu-zi.com/v1",
+            "https://api.tu-zi.com/coding ",
             "http://api.tu-zi.com/v1",
+            "https://API.TU-ZI.COM/coding",
             "https://api.tu-zi.com.evil/v1",
             "https://evil@api.tu-zi.com/v1",
             "https://api.tu-zi.com/v1/images",
             "https://api.tu-zi.com/v1?x=1",
             "https://api.tu-zi.com/coding#x",
+            "https://api.tu-zi.com:443/coding",
             "https://api.tu-zi.com:8443/v1",
         ] {
-            assert!(!is_supported_tuzi_image_source(rejected), "{rejected}");
+            assert_eq!(classify_tuzi_image_route(rejected), None, "{rejected}");
         }
+    }
+
+    #[test]
+    fn only_coding_route_is_eligible_for_managed_image_compat() {
+        let native = serde_json::json!({
+            "config": config("https://api.tu-zi.com/v1", "TUZI_CODEX_API_KEY")
+        });
+        let coding = serde_json::json!({
+            "config": config("https://api.tu-zi.com/coding", "CODING_CODEX_API_KEY")
+        });
+
+        let native_source = tuzi_image_source_from_settings(&native)
+            .expect("native source")
+            .expect("classified native source");
+        assert_eq!(native_source.route_kind, TuziImageRouteKind::NativeV1);
+        assert!(eligible_tuzi_image_source_from_settings(&native)
+            .expect("native eligibility")
+            .is_none());
+
+        let coding_source = eligible_tuzi_image_source_from_settings(&coding)
+            .expect("coding eligibility")
+            .expect("eligible coding source");
+        assert_eq!(coding_source.route_kind, TuziImageRouteKind::Coding);
+        assert_eq!(coding_source.env_key, "CODING_CODEX_API_KEY");
+    }
+
+    #[test]
+    fn top_level_base_url_override_controls_image_compat_eligibility() {
+        let attacker_override = serde_json::json!({
+            "base_url": "https://attacker.example/v1",
+            "config": config(
+                "https://api.tu-zi.com/coding",
+                "CODING02_CODEX_API_KEY"
+            )
+        });
+        assert!(tuzi_image_source_from_settings(&attacker_override)
+            .expect("parse attacker override")
+            .is_none());
+
+        let native_override = serde_json::json!({
+            "baseURL": "https://api.tu-zi.com/v1/",
+            "config": config(
+                "https://api.tu-zi.com/coding",
+                "CODING02_CODEX_API_KEY"
+            )
+        });
+        let source = tuzi_image_source_from_settings(&native_override)
+            .expect("parse native override")
+            .expect("native source");
+        assert_eq!(source.route_kind, TuziImageRouteKind::NativeV1);
+        assert!(eligible_tuzi_image_source_from_settings(&native_override)
+            .expect("native eligibility")
+            .is_none());
+
+        let coding_override = serde_json::json!({
+            "base_url": "https://api.tu-zi.com/coding/",
+            "config": config(
+                "https://api.tu-zi.com/v1",
+                "CODING02_CODEX_API_KEY"
+            )
+        });
+        assert!(eligible_tuzi_image_source_from_settings(&coding_override)
+            .expect("coding eligibility")
+            .is_some());
+    }
+
+    #[test]
+    fn coding_env_key_allowlist_is_narrow_and_bounded() {
+        for accepted in [
+            "CODING_CODEX_API_KEY",
+            "CODING01_CODEX_API_KEY",
+            "CODING99_CODEX_API_KEY",
+        ] {
+            assert!(image_source_env_key_allowed(accepted), "{accepted}");
+        }
+        for rejected in [
+            "OPENAI_API_KEY",
+            "TUZI_CODEX_API_KEY",
+            "TUZI01_CODEX_API_KEY",
+            "CODING00_CODEX_API_KEY",
+            "CODING001_CODEX_API_KEY",
+            "CODING100_CODEX_API_KEY",
+            "coding01_codex_api_key",
+            IMAGE_API_KEY_ENV,
+        ] {
+            assert!(!image_source_env_key_allowed(rejected), "{rejected}");
+        }
+    }
+
+    #[test]
+    fn image_api_key_validation_rejects_proxy_placeholder() {
+        assert!(validate_api_key(PROXY_MANAGED_PLACEHOLDER).is_err());
+        assert!(validate_api_key(" PROXY_MANAGED ").is_err());
+        assert_eq!(
+            validate_api_key(" live-key ").expect("valid key"),
+            "live-key"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn image_key_ignores_proxy_placeholder_and_uses_codex_dotenv() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let old_home = std::env::var_os("CC_SWITCH_TEST_HOME");
+        std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
+        fs::create_dir_all(temp.path().join(".codex")).expect("codex dir");
+        fs::write(
+            temp.path().join(".codex").join(".env"),
+            "CODING02_CODEX_API_KEY=dotenv-key\n",
+        )
+        .expect("codex dotenv");
+        let settings = serde_json::json!({
+            "auth": {"OPENAI_API_KEY": PROXY_MANAGED_PLACEHOLDER},
+            "config": config("https://api.tu-zi.com/coding", "CODING02_CODEX_API_KEY")
+        });
+
+        assert!(reconcile_managed_image_api_key(Some(&settings)).expect("reconcile"));
+        assert_eq!(
+            read_managed_image_api_key().expect("read").as_deref(),
+            Some("dotenv-key")
+        );
+
+        restore_env("CC_SWITCH_TEST_HOME", old_home);
     }
 
     #[test]
@@ -545,18 +756,25 @@ mod tests {
 
     #[test]
     #[serial]
-    fn image_key_uses_auth_then_managed_env_then_process_env_without_mutating_target_env() {
+    fn image_key_uses_auth_then_codex_dotenv_then_managed_env_then_process_env_without_mutating_target_env(
+    ) {
         let temp = tempfile::tempdir().expect("tempdir");
         let old_home = std::env::var_os("CC_SWITCH_TEST_HOME");
-        let old_source = std::env::var_os("TUZI01_CODEX_API_KEY");
+        let old_source = std::env::var_os("CODING02_CODEX_API_KEY");
         let old_target = std::env::var_os(IMAGE_API_KEY_ENV);
         std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
-        std::env::set_var("TUZI01_CODEX_API_KEY", "process-key");
+        std::env::set_var("CODING02_CODEX_API_KEY", "process-key");
         std::env::set_var(IMAGE_API_KEY_ENV, "must-stay");
+        fs::create_dir_all(temp.path().join(".codex")).expect("codex dir");
+        fs::write(
+            temp.path().join(".codex").join(".env"),
+            "CODING02_CODEX_API_KEY=dotenv-key\n",
+        )
+        .expect("codex dotenv");
 
         let auth = serde_json::json!({
             "auth": {"OPENAI_API_KEY": "auth-key"},
-            "config": config("https://api.tu-zi.com/v1", "TUZI01_CODEX_API_KEY")
+            "config": config("https://api.tu-zi.com/coding", "CODING02_CODEX_API_KEY")
         });
         assert!(reconcile_managed_image_api_key(Some(&auth)).expect("auth"));
         assert_eq!(
@@ -565,18 +783,28 @@ mod tests {
         );
         assert_eq!(std::env::var(IMAGE_API_KEY_ENV).as_deref(), Ok("must-stay"));
 
-        codex_config::write_managed_env_key_file("TUZI01_CODEX_API_KEY", "managed-key")
-            .expect("source managed");
         let managed = serde_json::json!({
             "auth": {},
-            "config": config("https://api.tu-zi.com/coding", "TUZI01_CODEX_API_KEY")
+            "config": config("https://api.tu-zi.com/coding", "CODING02_CODEX_API_KEY")
         });
+        assert!(reconcile_managed_image_api_key(Some(&managed)).expect("dotenv"));
+        assert_eq!(
+            read_managed_image_api_key().expect("read").as_deref(),
+            Some("dotenv-key")
+        );
+        codex_config::write_managed_env_key_file("CODING02_CODEX_API_KEY", "managed-key")
+            .expect("source managed");
+        fs::write(
+            temp.path().join(".codex").join(".env"),
+            "CODING02_CODEX_API_KEY=   \n",
+        )
+        .expect("empty Codex dotenv");
         assert!(reconcile_managed_image_api_key(Some(&managed)).expect("managed"));
         assert_eq!(
             read_managed_image_api_key().expect("read").as_deref(),
             Some("managed-key")
         );
-        codex_config::remove_managed_env_key_file("TUZI01_CODEX_API_KEY").expect("remove source");
+        codex_config::remove_managed_env_key_file("CODING02_CODEX_API_KEY").expect("remove source");
         assert!(reconcile_managed_image_api_key(Some(&managed)).expect("process"));
         assert_eq!(
             read_managed_image_api_key().expect("read").as_deref(),
@@ -584,7 +812,7 @@ mod tests {
         );
 
         restore_env("CC_SWITCH_TEST_HOME", old_home);
-        restore_env("TUZI01_CODEX_API_KEY", old_source);
+        restore_env("CODING02_CODEX_API_KEY", old_source);
         restore_env(IMAGE_API_KEY_ENV, old_target);
     }
 
@@ -596,6 +824,12 @@ mod tests {
         let old_secret = std::env::var_os("AWS_SECRET_ACCESS_KEY");
         std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
         std::env::set_var("AWS_SECRET_ACCESS_KEY", "must-not-copy");
+        fs::create_dir_all(temp.path().join(".codex")).expect("codex dir");
+        fs::write(
+            temp.path().join(".codex").join(".env"),
+            "AWS_SECRET_ACCESS_KEY=file-secret\n",
+        )
+        .expect("codex dotenv");
         codex_config::write_managed_env_key_file(IMAGE_API_KEY_ENV, "old-image-key")
             .expect("seed image key");
         let settings = serde_json::json!({
@@ -611,15 +845,21 @@ mod tests {
 
     #[test]
     #[serial]
-    fn tuzi_provider_cannot_read_arbitrary_process_env() {
+    fn coding_provider_cannot_read_arbitrary_process_env() {
         let temp = tempfile::tempdir().expect("tempdir");
         let old_home = std::env::var_os("CC_SWITCH_TEST_HOME");
         let old_secret = std::env::var_os("AWS_SECRET_ACCESS_KEY");
         std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
         std::env::set_var("AWS_SECRET_ACCESS_KEY", "must-not-copy");
+        fs::create_dir_all(temp.path().join(".codex")).expect("codex dir");
+        fs::write(
+            temp.path().join(".codex").join(".env"),
+            "AWS_SECRET_ACCESS_KEY=file-secret\n",
+        )
+        .expect("codex dotenv");
         let settings = serde_json::json!({
             "auth": {},
-            "config": config("https://api.tu-zi.com/v1", "AWS_SECRET_ACCESS_KEY")
+            "config": config("https://api.tu-zi.com/coding", "AWS_SECRET_ACCESS_KEY")
         });
 
         assert!(!reconcile_managed_image_api_key(Some(&settings)).expect("reject"));
@@ -627,6 +867,72 @@ mod tests {
 
         restore_env("CC_SWITCH_TEST_HOME", old_home);
         restore_env("AWS_SECRET_ACCESS_KEY", old_secret);
+    }
+
+    #[test]
+    #[serial]
+    fn coding_provider_cannot_read_generic_openai_key_from_files_or_process() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let old_home = std::env::var_os("CC_SWITCH_TEST_HOME");
+        let old_secret = std::env::var_os("OPENAI_API_KEY");
+        std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
+        std::env::set_var("OPENAI_API_KEY", "must-not-copy");
+        fs::create_dir_all(temp.path().join(".codex")).expect("codex dir");
+        fs::write(
+            temp.path().join(".codex").join(".env"),
+            "OPENAI_API_KEY=file-secret\n",
+        )
+        .expect("codex dotenv");
+        let settings = serde_json::json!({
+            "auth": {},
+            "config": config("https://api.tu-zi.com/coding", "OPENAI_API_KEY")
+        });
+
+        assert!(!reconcile_managed_image_api_key(Some(&settings)).expect("reject"));
+        assert!(read_managed_image_api_key().expect("read").is_none());
+
+        restore_env("CC_SWITCH_TEST_HOME", old_home);
+        restore_env("OPENAI_API_KEY", old_secret);
+    }
+
+    #[test]
+    #[serial]
+    fn oversized_codex_dotenv_clears_stale_image_key_without_importing_content() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let old_home = std::env::var_os("CC_SWITCH_TEST_HOME");
+        std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
+        fs::create_dir_all(temp.path().join(".codex")).expect("codex dir");
+        let mut content = String::from("CODING02_CODEX_API_KEY=");
+        content.push_str(&"x".repeat(256 * 1024));
+        fs::write(temp.path().join(".codex").join(".env"), content).expect("oversized dotenv");
+        codex_config::write_managed_env_key_file(IMAGE_API_KEY_ENV, "old-image-key")
+            .expect("seed image key");
+        let settings = serde_json::json!({
+            "auth": {},
+            "config": config("https://api.tu-zi.com/coding", "CODING02_CODEX_API_KEY")
+        });
+
+        assert!(reconcile_managed_image_api_key(Some(&settings)).is_err());
+        assert!(read_managed_image_api_key().expect("read").is_none());
+        restore_env("CC_SWITCH_TEST_HOME", old_home);
+    }
+
+    #[test]
+    #[serial]
+    fn native_v1_route_clears_previous_derived_image_key() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let old_home = std::env::var_os("CC_SWITCH_TEST_HOME");
+        std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
+        codex_config::write_managed_env_key_file(IMAGE_API_KEY_ENV, "old-image-key")
+            .expect("seed image key");
+        let settings = serde_json::json!({
+            "auth": {"OPENAI_API_KEY": "native-key"},
+            "config": config("https://api.tu-zi.com/v1", "TUZI_CODEX_API_KEY")
+        });
+
+        assert!(!reconcile_managed_image_api_key(Some(&settings)).expect("native route"));
+        assert!(read_managed_image_api_key().expect("read").is_none());
+        restore_env("CC_SWITCH_TEST_HOME", old_home);
     }
 
     #[test]

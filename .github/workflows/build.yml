@@ -18,6 +18,8 @@ permissions:
 env:
   PNPM_VERSION: "9"
   NODE_VERSION: "20"
+  TUZI_SWITCH_RELEASE_REPOSITORY: ${{ github.repository }}
+  VITE_RELEASE_REPOSITORY: ${{ github.repository }}
 
 jobs:
   create-release:
@@ -27,7 +29,6 @@ jobs:
     outputs:
       tag: ${{ steps.release-tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
       - name: Resolve release tag
         id: release-tag
         shell: bash
@@ -42,6 +43,14 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release-tag.outputs.tag }}
+      - name: Test Codex image render fallback
+        run: >-
+          python3 -m unittest discover
+          -s src-tauri/resources/builtin-skills/codex-image-render-fallback/scripts
+          -p 'test_*.py'
       - name: Check release signing mode
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -94,10 +103,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
-            pnpm tauri build --target aarch64-apple-darwin --config '{"bundle":{"createUpdaterArtifacts":false}}'
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --unsigned)"
           else
-            pnpm tauri build --target aarch64-apple-darwin
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs)"
           fi
+          pnpm tauri build --target aarch64-apple-darwin --config "$RELEASE_CONFIG"
       - name: Collect assets
         shell: bash
         run: |
@@ -158,10 +168,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
-            pnpm tauri build --config '{"productName":"tuzi switch","bundle":{"createUpdaterArtifacts":false}}'
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --desktop-product-name --unsigned)"
           else
-            pnpm tauri build --config '{"productName":"tuzi switch"}'
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --desktop-product-name)"
           fi
+          pnpm tauri build --config "$RELEASE_CONFIG"
       - name: Collect assets
         shell: pwsh
         run: |
@@ -195,9 +206,31 @@ jobs:
         with:
           ref: ${{ needs.create-release.outputs.tag }}
       - name: Install dependencies
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout --foreground 5m sudo apt-get \
+              -o Acquire::ForceIPv4=true \
+              -o Acquire::Retries=3 \
+              -o Acquire::http::Timeout=20 \
+              -o Acquire::https::Timeout=20 \
+              update \
+              && timeout --foreground 10m sudo env DEBIAN_FRONTEND=noninteractive apt-get \
+                -o Acquire::ForceIPv4=true \
+                -o Acquire::Retries=3 \
+                -o Acquire::http::Timeout=20 \
+                -o Acquire::https::Timeout=20 \
+                install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "APT dependency installation failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sudo rm -rf /var/lib/apt/lists/partial
+            sleep $((attempt * 10))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -229,10 +262,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
-            pnpm tauri build --config '{"productName":"tuzi switch","bundle":{"createUpdaterArtifacts":false}}'
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --desktop-product-name --unsigned)"
           else
-            pnpm tauri build --config '{"productName":"tuzi switch"}'
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --desktop-product-name)"
           fi
+          pnpm tauri build --config "$RELEASE_CONFIG"
       - name: Collect assets
         shell: bash
         run: |
@@ -294,13 +328,13 @@ jobs:
           ### macOS / Linux 一键安装
 
           \`\`\`bash
-          curl -fsSL https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@${TAG}/scripts/install_tuzi_switch.sh | bash
+          curl -fsSL https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${TAG}/scripts/install_tuzi_switch.sh | TUZI_SWITCH_REPO=${GITHUB_REPOSITORY} bash
           \`\`\`
 
           或指定版本：
 
           \`\`\`bash
-          curl -fsSL https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@${TAG}/scripts/install_tuzi_switch.sh | TUZI_SWITCH_TAG=${TAG} bash
+          curl -fsSL https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${TAG}/scripts/install_tuzi_switch.sh | TUZI_SWITCH_REPO=${GITHUB_REPOSITORY} TUZI_SWITCH_TAG=${TAG} bash
           \`\`\`
 
           ### Windows
@@ -329,6 +363,7 @@ jobs:
         run: |
           gh release upload "$TAG" dist/* scripts/install_tuzi_switch.sh --clobber
       - name: Generate latest.json
+        if: ${{ !contains(needs.create-release.outputs.tag, '-') }}
         env:
           TAG: ${{ needs.create-release.outputs.tag }}
         shell: bash
@@ -337,8 +372,9 @@ jobs:
           const fs = require("fs");
 
           const tag = process.env.TAG;
+          const repository = process.env.GITHUB_REPOSITORY;
           const version = tag.replace(/^v/, "");
-          const baseUrl = `https://github.com/tuziapi/tuzi-switch/releases/download/${tag}`;
+          const baseUrl = `https://github.com/${repository}/releases/download/${tag}`;
           const hasSignature = (name) => fs.existsSync(`dist/${name}.sig`);
           const signature = (name) => fs.readFileSync(`dist/${name}.sig`, "utf8").trim();
           const platforms = {};
@@ -384,18 +420,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.create-release.outputs.tag }}
+          IS_PRERELEASE: ${{ contains(needs.create-release.outputs.tag, '-') }}
         shell: bash
         run: |
           set -euo pipefail
           if [ -f latest.json ]; then
             gh release upload "$TAG" latest.json --clobber
           fi
-          gh release edit "$TAG" \
-            --draft=false \
-            --prerelease=false \
-            --latest
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            gh release edit "$TAG" \
+              --draft=false \
+              --prerelease \
+              --latest=false
+          else
+            gh release edit "$TAG" \
+              --draft=false \
+              --prerelease=false \
+              --latest
+          fi
       - name: Publish manifest branch
-        if: hashFiles('latest.json') != ''
+        if: ${{ hashFiles('latest.json') != '' && !contains(needs.create-release.outputs.tag, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -412,14 +456,15 @@ jobs:
           git commit -m "发布更新清单 ${{ needs.create-release.outputs.tag }}"
           git push origin release-manifest
       - name: Purge jsDelivr cache
-        if: hashFiles('latest.json') != ''
+        if: ${{ hashFiles('latest.json') != '' && !contains(needs.create-release.outputs.tag, '-') }}
         shell: bash
         run: |
-          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@release-manifest/latest.json" || true
-          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@${{ needs.create-release.outputs.tag }}/scripts/install_tuzi_switch.sh" || true
+          curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@release-manifest/latest.json" || true
+          curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${{ needs.create-release.outputs.tag }}/scripts/install_tuzi_switch.sh" || true
 
   publish-web:
     needs: [create-release]
+    if: ${{ !contains(needs.create-release.outputs.tag, '-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -437,8 +482,29 @@ jobs:
       - name: Install minisign
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y minisign
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout --foreground 5m sudo apt-get \
+              -o Acquire::ForceIPv4=true \
+              -o Acquire::Retries=3 \
+              -o Acquire::http::Timeout=20 \
+              -o Acquire::https::Timeout=20 \
+              update \
+              && timeout --foreground 5m sudo env DEBIAN_FRONTEND=noninteractive apt-get \
+                -o Acquire::ForceIPv4=true \
+                -o Acquire::Retries=3 \
+                -o Acquire::http::Timeout=20 \
+                -o Acquire::https::Timeout=20 \
+                install -y minisign; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "APT minisign installation failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sudo rm -rf /var/lib/apt/lists/partial
+            sleep $((attempt * 10))
+          done
       - name: Build web assets
         id: build-web-assets
         env:
@@ -469,6 +535,7 @@ jobs:
           node <<'NODE'
           const fs = require("fs");
           const tag = process.env.TAG;
+          const repository = process.env.GITHUB_REPOSITORY;
           const version = process.env.VERSION;
           const appVersionRange = process.env.APP_VERSION_RANGE;
           const sha256 = process.env.SHA256;
@@ -485,7 +552,7 @@ jobs:
             },
             pubDate: new Date().toISOString(),
             archive: {
-              url: `https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/${tag}/web.tar.gz`,
+              url: `https://cdn.jsdelivr.net/gh/${repository}@release-web/versions/${tag}/web.tar.gz`,
               sha256,
               signature,
             },
@@ -518,7 +585,7 @@ jobs:
         if: steps.build-web-assets.outputs.skip != 'true'
         shell: bash
         run: |
-          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/latest.json" || true
-          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/${{ needs.create-release.outputs.tag }}/web.tar.gz" || true
-          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/${{ needs.create-release.outputs.tag }}/web.tar.gz.sig" || true
-          curl -fsS "https://purge.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/${{ needs.create-release.outputs.tag }}/web.tar.gz.sha256" || true
+          curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@release-web/latest.json" || true
+          curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@release-web/versions/${{ needs.create-release.outputs.tag }}/web.tar.gz" || true
+          curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@release-web/versions/${{ needs.create-release.outputs.tag }}/web.tar.gz.sig" || true
+          curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@release-web/versions/${{ needs.create-release.outputs.tag }}/web.tar.gz.sha256" || true
