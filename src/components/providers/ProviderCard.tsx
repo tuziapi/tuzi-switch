@@ -21,6 +21,7 @@ import { ProviderHealthBadge } from "@/components/providers/ProviderHealthBadge"
 import { FailoverPriorityBadge } from "@/components/providers/FailoverPriorityBadge";
 import {
   extractCodexBaseUrl,
+  getCodexProviderApiKey,
   getCodexProviderEnvKeyFromSettings,
 } from "@/utils/providerConfigUtils";
 import { useProviderHealth } from "@/lib/query/failover";
@@ -60,6 +61,8 @@ interface ProviderCardProps {
   isInFailoverQueue?: boolean; // 是否在故障转移队列中
   onToggleFailover?: (enabled: boolean) => void; // 切换故障转移队列
   activeProviderId?: string; // 代理当前实际使用的供应商 ID（用于故障转移模式下标注绿色边框）
+  isSwitching?: boolean;
+  isSwitchDisabled?: boolean;
   // OpenClaw: default model
   isDefaultModel?: boolean;
   onSetAsDefault?: () => void;
@@ -157,6 +160,8 @@ export function ProviderCard({
   isInFailoverQueue = false,
   onToggleFailover,
   activeProviderId,
+  isSwitching = false,
+  isSwitchDisabled = false,
   // OpenClaw: default model
   isDefaultModel,
   onSetAsDefault,
@@ -194,6 +199,7 @@ export function ProviderCard({
   // Load API key from shell rc for Codex providers
   const [envKeyValue, setEnvKeyValue] = useState<string | null>(null);
   useEffect(() => {
+    let cancelled = false;
     if (appId !== "codex") {
       setEnvKeyValue(null);
       return;
@@ -207,11 +213,18 @@ export function ProviderCard({
     }
     const timer = setTimeout(() => {
       invoke<string | null>("read_codex_env_key", { envKey: envKeyName })
-        .then((val) => setEnvKeyValue(val || null))
-        .catch(() => setEnvKeyValue(null));
+        .then((val) => {
+          if (!cancelled) setEnvKeyValue(val || null);
+        })
+        .catch(() => {
+          if (!cancelled) setEnvKeyValue(null);
+        });
     }, 100);
-    return () => clearTimeout(timer);
-  }, [appId, provider.id, provider.settingsConfig]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [appId, provider.id, provider.settingsConfig, isCurrent]);
 
   const isOfficialBlockedByProxy =
     isProxyTakeover && (provider.category === "official" || isOfficial);
@@ -295,7 +308,7 @@ export function ProviderCard({
     ? (() => {
         const cfg = provider.settingsConfig as Record<string, any>;
         return appId === "codex"
-          ? envKeyValue || cfg?.auth?.OPENAI_API_KEY
+          ? getCodexProviderApiKey(provider.settingsConfig, envKeyValue)
           : appId === "claude"
             ? cfg?.env?.ANTHROPIC_AUTH_TOKEN || cfg?.env?.ANTHROPIC_API_KEY
             : appId === "gemini"
@@ -504,7 +517,7 @@ export function ProviderCard({
               const cfg = provider.settingsConfig as Record<string, any>;
               const rawKey =
                 appId === "codex"
-                  ? envKeyValue || cfg?.auth?.OPENAI_API_KEY
+                  ? getCodexProviderApiKey(provider.settingsConfig, envKeyValue)
                   : appId === "claude"
                     ? cfg?.env?.ANTHROPIC_AUTH_TOKEN ||
                       cfg?.env?.ANTHROPIC_API_KEY
@@ -655,6 +668,8 @@ export function ProviderCard({
             <ProviderActions
               appId={appId}
               isCurrent={isCurrent}
+              isSwitching={isSwitching}
+              isSwitchDisabled={isSwitchDisabled}
               isInConfig={isInConfig}
               isTesting={isTesting}
               isProxyTakeover={isProxyTakeover}

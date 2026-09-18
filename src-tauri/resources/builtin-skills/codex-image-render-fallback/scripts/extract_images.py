@@ -15,6 +15,7 @@ import secrets
 import stat
 from dataclasses import dataclass
 from typing import Any, BinaryIO, Iterable, Iterator, Mapping, Sequence
+from urllib.parse import quote
 
 
 DEFAULT_MAX_IMAGE_BYTES = 32 * 1024 * 1024
@@ -207,9 +208,11 @@ def _iter_image_items(value: Any) -> Iterator[dict[str, Any]]:
     while stack:
         current = stack.pop()
         if isinstance(current, dict):
+            item_type = current.get("type")
+            item_kind = current.get("kind")
             if (
-                current.get("type") in IMAGE_ITEM_TYPES
-                or current.get("kind") == "image_gen.generation"
+                (isinstance(item_type, str) and item_type in IMAGE_ITEM_TYPES)
+                or (isinstance(item_kind, str) and item_kind == "image_gen.generation")
             ):
                 yield current
             stack.extend(reversed(tuple(current.values())))
@@ -603,7 +606,7 @@ def _commit(staged: list[StagedImage], output_dir: Path) -> list[dict[str, Any]]
 
     results: list[dict[str, Any]] = []
     for index, image in enumerate(staged, start=1):
-        target = f"<{image.final_path}>"
+        target = f"<{quote(str(image.final_path), safe='/:')}>"
         markdown = f"![Generated image {index}]({target})\n\n[Download image {index}]({target})"
         results.append(
             {

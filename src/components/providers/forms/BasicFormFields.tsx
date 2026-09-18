@@ -19,7 +19,7 @@ import {
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { IconPicker } from "@/components/IconPicker";
 import { getIconMetadata } from "@/icons/extracted/metadata";
-import { Input } from "@/components/ui/input";
+import { ImeSafeInput } from "@/components/ui/ime-safe-input";
 import type { UseFormReturn } from "react-hook-form";
 import type { ProviderFormData } from "@/lib/schemas/provider";
 
@@ -132,42 +132,55 @@ export function BasicFormFields({
 
       {/* 基础信息 - 网格布局 */}
       {!hideNameAndNotes && (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{t("provider.name")}</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder={t("provider.namePlaceholder")} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {hideNotes ? (
-          <FormItem>{afterNameSlot}</FormItem>
-        ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="notes"
+            name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("provider.notes")}</FormLabel>
+                <FormLabel>{t("provider.name")}</FormLabel>
                 <FormControl>
-                  <Input
-                    {...field}
-                    placeholder={t("provider.notesPlaceholder")}
+                  <ImeSafeInput
+                    ref={field.ref}
+                    name={field.name}
+                    value={field.value ?? ""}
+                    onValueChange={field.onChange}
+                    onBlur={field.onBlur}
+                    disabled={field.disabled}
+                    placeholder={t("provider.namePlaceholder")}
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        )}
-      </div>
+
+          {hideNotes ? (
+            <FormItem>{afterNameSlot}</FormItem>
+          ) : (
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("provider.notes")}</FormLabel>
+                  <FormControl>
+                    <ImeSafeInput
+                      ref={field.ref}
+                      name={field.name}
+                      value={field.value ?? ""}
+                      onValueChange={field.onChange}
+                      onBlur={field.onBlur}
+                      disabled={field.disabled}
+                      placeholder={t("provider.notesPlaceholder")}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+        </div>
       )}
     </>
   );

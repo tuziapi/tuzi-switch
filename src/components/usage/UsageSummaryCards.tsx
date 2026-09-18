@@ -20,9 +20,14 @@ export function UsageSummaryCards({
 }: UsageSummaryCardsProps) {
   const { t } = useTranslation();
 
-  const { data: summary, isLoading } = useUsageSummary(range, appType, {
-    refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
-  });
+  const { data: summary, isLoading } = useUsageSummary(
+    range,
+    appType,
+    undefined,
+    {
+      refetchInterval: refreshIntervalMs > 0 ? refreshIntervalMs : false,
+    },
+  );
 
   const stats = useMemo(() => {
     const totalRequests = summary?.totalRequests ?? 0;

@@ -29,6 +29,7 @@ mod prompt_files;
 mod provider;
 mod provider_defaults;
 mod proxy;
+mod release_repository;
 mod services;
 mod session_manager;
 mod settings;
@@ -602,10 +603,33 @@ pub fn run() {
             }
 
             {
+                match crate::services::provider::ensure_current_codex_provider_env_ready(&app_state)
+                {
+                    Ok(true) => log::info!(
+                        "✓ Current Codex provider credential is available to desktop processes"
+                    ),
+                    Ok(false) => {}
+                    Err(e) => log::warn!(
+                        "✗ Current Codex provider credential is unavailable; live config was preserved: {e}"
+                    ),
+                }
+
                 if crate::settings::unify_codex_session_history() {
-                    if let Err(e) = crate::services::provider::reapply_current_codex_live(&app_state)
-                    {
-                        log::warn!("✗ Failed to reapply Codex unified live config on startup: {e}");
+                    match crate::codex_history_migration::ensure_codex_history_anchor() {
+                        Ok(_) => {
+                            if let Err(e) =
+                                crate::services::provider::reapply_current_codex_live(&app_state)
+                            {
+                                log::warn!(
+                                    "✗ Failed to reapply Codex unified live config on startup: {e}"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "✗ Failed to resolve fixed Codex history anchor; live config was not changed: {e}"
+                            );
+                        }
                     }
                 }
 
@@ -1220,13 +1244,17 @@ pub fn run() {
             commands::set_common_config_snippet,
             commands::extract_common_config_snippet,
             commands::read_codex_env_key,
+            commands::read_codex_provider_credential,
             commands::write_codex_env_key,
             commands::read_all_codex_env_keys,
             commands::save_codex_route,
             commands::read_live_provider_settings,
             commands::get_settings,
             commands::get_codex_image_compat_status,
+            commands::get_codex_subagent_settings,
+            commands::set_codex_subagent_max_concurrent_threads,
             commands::save_settings,
+            commands::get_codex_history_anchor_status,
             commands::has_codex_unify_history_backup,
             commands::restore_codex_unified_history,
             commands::get_rectifier_config,
@@ -1263,7 +1291,7 @@ pub fn run() {
             // subscription quota
             commands::get_subscription_quota,
             commands::get_codex_oauth_quota,
-            commands::sync_codex_live_api_key,
+            commands::sanitize_codex_provider_credentials,
             commands::sync_claude_live_api_key,
             commands::sync_gemini_live_api_key,
             commands::get_coding_plan_quota,
@@ -1391,6 +1419,7 @@ pub fn run() {
             commands::set_auto_failover_enabled,
             // Usage statistics
             commands::get_usage_summary,
+            commands::get_usage_summary_by_app,
             commands::get_usage_trends,
             commands::get_provider_stats,
             commands::get_model_stats,

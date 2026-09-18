@@ -4,6 +4,9 @@ use super::calculator::{CostBreakdown, CostCalculator, ModelPricing};
 use super::parser::TokenUsage;
 use crate::database::Database;
 use crate::error::AppError;
+use crate::services::sql_helpers::{
+    is_cache_inclusive_app, INPUT_TOKEN_SEMANTICS_FRESH, INPUT_TOKEN_SEMANTICS_TOTAL,
+};
 use crate::services::usage_stats::find_model_pricing_row;
 use rust_decimal::Decimal;
 use std::{str::FromStr, time::SystemTime};
@@ -78,8 +81,8 @@ impl<'a> UsageLogger<'a> {
                 input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
                 input_cost_usd, output_cost_usd, cache_read_cost_usd, cache_creation_cost_usd, total_cost_usd,
                 latency_ms, first_token_ms, status_code, error_message, session_id,
-                provider_type, is_streaming, cost_multiplier, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
+                provider_type, is_streaming, cost_multiplier, created_at, input_token_semantics
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
             rusqlite::params![
                 log.request_id,
                 log.provider_id,
@@ -104,6 +107,7 @@ impl<'a> UsageLogger<'a> {
                 log.is_streaming as i64,
                 log.cost_multiplier,
                 created_at,
+                if is_cache_inclusive_app(&log.app_type) { INPUT_TOKEN_SEMANTICS_TOTAL } else { INPUT_TOKEN_SEMANTICS_FRESH },
             ],
         )
         .map_err(|e| AppError::Database(format!("记录请求日志失败: {e}")))?;
@@ -307,7 +311,14 @@ impl<'a> UsageLogger<'a> {
             log::warn!("[USG-002] 模型定价未找到，成本将记录为 0: {pricing_model}");
         }
 
-        let cost = CostCalculator::try_calculate(&usage, pricing.as_ref(), cost_multiplier);
+        let semantics = if is_cache_inclusive_app(&app_type) {
+            INPUT_TOKEN_SEMANTICS_TOTAL
+        } else {
+            INPUT_TOKEN_SEMANTICS_FRESH
+        };
+        let cost = pricing.as_ref().map(|p| {
+            CostCalculator::calculate_with_input_semantics(&usage, p, cost_multiplier, semantics)
+        });
 
         let log = RequestLog {
             request_id,

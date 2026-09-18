@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { CodexConfigSection } from "./CodexConfigSections";
+import { CodexCommonConfigModal } from "./CodexCommonConfigModal";
 
 interface CodexConfigEditorProps {
   authValue: string;
@@ -31,25 +32,52 @@ interface CodexConfigEditorProps {
   onExtract?: () => void;
 
   isExtracting?: boolean;
+
+  isCommonConfigLoading?: boolean;
 }
 
 const CodexConfigEditor: React.FC<CodexConfigEditorProps> = ({
   configValue,
   onConfigChange,
+  useCommonConfig,
+  onCommonConfigToggle,
+  commonConfigSnippet,
+  onCommonConfigSnippetChange,
+  onCommonConfigErrorClear,
+  commonConfigError,
   configError,
+  onExtract,
+  isExtracting,
+  isCommonConfigLoading = false,
 }) => {
+  const [isCommonConfigModalOpen, setIsCommonConfigModalOpen] = useState(false);
+
+  const handleCloseCommonConfigModal = () => {
+    onCommonConfigErrorClear();
+    setIsCommonConfigModalOpen(false);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Config TOML Section (auth.json and common config are no longer needed) */}
       <CodexConfigSection
         value={configValue}
         onChange={onConfigChange}
-        useCommonConfig={false}
-        onCommonConfigToggle={() => {}}
-        onEditCommonConfig={() => {}}
-        commonConfigError=""
+        useCommonConfig={useCommonConfig}
+        onCommonConfigToggle={onCommonConfigToggle}
+        onEditCommonConfig={() => setIsCommonConfigModalOpen(true)}
+        commonConfigError={commonConfigError}
         configError={configError}
+        isCommonConfigLoading={isCommonConfigLoading}
+      />
+
+      <CodexCommonConfigModal
+        isOpen={isCommonConfigModalOpen}
+        onClose={handleCloseCommonConfigModal}
+        value={commonConfigSnippet}
+        onSave={onCommonConfigSnippetChange}
+        error={commonConfigError}
+        onExtract={onExtract}
+        isExtracting={isExtracting}
       />
     </div>
   );

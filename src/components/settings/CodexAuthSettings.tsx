@@ -13,7 +13,10 @@ import type { SettingsFormState } from "@/hooks/useSettings";
 import { ToggleRow } from "@/components/ui/toggle-row";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { settingsApi } from "@/lib/api";
-import { useCodexImageCompatStatusQuery } from "@/lib/query";
+import {
+  useCodexHistoryAnchorStatusQuery,
+  useCodexImageCompatStatusQuery,
+} from "@/lib/query";
 
 interface CodexAuthSettingsProps {
   settings: SettingsFormState;
@@ -32,10 +35,16 @@ export function CodexAuthSettings({
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
   const [hasUnifyBackup, setHasUnifyBackup] = useState(false);
   const imageCompatStatus = useCodexImageCompatStatusQuery();
+  const unifyHistoryEnabled = settings.unifyCodexSessionHistory ?? true;
+  const historyAnchorStatus =
+    useCodexHistoryAnchorStatusQuery(unifyHistoryEnabled);
   const imageCompatRequested = settings.codexImageRenderCompat ?? true;
+  const imageCompatUsesNativeRoute =
+    imageCompatRequested && imageCompatStatus.data?.reason === "native_route";
   const imageCompatNotReadyReason =
     imageCompatRequested &&
     imageCompatStatus.data?.requested === true &&
+    !imageCompatUsesNativeRoute &&
     !imageCompatStatus.data.ready
       ? imageCompatStatus.data.reason
       : null;
@@ -60,12 +69,13 @@ export function CodexAuthSettings({
       });
   };
 
-  const handleEnableConfirm = (migrateExisting: boolean) => {
+  const handleEnableConfirm = async (migrateExisting: boolean) => {
     setShowEnableConfirm(false);
-    void onChange({
+    const saved = await onChange({
       unifyCodexSessionHistory: true,
       unifyCodexMigrateExisting: migrateExisting,
     });
+    if (saved !== false) void historyAnchorStatus.refetch();
   };
 
   // 备份探测可能落后于正在后台进行的迁移（刚勾选迁入就立刻关闭时，
@@ -147,7 +157,27 @@ export function CodexAuthSettings({
           })}
         </p>
       ) : null}
-      {imageCompatRequested ? (
+      {imageCompatUsesNativeRoute ? (
+        <div
+          className="ml-11 flex items-start gap-2 border-l-2 border-emerald-500/60 pl-4 text-xs leading-5"
+          data-testid="codex-image-native-route"
+        >
+          <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div>
+            <p className="font-medium text-foreground">
+              {t("settings.codexImageRenderCompatNative.title")}
+            </p>
+            <p className="text-muted-foreground">
+              {t("settings.codexImageRenderCompatNative.description", {
+                baseUrl:
+                  imageCompatStatus.data?.providerBaseUrl ??
+                  "https://api.tu-zi.com/v1",
+              })}
+            </p>
+          </div>
+        </div>
+      ) : null}
+      {imageCompatRequested && !imageCompatUsesNativeRoute ? (
         <div
           className="ml-11 space-y-3 border-l-2 border-rose-500/60 pl-4"
           data-testid="codex-image-compat-details"
@@ -246,9 +276,46 @@ export function CodexAuthSettings({
         icon={<History className="h-4 w-4 text-sky-500" />}
         title={t("settings.unifyCodexSessionHistory")}
         description={t("settings.unifyCodexSessionHistoryDescription")}
-        checked={settings.unifyCodexSessionHistory ?? true}
+        checked={unifyHistoryEnabled}
         onCheckedChange={handleUnifyHistoryChange}
       />
+      {unifyHistoryEnabled ? (
+        <div
+          className="ml-11 flex items-start gap-2 border-l-2 border-sky-500/60 pl-4 text-xs leading-5"
+          data-testid="codex-history-anchor-status"
+        >
+          {historyAnchorStatus.data ? (
+            <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          ) : historyAnchorStatus.isError ? (
+            <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          ) : (
+            <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          )}
+          <div className="min-w-0">
+            <p className="font-medium text-foreground">
+              {historyAnchorStatus.data
+                ? t("settings.codexHistoryAnchor.active", {
+                    providerId: historyAnchorStatus.data.providerId,
+                  })
+                : historyAnchorStatus.isError
+                  ? t("settings.codexHistoryAnchor.failed")
+                  : t("settings.codexHistoryAnchor.resolving")}
+            </p>
+            {historyAnchorStatus.data ? (
+              <p className="break-all text-muted-foreground">
+                {t("settings.codexHistoryAnchor.resolvedFrom", {
+                  cwd:
+                    historyAnchorStatus.data.cwd ??
+                    historyAnchorStatus.data.configDir,
+                })}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              {t("settings.codexHistoryAnchor.restart")}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         isOpen={showEnableConfirm}

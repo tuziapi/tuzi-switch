@@ -14,8 +14,10 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
+  AlertCircle,
   Loader2,
   Plus,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import EndpointSpeedTest from "./EndpointSpeedTest";
@@ -31,6 +33,8 @@ import type {
   CodexChatReasoning,
   ProviderCategory,
 } from "@/types";
+import { CodexSubagentProviderField } from "./CodexSubagentProviderField";
+import type { CodexCredentialStatus } from "./hooks/useCodexConfigState";
 
 interface EndpointCandidate {
   url: string;
@@ -46,6 +50,9 @@ interface CodexFormFieldsProps {
   // API Key
   codexApiKey: string;
   onApiKeyChange: (key: string) => void;
+  credentialStatus: CodexCredentialStatus;
+  credentialError?: string;
+  onRetryCredentialLoad: () => void;
   category?: ProviderCategory;
   shouldShowApiKeyLink: boolean;
   websiteUrl: string;
@@ -68,6 +75,10 @@ interface CodexFormFieldsProps {
   onApiFormatChange: (format: CodexApiFormat) => void;
   codexChatReasoning?: CodexChatReasoning;
   onCodexChatReasoningChange?: (value: CodexChatReasoning) => void;
+
+  // Provider-specific subagent concurrency. Empty inherits the global default.
+  subagentThreads: string;
+  onSubagentThreadsChange: (value: string) => void;
 
   // Model Catalog
   catalogModels?: CodexCatalogModel[];
@@ -110,6 +121,9 @@ export function CodexFormFields({
   envKeyError,
   codexApiKey,
   onApiKeyChange,
+  credentialStatus,
+  credentialError,
+  onRetryCredentialLoad,
   category,
   shouldShowApiKeyLink,
   websiteUrl,
@@ -128,6 +142,8 @@ export function CodexFormFields({
   onApiFormatChange,
   codexChatReasoning = {},
   onCodexChatReasoningChange,
+  subagentThreads,
+  onSubagentThreadsChange,
   catalogModels = [],
   onCatalogModelsChange,
   speedTestEndpoints,
@@ -297,7 +313,55 @@ export function CodexFormFields({
             defaultValue: "输入 API Key，将自动填充到配置",
           }),
         }}
+        disabled={credentialStatus === "loading"}
       />
+      {credentialStatus === "loading" && (
+        <div
+          className="flex items-center gap-2 text-xs text-muted-foreground"
+          role="status"
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {t("providerForm.codexCredentialLoading", {
+            defaultValue: "正在读取已保存的 API Key",
+          })}
+        </div>
+      )}
+      {(credentialStatus === "missing" || credentialStatus === "error") && (
+        <div
+          className="flex items-center justify-between gap-3 text-xs text-destructive"
+          role="alert"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span className="break-words">
+              {credentialStatus === "missing"
+                ? t("providerForm.codexCredentialMissing", {
+                    defaultValue:
+                      "未找到该供应商已保存的 API Key，请重新填写",
+                  })
+                : t("providerForm.codexCredentialLoadFailed", {
+                    defaultValue: "已保存的 API Key 读取失败",
+                  })}
+              {credentialStatus === "error" && credentialError
+                ? `: ${credentialError}`
+                : ""}
+            </span>
+          </span>
+          {credentialStatus === "error" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              onClick={onRetryCredentialLoad}
+              title={t("common.retry", { defaultValue: "重试" })}
+              aria-label={t("common.retry", { defaultValue: "重试" })}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Codex Base URL 输入框 */}
       {shouldShowSpeedTest && (
@@ -362,6 +426,11 @@ export function CodexFormFields({
           </div>
         </div>
       )}
+
+      <CodexSubagentProviderField
+        value={subagentThreads}
+        onChange={onSubagentThreadsChange}
+      />
 
       {needsLocalRouting && canEditReasoning && (
         <Collapsible

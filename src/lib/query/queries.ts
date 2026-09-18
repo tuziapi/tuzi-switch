@@ -101,6 +101,15 @@ export const useCodexImageCompatStatusQuery = () => {
   });
 };
 
+export const useCodexHistoryAnchorStatusQuery = (enabled: boolean) => {
+  return useQuery({
+    queryKey: ["settings", "codex-history-anchor-status"],
+    queryFn: async () => settingsApi.getCodexHistoryAnchorStatus(),
+    enabled,
+    retry: false,
+  });
+};
+
 export interface UseUsageQueryOptions {
   enabled?: boolean;
   autoQueryInterval?: number; // 自动查询间隔（分钟），0 表示禁用

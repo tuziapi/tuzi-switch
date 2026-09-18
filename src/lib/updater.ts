@@ -5,6 +5,10 @@ import { invoke } from "@tauri-apps/api/core";
 // 我们按需加载并在运行时捕获错误，避免构建期类型问题
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import type { Update } from "@tauri-apps/plugin-updater";
+import {
+  GITHUB_LATEST_RELEASE_API,
+  RELEASES_URL,
+} from "@/lib/releaseRepository";
 
 export type UpdateChannel = "stable" | "beta";
 
@@ -55,10 +59,6 @@ interface GitHubRelease {
   published_at?: string;
   html_url?: string;
 }
-
-const RELEASES_URL = "https://github.com/tuziapi/tuzi-switch/releases";
-const GITHUB_LATEST_RELEASE_API =
-  "https://api.github.com/repos/tuziapi/tuzi-switch/releases/latest";
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -152,12 +152,17 @@ async function checkGitHubReleaseFallback(
       },
     });
     if (!response.ok) {
-      throw new Error(`GitHub release metadata unavailable: ${response.status}`);
+      throw new Error(
+        `GitHub release metadata unavailable: ${response.status}`,
+      );
     }
 
     const release = (await response.json()) as GitHubRelease;
     const availableVersion = release.tag_name?.replace(/^v/i, "") ?? "";
-    if (!availableVersion || compareVersions(availableVersion, currentVersion) <= 0) {
+    if (
+      !availableVersion ||
+      compareVersions(availableVersion, currentVersion) <= 0
+    ) {
       return { status: "up-to-date" };
     }
 
@@ -219,7 +224,10 @@ export async function checkForUpdate(
       "Tauri updater check timed out",
     );
   } catch (error) {
-    console.warn("Tauri updater check failed, falling back to GitHub release", error);
+    console.warn(
+      "Tauri updater check failed, falling back to GitHub release",
+      error,
+    );
     return await checkGitHubReleaseFallback(currentVersion, timeout);
   }
   if (!update) {

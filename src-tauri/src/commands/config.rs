@@ -415,6 +415,21 @@ pub fn read_codex_env_key(envKey: String) -> Result<Option<String>, String> {
 
 #[tauri::command]
 #[allow(non_snake_case)]
+pub fn read_codex_provider_credential(
+    state: State<'_, AppState>,
+    providerId: String,
+    envKey: String,
+) -> Result<crate::services::provider::CodexProviderCredential, String> {
+    crate::services::provider::read_codex_provider_credential(
+        state.inner(),
+        providerId.trim(),
+        envKey.trim(),
+    )
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
 pub fn write_codex_env_key(envKey: String, value: String) -> Result<(), String> {
     codex_config::write_managed_env_key(&envKey, &value).map_err(|e| e.to_string())
 }
@@ -556,10 +571,16 @@ fn save_codex_route_inner(
         serde_json::json!({ "auth": {}, "config": route_draft }),
         None,
     );
+    let submitted_provider = provider.clone();
     crate::services::provider::normalize_codex_managed_provider_for_storage(
         state.db.as_ref(),
         &mut provider,
         providerId.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
+    crate::services::provider::migrate_codex_provider_credential(
+        Some(&submitted_provider),
+        &provider,
     )
     .map_err(|e| e.to_string())?;
 
@@ -580,6 +601,8 @@ fn save_codex_route_inner(
         codex_config::write_managed_env_key(&normalized_env_key, &apiKey)
             .map_err(|e| e.to_string())?;
     }
+
+    codex_config::ensure_codex_provider_env_ready(normalized_config).map_err(|e| e.to_string())?;
 
     // Write route section to config.toml
     let existing = codex_config::read_codex_config_text().map_err(|e| e.to_string())?;

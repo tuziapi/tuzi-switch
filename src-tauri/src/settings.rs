@@ -183,12 +183,25 @@ impl WebDavSyncSettings {
 #[serde(rename_all = "camelCase")]
 pub struct LocalMigrations {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codex_history_anchor_v1: Option<CodexHistoryAnchor>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_third_party_history_provider_bucket_v1:
         Option<CodexThirdPartyHistoryProviderBucketMigration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_provider_template_v1: Option<CodexProviderTemplateMigration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_official_history_unify_v1: Option<CodexOfficialHistoryUnifyMigration>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexHistoryAnchor {
+    pub provider_id: String,
+    pub codex_config_dir: String,
+    pub resolved_at: String,
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -281,6 +294,13 @@ pub struct AppSettings {
     /// User opted in to migrate existing official sessions into the shared bucket.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unify_codex_migrate_existing: Option<bool>,
+    /// Device-level default for Codex subagent concurrency. Providers may override it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codex_subagent_default_threads: Option<u64>,
+    /// Distinguishes an explicit Codex-default choice from an installation that
+    /// has not migrated the legacy live-only setting yet.
+    #[serde(default)]
+    pub codex_subagent_default_initialized: bool,
     /// User has confirmed the failover toggle first-run notice
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failover_confirmed: Option<bool>,
@@ -398,6 +418,8 @@ impl Default for AppSettings {
             codex_image_render_compat: true,
             unify_codex_session_history: true,
             unify_codex_migrate_existing: None,
+            codex_subagent_default_threads: None,
+            codex_subagent_default_initialized: false,
             failover_confirmed: None,
             first_run_notice_confirmed: None,
             common_config_confirmed: None,
@@ -619,16 +641,36 @@ pub fn update_settings(mut new_settings: AppSettings) -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn is_codex_third_party_history_provider_bucket_migrated() -> bool {
-    get_settings()
-        .local_migrations
-        .as_ref()
-        .and_then(|migrations| {
-            migrations
-                .codex_third_party_history_provider_bucket_v1
-                .as_ref()
-        })
-        .is_some_and(|m| m.scanned_history_files)
+pub fn initialize_codex_subagent_default_threads(
+    live_value: Option<u64>,
+) -> Result<Option<u64>, AppError> {
+    let current = get_settings();
+    if current.codex_subagent_default_initialized {
+        return Ok(current.codex_subagent_default_threads);
+    }
+    let mut resolved = None;
+    mutate_settings(|settings| {
+        if !settings.codex_subagent_default_initialized {
+            settings.codex_subagent_default_threads = live_value;
+            settings.codex_subagent_default_initialized = true;
+        }
+        resolved = settings.codex_subagent_default_threads;
+    })?;
+    Ok(resolved)
+}
+
+pub fn set_codex_subagent_default_threads(value: Option<u64>) -> Result<(), AppError> {
+    set_codex_subagent_default_state(value, true)
+}
+
+pub fn set_codex_subagent_default_state(
+    value: Option<u64>,
+    initialized: bool,
+) -> Result<(), AppError> {
+    mutate_settings(|settings| {
+        settings.codex_subagent_default_threads = value;
+        settings.codex_subagent_default_initialized = initialized;
+    })
 }
 
 pub fn mark_codex_third_party_history_provider_bucket_migrated(
@@ -642,12 +684,33 @@ pub fn mark_codex_third_party_history_provider_bucket_migrated(
     })
 }
 
-pub fn is_codex_provider_template_migrated() -> bool {
+pub fn local_path_identity(path: &std::path::Path) -> String {
+    std::fs::canonicalize(path)
+        .unwrap_or_else(|_| path.to_path_buf())
+        .to_string_lossy()
+        .to_string()
+}
+
+pub fn get_codex_history_anchor_for_dir(codex_config_dir: &str) -> Option<CodexHistoryAnchor> {
     get_settings()
         .local_migrations
         .as_ref()
-        .and_then(|migrations| migrations.codex_provider_template_v1.as_ref())
-        .is_some()
+        .and_then(|migrations| migrations.codex_history_anchor_v1.as_ref())
+        .filter(|anchor| anchor.codex_config_dir == codex_config_dir)
+        .cloned()
+}
+
+pub fn get_codex_history_anchor_id_for_path(path: &std::path::Path) -> Option<String> {
+    get_codex_history_anchor_for_dir(&local_path_identity(path)).map(|anchor| anchor.provider_id)
+}
+
+pub fn set_codex_history_anchor(anchor: CodexHistoryAnchor) -> Result<(), AppError> {
+    mutate_settings(|settings| {
+        settings
+            .local_migrations
+            .get_or_insert_with(Default::default)
+            .codex_history_anchor_v1 = Some(anchor);
+    })
 }
 
 pub fn mark_codex_provider_template_migrated(

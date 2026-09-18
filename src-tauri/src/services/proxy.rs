@@ -155,6 +155,13 @@ impl ProxyService {
         });
     }
 
+    pub(crate) async fn lock_switch_for_app(
+        &self,
+        app_type: &str,
+    ) -> tokio::sync::OwnedMutexGuard<()> {
+        self.switch_locks.lock_for_app(app_type).await
+    }
+
     pub(crate) fn has_app_handle(&self) -> bool {
         self.app_handle
             .try_read()
@@ -1106,8 +1113,9 @@ impl ProxyService {
             }
             AppType::Codex => {
                 if let Ok(Some(backup)) = self.db.get_live_backup("codex").await {
-                    let config: Value = serde_json::from_str(&backup.original_config)
+                    let mut config: Value = serde_json::from_str(&backup.original_config)
                         .map_err(|e| format!("解析 Codex 备份失败: {e}"))?;
+                    self.preserve_codex_oauth_login_on_restore(&mut config);
                     self.write_codex_live(&config)?;
                     log::info!("Codex Live 配置已恢复");
                 }
@@ -1168,8 +1176,11 @@ impl ProxyService {
             .await
             .map_err(|e| format!("获取 {app_type_str} Live 备份失败: {e}"))?;
         if let Some(backup) = backup {
-            let config: Value = serde_json::from_str(&backup.original_config)
+            let mut config: Value = serde_json::from_str(&backup.original_config)
                 .map_err(|e| format!("解析 {app_type_str} 备份失败: {e}"))?;
+            if matches!(app_type, AppType::Codex) {
+                self.preserve_codex_oauth_login_on_restore(&mut config);
+            }
             self.write_live_config_for_app(app_type, &config)?;
             log::info!("{app_type_str} Live 配置已从备份恢复");
             return Ok(());
@@ -1501,6 +1512,46 @@ impl ProxyService {
         auth.get("OPENAI_API_KEY").and_then(|v| v.as_str()) == Some(PROXY_TOKEN_PLACEHOLDER)
     }
 
+    fn preserve_codex_oauth_login_on_restore(&self, target: &mut Value) {
+        let Ok(live) = self.read_codex_live() else {
+            return;
+        };
+        let live_has_login = live.get("auth").is_some_and(|auth| {
+            !Self::is_codex_live_taken_over(&json!({ "auth": auth }))
+                && crate::codex_config::codex_auth_has_credential_login_material(auth)
+        });
+        if !live_has_login {
+            return;
+        }
+
+        let Some(target_obj) = target.as_object_mut() else {
+            return;
+        };
+
+        if let Some(config_text) = target_obj
+            .get("config")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+        {
+            let provider_auth = target_obj.get("auth").cloned().unwrap_or_else(|| json!({}));
+            match crate::codex_config::prepare_codex_provider_live_config(
+                &provider_auth,
+                &config_text,
+            ) {
+                Ok(live_config) => {
+                    target_obj.insert("config".to_string(), json!(live_config));
+                }
+                Err(error) => {
+                    log::warn!(
+                        "Codex 恢复：备份 API key 降级进 config 失败，仅跳过 auth 覆盖: {error}"
+                    );
+                }
+            }
+        }
+        target_obj.remove("auth");
+        log::info!("Codex 恢复：保留当前 ChatGPT 登录，仅恢复备份中的 config");
+    }
+
     fn is_gemini_live_taken_over(config: &Value) -> bool {
         let env = match config.get("env").and_then(|v| v.as_object()) {
             Some(env) => env,
@@ -1545,6 +1596,17 @@ impl ProxyService {
     ) -> Result<(), String> {
         let app_type_enum =
             AppType::from_str(app_type).map_err(|_| format!("未知的应用类型: {app_type}"))?;
+        if matches!(app_type_enum, AppType::Codex)
+            && normalize_codex_history_bucket
+            && crate::settings::unify_codex_session_history()
+        {
+            tauri::async_runtime::spawn_blocking(
+                crate::codex_history_migration::ensure_codex_history_anchor,
+            )
+            .await
+            .map_err(|error| format!("解析 Codex 统一会话桶任务失败: {error}"))?
+            .map_err(|error| format!("无法确定 Codex 统一会话桶: {error}"))?;
+        }
         let mut effective_settings =
             build_effective_settings_with_common_config(self.db.as_ref(), &app_type_enum, provider)
                 .map_err(|e| format!("构建 {app_type} 有效配置失败: {e}"))?;
@@ -1615,6 +1677,14 @@ impl ProxyService {
     ) -> Result<HotSwitchOutcome, String> {
         let _guard = self.switch_locks.lock_for_app(app_type).await;
 
+        self.hot_switch_provider_inner(app_type, provider_id).await
+    }
+
+    pub(crate) async fn hot_switch_provider_inner(
+        &self,
+        app_type: &str,
+        provider_id: &str,
+    ) -> Result<HotSwitchOutcome, String> {
         let app_type_enum =
             AppType::from_str(app_type).map_err(|_| format!("无效的应用类型: {app_type}"))?;
         let provider = self
@@ -3085,6 +3155,100 @@ command = "latest-command"
                 .and_then(|v| v.as_str()),
             Some("latest-command"),
             "new MCP entries should remain in the restore backup"
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn restore_keeps_live_codex_oauth_login_and_restores_backup_config() {
+        let _home = TempHome::new();
+        crate::settings::reload_settings().expect("reload settings");
+
+        let db = Arc::new(Database::memory().expect("init db"));
+        let service = ProxyService::new(db.clone());
+        db.save_live_backup(
+            "codex",
+            &serde_json::to_string(&json!({
+                "auth": { "OPENAI_API_KEY": "sk-third-party" },
+                "config": r#"model_provider = "any"
+
+[model_providers.any]
+base_url = "https://third.example/v1"
+env_key = "TUZI_TEST_CODEX_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+"#
+            }))
+            .expect("serialize backup"),
+        )
+        .await
+        .expect("seed backup");
+        crate::codex_config::write_codex_live_atomic(
+            &json!({
+                "auth_mode": "chatgpt",
+                "OPENAI_API_KEY": null,
+                "tokens": { "refresh_token": "live-refresh-token" }
+            }),
+            Some("model_provider = \"any\"\n"),
+        )
+        .expect("seed live Codex files");
+
+        service
+            .restore_live_config_for_app_with_fallback(&AppType::Codex)
+            .await
+            .expect("restore Codex");
+
+        let live = service.read_codex_live().expect("read live Codex");
+        assert_eq!(
+            live.pointer("/auth/tokens/refresh_token")
+                .and_then(Value::as_str),
+            Some("live-refresh-token")
+        );
+        let config = live
+            .get("config")
+            .and_then(Value::as_str)
+            .expect("restored config");
+        assert!(config.contains("https://third.example/v1"));
+        assert!(config.contains("TUZI_TEST_CODEX_API_KEY"));
+        assert!(
+            !config.contains("sk-third-party"),
+            "provider credentials must not be exposed in config.toml"
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn restore_replaces_proxy_placeholder_with_backup_auth() {
+        let _home = TempHome::new();
+        crate::settings::reload_settings().expect("reload settings");
+
+        let db = Arc::new(Database::memory().expect("init db"));
+        let service = ProxyService::new(db.clone());
+        db.save_live_backup(
+            "codex",
+            &serde_json::to_string(&json!({
+                "auth": { "OPENAI_API_KEY": "sk-restored" },
+                "config": "model_provider = \"any\"\n"
+            }))
+            .expect("serialize backup"),
+        )
+        .await
+        .expect("seed backup");
+        crate::codex_config::write_codex_live_atomic(
+            &json!({ "OPENAI_API_KEY": PROXY_TOKEN_PLACEHOLDER }),
+            Some("model_provider = \"any\"\n"),
+        )
+        .expect("seed takeover state");
+
+        service
+            .restore_live_config_for_app_with_fallback(&AppType::Codex)
+            .await
+            .expect("restore Codex");
+
+        let live = service.read_codex_live().expect("read live Codex");
+        assert_eq!(
+            live.pointer("/auth/OPENAI_API_KEY").and_then(Value::as_str),
+            Some("sk-restored")
         );
     }
 }

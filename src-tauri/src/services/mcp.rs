@@ -181,16 +181,33 @@ impl McpService {
         let servers = Self::get_all_servers(state)?;
 
         for app in AppType::all() {
-            if matches!(app, AppType::OpenClaw | AppType::ClaudeDesktop) {
-                continue;
-            }
+            Self::project_servers_to_app(state, &servers, &app)?;
+        }
 
-            for server in servers.values() {
-                if server.apps.is_enabled_for(&app) {
-                    Self::sync_server_to_app(state, server, &app)?;
-                } else {
-                    Self::remove_server_from_app(state, &server.id, &app)?;
-                }
+        Ok(())
+    }
+
+    /// 将启用状态只投影到指定应用。供应商或通用配置重写单个应用的
+    /// live 文件后使用此入口，避免扫描并改写所有无关应用的配置文件。
+    pub fn sync_enabled_for_app(state: &AppState, app: &AppType) -> Result<(), AppError> {
+        let servers = Self::get_all_servers(state)?;
+        Self::project_servers_to_app(state, &servers, app)
+    }
+
+    fn project_servers_to_app(
+        state: &AppState,
+        servers: &indexmap::IndexMap<String, McpServer>,
+        app: &AppType,
+    ) -> Result<(), AppError> {
+        if matches!(app, AppType::OpenClaw | AppType::ClaudeDesktop) {
+            return Ok(());
+        }
+
+        for server in servers.values() {
+            if server.apps.is_enabled_for(app) {
+                Self::sync_server_to_app(state, server, app)?;
+            } else {
+                Self::remove_server_from_app(state, &server.id, app)?;
             }
         }
 

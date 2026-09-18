@@ -24,6 +24,7 @@ import { settingsApi } from "@/lib/api";
 import type { WebHotUpdateStatus } from "@/lib/api/settings";
 import { useUpdate } from "@/contexts/UpdateContext";
 import { relaunchApp } from "@/lib/updater";
+import { RELEASES_URL } from "@/lib/releaseRepository";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { isWindows } from "@/lib/platform";
@@ -255,15 +256,11 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
           : "";
 
       if (!displayVersion) {
-        await settingsApi.openExternal(
-          "https://github.com/tuziapi/tuzi-switch/releases",
-        );
+        await settingsApi.openExternal(RELEASES_URL);
         return;
       }
 
-      await settingsApi.openExternal(
-        `https://github.com/tuziapi/tuzi-switch/releases/tag/${displayVersion}`,
-      );
+      await settingsApi.openExternal(`${RELEASES_URL}/tag/${displayVersion}`);
     } catch (error) {
       console.error("[AboutSection] Failed to open release notes", error);
       toast.error(t("settings.openReleaseNotesFailed"));

@@ -3,6 +3,7 @@ import {
   extractCodexBaseUrl,
   extractCodexExperimentalBearerToken,
   getCodexEnvKey,
+  getCodexProviderApiKey,
   getCodexProviderEnvKeyFromSettings,
   extractCodexModelCatalogJson,
   extractCodexModelName,
@@ -69,6 +70,33 @@ describe("Codex TOML utils", () => {
         env: { envKey: "STALE_CODEX_KEY" },
       }),
     ).toBe("TUZI_CODEX_KEY");
+  });
+
+  it("does not fall back to stored auth when an env-backed provider key is empty", () => {
+    const settings = {
+      auth: { OPENAI_API_KEY: "copied-login-key" },
+      config: [
+        'model_provider = "coding"',
+        "",
+        "[model_providers.coding]",
+        'env_key = "CODING_CODEX_API_KEY"',
+        "",
+      ].join("\n"),
+    };
+
+    expect(getCodexProviderApiKey(settings, null)).toBe("");
+    expect(getCodexProviderApiKey(settings, " real-provider-key ")).toBe(
+      "real-provider-key",
+    );
+  });
+
+  it("keeps auth fallback only for legacy providers without env_key", () => {
+    expect(
+      getCodexProviderApiKey({
+        auth: { OPENAI_API_KEY: " legacy-provider-key " },
+        config: 'model_provider = "legacy"\n',
+      }),
+    ).toBe("legacy-provider-key");
   });
 
   it("reads env_key from valid single-quoted TOML strings", () => {
@@ -242,6 +270,45 @@ describe("Codex TOML utils", () => {
 
     const output2 = setCodexModelName(output1, " new-model \n");
     expect(extractCodexModelName(output2)).toBe("new-model");
+  });
+
+  it("updates a double-quoted base_url containing single quotes without duplicating it", () => {
+    const input = [
+      'model_provider = "custom"',
+      'model = "gpt-5.4"',
+      "",
+      "[model_providers.custom]",
+      'name = "custom"',
+      'base_url = "https://su\'us.codes/v1"',
+      'wire_api = "responses"',
+      "requires_openai_auth = false",
+      "",
+    ].join("\n");
+
+    const output = setCodexBaseUrl(input, "https://su'us'd.codes/v1");
+
+    expect(extractCodexBaseUrl(output)).toBe("https://su'us'd.codes/v1");
+    expect(output.match(/^\s*base_url\s*=/gm)).toHaveLength(1);
+  });
+
+  it("collapses duplicate base_url lines in the active provider section", () => {
+    const input = [
+      'model_provider = "custom"',
+      'model = "gpt-5.4"',
+      "",
+      "[model_providers.custom]",
+      'name = "custom"',
+      'base_url = "https://old.example/v1"',
+      'base_url = "https://older.example/v1"',
+      'wire_api = "responses"',
+      "",
+    ].join("\n");
+
+    const output = setCodexBaseUrl(input, "https://new.example/v1");
+
+    expect(extractCodexBaseUrl(output)).toBe("https://new.example/v1");
+    expect(output.match(/^\s*base_url\s*=/gm)).toHaveLength(1);
+    expect(output).not.toContain("older.example");
   });
 
   it("reads and writes base_url in the active provider section", () => {
@@ -576,7 +643,9 @@ describe("Codex TOML utils", () => {
     expect(migrated.migratedApiKey).toBe("legacy-token");
     expect(migrated.auth).toEqual({ OPENAI_API_KEY: "legacy-token" });
     expect(migrated.config).not.toMatch(/experimental_bearer_token/);
-    expect(extractCodexExperimentalBearerToken(migrated.config)).toBeUndefined();
+    expect(
+      extractCodexExperimentalBearerToken(migrated.config),
+    ).toBeUndefined();
   });
 
   it("does not overwrite existing auth or env_key when migrating legacy experimental_bearer_token", () => {

@@ -158,4 +158,32 @@ describe("RequestLogTable", () => {
       );
     });
   });
+
+  it("applies dashboard provider and model filters as exact log filters", async () => {
+    const range: UsageRangeSelection = { preset: "today" };
+    render(
+      <RequestLogTable
+        range={range}
+        rangeLabel="Today"
+        appType="codex"
+        providerName="Codex (Session)"
+        model="gpt-5.4"
+        refreshIntervalMs={0}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(useRequestLogsMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          filters: expect.objectContaining({
+            appType: "codex",
+            providerName: "Codex (Session)",
+            providerNameExact: true,
+            model: "gpt-5.4",
+            modelExact: true,
+          }),
+        }),
+      );
+    });
+  });
 });

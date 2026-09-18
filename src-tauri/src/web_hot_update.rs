@@ -15,11 +15,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{http, AppHandle, Manager};
 
-const WEB_UPDATE_MANIFEST_URLS: &[&str] = &[
-    "https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/latest.json",
-    "https://raw.githubusercontent.com/tuziapi/tuzi-switch/release-web/latest.json",
-];
-const WEB_UPDATE_PRIMARY_MANIFEST_URL: &str = WEB_UPDATE_MANIFEST_URLS[0];
 const WEB_UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU0REY1Nzg5OTc1ODNGMgpSV1R5ZzNXWmVQVk5EdEhGWlg0UkdSVFArcXpQUUNWWitSTTB1K25CMkNUU09yc2xRZUNqQTJKMwo=";
 const ACTIVE_VERSION_FILE: &str = "active-web-version";
 const MAX_ARCHIVE_BYTES: u64 = 30 * 1024 * 1024;
@@ -144,16 +139,16 @@ fn build_status() -> WebHotUpdateStatus {
         pending_version: active.clone(),
         using_hot_assets: active_web_root().is_some(),
         active_version: active,
-        manifest_url: WEB_UPDATE_PRIMARY_MANIFEST_URL.to_string(),
+        manifest_url: crate::release_repository::web_manifest_urls()[0].clone(),
     }
 }
 
 async fn fetch_web_manifest(client: &reqwest::Client) -> Result<WebManifest, String> {
     let mut last_error = String::new();
-    for url in WEB_UPDATE_MANIFEST_URLS {
+    for url in crate::release_repository::web_manifest_urls() {
         let result = async {
             let response = client
-                .get(*url)
+                .get(&url)
                 .send()
                 .await
                 .map_err(|e| format!("检查界面更新失败: {e}"))?
@@ -188,7 +183,7 @@ fn validate_manifest(manifest: &WebManifest) -> Result<(), String> {
         || !manifest
             .archive
             .url
-            .starts_with("https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/")
+            .starts_with(&crate::release_repository::trusted_web_archive_prefix())
     {
         return Err("界面更新包 URL 不可信".to_string());
     }
@@ -566,7 +561,10 @@ mod tests {
             app_version_range: ">=1.1.4 <1.2.0".to_string(),
             required_capabilities: BTreeMap::new(),
             archive: WebArchive {
-                url: "https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@release-web/versions/v1.1.4/web.tar.gz".to_string(),
+                url: format!(
+                    "{}versions/v1.1.4/web.tar.gz",
+                    crate::release_repository::trusted_web_archive_prefix()
+                ),
                 sha256: "ABCDEF".to_string(),
                 signature: "sig".to_string(),
             },

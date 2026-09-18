@@ -334,6 +334,13 @@ pub struct ProviderMeta {
     /// Codex OAuth FAST mode: inject `service_tier = "priority"` for ChatGPT Codex requests.
     #[serde(rename = "codexFastMode", skip_serializing_if = "Option::is_none")]
     pub codex_fast_mode: Option<bool>,
+    /// Optional provider-specific Codex subagent concurrency override.
+    /// `None` inherits the device-level default.
+    #[serde(
+        rename = "codexSubagentThreads",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub codex_subagent_threads: Option<u64>,
     /// Codex Chat Completions 本地路由的 reasoning 能力配置。
     #[serde(rename = "codexChatReasoning", skip_serializing_if = "Option::is_none")]
     pub codex_chat_reasoning: Option<CodexChatReasoning>,

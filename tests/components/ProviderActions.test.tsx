@@ -57,4 +57,17 @@ describe("ProviderActions", () => {
 
     expect(onClearConfig).toHaveBeenCalledTimes(1);
   });
+
+  it("切换过程中显示忙碌状态并禁止重复切换", () => {
+    const onSwitch = vi.fn();
+    renderActions({ isSwitching: true, isSwitchDisabled: true, onSwitch });
+
+    const switchButton = screen.getByRole("button", {
+      name: "provider.enable",
+    });
+    expect(switchButton).toBeDisabled();
+    expect(switchButton).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(switchButton);
+    expect(onSwitch).not.toHaveBeenCalled();
+  });
 });

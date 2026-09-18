@@ -14,10 +14,23 @@ import { invoke } from "@tauri-apps/api/core";
 import type { CodexCatalogModel } from "@/types";
 
 interface UseCodexConfigStateProps {
+  providerId?: string;
   initialData?: {
     name?: string;
     settingsConfig?: Record<string, unknown>;
   };
+}
+
+export type CodexCredentialStatus =
+  | "idle"
+  | "loading"
+  | "loaded"
+  | "missing"
+  | "error";
+
+interface CodexProviderCredentialResponse {
+  apiKey: string | null;
+  migratedFrom: string | null;
 }
 
 /**
@@ -112,7 +125,10 @@ function migrateLegacyConfig(configStr: string): string {
  * 管理 Codex 配置状态 (profile-based, env-first)
  * API Key 存储在 shell rc managed block，不再写入 auth.json
  */
-export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
+export function useCodexConfigState({
+  providerId,
+  initialData,
+}: UseCodexConfigStateProps) {
   const [codexAuth, setCodexAuthState] = useState("{}");
   const [codexConfig, setCodexConfigState] = useState("");
   const [codexApiKey, setCodexApiKey] = useState("");
@@ -123,6 +139,10 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
     CodexCatalogModel[]
   >([]);
   const [codexAuthError, setCodexAuthError] = useState("");
+  const [codexCredentialStatus, setCodexCredentialStatus] =
+    useState<CodexCredentialStatus>(initialData ? "loading" : "idle");
+  const [codexCredentialError, setCodexCredentialError] = useState("");
+  const [credentialReloadToken, setCredentialReloadToken] = useState(0);
 
   const isUpdatingCodexBaseUrlRef = useRef(false);
   const isUpdatingCodexModelNameRef = useRef(false);
@@ -130,6 +150,7 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
   // 初始化 Codex 配置（编辑模式）
   useEffect(() => {
     if (!initialData) return;
+    let cancelled = false;
 
     const config = initialData.settingsConfig;
     if (typeof config === "object" && config !== null) {
@@ -185,35 +206,72 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
         getCodexProviderEnvKeyFromSettings({ ...config, config: configStr }) ||
         "";
       setCodexEnvKey(resolvedEnvKey);
+      setCodexApiKey("");
+      setCodexCredentialError("");
 
-      // Read API key from shell rc via backend
+      // Read through the provider-bound command so the backend can safely
+      // migrate legacy env keys without allowing arbitrary credential reads.
       if (resolvedEnvKey) {
-        invoke<string | null>("read_codex_env_key", { envKey: resolvedEnvKey })
+        setCodexCredentialStatus("loading");
+        const command = providerId
+          ? invoke<CodexProviderCredentialResponse>(
+              "read_codex_provider_credential",
+              { providerId, envKey: resolvedEnvKey },
+            ).then((result) => result.apiKey)
+          : invoke<string | null>("read_codex_env_key", {
+              envKey: resolvedEnvKey,
+            });
+        command
           .then((key) => {
-            if (key) setCodexApiKey(key);
-            else if (migratedLegacyToken.migratedApiKey) {
+            if (cancelled) return;
+            if (key) {
+              setCodexApiKey(key);
+              setCodexCredentialStatus("loaded");
+            } else if (migratedLegacyToken.migratedApiKey) {
               setCodexApiKey(migratedLegacyToken.migratedApiKey);
+              setCodexCredentialStatus("loaded");
+            } else {
+              setCodexApiKey("");
+              setCodexCredentialStatus("missing");
             }
           })
-          .catch(() => {
-            // Fallback: legacy auth field
+          .catch((error) => {
+            if (cancelled) return;
             const auth = migratedLegacyToken.auth;
             if (
               auth?.OPENAI_API_KEY &&
               typeof auth.OPENAI_API_KEY === "string"
             ) {
               setCodexApiKey(auth.OPENAI_API_KEY);
+              setCodexCredentialStatus("loaded");
+              return;
             }
+            setCodexApiKey("");
+            setCodexCredentialStatus("error");
+            setCodexCredentialError(
+              error instanceof Error ? error.message : String(error),
+            );
           });
       } else {
         // Legacy provider without envKey
         const auth = migratedLegacyToken.auth;
         if (auth?.OPENAI_API_KEY && typeof auth.OPENAI_API_KEY === "string") {
           setCodexApiKey(auth.OPENAI_API_KEY);
+          setCodexCredentialStatus("loaded");
+        } else {
+          setCodexCredentialStatus("idle");
         }
       }
     }
-  }, [initialData]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialData, providerId, credentialReloadToken]);
+
+  const retryCodexCredentialLoad = useCallback(() => {
+    setCredentialReloadToken((value) => value + 1);
+  }, []);
 
   // 与 TOML 配置保持基础 URL 同步
   useEffect(() => {
@@ -265,6 +323,8 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
   // API Key 输入：只更新本地状态，实际写入在保存时通过后端完成
   const handleCodexApiKeyChange = useCallback((key: string) => {
     setCodexApiKey(key.trim());
+    setCodexCredentialError("");
+    setCodexCredentialStatus(key.trim() ? "loaded" : "missing");
   }, []);
 
   const handleCodexBaseUrlChange = useCallback(
@@ -342,7 +402,10 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
       });
       setCodexEnvKey(resolvedEnvKey);
 
-      setCodexApiKey(defaultApiKey || "");
+      const nextApiKey = defaultApiKey || "";
+      setCodexApiKey(nextApiKey);
+      setCodexCredentialStatus(nextApiKey ? "loaded" : "idle");
+      setCodexCredentialError("");
     },
     [setCodexAuth, setCodexConfig],
   );
@@ -362,6 +425,8 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
     codexModelName,
     codexCatalogModels,
     codexAuthError,
+    codexCredentialStatus,
+    codexCredentialError,
     setCodexAuth,
     setCodexConfig,
     setCodexEnvKey,
@@ -373,5 +438,6 @@ export function useCodexConfigState({ initialData }: UseCodexConfigStateProps) {
     resetCodexConfig,
     getCodexAuthApiKey,
     validateCodexAuth,
+    retryCodexCredentialLoad,
   };
 }

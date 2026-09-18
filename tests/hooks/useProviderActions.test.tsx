@@ -194,6 +194,47 @@ describe("useProviderActions", () => {
     expect(settingsApiApplyMock).not.toHaveBeenCalled();
   });
 
+  it("reminds users to restart the client after switching Codex providers", async () => {
+    switchProviderMutateAsync.mockResolvedValueOnce(undefined);
+    const { wrapper } = createWrapper();
+    const provider = createProvider({ category: "custom" });
+
+    const { result } = renderHook(() => useProviderActions("codex"), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.switchProvider(provider);
+    });
+
+    expect(toastSuccessMock).toHaveBeenCalledWith(
+      "切换成功，请重启客户端以生效",
+      expect.objectContaining({ closeButton: true }),
+    );
+  });
+
+  it("keeps the generic success message for Claude provider switches", async () => {
+    switchProviderMutateAsync.mockResolvedValueOnce(undefined);
+    settingsApiGetMock.mockResolvedValueOnce({
+      enableClaudePluginIntegration: false,
+    });
+    const { wrapper } = createWrapper();
+    const provider = createProvider({ category: "custom" });
+
+    const { result } = renderHook(() => useProviderActions("claude"), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.switchProvider(provider);
+    });
+
+    expect(toastSuccessMock).toHaveBeenCalledWith(
+      "切换成功！",
+      expect.objectContaining({ closeButton: true }),
+    );
+  });
+
   it("warns but still switches providers that require proxy when proxy is not running", async () => {
     switchProviderMutateAsync.mockResolvedValueOnce(undefined);
     const { wrapper } = createWrapper();

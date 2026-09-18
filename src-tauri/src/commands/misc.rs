@@ -141,7 +141,7 @@ pub async fn check_for_updates(handle: AppHandle) -> Result<bool, String> {
     handle
         .opener()
         .open_url(
-            "https://github.com/tuziapi/tuzi-switch/releases/latest",
+            crate::release_repository::latest_release_url(),
             None::<String>,
         )
         .map_err(|e| format!("打开更新页面失败: {e}"))?;

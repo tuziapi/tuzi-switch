@@ -86,6 +86,20 @@ fn import_default_config_without_live_file_returns_error() {
 
     let state = create_test_state().expect("create test state");
 
+    // Database initialization seeds built-in providers. Remove them so this
+    // test reaches the missing-live-file branch instead of the idempotent
+    // "providers already exist" early return.
+    for (id, _) in state
+        .db
+        .get_all_providers(AppType::Claude.as_str())
+        .unwrap_or_default()
+    {
+        state
+            .db
+            .delete_provider(AppType::Claude.as_str(), &id)
+            .expect("remove seeded Claude provider");
+    }
+
     let err = import_default_config_test_hook(&state, AppType::Claude)
         .expect_err("missing live file should error");
     match err {

@@ -45,19 +45,13 @@ export function generateThirdPartyConfig(
   envKey: string,
   modelName = "gpt-5.5",
 ): string {
-  const cleanProviderName =
-    providerName
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "_")
-      .replace(/^_+|_+$/g, "") || "custom";
-
-  return `model_provider = "${cleanProviderName}"
+  return `model_provider = "custom"
 model = "${modelName}"
 model_reasoning_effort = "high"
 disable_response_storage = true
 
-[model_providers.${cleanProviderName}]
-name = "${cleanProviderName}"
+[model_providers.custom]
+name = "${providerName}"
 base_url = "${baseUrl}"
 env_key = "${envKey}"
 wire_api = "responses"

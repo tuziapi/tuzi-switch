@@ -57,6 +57,7 @@ pub(crate) struct CodexImageCompatState {
 pub enum CodexImageCompatReadinessReason {
     Disabled,
     NoProvider,
+    NativeRoute,
     UnsupportedProvider,
     ProviderConfigInvalid,
     MissingCredential,
@@ -145,10 +146,14 @@ pub(crate) async fn readiness(state: &AppState) -> Result<CodexImageCompatReadin
     let Some(provider) = current_codex_provider_settings(state.db.as_ref())? else {
         return Ok(readiness);
     };
-    match codex_image_config::eligible_tuzi_image_source_from_settings(&provider) {
-        Ok(Some((base_url, env_key))) => {
-            readiness.provider_base_url = Some(base_url);
-            readiness.provider_env_key = Some(env_key);
+    match codex_image_config::tuzi_image_source_from_settings(&provider) {
+        Ok(Some(source)) => {
+            readiness.provider_base_url = Some(source.base_url);
+            readiness.provider_env_key = Some(source.env_key);
+            if source.route_kind == codex_image_config::TuziImageRouteKind::NativeV1 {
+                readiness.reason = CodexImageCompatReadinessReason::NativeRoute;
+                return Ok(readiness);
+            }
         }
         Ok(None) => {
             readiness.reason = CodexImageCompatReadinessReason::UnsupportedProvider;
@@ -508,7 +513,37 @@ fn managed_skill_is_installed_at(codex_home: &Path) -> Result<bool, AppError> {
 }
 
 fn install_managed_skill_at(codex_home: &Path) -> Result<bool, AppError> {
+    let legacy_skill_dirs = legacy_skill_dirs();
+    install_managed_skill_at_with_legacy_targets(codex_home, &legacy_skill_dirs)
+}
+
+fn legacy_skill_dirs() -> Vec<std::path::PathBuf> {
+    legacy_skill_dirs_for(
+        &crate::config::get_home_dir(),
+        &crate::config::get_app_config_dir(),
+    )
+}
+
+fn legacy_skill_dirs_for(home: &Path, app_config_dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut targets = Vec::with_capacity(3);
+    for target in [
+        app_config_dir.join("skills").join(SKILL_NAME),
+        home.join(".tuzi-switch").join("skills").join(SKILL_NAME),
+        home.join(".agents").join("skills").join(SKILL_NAME),
+    ] {
+        if target.is_absolute() && !targets.contains(&target) {
+            targets.push(target);
+        }
+    }
+    targets
+}
+
+fn install_managed_skill_at_with_legacy_targets(
+    codex_home: &Path,
+    legacy_skill_dirs: &[std::path::PathBuf],
+) -> Result<bool, AppError> {
     let skill_dir = codex_home.join("skills").join(SKILL_NAME);
+    remove_stale_legacy_skill_symlink(&skill_dir, legacy_skill_dirs)?;
     let owner_path = skill_dir.join(SKILL_OWNER_FILE);
     let existed = match fs::symlink_metadata(&skill_dir) {
         Ok(metadata) => {
@@ -558,6 +593,52 @@ fn install_managed_skill_at(codex_home: &Path) -> Result<bool, AppError> {
         }
     }
     Ok(changed)
+}
+
+fn remove_stale_legacy_skill_symlink(
+    skill_dir: &Path,
+    legacy_skill_dirs: &[std::path::PathBuf],
+) -> Result<bool, AppError> {
+    let metadata = match fs::symlink_metadata(skill_dir) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(AppError::io(skill_dir, error)),
+    };
+    if !metadata.file_type().is_symlink() {
+        return Ok(false);
+    }
+
+    let target = fs::read_link(skill_dir).map_err(|error| AppError::io(skill_dir, error))?;
+    let Some(legacy_skill_dir) = legacy_skill_dirs.iter().find(|known| **known == target) else {
+        return Ok(false);
+    };
+    match fs::metadata(legacy_skill_dir) {
+        Ok(_) => return Ok(false),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(AppError::io(legacy_skill_dir, error)),
+    }
+
+    // Re-check ownership immediately before unlinking. Only the top-level link
+    // is removed; the legacy target is never followed or modified.
+    let metadata =
+        fs::symlink_metadata(skill_dir).map_err(|error| AppError::io(skill_dir, error))?;
+    if !metadata.file_type().is_symlink()
+        || fs::read_link(skill_dir).map_err(|error| AppError::io(skill_dir, error))?
+            != *legacy_skill_dir
+    {
+        return Err(skill_conflict());
+    }
+    match fs::metadata(legacy_skill_dir) {
+        Ok(_) => return Ok(false),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(AppError::io(legacy_skill_dir, error)),
+    }
+
+    #[cfg(unix)]
+    fs::remove_file(skill_dir).map_err(|error| AppError::io(skill_dir, error))?;
+    #[cfg(windows)]
+    fs::remove_dir(skill_dir).map_err(|error| AppError::io(skill_dir, error))?;
+    Ok(true)
 }
 
 fn install_managed_skill_file(
@@ -617,9 +698,10 @@ fn ensure_managed_parent_dirs(skill_dir: &Path, relative: &Path) -> Result<(), A
 
 fn uninstall_managed_skill_at(codex_home: &Path) -> Result<bool, AppError> {
     let skill_dir = codex_home.join("skills").join(SKILL_NAME);
+    let removed_legacy = remove_stale_legacy_skill_symlink(&skill_dir, &legacy_skill_dirs())?;
     let metadata = match fs::symlink_metadata(&skill_dir) {
         Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(removed_legacy),
         Err(error) => return Err(AppError::io(&skill_dir, error)),
     };
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
@@ -753,6 +835,9 @@ mod tests {
             fs::read(skill_dir.join(SKILL_OWNER_FILE)).unwrap(),
             SKILL_OWNER
         );
+        assert!(fs::read_to_string(skill_dir.join("agents/openai.yaml"))
+            .expect("read skill policy")
+            .contains("allow_implicit_invocation: true"));
         assert!(uninstall_managed_skill_at(temp.path()).expect("uninstall"));
         assert!(!skill_dir.exists());
     }
@@ -768,6 +853,115 @@ mod tests {
         assert_eq!(
             fs::read_to_string(skill_dir.join("SKILL.md")).unwrap(),
             "user skill"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn install_replaces_only_dangling_legacy_tuzi_skill_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let codex_home = temp.path().join("codex");
+        let skill_dir = codex_home.join("skills").join(SKILL_NAME);
+        let legacy_skill_dir = temp
+            .path()
+            .join(".tuzi-switch")
+            .join("skills")
+            .join(SKILL_NAME);
+        fs::create_dir_all(skill_dir.parent().expect("skills parent")).expect("skills dir");
+        symlink(&legacy_skill_dir, &skill_dir).expect("legacy symlink");
+
+        assert!(install_managed_skill_at_with_legacy_targets(
+            &codex_home,
+            std::slice::from_ref(&legacy_skill_dir),
+        )
+        .expect("install"));
+        assert!(!fs::symlink_metadata(&skill_dir)
+            .expect("installed skill")
+            .file_type()
+            .is_symlink());
+        assert_eq!(
+            fs::read(skill_dir.join(SKILL_OWNER_FILE)).expect("owner marker"),
+            SKILL_OWNER
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn install_preserves_unknown_dangling_skill_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let codex_home = temp.path().join("codex");
+        let skill_dir = codex_home.join("skills").join(SKILL_NAME);
+        let legacy_skill_dir = temp.path().join("legacy").join(SKILL_NAME);
+        let unknown_target = temp.path().join("user-skill");
+        fs::create_dir_all(skill_dir.parent().expect("skills parent")).expect("skills dir");
+        symlink(&unknown_target, &skill_dir).expect("user symlink");
+
+        assert!(install_managed_skill_at_with_legacy_targets(
+            &codex_home,
+            std::slice::from_ref(&legacy_skill_dir),
+        )
+        .is_err());
+        assert_eq!(
+            fs::read_link(&skill_dir).expect("preserved link"),
+            unknown_target
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn install_preserves_live_legacy_skill_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let codex_home = temp.path().join("codex");
+        let skill_dir = codex_home.join("skills").join(SKILL_NAME);
+        let legacy_skill_dir = temp.path().join("legacy").join(SKILL_NAME);
+        fs::create_dir_all(&legacy_skill_dir).expect("legacy skill");
+        fs::write(legacy_skill_dir.join("SKILL.md"), "legacy user content").expect("legacy file");
+        fs::create_dir_all(skill_dir.parent().expect("skills parent")).expect("skills dir");
+        symlink(&legacy_skill_dir, &skill_dir).expect("legacy symlink");
+
+        assert!(install_managed_skill_at_with_legacy_targets(
+            &codex_home,
+            std::slice::from_ref(&legacy_skill_dir),
+        )
+        .is_err());
+        assert_eq!(
+            fs::read_link(&skill_dir).expect("preserved link"),
+            legacy_skill_dir
+        );
+        assert_eq!(
+            fs::read_to_string(skill_dir.join("SKILL.md")).expect("legacy content"),
+            "legacy user content"
+        );
+    }
+
+    #[test]
+    fn legacy_targets_cover_custom_default_and_unified_skill_storage() {
+        let home = Path::new("/home/test-user");
+        let custom_app_dir = Path::new("/data/custom-tuzi");
+        assert_eq!(
+            legacy_skill_dirs_for(home, custom_app_dir),
+            vec![
+                custom_app_dir.join("skills").join(SKILL_NAME),
+                home.join(".tuzi-switch").join("skills").join(SKILL_NAME),
+                home.join(".agents").join("skills").join(SKILL_NAME),
+            ]
+        );
+
+        assert_eq!(
+            legacy_skill_dirs_for(home, &home.join(".tuzi-switch")),
+            vec![
+                home.join(".tuzi-switch").join("skills").join(SKILL_NAME),
+                home.join(".agents").join("skills").join(SKILL_NAME),
+            ]
+        );
+        assert!(
+            legacy_skill_dirs_for(Path::new("relative-home"), Path::new("relative-app")).is_empty()
         );
     }
 
