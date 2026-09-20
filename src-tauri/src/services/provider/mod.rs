@@ -11,6 +11,7 @@ use indexmap::IndexMap;
 use regex::Regex;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashSet;
 
 use crate::app_config::AppType;
 use crate::error::AppError;
@@ -48,6 +49,118 @@ use usage::validate_usage_script;
 pub struct CodexProviderCredential {
     pub api_key: Option<String>,
     pub migrated_from: Option<String>,
+}
+
+fn next_legacy_codex_provider_env_key(
+    state: &AppState,
+    provider_id: &str,
+) -> Result<String, AppError> {
+    let mut used: HashSet<String> = crate::codex_config::read_managed_env_block()
+        .into_keys()
+        .collect();
+    used.extend(
+        state
+            .db
+            .get_all_providers(AppType::Codex.as_str())?
+            .values()
+            .filter_map(codex_provider_env_key),
+    );
+
+    let suffix: String = provider_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .take(32)
+        .collect();
+    let suffix = suffix.trim_matches('_');
+    let suffix = if suffix.is_empty() {
+        "PROVIDER"
+    } else {
+        suffix
+    };
+    let base = format!("TUZI_SWITCH_{suffix}_CODEX_API_KEY");
+
+    for index in 0..=used.len() {
+        let candidate = if index == 0 {
+            base.clone()
+        } else {
+            format!("{base}_{}", index + 1)
+        };
+        if !used.contains(&candidate) {
+            return Ok(candidate);
+        }
+    }
+
+    Err(AppError::Config(
+        "无法为旧版 Codex 供应商分配独立环境变量".to_string(),
+    ))
+}
+
+fn migrate_legacy_codex_provider_for_switch(
+    state: &AppState,
+    provider: &Provider,
+) -> Result<Provider, AppError> {
+    if provider.category.as_deref() == Some("official") {
+        return Ok(provider.clone());
+    }
+    let Some(config_text) = provider
+        .settings_config
+        .get("config")
+        .and_then(Value::as_str)
+    else {
+        return Ok(provider.clone());
+    };
+    if crate::codex_config::extract_codex_env_key(config_text).is_some() {
+        return Ok(provider.clone());
+    }
+    let Some(api_key) = provider
+        .settings_config
+        .pointer("/auth/OPENAI_API_KEY")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(provider.clone());
+    };
+
+    let env_key = provider
+        .settings_config
+        .pointer("/env/envKey")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .map(Ok)
+        .unwrap_or_else(|| next_legacy_codex_provider_env_key(state, &provider.id))?;
+    let migrated_config =
+        crate::codex_config::set_codex_active_provider_env_key(config_text, Some(&env_key))?;
+    if crate::codex_config::extract_codex_env_key(&migrated_config).as_deref()
+        != Some(env_key.as_str())
+    {
+        return Err(AppError::localized(
+            "provider.codex.config.missing_provider",
+            "旧版 Codex 供应商缺少可写入 env_key 的 model_provider 配置",
+            "Legacy Codex provider is missing a model_provider section for env_key migration",
+        ));
+    }
+
+    crate::codex_config::write_managed_env_key(&env_key, api_key)?;
+    let mut migrated = provider.clone();
+    if let Some(settings) = migrated.settings_config.as_object_mut() {
+        settings.insert("config".to_string(), Value::String(migrated_config));
+        settings.insert("env".to_string(), json!({ "envKey": env_key }));
+    }
+    state.db.save_provider(AppType::Codex.as_str(), &migrated)?;
+    log::info!(
+        "Migrated legacy Codex provider '{}' to an env-backed credential",
+        provider.id
+    );
+    Ok(migrated)
 }
 
 fn legacy_codex_env_key_for_target(env_key: &str) -> Option<&'static str> {
@@ -2150,17 +2263,22 @@ impl ProviderService {
         id: &str,
         providers: &indexmap::IndexMap<String, Provider>,
     ) -> Result<SwitchResult, AppError> {
-        let provider = providers
+        let mut provider = providers
             .get(id)
+            .cloned()
             .ok_or_else(|| AppError::Message(format!("供应商 {id} 不存在")))?;
-        Self::validate_provider_settings(&app_type, provider)?;
+        Self::validate_provider_settings(&app_type, &provider)?;
+
+        if matches!(app_type, AppType::Codex) {
+            provider = migrate_legacy_codex_provider_for_switch(state, &provider)?;
+        }
 
         // Resolve and persist the target provider's own credential before any
         // current-provider state changes or live-config writes. This migrates
         // legacy auth.OPENAI_API_KEY data without allowing cross-provider
         // fallback, and keeps a failed switch atomic.
         if matches!(app_type, AppType::Codex) {
-            if let Some(env_key) = codex_provider_env_key(provider) {
+            if let Some(env_key) = codex_provider_env_key(&provider) {
                 let _ = read_codex_provider_credential(state, id, &env_key)?;
             }
             if let Some(config_text) = provider
@@ -2243,7 +2361,7 @@ impl ProviderService {
         }
 
         // Sync to live (write_gemini_live handles security flag internally for Gemini)
-        write_live_with_common_config(state.db.as_ref(), &app_type, provider)?;
+        write_live_with_common_config(state.db.as_ref(), &app_type, &provider)?;
 
         // Hermes is additive, so "switching" doesn't overwrite a live config file
         // — we instead update the top-level `model:` section to point at this
@@ -2270,7 +2388,8 @@ impl ProviderService {
         //
         // If persisting the marker fails, roll back the just-written live config so we don't leave
         // the provider in a silent inconsistent state (present in live, but still marked DB-only).
-        if app_type.is_additive_mode() && Self::provider_live_config_managed(provider) != Some(true)
+        if app_type.is_additive_mode()
+            && Self::provider_live_config_managed(&provider) != Some(true)
         {
             let mut updated = provider.clone();
             Self::set_provider_live_config_managed(&mut updated, true);

@@ -459,7 +459,8 @@ const TOML_EXPERIMENTAL_BEARER_TOKEN_PATTERN =
   /^\s*experimental_bearer_token\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
 const TOML_EXPERIMENTAL_BEARER_TOKEN_REPLACE_PATTERN =
   /^(\s*experimental_bearer_token\s*=\s*)(?:"(?:\\.|[^"\\\r\n])*"|'[^'\r\n]*')(\s*(?:#.*)?)$/;
-const TOML_MODEL_PATTERN = /^\s*model\s*=\s*(["'])([^"'\r\n]+)\1\s*(?:#.*)?$/;
+const TOML_MODEL_PATTERN =
+  /^\s*model\s*=\s*(?:"((?:\\.|[^"\\\r\n])*)"|'([^'\r\n]*)')\s*(?:#.*)?$/;
 const TOML_MODEL_CATALOG_JSON_PATTERN =
   /^\s*model_catalog_json\s*=\s*(["'])([^"'\r\n]*)\1\s*(?:#.*)?$/;
 const TOML_MODEL_CATALOG_JSON_REPLACE_PATTERN =
@@ -1327,7 +1328,7 @@ export const setCodexModelName = (
   const normalizedText = normalizeTomlText(configText);
   const lines = normalizedText ? normalizedText.split("\n") : [];
   const topLevelEndIndex = getTopLevelEndIndex(lines);
-  const topLevelMatch = findTomlAssignmentInRange(
+  const topLevelMatches = findTomlAssignmentsInRange(
     lines,
     TOML_MODEL_PATTERN,
     0,
@@ -1336,15 +1337,19 @@ export const setCodexModelName = (
 
   if (!trimmed) {
     if (!normalizedText) return normalizedText;
-    if (topLevelMatch) {
-      lines.splice(topLevelMatch.index, 1);
+    for (const match of [...topLevelMatches].reverse()) {
+      lines.splice(match.index, 1);
     }
     return finalizeTomlText(lines);
   }
 
-  const replacementLine = `model = "${trimmed}"`;
+  const replacementLine = `model = "${escapeTomlBasicString(trimmed)}"`;
+  const [topLevelMatch, ...duplicateMatches] = topLevelMatches;
   if (topLevelMatch) {
     lines[topLevelMatch.index] = replacementLine;
+    for (const match of [...duplicateMatches].reverse()) {
+      lines.splice(match.index, 1);
+    }
     return finalizeTomlText(lines);
   }
 

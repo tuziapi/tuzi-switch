@@ -1,11 +1,11 @@
 use serde_json::json;
 
 use tuzi_switch_lib::{
-    clear_provider_live_config_test_hook, get_codex_config_path, import_default_config_test_hook,
-    read_all_codex_env_keys, read_json_file, sanitize_codex_provider_credentials_test_hook,
-    save_codex_route_test_hook, switch_provider_test_hook, write_codex_env_key,
-    write_codex_live_atomic, AppError, AppType, McpApps, McpServer, MultiAppConfig, Provider,
-    ProviderService,
+    clear_provider_live_config_test_hook, get_codex_auth_path, get_codex_config_path,
+    import_default_config_test_hook, read_all_codex_env_keys, read_json_file,
+    sanitize_codex_provider_credentials_test_hook, save_codex_route_test_hook,
+    switch_provider_test_hook, write_codex_env_key, write_codex_live_atomic, AppError, AppType,
+    McpApps, McpServer, MultiAppConfig, Provider, ProviderService,
 };
 
 #[path = "support.rs"]
@@ -1338,6 +1338,103 @@ requires_openai_auth = false
         assert!(
             stored.contains(&format!("base_url = \"{base_url}\"")),
             "backfill must preserve the provider-specific base_url for {route}"
+        );
+    }
+}
+
+#[test]
+fn repeated_legacy_codex_switches_migrate_tokens_without_changing_official_auth() {
+    let _guard = test_mutex().lock().expect("acquire test mutex");
+    reset_test_fs();
+    let _home = ensure_test_home();
+
+    fn legacy_settings(route: &str, api_key: &str) -> serde_json::Value {
+        json!({
+            "auth": { "OPENAI_API_KEY": api_key },
+            "config": format!(r#"model_provider = "{route}"
+model = "gpt-5.5"
+
+[model_providers.{route}]
+name = "{route}"
+base_url = "https://{route}.example/v1"
+wire_api = "responses"
+requires_openai_auth = false
+"#)
+        })
+    }
+
+    let mut config = MultiAppConfig::default();
+    let manager = config
+        .get_manager_mut(&AppType::Codex)
+        .expect("codex manager");
+    manager.current = "provider-a".to_string();
+    for (provider_id, api_key) in [
+        ("provider-a", "sk-provider-a"),
+        ("provider-b", "sk-provider-b"),
+    ] {
+        manager.providers.insert(
+            provider_id.to_string(),
+            Provider::with_id(
+                provider_id.to_string(),
+                provider_id.to_string(),
+                legacy_settings(provider_id, api_key),
+                None,
+            ),
+        );
+    }
+
+    let state = create_test_state_with_config(&config).expect("create test state");
+    let official_auth = json!({
+        "auth_mode": "chatgpt",
+        "tokens": {
+            "access_token": "official-access-token",
+            "refresh_token": "official-refresh-token"
+        }
+    });
+    write_codex_live_atomic(
+        &official_auth,
+        legacy_settings("provider-a", "sk-provider-a")
+            .get("config")
+            .and_then(serde_json::Value::as_str),
+    )
+    .expect("seed provider A live config");
+
+    for (target, expected_key) in [
+        ("provider-b", "sk-provider-b"),
+        ("provider-a", "sk-provider-a"),
+    ] {
+        switch_provider_test_hook(&state, AppType::Codex, target)
+            .unwrap_or_else(|error| panic!("switch to {target}: {error}"));
+
+        let auth: serde_json::Value =
+            read_json_file(&get_codex_auth_path()).expect("read live Codex auth");
+        assert_eq!(
+            auth, official_auth,
+            "switching must preserve official login"
+        );
+
+        let providers = state
+            .db
+            .get_all_providers(AppType::Codex.as_str())
+            .expect("read migrated providers");
+        let settings = &providers[target].settings_config;
+        let config_text = settings
+            .get("config")
+            .and_then(serde_json::Value::as_str)
+            .expect("migrated config");
+        let env_key = settings
+            .pointer("/env/envKey")
+            .and_then(serde_json::Value::as_str)
+            .expect("migrated env key");
+        assert!(
+            config_text.contains(&format!("env_key = \"{env_key}\"")),
+            "legacy switch to {target} must activate its env-backed credential"
+        );
+        let keys = read_all_codex_env_keys().expect("read managed Codex keys");
+        assert_eq!(
+            keys.get(env_key).map(String::as_str),
+            Some(expected_key),
+            "legacy switch to {target} must migrate its own token"
         );
     }
 }

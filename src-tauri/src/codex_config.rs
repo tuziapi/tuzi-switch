@@ -2963,7 +2963,7 @@ fn codex_active_provider_env_key_state(
     ))
 }
 
-fn set_codex_active_provider_env_key(
+pub(crate) fn set_codex_active_provider_env_key(
     config_text: &str,
     env_key: Option<&str>,
 ) -> Result<String, AppError> {
@@ -3244,18 +3244,13 @@ fn write_codex_live_for_provider_inner(
     };
     let config_text_opt = unified_official_config.as_deref().or(config_text_opt);
 
-    let should_write_auth = (category == Some("official") && codex_auth_has_login_material(auth))
-        || (category != Some("official")
-            && !crate::settings::preserve_codex_official_auth_on_switch());
-
-    if should_write_auth {
-        if category == Some("official") {
-            if let Some(config_text) = config_text_opt {
-                validate_codex_config_routes_history_anchor(config_text)?;
-            }
-            return write_codex_live_atomic(auth, config_text_opt);
+    // Third-party providers authenticate through their own env_key. Switching
+    // routes must never replace the user's official Codex login in auth.json.
+    if category == Some("official") && codex_auth_has_login_material(auth) {
+        if let Some(config_text) = config_text_opt {
+            validate_codex_config_routes_history_anchor(config_text)?;
         }
-        return write_codex_live_atomic_with_stable_provider(auth, config_text_opt);
+        return write_codex_live_atomic(auth, config_text_opt);
     }
 
     let Some(config_text) = config_text_opt else {

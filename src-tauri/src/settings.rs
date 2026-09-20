@@ -992,16 +992,6 @@ pub fn get_preferred_terminal() -> Option<String> {
         .clone()
 }
 
-pub fn preserve_codex_official_auth_on_switch() -> bool {
-    settings_store()
-        .read()
-        .unwrap_or_else(|e| {
-            log::warn!("设置锁已毒化，使用恢复值: {e}");
-            e.into_inner()
-        })
-        .preserve_codex_official_auth_on_switch
-}
-
 pub fn codex_image_render_compat() -> bool {
     settings_store()
         .read()

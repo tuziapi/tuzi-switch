@@ -272,6 +272,41 @@ describe("Codex TOML utils", () => {
     expect(extractCodexModelName(output2)).toBe("new-model");
   });
 
+  it("updates a double-quoted model containing a single quote without duplicating it", () => {
+    const input = [
+      'model_provider = "custom"',
+      'model = "gpt-5.6-so\'l"',
+      "",
+      "[model_providers.custom]",
+      'name = "custom"',
+      "",
+    ].join("\n");
+
+    const output = setCodexModelName(input, "gpt-6-astra");
+
+    expect(extractCodexModelName(output)).toBe("gpt-6-astra");
+    expect(output.match(/^\s*model\s*=/gm)).toHaveLength(1);
+    expect(output).not.toContain("gpt-5.6-so'l");
+  });
+
+  it("collapses duplicate top-level model lines without touching profile models", () => {
+    const input = [
+      'model_provider = "custom"',
+      'model = "gpt-6-astra"',
+      'model = "gpt-5.6-sol"',
+      "",
+      "[profiles.default]",
+      'model = "profile-model"',
+      "",
+    ].join("\n");
+
+    const output = setCodexModelName(input, "gpt-6-astra");
+
+    const topLevelConfig = output.split("[profiles.default]")[0];
+    expect(topLevelConfig.match(/^model\s*=/gm)).toHaveLength(1);
+    expect(output).toContain('[profiles.default]\nmodel = "profile-model"');
+  });
+
   it("updates a double-quoted base_url containing single quotes without duplicating it", () => {
     const input = [
       'model_provider = "custom"',

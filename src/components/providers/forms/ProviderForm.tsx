@@ -1653,12 +1653,10 @@ function ProviderFormFull({
             ? normalizeCodexCatalogModelsForSave(codexCatalogModels)
             : [];
 
-        if (normalizedCatalogModels.length > 0) {
-          normalizedCodexConfig = setCodexModelNameInConfig(
-            normalizedCodexConfig,
-            normalizedCatalogModels[0].model,
-          );
-        }
+        normalizedCodexConfig = setCodexModelNameInConfig(
+          normalizedCodexConfig,
+          normalizedCatalogModels[0]?.model || codexModelName,
+        );
 
         const routeIdMatch = normalizedCodexConfig.match(
           /^\s*model_provider\s*=\s*"([^"]+)"/m,
