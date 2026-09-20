@@ -127,16 +127,6 @@ export function CodexAuthSettings({
       </div>
 
       <ToggleRow
-        icon={<KeyRound className="h-4 w-4 text-emerald-500" />}
-        title={t("settings.preserveCodexOfficialAuthOnSwitch")}
-        description={t("settings.preserveCodexOfficialAuthOnSwitchDescription")}
-        checked={settings.preserveCodexOfficialAuthOnSwitch ?? true}
-        onCheckedChange={(value) =>
-          onChange({ preserveCodexOfficialAuthOnSwitch: value })
-        }
-      />
-
-      <ToggleRow
         icon={<ImageIcon className="h-4 w-4 text-rose-500" />}
         title={t("settings.codexImageRenderCompat")}
         badge={t("settings.codexImageRenderCompatBadge")}

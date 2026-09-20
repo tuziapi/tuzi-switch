@@ -10,7 +10,8 @@ use crate::proxy::server::ProxyServer;
 use crate::proxy::switch_lock::SwitchLockManager;
 use crate::proxy::types::*;
 use crate::services::provider::{
-    build_effective_settings_with_common_config, write_live_with_common_config,
+    build_effective_settings_with_common_config, migrate_legacy_codex_provider_for_switch,
+    write_live_with_common_config,
 };
 use serde_json::{json, Value};
 use std::str::FromStr;
@@ -1687,11 +1688,16 @@ impl ProxyService {
     ) -> Result<HotSwitchOutcome, String> {
         let app_type_enum =
             AppType::from_str(app_type).map_err(|_| format!("无效的应用类型: {app_type}"))?;
-        let provider = self
+        let mut provider = self
             .db
             .get_provider_by_id(provider_id, app_type)
             .map_err(|e| format!("读取供应商失败: {e}"))?
             .ok_or_else(|| format!("供应商不存在: {provider_id}"))?;
+
+        if matches!(app_type_enum, AppType::Codex) {
+            provider = migrate_legacy_codex_provider_for_switch(self.db.as_ref(), &provider)
+                .map_err(|e| format!("迁移 Codex 供应商凭据失败: {e}"))?;
+        }
 
         // Defense-in-depth: block official providers during proxy takeover
         if provider.category.as_deref() == Some("official") {
@@ -3009,6 +3015,21 @@ requires_openai_auth = false
             .hot_switch_provider("codex", "b")
             .await
             .expect("hot switch Codex provider");
+
+        let migrated = db
+            .get_provider_by_id("b", "codex")
+            .expect("read migrated provider")
+            .expect("migrated provider exists");
+        let migrated_env_key = migrated
+            .settings_config
+            .get("config")
+            .and_then(Value::as_str)
+            .and_then(crate::codex_config::extract_codex_env_key)
+            .expect("hot switch should migrate the provider env key");
+        assert_eq!(
+            crate::codex_config::read_managed_env_key(&migrated_env_key).as_deref(),
+            Some("aihubmix-key")
+        );
 
         let backup = db
             .get_live_backup("codex")

@@ -14,6 +14,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 
 use crate::app_config::AppType;
+use crate::database::Database;
 use crate::error::AppError;
 use crate::provider::{Provider, UsageResult};
 use crate::services::mcp::McpService;
@@ -52,16 +53,14 @@ pub struct CodexProviderCredential {
 }
 
 fn next_legacy_codex_provider_env_key(
-    state: &AppState,
+    db: &Database,
     provider_id: &str,
 ) -> Result<String, AppError> {
     let mut used: HashSet<String> = crate::codex_config::read_managed_env_block()
         .into_keys()
         .collect();
     used.extend(
-        state
-            .db
-            .get_all_providers(AppType::Codex.as_str())?
+        db.get_all_providers(AppType::Codex.as_str())?
             .values()
             .filter_map(codex_provider_env_key),
     );
@@ -101,8 +100,8 @@ fn next_legacy_codex_provider_env_key(
     ))
 }
 
-fn migrate_legacy_codex_provider_for_switch(
-    state: &AppState,
+pub(crate) fn migrate_legacy_codex_provider_for_switch(
+    db: &Database,
     provider: &Provider,
 ) -> Result<Provider, AppError> {
     if provider.category.as_deref() == Some("official") {
@@ -128,15 +127,9 @@ fn migrate_legacy_codex_provider_for_switch(
         return Ok(provider.clone());
     };
 
-    let env_key = provider
-        .settings_config
-        .pointer("/env/envKey")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
-        .map(Ok)
-        .unwrap_or_else(|| next_legacy_codex_provider_env_key(state, &provider.id))?;
+    // A legacy env.envKey may be shared by several providers (commonly
+    // OPENAI_API_KEY), so it cannot be promoted to the provider's TOML key.
+    let env_key = next_legacy_codex_provider_env_key(db, &provider.id)?;
     let migrated_config =
         crate::codex_config::set_codex_active_provider_env_key(config_text, Some(&env_key))?;
     if crate::codex_config::extract_codex_env_key(&migrated_config).as_deref()
@@ -155,7 +148,7 @@ fn migrate_legacy_codex_provider_for_switch(
         settings.insert("config".to_string(), Value::String(migrated_config));
         settings.insert("env".to_string(), json!({ "envKey": env_key }));
     }
-    state.db.save_provider(AppType::Codex.as_str(), &migrated)?;
+    db.save_provider(AppType::Codex.as_str(), &migrated)?;
     log::info!(
         "Migrated legacy Codex provider '{}' to an env-backed credential",
         provider.id
@@ -2270,7 +2263,7 @@ impl ProviderService {
         Self::validate_provider_settings(&app_type, &provider)?;
 
         if matches!(app_type, AppType::Codex) {
-            provider = migrate_legacy_codex_provider_for_switch(state, &provider)?;
+            provider = migrate_legacy_codex_provider_for_switch(state.db.as_ref(), &provider)?;
         }
 
         // Resolve and persist the target provider's own credential before any

@@ -1351,6 +1351,7 @@ fn repeated_legacy_codex_switches_migrate_tokens_without_changing_official_auth(
     fn legacy_settings(route: &str, api_key: &str) -> serde_json::Value {
         json!({
             "auth": { "OPENAI_API_KEY": api_key },
+            "env": { "envKey": "OPENAI_API_KEY" },
             "config": format!(r#"model_provider = "{route}"
 model = "gpt-5.5"
 
@@ -1399,6 +1400,8 @@ requires_openai_auth = false
     )
     .expect("seed provider A live config");
 
+    let mut migrated_env_keys = Vec::new();
+
     for (target, expected_key) in [
         ("provider-b", "sk-provider-b"),
         ("provider-a", "sk-provider-a"),
@@ -1426,6 +1429,8 @@ requires_openai_auth = false
             .pointer("/env/envKey")
             .and_then(serde_json::Value::as_str)
             .expect("migrated env key");
+        assert_ne!(env_key, "OPENAI_API_KEY");
+        migrated_env_keys.push(env_key.to_string());
         assert!(
             config_text.contains(&format!("env_key = \"{env_key}\"")),
             "legacy switch to {target} must activate its env-backed credential"
@@ -1437,6 +1442,14 @@ requires_openai_auth = false
             "legacy switch to {target} must migrate its own token"
         );
     }
+
+    migrated_env_keys.sort();
+    migrated_env_keys.dedup();
+    assert_eq!(
+        migrated_env_keys.len(),
+        2,
+        "providers need isolated env keys"
+    );
 }
 
 #[test]
