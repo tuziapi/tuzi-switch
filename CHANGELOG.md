@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-09-21
+
+### Features
+
+- 新增 Codex 安全票据一键导入、导入确认和受管凭据持久化流程。
+- 新增 Codex 图片渲染兼容模式、专用图片代理、本地渲染兜底 Skill 与子代理并发设置。
+- 完善 Codex 供应商配置编辑、端点管理、会话历史统一和多线路工作流。
+
+### Fixes
+
+- 修复 Codex 线路切换可能继续使用旧令牌的问题；旧版供应商会迁移到独立 `env_key`，并保留官方 OAuth 登录状态。
+- 修复代理接管热切换绕过凭据迁移、多个旧供应商共享 `OPENAI_API_KEY` 以及模型配置重复导致 TOML 解析失败的问题。
+- 修复 Codex 图片结果展示、票据导入启用状态、配置编辑内容和模型字段注入等问题。
+
+### Documentation
+
+- 补充 Codex 图片渲染兼容、供应商配置迁移和人工验证文档。
+
 ## [1.2.1] - 2026-07-24
 
 ### Fixes
