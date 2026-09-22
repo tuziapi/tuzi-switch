@@ -48,11 +48,7 @@ struct CodexEnvFileFingerprint {
     device: u64,
     #[cfg(unix)]
     inode: u64,
-    #[cfg(windows)]
-    volume_serial: Option<u32>,
-    #[cfg(windows)]
-    file_index: Option<u64>,
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     created: Option<SystemTime>,
 }
 
@@ -60,8 +56,6 @@ impl CodexEnvFileFingerprint {
     fn from_metadata(metadata: &fs::Metadata) -> std::io::Result<Self> {
         #[cfg(unix)]
         use std::os::unix::fs::MetadataExt;
-        #[cfg(windows)]
-        use std::os::windows::fs::MetadataExt;
 
         Ok(Self {
             len: metadata.len(),
@@ -70,11 +64,7 @@ impl CodexEnvFileFingerprint {
             device: metadata.dev(),
             #[cfg(unix)]
             inode: metadata.ino(),
-            #[cfg(windows)]
-            volume_serial: metadata.volume_serial_number(),
-            #[cfg(windows)]
-            file_index: metadata.file_index(),
-            #[cfg(not(any(unix, windows)))]
+            #[cfg(not(unix))]
             created: metadata.created().ok(),
         })
     }
@@ -88,11 +78,7 @@ impl CodexEnvFileFingerprint {
             device: 1,
             #[cfg(unix)]
             inode: identity,
-            #[cfg(windows)]
-            volume_serial: Some(1),
-            #[cfg(windows)]
-            file_index: Some(identity),
-            #[cfg(not(any(unix, windows)))]
+            #[cfg(not(unix))]
             created: Some(SystemTime::UNIX_EPOCH + Duration::from_secs(identity)),
         }
     }

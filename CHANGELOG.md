@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - 修复 Codex 线路切换可能继续使用旧令牌的问题；旧版供应商会迁移到独立 `env_key`，并保留官方 OAuth 登录状态。
 - 修复代理接管热切换绕过凭据迁移、多个旧供应商共享 `OPENAI_API_KEY` 以及模型配置重复导致 TOML 解析失败的问题。
 - 修复 Codex 图片结果展示、票据导入启用状态、配置编辑内容和模型字段注入等问题。
+- 修复 Windows stable Rust 下构建失败的问题。
 
 ### Documentation
 
