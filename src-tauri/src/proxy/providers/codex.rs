@@ -28,8 +28,11 @@ static CODEX_CLIENT_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(codex_vscode|codex_cli_rs)/[\d.]+").unwrap());
 
 const TUZI_CODING_BASE_URL: &str = "https://api.tu-zi.com/coding";
+const TUZI_API_BASE_URL: &str = "https://api.tu-zi.com/v1";
 const LEGACY_CODING_ENV_KEY: &str = "CODING_CODEX_API_KEY";
 const CODING_ENV_KEY_PREFIX: &str = "CODING";
+const LEGACY_TUZI_ENV_KEY: &str = "TUZI_CODEX_API_KEY";
+const TUZI_ENV_KEY_PREFIX: &str = "TUZI";
 const CODEX_API_KEY_SUFFIX: &str = "_CODEX_API_KEY";
 const ENV_KEY_CACHE_CAPACITY: usize = 8;
 const ENV_KEY_CACHE_FILE_CHECK_INTERVAL: Duration = Duration::from_millis(250);
@@ -347,15 +350,19 @@ fn normalize_cached_env_key_value(value: String) -> Option<String> {
 }
 
 fn coding_env_key_allowed(env_key: &str) -> bool {
-    env_key_gate_index(env_key).is_some()
+    numbered_env_key_index(env_key, LEGACY_CODING_ENV_KEY, CODING_ENV_KEY_PREFIX).is_some()
 }
 
-fn env_key_gate_index(env_key: &str) -> Option<usize> {
-    if env_key == LEGACY_CODING_ENV_KEY {
+fn tuzi_env_key_allowed(env_key: &str) -> bool {
+    numbered_env_key_index(env_key, LEGACY_TUZI_ENV_KEY, TUZI_ENV_KEY_PREFIX).is_some()
+}
+
+fn numbered_env_key_index(env_key: &str, legacy_key: &str, prefix: &str) -> Option<usize> {
+    if env_key == legacy_key {
         return Some(0);
     }
     let Some(number) = env_key
-        .strip_prefix(CODING_ENV_KEY_PREFIX)
+        .strip_prefix(prefix)
         .and_then(|value| value.strip_suffix(CODEX_API_KEY_SUFFIX))
     else {
         return None;
@@ -369,11 +376,28 @@ fn env_key_gate_index(env_key: &str) -> Option<usize> {
         .filter(|index| (1..=99).contains(index))
 }
 
+fn env_key_gate_index(env_key: &str) -> Option<usize> {
+    numbered_env_key_index(env_key, LEGACY_CODING_ENV_KEY, CODING_ENV_KEY_PREFIX)
+        .or_else(|| numbered_env_key_index(env_key, LEGACY_TUZI_ENV_KEY, TUZI_ENV_KEY_PREFIX))
+}
+
 fn is_tuzi_coding_base_url(base_url: &str) -> bool {
     base_url == TUZI_CODING_BASE_URL
         || base_url
             .strip_suffix('/')
             .is_some_and(|value| value == TUZI_CODING_BASE_URL)
+}
+
+fn is_tuzi_api_base_url(base_url: &str) -> bool {
+    base_url == TUZI_API_BASE_URL
+        || base_url
+            .strip_suffix('/')
+            .is_some_and(|value| value == TUZI_API_BASE_URL)
+}
+
+fn managed_env_key_allowed(base_url: &str, env_key: &str) -> bool {
+    (is_tuzi_coding_base_url(base_url) && coding_env_key_allowed(env_key))
+        || (is_tuzi_api_base_url(base_url) && tuzi_env_key_allowed(env_key))
 }
 
 fn effective_codex_base_url(provider: &Provider) -> Option<String> {
@@ -1093,9 +1117,8 @@ impl CodexAdapter {
             })?;
         effective_codex_base_url(provider)
             .as_deref()
-            .is_some_and(is_tuzi_coding_base_url)
+            .is_some_and(|base_url| managed_env_key_allowed(base_url, &env_key))
             .then_some(env_key)
-            .filter(|key| coding_env_key_allowed(key))
     }
 
     fn extract_legacy_bearer(provider: &Provider) -> Option<String> {
@@ -1356,6 +1379,22 @@ env_key = "{env_key}"
     }
 
     #[test]
+    fn test_tuzi_api_url_match_is_exact() {
+        for accepted in ["https://api.tu-zi.com/v1", "https://api.tu-zi.com/v1/"] {
+            assert!(is_tuzi_api_base_url(accepted), "{accepted}");
+        }
+        for rejected in [
+            " https://api.tu-zi.com/v1",
+            "http://api.tu-zi.com/v1",
+            "https://api.tu-zi.com/v1/responses",
+            "https://api.tu-zi.com/v1?x=1",
+            "https://api.tu-zi.com.evil/v1",
+        ] {
+            assert!(!is_tuzi_api_base_url(rejected), "{rejected}");
+        }
+    }
+
+    #[test]
     fn test_coding_env_key_allowlist_is_narrow_and_bounded() {
         for accepted in [
             "CODING_CODEX_API_KEY",
@@ -1380,6 +1419,53 @@ env_key = "{env_key}"
         ] {
             assert!(!coding_env_key_allowed(rejected), "{rejected}");
         }
+    }
+
+    #[test]
+    fn test_tuzi_env_key_allowlist_is_narrow_and_bounded() {
+        for accepted in [
+            "TUZI_CODEX_API_KEY",
+            "TUZI01_CODEX_API_KEY",
+            "TUZI50_CODEX_API_KEY",
+            "TUZI99_CODEX_API_KEY",
+        ] {
+            assert!(tuzi_env_key_allowed(accepted), "{accepted}");
+        }
+        for rejected in [
+            "OPENAI_API_KEY",
+            "CODING01_CODEX_API_KEY",
+            "TUZI_CODEX_IMAGE_API_KEY",
+            "TUZI00_CODEX_API_KEY",
+            "TUZI1_CODEX_API_KEY",
+            "TUZI100_CODEX_API_KEY",
+            "CUSTOM_SECRET",
+        ] {
+            assert!(!tuzi_env_key_allowed(rejected), "{rejected}");
+        }
+    }
+
+    #[test]
+    fn test_managed_env_key_requires_matching_tuzi_route_family() {
+        assert!(managed_env_key_allowed(
+            TUZI_API_BASE_URL,
+            "TUZI02_CODEX_API_KEY"
+        ));
+        assert!(managed_env_key_allowed(
+            TUZI_CODING_BASE_URL,
+            "CODING02_CODEX_API_KEY"
+        ));
+        assert!(!managed_env_key_allowed(
+            TUZI_API_BASE_URL,
+            "CODING02_CODEX_API_KEY"
+        ));
+        assert!(!managed_env_key_allowed(
+            TUZI_CODING_BASE_URL,
+            "TUZI02_CODEX_API_KEY"
+        ));
+        assert!(!managed_env_key_allowed(
+            "https://attacker.example/v1",
+            "TUZI02_CODEX_API_KEY"
+        ));
     }
 
     #[test]
@@ -1441,6 +1527,22 @@ env_key = "CODING02_CODEX_API_KEY"
 
         let key = adapter.extract_key_with_env_reader(&provider, |env_key| {
             assert_eq!(env_key, "CODING02_CODEX_API_KEY");
+            Ok::<_, &str>(Some("dotenv-key".to_string()))
+        });
+        assert_eq!(key.as_deref(), Some("dotenv-key"));
+    }
+
+    #[test]
+    fn test_extract_auth_from_tuzi_api_dotenv_env_key() {
+        let adapter = CodexAdapter::new();
+        let provider = create_provider(json!({
+            "auth": {},
+            "env": { "envKey": "TUZI02_CODEX_API_KEY" },
+            "config": coding_toml(TUZI_API_BASE_URL, "TUZI02_CODEX_API_KEY")
+        }));
+
+        let key = adapter.extract_key_with_env_reader(&provider, |env_key| {
+            assert_eq!(env_key, "TUZI02_CODEX_API_KEY");
             Ok::<_, &str>(Some("dotenv-key".to_string()))
         });
         assert_eq!(key.as_deref(), Some("dotenv-key"));
@@ -2180,9 +2282,14 @@ base_url = "https://relay.example/v1"
     fn test_env_key_gate_index_covers_exact_allowlist() {
         assert_eq!(CODEX_ENV_CREDENTIAL_GATES.len(), 100);
         assert_eq!(env_key_gate_index(LEGACY_CODING_ENV_KEY), Some(0));
+        assert_eq!(env_key_gate_index(LEGACY_TUZI_ENV_KEY), Some(0));
         for index in 1..=99 {
             assert_eq!(
                 env_key_gate_index(&format!("CODING{index:02}_CODEX_API_KEY")),
+                Some(index)
+            );
+            assert_eq!(
+                env_key_gate_index(&format!("TUZI{index:02}_CODEX_API_KEY")),
                 Some(index)
             );
         }
