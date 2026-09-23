@@ -35,6 +35,7 @@ const LEGACY_TUZI_ENV_KEY: &str = "TUZI_CODEX_API_KEY";
 const TUZI_ENV_KEY_PREFIX: &str = "TUZI";
 const CODEX_API_KEY_SUFFIX: &str = "_CODEX_API_KEY";
 const ENV_KEY_CACHE_CAPACITY: usize = 8;
+const GENERIC_ENV_KEY_GATE_INDEX: usize = 100;
 const ENV_KEY_CACHE_FILE_CHECK_INTERVAL: Duration = Duration::from_millis(250);
 const ENV_KEY_CACHE_NEGATIVE_TTL: Duration = Duration::from_millis(250);
 const ENV_KEY_CACHE_VALUE_TTL: Duration = Duration::from_secs(5);
@@ -328,8 +329,11 @@ struct CodexEnvCredentialCacheCoordinator {
 
 static CODEX_ENV_CREDENTIAL_CACHE: LazyLock<Arc<Mutex<CodexEnvCredentialCacheCoordinator>>> =
     LazyLock::new(|| Arc::new(Mutex::new(CodexEnvCredentialCacheCoordinator::default())));
-static CODEX_ENV_CREDENTIAL_GATES: LazyLock<Vec<Arc<AsyncMutex<()>>>> =
-    LazyLock::new(|| (0..100).map(|_| Arc::new(AsyncMutex::new(()))).collect());
+static CODEX_ENV_CREDENTIAL_GATES: LazyLock<Vec<Arc<AsyncMutex<()>>>> = LazyLock::new(|| {
+    (0..=GENERIC_ENV_KEY_GATE_INDEX)
+        .map(|_| Arc::new(AsyncMutex::new(())))
+        .collect()
+});
 static CODEX_ENV_CREDENTIAL_READ_LIMIT: LazyLock<Arc<Semaphore>> =
     LazyLock::new(|| Arc::new(Semaphore::new(ENV_KEY_BLOCKING_READ_LIMIT)));
 
@@ -379,6 +383,14 @@ fn numbered_env_key_index(env_key: &str, legacy_key: &str, prefix: &str) -> Opti
 fn env_key_gate_index(env_key: &str) -> Option<usize> {
     numbered_env_key_index(env_key, LEGACY_CODING_ENV_KEY, CODING_ENV_KEY_PREFIX)
         .or_else(|| numbered_env_key_index(env_key, LEGACY_TUZI_ENV_KEY, TUZI_ENV_KEY_PREFIX))
+        .or_else(|| generic_env_key_allowed(env_key).then_some(GENERIC_ENV_KEY_GATE_INDEX))
+}
+
+fn generic_env_key_allowed(env_key: &str) -> bool {
+    let mut chars = env_key.chars();
+    let valid_shape = matches!(chars.next(), Some(c) if c == '_' || c.is_ascii_alphabetic())
+        && chars.all(|c| c == '_' || c.is_ascii_alphanumeric());
+    valid_shape && !env_key.starts_with("TUZI") && !env_key.starts_with("CODING")
 }
 
 fn is_tuzi_coding_base_url(base_url: &str) -> bool {
@@ -398,6 +410,9 @@ fn is_tuzi_api_base_url(base_url: &str) -> bool {
 fn managed_env_key_allowed(base_url: &str, env_key: &str) -> bool {
     (is_tuzi_coding_base_url(base_url) && coding_env_key_allowed(env_key))
         || (is_tuzi_api_base_url(base_url) && tuzi_env_key_allowed(env_key))
+        || (!is_tuzi_coding_base_url(base_url)
+            && !is_tuzi_api_base_url(base_url)
+            && generic_env_key_allowed(env_key))
 }
 
 fn effective_codex_base_url(provider: &Provider) -> Option<String> {
@@ -2280,7 +2295,7 @@ base_url = "https://relay.example/v1"
 
     #[test]
     fn test_env_key_gate_index_covers_exact_allowlist() {
-        assert_eq!(CODEX_ENV_CREDENTIAL_GATES.len(), 100);
+        assert_eq!(CODEX_ENV_CREDENTIAL_GATES.len(), 101);
         assert_eq!(env_key_gate_index(LEGACY_CODING_ENV_KEY), Some(0));
         assert_eq!(env_key_gate_index(LEGACY_TUZI_ENV_KEY), Some(0));
         for index in 1..=99 {
@@ -2296,7 +2311,7 @@ base_url = "https://relay.example/v1"
         for rejected in [
             "CODING00_CODEX_API_KEY",
             "CODING100_CODEX_API_KEY",
-            "OPENAI_API_KEY",
+            "CUSTOM- CODEX-API-KEY",
         ] {
             assert_eq!(env_key_gate_index(rejected), None);
         }
