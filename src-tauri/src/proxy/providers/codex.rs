@@ -408,8 +408,17 @@ fn is_tuzi_api_base_url(base_url: &str) -> bool {
 }
 
 fn managed_env_key_allowed(base_url: &str, env_key: &str) -> bool {
-    (is_tuzi_coding_base_url(base_url) && coding_env_key_allowed(env_key))
-        || (is_tuzi_api_base_url(base_url) && tuzi_env_key_allowed(env_key))
+    // Accept either managed Tuzi family on Tuzi routes so older saved
+    // providers remain testable while the form migrates them to the matching
+    // family on the next save.
+    (is_tuzi_coding_base_url(base_url)
+        && (coding_env_key_allowed(env_key)
+            || tuzi_env_key_allowed(env_key)
+            || generic_env_key_allowed(env_key)))
+        || (is_tuzi_api_base_url(base_url)
+            && (tuzi_env_key_allowed(env_key)
+                || coding_env_key_allowed(env_key)
+                || generic_env_key_allowed(env_key)))
         || (!is_tuzi_coding_base_url(base_url)
             && !is_tuzi_api_base_url(base_url)
             && generic_env_key_allowed(env_key))
@@ -1460,7 +1469,7 @@ env_key = "{env_key}"
     }
 
     #[test]
-    fn test_managed_env_key_requires_matching_tuzi_route_family() {
+    fn test_managed_env_key_accepts_legacy_tuzi_route_family() {
         assert!(managed_env_key_allowed(
             TUZI_API_BASE_URL,
             "TUZI02_CODEX_API_KEY"
@@ -1469,11 +1478,11 @@ env_key = "{env_key}"
             TUZI_CODING_BASE_URL,
             "CODING02_CODEX_API_KEY"
         ));
-        assert!(!managed_env_key_allowed(
+        assert!(managed_env_key_allowed(
             TUZI_API_BASE_URL,
             "CODING02_CODEX_API_KEY"
         ));
-        assert!(!managed_env_key_allowed(
+        assert!(managed_env_key_allowed(
             TUZI_CODING_BASE_URL,
             "TUZI02_CODEX_API_KEY"
         ));
