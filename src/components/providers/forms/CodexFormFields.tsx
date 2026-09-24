@@ -279,6 +279,12 @@ export function CodexFormFields({
           placeholder="TUZI01_CODEX_API_KEY"
           autoCapitalize="characters"
           spellCheck={false}
+          readOnly={
+            codexBaseUrl.trim().replace(/\/$/, "") ===
+              "https://api.tu-zi.com/v1" ||
+            codexBaseUrl.trim().replace(/\/$/, "") ===
+              "https://api.tu-zi.com/coding"
+          }
           aria-invalid={Boolean(envKeyError)}
         />
         {envKeyError ? (
@@ -336,8 +342,7 @@ export function CodexFormFields({
             <span className="break-words">
               {credentialStatus === "missing"
                 ? t("providerForm.codexCredentialMissing", {
-                    defaultValue:
-                      "未找到该供应商已保存的 API Key，请重新填写",
+                    defaultValue: "未找到该供应商已保存的 API Key，请重新填写",
                   })
                 : t("providerForm.codexCredentialLoadFailed", {
                     defaultValue: "已保存的 API Key 读取失败",

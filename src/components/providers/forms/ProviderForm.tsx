@@ -302,6 +302,20 @@ const formatCodexCodingRouteId = (index: number) =>
 const formatCodexCodingEnvKey = (index: number) =>
   `CODING${String(index).padStart(2, "0")}_CODEX_API_KEY`;
 
+const normalizeManagedCodexEnvKey = (baseUrl: string, envKey: string) => {
+  const route = baseUrl.trim().replace(/\/$/, "");
+  const match = envKey.trim().match(/^(?:TUZI|CODING)(\d{2})_CODEX_API_KEY$/);
+  if (!match) return envKey.trim();
+  const index = Number.parseInt(match[1], 10);
+  if (route === "https://api.tu-zi.com/v1") {
+    return formatCodexTuziEnvKey(index);
+  }
+  if (route === "https://api.tu-zi.com/coding") {
+    return formatCodexCodingEnvKey(index);
+  }
+  return envKey.trim();
+};
+
 const extractCodexTuziIndex = (routeId: string, envKey: string): number => {
   const trimmedEnvKey = envKey.trim();
   const envMatch = trimmedEnvKey.match(CODEX_TUZI_ENV_PATTERN);
@@ -1327,12 +1341,16 @@ function ProviderFormFull({
         }),
       );
     } else if (appId === "codex") {
-      const submittedEnvKey = (
+      const rawSubmittedEnvKey = (
         getCodexProviderEnvKeyFromSettings({
           config: codexConfig,
           env: { envKey: codexEnvKey },
         }) || codexEnvKey
       ).trim();
+      const submittedEnvKey = normalizeManagedCodexEnvKey(
+        codexBaseUrl,
+        rawSubmittedEnvKey,
+      );
 
       if (category !== "official" && !submittedEnvKey) {
         const message = t("providerForm.envKeyRequired", {
@@ -1386,7 +1404,7 @@ function ProviderFormFull({
       }
       setCodexEnvKeyError("");
 
-      if (finalEnvKey !== submittedEnvKey) {
+      if (finalEnvKey !== rawSubmittedEnvKey) {
         setCodexEnvKey(finalEnvKey);
         setCodexConfig((prev) => setCodexEnvKeyInConfig(prev, finalEnvKey));
       }
