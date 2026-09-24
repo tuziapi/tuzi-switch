@@ -1621,14 +1621,13 @@ env_key = "CODING02_CODEX_API_KEY"
     }
 
     #[test]
-    fn test_extract_auth_rejects_non_allowlisted_env_keys_without_reading() {
+    fn test_extract_auth_rejects_invalid_env_keys_without_reading() {
         let adapter = CodexAdapter::new();
         for env_key in [
-            "OPENAI_API_KEY",
-            "TUZI_CODEX_API_KEY",
             "TUZI_CODEX_IMAGE_API_KEY",
             "CODING00_CODEX_API_KEY",
-            "CUSTOM_SECRET",
+            "CUSTOM-SECRET",
+            "123_BAD_KEY",
         ] {
             let provider = create_provider(json!({
                 "config": coding_toml(TUZI_CODING_BASE_URL, env_key)
@@ -1645,6 +1644,21 @@ env_key = "CODING02_CODEX_API_KEY"
             );
             assert_eq!(calls.get(), 0, "{env_key}");
         }
+    }
+
+    #[test]
+    fn test_extract_auth_reads_generic_env_key_for_custom_route() {
+        let adapter = CodexAdapter::new();
+        let provider = create_provider(json!({
+            "config": coding_toml("https://relay.example/v1", "OPENAI_API_KEY")
+        }));
+
+        let key = adapter.extract_key_with_env_reader(&provider, |env_key| {
+            assert_eq!(env_key, "OPENAI_API_KEY");
+            Ok::<_, &str>(Some("generic-provider-key".to_string()))
+        });
+
+        assert_eq!(key.as_deref(), Some("generic-provider-key"));
     }
 
     #[test]
