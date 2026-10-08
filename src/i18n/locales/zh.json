@@ -1139,7 +1139,7 @@
     "saveFailed": "保存失败: {{error}}",
     "modelNameHint": "指定使用的模型，将自动更新到 config.toml 中",
     "modelName": "模型名称",
-    "modelNamePlaceholder": "例如: gpt-5-codex",
+    "modelNamePlaceholder": "例如: gpt-6-astra",
     "contextWindow1M": "1M 上下文窗口",
     "autoCompactLimit": "压缩阈值",
     "autoCompactLimitHint": "上下文 token 数达到此阈值时自动压缩历史",

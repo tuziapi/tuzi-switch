@@ -40,13 +40,13 @@ export interface UniversalProviderPreset {
  */
 const NEWAPI_DEFAULT_MODELS: UniversalProviderModels = {
   claude: {
-    model: "claude-sonnet-4-6",
-    haikuModel: "claude-haiku-4-5-20251001",
-    sonnetModel: "claude-sonnet-4-6",
-    opusModel: "claude-opus-4-7",
+    model: "claude-sonnet-5-5",
+    haikuModel: "claude-haiku-4-5",
+    sonnetModel: "claude-sonnet-5-5",
+    opusModel: "claude-opus-5",
   },
   codex: {
-    model: "gpt-5.4",
+    model: "gpt-6-astra",
     reasoningEffort: "high",
   },
   gemini: {

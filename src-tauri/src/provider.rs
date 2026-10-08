@@ -542,7 +542,7 @@ impl UniversalProvider {
         let models = self.models.claude.as_ref();
         let model = models
             .and_then(|m| m.model.clone())
-            .unwrap_or_else(|| "claude-sonnet-4-20250514".to_string());
+            .unwrap_or_else(|| "claude-sonnet-5-5".to_string());
         let haiku = models
             .and_then(|m| m.haiku_model.clone())
             .unwrap_or_else(|| model.clone());
@@ -589,7 +589,7 @@ impl UniversalProvider {
         let models = self.models.codex.as_ref();
         let model = models
             .and_then(|m| m.model.clone())
-            .unwrap_or_else(|| "gpt-4o".to_string());
+            .unwrap_or_else(|| "gpt-6-astra".to_string());
         let reasoning_effort = models
             .and_then(|m| m.reasoning_effort.clone())
             .unwrap_or_else(|| "high".to_string());
@@ -654,7 +654,7 @@ requires_openai_auth = false"#
         let models = self.models.gemini.as_ref();
         let model = models
             .and_then(|m| m.model.clone())
-            .unwrap_or_else(|| "gemini-2.5-pro".to_string());
+            .unwrap_or_else(|| "gemini-3.1-pro".to_string());
 
         let settings_config = serde_json::json!({
             "env": {
@@ -1002,7 +1002,7 @@ mod tests {
                 .settings_config
                 .pointer("/env/GEMINI_MODEL")
                 .and_then(|item| item.as_str()),
-            Some("gemini-2.5-pro")
+            Some("gemini-3.1-pro")
         );
     }
 

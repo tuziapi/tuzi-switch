@@ -43,7 +43,7 @@ export function generateThirdPartyConfig(
   providerName: string,
   baseUrl: string,
   envKey: string,
-  modelName = "gpt-5.5",
+  modelName = "gpt-6-astra",
 ): string {
   return `model_provider = "custom"
 model = "${modelName}"
@@ -68,7 +68,7 @@ export const codexProviderPresets: CodexProviderPreset[] = [
       "provider-tuzi01",
       "https://api.tu-zi.com/v1",
       "TUZI01_CODEX_API_KEY",
-      "gpt-5.5",
+      "gpt-6-astra",
     ),
     envKey: "TUZI01_CODEX_API_KEY",
     category: "aggregator",
@@ -85,7 +85,7 @@ export const codexProviderPresets: CodexProviderPreset[] = [
       "provider-coding01",
       "https://api.tu-zi.com/coding",
       "CODING01_CODEX_API_KEY",
-      "gpt-5.5",
+      "gpt-6-astra",
     ),
     envKey: "CODING01_CODEX_API_KEY",
     category: "aggregator",

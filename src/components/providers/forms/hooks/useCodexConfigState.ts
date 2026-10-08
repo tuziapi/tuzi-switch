@@ -65,7 +65,7 @@ function migrateLegacyConfig(configStr: string): string {
   const effortMatch = result.match(
     /^\s*model_reasoning_effort\s*=\s*"([^"]+)"/m,
   );
-  const model = modelMatch?.[1] || "gpt-5.5";
+  const model = modelMatch?.[1] || "gpt-6-astra";
   const effort = effortMatch?.[1] || "high";
 
   // Build new format
