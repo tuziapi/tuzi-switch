@@ -13,7 +13,7 @@ describe("Provider presets", () => {
         name: "兔子线路",
         provider: "provider-tuzi01",
         baseUrl: "https://api.tu-zi.com/v1",
-        model: "gpt-5.5",
+        model: "gpt-6-astra",
         apiKeyUrl: "https://api.tu-zi.com",
         endpointCandidates: ["https://api.tu-zi.com/v1"],
       },
@@ -21,7 +21,7 @@ describe("Provider presets", () => {
         name: "codex订阅",
         provider: "provider-coding01",
         baseUrl: "https://api.tu-zi.com/coding",
-        model: "gpt-5.5",
+        model: "gpt-6-astra",
         apiKeyUrl: "https://store.tu-zi.com/cat/11",
         endpointCandidates: [
           "https://api.tu-zi.com/coding",
