@@ -1139,7 +1139,7 @@
     "saveFailed": "Save failed: {{error}}",
     "modelNameHint": "Specify the model to use, will be auto-updated in config.toml",
     "modelName": "Model Name",
-    "modelNamePlaceholder": "e.g., gpt-5-codex",
+    "modelNamePlaceholder": "e.g., gpt-6-astra",
     "contextWindow1M": "1M Context Window",
     "autoCompactLimit": "Auto Compact Limit",
     "autoCompactLimitHint": "Auto-compacts history when context reaches this token limit",

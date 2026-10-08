@@ -1693,7 +1693,7 @@ function ProviderFormFull({
               model:
                 normalizedCatalogModels[0]?.model ||
                 codexModelName ||
-                "gpt-5.5",
+                "gpt-6-astra",
               modelReasoningEffort: "high",
               profileName: values.name.trim(),
               providerId,
@@ -2126,7 +2126,7 @@ function ProviderFormFull({
           nextTuziRoute.routeId,
           preset.endpointCandidates?.[0] || "https://api.tu-zi.com/v1",
           envKey,
-          "gpt-5.5",
+          "gpt-6-astra",
         );
         defaultApiKey = shellEnvKeys?.[envKey] ?? "";
         if (nextTuziRoute.index > 1) {
@@ -2142,7 +2142,7 @@ function ProviderFormFull({
           nextCodingRoute.routeId,
           preset.endpointCandidates?.[0] || "https://api.tu-zi.com/coding",
           envKey,
-          "gpt-5.5",
+          "gpt-6-astra",
         );
         defaultApiKey = shellEnvKeys?.[envKey] ?? "";
         if (nextCodingRoute.index > 1) {
@@ -2194,7 +2194,7 @@ function ProviderFormFull({
             newRouteId,
             preset.endpointCandidates?.[0] || "",
             envKey,
-            "gpt-5.5",
+            "gpt-6-astra",
           );
         }
       }
@@ -2665,7 +2665,7 @@ function ProviderFormFull({
                     id="gemini-model"
                     value={geminiModel}
                     onChange={handleGeminiModelChange}
-                    placeholder="gemini-3-pro-preview"
+                    placeholder="gemini-3.1-pro"
                     fetchedModels={geminiFetchedModels}
                     isLoading={isFetchingGeminiModels}
                   />
@@ -2699,7 +2699,7 @@ function ProviderFormFull({
                     value={codexModelName}
                     onChange={(v) => handleCodexModelNameChange(v)}
                     placeholder={t("codexConfig.modelNamePlaceholder", {
-                      defaultValue: "例如: gpt-5.4",
+                      defaultValue: "例如: gpt-6-astra",
                     })}
                     fetchedModels={fetchedModels}
                     isLoading={isFetchingModels}

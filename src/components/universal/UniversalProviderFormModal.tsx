@@ -126,10 +126,10 @@ export function UniversalProviderFormModal({
   // 计算 Claude 配置 JSON 预览
   const claudeConfigJson = useMemo(() => {
     if (!claudeEnabled) return null;
-    const model = models.claude?.model || "claude-sonnet-4-20250514";
-    const haiku = models.claude?.haikuModel || "claude-haiku-4-20250514";
-    const sonnet = models.claude?.sonnetModel || "claude-sonnet-4-20250514";
-    const opus = models.claude?.opusModel || "claude-sonnet-4-20250514";
+    const model = models.claude?.model || "claude-sonnet-5-5";
+    const haiku = models.claude?.haikuModel || "claude-haiku-4-5";
+    const sonnet = models.claude?.sonnetModel || "claude-sonnet-5-5";
+    const opus = models.claude?.opusModel || "claude-opus-5";
     return {
       env: {
         ANTHROPIC_BASE_URL: baseUrl,
@@ -145,7 +145,7 @@ export function UniversalProviderFormModal({
   // 计算 Codex 配置 JSON 预览
   const codexConfigJson = useMemo(() => {
     if (!codexEnabled) return null;
-    const model = models.codex?.model || "gpt-5.4";
+    const model = models.codex?.model || "gpt-6-astra";
     const reasoningEffort = models.codex?.reasoningEffort || "high";
     // 确保 base_url 以 /v1 结尾（Codex 使用 OpenAI 兼容 API）
     const codexBaseUrl = baseUrl.endsWith("/v1")
@@ -172,7 +172,7 @@ requires_openai_auth = false`;
   // 计算 Gemini 配置 JSON 预览
   const geminiConfigJson = useMemo(() => {
     if (!geminiEnabled) return null;
-    const model = models.gemini?.model || "gemini-2.5-pro";
+    const model = models.gemini?.model || "gemini-3.1-pro";
     return {
       env: {
         GOOGLE_GEMINI_BASE_URL: baseUrl,
@@ -537,7 +537,7 @@ requires_openai_auth = false`;
                     onChange={(e) =>
                       updateModel("claude", "model", e.target.value)
                     }
-                    placeholder="claude-sonnet-4-20250514"
+                    placeholder="claude-sonnet-5-5"
                   />
                 </div>
                 <div className="space-y-1">
@@ -547,7 +547,7 @@ requires_openai_auth = false`;
                     onChange={(e) =>
                       updateModel("claude", "haikuModel", e.target.value)
                     }
-                    placeholder="claude-haiku-4-20250514"
+                    placeholder="claude-haiku-4-5"
                   />
                 </div>
                 <div className="space-y-1">
@@ -557,7 +557,7 @@ requires_openai_auth = false`;
                     onChange={(e) =>
                       updateModel("claude", "sonnetModel", e.target.value)
                     }
-                    placeholder="claude-sonnet-4-20250514"
+                    placeholder="claude-sonnet-5-5"
                   />
                 </div>
                 <div className="space-y-1">
@@ -567,7 +567,7 @@ requires_openai_auth = false`;
                     onChange={(e) =>
                       updateModel("claude", "opusModel", e.target.value)
                     }
-                    placeholder="claude-sonnet-4-20250514"
+                    placeholder="claude-opus-5"
                   />
                 </div>
               </div>
@@ -591,7 +591,7 @@ requires_openai_auth = false`;
                     onChange={(e) =>
                       updateModel("codex", "model", e.target.value)
                     }
-                    placeholder="gpt-5.4"
+                    placeholder="gpt-6-astra"
                   />
                 </div>
                 <div className="space-y-1">
@@ -624,7 +624,7 @@ requires_openai_auth = false`;
                   onChange={(e) =>
                     updateModel("gemini", "model", e.target.value)
                   }
-                  placeholder="gemini-2.5-pro"
+                  placeholder="gemini-3.1-pro"
                 />
               </div>
             </div>
