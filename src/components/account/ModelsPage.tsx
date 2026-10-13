@@ -1,0 +1,273 @@
+import { Button } from "@/components/ui/button";
+import {
+type AccountState
+} from "@/lib/api/account";
+import type {
+DesktopError,
+DesktopKey,
+DesktopPricing,
+Models,
+Page,
+Performance
+} from "@/lib/api/desktop";
+import { useDesktop } from "@/lib/query/desktop";
+import { useEffect,useState } from "react";
+import { useTranslation } from "react-i18next";
+import { date,Field,Pager,QueryState } from "./BusinessShared";
+import { PricingDetails } from "./PricingDetails";
+export function ModelsPage({
+  state,
+  performance = false,
+  onConfigure,
+}: {
+  state: AccountState;
+  performance?: boolean;
+  onConfigure?: (key: DesktopKey, model?: DesktopPricing) => void;
+}) {
+  const { t } = useTranslation();
+  const [page, setPage] = useState(1),
+    [filters, setFilters] = useState<Record<string, string>>({}),
+    [snapshot, setSnapshot] = useState<string | undefined>(),
+    [selected, setSelected] = useState<DesktopPricing | null>(null),
+    [hours, setHours] = useState(24),
+    [keyId, setKeyId] = useState("");
+  const models = useDesktop<Models>(
+    state,
+    "/api/desktop/models",
+    { ...filters, page, snapshot_id: page > 1 ? snapshot : undefined },
+    300000,
+  );
+  const keys = useDesktop<Page<DesktopKey>>(
+    selected && onConfigure ? state : { ...state, identity: null },
+    "/api/desktop/keys",
+    { page: 1, page_size: 100, status: 1 },
+  );
+  useEffect(() => {
+    if (performance && !selected && models.data?.data.items[0])
+      setSelected(models.data.data.items[0]);
+  }, [performance, selected, models.data]);
+  const quality = useDesktop<Performance>(
+    selected ? state : { ...state, identity: null },
+    "/api/desktop/model-performance",
+    {
+      model: selected?.model_name,
+      hours,
+      resolution: "30m",
+      group: filters.group,
+    },
+    60000,
+    performance,
+  );
+  useEffect(() => {
+    const data = models.data?.data;
+    if (data) {
+      if (data.snapshot_refreshed && page > 1) {
+        setPage(1);
+        setSelected(null);
+      }
+      setSnapshot(data.snapshot_id);
+    }
+  }, [models.data, page]);
+  useEffect(() => {
+    if (
+      (models.error as unknown as DesktopError)?.code === "snapshot_changed"
+    ) {
+      setSnapshot(undefined);
+      setPage(1);
+      setSelected(null);
+    }
+  }, [models.error]);
+  const filter = (k: string, v: string) => {
+    setFilters((f) => ({ ...f, [k]: v }));
+    setSnapshot(undefined);
+    setPage(1);
+    setSelected(null);
+  };
+  return (
+    <>
+      <p>{t("account.business.accountPrices")}</p>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          "search",
+          "group",
+          "quota_type",
+          "endpoint_type",
+          "vendor",
+          "tag",
+          "models",
+        ].map((k) => (
+          <Field
+            key={k}
+            label={t(`account.business.modelFilter.${k}`)}
+            value={filters[k] ?? ""}
+            onChange={(v) => filter(k, v)}
+          />
+        ))}
+      </div>
+      <QueryState query={models} />
+      {models.data?.data.items.map((m) => (
+        <article key={m.model_name} className="border rounded p-3">
+          <h3>{m.model_name}</h3>
+          <p>
+            {m.description} · {m.tags} · {m.vendor_id}
+          </p>
+          <p>
+            {m.enable_groups.join(", ")} ·{" "}
+            {m.supported_endpoint_types.join(", ")}
+          </p>
+          <p>
+            {t("account.business.billingMode")}:{" "}
+            {m.billing_mode ?? m.quota_type} ·{" "}
+            {t("account.business.priceVersion")}: {m.pricing_version ?? "—"}
+          </p>
+          <p>
+            {m.pricing_unavailable
+              ? t("account.business.priceUnavailable")
+              : m.billing_expr ||
+                  m.conditional_task_pricing ||
+                  m.task_per_second_pricing
+                ? t("account.business.complexPrice")
+                : t("account.business.priceFields", {
+                    price: m.model_price ?? "—",
+                    ratio: m.model_ratio ?? "—",
+                    completion: m.completion_ratio ?? "—",
+                  })}
+          </p>
+          {m.billing_expr && <code>{m.billing_expr}</code>}
+          <Button
+            onClick={() => {
+              setSelected(m);
+              setKeyId("");
+            }}
+          >
+            {t("account.business.details")}
+          </Button>
+        </article>
+      ))}
+      {models.data && (
+        <Pager
+          page={page}
+          more={models.data.data.pagination.has_more}
+          onChange={(p) => {
+            setPage(p);
+            setSelected(null);
+          }}
+        />
+      )}
+      {selected && (
+        <section>
+          <h3>{selected.model_name}</h3>
+          <PricingDetails
+            model={selected}
+            meta={models.data?.data.pricing_meta ?? {}}
+            group={filters.group}
+          />
+          <label>
+            {t("account.business.window")}
+            <select
+              value={hours}
+              onChange={(e) => setHours(Number(e.target.value))}
+            >
+              {[1, 6, 24].map((h) => (
+                <option key={h} value={h}>
+                  {h} h
+                </option>
+              ))}
+            </select>
+          </label>
+          <QueryState query={quality} />
+          {quality.data && (
+            <>
+              <Metrics metric={quality.data.data.aggregate} />
+              {quality.data.data.groups.map((g) => (
+                <div key={g.group}>
+                  <h4>{g.group}</h4>
+                  <Metrics metric={g} />
+                </div>
+              ))}
+            </>
+          )}
+          {onConfigure && (
+            <>
+              <QueryState query={keys} />
+              <label>
+                {t("account.business.selectKey")}
+                <select
+                  value={keyId}
+                  onChange={(e) => setKeyId(e.target.value)}
+                >
+                  <option value="">—</option>
+                  {keys.data?.data.items.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.name} {k.masked_key}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button
+                disabled={!keyId}
+                onClick={() => {
+                  const k = keys.data?.data.items.find((k) => k.id === keyId);
+                  if (k) onConfigure(k, selected);
+                }}
+              >
+                {t("account.business.configure")}
+              </Button>
+            </>
+          )}
+          <Button onClick={() => setSelected(null)}>
+            {t("account.business.close")}
+          </Button>
+        </section>
+      )}
+    </>
+  );
+}
+function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <p>
+        {m.has_samples
+          ? t("account.business.samples")
+          : t("account.business.noSamples")}{" "}
+        · {t("account.business.latest")}:{" "}
+        {m.latest_sample_ts ? date(m.latest_sample_ts) : "—"} · {m.sample_level}
+        /{m.ttft_sample_level}
+      </p>
+      <p>
+        {t("account.business.latency")} {m.avg_latency_ms ?? "—"} ms · TTFT{" "}
+        {m.avg_ttft_ms ?? "—"} ms · {m.avg_tps ?? "—"} token/s ·{" "}
+        {t("account.business.successRate")} {m.success_rate ?? "—"}%
+      </p>
+      <p>{t("account.business.historical")}</p>
+      <dl>
+        {Object.entries(m.historical_values ?? {}).map(([key, value]) => (
+          <div key={key}>
+            <dt>{key}</dt>
+            <dd>
+              {typeof value === "number" && key.includes("timestamp")
+                ? date(value)
+                : typeof value === "object" && value
+                  ? `${value.value} (${date(value.ts)})`
+                  : String(value ?? "—")}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <table>
+        <tbody>
+          {m.half_hour_series.map((p) => (
+            <tr key={p.ts}>
+              <td>{date(p.ts)}</td>
+              <td>{p.avg_latency_ms ?? "—"} ms</td>
+              <td>{p.avg_ttft_ms ?? "—"} ms</td>
+              <td>{p.avg_tps ?? "—"} token/s</td>
+              <td>{p.success_rate ?? "—"}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
