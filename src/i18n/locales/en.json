@@ -2717,5 +2717,53 @@
     "expiredHint": "Run the {{tool}} command to refresh your login",
     "queryFailed": "Query failed",
     "refresh": "Refresh"
+  },
+  "account": {
+    "title": "Tuzi account",
+    "tools": "Tools",
+    "pagesLabel": "Account pages",
+    "pages": {
+      "overview": "Overview",
+      "keys": "API keys",
+      "logs": "Call logs",
+      "modelsStatus": "Model status",
+      "topup": "Top up",
+      "redeem": "Redeem",
+      "profile": "Profile",
+      "models": "Models"
+    },
+    "status": {
+      "loading": "Loading account state",
+      "disconnected": "Disconnected",
+      "authorizing": "Complete authorization in your default browser",
+      "exchanging": "Exchanging authorization code",
+      "verifying": "Verifying account identity",
+      "connected": "Connected",
+      "refreshing": "Refreshing connection",
+      "offline": "Offline",
+      "invalid": "Authorization expired; reconnect",
+      "error": "Account connection error"
+    },
+    "toolsIndependent": "Your Tuzi account is separate from tool sign-ins. Disconnecting keeps provider settings and tool requests intact.",
+    "offlineHint": "The account service is unreachable. This identity is a local record, not confirmation of a valid remote authorization.",
+    "remoteNotRevoked": "Local credentials were cleared, but remote revocation was not confirmed. Revoke this desktop connection in the website profile.",
+    "actionFailed": "The operation failed. Check your account state and try again.",
+    "connect": "Connect in browser",
+    "cancel": "Cancel authorization",
+    "retry": "Retry account state",
+    "disconnect": "Disconnect this connection",
+    "connectRequired": "Connect to use account features. Tool management remains available.",
+    "stagePending": "This page is not implemented yet. This stage provides account connection and state management.",
+    "errors": {
+      "generic": "The account service is unavailable. Retry or check its configuration.",
+      "insufficient_scope": "Required permissions are missing. Ask the service administrator to check the desktop client configuration.",
+      "unsupported_contract": "Client and account service versions are incompatible.",
+      "account_disabled": "This account is unavailable. Check its status on the website.",
+      "desktop_disabled": "The account service has not enabled desktop connections.",
+      "rate_limited": "Too many requests. Please try again later.",
+      "secure_storage_unavailable": "System credential storage is unavailable. Unlock or enable it; credentials will not be stored as plain text."
+    },
+    "navigation": "Account and tools",
+    "retryAfter": "Retry in {{seconds}} seconds."
   }
 }

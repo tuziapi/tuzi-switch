@@ -2717,5 +2717,53 @@
     "expiredHint": "请运行 {{tool}} 命令刷新登录",
     "queryFailed": "查询失败",
     "refresh": "刷新"
+  },
+  "account": {
+    "title": "兔子账户",
+    "tools": "工具管理",
+    "pagesLabel": "账户功能",
+    "pages": {
+      "overview": "总览",
+      "keys": "API 密钥",
+      "logs": "调用明细",
+      "modelsStatus": "模型服务状态",
+      "topup": "充值",
+      "redeem": "兑换",
+      "profile": "个人资料",
+      "models": "模型广场"
+    },
+    "status": {
+      "loading": "正在读取账户状态",
+      "disconnected": "未连接",
+      "authorizing": "请在默认浏览器中完成授权",
+      "exchanging": "正在交换授权码",
+      "verifying": "正在验证账户身份",
+      "connected": "已连接",
+      "refreshing": "正在刷新连接",
+      "offline": "离线",
+      "invalid": "授权已失效，请重新连接",
+      "error": "账户连接异常"
+    },
+    "toolsIndependent": "兔子账户与工具自身登录独立。断开连接不会删除供应商配置或停止工具调用。",
+    "offlineHint": "当前无法访问账户服务；此处身份为本机已有记录，不表示远端授权仍然有效。",
+    "remoteNotRevoked": "本机凭证已清理，但服务端撤销未确认。请到网站个人资料中撤销此桌面连接。",
+    "actionFailed": "操作未完成，请检查账户状态后重试。",
+    "connect": "通过浏览器连接",
+    "cancel": "取消授权",
+    "retry": "重试连接状态",
+    "disconnect": "断开当前连接",
+    "connectRequired": "连接账户后可使用账户功能，工具管理不受影响。",
+    "stagePending": "此页面尚未实现；当前阶段仅提供账户连接与状态管理。",
+    "errors": {
+      "generic": "账户服务暂不可用，请重试或检查服务配置。",
+      "insufficient_scope": "授权缺少必要权限，请联系服务管理员检查桌面客户端配置。",
+      "unsupported_contract": "客户端与账户服务版本不兼容，请检查版本。",
+      "account_disabled": "账户不可用，请到网站检查账户状态。",
+      "desktop_disabled": "账户服务暂未开放桌面连接。",
+      "rate_limited": "请求过于频繁，请稍后重试。",
+      "secure_storage_unavailable": "系统安全存储不可用，请解锁或启用系统凭据服务；不会保存明文凭证。"
+    },
+    "navigation": "兔子账户与工具管理",
+    "retryAfter": "请在 {{seconds}} 秒后重试。"
   }
 }
