@@ -31,6 +31,8 @@ pub struct AccountError {
     pub code: String,
     pub message: String,
     pub retry_after: Option<u64>,
+    #[serde(skip)]
+    refresh_not_consumed: bool,
 }
 impl AccountError {
     fn new(code: &str) -> Self {
@@ -38,6 +40,7 @@ impl AccountError {
             code: code.into(),
             message: code.into(),
             retry_after: None,
+            refresh_not_consumed: false,
         }
     }
     fn storage() -> Self {
@@ -107,6 +110,8 @@ pub struct Record {
     tokens: Option<Tokens>,
     identity: Option<Identity>,
     refresh_in_flight: bool,
+    #[serde(default)]
+    refresh_retry_at: i64,
 }
 impl Default for Record {
     fn default() -> Self {
@@ -119,6 +124,7 @@ impl Default for Record {
             tokens: None,
             identity: None,
             refresh_in_flight: false,
+            refresh_retry_at: 0,
         }
     }
 }
@@ -235,6 +241,7 @@ impl AccountService {
                 }
                 i.state.generation = r.generation;
                 i.record = r;
+                i.retry_not_before = i.record.refresh_retry_at;
                 i.state.local_cleared = i.record.tokens.is_none() && !i.record.refresh_in_flight;
                 if i.record.refresh_in_flight {
                     i.state.status = "invalid".into();
@@ -292,7 +299,7 @@ impl AccountService {
                 "error"
             }
             .into();
-            i.retry_not_before = now() + e.retry_after.unwrap_or(30).max(1) as i64;
+            i.retry_not_before = now().saturating_add(e.retry_after.unwrap_or(30).max(1).min(i64::MAX as u64) as i64);
             i.state.error = Some(e);
             if invalid {
                 i.state.identity = None;
@@ -383,6 +390,21 @@ impl AccountService {
                 .get("retry-after")
                 .and_then(|x| x.to_str().ok())
                 .and_then(|x| x.parse().ok());
+            let marked = matches!(status.as_u16(), 429 | 503)
+                && response.headers().get_all("OAuth-Refresh-Outcome").iter().count() == 1
+                && response.headers().get("OAuth-Refresh-Outcome").is_some_and(|h| h == "not-consumed");
+            if marked {
+                // Drain and validate the bounded response. A truncated or foreign
+                // response never proves that the refresh was rejected preflight.
+                let mut response = response;
+                let mut body = zeroize::Zeroizing::new(Vec::new());
+                while let Some(chunk) = response.chunk().await.map_err(|_| AccountError::new("network_uncertain"))? {
+                    if body.len() + chunk.len() > 65536 { return Err(AccountError::new("invalid_response")); }
+                    body.extend_from_slice(&chunk);
+                }
+                e.refresh_not_consumed = serde_json::from_slice::<serde_json::Value>(&body)
+                    .ok().is_some_and(|v| v.get("error").and_then(|v| v.as_str()) == Some("temporarily_unavailable"));
+            }
             return Err(e);
         }
         if response.content_length().is_some_and(|n| n > 65536) {
@@ -466,6 +488,7 @@ impl AccountService {
                 r.identity = Some(identity.clone());
                 r.pending = None;
                 r.refresh_in_flight = false;
+                r.refresh_retry_at = 0;
                 match self.persist(&r) {
                     Err(e) => Err(e),
                     Ok(()) => {
@@ -613,6 +636,31 @@ impl AccountService {
             .await
         {
             Ok(w) => w,
+            Err(e) if e.refresh_not_consumed => {
+                let mut i = self.inner.lock().unwrap();
+                if i.record.generation != generation { return i.state.clone(); }
+                let mut r = i.record.clone();
+                r.refresh_in_flight = false;
+                r.refresh_retry_at = now().saturating_add(e.retry_after.unwrap_or(30).max(1).min(i64::MAX as u64) as i64);
+                match self.persist(&r) {
+                    Ok(()) => {
+                        i.retry_not_before = r.refresh_retry_at;
+                        i.record = r;
+                        i.state.status = "offline".into();
+                        i.state.error = Some(e);
+                    }
+                    Err(e) => {
+                        // Original durable in-flight record remains terminal. Do
+                        // not reuse the RT until safe storage can be confirmed.
+                        i.state.status = "invalid".into();
+                        i.state.identity = None;
+                        i.state.local_cleared = false;
+                        i.state.error = Some(e);
+                    }
+                }
+                self.publish(&mut i.state);
+                return i.state.clone();
+            }
             Err(e) => {
                 let remote = self.revoke(&t.refresh_token).await;
                 self.fail(generation, e, true);

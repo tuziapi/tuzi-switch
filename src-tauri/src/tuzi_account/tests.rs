@@ -428,15 +428,15 @@ async fn real_go_loopback_pair() {
     let s = AccountService::with_store(store.clone(), &origin, "tuzi-switch-desktop-test").unwrap();
     let (_, authorize) = s.begin().unwrap();
     let url = Url::parse(&authorize).unwrap();
-    let mut body = serde_json::Map::new();
-    for (k,v) in url.query_pairs() { body.insert(k.into_owned(), serde_json::Value::String(v.into_owned())); }
-    body.insert("approve".into(), true.into());
     let login = s.http.post(format!("{origin}/fixture/login")).send().await.unwrap();
     assert!(login.status().is_success());
     let cookie = login.headers().get("set-cookie").unwrap().to_str().unwrap().split(';').next().unwrap().to_string();
     let context = s.http.get(format!("{origin}/api/oauth-provider/authorize-context?{}", url.query().unwrap()))
         .header("cookie", &cookie).header("New-Api-User", "1").send().await.unwrap();
     assert!(context.status().is_success());
+    let context: serde_json::Value = context.json().await.unwrap();
+    let mut body = context["data"]["request"].as_object().unwrap().clone();
+    body.insert("approve".into(), true.into());
     let approve: serde_json::Value = s.http.post(format!("{origin}/api/oauth-provider/authorize"))
         .header("cookie", &cookie).header("New-Api-User", "1").header("Origin", &origin)
         .json(&body).send().await.unwrap().json().await.unwrap();
@@ -446,6 +446,20 @@ async fn real_go_loopback_pair() {
     assert_eq!(state.status, "connected", "{}", state.error.as_ref().map(|e| e.code.as_str()).unwrap_or("none"));
     assert_eq!(state.identity.unwrap().user_id, "1");
     let old = { let mut i = s.inner.lock().unwrap(); let t = i.record.tokens.as_mut().unwrap(); t.access_expires = now()-1; t.clone() };
+    let toggle = |enabled| s.http.post(format!("{origin}/fixture/refresh-enabled?enabled={enabled}"));
+    assert!(toggle(false).send().await.unwrap().status().is_success());
+    let deferred = s.retry().await;
+    assert_eq!(deferred.status, "offline");
+    assert_eq!(deferred.error.unwrap().code, "temporarily_unavailable");
+    let saved = store.read().unwrap().unwrap();
+    assert!(!saved.refresh_in_flight);
+    assert_eq!(saved.tokens.as_ref().unwrap().refresh_token, old.refresh_token);
+    assert!(saved.refresh_retry_at >= now() + 55);
+    let restored = AccountService::with_store(store.clone(), &origin, "tuzi-switch-desktop-test").unwrap();
+    assert_eq!(restored.retry().await.status, "offline");
+    assert!(toggle(true).send().await.unwrap().status().is_success());
+    // Advance only the synthetic test deadline; production honors Retry-After.
+    { let mut i = s.inner.lock().unwrap(); i.retry_not_before = 0; }
     let refreshed = s.retry().await;
     assert_eq!(refreshed.status, "connected");
     let new = s.inner.lock().unwrap().record.tokens.clone().unwrap();
@@ -562,4 +576,135 @@ fn maintenance_is_visible_bounded_and_honors_retry_after() {
     for _ in 0..3 {assert!(s.take_maintenance_attempt(true));}
     assert!(!s.take_maintenance_attempt(true));
     assert_eq!(s.inner.lock().unwrap().maintenance_attempts,3);
+}
+
+#[tokio::test]
+async fn marked_refresh_backoff_preserves_rt_across_restart_and_never_revives_logout() {
+    use axum::{routing::{get,post}, Router};
+    for status in [429,503] {
+        for mode in ["recover", "write_failure", "logout"] {
+            let store=Arc::new(MemoryStore::default());
+            let count=Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let consumed=Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let revokes=Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let c=count.clone();let used=consumed.clone();let rs=revokes.clone();let fault=store.clone();
+            let grant=now()+2592000;let connection=uuid::Uuid::new_v4().to_string();let conn=connection.clone();
+            let app=Router::new().route("/api/oauth-provider/token",post(move || {let c=c.clone();let used=used.clone();let conn=conn.clone();let fault=fault.clone();async move {
+                let n=c.fetch_add(1,std::sync::atomic::Ordering::SeqCst);
+                if n==0 {
+                    if mode=="write_failure" {*fault.fail.lock().unwrap()=true;}
+                    return (axum::http::StatusCode::from_u16(status).unwrap(),[("OAuth-Refresh-Outcome","not-consumed"),("Retry-After","120")],axum::Json(serde_json::json!({"error":"temporarily_unavailable"})));
+                }
+                used.fetch_add(1,std::sync::atomic::Ordering::SeqCst);
+                (axum::http::StatusCode::OK,[("x-synthetic","test"),("x-synthetic-two","test")],axum::Json(serde_json::json!({"access_token":"N".repeat(43),"refresh_token":"T".repeat(43),"token_type":"Bearer","scope":SCOPES,"expires_in":1800,"refresh_expires_in":604800,"grant_expires_at":grant,"user_id":"1","connection_id":conn,"scope_version":"desktop-v1"})))
+            }})).route("/api/oauth-provider/userinfo",get(|| async {axum::Json(serde_json::json!({"sub":"1","user_id":"1","preferred_username":"synthetic","name":"Synthetic"}))}))
+            .route("/api/oauth-provider/revoke",post(move || {let rs=rs.clone();async move {rs.fetch_add(1,std::sync::atomic::Ordering::SeqCst);axum::http::StatusCode::OK}}));
+            let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();let origin=format!("http://{}",listener.local_addr().unwrap());
+            let server=tokio::spawn(async move {axum::serve(listener,app).await.unwrap()});
+            let s=test_service(store.clone(),&origin);s.load();
+            {let mut i=s.inner.lock().unwrap();i.record.tokens=Some(Tokens {access_token:"S".repeat(43),refresh_token:"R".repeat(43),user_id:"1".into(),connection_id:connection,access_expires:now()-1,refresh_expires:now()+604800,grant_expires:grant});s.persist(&i.record).unwrap();}
+            let state=s.retry().await;
+            assert_eq!(revokes.load(std::sync::atomic::Ordering::SeqCst),0);
+            assert_eq!(consumed.load(std::sync::atomic::Ordering::SeqCst),0);
+            assert_eq!(state.status,if mode=="write_failure" {"invalid"} else {"offline"});
+            s.retry().await;assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst),1);
+            *store.fail.lock().unwrap()=false;
+            let restored=AccountService::with_store(store.clone(),&origin,"tuzi-switch-desktop-test").unwrap();restored.state();
+            restored.retry().await;assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst),1);
+            if mode=="recover" {
+                {let mut i=restored.inner.lock().unwrap();assert!(!i.record.refresh_in_flight);assert_eq!(i.record.tokens.as_ref().unwrap().refresh_token,"R".repeat(43));i.retry_not_before=0;}
+                assert_eq!(restored.retry().await.status,"connected");assert_eq!(consumed.load(std::sync::atomic::Ordering::SeqCst),1);
+            } else if mode=="logout" {
+                assert!(restored.logout().await.local_cleared);
+                assert_eq!(AccountService::with_store(store.clone(),&origin,"tuzi-switch-desktop-test").unwrap().retry().await.status,"disconnected");
+                assert_eq!(consumed.load(std::sync::atomic::Ordering::SeqCst),0);
+            } else {assert!(store.read().unwrap().unwrap().refresh_in_flight);}
+            server.abort();
+        }
+    }
+}
+
+#[tokio::test]
+async fn unproven_refresh_errors_never_clear_the_journal() {
+    use axum::{routing::post,Router};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for (status,proof) in [(429,""),(503,""),(503,"unknown"),(500,"not-consumed"),(503,"not-consumed, not-consumed")] {
+        let count = Arc::new(AtomicUsize::new(0));
+        let calls = count.clone();
+        let app=Router::new().route("/api/oauth-provider/token",post(move || {let calls=calls.clone(); async move {
+            calls.fetch_add(1, Ordering::SeqCst);
+            (axum::http::StatusCode::from_u16(status).unwrap(),[("OAuth-Refresh-Outcome",proof)],axum::Json(serde_json::json!({"error":"temporarily_unavailable"})))
+        }})).route("/api/oauth-provider/revoke",post(|| async {axum::http::StatusCode::OK}));
+        let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();let origin=format!("http://{}",listener.local_addr().unwrap());
+        let server=tokio::spawn(async move {axum::serve(listener,app).await.unwrap()});
+        let store=Arc::new(MemoryStore::default());
+        let s=test_service(store.clone(),&origin);s.load();
+        {let mut i=s.inner.lock().unwrap();i.record.tokens=Some(Tokens {access_token:"S".repeat(43),refresh_token:"R".repeat(43),user_id:"1".into(),connection_id:uuid::Uuid::new_v4().to_string(),access_expires:now()-1,refresh_expires:now()+604800,grant_expires:now()+2592000});s.persist(&i.record).unwrap();}
+        assert_eq!(s.retry().await.status, "invalid");
+        assert!(store.read().unwrap().unwrap().refresh_in_flight);
+        assert_eq!(s.retry().await.status, "invalid");
+        let restored=AccountService::with_store(store,&origin,"tuzi-switch-desktop-test").unwrap();
+        assert_eq!(restored.retry().await.status, "invalid");
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        server.abort();
+    }
+}
+
+#[tokio::test]
+async fn duplicate_outcome_and_truncated_body_are_not_proof() {
+    use axum::{routing::post,Router};
+    let app=Router::new().route("/error",post(|| async {
+        let mut headers=axum::http::HeaderMap::new();
+        headers.append("OAuth-Refresh-Outcome","not-consumed".parse().unwrap());
+        headers.append("OAuth-Refresh-Outcome","unknown".parse().unwrap());
+        (axum::http::StatusCode::SERVICE_UNAVAILABLE,headers,axum::Json(serde_json::json!({"error":"temporarily_unavailable"})))
+    })).route("/truncated",post(|| async {(axum::http::StatusCode::SERVICE_UNAVAILABLE,[("OAuth-Refresh-Outcome","not-consumed")],"{\"error\":")}));
+    let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();let origin=format!("http://{}",listener.local_addr().unwrap());
+    let server=tokio::spawn(async move {axum::serve(listener,app).await.unwrap()});let s=test_service(Arc::new(MemoryStore::default()),&origin);
+    for path in ["error","truncated"] {assert!(!s.response::<serde_json::Value>(s.http.post(format!("{origin}/{path}"))).await.unwrap_err().refresh_not_consumed);}
+    let mut e=AccountError::new("rate_limited");e.retry_after=Some(u64::MAX);s.fail(0,e,false);
+    assert_eq!(s.inner.lock().unwrap().retry_not_before,i64::MAX);
+    server.abort();
+}
+
+#[tokio::test]
+async fn delayed_marked_rejection_cannot_restore_after_logout() {
+    use axum::{routing::post,Router};
+    let entered=Arc::new(tokio::sync::Notify::new());let release=Arc::new(tokio::sync::Notify::new());
+    let notify=entered.clone();let gate=release.clone();
+    let app=Router::new().route("/api/oauth-provider/token",post(move || {let notify=notify.clone();let gate=gate.clone();async move {notify.notify_one();gate.notified().await;(axum::http::StatusCode::SERVICE_UNAVAILABLE,[("OAuth-Refresh-Outcome","not-consumed"),("Retry-After","60")],axum::Json(serde_json::json!({"error":"temporarily_unavailable"})))}}))
+        .route("/api/oauth-provider/revoke",post(|| async {axum::http::StatusCode::OK}));
+    let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();let origin=format!("http://{}",listener.local_addr().unwrap());
+    let server=tokio::spawn(async move {axum::serve(listener,app).await.unwrap()});let store=Arc::new(MemoryStore::default());let s=Arc::new(test_service(store.clone(),&origin));s.load();
+    {let mut i=s.inner.lock().unwrap();i.record.tokens=Some(Tokens {access_token:"S".repeat(43),refresh_token:"R".repeat(43),user_id:"1".into(),connection_id:uuid::Uuid::new_v4().to_string(),access_expires:now()-1,refresh_expires:now()+604800,grant_expires:now()+2592000});s.persist(&i.record).unwrap();}
+    let service=s.clone();let refresh=tokio::spawn(async move {service.retry().await});
+    tokio::time::timeout(Duration::from_secs(2),entered.notified()).await.unwrap();
+    assert!(s.logout().await.local_cleared);release.notify_one();
+    assert_eq!(refresh.await.unwrap().status,"disconnected");
+    assert!(store.read().unwrap().unwrap().tokens.is_none());
+    assert_eq!(AccountService::with_store(store,&origin,"tuzi-switch-desktop-test").unwrap().retry().await.status,"disconnected");
+    server.abort();
+}
+
+#[tokio::test]
+async fn incomplete_transport_and_oversized_error_are_not_proof() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    for oversized in [false, true] {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0u8; 4096];
+            socket.read(&mut request).await.unwrap();
+            let body = if oversized { format!("{{\"error\":\"temporarily_unavailable\",\"padding\":\"{}\"}}", "x".repeat(65536)) } else { "{\"error\":\"temporarily_unavailable\"}".into() };
+            let declared = body.len() + if oversized { 0 } else { 100 };
+            let response = format!("HTTP/1.1 503 Service Unavailable\r\nOAuth-Refresh-Outcome: not-consumed\r\nContent-Length: {declared}\r\nConnection: close\r\n\r\n{body}");
+            let _ = socket.write_all(response.as_bytes()).await;
+        });
+        let s = test_service(Arc::new(MemoryStore::default()), &origin);
+        let error = s.response::<serde_json::Value>(s.http.post(format!("{origin}/error"))).await.unwrap_err();
+        assert!(!error.refresh_not_consumed);
+        assert_eq!(error.code, if oversized { "invalid_response" } else { "network_uncertain" });
+        server.await.unwrap();
+    }
 }
