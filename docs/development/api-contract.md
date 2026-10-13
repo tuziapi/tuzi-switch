@@ -74,6 +74,8 @@ IF-06 items/detail白名单恰 `id,name,masked_key,status,group,created_time,acc
 
 IF-07 POST必需name/group/expired_time/remain_quota/unlimited_quota/model_limits_enabled/model_limits，allow_ips/exclude_ips可缺默认空；PATCH仅这些九项，缺项保留，IP空串清除不收null。name≤50 UTF-8字节（沿用允许空名）；group逗号分隔逐组验证；model_limits≤16KiB，IP各≤4KiB且现有格式验证；quota≥0且≤min(int64上界,10^9×quota_per_unit)，到期-1或未来秒；禁写used_quota/status/user_id/高级路由。服务器事务读合并保留未展示字段，不能前端全量回传。创建data `{id:string,key:string}`，token:write一次受控明文；编辑回detail；status PATCH恰 `{status:1|2}`且遵守现有过期/耗尽检查；删除null。IF-08无body，data `{key:string}`，独立scope/限流，不进query cache/日志，取消/换号清内存。
 
+2026-10-14 G2 实施事实补充：IF-07 创建和 IF-08 揭示的 `key` 是带单个 `sk-` 前缀的可调用模型 Key，与网站显式复制动作一致。数据库继续保存原有裸 Key，旧 API 的返回及 relay 查找规则不变；仅桌面 DTO 做格式转换。不得将其与账户 OAuth 混用。两端真实配对及旧存储/查找兼容测试通过，见 [G2 验证记录](g2-verification.md)；不改变 desktop-v1.1 或 scope。
+
 本地非秘密关联 `{api_origin,user_id,token_id,app_id,provider_id}`，退出不删工具配置；不能从名称/掩码猜历史归属。batch/delete批量/导出不是首版。
 
 ## 日志与消费

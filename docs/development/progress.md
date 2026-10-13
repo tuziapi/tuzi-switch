@@ -165,3 +165,21 @@ R1 旧 OAuth 授权兼容与 R2 token 请求体上限已修复，正式回归通
 API 当前 HEAD 为 `20f797d33`，客户端继续为 `74aa8ed5de159e7ea2c7150e47e449fc660387eb`；客户端未改业务代码。五包定向回归及 middleware/controller/router 全量相关包测试通过。未执行 push、PR、部署、生产迁移。保留未验证的 race、实 MySQL/PG/Redis、多平台、完整浏览器/2FA 限制。
 
 结论：修复后的 G1 检查点通过，**具备在新任务授权下进入 G2 本地开发的条件**；本轮停在 G1，不自动进入 G2，也不宣称可以上线。
+
+## G2 本地研发检查点（2026-10-14，最终）
+
+本目标已授权 G2 本地编码、隔离验证、非作者审查、阶段提交和本地集成。T08—T11、T13—T18 全部完成范围内实现和 G2 本地验收，无剩余阻塞；TA-AC-1.5-B3 / desktop-v1.1 / desktop-v1 不变。上方 G1/未开始记录属于历史，不代表本轮状态。
+
+| 仓库 | 本地集成分支 | 最终配对代码 SHA |
+|---|---|---|
+| 客户端 | `codex/tuzi-assistant-dev` | `49ea2584c2a6f8f9699ef62eb210aa63e778d268` |
+| API | `codex/tuzi-assistant-dev` | `665f318466afce017a8db89c349eeedefcf7f3ea` |
+
+- 代码：真实原生账户/Key/日志用量/模型性能/五字段资料/固定网页入口接入；七工具账户来源保存、完整备份、失败补偿、并发检查恢复已实现；不自动付费调用。
+- 验证：客户端 typecheck、12 文件 113 项 React/查询/兼容测试、renderer 构建通过；Rust account 31 项、事务 12 项通过（默认忽略的配对测试另显式执行）；API 五包定向回归及独立性能引擎测试通过。固定提交非作者审查、修复复验及本地集成完成。
+- 实际配对：最终上述 SHA 在隔离 Go HTTP/合成 SQLite → Rust 业务链路通过完整账户、Key、日志用量、模型性能、资料回读和鉴权错误验证，包含实时工具资格与一次性揭示来源证明。临时服务、DB、origin/stop 文件及 UUID 专用 Keychain 条目已清理。
+- 兼容：桌面 create/reveal 输出网站复制动作一致的 `sk-` 模型 Key；存储、旧 API、relay 不变，无 G2 生产 schema 迁移。账户 OAuth 仍仅系统安全存储；本机来源关联排除导出/WebDAV。保留 G1/R1/R2 修复。
+
+完整任务—AC—接口—实现—证据、命令、逐工具测试、固定 SHA 审查、复现与配对回退顺序见 [g2-verification.md](g2-verification.md) 和 [ADR-005](decisions/0005-g2-local-tool-transactions.md)。后续纯文档提交不改变上述代码配对。
+
+发布与验收：未 push、PR、部署、生产访问/登记/迁移或付费测试；用户产品验收未代确认。T19—T22、真实 MySQL 版本/主库及 LOG_DB 拓扑、Redis 多实例、Windows/Linux 实机、三平台安装包和完整浏览器/2FA 尚待后续授权验证。G2 检查点通过，本目标停止，不进入 G3。
