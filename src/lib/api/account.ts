@@ -44,3 +44,40 @@ export const accountApi = {
   logout: () => invoke<AccountState>("account_logout"),
   retry: () => invoke<AccountState>("account_retry"),
 };
+
+export type WebTarget =
+  | "topup"
+  | "redemption"
+  | "personal"
+  | "coding"
+  | "gaccode";
+export interface DesktopRequest {
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  path: string;
+  query?: [string, string][];
+  body?: unknown;
+  generation: number;
+}
+export const desktopRequest = async <T>(
+  request: DesktopRequest,
+  signal?: AbortSignal,
+) => {
+  const requestId = crypto.randomUUID();
+  const cancel = () => {
+    void invoke("account_cancel_request", { requestId }).catch(() => {});
+  };
+  if (signal?.aborted) throw new Error("cancelled");
+  signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    const result = await invoke<import("./desktop").Envelope<T>>(
+      "account_request",
+      { request: { ...request, requestId } },
+    );
+    if (signal?.aborted) throw new Error("cancelled");
+    return result;
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+  }
+};
+export const openAccountWeb = (target: WebTarget) =>
+  invoke<void>("account_open_web", { target });
