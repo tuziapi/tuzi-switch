@@ -22,7 +22,19 @@ export function ModelsPage({
   performance?: boolean;
   onConfigure?: (key: DesktopKey, model?: DesktopPricing) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const description = (model: DesktopPricing) => {
+    try {
+      const translations: unknown = JSON.parse(model.description_i18n);
+      if (translations && typeof translations === "object") {
+        const entry = (translations as Record<string, unknown>)[i18n.language];
+        if (typeof entry === "string") return entry;
+      }
+    } catch {
+      /* Legacy descriptions may omit translations. */
+    }
+    return model.description;
+  };
   const [page, setPage] = useState(1),
     [filters, setFilters] = useState<Record<string, string>>({}),
     [snapshot, setSnapshot] = useState<string | undefined>(),
@@ -107,7 +119,7 @@ export function ModelsPage({
         <article key={m.model_name} className="border rounded p-3">
           <h3>{m.model_name}</h3>
           <p>
-            {m.description} · {m.tags} · {m.vendor_id}
+            {description(m)} · {m.tags} · {m.vendor_id}
           </p>
           <p>
             {m.enable_groups.join(", ")} ·{" "}
