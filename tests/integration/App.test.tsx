@@ -2,6 +2,9 @@ import { Suspense, type ComponentType } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { server } from "../msw/server";
+import { disconnectedAccount } from "@/lib/api/account";
 import { providersApi } from "@/lib/api/providers";
 import {
   deleteProvider as deleteProviderState,
@@ -53,7 +56,9 @@ vi.mock("@/components/providers/ProviderList", () => ({
         delete
       </button>
       {onRemoveFromConfig && (
-        <button onClick={() => onRemoveFromConfig(providers[currentProviderId])}>
+        <button
+          onClick={() => onRemoveFromConfig(providers[currentProviderId])}
+        >
           remove-config
         </button>
       )}
@@ -175,9 +180,43 @@ const renderApp = (AppComponent: ComponentType) => {
 
 describe("App integration with MSW", () => {
   beforeEach(() => {
+    localStorage.removeItem("tuzi-switch-last-view");
+    server.use(
+      http.post("http://tauri.local/account_get_state", () =>
+        HttpResponse.json(disconnectedAccount),
+      ),
+    );
     resetProviderState();
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
+  });
+
+  it("keeps tools usable while switching through disconnected account pages", async () => {
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    await screen.findByTestId("provider-list");
+    const notice = await screen.findByRole("button", {
+      name: "firstRunNotice.confirm",
+    });
+    fireEvent.click(notice);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "account.title" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "account.status.disconnected",
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "account.pages.keys" }));
+    expect(screen.getByText("account.stagePending")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "account.tools" }));
+    expect(await screen.findByTestId("provider-list")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("switch-openclaw"));
+    expect(await screen.findByTitle("workspace.manage")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("switch-claude"));
+    expect(await screen.findByTitle("skills.manage")).toBeInTheDocument();
+    expect(screen.getByTitle("sessionManager.title")).toBeInTheDocument();
   });
 
   it("covers basic provider flows via real hooks", async () => {

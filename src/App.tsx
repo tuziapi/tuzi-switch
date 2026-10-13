@@ -61,6 +61,8 @@ import {
   DRAG_REGION_ATTR,
   DRAG_REGION_STYLE,
 } from "@/lib/platform";
+import { AccountPage } from "@/components/account/AccountPage";
+import { useAccount } from "@/lib/query/account";
 import { AppSwitcher } from "@/components/AppSwitcher";
 import { ProviderList } from "@/components/providers/ProviderList";
 import { AddProviderDialog } from "@/components/providers/AddProviderDialog";
@@ -96,6 +98,7 @@ import OpenClawHealthBanner from "@/components/openclaw/OpenClawHealthBanner";
 import HermesMemoryPanel from "@/components/hermes/HermesMemoryPanel";
 
 type View =
+  | "account"
   | "providers"
   | "settings"
   | "prompts"
@@ -141,6 +144,7 @@ const getInitialApp = (): AppId => {
 
 const VIEW_STORAGE_KEY = "tuzi-switch-last-view";
 const VALID_VIEWS: View[] = [
+  "account",
   "providers",
   "settings",
   "prompts",
@@ -168,6 +172,7 @@ const getInitialView = (): View => {
 function App() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const account = useAccount();
 
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
   const [currentView, setCurrentView] = useState<View>(getInitialView);
@@ -999,6 +1004,8 @@ function App() {
   const renderContent = () => {
     const content = (() => {
       switch (currentView) {
+        case "account":
+          return <AccountPage account={account} />;
         case "settings":
           return (
             <SettingsPage
@@ -1285,6 +1292,7 @@ function App() {
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
                 <h1 className="text-lg font-semibold">
+                  {currentView === "account" && t("account.title")}
                   {currentView === "settings" && t("settings.title")}
                   {currentView === "prompts" &&
                     t("prompts.title", { appName: t(`apps.${activeApp}`) })}
@@ -1678,6 +1686,27 @@ function App() {
         </div>
       </header>
 
+      <nav
+        aria-label={t("account.navigation", {
+          defaultValue: "兔子账户与工具管理",
+        })}
+        className="flex gap-2 px-6 py-2 border-b"
+      >
+        <Button
+          variant={currentView === "account" ? "default" : "ghost"}
+          aria-current={currentView === "account" ? "page" : undefined}
+          onClick={() => setCurrentView("account")}
+        >
+          {t("account.title")}
+        </Button>
+        <Button
+          variant={currentView !== "account" ? "default" : "ghost"}
+          aria-current={currentView !== "account" ? "page" : undefined}
+          onClick={() => setCurrentView("providers")}
+        >
+          {t("account.tools")}
+        </Button>
+      </nav>
       <main className="flex-1 min-h-0 flex flex-col overflow-y-auto animate-fade-in">
         {isOpenClawView && openclawHealthWarnings.length > 0 && (
           <OpenClawHealthBanner warnings={openclawHealthWarnings} />
