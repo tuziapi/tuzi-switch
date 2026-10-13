@@ -185,6 +185,9 @@ describe("App integration with MSW", () => {
       http.post("http://tauri.local/account_get_state", () =>
         HttpResponse.json(disconnectedAccount),
       ),
+      http.post("http://tauri.local/get_current_import_urls", () =>
+        HttpResponse.json([]),
+      ),
     );
     resetProviderState();
     toastSuccessMock.mockReset();
