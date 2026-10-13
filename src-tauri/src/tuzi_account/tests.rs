@@ -342,3 +342,70 @@ async fn single_flight_refresh_and_uncertain_journal_never_replays() {
         task.abort();
     }
 }
+
+#[tokio::test]
+async fn failed_logout_is_truthful_and_retry_clears_persisted_secrets() {
+    let store = Arc::new(MemoryStore::default());
+    let s = AccountService::with_store(store.clone(), ORIGIN, CLIENT).unwrap();
+    s.begin().unwrap();
+    *store.fail.lock().unwrap() = true;
+    let state = s.logout().await;
+    assert!(!state.local_cleared);
+    assert_eq!(state.status, "error");
+    assert!(s.begin().is_err());
+    *store.fail.lock().unwrap() = false;
+    let retry = s.retry().await;
+    assert!(retry.local_cleared);
+    assert!(store
+        .record
+        .lock()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .pending
+        .is_none());
+}
+#[test]
+fn restart_inflight_does_not_claim_local_clear() {
+    let store = Arc::new(MemoryStore::default());
+    let mut r = Record::default();
+    r.refresh_in_flight = true;
+    store.write(&r).unwrap();
+    let s = AccountService::with_store(store, ORIGIN, CLIENT).unwrap();
+    assert!(!s.state().local_cleared);
+}
+#[tokio::test]
+async fn pending_expiry_and_restore_are_enforced() {
+    let store = Arc::new(MemoryStore::default());
+    let s = AccountService::with_store(store.clone(), ORIGIN, CLIENT).unwrap();
+    s.begin().unwrap();
+    let restored = AccountService::with_store(store.clone(), ORIGIN, CLIENT).unwrap();
+    assert_eq!(restored.state().status, "authorizing");
+    {
+        let mut r = store.record.lock().unwrap();
+        r.as_mut().unwrap().pending.as_mut().unwrap().expires = now() - 1;
+    }
+    let expired = AccountService::with_store(store, ORIGIN, CLIENT).unwrap();
+    assert_eq!(expired.state().error.unwrap().code, "authorization_timeout");
+}
+#[tokio::test]
+async fn trusted_client_never_follows_redirect_with_credentials() {
+    use axum::{response::Redirect, routing::post, Router};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let app = Router::new().route(
+        "/redirect",
+        post(|| async { Redirect::temporary("https://example.invalid/stolen") }),
+    );
+    let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let s = test_service(Arc::new(MemoryStore::default()), &origin);
+    let result = s
+        .response::<serde_json::Value>(
+            s.http
+                .post(format!("{origin}/redirect"))
+                .bearer_auth("synthetic-never-real"),
+        )
+        .await;
+    assert_eq!(result.unwrap_err().code, "server_error");
+    task.abort();
+}

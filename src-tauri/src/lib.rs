@@ -78,7 +78,7 @@ use tauri_plugin_updater::UpdaterExt;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 fn redact_url_for_log(url_str: &str) -> String {
-    if url_str.to_ascii_lowercase().starts_with("tuziswitch://auth") {
+    if crate::tuzi_account::is_auth_input(url_str) {
         return "tuziswitch://auth/[redacted]".into();
     }
     match url::Url::parse(url_str) {
@@ -917,8 +917,10 @@ pub fn run() {
                 }
             }
 
-            app.manage(Arc::new(crate::tuzi_account::AccountService::new()
-                .map_err(|_| "account initialization failed")?));
+            let account_service = Arc::new(crate::tuzi_account::AccountService::new()
+                .map_err(|_| "account initialization failed")?);
+            account_service.attach(app.handle().clone());
+            app.manage(account_service);
             // Cold-start CLI callbacks use the same secret-safe dispatcher.
             for arg in std::env::args() {
                 if crate::tuzi_account::handle_callback(app.handle(), &arg) { break; }
