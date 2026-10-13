@@ -126,6 +126,8 @@ struct Inner {
     record: Record,
     state: AccountState,
     loaded: bool,
+    cleanup_token: Option<Tokens>,
+    retry_not_before: i64,
 }
 pub struct AccountService {
     inner: Mutex<Inner>,
@@ -164,6 +166,8 @@ impl AccountService {
                 record: Record::default(),
                 state: AccountState::default(),
                 loaded: false,
+                cleanup_token: None,
+                retry_not_before: 0,
             }),
             operation: tokio::sync::Mutex::new(()),
             store,
@@ -174,8 +178,23 @@ impl AccountService {
             revision: std::sync::atomic::AtomicU64::new(0),
         })
     }
-    pub fn attach(&self, app: tauri::AppHandle) {
-        *self.app.lock().unwrap() = Some(app);
+    pub fn attach(self: &Arc<Self>, app: tauri::AppHandle) {
+        *self.app.lock().unwrap() = Some(app.clone());
+        let weak = Arc::downgrade(self);
+        tauri::async_runtime::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                let Some(service) = weak.upgrade() else { break; };
+                let state = service.state(); // Expire pending even after process restart.
+                let visible = app.get_webview_window("main").is_some_and(|w| w.is_visible().unwrap_or(false));
+                if visible && matches!(state.status.as_str(), "connected" | "offline") {
+                    let due = { let i = service.inner.lock().unwrap();
+                        i.record.tokens.as_ref().is_some_and(|t| t.access_expires <= now() + 30)
+                            && i.retry_not_before <= now() };
+                    if due { service.retry().await; }
+                }
+            }
+        });
     }
     fn publish(&self, state: &mut AccountState) {
         state.revision = self
@@ -245,6 +264,11 @@ impl AccountService {
             }
             self.publish(&mut i.state);
         }
+        if i.state.status == "connected" && i.record.tokens.as_ref().is_some_and(|t| t.access_expires <= now()) {
+            i.state.status = "offline".into();
+            i.state.error = Some(AccountError::new("access_expired"));
+            self.publish(&mut i.state);
+        }
         i.state.clone()
     }
     fn fail(&self, generation: u64, e: AccountError, invalid: bool) -> AccountState {
@@ -258,15 +282,18 @@ impl AccountService {
                 "error"
             }
             .into();
+            i.retry_not_before = now() + e.retry_after.unwrap_or(30).max(1) as i64;
             i.state.error = Some(e);
             if invalid {
                 i.state.identity = None;
-                // Invalid authorization cannot be restored by a later retry or restart.
+                // Block in-memory reuse even if the secure-store write fails.
                 let mut r = i.record.clone();
                 r.refresh_in_flight = r.tokens.is_some();
-                if self.persist(&r).is_ok() {
-                    i.record = r;
+                if self.persist(&r).is_err() {
+                    i.state.local_cleared = false;
+                    i.state.error = Some(AccountError::storage());
                 }
+                i.record = r;
             }
             self.publish(&mut i.state);
         }
@@ -527,7 +554,7 @@ impl AccountService {
         let _operation = self.operation.lock().await;
         let (t, generation) = {
             let i = self.inner.lock().unwrap();
-            if i.record.refresh_in_flight {
+            if i.record.refresh_in_flight || i.retry_not_before > now() {
                 return i.state.clone();
             }
             let Some(t) = i.record.tokens.clone() else {
@@ -574,7 +601,13 @@ impl AccountService {
             .await
         {
             Ok(w) => w,
-            Err(e) => return self.fail(generation, e, true),
+            Err(e) => {
+                let remote = self.revoke(&t.refresh_token).await;
+                self.fail(generation, e, true);
+                let mut i = self.inner.lock().unwrap();
+                if i.record.generation == generation { i.state.remote_revoked = Some(remote); self.publish(&mut i.state); }
+                return i.state.clone();
+            },
         };
         let next = match wire.validate(now(), Some(&t)) {
             Ok(t) => t,
@@ -589,7 +622,7 @@ impl AccountService {
         self.load();
         let (token, generation) = {
             let mut i = self.inner.lock().unwrap();
-            let token = i.record.tokens.clone();
+            let token = i.record.tokens.clone().or_else(|| i.cleanup_token.clone());
             let generation = i.record.generation + 1;
             let r = Record {
                 generation,
@@ -599,6 +632,8 @@ impl AccountService {
             };
             let saved = self.persist(&r);
             i.record = r;
+            i.cleanup_token = token.clone();
+            i.retry_not_before = 0;
             i.state = AccountState {
                 generation,
                 local_cleared: saved.is_ok(),
@@ -617,6 +652,7 @@ impl AccountService {
         };
         let mut i = self.inner.lock().unwrap();
         if i.record.generation == generation {
+            if remote == Some(true) { i.cleanup_token = None; }
             i.state.remote_revoked = remote;
             self.publish(&mut i.state);
         }
@@ -732,6 +768,9 @@ fn parse_callback(input: &str) -> Result<Callback, AccountError> {
 
 fn emit(app: &tauri::AppHandle, state: &AccountState) {
     let _ = app.emit("account-state-changed", state);
+}
+pub fn is_import_input(input: &str) -> bool {
+    Url::parse(input).is_ok_and(|u| u.scheme() == "tuziswitch" && u.host_str() == Some("v1") && u.path() == "/import" && u.username().is_empty() && u.password().is_none() && u.port().is_none())
 }
 pub fn is_auth_input(input: &str) -> bool {
     input.to_ascii_lowercase().starts_with("tuziswitch://auth")

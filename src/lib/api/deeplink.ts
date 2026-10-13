@@ -75,7 +75,7 @@ export const deeplinkApi = {
    * This closes the cold-start race before React event listeners are ready.
    */
   getCurrentUrls: async (): Promise<string[] | null> => {
-    return invoke("plugin:deep-link|get_current");
+    return invoke("get_current_import_urls");
   },
 
   /**

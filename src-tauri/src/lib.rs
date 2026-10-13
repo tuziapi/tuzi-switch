@@ -165,6 +165,14 @@ fn run_updater_install_verification(app: &tauri::AppHandle) {
 /// - 解析 URL
 /// - 向前端发射 `deeplink-import` / `deeplink-error` 事件
 /// - 可选：在成功时聚焦主窗口
+#[tauri::command]
+fn get_current_import_urls(app: tauri::AppHandle) -> Vec<String> {
+    use tauri_plugin_deep_link::DeepLinkExt;
+    app.deep_link().get_current().ok().flatten().unwrap_or_default()
+        .into_iter().filter(|url| crate::tuzi_account::is_import_input(url.as_str()))
+        .map(|url| url.to_string()).collect()
+}
+
 fn handle_deeplink_url(
     app: &tauri::AppHandle,
     url_str: &str,
@@ -1375,6 +1383,7 @@ pub fn run() {
             commands::delete_db_backup,
             commands::sync_current_providers_live,
             // Deep link import
+            get_current_import_urls,
             commands::parse_deeplink,
             commands::merge_deeplink_config,
             commands::import_from_deeplink,
