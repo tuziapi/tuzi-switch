@@ -23,6 +23,7 @@ import { formatMoney } from "@/lib/accountMoney";
 import { useDesktop } from "@/lib/query/desktop";
 import {
   Keys,
+  Overview,
   Logs,
   ModelsPage,
   ProfilePage,
@@ -195,6 +196,48 @@ describe("identity-isolated native business queries", () => {
     });
     await waitFor(() => expect(signal.aborted).toBe(true));
     hook.unmount();
+  });
+});
+describe("overview time window", () => {
+  it("pins summary and trend to the same explicit local day window", async () => {
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.path.endsWith("/account"))
+        return env({
+          username: "synthetic",
+          group: "default",
+          quota: "1",
+          used_quota: "1",
+          request_count: "1",
+          money,
+        });
+      if (req.path.endsWith("/summary"))
+        return env({
+          call_count: "1",
+          quota: "1",
+          prompt_tokens: "1",
+          completion_tokens: "1",
+        });
+      return env({ chart: [], table: [], start_time: 1, end_time: 2 });
+    });
+    const { wrapper } = setup();
+    render(<Overview state={state} />, { wrapper });
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(desktopRequest)
+          .mock.calls.some(([r]) => r.path.endsWith("/summary")),
+      ).toBe(true),
+    );
+    const calls = vi
+      .mocked(desktopRequest)
+      .mock.calls.map(([r]) => r)
+      .filter((r) => r.path.includes("/usage"));
+    const range = (query: (typeof calls)[number]["query"]) =>
+      query?.filter(([k]) =>
+        ["start_time", "end_time", "timezone"].includes(k),
+      );
+    expect(range(calls[0].query)).toEqual(range(calls[1].query));
+    expect(range(calls[0].query)).toHaveLength(3);
   });
 });
 describe("business actions and secret lifetime", () => {
