@@ -1,21 +1,21 @@
 # G1验证与配对交付记录
 
-2026-10-13，B3 / desktop-v1.1 / scope desktop-v1。当前实施中，本文件不把计划断言计为通过。
+2026-10-13，B3 / desktop-v1.1 / scope desktop-v1。G1本地代码交付完成；未验证平台/实库/完整浏览器保持受限。历史审查快照由最终记录覆盖，不把计划断言计为通过。
 
 ## 必须执行的矩阵
 
 | 任务 | 必测 | 证据状态 |
 |---|---|---|
-| T02 | public/旧confidential隔离、S256/固定redirect/全集scope、code一次/过期、AT30m/RT7d/绝对30d、并发轮换/重放 | 待执行 |
-| T02迁移 | 隔离新库/旧库/部分安装/重跑、列索引不兼容中止、never-installed/required/installed缺失 | 待执行；三库实际服务分别记录 |
-| T03 | context不签发、纯网站session拒旧token、Origin/CSRF、账号切换/登录恢复、批准/取消/回跳失败 | 待执行 |
-| T04 | 系统存储故障无明文、唯一测试条目清理、IPC/日志无秘密、记录绑定、HTTP无redirect/任意origin | 待执行；macOS实机与Mock分开 |
-| T05 | 所有deep-link入口、重复key/错state/超时/取消/重复callback、userinfo/scope不符、旧import | 待执行 |
-| T06 | single-flight、401一次/403不刷新、in-flight崩溃/响应丢失、写失败、退出/切号迟到不复活、缓存隔离 | 待执行 |
-| T07 | 两用户多连接、各安全入口撤销原子性、撤销失败回滚、清理重放证据保留/围栏/暂停、桶隔离/Redis故障 | 待执行 |
-| T12 | 全账户入口、七工具及原页可达、真实原生状态接线、状态/错误/取消/切号 | 待执行 |
-| 兼容回退 | compatible基线关签发/刷新/业务仍revoke/安全事件/cleanup；原旧版不可充当此目标 | 待执行；实际MySQL副本T21 |
-| G2统计规范 | type2收费失败不成功、退款优先、历史unknown、累计vs窗口、日志关闭非零账单 | 仅契约闭合；G2执行 |
+| T02 | public/旧confidential隔离、S256/固定redirect/全集scope、code一次/过期、AT30m/RT7d/绝对30d、并发轮换/重放 | Go model/HTTP测试通过；真实原生局部配对通过 |
+| T02迁移 | 新/旧/部分安装/重跑、不兼容拒绝、never-installed/required/installed缺失 | 隔离SQLite及两独立进程竞争安装测试通过；MySQL/PG实库未测 |
+| T03 | context不签发、纯网站session、Origin/CSRF、切号/恢复、批准/取消/回跳失败 | HTTP与6网站组件测试通过；完整网站登录/2FA和浏览器回跳未测 |
+| T04 | 无明文降级、条目清理、IPC/日志隔离、记录绑定、受信HTTP | 原生故障/协议测试通过；真实macOS Keychain＋Go配对通过并确认NoEntry；Windows/Linux未测 |
+| T05 | deep-link入口、错state/重复key/取消/超时/重复callback、身份/scope、旧import | 原生测试及原import30项通过；冷暖安装包OS回跳未测 |
+| T06 | single-flight、401一次/403不刷、崩溃/写失败、退出迟到不复活、缓存隔离 | 原生18项及query4项通过；实际HTTP并发401只1 refresh、挂起请求期间logout、三次自动重试预算覆盖 |
+| T07 | 两用户多连接、安全入口原子撤销/回滚、清理保留/围栏/暂停、桶隔离/Redis故障 | Go隔离SQLite/HTTP测试通过，含disable/reenable、email/admin password、软/硬删除、刷新vs禁用；真实共享Redis未测 |
+| T12 | 八账户入口、七工具原页、原生状态接线、错误/取消/清除重试 | 集成TS、24项UI/query/App测试、renderer构建通过；组件含Mock，未冒充业务联调 |
+| 兼容回退 | 关签发/刷新/业务仍保留revoke/安全事件/cleanup/schema检查 | SQLite独立开关/撤销/清理测试及固定代码审查通过；实际MySQL副本回退T21未测 |
+| G2统计规范 | 收费失败非成功、退款优先、历史unknown、累计vs窗口、日志缺失 | 契约已闭合；G2业务实现/实测未开始 |
 
 ## 环境及限制
 
@@ -58,3 +58,34 @@
 - 主审发现8c限流统一20/60s不符合冻结authorize5/user/300s、exchange10/clientIP/60s、refresh6/connection/60s规则，退回修复；清理候选查询需绑定总deadline，SQLite迁移跨进程锁和认证并发测试仍需补证。作者HTTP测试发现custom-scheme回跳误用旧HTTP redirect helper，另补修复，不以model测试掩盖路由失败。
 - navigation非作者复查native `c1c7346` / `ff93465`：插件三处事件均过滤精确v1/import、raw get_current权限移除、OAuth只在原生分流；ff93465修复读取安全记录失败时localCleared=false和本地成功清除后内存cleanup_token残留。独立执行运输测试尚待最终稳定提交。
 - 真实Rust→Go fixture首次尝试因测试服务RedisEnabled默认值引发nil Redis故障而停止；未计通过。fixture只提供合成网站会话，不构成真实登录/2FA/默认浏览器/已安装包回跳验收。
+
+## 最终独立审查与集成验证（2026-10-13）
+
+### 固定提交审查
+
+- API作者server，最终稳定 `9abd1fa3eb64a3a5faa22e87f93526f4a0d6e276`。主智能体在codex/g1-server-review独立worktree分轮审查bd28→1d5→8c→e1→9abd并执行五包及未知marker版本探针；9abd执行 `go test ./model -run 'Desktop|G1Review' -count=1 -timeout=90s` 退出0。已发现的schema未知版本/损坏忽略、硬删撤销漏口、token绑定、回跳构造、限流规格、SQLite迁移竞争、清理预算等均修复；最后增量只增加安全事件和并发回归，主审检查并复验，无剩余阻断。旧schema/旧OAuth测试保留。
+- native作者native，非作者navigation固定最终 `34f4274de126b25d06745e7364b78167d2de712f`，独立review worktree运行 `CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target cargo test --manifest-path src-tauri/Cargo.toml --lib tuzi_account`：18通过、0失败、2默认忽略。审查覆盖native/HTTP/store/journal、秘密不进WebView、generation/revision与退出隔离、maintenance可见性/RetryAfter/三次预算；无剩余阻断。插件原始auth广播问题在c1/ff修复，三个入口只广播精确import，raw get_current权限移除；c8独立旧deep-link30项通过，最终增量未改插件。
+- T12作者navigation，主智能体审查 `4864283e3c73a6d8b037c7a398e0c68f666b9cff`（含216d7ba）；invalid/localCleared=false缺Disconnect/清除重试已修复，未发现剩余阻断。主集成测试补丁ec78f88只给App fixture空import快照，navigation只读审查无阻断，不削弱断言。
+
+### 集成代码检查点和命令
+
+C `ec78f883dc536a35fbbd72ae88305227d0a1ef4c` / S `615f501207b1c6d02be765fad97c469e6c213bc6`，均codex/tuzi-assistant-dev，B3/desktop-v1.1/scope desktop-v1。native与navigation先后no-ff合并，API保留阶段提交后no-ff合并最终测试；没有push。起点和回退限制详见progress。
+
+- C `pnpm typecheck`：退出0。
+- C `pnpm exec vitest run tests/account/account-query.test.tsx tests/components/AccountPage.test.tsx tests/components/AppSwitcher.accountCompatibility.test.tsx tests/integration/App.test.tsx`：4文件24项通过。初次import IPC fixture缺handler产生MSW警告，追加已审空列表handler后 `pnpm exec vitest run tests/integration/App.test.tsx` 7项通过且无该警告；不是将未处理请求一律忽略。
+- C `pnpm build:renderer`：退出0；既有大chunk/动态静态重复import/浏览器数据陈旧警告保留，不触发release/version/postversion。
+- S `go test ./model ./controller ./middleware ./router ./cmd/db-migrate -run 'Desktop|OAuthProvider|MigrationArgs' -count=1 -timeout=90s`：五包退出0；middleware包含纯session及独立限流/无共享权威failclosed测试。本地SQLite文件池、两独立子进程迁移、两用户多连接、code/RT并发、refresh与禁用交错；不等于MySQL/PG/共享Redis实际运行。
+- S web `bun test src/helpers/desktopAuthorization.test.js src/pages/OAuthAuthorize/index.test.jsx`：6通过、22断言，批准单次、手动重开、取消、401恢复、切号、失败重载。
+- S web `NODE_OPTIONS=--max-old-space-size=8192 bunx --no-install vite build`：退出0（30.03秒），大chunk/重复import/浏览器数据陈旧警告；直接运行Vite，未执行会生成站点更新元数据的包装脚本，没有发布副作用。
+
+### 真实本地跨仓库/系统存储配对（限定范围）
+
+固定 native `bcdc0b1` 与 API `ad2c8f61e`（native最终只加maintenance预算；API后续包含限流、迁移并发和授权页防重复提交修复及测试，已在最终API定向/网站测试复验，但真实Go＋Keychain配对未在最终API SHA重跑）。API独立worktree用 `TUZI_DESKTOP_LOOPBACK_PORT_FILE=/tmp/tuzi-native-g1-keychain-origin go test ./router -run '^TestDesktopLoopbackFixture$' -count=1 -v`，显式127.0.0.1随机端口、t.TempDir SQLite、合成user/client、单实例限流；fixture login只构造网站session，未走真实登录/2FA。
+
+native以portfile实际origin运行 `TUZI_NATIVE_TEST_ORIGIN=http://127.0.0.1:<实际端口> CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target cargo test --manifest-path src-tauri/Cargo.toml --lib tuzi_account::tests::real_go_loopback_pair -- --ignored --exact`：1通过。真实Go context/approve→native callback→exchange→userinfo→强制本地AT过期→实际RT轮换并从macOS Keychain读回一致→logout→AT拒绝/旧RT失效。唯一UUID SystemStore namespace、合成凭证、不打印令牌；显式delete后get_secret确认NoEntry，RAII异常清理。portfile.stop停止Go fixture且PASS，t.TempDir清理DB。
+
+主智能体检查 `/tmp/tuzi-g1-keychain-pair-result.txt` 的成功输出及作者cleanup断言代码；账户最终证据 `/tmp/tuzi-g1-native-final-tests.txt` 18通过/2默认忽略。临时输出路径仅本机会话证据，不作为可迁移构建产物；关键命令/固定SHA/结果已持久登记本文件。此次真实局部配对不证明默认浏览器、完整网站登录/2FA、OS协议注册/冷暖回跳、三平台或T19完整首版。
+
+### 未验证与交付结论
+
+G1代码、当前可用本地验证、独立审查及阶段提交已交付。T02～T07跨环境/平台验收受限，不标完整通过；T12状态壳已交付但G2业务未实现。真实MySQL/PG、共享Redis多实例、数据库副本迁移/回退/负载、Windows/Linux、macOS安装包和完整网站浏览器路径未验证。T19～T22未开始，未发布、未用户完整验收。已停止本地fixture，没有生产访问/登记/迁移/远程操作。后续G2需新任务授权，环境信息按open-questions Q02/Q04/Q09/Q10收集。
