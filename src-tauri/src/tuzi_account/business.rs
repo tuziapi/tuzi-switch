@@ -99,7 +99,67 @@ fn allowed(method: &str, path: &str) -> bool {
         }
     }
 }
+fn endpoint_aliases(protocol: &str) -> &'static [&'static str] {
+    match protocol {
+        "anthropic" => &["anthropic", "anthropic-messages", "anthropic_messages"],
+        "responses" => &["openai-responses", "responses", "codex_responses"],
+        "chat" => &["openai", "openai-chat", "chat", "openai_chat", "openai_completions"],
+        "gemini" => &["gemini", "google", "gemini-native", "gemini_native", "google_generative_ai"],
+        _ => &[],
+    }
+}
+fn qualified_models(key: &Value, data: &Value, names: &[String], protocol: &str, timestamp: i64) -> Result<(), String> {
+    let denied = || "provider_selection_not_qualified".to_string();
+    if key["status"].as_i64() != Some(1) { return Err(denied()); }
+    let expiry = key["expired_time"].as_i64().ok_or_else(denied)?;
+    if expiry != -1 && expiry <= timestamp { return Err(denied()); }
+    if key["unlimited_quota"].as_bool() != Some(true) {
+        let quota = key["remain_quota"].as_str().and_then(|v| v.parse::<i128>().ok()).ok_or_else(denied)?;
+        if quota <= 0 { return Err(denied()); }
+    }
+    let groups: Vec<&str> = key["group"].as_str().ok_or_else(denied)?.split(',').map(str::trim).collect();
+    let limits: Vec<&str> = key["model_limits"].as_str().ok_or_else(denied)?.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+    let items = data["items"].as_array().ok_or_else(denied)?;
+    let meta = &data["pricing_meta"];
+    let visible = meta["usable_group"].as_object().ok_or_else(denied)?;
+    for name in names {
+        if key["model_limits_enabled"].as_bool() == Some(true) && !limits.is_empty() && !limits.contains(&name.as_str()) { return Err(denied()); }
+        let model = items.iter().find(|m| m["model_name"].as_str() == Some(name.as_str())).ok_or_else(denied)?;
+        let effective = meta["default_resolution"][name]["effective_group"].as_str()
+            .or_else(|| meta["default_effective_group"].as_str()).unwrap_or("");
+        let enabled = model["enable_groups"].as_array().ok_or_else(denied)?;
+        if !groups.iter().any(|g| {
+            let g = if *g == "default" && !effective.is_empty() { effective } else { *g };
+            g != "auto" && visible.contains_key(g) && enabled.iter().any(|v| v.as_str() == Some(g))
+        }) { return Err(denied()); }
+        let endpoints = model["supported_endpoint_types"].as_array().ok_or_else(denied)?;
+        if !endpoints.iter().any(|e| e.as_str().is_some_and(|v| endpoint_aliases(protocol).contains(&v))) { return Err(denied()); }
+    }
+    Ok(())
+}
 impl AccountService {
+    /// Re-read current account Key and visible models before local side effects.
+    /// This never holds the account mutex across await; save subsequently takes
+    /// the reveal/source guard to reject a generation change during these reads.
+    pub async fn provider_qualification(
+        &self, generation: u64, token_id: &str, selected_models: &[String], protocol: &str,
+    ) -> Result<(), String> {
+        if token_id.parse::<u64>().ok().filter(|n| *n > 0).is_none()
+            || selected_models.is_empty() || selected_models.len() > 50
+            || selected_models.iter().any(|m| m.is_empty() || m.len() > 256)
+            || endpoint_aliases(protocol).is_empty()
+        { return Err("invalid_provider_selection".into()); }
+        let get = |path: String, query: Vec<(String, String)>| BusinessRequest {
+            method: "GET".into(), path, query, body: None, generation, request_id: None,
+        };
+        let key = self.business_request(get(format!("/api/desktop/keys/{token_id}"), vec![]))
+            .await.map_err(|e| e.code)?;
+        let mut query = vec![("page".into(), "1".into()), ("page_size".into(), "100".into())];
+        query.extend(selected_models.iter().map(|m| ("models".into(), m.clone())));
+        let models = self.business_request(get("/api/desktop/models".into(), query))
+            .await.map_err(|e| e.code)?;
+        qualified_models(&key["data"], &models["data"], selected_models, protocol, now())
+    }
     #[cfg(test)]
     pub(super) async fn business_auth_probe(&self, bearer: &str, contract: &str, user: Option<&str>) -> Result<Value, BusinessError> {
         let mut request = self.http.get(format!("{}/api/desktop/account", self.origin))
@@ -251,6 +311,15 @@ impl AccountService {
                     self.fail(request.generation, AccountError::new("invalid_token"), true);
                     return Err(e);
                 }
+                Ok(value) => {
+                    if request.method=="POST" {
+                        if let Some(token_id)=request.path.strip_prefix("/api/desktop/keys/").and_then(|rest|rest.strip_suffix("/reveal")) {
+                            let key=value.pointer("/data/key").and_then(Value::as_str).ok_or_else(||BusinessError::new("invalid_response",false))?;
+                            self.remember_model_key_reveal(request.generation,token_id,key)?;
+                        }
+                    }
+                    return Ok(value);
+                }
                 other => return other,
             }
         }
@@ -281,8 +350,7 @@ impl AccountService {
             }
             bytes.extend_from_slice(&chunk);
         }
-        let data: Value = serde_json::from_slice(&bytes)
-            .map_err(|_| BusinessError::new("invalid_response", write))?;
+        let data: Value = match serde_json::from_slice(&bytes){Ok(data)=>data,Err(_) if !(200..300).contains(&status)=>Value::Null,Err(_)=>return Err(BusinessError::new("invalid_response",write))};
         if (200..300).contains(&status) {
             if data["success"] != true
                 || data["meta"]["contract_version"] != "desktop-v1.1"
@@ -597,4 +665,53 @@ mod tests {
         assert!(s.business_pending.lock().unwrap().is_empty());
         task.abort();
     }
+    #[test]
+    fn provider_qualification_checks_current_key_models_and_virtual_default() {
+        let mut key=serde_json::json!({"status":1,"expired_time":-1,"unlimited_quota":false,"remain_quota":"9007199254740993123","group":"default","model_limits_enabled":true,"model_limits":"synthetic-model"});
+        let mut data=serde_json::json!({"items":[{"model_name":"synthetic-model","enable_groups":["vip"],"supported_endpoint_types":["openai-responses"]}],"pricing_meta":{"usable_group":{"vip":"VIP"},"default_effective_group":"vip","default_resolution":{}}});
+        let names=vec!["synthetic-model".into()];
+        assert!(qualified_models(&key,&data,&names,"responses",100).is_ok());
+        for protocol in ["chat","gemini","anthropic","unknown"] {assert!(qualified_models(&key,&data,&names,protocol,100).is_err());}
+        key["status"]=serde_json::json!(2); assert!(qualified_models(&key,&data,&names,"responses",100).is_err());key["status"]=serde_json::json!(1);
+        key["expired_time"]=serde_json::json!(99);assert!(qualified_models(&key,&data,&names,"responses",100).is_err());key["expired_time"]=serde_json::json!(-1);
+        key["remain_quota"]=serde_json::json!("0");assert!(qualified_models(&key,&data,&names,"responses",100).is_err());key["remain_quota"]=serde_json::json!("1");
+        key["model_limits"]=serde_json::json!("other-model");assert!(qualified_models(&key,&data,&names,"responses",100).is_err());key["model_limits"]=serde_json::json!("synthetic-model");
+        data["pricing_meta"]["usable_group"]=serde_json::json!({});assert!(qualified_models(&key,&data,&names,"responses",100).is_err());
+        assert!(qualified_models(&key,&data,&["missing".into()],"responses",100).is_err());
+    }
+    #[test]
+    fn revealed_model_key_proof_is_exact_ephemeral_and_consumed() {
+        let s=service("http://127.0.0.1:1",&uuid::Uuid::new_v4().to_string(),now()+2592000);
+        let key="sk-synthetic-reveal-T15";
+        let changed=std::sync::atomic::AtomicBool::new(false);
+        assert!(s.with_confirmed_model_source("1",0,"1",key,||{changed.store(true,Ordering::SeqCst);Ok(())}).is_err());assert!(!changed.load(Ordering::SeqCst));
+        s.remember_model_key_reveal(0,"1",key).unwrap();
+        assert!(s.with_confirmed_model_source("1",0,"2",key,||Ok(())).is_err());
+        assert!(s.with_confirmed_model_source("1",0,"1","sk-synthetic-other",||Ok(())).is_err());
+        assert!(s.with_confirmed_model_source("1",0,"1","desktop_synthetic",||Ok(())).is_err());
+        assert!(s.with_confirmed_model_source("1",0,"1",key,||Err::<(),_>("synthetic compensated failure".into())).is_err());
+        assert!(s.with_confirmed_model_source("1",0,"1",key,||Ok(())).is_ok());
+        assert!(s.with_confirmed_model_source("1",0,"1",key,||Ok(())).is_err());
+        s.remember_model_key_reveal(0,"1",key).unwrap();s.inner.lock().unwrap().model_key_proof.as_mut().unwrap().expires=now()-1;
+        assert!(s.with_confirmed_model_source("1",0,"1",key,||Ok(())).is_err());
+    }
+
+    #[tokio::test]
+    async fn successful_business_reveal_records_native_model_source_proof() {
+        use axum::{Router,routing::post,Json};
+        let app=Router::new().route("/api/desktop/keys/7/reveal",post(||async{Json(envelope(serde_json::json!({"key":"sk-synthetic-business-reveal"})))}));
+        let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();let origin=format!("http://{}",listener.local_addr().unwrap());let task=tokio::spawn(async move{axum::serve(listener,app).await.unwrap()});
+        let s=service(&origin,&uuid::Uuid::new_v4().to_string(),now()+2592000);
+        let value=s.business_request(request("POST","/api/desktop/keys/7/reveal")).await.unwrap();assert_eq!(value["data"]["key"],"sk-synthetic-business-reveal");
+        assert!(s.with_confirmed_model_source("1",0,"7","sk-synthetic-business-reveal",||Ok(())).is_ok());assert!(s.inner.lock().unwrap().model_key_proof.is_none());task.abort();
+    }
+
+    #[tokio::test]
+    async fn non_json_errors_preserve_status_and_retry_without_body() {
+        use axum::{Router,routing::get};
+        let app=Router::new().route("/api/desktop/account",get(||async{(axum::http::StatusCode::TOO_MANY_REQUESTS,[("retry-after","60")],"synthetic non-JSON secret body")}));
+        let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();let origin=format!("http://{}",listener.local_addr().unwrap());let task=tokio::spawn(async move{axum::serve(listener,app).await.unwrap()});let s=service(&origin,&uuid::Uuid::new_v4().to_string(),now()+2592000);
+        let error=s.business_request(request("GET","/api/desktop/account")).await.unwrap_err();assert_eq!(error.status,Some(429));assert_eq!(error.retry_after,Some(60));assert_eq!(error.code,"rate_limited");assert!(!serde_json::to_string(&error).unwrap().contains("secret body"));task.abort();
+    }
+
 }

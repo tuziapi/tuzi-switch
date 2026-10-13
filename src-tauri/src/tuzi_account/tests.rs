@@ -799,6 +799,9 @@ async fn verify_go_business(s: &AccountService) {
         .await
         .unwrap();
     assert_eq!(reveal["data"]["key"], key);
+    s.provider_qualification(s.state().generation,id,&["synthetic-g2-model".into()],"chat").await.unwrap();
+    assert!(s.provider_qualification(s.state().generation,id,&["synthetic-g2-model".into()],"gemini").await.is_err());
+    assert!(s.provider_qualification(s.state().generation,id,&["synthetic-missing-model".into()],"chat").await.is_err());
     let changed = call(
         s,
         "PATCH",
@@ -819,6 +822,7 @@ async fn verify_go_business(s: &AccountService) {
     .await
     .unwrap();
     assert_eq!(disabled["data"]["status"], 2);
+    assert!(s.provider_qualification(s.state().generation,id,&["synthetic-g2-model".into()],"chat").await.is_err());
     call(
         s,
         "PATCH",

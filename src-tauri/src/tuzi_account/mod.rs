@@ -129,7 +129,9 @@ impl Default for Record {
         }
     }
 }
+struct ModelKeyProof { generation:u64, user_id:String, token_id:String, key_hash:[u8;32], expires:i64 }
 struct Inner {
+    model_key_proof: Option<ModelKeyProof>,
     record: Record,
     state: AccountState,
     loaded: bool,
@@ -177,6 +179,30 @@ impl AccountService {
         }
         write()
     }
+    /// A source association may only consume the exact model Key explicitly revealed
+    /// by this native session. Hash-only proof is memory-local and expires with the draft.
+    pub fn with_confirmed_model_source<T>(&self,user_id:&str,generation:u64,token_id:&str,key:&str,write:impl FnOnce()->Result<T,String>)->Result<T,String> {
+        self.load();
+        let mut i=self.inner.lock().unwrap();
+        if i.record.generation!=generation || i.state.status!="connected" || i.record.refresh_in_flight
+            || i.record.tokens.as_ref().is_none_or(|t|t.grant_expires<=now()||t.refresh_expires<=now())
+            || i.state.identity.as_ref().is_none_or(|identity|identity.user_id!=user_id) {return Err("stale_account".into());}
+        let digest:[u8;32]=Sha256::digest(key.as_bytes()).into();
+        if !key.starts_with("sk-") || i.model_key_proof.as_ref().is_none_or(|proof|proof.generation!=generation||proof.user_id!=user_id||proof.token_id!=token_id||proof.key_hash!=digest||proof.expires<=now()) {
+            return Err("model_key_reveal_required".into());
+        }
+        let result=write();
+        if result.is_ok(){i.model_key_proof=None;}
+        result
+    }
+    fn remember_model_key_reveal(&self,generation:u64,token_id:&str,key:&str)->Result<(),AccountError> {
+        let mut i=self.inner.lock().unwrap();
+        if i.record.generation!=generation || i.state.status!="connected" || i.record.refresh_in_flight {return Err(AccountError::new("stale_account"));}
+        if !key.starts_with("sk-") || key.contains(['\r','\n']) {return Err(AccountError::new("invalid_response"));}
+        let user_id=i.state.identity.as_ref().ok_or_else(||AccountError::new("stale_account"))?.user_id.clone();
+        i.model_key_proof=Some(ModelKeyProof{generation,user_id,token_id:token_id.into(),key_hash:Sha256::digest(key.as_bytes()).into(),expires:now()+600});
+        Ok(())
+    }
     pub fn new() -> Result<Self, AccountError> {
         Self::with_store(Arc::new(SystemStore::new(ORIGIN, CLIENT)?), ORIGIN, CLIENT)
     }
@@ -200,6 +226,7 @@ impl AccountService {
             .map_err(|_| AccountError::new("http_unavailable"))?;
         Ok(Self {
             inner: Mutex::new(Inner {
+                model_key_proof: None,
                 record: Record::default(),
                 state: AccountState::default(),
                 loaded: false,
@@ -333,6 +360,7 @@ impl AccountService {
             i.retry_not_before = now().saturating_add(e.retry_after.unwrap_or(30).max(1).min(i64::MAX as u64) as i64);
             i.state.error = Some(e);
             if invalid {
+                i.model_key_proof=None;
                 i.state.identity = None;
                 // Block in-memory reuse even if the secure-store write fails.
                 let mut r = i.record.clone();
@@ -377,6 +405,7 @@ impl AccountService {
         record.refresh_in_flight = false;
         self.persist(&record)?;
         i.record = record;
+        i.model_key_proof=None;
         i.state = AccountState {
             status: "authorizing".into(),
             generation,
@@ -735,6 +764,7 @@ impl AccountService {
             };
             let saved = self.persist(&r);
             i.record = r;
+            i.model_key_proof=None;
             i.cleanup_token = token.clone();
             i.retry_not_before = 0;
             i.maintenance_attempts = 0;
