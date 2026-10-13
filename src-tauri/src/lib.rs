@@ -34,6 +34,7 @@ mod services;
 mod session_manager;
 mod settings;
 mod store;
+mod tuzi_account;
 
 mod tray;
 mod usage_script;
@@ -77,6 +78,9 @@ use tauri_plugin_updater::UpdaterExt;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 fn redact_url_for_log(url_str: &str) -> String {
+    if crate::tuzi_account::is_auth_input(url_str) {
+        return "tuziswitch://auth/[redacted]".into();
+    }
     match url::Url::parse(url_str) {
         Ok(url) => {
             let mut output = format!("{}://", url.scheme());
@@ -161,6 +165,14 @@ fn run_updater_install_verification(app: &tauri::AppHandle) {
 /// - 解析 URL
 /// - 向前端发射 `deeplink-import` / `deeplink-error` 事件
 /// - 可选：在成功时聚焦主窗口
+#[tauri::command]
+fn get_current_import_urls(app: tauri::AppHandle) -> Vec<String> {
+    use tauri_plugin_deep_link::DeepLinkExt;
+    app.deep_link().get_current().ok().flatten().unwrap_or_default()
+        .into_iter().filter(|url| crate::tuzi_account::is_import_input(url.as_str()))
+        .map(|url| url.to_string()).collect()
+}
+
 fn handle_deeplink_url(
     app: &tauri::AppHandle,
     url_str: &str,
@@ -171,6 +183,16 @@ fn handle_deeplink_url(
         return false;
     }
 
+    if crate::tuzi_account::handle_callback(app, url_str) {
+        if focus_main_window {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+        return true;
+    }
     let redacted_url = redact_url_for_log(url_str);
     log::info!("✓ Deep link URL detected from {source}: {redacted_url}");
 
@@ -903,6 +925,17 @@ pub fn run() {
                 }
             }
 
+            let account_service = Arc::new(crate::tuzi_account::AccountService::new()
+                .map_err(|_| "account initialization failed")?);
+            account_service.attach(app.handle().clone());
+            app.manage(account_service);
+            // Cold-start CLI callbacks use the same secret-safe dispatcher.
+            for arg in std::env::args() {
+                if crate::tuzi_account::handle_callback(app.handle(), &arg) { break; }
+            }
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                for url in urls { crate::tuzi_account::handle_callback(app.handle(), url.as_str()); }
+            }
             // 注册 URL 处理回调（所有平台通用）
             app.deep_link().on_open_url({
                 let app_handle = app.handle().clone();
@@ -1214,6 +1247,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_providers,
+            tuzi_account::account_get_state,
+            tuzi_account::account_start_login,
+            tuzi_account::account_cancel_login,
+            tuzi_account::account_logout,
+            tuzi_account::account_retry,
             commands::get_current_provider,
             commands::add_provider,
             commands::update_provider,
@@ -1345,6 +1383,7 @@ pub fn run() {
             commands::delete_db_backup,
             commands::sync_current_providers_live,
             // Deep link import
+            get_current_import_urls,
             commands::parse_deeplink,
             commands::merge_deeplink_config,
             commands::import_from_deeplink,
@@ -1600,52 +1639,21 @@ pub fn run() {
                 RunEvent::Opened { urls } => {
                     if let Some(url) = urls.first() {
                         let url_str = url.to_string();
-                        log::info!("RunEvent::Opened with URL: {}", redact_url_for_log(&url_str));
+                        log::info!(
+                            "RunEvent::Opened with URL: {}",
+                            redact_url_for_log(&url_str)
+                        );
 
                         if url_str.starts_with("tuziswitch://") {
                             if crate::lightweight::is_lightweight_mode() {
-                                if let Err(e) = crate::lightweight::exit_lightweight_mode(app_handle)
+                                if let Err(e) =
+                                    crate::lightweight::exit_lightweight_mode(app_handle)
                                 {
                                     log::error!("退出轻量模式重建窗口失败: {e}");
                                 }
                             }
 
-                            // 解析并广播深链接事件，复用与 single_instance 相同的逻辑
-                            match crate::deeplink::parse_deeplink_url(&url_str) {
-                                Ok(request) => {
-                                    log::info!(
-                                        "Successfully parsed deep link from RunEvent::Opened: resource={}, app={:?}",
-                                        request.resource,
-                                        request.app
-                                    );
-
-                                    if let Err(e) =
-                                        app_handle.emit("deeplink-import", &request)
-                                    {
-                                        log::error!(
-                                            "Failed to emit deep link event from RunEvent::Opened: {e}"
-                                        );
-                                    }
-                                }
-                                Err(e) => {
-                                    log::error!(
-                                        "Failed to parse deep link URL from RunEvent::Opened: {e}"
-                                    );
-
-                                    let redacted_url = redact_url_for_log(&url_str);
-                                    if let Err(emit_err) = app_handle.emit(
-                                        "deeplink-error",
-                                        serde_json::json!({
-                                            "url": redacted_url,
-                                            "error": e.to_string()
-                                        }),
-                                    ) {
-                                        log::error!(
-                                            "Failed to emit deep link error event from RunEvent::Opened: {emit_err}"
-                                        );
-                                    }
-                                }
-                            }
+                            handle_deeplink_url(app_handle, &url_str, true, "RunEvent::Opened");
 
                             // 确保主窗口可见
                             if let Some(window) = app_handle.get_webview_window("main") {

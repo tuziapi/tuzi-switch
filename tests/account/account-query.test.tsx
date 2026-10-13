@@ -1,0 +1,120 @@
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
+import {
+  accountApi,
+  disconnectedAccount,
+  type AccountState,
+} from "@/lib/api/account";
+import { useAccount } from "@/lib/query/account";
+const listener = vi.hoisted(() => ({
+  handler: undefined as
+    | undefined
+    | ((event: { payload: AccountState }) => void),
+}));
+vi.mock("@/lib/api/account", async (original) => ({
+  ...(await original<typeof import("@/lib/api/account")>()),
+  accountApi: {
+    getState: vi.fn(),
+    startLogin: vi.fn(),
+    cancelLogin: vi.fn(),
+    logout: vi.fn(),
+    retry: vi.fn(),
+  },
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async (_name, handler) => {
+    listener.handler = handler;
+    return () => {};
+  }),
+}));
+const connected: AccountState = {
+  ...disconnectedAccount,
+  generation: 3,
+  revision: 3,
+  status: "connected",
+  localCleared: false,
+  identity: {
+    userId: "9007199254740993",
+    username: "synthetic",
+    displayName: "Synthetic",
+    connectionId: "synthetic-connection",
+  },
+};
+function setup() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const result = renderHook(() => useAccount(), { wrapper });
+  return { client, ...result };
+}
+beforeEach(() => {
+  vi.clearAllMocks();
+  listener.handler = undefined;
+});
+describe("account native state and cache isolation", () => {
+  it("late initial reads cannot overwrite a same-generation native event", async () => {
+    const finishes: Array<(state: AccountState) => void> = [];
+    vi.mocked(accountApi.getState).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishes.push(resolve);
+        }),
+    );
+    const { result } = setup();
+    await waitFor(() => expect(listener.handler).toBeDefined());
+    act(() => listener.handler!({ payload: connected }));
+    await act(async () =>
+      finishes.forEach((finish) =>
+        finish({ ...connected, status: "authorizing", revision: 1 }),
+      ),
+    );
+    await waitFor(() => expect(result.current.state.status).toBe("connected"));
+  });
+  it("logout clears account caches while retaining tool caches and ignores old events", async () => {
+    vi.mocked(accountApi.getState).mockResolvedValue(connected);
+    const { result, client } = setup();
+    await waitFor(() => expect(result.current.state.status).toBe("connected"));
+    client.setQueryData(["account", "synthetic"], { synthetic: true });
+    client.setQueryData(["providers"], { keep: true });
+    act(() =>
+      listener.handler!({
+        payload: { ...disconnectedAccount, generation: 4, revision: 4 },
+      }),
+    );
+    expect(client.getQueryData(["account", "synthetic"])).toBeUndefined();
+    expect(client.getQueryData(["providers"])).toEqual({ keep: true });
+    act(() => listener.handler!({ payload: connected }));
+    await waitFor(() => expect(result.current.state.identity).toBeNull());
+  });
+  it("loss of identity clears private cache even in the same generation", async () => {
+    vi.mocked(accountApi.getState).mockResolvedValue(connected);
+    const { result, client } = setup();
+    await waitFor(() => expect(result.current.state.status).toBe("connected"));
+    client.setQueryData(["account", "data"], ["synthetic"]);
+    act(() =>
+      listener.handler!({
+        payload: {
+          ...connected,
+          identity: null,
+          status: "invalid",
+          revision: 4,
+        },
+      }),
+    );
+    expect(client.getQueryData(["account", "data"])).toBeUndefined();
+  });
+  it("native IPC errors are visible and do not trigger a login loop", async () => {
+    vi.mocked(accountApi.getState).mockRejectedValue(
+      new Error("synthetic failure"),
+    );
+    const { result } = setup();
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+    expect(result.current.state.error?.code).toBe("native_unavailable");
+    expect(accountApi.startLogin).not.toHaveBeenCalled();
+  });
+});
