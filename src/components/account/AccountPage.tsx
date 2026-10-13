@@ -47,6 +47,10 @@ export function AccountPage({ account }: { account: AccountController }) {
     "account_disabled",
     "desktop_disabled",
   ].includes(state.error?.code ?? "");
+  // Native invalid states can retain a refresh journal or expired credentials.
+  // Explicit cleanup is required before a new authorization may replace them.
+  const requiresCleanup =
+    state.status === "invalid" || state.localCleared === false;
   const run = async (action: () => unknown) => {
     setBusy(true);
     setActionFailed(false);
@@ -95,7 +99,7 @@ export function AccountPage({ account }: { account: AccountController }) {
         )}
         {actionFailed && <p role="alert">{t("account.actionFailed")}</p>}
         <div className="flex flex-wrap gap-2">
-          {!pending && !connected && !policyError && (
+          {!pending && !connected && !policyError && !requiresCleanup && (
             <Button
               disabled={busy || isLoading || retrySeconds > 0}
               onClick={() => void run(account.startLogin)}
@@ -126,7 +130,7 @@ export function AccountPage({ account }: { account: AccountController }) {
               {t("account.retry")}
             </Button>
           )}
-          {(connected || policyError) && (
+          {!pending && (connected || policyError || requiresCleanup) && (
             <Button
               variant="outline"
               disabled={busy}

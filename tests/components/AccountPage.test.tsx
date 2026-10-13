@@ -91,6 +91,36 @@ describe("G1 account navigation and native state projection", () => {
     );
   });
 
+  it.each([
+    { status: "invalid", localCleared: false, code: "refresh_uncertain" },
+    { status: "invalid", localCleared: true, code: "refresh_uncertain" },
+    { status: "error", localCleared: false, code: "secure_storage_failed" },
+  ] as const)(
+    "allows explicit cleanup for $status/$code without unusable reauthorization",
+    async ({ status, localCleared, code }) => {
+      const { account, rerender } = await setup({
+        ...disconnectedAccount,
+        status,
+        localCleared,
+        error: { code, message: "" },
+      });
+      expect(
+        screen.queryByRole("button", { name: zh.account.connect }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: zh.account.disconnect }),
+      );
+      await waitFor(() => expect(account.logout).toHaveBeenCalledTimes(1));
+      expect(account.startLogin).not.toHaveBeenCalled();
+      rerender(
+        <AccountPage account={{ ...account, state: disconnectedAccount }} />,
+      );
+      expect(
+        screen.getByRole("button", { name: zh.account.connect }),
+      ).toBeEnabled();
+    },
+  );
+
   it("renders policy errors without automatic reauthorization or arbitrary native error text", async () => {
     const { account } = await setup({
       ...disconnectedAccount,
