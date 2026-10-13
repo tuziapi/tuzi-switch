@@ -17,6 +17,7 @@ use tauri_plugin_opener::OpenerExt;
 use url::Url;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+pub mod business;
 const ORIGIN: &str = "https://api.tu-zi.com";
 const CLIENT: &str = "tuzi-switch-desktop";
 const CALLBACK: &str = "tuziswitch://auth/callback";
@@ -145,8 +146,37 @@ pub struct AccountService {
     client: String,
     app: Mutex<Option<tauri::AppHandle>>,
     revision: std::sync::atomic::AtomicU64,
+    business_pending: Mutex<std::collections::HashMap<String, tokio::sync::watch::Sender<bool>>>,
 }
 impl AccountService {
+    /// Keep a confirmed account source valid throughout a synchronous local
+    /// provider transaction. Logout cannot change the generation while the
+    /// closure performs the approved write set. The closure must not call back
+    /// into this account service.
+    pub fn with_confirmed_source<T>(
+        &self,
+        user_id: &str,
+        generation: u64,
+        write: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        self.load();
+        let i = self.inner.lock().unwrap();
+        if i.record.generation != generation
+            || i.state.status != "connected"
+            || i.record.refresh_in_flight
+            || i.record
+                .tokens
+                .as_ref()
+                .is_none_or(|t| t.grant_expires <= now() || t.refresh_expires <= now())
+            || i.state
+                .identity
+                .as_ref()
+                .is_none_or(|identity| identity.user_id != user_id)
+        {
+            return Err("stale_account".into());
+        }
+        write()
+    }
     pub fn new() -> Result<Self, AccountError> {
         Self::with_store(Arc::new(SystemStore::new(ORIGIN, CLIENT)?), ORIGIN, CLIENT)
     }
@@ -184,6 +214,7 @@ impl AccountService {
             client: client.into(),
             app: Mutex::new(None),
             revision: std::sync::atomic::AtomicU64::new(0),
+            business_pending: Mutex::new(std::collections::HashMap::new()),
         })
     }
     pub fn attach(self: &Arc<Self>, app: tauri::AppHandle) {
@@ -403,7 +434,10 @@ impl AccountService {
                     body.extend_from_slice(&chunk);
                 }
                 e.refresh_not_consumed = serde_json::from_slice::<serde_json::Value>(&body)
-                    .ok().is_some_and(|v| v.get("error").and_then(|v| v.as_str()) == Some("temporarily_unavailable"));
+                    .ok()
+                    .is_some_and(|v| {
+                        v.get("error").and_then(|v| v.as_str()) == Some("temporarily_unavailable")
+                    });
             }
             return Err(e);
         }
@@ -578,6 +612,9 @@ impl AccountService {
         self.commit_tokens(generation, t, None).await
     }
     pub async fn retry(&self) -> AccountState {
+        self.retry_inner(None).await
+    }
+    async fn retry_inner(&self, rejected_access: Option<&str>) -> AccountState {
         self.load();
         let clear_failed = {
             let i = self.inner.lock().unwrap();
@@ -597,10 +634,13 @@ impl AccountService {
             };
             (t, i.record.generation)
         };
+        if rejected_access.is_some_and(|rejected| rejected != t.access_token) {
+            return self.state(); // Another waiter already completed this refresh.
+        }
         if t.grant_expires <= now() || t.refresh_expires <= now() {
             return self.fail(generation, AccountError::new("authorization_expired"), true);
         }
-        if t.access_expires > now() + 30 {
+        if rejected_access.is_none() && t.access_expires > now() + 30 {
             match self.identity(&t).await {
                 Ok(identity) => return self.commit_tokens(generation, t, Some(identity)).await,
                 Err(e) if e.code == "invalid_grant" => {}
@@ -667,7 +707,7 @@ impl AccountService {
                 let mut i = self.inner.lock().unwrap();
                 if i.record.generation == generation { i.state.remote_revoked = Some(remote); self.publish(&mut i.state); }
                 return i.state.clone();
-            },
+            }
         };
         let next = match wire.validate(now(), Some(&t)) {
             Ok(t) => t,
@@ -680,6 +720,9 @@ impl AccountService {
     }
     pub async fn logout(&self) -> AccountState {
         self.load();
+        for sender in self.business_pending.lock().unwrap().values() {
+            let _ = sender.send(true);
+        }
         let (token, generation) = {
             let mut i = self.inner.lock().unwrap();
             let token = i.record.tokens.clone().or_else(|| i.cleanup_token.clone());
@@ -831,7 +874,14 @@ fn emit(app: &tauri::AppHandle, state: &AccountState) {
     let _ = app.emit("account-state-changed", state);
 }
 pub fn is_import_input(input: &str) -> bool {
-    Url::parse(input).is_ok_and(|u| u.scheme() == "tuziswitch" && u.host_str() == Some("v1") && u.path() == "/import" && u.username().is_empty() && u.password().is_none() && u.port().is_none())
+    Url::parse(input).is_ok_and(|u| {
+        u.scheme() == "tuziswitch"
+            && u.host_str() == Some("v1")
+            && u.path() == "/import"
+            && u.username().is_empty()
+            && u.password().is_none()
+            && u.port().is_none()
+    })
 }
 pub fn is_auth_input(input: &str) -> bool {
     input.to_ascii_lowercase().starts_with("tuziswitch://auth")

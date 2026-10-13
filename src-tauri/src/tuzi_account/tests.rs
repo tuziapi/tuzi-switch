@@ -413,6 +413,14 @@ async fn trusted_client_never_follows_redirect_with_credentials() {
 #[tokio::test]
 #[ignore = "explicit paired Go loopback fixture only"]
 async fn real_go_loopback_pair() {
+    real_go_pair(false).await;
+}
+#[tokio::test]
+#[ignore = "explicit paired Go G2 business fixture only"]
+async fn real_go_business_pair() {
+    real_go_pair(true).await;
+}
+async fn real_go_pair(g2: bool) {
     let origin = std::env::var("TUZI_NATIVE_TEST_ORIGIN").expect("fixture origin required");
     let parsed = Url::parse(&origin).unwrap();
     assert_eq!(parsed.scheme(), "http"); assert_eq!(parsed.host_str(), Some("127.0.0.1"));
@@ -445,8 +453,17 @@ async fn real_go_loopback_pair() {
     let state = s.callback(callback).await;
     assert_eq!(state.status, "connected", "{}", state.error.as_ref().map(|e| e.code.as_str()).unwrap_or("none"));
     assert_eq!(state.identity.unwrap().user_id, "1");
-    let old = { let mut i = s.inner.lock().unwrap(); let t = i.record.tokens.as_mut().unwrap(); t.access_expires = now()-1; t.clone() };
-    let toggle = |enabled| s.http.post(format!("{origin}/fixture/refresh-enabled?enabled={enabled}"));
+    let old = {
+        let mut i = s.inner.lock().unwrap();
+        let t = i.record.tokens.as_mut().unwrap();
+        t.access_expires = now() - 1;
+        t.clone()
+    };
+    let toggle = |enabled| {
+        s.http.post(format!(
+            "{origin}/fixture/refresh-enabled?enabled={enabled}"
+        ))
+    };
     assert!(toggle(false).send().await.unwrap().status().is_success());
     let deferred = s.retry().await;
     assert_eq!(deferred.status, "offline");
@@ -465,9 +482,24 @@ async fn real_go_loopback_pair() {
     let new = s.inner.lock().unwrap().record.tokens.clone().unwrap();
     assert_eq!(store.read().unwrap().unwrap().tokens.as_ref().unwrap().refresh_token, new.refresh_token);
     assert_ne!(old.refresh_token, new.refresh_token);
-    let out = s.logout().await; assert_eq!(out.remote_revoked, Some(true)); assert!(out.local_cleared);
+    if g2 {
+        verify_go_business(&s).await;
+    }
+    let out = s.logout().await;
+    assert_eq!(out.remote_revoked, Some(true));
+    assert!(out.local_cleared);
     assert_eq!(s.identity(&new).await.unwrap_err().code, "invalid_grant");
-    let replay = s.http.post(format!("{origin}/api/oauth-provider/token")).form(&[("grant_type","refresh_token"),("client_id",s.client.as_str()),("refresh_token",old.refresh_token.as_str())]).send().await.unwrap();
+    let replay = s
+        .http
+        .post(format!("{origin}/api/oauth-provider/token"))
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("client_id", s.client.as_str()),
+            ("refresh_token", old.refresh_token.as_str()),
+        ])
+        .send()
+        .await
+        .unwrap();
     assert!(!replay.status().is_success());
     assert!(store.read().unwrap().unwrap().tokens.is_none());
     cleanup.0.delete_credential().unwrap();
@@ -475,8 +507,17 @@ async fn real_go_loopback_pair() {
 }
 #[test]
 fn raw_auth_is_never_an_import() {
-    for url in ["tuziswitch://auth/callback?code=synthetic", "tuziswitch://user@auth/callback?code=synthetic", "tuziswitch://auth%2f/callback", "tuziswitch://auth@v1/import?code=synthetic"] { assert!(!is_import_input(url)); }
-    assert!(is_import_input("tuziswitch://v1/import?resource=provider&name=synthetic"));
+    for url in [
+        "tuziswitch://auth/callback?code=synthetic",
+        "tuziswitch://user@auth/callback?code=synthetic",
+        "tuziswitch://auth%2f/callback",
+        "tuziswitch://auth@v1/import?code=synthetic",
+    ] {
+        assert!(!is_import_input(url));
+    }
+    assert!(is_import_input(
+        "tuziswitch://v1/import?resource=provider&name=synthetic"
+    ));
     let plugin = include_str!("../../vendor/tauri-plugin-deep-link/src/lib.rs");
     assert!(!plugin.contains("emit_to("));
     assert_eq!(plugin.matches(".emit(\"deep-link://new-url\"").count(), 1);
@@ -707,4 +748,189 @@ async fn incomplete_transport_and_oversized_error_are_not_proof() {
         assert_eq!(error.code, if oversized { "invalid_response" } else { "network_uncertain" });
         server.await.unwrap();
     }
+}
+
+async fn verify_go_business(s: &AccountService) {
+    use super::business::BusinessRequest;
+    let access = s.inner.lock().unwrap().record.tokens.as_ref().unwrap().access_token.clone();
+    for (bearer, contract, user, status, code) in [
+        ("synthetic-old-system-token", "desktop-v1.1", None, 401, "invalid_token"),
+        (access.as_str(), "desktop-v1.0", None, 409, "contract_mismatch"),
+        (access.as_str(), "desktop-v1.1", Some("2"), 403, "account_restricted"),
+    ] {
+        let error = serde_json::to_value(s.business_auth_probe(bearer, contract, user).await.unwrap_err()).unwrap();
+        assert_eq!(error["status"], status);
+        assert_eq!(error["code"], code);
+    }
+    async fn call(
+        s: &AccountService,
+        method: &str,
+        path: &str,
+        query: Vec<(&str, String)>,
+        body: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value, business::BusinessError> {
+        let request: BusinessRequest = serde_json::from_value(serde_json::json!({"method":method,"path":path,"query":query,"body":body,"generation":s.state().generation})).unwrap();
+        s.business_request(request).await
+    }
+    let account = call(s, "GET", "/api/desktop/account", vec![], None)
+        .await
+        .unwrap();
+    assert_eq!(account["data"]["user_id"], "1");
+    assert!(account["data"]["quota"].is_string());
+    assert!(account["data"].get("role").is_none());
+    let caps = call(s, "GET", "/api/desktop/capabilities", vec![], None)
+        .await
+        .unwrap();
+    assert_eq!(caps["data"]["native"]["keys"], true);
+    let groups = call(s, "GET", "/api/desktop/key-groups", vec![], None)
+        .await
+        .unwrap();
+    let group = groups["data"][0]["id"]
+        .as_str()
+        .expect("fixture assignable group");
+    let created=call(s,"POST","/api/desktop/keys",vec![],Some(serde_json::json!({"name":"synthetic-g2-key","group":group,"expired_time":-1,"remain_quota":"1000","unlimited_quota":false,"model_limits_enabled":false,"model_limits":""}))).await.unwrap();
+    let id = created["data"]["id"].as_str().unwrap();
+    let key = created["data"]["key"].as_str().unwrap();
+    let path = format!("/api/desktop/keys/{id}");
+    let detail = call(s, "GET", &path, vec![], None).await.unwrap();
+    assert!(detail["data"].get("key").is_none());
+    assert_eq!(detail["data"]["name"], "synthetic-g2-key");
+    let reveal = call(s, "POST", &format!("{path}/reveal"), vec![], None)
+        .await
+        .unwrap();
+    assert_eq!(reveal["data"]["key"], key);
+    let changed = call(
+        s,
+        "PATCH",
+        &path,
+        vec![],
+        Some(serde_json::json!({"name":"synthetic-g2-renamed"})),
+    )
+    .await
+    .unwrap();
+    assert_eq!(changed["data"]["remain_quota"], "1000");
+    let disabled = call(
+        s,
+        "PATCH",
+        &format!("{path}/status"),
+        vec![],
+        Some(serde_json::json!({"status":2})),
+    )
+    .await
+    .unwrap();
+    assert_eq!(disabled["data"]["status"], 2);
+    call(
+        s,
+        "PATCH",
+        &format!("{path}/status"),
+        vec![],
+        Some(serde_json::json!({"status":1})),
+    )
+    .await
+    .unwrap();
+    let keys = call(
+        s,
+        "GET",
+        "/api/desktop/keys",
+        vec![("keyword", "synthetic-g2-renamed".into())],
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(keys["data"]["total"], "1");
+    call(s, "DELETE", &path, vec![], None).await.unwrap();
+    assert!(call(s, "GET", &path, vec![], None).await.is_err());
+    for endpoint in [
+        "/api/desktop/logs",
+        "/api/desktop/logs/summary",
+        "/api/desktop/logs/statistics",
+    ] {
+        let result = call(s, "GET", endpoint, vec![], None).await.unwrap();
+        assert_eq!(result["success"], true);
+    }
+    let logs = call(s, "GET", "/api/desktop/logs", vec![], None)
+        .await
+        .unwrap();
+    assert!(logs["data"]["items"].as_array().unwrap().len() >= 3);
+    assert!(logs["data"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|row| row.get("content").is_none() && row.get("other").is_none()));
+    call(
+        s,
+        "GET",
+        "/api/desktop/logs/requests/synthetic-g2-request",
+        vec![],
+        None,
+    )
+    .await
+    .unwrap();
+    for endpoint in ["/api/desktop/usage", "/api/desktop/usage/summary"] {
+        let result = call(
+            s,
+            "GET",
+            endpoint,
+            vec![("timezone", "Asia/Shanghai".into())],
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["data"]["source"], "usage");
+        assert!(result["data"]["data_as_of"].is_null());
+    }
+    let models = call(s, "GET", "/api/desktop/models", vec![], None)
+        .await
+        .unwrap();
+    assert!(!models["data"]["items"].as_array().unwrap().is_empty());
+    let model = models["data"]["items"][0]["model_name"].as_str().unwrap();
+    for hours in [1, 6, 24] {
+        let perf = call(
+            s,
+            "GET",
+            "/api/desktop/model-performance",
+            vec![("model", model.into()), ("hours", hours.to_string())],
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(perf["data"]["aggregate"].get("request_count").is_none());
+    }
+    call(
+        s,
+        "POST",
+        "/api/desktop/model-performance/batch",
+        vec![],
+        Some(serde_json::json!({"models":[model],"hours":6})),
+    )
+    .await
+    .unwrap();
+    let profile = call(s, "GET", "/api/desktop/profile", vec![], None)
+        .await
+        .unwrap();
+    assert_eq!(profile["data"]["user_id"], "1");
+    call(s,"PATCH","/api/desktop/profile",vec![],Some(serde_json::json!({"display_name":"Synthetic G2","language":"en","accept_unset_model_ratio_model":false,"high_concurrency_enabled":false,"record_ip_log":false}))).await.unwrap();
+    let readback = call(s, "GET", "/api/desktop/profile", vec![], None)
+        .await
+        .unwrap();
+    assert_eq!(readback["data"]["display_name"], "Synthetic G2");
+    assert_eq!(readback["data"]["record_ip_log"], false);
+    assert!(call(
+        s,
+        "PATCH",
+        "/api/desktop/profile",
+        vec![],
+        Some(serde_json::json!({"password":"synthetic-never-real"}))
+    )
+    .await
+    .is_err());
+    assert!(call(
+        s,
+        "GET",
+        "/api/desktop/keys",
+        vec![("user_id", "2".into())],
+        None
+    )
+    .await
+    .is_err());
 }
