@@ -2,6 +2,8 @@
 
 2026-10-13，B3 / desktop-v1.1 / scope desktop-v1。G1本地代码交付完成；未验证平台/实库/完整浏览器保持受限。历史审查快照由最终记录覆盖，不把计划断言计为通过。
 
+**最新验收补充：** 当前C74aa8ed / S7c131f18e在本聊天独立复查中，现有定向测试通过，但新增路由边界探针复现两项缺陷，G1验收暂不通过。旧client系统令牌授权兼容、token请求体限长须修复并补正式回归。见 [G1独立验收报告](g1-acceptance-review.md)；下方历史“无剩余阻断”不覆盖本次新增发现。
+
 ## 必须执行的矩阵
 
 | 任务 | 必测 | 证据状态 |
@@ -125,3 +127,13 @@ C1ddb9b6 + S155efcaf3，Darwin arm64，显式Go loopback + t.TempDir SQLite合�
 文档检查：旧T01检查器仍假定HEAD不变和未提交文档，故在已授权编码提交后报基线状态不符；保留该事实，未将它算通过。按当前任务运行独立 `/tmp/validate-tuzi-g1-r1-docs.py`（链接/表格/围栏/18AC/16IF/22任务及依赖、21保护输入哈希），17文档无错误；另核查实际分支/提交/工作区和git diff --check。临时输出仅本机会话证据，结果已在此持久记录。
 
 限制不变：MySQL/PG、共享Redis多实例、全浏览器/2FA、安装包回跳、Windows/Linux、发布拓扑及T19～T22未验证；新增共享SESSION_SECRET和代理结果头发布核验见open-questions。G1此次四缺陷已关闭，无push/PR/部署，不代表可上线。
+
+## R1/R2 修复后复验（2026-10-13）
+
+修复后的 API 集成提交为 R2 `1ff07d190`、R1 `20f797d33`，对应独立任务提交分别为 `0a319f14fa687b741a3f663d46208218b33f8fd8` 和 `8ffbf5d027f7ed824f5a7da3f65c3b9619b54c82`。R1/R2 正式回归均通过，非作者独立只读审查结论为通过、无阻断；客户端业务代码未改，客户端检查点仍为 `74aa8ed5de159e7ea2c7150e47e449fc660387eb`。
+
+- R1：`go test ./router -run 'TestOAuthProviderAuthorizeRoutesPreserveLegacyAndDesktopAuth|TestDesktopAuthorizationHTTPAccountBindingAndMediaTypes' -count=1`，以及相关 controller/middleware 定向测试通过。
+- R2：`go test ./middleware ./router -run 'TestDesktopOAuthRateLimitBoundsStreamingAndLegacyFormReuse|TestDesktopOAuthTokenBodyLimitDoesNotConsumeGrant' -count=1` 通过；覆盖 64 KiB 边界、未知长度流式、桌面/旧 client、换码/刷新和不消费语义。
+- 集成：`go test ./model ./controller ./middleware ./router ./cmd/db-migrate -run 'Desktop|OAuthProvider|MigrationArgs' -count=1 -timeout=120s` 通过；`go test ./middleware ./controller ./router -count=1` 通过；`git diff --check` 通过。
+
+仍未验证 `go test -race`、真实 MySQL/PostgreSQL、共享 Redis 多实例、Windows/Linux、安装包回跳、真实浏览器完整登录/2FA 和跨平台联调。R2 未单独增加未知长度恰好 64 KiB 成功边界与 revoke 超限状态断言，审查未发现实现绕过，作为后续增强记录。修复后的 G1 检查点具备在新任务授权下进入 G2 本地开发的条件；本轮不进入 G2、不发布。
