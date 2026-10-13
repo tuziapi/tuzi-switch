@@ -182,8 +182,13 @@ fn permissions(mode: Option<u32>) -> Option<fs::Permissions> {
     }
     #[cfg(not(unix))]
     {
-        let _ = mode;
-        None
+        mode.and_then(|m| {
+            fs::metadata(backup_directory()).ok().map(|meta| {
+                let mut p = meta.permissions();
+                p.set_readonly(m != 0);
+                p
+            })
+        })
     }
 }
 fn hash(bytes: &[u8]) -> String {
@@ -855,6 +860,32 @@ fn selected_models(
     models.dedup();
     Ok((protocol, models))
 }
+fn public_display(value: &str) -> String {
+    if value.starts_with("http:") || value.starts_with("https:") {
+        match url::Url::parse(value) {
+            Ok(mut url) => {
+                let _ = url.set_username("");
+                let _ = url.set_password(None);
+                url.set_query(None);
+                url.set_fragment(None);
+                url.to_string()
+            }
+            Err(_) => "无效地址（已脱敏）".into(),
+        }
+    } else {
+        value.into()
+    }
+}
+fn public_field(field: &str, value: &str) -> String {
+    if field.to_ascii_lowercase().contains("base_url")
+        || field.to_ascii_lowercase().contains("baseurl")
+    {
+        if !value.starts_with("https:") && !value.starts_with("http:") {
+            return "无效地址（已脱敏）".into();
+        }
+    }
+    public_display(value)
+}
 fn safe_file_fields(file: &FileState) -> String {
     fn walk(value: &serde_json::Value, path: &str, out: &mut Vec<String>) {
         if let Some(object) = value.as_object() {
@@ -878,7 +909,7 @@ fn safe_file_fields(file: &FileState) -> String {
                 .contains(&key.as_str())
                 {
                     if let Some(v) = value.as_str() {
-                        out.push(format!("{path}={v}"));
+                        out.push(format!("{path}={}", public_field(key, v)));
                     }
                 }
                 if key == "models" {
@@ -914,7 +945,7 @@ fn safe_file_fields(file: &FileState) -> String {
                 for (route, item) in routes.iter() {
                     for field in ["base_url", "wire_api", "env_key"] {
                         if let Some(v) = item.get(field).and_then(|v| v.as_str()) {
-                            fields.push(format!("{route}.{field}={v}"));
+                            fields.push(format!("{route}.{field}={}", public_field(field, v)));
                         }
                     }
                 }
@@ -923,7 +954,11 @@ fn safe_file_fields(file: &FileState) -> String {
         for line in text.lines() {
             if let Some((key, value)) = line.split_once('=') {
                 if ["GEMINI_MODEL", "GOOGLE_GEMINI_BASE_URL"].contains(&key.trim()) {
-                    fields.push(format!("{}={}", key.trim(), value.trim()));
+                    fields.push(format!(
+                        "{}={}",
+                        key.trim(),
+                        public_field(key.trim(), value.trim())
+                    ));
                 }
             }
         }
@@ -950,7 +985,7 @@ fn masked_settings(provider: &Provider) -> String {
         "/api_mode",
     ] {
         if let Some(value) = config.pointer(pointer).and_then(serde_json::Value::as_str) {
-            fields.push(format!("{} = {}", pointer, value));
+            fields.push(format!("{} = {}", pointer, public_field(pointer, value)));
         }
     }
     if let Some(toml) = config.get("config").and_then(serde_json::Value::as_str) {
@@ -961,7 +996,7 @@ fn masked_settings(provider: &Provider) -> String {
                         .get(field)
                         .and_then(|i| i.as_str())
                     {
-                        fields.push(format!("Codex {field} = {value}"));
+                        fields.push(format!("Codex {field} = {}", public_field(field, value)));
                     }
                 }
             }
@@ -1805,5 +1840,35 @@ mod tests {
         assert!(restore_files(&before, &expected).is_err());
         assert_eq!(fs::read(a).unwrap(), b"saved-a");
         assert_eq!(fs::read(b).unwrap(), b"saved-b");
+    }
+    #[test]
+    fn preview_url_fields_never_expose_userinfo_query_or_fragment() {
+        let secret="https://user:synthetic-password@example.invalid/v1?api_key=synthetic-query#synthetic-fragment";
+        let mut p = provider(&AppType::Claude);
+        p.settings_config["env"]["ANTHROPIC_BASE_URL"] = json!(secret);
+        let display = masked_settings(&p);
+        assert!(display.contains("https://example.invalid/v1"));
+        for secret in [
+            "user:",
+            "synthetic-password",
+            "synthetic-query",
+            "synthetic-fragment",
+        ] {
+            assert!(!display.contains(secret));
+        }
+        let file = FileState {
+            path: PathBuf::from("synthetic.json"),
+            content: Some(serde_json::to_vec(&p.settings_config).unwrap()),
+            permissions: None,
+        };
+        let fields = safe_file_fields(&file);
+        assert!(fields.contains("https://example.invalid/v1"));
+        assert!(!fields.contains("synthetic-password"));
+        assert!(!fields.contains("synthetic-query"));
+        assert!(!fields.contains("synthetic-fragment"));
+        assert_eq!(
+            public_display("https://[invalid?api_key=synthetic"),
+            "无效地址（已脱敏）"
+        );
     }
 }
