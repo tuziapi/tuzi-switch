@@ -94,3 +94,34 @@ G1代码、当前可用本地验证、独立审查及阶段提交已交付。T02
 ### 最终版本真实配对补验
 
 主智能体核验2026-10-13最终日志：native `34f4274de126b25d06745e7364b78167d2de712f`（与客户端集成src-tauri无差异）＋API集成 `5abbe82f69ffb9fa754a2a4533b1a5b6a1cfbd28`（代码检查点615f501之后仅文档）复验通过。API命令 `TUZI_DESKTOP_LOOPBACK_PORT_FILE=/tmp/tuzi-g1-final-api-origin go test ./router -run '^TestDesktopLoopbackFixture$' -count=1 -v`；native命令同前，实际受信测试origin为 `http://127.0.0.1:50133`。账户真实Go＋SystemStore Keychain测试1通过/0失败；条目delete后NoEntry断言通过，Go fixture停止PASS，临时SQLite和port/stop文件已清理。证据 `/tmp/tuzi-g1-final-native-pair.txt`、`/tmp/tuzi-g1-final-api-fixture.txt`；没有代码变更。最终API限流/迁移/授权页修复后的配对证据现已闭合，完整浏览器/平台/实库限制仍不变。
+
+## G1 r1 用户反馈回归与交付（2026-10-13）
+
+四项反馈均确认成立；先前G1检查点未覆盖对应场景，不能以原通过结论否定缺陷。ADR-004先冻结修订，再实现；规范提交C e0d619c / S f624a2d2e。最终稳定C 1ddb9b69164e0cbde583630ebf948232d2e6e09f / S 155efcaf3e8ab7174d47bcbd3b9d6a3657c9ce62；集成分别b85673968c4679db3878ac231ad6aebc82d58c3b / 6eca23f5a97828a91a2eb337acefd08a16c6013f，运行代码逐仓diff为空。
+
+| 回归 | 实际检查 | 结果 |
+|---|---|---|
+| T02 授权限流 | 隔离HTTP网站session，text/plain、JSON charset、无媒体头均第6次429 | 通过 |
+| T03 展示账户绑定 | A上下文切B后批准/取消409且无签发；新B重新确认成功；签名篡改/期限边界/缺失拒绝 | 通过 |
+| T03 页面恢复 | 409清旧账户，重新展示B后第二次明确点击；重载失败无旧批准按钮；原401/取消/回跳保留 | 通过 |
+| T06 暂时刷新 | 429/503+唯一精确头+完整错误体才保留RT/清journal/持久deadline；跨重启退避；恢复后轮换 | 通过 |
+| T06 不确定与存储失败 | 裸429/503、错误/重复头、截断/超大体不重放；写存储失败保持journal；退出generation阻迟到恢复；超大RetryAfter不溢出 | 通过 |
+| T07 列表寿命 | 当前RT闲置到期边界/绝对截止、只有历史RT、历史与当前共存、无RT、pending及revoked优先 | 通过 |
+
+### 稳定提交的非作者证据
+
+主智能体在 `/Users/syd08/Documents/tuzi/tuzi-api-g1-auth-followup-server-review` 固定155efcaf3逐文件检查：限流内容分类/strict controller拒绝、HMAC用途隔离/常量时间比较/纯会话绑定、结果头仅消费前产生、事务错误无标记、列表只查询本人当前RT到期字段，网页重确认与旧OAuth隔离。执行 `go test ./model ./controller ./middleware ./router ./cmd/db-migrate -run 'Desktop|OAuthProvider|MigrationArgs' -count=1 -timeout=90s` 五包退出0；日志 `/tmp/tuzi-g1-r1-independent-go.txt`。作者同命令也通过。测试开发中曾因fixture cookie停留账户75却请求72列表失败，修正登录72后复验通过，未弱化断言。
+
+review_finish在独立 `/Users/syd08/Documents/tuzi-switch-g1-auth-followup-review` 固定1ddb9b6审查并执行 `CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target cargo test --manifest-path src-tauri/Cargo.toml tuzi_account --lib -- --test-threads=1`，23通过/2默认忽略，无剩余阻断；日志 `/tmp/tuzi-g1-followup-native-independent-review.txt`。作者结果一致。上述2项忽略为显式系统存储/真实服务fixture，不能算默认测试通过，真实配对另见下。
+
+主智能体在固定服务端任务工作区执行 `bun test src/helpers/desktopAuthorization.test.js src/pages/OAuthAuthorize/index.test.jsx`，8通过/28断言。作者页面单独7通过/19断言。网站直接Vite首次缺ignored generated system-updates文件失败；检查构建脚本后清空两个GitHub token，用 `SYSTEM_UPDATE_GITHUB_TOKEN='' GITHUB_TOKEN='' bun run build` 生成本地git历史元数据并构建，退出0（22.49s）；脚本无push/部署，只写ignored生成文件，既有chunk/Browserslist警告保留。日志 `/tmp/tuzi-g1-followup-web-build.txt`，没有将构建当真实浏览器验证。
+
+### 真实本地配对与清理
+
+C1ddb9b6 + S155efcaf3，Darwin arm64，显式Go loopback + t.TempDir SQLite合成用户/client + UUID独立macOS Keychain条目。API：`TUZI_DESKTOP_LOOPBACK_PORT_FILE=/tmp/tuzi-g1-followup-pair-port go test ./router -run '^TestDesktopLoopbackFixture$' -count=1 -v`；原生：`TUZI_NATIVE_TEST_ORIGIN=http://127.0.0.1:56563 CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target cargo test --manifest-path src-tauri/Cargo.toml --lib tuzi_account::tests::real_go_loopback_pair -- --ignored --exact`。1通过：签名context授权/换码/身份→测试专用端点关闭合成client刷新→真实503 not-consumed→Keychain读回RT未变、journal=false、deadline持久→新service保持退避→恢复开关并仅在测试中推进deadline→真实轮换→退出、旧AT/RT拒绝→delete后NoEntry。不是Mock，但fixture login直接创建session，未覆盖真实登录/2FA或默认浏览器。429真实服务端限流和原生恢复分别有HTTP测试，跨仓库配对本次使用503场景。
+
+主核对 `/tmp/tuzi-g1-followup-native-pair.txt`、`/tmp/tuzi-g1-followup-api-fixture.txt` 及测试源码断言；fixture退出PASS、port/stop删除、临时SQLite清理。仅合成凭证，不访问真实工具目录/生产数据。
+
+文档检查：旧T01检查器仍假定HEAD不变和未提交文档，故在已授权编码提交后报基线状态不符；保留该事实，未将它算通过。按当前任务运行独立 `/tmp/validate-tuzi-g1-r1-docs.py`（链接/表格/围栏/18AC/16IF/22任务及依赖、21保护输入哈希），17文档无错误；另核查实际分支/提交/工作区和git diff --check。临时输出仅本机会话证据，结果已在此持久记录。
+
+限制不变：MySQL/PG、共享Redis多实例、全浏览器/2FA、安装包回跳、Windows/Linux、发布拓扑及T19～T22未验证；新增共享SESSION_SECRET和代理结果头发布核验见open-questions。G1此次四缺陷已关闭，无push/PR/部署，不代表可上线。

@@ -257,3 +257,5 @@ T02/T03/T04/T05/T06/T07/T12代码均已本地集成并通过非作者审查，�
 ## G1 安全修订 r1（2026-10-13）
 
 B3 / desktop-v1.1 / scope desktop-v1 保持，[ADR-004](decisions/0004-g1-auth-corrections.md)冻结授权解析一致性、签名账户上下文、明确未消费的刷新退避、当前RT闲置到期展示。T02/T03/T06/T07重新打开对应缺陷验证；实现/审查/集成结果见progress及g1-verification，先前检查点不代表这些新增回归已通过。网页与API须配对更新，无数据库迁移，不扩展G2。
+
+G1 r1收尾：T02/T03/T06/T07上述四缺陷已在稳定C1ddb9b6/S155efcaf3完成实现、非作者审查与本地回归，并集成；限定真实Go+macOS Keychain503恢复配对通过。其余平台/实库/首版验收限制不变，详见g1-verification最终记录。

@@ -133,3 +133,16 @@ API `8c0f887f1` 在独立review worktree的五包定向测试与未知marker版�
 ## G1 用户反馈修复（进行中，2026-10-13）
 
 四项反馈经源码确认成立：text/plain绕过桌面专用授权限流、展示账户未绑定批准账户、临时刷新错误直接终止连接、连接列表遗漏RT闲置过期。按ADR-004冻结desktop-v1.1安全修订r1。起点C 1504b05250e47c0c5bb536674f6261d9cbcd8b66 / S 5abbe82f69ffb9fa754a2a4533b1a5b6a1cfbd28，均codex/tuzi-assistant-dev；原未跟踪Word及预览保留。server/native分别在独立codex/g1-auth-followup-server与codex/g1-auth-followup-native实施；主智能体负责公共文档和服务端非作者审查，navigation负责原生非作者审查。此次新增回归尚未通过，不把此前交付视为已修复。
+
+### G1 r1 修复交付（2026-10-13）
+
+上述四项已修复、非作者审查和当前本地验证通过，并集成回两端 codex/tuzi-assistant-dev。规范仍B3 / desktop-v1.1安全修订r1，scope/寿命/schema不变。T02/T03/T06/T07本次缺陷重新关闭；T12不变，不扩大G2，完整跨环境验收仍受限。
+
+| 配对 | 已审任务提交 | 本地集成代码提交 |
+|---|---|---|
+| C 原生刷新/恢复 | 1ddb9b69164e0cbde583630ebf948232d2e6e09f | b85673968c4679db3878ac231ad6aebc82d58c3b |
+| S 限流/授权页绑定/连接列表/刷新结果 | 155efcaf3e8ab7174d47bcbd3b9d6a3657c9ce62 | 6eca23f5a97828a91a2eb337acefd08a16c6013f |
+
+作者server_finish/native_finish接续中断前独立worktree；review_finish在独立worktree审查原生稳定SHA，主智能体在新的API审查worktree审查服务端稳定SHA。无剩余已知阻断；原生23项通过/2默认忽略、Go五包通过、网站8项/28断言通过、网站构建通过。真实Go+macOS Keychain配对1项通过（含服务端503拒绝、RT保留及安全落盘、恢复轮换）；唯一条目删除后NoEntry，fixture停止PASS。集成后比对两端运行代码与已审/实测提交无差异，无冲突。详细命令、失败修复及限制见g1-verification。
+
+代码完成、本地测试通过、上述限定真实配对通过；发布未执行。尚未验证MySQL/PG、共享Redis多实例、完整网站登录/2FA与安装包回跳、Windows/Linux及T19～T22。新增部署核验为共享SESSION_SECRET和代理结果头约束；旧网页与API须配对升级，无数据库迁移，不回退到本次缺陷版本。后续可在新授权下进入G2，但本轮停止在G1修复检查点。没有push/PR/生产访问；原Word/预览附件保留且未提交。

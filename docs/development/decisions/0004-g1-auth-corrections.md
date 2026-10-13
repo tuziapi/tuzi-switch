@@ -6,7 +6,7 @@
 
 专用授权限流与控制器必须以同一 JSON 请求内容识别桌面 client，不得依赖可由调用者伪造的 Content-Type 来跳过限流；有界解析失败必须拒绝，不得退化为旧客户端。旧 OAuth 接入方行为保持。
 
-桌面 context.request 增加 context_token：服务端 HMAC 签名，绑定所展示账户 ID、完整授权请求和 600 秒截止。批准和取消均须校验签名、期限、请求绑定及当前纯网站 session 用户；缺失、篡改、过期或切号返回 HTTP 409 authorization_context_changed，不能签发连接或授权码。网页清除旧上下文并重新获取，显示新账户后要求再次明确点击，不自动提交。旧 confidential OAuth 不要求此字段。选择签名上下文而不是仅前端 account_id 断言，使展示账户及请求来自服务器可信快照；签名常量时间比较，不记录 context_token。
+桌面 context.request 增加 context_token：服务端 HMAC 签名，绑定所展示账户 ID、完整授权请求和 600 秒截止。批准和取消均须校验签名、期限、请求绑定及当前纯网站 session 用户；缺失、篡改、过期或切号返回 HTTP 409 authorization_context_changed，不能签发连接或授权码。网页清除旧上下文并重新获取，显示新账户后要求再次明确点击，不自动提交。旧 confidential OAuth 不要求此字段。选择签名上下文而不是仅前端 account_id 断言，使展示账户及请求来自服务器可信快照；签名常量时间比较，不记录 context_token。复用既有 SESSION_SECRET 并作签名用途隔离；多实例须使用相同受控共享密钥，不能依赖每进程随机默认值。发布前验证密钥配置与代理结果头处理，本轮不访问线上配置。
 
 ## 明确未消费与不确定结果
 
