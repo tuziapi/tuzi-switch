@@ -426,6 +426,48 @@ describe("business actions and secret lifetime", () => {
       vi.mocked(desktopRequest).mock.calls.filter(([r]) => r.method === "POST"),
     ).toHaveLength(1);
   });
+  it("recovers an uncertain profile write only after a successful reread", async () => {
+    let writes = 0;
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.method === "PATCH") {
+        if (++writes === 1)
+          throw { code: "network_uncertain", outcomeUnknown: true };
+        return env({ ...profile, record_ip_log: false });
+      }
+      return env(profile);
+    });
+    const { wrapper } = setup();
+    render(<ProfilePage state={state} canWrite />, { wrapper });
+    await screen.findByDisplayValue("Synthetic");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: zh.account.business.record_ip_log }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.save }),
+    );
+    await screen.findByText(zh.account.business.unknownOutcome);
+    expect(
+      screen.getByRole("button", { name: zh.account.business.save }),
+    ).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.verify }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: zh.account.business.save }),
+      ).toBeEnabled(),
+    );
+    expect(
+      screen.getByRole("checkbox", { name: zh.account.business.record_ip_log }),
+    ).toBeChecked();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: zh.account.business.record_ip_log }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.save }),
+    );
+    await waitFor(() => expect(writes).toBe(2));
+  });
   it("patches only changed profile fields and preserves explicit false", async () => {
     vi.mocked(desktopRequest).mockImplementation(async (req) =>
       env(

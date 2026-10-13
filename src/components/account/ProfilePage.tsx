@@ -24,19 +24,24 @@ export function ProfilePage({
   const { t } = useTranslation();
   const query = useDesktop<Profile>(state, "/api/desktop/profile", {}, 60000);
   const [form, setForm] = useState<ProfileWrite | null>(null);
-  const { write, busy, error } = useWrite(state);
+  const { write, busy, error, clear } = useWrite(state);
+  const readForm = (p: Profile): ProfileWrite => ({
+    display_name: p.display_name,
+    language: p.language,
+    accept_unset_model_ratio_model: p.accept_unset_model_ratio_model,
+    high_concurrency_enabled: p.high_concurrency_enabled,
+    record_ip_log: p.record_ip_log,
+  });
   useEffect(() => {
-    if (query.data && !form) {
-      const p = query.data.data;
-      setForm({
-        display_name: p.display_name,
-        language: p.language,
-        accept_unset_model_ratio_model: p.accept_unset_model_ratio_model,
-        high_concurrency_enabled: p.high_concurrency_enabled,
-        record_ip_log: p.record_ip_log,
-      });
-    }
+    if (query.data && !form) setForm(readForm(query.data.data));
   }, [query.data, form]);
+  const verify = async () => {
+    const result = await query.refetch();
+    if (!result.error && result.data) {
+      setForm(readForm(result.data.data));
+      clear();
+    }
+  };
   const save = async () => {
     if (!form || !query.data || error?.outcomeUnknown) return;
     const body = Object.fromEntries(
@@ -47,8 +52,7 @@ export function ProfilePage({
     if (!Object.keys(body).length) return;
     const p = await write<Profile>("PATCH", "/api/desktop/profile", body);
     if (p) {
-      setForm(null);
-      await query.refetch();
+      await verify();
     }
   };
   return (
@@ -107,13 +111,7 @@ export function ProfilePage({
           >
             {t("account.business.save")}
           </Button>
-          <Button
-            type="button"
-            onClick={() => {
-              setForm(null);
-              void query.refetch();
-            }}
-          >
+          <Button type="button" onClick={() => void verify()}>
             {t("account.business.verify")}
           </Button>
         </form>

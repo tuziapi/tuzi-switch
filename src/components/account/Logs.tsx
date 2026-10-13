@@ -40,6 +40,7 @@ export function Logs({ state }: { state: AccountState }) {
   );
   return (
     <>
+      <p>{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
       <div className="grid grid-cols-3 gap-2">
         {[
           "start_timestamp",
