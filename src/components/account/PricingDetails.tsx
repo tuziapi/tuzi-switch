@@ -70,7 +70,6 @@ export function PricingDetails({
           "system_group_ratio",
           "user_group_multiplier",
           "group_discount_ratio",
-          "user_model_discount_ratio",
           "group_discount_source",
         ].map((f) => (
           <div key={f}>
@@ -78,6 +77,16 @@ export function PricingDetails({
             <dd>{String(object(meta[f])[effective] ?? "—")}</dd>
           </div>
         ))}
+        <div>
+          <dt>user_model_discount_ratio</dt>
+          <dd>
+            {String(
+              object(object(meta.user_model_discount_ratio)[effective])[
+                model.model_name
+              ] ?? "—",
+            )}
+          </dd>
+        </div>
         {Object.entries(groups).map(([f, map]) => (
           <div key={f}>
             <dt>{f}</dt>

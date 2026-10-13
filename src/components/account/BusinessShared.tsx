@@ -1,15 +1,13 @@
 import { Button } from "@/components/ui/button";
 import {
-desktopRequest,
-openAccountWeb,
-type AccountState,
-type WebTarget,
+  desktopRequest,
+  openAccountWeb,
+  type AccountState,
+  type WebTarget,
 } from "@/lib/api/account";
-import type {
-DesktopError
-} from "@/lib/api/desktop";
+import type { DesktopError } from "@/lib/api/desktop";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef,useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 export const date = (n: number) =>
   n > 0 ? new Date(n * 1000).toLocaleString() : n === -1 ? "∞" : "—";

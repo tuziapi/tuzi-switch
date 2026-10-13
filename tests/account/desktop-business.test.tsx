@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import i18n from "i18next";
+import { ConfigureTool } from "@/components/account/ConfigureTool";
 import zh from "@/i18n/locales/zh.json";
 import {
   desktopRequest,
@@ -235,19 +236,161 @@ describe("business actions and secret lifetime", () => {
   it("discards a reveal that finishes after its view is closed", async () => {
     let finish!: (value: Envelope<{ key: string }>) => void;
     vi.mocked(desktopRequest).mockImplementation(async (req) => {
-      if (req.path.endsWith("/reveal")) return new Promise((resolve) => { finish = resolve; });
-      if (req.path.endsWith("key-groups")) return env([{ id: "default", label: "Default" }]);
-      return env({ page: 1, page_size: 20, total: "1", has_more: false, items: [key] });
+      if (req.path.endsWith("/reveal"))
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      if (req.path.endsWith("key-groups"))
+        return env([{ id: "default", label: "Default" }]);
+      return env({
+        page: 1,
+        page_size: 20,
+        total: "1",
+        has_more: false,
+        items: [key],
+      });
     });
     const { wrapper, client } = setup();
     render(<Keys state={state} />, { wrapper });
     await screen.findByText(/Synthetic key/);
-    fireEvent.click(screen.getByRole("button", { name: zh.account.business.reveal }));
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.reveal }),
+    );
     await waitFor(() => expect(finish).toBeDefined());
-    fireEvent.click(screen.getByRole("button", { name: zh.account.business.close }));
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.close }),
+    );
     await act(async () => finish(env({ key: "SYNTHETIC_LATE_SECRET_ONLY" })));
     expect(screen.queryByDisplayValue("SYNTHETIC_LATE_SECRET_ONLY")).toBeNull();
-    expect(JSON.stringify(client.getQueryCache().getAll().map(q => q.state.data))).not.toContain("SYNTHETIC_LATE_SECRET_ONLY");
+    expect(
+      JSON.stringify(
+        client
+          .getQueryCache()
+          .getAll()
+          .map((q) => q.state.data),
+      ),
+    ).not.toContain("SYNTHETIC_LATE_SECRET_ONLY");
+  });
+  it.each(["filter", "page"])(
+    "discards a reveal after %s changes",
+    async (change) => {
+      let finish!: (value: Envelope<{ key: string }>) => void;
+      vi.mocked(desktopRequest).mockImplementation(async (req) => {
+        if (req.path.endsWith("/reveal"))
+          return new Promise((resolve) => {
+            finish = resolve;
+          });
+        if (req.path.endsWith("key-groups")) return env([]);
+        return env({
+          page: 1,
+          page_size: 20,
+          total: "30",
+          has_more: true,
+          items: [key],
+        });
+      });
+      const { wrapper } = setup();
+      render(<Keys state={state} />, { wrapper });
+      await screen.findByText(/Synthetic key/);
+      fireEvent.click(
+        screen.getByRole("button", { name: zh.account.business.reveal }),
+      );
+      await waitFor(() => expect(finish).toBeDefined());
+      if (change === "filter")
+        fireEvent.change(
+          screen.getByLabelText(zh.account.business.keyFilter.keyword),
+          { target: { value: "changed" } },
+        );
+      else
+        fireEvent.click(
+          screen.getByRole("button", { name: zh.account.business.next }),
+        );
+      await act(async () =>
+        finish(env({ key: "SYNTHETIC_LATE_FILTER_SECRET" })),
+      );
+      expect(
+        screen.queryByDisplayValue("SYNTHETIC_LATE_FILTER_SECRET"),
+      ).toBeNull();
+    },
+  );
+  it("discards a created secret after the form is canceled", async () => {
+    let finish!: (value: Envelope<{ id: string; key: string }>) => void;
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.method === "POST")
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      if (req.path.endsWith("key-groups"))
+        return env([{ id: "default", label: "Default" }]);
+      return env({
+        page: 1,
+        page_size: 20,
+        total: "0",
+        has_more: false,
+        items: [],
+      });
+    });
+    const { wrapper } = setup();
+    render(<Keys state={state} />, { wrapper });
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.create }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.save }),
+    );
+    await waitFor(() => expect(finish).toBeDefined());
+    fireEvent.click(screen.getByRole("button", { name: zh.account.cancel }));
+    await act(async () =>
+      finish(env({ id: "99", key: "SYNTHETIC_CANCELED_CREATED_SECRET" })),
+    );
+    expect(
+      screen.queryByDisplayValue("SYNTHETIC_CANCELED_CREATED_SECRET"),
+    ).toBeNull();
+  });
+  it("resets the configuration model snapshot after page two is rejected", async () => {
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.query?.some(([name, value]) => name === "page" && value === "2"))
+        throw { code: "snapshot_changed", status: 409 };
+      return env({
+        items: [],
+        pagination: { page: 1, page_size: 100, total: "101", has_more: true },
+        snapshot_id: "synthetic-snapshot",
+        snapshot_refreshed: false,
+        api_version: 1,
+        schema_version: "1",
+        algorithm_version: "1",
+        pricing_meta: {},
+      });
+    });
+    const { wrapper } = setup();
+    const ready = vi.fn();
+    render(
+      <ConfigureTool
+        state={state}
+        keyDto={key}
+        onClose={vi.fn()}
+        onReady={ready}
+      />,
+      { wrapper },
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "→" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "→" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "←" })).toBeDisabled(),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: zh.account.business.revealAndContinue,
+      }),
+    ).toBeDisabled();
+    expect(ready).not.toHaveBeenCalled();
+    expect(
+      vi
+        .mocked(desktopRequest)
+        .mock.calls.every(([req]) => req.method === "GET"),
+    ).toBe(true);
   });
   it("does not replay an uncertain create", async () => {
     vi.mocked(desktopRequest).mockImplementation(async (req) => {

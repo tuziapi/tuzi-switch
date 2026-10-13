@@ -43,9 +43,21 @@ export function ConfigureTool({
     [error, setError] = useState<DesktopError | null>(null);
   useEffect(() => {
     if (!models.data) return;
-    if (models.data.data.snapshot_refreshed && page > 1) setPage(1);
+    if (models.data.data.snapshot_refreshed) {
+      setPage(1);
+      setModel(undefined);
+      setTarget("");
+    }
     setSnapshot(models.data.data.snapshot_id);
   }, [models.data, page]);
+  useEffect(() => {
+    if ((models.error as DesktopError | null)?.code === "snapshot_changed") {
+      setPage(1);
+      setSnapshot("");
+      setModel(undefined);
+      setTarget("");
+    }
+  }, [models.error]);
   const alive = useRef(true);
   const abort = useRef(new AbortController());
   useEffect(
@@ -63,7 +75,7 @@ export function ConfigureTool({
       ? tuziToolCompatibility(keyDto, model, selected.appId, selected.protocol)
       : t("account.business.selectCompatible");
   const reveal = async () => {
-    if (!selected || !model || reason) return;
+    if (!selected || !model || reason || models.error) return;
     setBusy(true);
     setError(null);
     try {
@@ -173,7 +185,10 @@ export function ConfigureTool({
           )}
         </p>
       )}
-      <Button disabled={busy || !!reason} onClick={() => void reveal()}>
+      <Button
+        disabled={busy || !!reason || !!models.error}
+        onClick={() => void reveal()}
+      >
         {t("account.business.revealAndContinue")}
       </Button>
       <Button disabled={false} onClick={onClose}>

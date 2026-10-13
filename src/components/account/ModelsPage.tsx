@@ -1,19 +1,17 @@
 import { Button } from "@/components/ui/button";
-import {
-type AccountState
-} from "@/lib/api/account";
+import { type AccountState } from "@/lib/api/account";
 import type {
-DesktopError,
-DesktopKey,
-DesktopPricing,
-Models,
-Page,
-Performance
+  DesktopError,
+  DesktopKey,
+  DesktopPricing,
+  Models,
+  Page,
+  Performance,
 } from "@/lib/api/desktop";
 import { useDesktop } from "@/lib/query/desktop";
-import { useEffect,useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { date,Field,Pager,QueryState } from "./BusinessShared";
+import { date, Field, Pager, QueryState } from "./BusinessShared";
 import { PricingDetails } from "./PricingDetails";
 export function ModelsPage({
   state,

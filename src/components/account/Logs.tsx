@@ -1,16 +1,10 @@
 import { Button } from "@/components/ui/button";
-import {
-type AccountState
-} from "@/lib/api/account";
-import type {
-Log,
-Page,
-Summary
-} from "@/lib/api/desktop";
+import { type AccountState } from "@/lib/api/account";
+import type { Log, Page, Summary } from "@/lib/api/desktop";
 import { useDesktop } from "@/lib/query/desktop";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { date,Field,Pager,QueryState } from "./BusinessShared";
+import { date, Field, Pager, QueryState } from "./BusinessShared";
 export function Logs({ state }: { state: AccountState }) {
   const { t } = useTranslation();
   const [page, setPage] = useState(1),

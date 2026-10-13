@@ -1,15 +1,17 @@
 import { Button } from "@/components/ui/button";
-import {
-type AccountState
-} from "@/lib/api/account";
-import type {
-Profile,
-ProfileWrite
-} from "@/lib/api/desktop";
+import { type AccountState } from "@/lib/api/account";
+import type { Profile, ProfileWrite } from "@/lib/api/desktop";
 import { useDesktop } from "@/lib/query/desktop";
-import { useEffect,useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check,Field,QueryState,useWrite,WebEntry,WriteError } from "./BusinessShared";
+import {
+  Check,
+  Field,
+  QueryState,
+  useWrite,
+  WebEntry,
+  WriteError,
+} from "./BusinessShared";
 export function ProfilePage({
   state,
   canWrite,

@@ -1,15 +1,10 @@
 import { formatMoney } from "@/lib/accountMoney";
-import {
-type AccountState
-} from "@/lib/api/account";
-import type {
-DesktopAccount,
-Usage,
-UsageValues
-} from "@/lib/api/desktop";
+import { type AccountState } from "@/lib/api/account";
+import type { DesktopAccount, Usage, UsageValues } from "@/lib/api/desktop";
 import { useDesktop } from "@/lib/query/desktop";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { date,QueryState,WebEntry } from "./BusinessShared";
+import { date, QueryState, WebEntry } from "./BusinessShared";
 export function Overview({
   state,
   localStatus,
@@ -24,13 +19,24 @@ export function Overview({
     {},
     60000,
   );
+  const [window] = useState(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    return {
+      start_time: Math.floor(start.getTime() / 1000),
+      end_time: Math.floor(now.getTime() / 1000),
+    };
+  });
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const usage = useDesktop<Usage>(state, "/api/desktop/usage", {
     timezone,
+    ...window,
     interval_seconds: 3600,
   });
   const daily = useDesktop<UsageValues>(state, "/api/desktop/usage/summary", {
     timezone,
+    ...window,
   });
   return (
     <>

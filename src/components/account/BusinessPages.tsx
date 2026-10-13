@@ -1,20 +1,18 @@
-import {
-type AccountState
-} from "@/lib/api/account";
+import { type AccountState } from "@/lib/api/account";
 import type {
-Capabilities,
-DesktopKey,
-DesktopPricing
+  Capabilities,
+  DesktopKey,
+  DesktopPricing,
 } from "@/lib/api/desktop";
 import { useDesktop } from "@/lib/query/desktop";
 import { useTranslation } from "react-i18next";
-import { QueryState,WebEntry } from "./BusinessShared";
+import { QueryState, WebEntry } from "./BusinessShared";
 import { Keys } from "./Keys";
 import { Logs } from "./Logs";
 import { ModelsPage } from "./ModelsPage";
 import { Overview } from "./Overview";
 import { ProfilePage } from "./ProfilePage";
-export { Keys,Logs,ModelsPage,Overview,ProfilePage,WebEntry };
+export { Keys, Logs, ModelsPage, Overview, ProfilePage, WebEntry };
 export function AccountBusiness({
   state,
   page,

@@ -1,17 +1,23 @@
 import { Button } from "@/components/ui/button";
-import {
-type AccountState
-} from "@/lib/api/account";
+import { type AccountState } from "@/lib/api/account";
 import type {
-DesktopKey,
-DesktopPricing,
-KeyWrite,
-Page
+  DesktopKey,
+  DesktopPricing,
+  KeyWrite,
+  Page,
 } from "@/lib/api/desktop";
 import { useDesktop } from "@/lib/query/desktop";
-import { useEffect,useRef,useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check,date,Field,Pager,QueryState,useWrite,WriteError } from "./BusinessShared";
+import {
+  Check,
+  date,
+  Field,
+  Pager,
+  QueryState,
+  useWrite,
+  WriteError,
+} from "./BusinessShared";
 const defaultKey: KeyWrite = {
   name: "",
   group: "",
@@ -67,7 +73,7 @@ export function Keys({
   const { write, busy, error, clear } = useWrite(state);
   useEffect(() => {
     clearSecret();
-    const timer = window.setTimeout(() => setSecret(""), 60000);
+    const timer = window.setTimeout(() => clearSecret(), 60000);
     return () => window.clearTimeout(timer);
   }, [selected, state.status]);
   useEffect(() => {
@@ -100,16 +106,18 @@ export function Keys({
         )
       : form;
     if (!Object.keys(body).length) return;
+    clearSecret();
+    const epoch = secretEpoch.current;
     const result = await write<DesktopKey | { id: string; key: string }>(
       selected ? "PATCH" : "POST",
       selected ? `/api/desktop/keys/${selected}` : "/api/desktop/keys",
       body,
     );
-    if (result && current.current) {
+    if (result && current.current && epoch === secretEpoch.current) {
       if ("key" in result) {
         setSecret(result.key);
         window.setTimeout(() => {
-          if (current.current) setSecret("");
+          if (current.current && epoch === secretEpoch.current) clearSecret();
         }, 60000);
       }
       setForm(null);
@@ -145,7 +153,7 @@ export function Keys({
               setFilters((f) => ({ ...f, [k]: v }));
               setPage(1);
               setSelected(null);
-              setSecret("");
+              clearSecret();
             }}
           />
         ))}
@@ -156,6 +164,8 @@ export function Keys({
             value={filters[k] === "true"}
             onChange={(v) => {
               setFilters((f) => ({ ...f, [k]: v ? "true" : "" }));
+              clearSecret();
+              setSelected(null);
               setPage(1);
             }}
           />
@@ -167,7 +177,7 @@ export function Keys({
           setSelected(null);
           setOriginal(null);
           setForm(defaultKey);
-          setSecret("");
+          clearSecret();
         }}
       >
         {t("account.business.create")}
@@ -186,7 +196,7 @@ export function Keys({
             onClick={() => {
               setSelected(k.id);
               setForm(null);
-              setSecret("");
+              clearSecret();
               clear();
             }}
           >
@@ -227,7 +237,8 @@ export function Keys({
               if (r && current.current && epoch === secretEpoch.current) {
                 setSecret(r.key);
                 window.setTimeout(() => {
-                  if (current.current) setSecret("");
+                  if (current.current && epoch === secretEpoch.current)
+                    clearSecret();
                 }, 60000);
               }
             }}
@@ -242,7 +253,14 @@ export function Keys({
         </article>
       ))}
       {list.data && (
-        <Pager page={page} more={list.data.data.has_more} onChange={setPage} />
+        <Pager
+          page={page}
+          more={list.data.data.has_more}
+          onChange={(next) => {
+            clearSecret();
+            setPage(next);
+          }}
+        />
       )}
       <WriteError error={error} />
       {error?.outcomeUnknown && (
@@ -257,7 +275,9 @@ export function Keys({
         </Button>
       )}
       {copyFailed && <p role="alert">{t("account.business.errors.generic")}</p>}
-      {busy && <Button onClick={clearSecret}>{t("account.business.close")}</Button>}
+      {busy && (
+        <Button onClick={clearSecret}>{t("account.business.close")}</Button>
+      )}
       {secret && (
         <div>
           <input
@@ -347,7 +367,7 @@ export function Keys({
             onClick={() => {
               setSelected(null);
               setForm(null);
-              setSecret("");
+              clearSecret();
               clear();
             }}
           >
