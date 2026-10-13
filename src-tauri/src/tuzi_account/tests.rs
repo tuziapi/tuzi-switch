@@ -416,7 +416,16 @@ async fn real_go_loopback_pair() {
     let origin = std::env::var("TUZI_NATIVE_TEST_ORIGIN").expect("fixture origin required");
     let parsed = Url::parse(&origin).unwrap();
     assert_eq!(parsed.scheme(), "http"); assert_eq!(parsed.host_str(), Some("127.0.0.1"));
-    let s = test_service(Arc::new(MemoryStore::default()), &origin);
+    let name = format!("tuzi-native-paired-test-{}", uuid::Uuid::new_v4());
+    let namespace_origin = format!("{origin}/{name}");
+    let namespace = format!("tuzi-assistant/account/v1/{namespace_origin}/tuzi-switch-desktop-test");
+    let entry = keyring::Entry::new(&namespace, "active-connection").unwrap();
+    struct Cleanup(keyring::Entry);
+    impl Drop for Cleanup { fn drop(&mut self) { let _ = self.0.delete_credential(); } }
+    let cleanup = Cleanup(entry);
+    let store = Arc::new(SystemStore::new(&namespace_origin, "tuzi-switch-desktop-test").unwrap());
+    let mut record = Record::default(); record.origin = origin.clone(); record.client = "tuzi-switch-desktop-test".into(); store.write(&record).unwrap();
+    let s = AccountService::with_store(store.clone(), &origin, "tuzi-switch-desktop-test").unwrap();
     let (_, authorize) = s.begin().unwrap();
     let url = Url::parse(&authorize).unwrap();
     let mut body = serde_json::Map::new();
@@ -440,11 +449,15 @@ async fn real_go_loopback_pair() {
     let refreshed = s.retry().await;
     assert_eq!(refreshed.status, "connected");
     let new = s.inner.lock().unwrap().record.tokens.clone().unwrap();
+    assert_eq!(store.read().unwrap().unwrap().tokens.as_ref().unwrap().refresh_token, new.refresh_token);
     assert_ne!(old.refresh_token, new.refresh_token);
     let out = s.logout().await; assert_eq!(out.remote_revoked, Some(true)); assert!(out.local_cleared);
     assert_eq!(s.identity(&new).await.unwrap_err().code, "invalid_grant");
     let replay = s.http.post(format!("{origin}/api/oauth-provider/token")).form(&[("grant_type","refresh_token"),("client_id",s.client.as_str()),("refresh_token",old.refresh_token.as_str())]).send().await.unwrap();
     assert!(!replay.status().is_success());
+    assert!(store.read().unwrap().unwrap().tokens.is_none());
+    cleanup.0.delete_credential().unwrap();
+    assert!(matches!(cleanup.0.get_secret(), Err(keyring::Error::NoEntry)));
 }
 #[test]
 fn raw_auth_is_never_an_import() {
@@ -503,4 +516,37 @@ async fn late_generation_cannot_persist_and_failed_cleanup_remains_retryable() {
     assert!(s.retry().await.local_cleared);
     assert!(store.record.lock().unwrap().as_ref().unwrap().tokens.is_none());
     task.abort();
+}
+
+#[tokio::test]
+async fn real_http_concurrent_401_and_logout_during_identity() {
+    use axum::{routing::{get,post}, Router};
+    for logout in [false,true] {
+        let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin=format!("http://{}",listener.local_addr().unwrap());
+        let entered=Arc::new(tokio::sync::Notify::new()); let release=Arc::new(tokio::sync::Notify::new());
+        let requests=Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let refreshes=Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let grant=now()+2592000;let connection=uuid::Uuid::new_v4().to_string();
+        let notify=entered.clone();let gate=release.clone();let calls=requests.clone();let counts=refreshes.clone();let conn=connection.clone();
+        let app=Router::new().route("/api/oauth-provider/userinfo",get(move || {let notify=notify.clone();let gate=gate.clone();let calls=calls.clone();async move {
+            let n=calls.fetch_add(1,std::sync::atomic::Ordering::SeqCst);
+            if n==0 {notify.notify_one();gate.notified().await;}
+            if n==0 && !logout {(axum::http::StatusCode::UNAUTHORIZED,axum::Json(serde_json::json!({})))} else {(axum::http::StatusCode::OK,axum::Json(serde_json::json!({"sub":"1","user_id":"1","preferred_username":"synthetic","name":"Synthetic"})))}
+        }})).route("/api/oauth-provider/token",post(move || {let counts=counts.clone();let conn=conn.clone();async move {
+            counts.fetch_add(1,std::sync::atomic::Ordering::SeqCst);
+            axum::Json(serde_json::json!({"access_token":"N".repeat(43),"refresh_token":"T".repeat(43),"token_type":"Bearer","scope":SCOPES,"expires_in":1800,"refresh_expires_in":604800,"grant_expires_at":grant,"user_id":"1","connection_id":conn,"scope_version":"desktop-v1"}))
+        }})).route("/api/oauth-provider/revoke",post(|| async {axum::http::StatusCode::OK}));
+        let server=tokio::spawn(async move{axum::serve(listener,app).await.unwrap()});
+        let store=Arc::new(MemoryStore::default());let s=Arc::new(test_service(store.clone(),&origin));s.load();
+        {let mut i=s.inner.lock().unwrap();i.record.tokens=Some(Tokens {access_token:"S".repeat(43),refresh_token:"R".repeat(43),user_id:"1".into(),connection_id:connection,access_expires:now()+1800,refresh_expires:now()+604800,grant_expires:grant});s.persist(&i.record).unwrap();}
+        let one=s.clone();let first=tokio::spawn(async move{one.retry().await});
+        tokio::time::timeout(Duration::from_secs(2),entered.notified()).await.unwrap();
+        let two=s.clone();let second=tokio::spawn(async move{two.retry().await});
+        if logout {assert_eq!(s.logout().await.status,"disconnected");}
+        release.notify_one();
+        let a=first.await.unwrap();let b=second.await.unwrap();
+        if logout {assert_eq!(a.status,"disconnected");assert_eq!(b.status,"disconnected");assert!(store.read().unwrap().unwrap().tokens.is_none());assert_eq!(refreshes.load(std::sync::atomic::Ordering::SeqCst),0);} else {assert_eq!(a.status,"connected");assert_eq!(b.status,"connected");assert_eq!(refreshes.load(std::sync::atomic::Ordering::SeqCst),1);}
+        server.abort();
+    }
 }
