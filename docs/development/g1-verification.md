@@ -50,3 +50,11 @@
 - native第二稳定 `81a145a` 的generation/revision、立即状态发布、journal localCleared和重复userinfo修复经navigation非作者复查；T06实际多请求401/403运输测试仍在补齐。
 - navigation非作者发现原deep-link插件get_current和new-url广播会把auth URL送入WebView；已交native修复，不能因Rust回调处理正确而视为凭证隔离通过。原import冷/热入口须保持。
 - T12修复 `4864283`（继承216d7ba）主审确认invalid/未清除状态有显式Disconnect、清除成功后恢复Connect；作者针对native81a145a类型检查/20项测试通过。等待最终原生修复后集成复验。
+
+## 第三次独立审查与复验
+
+- 主审固定API `8c0f887f18b6416f8f9dcac805c8ebf6144345af`，独立review worktree执行 `go test ./model ./controller ./middleware ./router ./cmd/db-migrate -run 'Desktop|OAuthProvider|MigrationArgs|G1Review' -count=1 -timeout=90s`：五包退出0，未知marker版本故障探针由失败转通过；已有同义回归纳入作者model测试。未证明多实例/三库。
+- 删除备份入口同用户锁事务增加撤销，作者回归包括删除→恢复后AT/RT仍失效、缺token表删除回滚；主审检查稳定补丁和测试通过。token/connection用户、client、scope、status、版本交叉校验已补。
+- 主审发现8c限流统一20/60s不符合冻结authorize5/user/300s、exchange10/clientIP/60s、refresh6/connection/60s规则，退回修复；清理候选查询需绑定总deadline，SQLite迁移跨进程锁和认证并发测试仍需补证。作者HTTP测试发现custom-scheme回跳误用旧HTTP redirect helper，另补修复，不以model测试掩盖路由失败。
+- navigation非作者复查native `c1c7346` / `ff93465`：插件三处事件均过滤精确v1/import、raw get_current权限移除、OAuth只在原生分流；ff93465修复读取安全记录失败时localCleared=false和本地成功清除后内存cleanup_token残留。独立执行运输测试尚待最终稳定提交。
+- 真实Rust→Go fixture首次尝试因测试服务RedisEnabled默认值引发nil Redis故障而停止；未计通过。fixture只提供合成网站会话，不构成真实登录/2FA/默认浏览器/已安装包回跳验收。
