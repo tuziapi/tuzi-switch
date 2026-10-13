@@ -72,7 +72,14 @@ export function ConfigureTool({
   );
   const reason =
     selected && model
-      ? tuziToolCompatibility(keyDto, model, selected.appId, selected.protocol)
+      ? tuziToolCompatibility(
+          keyDto,
+          model,
+          selected.appId,
+          selected.protocol,
+          undefined,
+          models.data?.data.pricing_meta,
+        )
       : t("account.business.selectCompatible");
   const reveal = async () => {
     if (!selected || !model || reason || models.error) return;

@@ -1,3 +1,4 @@
+import { TuziProviderRecovery } from "@/components/providers/TuziProviderDialog";
 import { type AccountState } from "@/lib/api/account";
 import type {
   Capabilities,
@@ -46,6 +47,7 @@ export function AccountBusiness({
   return (
     <>
       <QueryState query={caps} />
+      {(page === "overview" || page === "keys") && <TuziProviderRecovery />}
       {enabled === false && (
         <p role="alert">{t("account.business.unavailable")}</p>
       )}
