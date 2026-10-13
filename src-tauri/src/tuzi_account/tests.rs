@@ -455,3 +455,52 @@ fn raw_auth_is_never_an_import() {
     assert_eq!(plugin.matches(".emit(\"deep-link://new-url\"").count(), 1);
     assert!(!include_str!("../../capabilities/default.json").contains("deep-link:"));
 }
+
+#[tokio::test]
+async fn http_401_refreshes_once_403_never_refreshes_and_429_respects_retry_after() {
+    use axum::{routing::get, Router};
+    for status in [401,403,429] {
+        let (origin, f, task) = local_server(false, false).await;
+        let s = test_service(Arc::new(MemoryStore::default()), &origin);
+        let mut token = Tokens {access_token:"S".repeat(43),refresh_token:"R".repeat(43),user_id:"9007199254740993".into(),connection_id:f.connection.clone(),access_expires:now()+1800,refresh_expires:now()+604800,grant_expires:f.grant};
+        // A dedicated origin exercises actual HTTP status handling, with the same
+        // token route counting refresh requests; userinfo endpoint stays failing.
+        task.abort();
+        let _ = task.await;
+        let port = Url::parse(&origin).unwrap().port().unwrap();
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1",port)).await.unwrap();
+        let count = f.exchanges.clone();
+        let token_wire = serde_json::json!({"access_token":"N".repeat(43),"refresh_token":"T".repeat(43),"token_type":"Bearer","scope":SCOPES,"expires_in":1800,"refresh_expires_in":604800,"grant_expires_at":f.grant,"user_id":token.user_id,"connection_id":token.connection_id,"scope_version":"desktop-v1"});
+        let app = Router::new().route("/api/oauth-provider/userinfo",get(move || async move { (axum::http::StatusCode::from_u16(status).unwrap(),[("retry-after","120")]) }))
+            .route("/api/oauth-provider/token", axum::routing::post(move || {let count=count.clone();let wire=token_wire.clone(); async move { count.fetch_add(1,std::sync::atomic::Ordering::SeqCst); axum::Json(wire) }}))
+            .route("/api/oauth-provider/revoke",axum::routing::post(|| async { axum::http::StatusCode::OK }));
+        let server=tokio::spawn(async move {axum::serve(listener,app).await.unwrap()});
+        {let mut i=s.inner.lock().unwrap();i.loaded=true;i.record.tokens=Some(token.clone());s.persist(&i.record).unwrap();}
+        let state=s.retry().await;
+        assert_eq!(f.exchanges.load(std::sync::atomic::Ordering::SeqCst),if status==401 {1}else{0});
+        if status==403 {assert_eq!(state.error.as_ref().unwrap().code,"insufficient_scope");}
+        if status==429 {assert_eq!(state.error.as_ref().unwrap().retry_after,Some(120));assert!(s.inner.lock().unwrap().retry_not_before>=now()+119);}
+        s.retry().await;
+        assert_eq!(f.exchanges.load(std::sync::atomic::Ordering::SeqCst),if status==401 {1}else{0});
+        token.zeroize(); server.abort();
+    }
+}
+#[tokio::test]
+async fn late_generation_cannot_persist_and_failed_cleanup_remains_retryable() {
+    let (origin,f,task)=local_server(false,false).await;
+    let store=Arc::new(MemoryStore::default()); let s=test_service(store.clone(),&origin);
+    let t=Tokens {access_token:"S".repeat(43),refresh_token:"R".repeat(43),user_id:"9007199254740993".into(),connection_id:f.connection.clone(),access_expires:now()+1800,refresh_expires:now()+604800,grant_expires:f.grant};
+    s.load(); let old_generation=s.state().generation;
+    s.logout().await;
+    let stale=s.commit_tokens(old_generation,t.clone(),None).await;
+    assert_eq!(stale.status,"disconnected"); assert!(s.inner.lock().unwrap().record.tokens.is_none());
+    assert_eq!(f.revokes.load(std::sync::atomic::Ordering::SeqCst),1);
+    {let mut i=s.inner.lock().unwrap();i.record.tokens=Some(t);s.persist(&i.record).unwrap();}
+    *store.fail.lock().unwrap()=true;
+    let failed=s.logout().await;assert!(!failed.local_cleared);assert_eq!(failed.remote_revoked,Some(true));
+    assert!(s.inner.lock().unwrap().record.tokens.is_none());
+    *store.fail.lock().unwrap()=false;
+    assert!(s.retry().await.local_cleared);
+    assert!(store.record.lock().unwrap().as_ref().unwrap().tokens.is_none());
+    task.abort();
+}
