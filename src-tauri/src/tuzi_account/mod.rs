@@ -213,6 +213,7 @@ impl AccountService {
         match self.store.read() {
             Err(e) => {
                 i.state.status = "error".into();
+                i.state.local_cleared = false;
                 i.state.error = Some(e);
                 return;
             }
@@ -220,6 +221,7 @@ impl AccountService {
             Ok(Some(r)) => {
                 if r.version != 1 || r.origin != self.origin || r.client != self.client {
                     i.state.status = "error".into();
+                    i.state.local_cleared = false;
                     i.state.error = Some(AccountError::new("storage_invalid"));
                     return;
                 }
@@ -652,7 +654,7 @@ impl AccountService {
         };
         let mut i = self.inner.lock().unwrap();
         if i.record.generation == generation {
-            if remote == Some(true) { i.cleanup_token = None; }
+            if remote == Some(true) || i.state.local_cleared { i.cleanup_token = None; }
             i.state.remote_revoked = remote;
             self.publish(&mut i.state);
         }

@@ -409,3 +409,49 @@ async fn trusted_client_never_follows_redirect_with_credentials() {
     assert_eq!(result.unwrap_err().code, "server_error");
     task.abort();
 }
+
+#[tokio::test]
+#[ignore = "explicit paired Go loopback fixture only"]
+async fn real_go_loopback_pair() {
+    let origin = std::env::var("TUZI_NATIVE_TEST_ORIGIN").expect("fixture origin required");
+    let parsed = Url::parse(&origin).unwrap();
+    assert_eq!(parsed.scheme(), "http"); assert_eq!(parsed.host_str(), Some("127.0.0.1"));
+    let s = test_service(Arc::new(MemoryStore::default()), &origin);
+    let (_, authorize) = s.begin().unwrap();
+    let url = Url::parse(&authorize).unwrap();
+    let mut body = serde_json::Map::new();
+    for (k,v) in url.query_pairs() { body.insert(k.into_owned(), serde_json::Value::String(v.into_owned())); }
+    body.insert("approve".into(), true.into());
+    let login = s.http.post(format!("{origin}/fixture/login")).send().await.unwrap();
+    assert!(login.status().is_success());
+    let cookie = login.headers().get("set-cookie").unwrap().to_str().unwrap().split(';').next().unwrap().to_string();
+    let context = s.http.get(format!("{origin}/api/oauth-provider/authorize-context?{}", url.query().unwrap()))
+        .header("cookie", &cookie).header("New-Api-User", "1").send().await.unwrap();
+    assert!(context.status().is_success());
+    let approve: serde_json::Value = s.http.post(format!("{origin}/api/oauth-provider/authorize"))
+        .header("cookie", &cookie).header("New-Api-User", "1").header("Origin", &origin)
+        .json(&body).send().await.unwrap().json().await.unwrap();
+    assert_eq!(approve["success"], true);
+    let callback = approve["data"]["redirect_uri"].as_str().unwrap();
+    let state = s.callback(callback).await;
+    assert_eq!(state.status, "connected", "{}", state.error.as_ref().map(|e| e.code.as_str()).unwrap_or("none"));
+    assert_eq!(state.identity.unwrap().user_id, "1");
+    let old = { let mut i = s.inner.lock().unwrap(); let t = i.record.tokens.as_mut().unwrap(); t.access_expires = now()-1; t.clone() };
+    let refreshed = s.retry().await;
+    assert_eq!(refreshed.status, "connected");
+    let new = s.inner.lock().unwrap().record.tokens.clone().unwrap();
+    assert_ne!(old.refresh_token, new.refresh_token);
+    let out = s.logout().await; assert_eq!(out.remote_revoked, Some(true)); assert!(out.local_cleared);
+    assert_eq!(s.identity(&new).await.unwrap_err().code, "invalid_grant");
+    let replay = s.http.post(format!("{origin}/api/oauth-provider/token")).form(&[("grant_type","refresh_token"),("client_id",s.client.as_str()),("refresh_token",old.refresh_token.as_str())]).send().await.unwrap();
+    assert!(!replay.status().is_success());
+}
+#[test]
+fn raw_auth_is_never_an_import() {
+    for url in ["tuziswitch://auth/callback?code=synthetic", "tuziswitch://user@auth/callback?code=synthetic", "tuziswitch://auth%2f/callback", "tuziswitch://auth@v1/import?code=synthetic"] { assert!(!is_import_input(url)); }
+    assert!(is_import_input("tuziswitch://v1/import?resource=provider&name=synthetic"));
+    let plugin = include_str!("../../vendor/tauri-plugin-deep-link/src/lib.rs");
+    assert!(!plugin.contains("emit_to("));
+    assert_eq!(plugin.matches(".emit(\"deep-link://new-url\"").count(), 1);
+    assert!(!include_str!("../../capabilities/default.json").contains("deep-link:"));
+}

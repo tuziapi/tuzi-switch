@@ -194,7 +194,6 @@ mod imp {
         /// This function updates the [`Self::get_current`] value and emits a `deep-link://new-url` event.
         #[cfg(desktop)]
         pub fn handle_cli_arguments<S: AsRef<str>, I: Iterator<Item = S>>(&self, mut args: I) {
-            use tauri::Emitter;
 
             let Some(config) = &self.config else {
                 return;
@@ -542,8 +541,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R, Option<config::Config>> {
         .on_event(|_app, _event| {
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             if let tauri::RunEvent::Opened { urls } = _event {
-                use tauri::Emitter;
-
+    
                 emit_import_urls(_app, urls);
                 _app.state::<DeepLink<R>>()
                     .current
