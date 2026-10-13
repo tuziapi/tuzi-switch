@@ -190,3 +190,7 @@ Git回退通常git revert，两仓库独立操作并记录顺序；数据库回�
 T04采用keyring3.6系列平台原生后端（Linux仅Secret Service，无keyutils/明文fallback），独立固定origin的reqwest客户端no_proxy且禁止redirect。单条安全记录保存pending/active/refresh journal，平台实测与Mock故障证据分开。详细恢复和平台限制见ADR-003。
 
 调用结果、退款和统计语义以desktop-v1.1契约为准；账户累计不是窗口日志，type2不是成功调用，usage不是净账务；复用既有服务/查询，不新增账务链。
+
+## G1 安全修订 r1（2026-10-13）
+
+B3 / desktop-v1.1 / scope desktop-v1 保持，[ADR-004](decisions/0004-g1-auth-corrections.md)冻结授权解析一致性、签名账户上下文、明确未消费的刷新退避、当前RT闲置到期展示。T02/T03/T06/T07重新打开对应缺陷验证；实现/审查/集成结果见progress及g1-verification，先前检查点不代表这些新增回归已通过。网页与API须配对更新，无数据库迁移，不扩展G2。

@@ -49,3 +49,7 @@ T01文档设计已完成，下一轮获编码授权后可从T02（服务端认�
 ## G1 B3修订与编码授权（2026-10-13）
 
 本轮用户正式授权G1本地开发/验证/子智能体/阶段提交与本地集成，替代历史文档阶段禁编码限制。当前基线B3、契约desktop-v1.1、scope仍desktop-v1；[ADR-003](decisions/0003-g1-safety-and-recovery.md)闭合日志/退款语义、安装状态、兼容回退和T04存储选型。OAuth wire/授权寿命及产品范围不变；旧T01/ADR-002/源码审计记录保留历史B2/v1.0，不作为当前实现状态。当前状态及SHA以progress、[G1验证记录](g1-verification.md)为准。
+
+## G1 安全修订 r1（2026-10-13）
+
+B3 / desktop-v1.1 / scope desktop-v1 保持，[ADR-004](decisions/0004-g1-auth-corrections.md)冻结授权解析一致性、签名账户上下文、明确未消费的刷新退避、当前RT闲置到期展示。T02/T03/T06/T07重新打开对应缺陷验证；实现/审查/集成结果见progress及g1-verification，先前检查点不代表这些新增回归已通过。网页与API须配对更新，无数据库迁移，不扩展G2。

@@ -129,3 +129,7 @@ API `8c0f887f1` 在独立review worktree的五包定向测试与未知marker版�
 建议可进入G2本地开发，须新任务授权；不建议上线。最少后续环境信息是脱敏MySQL版本及拓扑、可用隔离DB/Redis测试环境、Windows/Linux/macOS安装包测试设备。缺少这些不阻塞冻结契约下的G2普通实现，但阻塞相应实库/平台/首版验收。本轮停在G1检查点。
 
 最终补验：native34f4274（与集成原生代码一致）＋API集成5abbe82f6在真实macOS Keychain/Go loopback再次1项通过，消除早期API配对版本限制；服务和唯一条目清理完成。精确命令及证据见g1-verification末尾，未扩大浏览器/平台/数据库通过范围。
+
+## G1 用户反馈修复（进行中，2026-10-13）
+
+四项反馈经源码确认成立：text/plain绕过桌面专用授权限流、展示账户未绑定批准账户、临时刷新错误直接终止连接、连接列表遗漏RT闲置过期。按ADR-004冻结desktop-v1.1安全修订r1。起点C 1504b05250e47c0c5bb536674f6261d9cbcd8b66 / S 5abbe82f69ffb9fa754a2a4533b1a5b6a1cfbd28，均codex/tuzi-assistant-dev；原未跟踪Word及预览保留。server/native分别在独立codex/g1-auth-followup-server与codex/g1-auth-followup-native实施；主智能体负责公共文档和服务端非作者审查，navigation负责原生非作者审查。此次新增回归尚未通过，不把此前交付视为已修复。

@@ -35,7 +35,7 @@
 
 IF-01浏览器参数：`response_type=code,client_id,redirect_uri,state,scope,code_challenge,code_challenge_method=S256`。Rust分别生成32随机字节base64url无填充的state/verifier（43字符）；服务器接受state/verifier43～128个协议安全ASCII字符，challenge恰43字符；redirect精确匹配无通配符。桌面code120秒（技术选择，旧300秒不改），pending600秒；GET不得签发。取消/过期使事务失效。
 
-context沿用 `{success,message,data:{client:{id,name},account:{id,username,display_name},request:{response_type,client_id,redirect_uri,state,scope,code_challenge,code_challenge_method},scopes:[{name,label,description}]}}`；桌面account.id十进制字符串，显示名读真实字段，旧类型不变。POST为同一request加 `approve:boolean`；成功 `data:{redirect_uri}`；取消callback `error=access_denied&state=...`。名称/权限说明来自服务端登记。纯网站会话拒绝旧系统token；保留Origin/CSRF保护、原登录/2FA。
+context沿用 `{success,message,data:{client:{id,name},account:{id,username,display_name},request:{response_type,client_id,redirect_uri,state,scope,code_challenge,code_challenge_method},scopes:[{name,label,description}]}}`；桌面account.id十进制字符串，显示名读真实字段，旧类型不变。桌面 request 另含服务端签名 `context_token`（账户+完整请求+600秒），POST 必须原样携带；当前网站会话与签名账户不一致、过期/篡改/缺失返回409 `authorization_context_changed`，网页重载上下文后要求重新确认。旧 OAuth 不增加此要求。POST为同一request加 `approve:boolean`；成功 `data:{redirect_uri}`；取消callback `error=access_denied&state=...`。名称/权限说明来自服务端登记。纯网站会话拒绝旧系统token；保留Origin/CSRF保护、原登录/2FA。
 
 callback严格scheme=tuziswitch、host=auth、path=/callback，无port/userinfo/fragment；成功code+state，失败error+state（可带脱敏error_description）；重复键、成功失败混合、非pending、错state、过期/旧generation拒绝。一次消费，全deep-link入口统一分流，兼容v1/import；不得传AT/RT/Key或输出原回跳URL。
 
@@ -43,9 +43,9 @@ IF-02 Content-Type form。换码 `grant_type=authorization_code,client_id,code,r
 
 IF-03桌面userinfo裸对象 `{sub:string,user_id:string,preferred_username:string,name:string}`；两ID与换码ID一致，无OIDC issuer/id_token声明。旧userinfo数字user_id不变。完整scope/身份/安全落盘都通过才已连接。刷新成功时同一事务撤销旧AT并签发新AT/RT；旧RT保留hash用于识别重放。
 
-OAuth错误沿用裸 `{error,error_description}`：400 invalid_request/invalid_grant/invalid_scope/unsupported_grant_type；401 invalid_client（userinfo为invalid_token）；403 insufficient_scope；429/503 temporarily_unavailable，429附Retry-After；鉴权错误WWW-Authenticate含安全原因，不回显凭证/内部错误。token/userinfo/revoke/context均no-store。
+OAuth错误沿用裸 `{error,error_description}`：400 invalid_request/invalid_grant/invalid_scope/unsupported_grant_type；401 invalid_client（userinfo为invalid_token）；403 insufficient_scope；429/503 temporarily_unavailable，429附Retry-After；鉴权错误WWW-Authenticate含安全原因，不回显凭证/内部错误。token/userinfo/revoke/context均no-store。安全修订r1：仅桌面刷新消费前明确拒绝的429/503附 `OAuth-Refresh-Outcome: not-consumed`；原生同时验证完整temporarily_unavailable错误体后才可持久清journal并退避重试旧RT。事务错误/不确定响应不附此标记，不重放。详见[ADR-004](decisions/0004-g1-auth-corrections.md)。
 
-IF-04 form `client_id,token,token_type_hint?`（access_token/refresh_token）；未知/已撤销幂等200 `{success:true}`。RT撤整个connection/family、AT仅自身，退出用RT。网站列表旧网站包络data为数组 `{id:UUID,client_id:string,client_name:string,device_label:null,created_at:int,last_refresh_at:int|null,absolute_expires_at:int,status:"pending"|"active"|"revoked"|"expired"}`；pending表示已批准但尚未换码，不采集机器名/硬件/IP，不返回token/hash。DELETE本人200 success；他人同不存在404。改密/重置/禁用/删号撤全部该用户桌面连接及未消费code；启用不复活；事务见技术方案。
+IF-04 form `client_id,token,token_type_hint?`（access_token/refresh_token）；未知/已撤销幂等200 `{success:true}`。RT撤整个connection/family、AT仅自身，退出用RT。网站列表旧网站包络data为数组 `{id:UUID,client_id:string,client_name:string,device_label:null,created_at:int,last_refresh_at:int|null,absolute_expires_at:int,status:"pending"|"active"|"revoked"|"expired"}`；active必须还存在当前未旋转/未撤销且未过期的RT，否则expired；历史RT不决定当前状态，revoked优先。pending表示已批准但尚未换码，不采集机器名/硬件/IP，不返回token/hash。DELETE本人200 success；他人同不存在404。改密/重置/禁用/删号撤全部该用户桌面连接及未消费code；启用不复活；事务见技术方案。
 
 ## N统一传输规则
 
