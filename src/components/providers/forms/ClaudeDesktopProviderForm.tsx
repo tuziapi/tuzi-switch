@@ -92,6 +92,7 @@ export interface ClaudeDesktopProviderFormProps {
     icon?: string;
     iconColor?: string;
   };
+  creationPrefill?: ClaudeDesktopProviderFormProps["initialData"];
   showButtons?: boolean;
 }
 
@@ -168,10 +169,12 @@ export function ClaudeDesktopProviderForm({
   onSubmit,
   onCancel,
   onSubmittingChange,
-  initialData,
+  initialData: editData,
+  creationPrefill,
   showButtons = true,
 }: ClaudeDesktopProviderFormProps) {
   const { t } = useTranslation();
+  const initialData = editData ?? creationPrefill;
   const initialMode = initialData?.meta?.claudeDesktopMode ?? "direct";
   const [mode, setMode] = useState<"direct" | "proxy">(initialMode);
   const needsModelMapping = mode === "proxy";
@@ -565,7 +568,7 @@ export function ClaudeDesktopProviderForm({
         onSubmit={form.handleSubmit(handleSubmit)}
         className="space-y-6"
       >
-        {!initialData && (
+        {!editData && (
           <ProviderPresetSelector
             selectedPresetId={selectedPresetId}
             groupedPresets={groupedPresets}

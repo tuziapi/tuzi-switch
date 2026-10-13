@@ -11,6 +11,7 @@ import { universalProvidersApi } from "@/lib/api";
 import {
   ProviderForm,
   type ProviderFormValues,
+  type ProviderFormProps,
 } from "@/components/providers/forms/ProviderForm";
 import { UniversalProviderFormModal } from "@/components/universal/UniversalProviderFormModal";
 import { UniversalProviderPanel } from "@/components/universal";
@@ -26,6 +27,7 @@ interface AddProviderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appId: AppId;
+  creationPrefill?: ProviderFormProps["initialData"];
   onSubmit: (
     provider: Omit<Provider, "id"> & {
       providerKey?: string;
@@ -38,12 +40,13 @@ export function AddProviderDialog({
   open,
   onOpenChange,
   appId,
+  creationPrefill,
   onSubmit,
 }: AddProviderDialogProps) {
   const { t } = useTranslation();
   // OpenCode and OpenClaw don't support universal providers
   const showUniversalTab =
-    appId !== "opencode" &&
+    !creationPrefill && appId !== "opencode" &&
     appId !== "openclaw" &&
     appId !== "hermes" &&
     appId !== "claude-desktop";
@@ -328,6 +331,7 @@ export function AddProviderDialog({
           <TabsContent value="app-specific" className="mt-0">
             <ProviderForm
               appId={appId}
+              creationPrefill={creationPrefill}
               submitLabel={t("common.add")}
               onSubmit={handleSubmit}
               onCancel={() => onOpenChange(false)}
@@ -344,6 +348,7 @@ export function AddProviderDialog({
         // OpenCode/OpenClaw: directly show form without tabs
         <ProviderForm
           appId={appId}
+              creationPrefill={creationPrefill}
           submitLabel={t("common.add")}
           onSubmit={handleSubmit}
           onCancel={() => onOpenChange(false)}

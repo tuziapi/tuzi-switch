@@ -437,6 +437,7 @@ export interface ProviderFormProps {
     icon?: string;
     iconColor?: string;
   };
+  creationPrefill?: ProviderFormProps["initialData"];
   showButtons?: boolean;
 }
 
@@ -457,7 +458,8 @@ function ProviderFormFull({
   onUniversalPresetSelect,
   onManageUniversalProviders,
   onSubmittingChange,
-  initialData,
+  initialData: editData,
+  creationPrefill,
   showButtons = true,
 }: ProviderFormProps) {
   if (appId === "claude-desktop") {
@@ -465,7 +467,8 @@ function ProviderFormFull({
   }
 
   const { t } = useTranslation();
-  const isEditMode = Boolean(initialData);
+  const initialData = editData ?? creationPrefill;
+  const isEditMode = Boolean(editData);
   const queryClient = useQueryClient();
   const { data: settingsData } = useSettingsQuery();
   const getInitialPresetId = useCallback((nextAppId: AppId) => {
@@ -1682,7 +1685,7 @@ function ProviderFormFull({
         const routeId = routeIdMatch?.[1] || "tuziswitch";
         let resolvedCodexEnvKey = requestedCodexEnvKey;
 
-        if (resolvedCodexEnvKey && codexBaseUrl) {
+        if (!creationPrefill && resolvedCodexEnvKey && codexBaseUrl) {
           const savedRoute = await invoke<SaveCodexRouteResult>(
             "save_codex_route",
             {
@@ -1712,7 +1715,7 @@ function ProviderFormFull({
           env: { envKey: string };
           modelCatalog?: { models: CodexCatalogModel[] };
         } = {
-          auth: resolvedCodexEnvKey ? {} : codexAuthObject,
+          auth: creationPrefill ? { OPENAI_API_KEY: codexApiKey } : resolvedCodexEnvKey ? {} : codexAuthObject,
           config: normalizedCodexConfig,
           env: { envKey: resolvedCodexEnvKey },
         };
