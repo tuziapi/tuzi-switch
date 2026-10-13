@@ -319,7 +319,7 @@ fn write_yaml_section_to_config_locked(
         return Ok(HermesWriteOutcome::default());
     }
 
-    let backup_path = if !raw.is_empty() {
+    let backup_path = if !raw.is_empty() && !crate::services::tuzi_provider::account_backup_active() {
         Some(create_hermes_backup(&raw)?)
     } else {
         None

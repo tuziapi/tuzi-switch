@@ -47,6 +47,7 @@ impl Database {
 
     /// 设置值
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
+        let _operation = crate::services::provider::OperationGuard::acquire()?;
         let conn = lock_conn!(self.conn);
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",

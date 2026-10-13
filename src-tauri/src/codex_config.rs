@@ -164,6 +164,7 @@ fn ensure_managed_env_file_private() -> Result<(), AppError> {
         if path.exists() {
             fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
                 .map_err(|error| AppError::io(&path, error))?;
+            crate::services::tuzi_provider::record_config_mode(&path, 0o100600);
         }
     }
     Ok(())
@@ -191,6 +192,7 @@ fn write_managed_env_file_entries(entries: &BTreeMap<String, String>) -> Result<
 }
 
 pub(crate) fn secure_atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
+    crate::services::tuzi_provider::before_config_write(path, Some(data))?;
     let parent = path
         .parent()
         .ok_or_else(|| AppError::Config("无效的路径".to_string()))?;
@@ -220,6 +222,7 @@ pub(crate) fn secure_atomic_write(path: &Path, data: &[u8]) -> Result<(), AppErr
     temporary
         .persist(path)
         .map_err(|error| AppError::io(path, error.error))?;
+    crate::services::tuzi_provider::after_config_write(path);
     Ok(())
 }
 
@@ -523,7 +526,7 @@ fn dedup_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     result
 }
 
-fn shell_rc_candidates() -> Vec<PathBuf> {
+pub(crate) fn shell_rc_candidates() -> Vec<PathBuf> {
     if cfg!(target_os = "windows") {
         return Vec::new();
     }
@@ -617,7 +620,7 @@ fn write_codex_env_file(env_map: &HashMap<String, String>) -> Result<(), AppErro
     let path = get_codex_env_file_path();
     if env_map.is_empty() {
         if path.exists() {
-            fs::remove_file(&path).map_err(|e| AppError::io(&path, e))?;
+            crate::config::delete_file(&path)?;
         }
         return Ok(());
     }
@@ -640,6 +643,7 @@ fn write_codex_env_file(env_map: &HashMap<String, String>) -> Result<(), AppErro
             .permissions();
         perms.set_mode(0o600);
         fs::set_permissions(&path, perms).map_err(|e| AppError::io(&path, e))?;
+        crate::services::tuzi_provider::record_config_mode(&path, 0o100600);
     }
 
     Ok(())

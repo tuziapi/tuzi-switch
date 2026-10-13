@@ -75,6 +75,12 @@ impl Database {
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
 
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS tuzi_provider_sources (
+            site TEXT NOT NULL, user_id TEXT NOT NULL, token_id TEXT NOT NULL,
+            app_type TEXT NOT NULL, provider_id TEXT NOT NULL,
+            PRIMARY KEY(app_type, provider_id)
+        );")?;
+
         // 2. Provider Endpoints 表
         conn.execute(
             "CREATE TABLE IF NOT EXISTS provider_endpoints (

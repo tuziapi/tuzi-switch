@@ -21,6 +21,35 @@ use crate::services::mcp::McpService;
 use crate::settings::CustomEndpoint;
 use crate::store::AppState;
 
+// Serialize provider changes while allowing existing nested service calls on the same thread.
+// Lock order: account source guard -> provider operation -> database connection.
+static PROVIDER_OPERATION: std::sync::Mutex<()> = std::sync::Mutex::new(());
+thread_local! { static PROVIDER_OPERATION_DEPTH: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+pub(crate) struct OperationGuard {
+    _lock: Option<std::sync::MutexGuard<'static, ()>>,
+}
+impl OperationGuard {
+    pub(crate) fn acquire() -> Result<Self, AppError> {
+        let nested = PROVIDER_OPERATION_DEPTH.with(|depth| depth.get() > 0);
+        let lock = if nested {
+            None
+        } else {
+            Some(
+                PROVIDER_OPERATION
+                    .lock()
+                    .map_err(|_| AppError::Config("供应商操作锁不可用".into()))?,
+            )
+        };
+        PROVIDER_OPERATION_DEPTH.with(|depth| depth.set(depth.get() + 1));
+        Ok(Self { _lock: lock })
+    }
+}
+impl Drop for OperationGuard {
+    fn drop(&mut self) {
+        PROVIDER_OPERATION_DEPTH.with(|depth| depth.set(depth.get() - 1));
+    }
+}
+
 // Re-export sub-module functions for external access
 pub use live::{
     import_default_config, import_hermes_providers_from_live, import_openclaw_providers_from_live,
@@ -1547,7 +1576,9 @@ wire_api = "responses"
 
 impl ProviderService {
     fn reconcile_codex_image_compat_after_change(state: &AppState, app_type: &AppType) {
-        if matches!(app_type, AppType::Codex) {
+        if matches!(app_type, AppType::Codex)
+            && !crate::services::tuzi_provider::account_backup_active()
+        {
             if let Err(error) = crate::services::codex_image_compat::schedule_reconcile(state) {
                 log::warn!("Codex Provider 变更后图片兼容收敛失败: {error}");
             }
@@ -1622,6 +1653,7 @@ impl ProviderService {
         provider: Provider,
         add_to_live: bool,
     ) -> Result<bool, AppError> {
+        let _operation = OperationGuard::acquire()?;
         let mut provider = provider;
         let submitted_provider = provider.clone();
         let current = state.db.get_current_provider(app_type.as_str())?;
@@ -1692,6 +1724,7 @@ impl ProviderService {
         original_id: Option<&str>,
         provider: Provider,
     ) -> Result<bool, AppError> {
+        let _operation = OperationGuard::acquire()?;
         let mut provider = provider;
         let submitted_provider = provider.clone();
         let original_id = original_id.unwrap_or(provider.id.as_str()).to_string();
@@ -1920,6 +1953,7 @@ impl ProviderService {
     /// 同时检查本地 settings 和数据库的当前供应商，防止删除任一端正在使用的供应商。
     /// 删除只移除兔子switch 内部管理记录，不修改用户真实客户端配置文件。
     pub fn delete(state: &AppState, app_type: AppType, id: &str) -> Result<(), AppError> {
+        let _operation = OperationGuard::acquire()?;
         // Check both local settings and database for apps with a current-provider concept.
         let local_current = crate::settings::get_current_provider(&app_type);
         let db_current = state.db.get_current_provider(app_type.as_str())?;
@@ -1956,6 +1990,7 @@ impl ProviderService {
         app_type: AppType,
         id: &str,
     ) -> Result<(), AppError> {
+        let _operation = OperationGuard::acquire()?;
         match app_type {
             AppType::OpenCode => {
                 let provider_category = state
@@ -2169,6 +2204,7 @@ impl ProviderService {
     ///    d. Write target provider config to live files
     ///    e. Sync MCP configuration
     pub fn switch(state: &AppState, app_type: AppType, id: &str) -> Result<SwitchResult, AppError> {
+        let _operation = OperationGuard::acquire()?;
         // Check if provider exists
         let providers = state.db.get_all_providers(app_type.as_str())?;
         let _provider = providers
@@ -2831,6 +2867,7 @@ impl ProviderService {
         app_type: AppType,
         updates: Vec<ProviderSortUpdate>,
     ) -> Result<bool, AppError> {
+        let _operation = OperationGuard::acquire()?;
         let mut providers = state.db.get_all_providers(app_type.as_str())?;
 
         for update in updates {
@@ -3446,6 +3483,7 @@ impl ProviderService {
 
     /// 删除统一供应商
     pub fn delete_universal(state: &AppState, id: &str) -> Result<bool, AppError> {
+        let _operation = OperationGuard::acquire()?;
         // 获取统一供应商（用于删除生成的子供应商）
         let provider = state.db.get_universal_provider(id)?;
 

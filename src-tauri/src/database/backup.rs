@@ -17,6 +17,7 @@ const CC_SWITCH_SQL_EXPORT_HEADER: &str = "-- tuzi switch SQLite 导出";
 
 /// Tables whose data rows are skipped when exporting for WebDAV sync.
 const SYNC_SKIP_TABLES: &[&str] = &[
+    "tuzi_provider_sources",
     "proxy_request_logs",
     "stream_check_logs",
     "provider_health",
@@ -27,6 +28,7 @@ const SYNC_SKIP_TABLES: &[&str] = &[
 /// Tables whose local data is preserved (restored from local snapshot) during WebDAV import.
 /// Excludes ephemeral tables like provider_health that can safely rebuild at runtime.
 const SYNC_PRESERVE_TABLES: &[&str] = &[
+    "tuzi_provider_sources",
     "proxy_request_logs",
     "stream_check_logs",
     "proxy_live_backup",

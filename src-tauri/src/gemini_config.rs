@@ -222,7 +222,9 @@ pub fn write_gemini_env_atomic(map: &HashMap<String, String>) -> Result<(), AppE
                 .map_err(|e| AppError::io(parent, e))?
                 .permissions();
             perms.set_mode(0o700);
-            fs::set_permissions(parent, perms).map_err(|e| AppError::io(parent, e))?;
+            if !crate::services::tuzi_provider::account_backup_active() {
+                fs::set_permissions(parent, perms).map_err(|e| AppError::io(parent, e))?;
+            }
         }
     }
 
@@ -238,6 +240,7 @@ pub fn write_gemini_env_atomic(map: &HashMap<String, String>) -> Result<(), AppE
             .permissions();
         perms.set_mode(0o600);
         fs::set_permissions(&path, perms).map_err(|e| AppError::io(&path, e))?;
+        crate::services::tuzi_provider::record_config_mode(&path, 0o100600);
     }
 
     Ok(())

@@ -194,6 +194,7 @@ pub fn write_text_file(path: &Path, data: &str) -> Result<(), AppError> {
 
 /// 原子写入：写入临时文件后 rename 替换，避免半写状态
 pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
+    crate::services::tuzi_provider::before_config_write(path, Some(data))?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| AppError::io(parent, e))?;
     }
@@ -333,6 +334,7 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
             source: e,
         })?;
     }
+    crate::services::tuzi_provider::after_config_write(path);
     Ok(())
 }
 
@@ -504,9 +506,11 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<(), AppError> {
 
 /// 删除文件
 pub fn delete_file(path: &Path) -> Result<(), AppError> {
+    crate::services::tuzi_provider::before_config_write(path, None)?;
     if path.exists() {
         fs::remove_file(path).map_err(|e| AppError::io(path, e))?;
     }
+    crate::services::tuzi_provider::after_config_write(path);
     Ok(())
 }
 

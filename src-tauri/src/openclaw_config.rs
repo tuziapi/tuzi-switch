@@ -354,6 +354,7 @@ impl OpenClawConfigDocument {
 
         let backup_path = current_source
             .as_ref()
+            .filter(|_| !crate::services::tuzi_provider::account_backup_active())
             .map(|source| create_openclaw_backup(source))
             .transpose()?
             .map(|path| path.display().to_string());

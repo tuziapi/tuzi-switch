@@ -562,6 +562,7 @@ fn save_settings_file(settings: &AppSettings) -> Result<(), AppError> {
 
     let json = serde_json::to_string_pretty(&normalized)
         .map_err(|e| AppError::JsonSerialize { source: e })?;
+    crate::services::tuzi_provider::before_config_write(&path, Some(json.as_bytes()))?;
     #[cfg(unix)]
     {
         use std::fs::OpenOptions;
@@ -583,6 +584,7 @@ fn save_settings_file(settings: &AppSettings) -> Result<(), AppError> {
         fs::write(&path, json).map_err(|e| AppError::io(&path, e))?;
     }
 
+    crate::services::tuzi_provider::after_config_write(&path);
     Ok(())
 }
 
