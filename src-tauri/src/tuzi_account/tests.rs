@@ -550,3 +550,16 @@ async fn real_http_concurrent_401_and_logout_during_identity() {
         server.abort();
     }
 }
+
+#[test]
+fn maintenance_is_visible_bounded_and_honors_retry_after() {
+    let s=AccountService::with_store(Arc::new(MemoryStore::default()),ORIGIN,CLIENT).unwrap();
+    {let mut i=s.inner.lock().unwrap();i.loaded=true;i.state.status="offline".into();i.record.tokens=Some(Tokens {access_token:"S".repeat(43),refresh_token:"R".repeat(43),user_id:"1".into(),connection_id:uuid::Uuid::new_v4().to_string(),access_expires:now()-1,refresh_expires:now()+604800,grant_expires:now()+2592000});}
+    assert!(!s.take_maintenance_attempt(false));
+    {s.inner.lock().unwrap().retry_not_before=now()+120;}
+    assert!(!s.take_maintenance_attempt(true));
+    {s.inner.lock().unwrap().retry_not_before=0;}
+    for _ in 0..3 {assert!(s.take_maintenance_attempt(true));}
+    assert!(!s.take_maintenance_attempt(true));
+    assert_eq!(s.inner.lock().unwrap().maintenance_attempts,3);
+}

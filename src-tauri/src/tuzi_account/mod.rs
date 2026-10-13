@@ -128,6 +128,7 @@ struct Inner {
     loaded: bool,
     cleanup_token: Option<Tokens>,
     retry_not_before: i64,
+    maintenance_attempts: u8,
 }
 pub struct AccountService {
     inner: Mutex<Inner>,
@@ -168,6 +169,7 @@ impl AccountService {
                 loaded: false,
                 cleanup_token: None,
                 retry_not_before: 0,
+                maintenance_attempts: 0,
             }),
             operation: tokio::sync::Mutex::new(()),
             store,
@@ -188,13 +190,19 @@ impl AccountService {
                 let state = service.state(); // Expire pending even after process restart.
                 let visible = app.get_webview_window("main").is_some_and(|w| w.is_visible().unwrap_or(false));
                 if visible && matches!(state.status.as_str(), "connected" | "offline") {
-                    let due = { let i = service.inner.lock().unwrap();
-                        i.record.tokens.as_ref().is_some_and(|t| t.access_expires <= now() + 30)
-                            && i.retry_not_before <= now() };
+                    let due = service.take_maintenance_attempt(visible);
                     if due { service.retry().await; }
                 }
             }
         });
+    }
+    fn take_maintenance_attempt(&self, visible: bool) -> bool {
+        let mut i = self.inner.lock().unwrap();
+        let due = visible && matches!(i.state.status.as_str(), "connected" | "offline")
+            && i.record.tokens.as_ref().is_some_and(|t| t.access_expires <= now() + 30)
+            && i.retry_not_before <= now() && i.maintenance_attempts < 3;
+        if due { i.maintenance_attempts += 1; }
+        due
     }
     fn publish(&self, state: &mut AccountState) {
         state.revision = self
@@ -462,6 +470,8 @@ impl AccountService {
                     Err(e) => Err(e),
                     Ok(()) => {
                         i.record = r;
+                        i.maintenance_attempts = 0;
+                        i.retry_not_before = 0;
                         i.state = AccountState {
                             status: "connected".into(),
                             generation,
@@ -636,6 +646,7 @@ impl AccountService {
             i.record = r;
             i.cleanup_token = token.clone();
             i.retry_not_before = 0;
+            i.maintenance_attempts = 0;
             i.state = AccountState {
                 generation,
                 local_cleared: saved.is_ok(),
@@ -857,6 +868,7 @@ pub async fn account_retry(
     app: tauri::AppHandle,
     service: tauri::State<'_, Arc<AccountService>>,
 ) -> Result<AccountState, AccountError> {
+    service.inner.lock().unwrap().maintenance_attempts = 0;
     let state = service.retry().await;
     emit(&app, &state);
     Ok(state)
