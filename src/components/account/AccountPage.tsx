@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { AccountBusiness } from "./BusinessPages";
+import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 import type { useAccount } from "@/lib/query/account";
 
 export const ACCOUNT_PAGES = [
@@ -17,7 +19,15 @@ export type AccountPageId = (typeof ACCOUNT_PAGES)[number];
 type AccountController = ReturnType<typeof useAccount>;
 
 /** Only sanitized native account state crosses this boundary. Never persist it. */
-export function AccountPage({ account }: { account: AccountController }) {
+export function AccountPage({
+  account,
+  onConfigureKey,
+  localStatus,
+}: {
+  account: AccountController;
+  localStatus?: string;
+  onConfigureKey?: (key: DesktopKey, model?: DesktopPricing) => void;
+}) {
   const { t } = useTranslation();
   const [page, setPage] = useState<AccountPageId>("overview");
   const [busy, setBusy] = useState(false);
@@ -162,7 +172,15 @@ export function AccountPage({ account }: { account: AccountController }) {
       >
         <h2 className="font-semibold">{t(`account.pages.${page}`)}</h2>
         {!connected && <p>{t("account.connectRequired")}</p>}
-        <p className="text-muted-foreground">{t("account.stagePending")}</p>
+        {connected && state.identity ? (
+          <AccountBusiness
+            key={`${state.identity.connectionId}:${state.generation}:${page}`}
+            state={state}
+            page={page}
+            onConfigure={onConfigureKey}
+            localStatus={localStatus}
+          />
+        ) : null}
       </section>
     </section>
   );

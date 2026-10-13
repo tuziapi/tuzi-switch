@@ -212,7 +212,7 @@ describe("App integration with MSW", () => {
       ),
     );
     fireEvent.click(screen.getByRole("button", { name: "account.pages.keys" }));
-    expect(screen.getByText("account.stagePending")).toBeInTheDocument();
+    expect(screen.getByText("account.connectRequired")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "account.tools" }));
     expect(await screen.findByTestId("provider-list")).toBeInTheDocument();
     fireEvent.click(screen.getByText("switch-openclaw"));

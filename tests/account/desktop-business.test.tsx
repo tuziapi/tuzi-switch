@@ -1,0 +1,457 @@
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
+import i18n from "i18next";
+import zh from "@/i18n/locales/zh.json";
+import {
+  desktopRequest,
+  openAccountWeb,
+  disconnectedAccount,
+  type AccountState,
+} from "@/lib/api/account";
+import type { DesktopKey, Envelope, Money, Profile } from "@/lib/api/desktop";
+import { formatMoney } from "@/lib/accountMoney";
+import { useDesktop } from "@/lib/query/desktop";
+import {
+  Keys,
+  Logs,
+  ModelsPage,
+  ProfilePage,
+  WebEntry,
+} from "@/components/account/BusinessPages";
+vi.mock("@/lib/api/account", async (original) => ({
+  ...(await original<typeof import("@/lib/api/account")>()),
+  desktopRequest: vi.fn(),
+  openAccountWeb: vi.fn(),
+}));
+const state: AccountState = {
+  ...disconnectedAccount,
+  status: "connected",
+  generation: 3,
+  identity: {
+    userId: "9007199254740993",
+    username: "synthetic",
+    displayName: "Synthetic",
+    connectionId: "synthetic-connection",
+  },
+};
+const key: DesktopKey = {
+  id: "9007199254740997",
+  name: "Synthetic key",
+  masked_key: "sk-SYN…MASK",
+  status: 1,
+  group: "default",
+  created_time: 1,
+  accessed_time: 0,
+  expired_time: -1,
+  remain_quota: "100",
+  used_quota: "1",
+  unlimited_quota: false,
+  model_limits_enabled: false,
+  model_limits: "",
+  allow_ips: null,
+  exclude_ips: null,
+  is_expired: false,
+};
+const profile: Profile = {
+  user_id: state.identity!.userId,
+  username: "synthetic",
+  email: "",
+  display_name: "Synthetic",
+  language: "zh-CN",
+  accept_unset_model_ratio_model: true,
+  high_concurrency_enabled: true,
+  record_ip_log: true,
+};
+const env = <T,>(data: T): Envelope<T> => ({
+  success: true,
+  message: "",
+  data,
+  meta: {
+    contract_version: "desktop-v1.1",
+    request_id: "synthetic",
+    generated_at: 1,
+  },
+});
+const money: Money = {
+  quota_per_unit: "100",
+  base_currency: "USD",
+  display_type: "USD",
+  usd_exchange_rate: "7.03",
+  custom_currency_symbol: "X",
+  custom_currency_exchange_rate: "2.5",
+};
+function setup() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  return { client, wrapper };
+}
+beforeEach(() => {
+  vi.clearAllMocks();
+  i18n.addResourceBundle("zh", "translation", zh, true, true);
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: "visible",
+  });
+  vi.mocked(openAccountWeb).mockResolvedValue();
+});
+describe("decimal money contract", () => {
+  it("keeps values above safe integers and metadata rates exact", () => {
+    expect(formatMoney("9007199254740993", money)).toBe(
+      "USD 90071992547409.93",
+    );
+    expect(formatMoney("100", { ...money, display_type: "CNY" })).toBe(
+      "CNY 7.03",
+    );
+    expect(formatMoney("100", { ...money, display_type: "CUSTOM" })).toBe(
+      "X 2.50",
+    );
+  });
+  it("rounds half-up and marks tiny positive amounts rather than zero", () => {
+    expect(formatMoney("1", { ...money, quota_per_unit: "200" })).toBe(
+      "USD 0.01",
+    );
+    expect(formatMoney("1", { ...money, quota_per_unit: "100000" })).toBe(
+      "USD <0.01",
+    );
+    expect(formatMoney("-1", { ...money, quota_per_unit: "200" })).toBe(
+      "USD -0.01",
+    );
+    expect(formatMoney("123", { ...money, display_type: "TOKENS" })).toBe(
+      "123 quota",
+    );
+  });
+});
+describe("identity-isolated native business queries", () => {
+  it("discards delayed results after identity changes and cancels old signal", async () => {
+    let finish!: (v: Envelope<{ owner: string }>) => void;
+    vi.mocked(desktopRequest).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    vi.mocked(desktopRequest).mockResolvedValue(env({ owner: "B" }));
+    const { wrapper } = setup();
+    const hook = renderHook(
+      ({ s }) => useDesktop<{ owner: string }>(s, "/api/desktop/account"),
+      { wrapper, initialProps: { s: state } },
+    );
+    await waitFor(() => expect(desktopRequest).toHaveBeenCalledTimes(1));
+    const signal = vi.mocked(desktopRequest).mock.calls[0][1]!;
+    hook.rerender({
+      s: {
+        ...state,
+        generation: 4,
+        identity: { ...state.identity!, userId: "B", connectionId: "B" },
+      },
+    });
+    await waitFor(() => expect(hook.result.current.data?.data.owner).toBe("B"));
+    expect(signal.aborted).toBe(true);
+    await act(async () => finish(env({ owner: "A" })));
+    expect(hook.result.current.data?.data.owner).toBe("B");
+  });
+  it("keeps permission failures visible without retries or empty data", async () => {
+    vi.mocked(desktopRequest).mockRejectedValue({
+      code: "insufficient_scope",
+      status: 403,
+    });
+    const { wrapper } = setup();
+    const { result } = renderHook(
+      () => useDesktop(state, "/api/desktop/logs"),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeUndefined();
+    expect(desktopRequest).toHaveBeenCalledTimes(1);
+  });
+  it("pauses hidden views and cancels outstanding reads", async () => {
+    vi.mocked(desktopRequest).mockImplementation(() => new Promise(() => {}));
+    const { wrapper } = setup();
+    const hook = renderHook(() => useDesktop(state, "/api/desktop/logs"), {
+      wrapper,
+    });
+    await waitFor(() => expect(desktopRequest).toHaveBeenCalledOnce());
+    const signal = vi.mocked(desktopRequest).mock.calls[0][1]!;
+    act(() => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "hidden",
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await waitFor(() => expect(signal.aborted).toBe(true));
+    hook.unmount();
+  });
+});
+describe("business actions and secret lifetime", () => {
+  it("holds explicitly revealed model keys outside every query cache and clears on close", async () => {
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.path.endsWith("/reveal"))
+        return env({ key: "SYNTHETIC_MODEL_KEY_ONLY" });
+      if (req.path.endsWith("key-groups"))
+        return env([{ id: "default", label: "Default" }]);
+      return env({
+        page: 1,
+        page_size: 20,
+        total: "1",
+        has_more: false,
+        items: [key],
+      });
+    });
+    const { wrapper, client } = setup();
+    render(<Keys state={state} />, { wrapper });
+    await screen.findByText(/Synthetic key/);
+    expect(screen.queryByDisplayValue("SYNTHETIC_MODEL_KEY_ONLY")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.reveal }),
+    );
+    await screen.findByDisplayValue("SYNTHETIC_MODEL_KEY_ONLY");
+    expect(
+      JSON.stringify(
+        client
+          .getQueryCache()
+          .getAll()
+          .map((q) => q.state.data),
+      ),
+    ).not.toContain("SYNTHETIC_MODEL_KEY_ONLY");
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.close }),
+    );
+    expect(screen.queryByDisplayValue("SYNTHETIC_MODEL_KEY_ONLY")).toBeNull();
+  });
+  it("discards a reveal that finishes after its view is closed", async () => {
+    let finish!: (value: Envelope<{ key: string }>) => void;
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.path.endsWith("/reveal")) return new Promise((resolve) => { finish = resolve; });
+      if (req.path.endsWith("key-groups")) return env([{ id: "default", label: "Default" }]);
+      return env({ page: 1, page_size: 20, total: "1", has_more: false, items: [key] });
+    });
+    const { wrapper, client } = setup();
+    render(<Keys state={state} />, { wrapper });
+    await screen.findByText(/Synthetic key/);
+    fireEvent.click(screen.getByRole("button", { name: zh.account.business.reveal }));
+    await waitFor(() => expect(finish).toBeDefined());
+    fireEvent.click(screen.getByRole("button", { name: zh.account.business.close }));
+    await act(async () => finish(env({ key: "SYNTHETIC_LATE_SECRET_ONLY" })));
+    expect(screen.queryByDisplayValue("SYNTHETIC_LATE_SECRET_ONLY")).toBeNull();
+    expect(JSON.stringify(client.getQueryCache().getAll().map(q => q.state.data))).not.toContain("SYNTHETIC_LATE_SECRET_ONLY");
+  });
+  it("does not replay an uncertain create", async () => {
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.method === "POST")
+        throw { code: "transport_error", outcomeUnknown: true };
+      if (req.path.endsWith("key-groups"))
+        return env([{ id: "default", label: "Default" }]);
+      return env({
+        page: 1,
+        page_size: 20,
+        total: "0",
+        has_more: false,
+        items: [],
+      });
+    });
+    const { wrapper } = setup();
+    render(<Keys state={state} />, { wrapper });
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.create }),
+    );
+    fireEvent.change(
+      screen.getByRole("listbox", { name: zh.account.business.group }),
+      { target: { value: "default" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.save }),
+    );
+    await screen.findByText(zh.account.business.unknownOutcome);
+    expect(
+      screen.getByRole("button", { name: zh.account.business.save }),
+    ).toBeDisabled();
+    expect(
+      vi.mocked(desktopRequest).mock.calls.filter(([r]) => r.method === "POST"),
+    ).toHaveLength(1);
+  });
+  it("patches only changed profile fields and preserves explicit false", async () => {
+    vi.mocked(desktopRequest).mockImplementation(async (req) =>
+      env(
+        req.method === "PATCH" ? { ...profile, record_ip_log: false } : profile,
+      ),
+    );
+    const { wrapper } = setup();
+    render(<ProfilePage state={state} canWrite />, { wrapper });
+    await screen.findByDisplayValue("Synthetic");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: zh.account.business.record_ip_log }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.save }),
+    );
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(desktopRequest)
+          .mock.calls.find(([r]) => r.method === "PATCH")?.[0].body,
+      ).toEqual({ record_ip_log: false }),
+    );
+    await waitFor(() =>
+      expect(
+        vi.mocked(desktopRequest).mock.calls.filter(([r]) => r.method === "GET")
+          .length,
+      ).toBeGreaterThan(1),
+    );
+  });
+  it("opens fixed native targets without credentials", async () => {
+    const { wrapper } = setup();
+    render(
+      <>
+        <WebEntry target="coding" />
+        <WebEntry target="gaccode" />
+        <WebEntry target="redemption" allowed={false} />
+      </>,
+      { wrapper },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.web.coding }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.web.gaccode }),
+    );
+    expect(openAccountWeb).toHaveBeenNthCalledWith(1, "coding");
+    expect(openAccountWeb).toHaveBeenNthCalledWith(2, "gaccode");
+    expect(
+      screen.getByRole("button", { name: zh.account.business.web.redemption }),
+    ).toBeDisabled();
+  });
+  it("resets log pagination and request selection on changed filters", async () => {
+    vi.mocked(desktopRequest).mockImplementation(async (r) =>
+      r.path.endsWith("/logs")
+        ? env({
+            page: Number(r.query?.find(([k]) => k === "page")?.[1] ?? 1),
+            page_size: 20,
+            total: "50",
+            has_more: true,
+            items: [],
+          })
+        : r.path.endsWith("statistics")
+          ? env({ summary: {}, trend: [], by_model: [], by_error: [] })
+          : env({
+              record_count: "0",
+              error_count: "0",
+              quota: "0",
+              start_timestamp: 1,
+              end_timestamp: 2,
+            }),
+    );
+    const { wrapper } = setup();
+    render(<Logs state={state} />, { wrapper });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: zh.account.business.next }),
+      ).toBeEnabled(),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.next }),
+    );
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(desktopRequest)
+          .mock.calls.some(
+            ([r]) =>
+              r.path.endsWith("/logs") &&
+              r.query?.some(([k, v]) => k === "page" && v === "2"),
+          ),
+      ).toBe(true),
+    );
+    fireEvent.change(
+      screen.getByLabelText(zh.account.business.logFilter.model_name),
+      { target: { value: "synthetic-model" } },
+    );
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(desktopRequest)
+          .mock.calls.some(
+            ([r]) =>
+              r.path.endsWith("/logs") &&
+              r.query?.some(
+                ([k, v]) => k === "model_name" && v === "synthetic-model",
+              ) &&
+              r.query?.some(([k, v]) => k === "page" && v === "1"),
+          ),
+      ).toBe(true),
+    );
+  });
+  it("renders percentages once, milliseconds, null samples and timestamped history", async () => {
+    const model = {
+      model_name: "synthetic-model",
+      description: "Synthetic",
+      tags: "test",
+      vendor_id: "1",
+      enable_groups: ["default"],
+      supported_endpoint_types: ["codex_responses"],
+      billing_expr: "SYNTHETIC_PRICE_EXPR",
+      billing_mode: "expression",
+      pricing_version: "1",
+      model_ratio: null,
+      model_price: null,
+      completion_ratio: null,
+      pricing_unavailable: false,
+      related_pricing: [],
+      endpoints: {},
+    };
+    const aggregate = {
+      has_samples: false,
+      avg_latency_ms: 2000,
+      avg_ttft_ms: null,
+      avg_tps: null,
+      success_rate: 75,
+      latest_sample_ts: null,
+      sample_level: "none",
+      ttft_sample_level: "none",
+      historical_values: { success_rate: { value: 80, ts: 1 } },
+      half_hour_series: [],
+    };
+    vi.mocked(desktopRequest).mockImplementation(async (req) =>
+      req.path.includes("model-performance")
+        ? env({
+            model_name: model.model_name,
+            aggregate,
+            groups: [],
+            series_schema: "30m",
+          })
+        : env({
+            items: [model],
+            pagination: { page: 1, has_more: false },
+            snapshot_id: "synthetic-snapshot",
+            snapshot_refreshed: false,
+            pricing_meta: { default_effective_group: "default" },
+          }),
+    );
+    const { wrapper } = setup();
+    render(<ModelsPage state={state} />, { wrapper });
+    await screen.findByText("synthetic-model");
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.details }),
+    );
+    await screen.findByText(/75%/);
+    expect(screen.queryByText(/7500%/)).toBeNull();
+    expect(screen.getByText(/2000 ms/)).toBeInTheDocument();
+    expect(
+      screen.getByText(zh.account.business.noSamples, { exact: false }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("SYNTHETIC_PRICE_EXPR")).toHaveLength(1);
+  });
+});

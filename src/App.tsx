@@ -61,6 +61,10 @@ import {
   DRAG_REGION_ATTR,
   DRAG_REGION_STYLE,
 } from "@/lib/platform";
+import { ConfigureTool } from "@/components/account/ConfigureTool";
+import { TuziProviderDialog } from "@/components/providers/TuziProviderDialog";
+import type { TuziProviderDraft } from "@/lib/tuziToolCompatibility";
+import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 import { AccountPage } from "@/components/account/AccountPage";
 import { useAccount } from "@/lib/query/account";
 import { AppSwitcher } from "@/components/AppSwitcher";
@@ -173,6 +177,21 @@ function App() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const account = useAccount();
+  const [configureKey, setConfigureKey] = useState<{
+    key: DesktopKey;
+    model?: DesktopPricing;
+  } | null>(null);
+  const [tuziDraft, setTuziDraft] = useState<TuziProviderDraft | null>(null);
+  useEffect(() => {
+    setConfigureKey(null);
+    setTuziDraft(null);
+  }, [account.state.generation, account.state.identity?.connectionId]);
+  useEffect(() => {
+    if (!["connected", "refreshing"].includes(account.state.status)) {
+      setConfigureKey(null);
+      setTuziDraft(null);
+    }
+  }, [account.state.status]);
 
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
   const [currentView, setCurrentView] = useState<View>(getInitialView);
@@ -1005,7 +1024,17 @@ function App() {
     const content = (() => {
       switch (currentView) {
         case "account":
-          return <AccountPage account={account} />;
+          return (
+            <AccountPage
+              account={account}
+              localStatus={t(
+                isProxyRunning
+                  ? "account.business.proxyRunning"
+                  : "account.business.proxyStopped",
+              )}
+              onConfigureKey={(key, model) => setConfigureKey({ key, model })}
+            />
+          );
         case "settings":
           return (
             <SettingsPage
@@ -1714,6 +1743,25 @@ function App() {
         {renderContent()}
       </main>
 
+      {configureKey && account.state.identity && (
+        <ConfigureTool
+          key={`${account.state.generation}:${configureKey.key.id}`}
+          state={account.state}
+          keyDto={configureKey.key}
+          model={configureKey.model}
+          onClose={() => setConfigureKey(null)}
+          onReady={(draft) => {
+            setConfigureKey(null);
+            setTuziDraft(draft);
+          }}
+        />
+      )}
+      {tuziDraft && tuziDraft.generation === account.state.generation && (
+        <TuziProviderDialog
+          draft={tuziDraft}
+          onClose={() => setTuziDraft(null)}
+        />
+      )}
       <AddProviderDialog
         open={isAddOpen}
         onOpenChange={setIsAddOpen}

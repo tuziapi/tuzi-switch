@@ -1,9 +1,19 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import i18n from "i18next";
 import zh from "@/i18n/locales/zh.json";
 import { AccountPage, ACCOUNT_PAGES } from "@/components/account/AccountPage";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
+
+vi.mock("@/lib/api/account", async (original) => ({
+  ...(await original<typeof import("@/lib/api/account")>()),
+  desktopRequest: vi.fn(async () => ({
+    success: true,
+    data: { native: { account: false }, web: {} },
+    meta: { generated_at: 1 },
+  })),
+}));
 
 const makeAccount = (state: AccountState = disconnectedAccount) => ({
   state,
@@ -17,7 +27,13 @@ const makeAccount = (state: AccountState = disconnectedAccount) => ({
 async function setup(state?: AccountState) {
   i18n.addResourceBundle("zh", "translation", zh, true, true);
   const account = makeAccount(state);
-  const result = render(<AccountPage account={account} />);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const wrapper = ({ children }: { children: import("react").ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const result = render(<AccountPage account={account} />, { wrapper });
   return { account, ...result };
 }
 
@@ -30,7 +46,7 @@ describe("G1 account navigation and native state projection", () => {
       );
       expect(
         screen.getByRole("region", { name: zh.account.pages[page] }),
-      ).toHaveTextContent(zh.account.stagePending);
+      ).toHaveTextContent(zh.account.connectRequired);
     }
     expect(account.startLogin).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: zh.account.connect }));
