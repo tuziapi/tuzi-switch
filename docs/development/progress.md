@@ -99,3 +99,7 @@ T01记录：C/S起点为source-audit的两个SHA；当前既有分支均codex/tu
 - native稳定 `94fa489`：T04/T05安全存储与认证基础；作者报告Rust账户单测9通过/1忽略，显式macOS Keychain唯一合成条目测试1通过且删除后NoEntry。navigation正在非作者审查稳定提交。Windows/Linux和已安装包回跳未验证。
 - navigation稳定 `216d7ba`：T12八入口/原工具导航；作者报告TS类型检查、renderer构建、17项定向测试通过。主审确认invalid状态保留令牌但页面不提供logout，clear失败也缺重试清除路径；已退回修复，并要求补回归测试。
 - 主审另要求native将refresh journal恢复的localCleared修正为false，避免误报已清除；T06请求/cache及故障测试继续。上述均未集成，不能以作者测试代替最终复验。
+
+### G1第二次审查快照
+
+当前API任务分支稳定到 `1d5ddd76a`，原生任务分支到 `81a145a`，导航到 `4864283`；均未正式集成。主审定向Go测试通过但新marker版本探针失败；hard-delete-with-data撤销漏口已确认。navigation非作者发现插件把auth URL广播到WebView，native正在修复。T06真正并发401运输、T03网站、T07限流/清理/安全入口测试继续，G1保持未完成。详情见g1-verification。

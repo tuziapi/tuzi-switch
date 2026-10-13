@@ -41,3 +41,12 @@
 - native `94fa489` 作者报告：`cargo test --lib tuzi_account` 9通过/1忽略；显式真实macOS Keychain测试1通过，唯一合成条目删除后NoEntry。主审尚待复验，三平台不据此通过。
 - navigation `216d7ba` 作者报告：TS类型检查、Vite renderer构建通过（既有bundle大小警告）；AccountPage/AppSwitcher/App定向测试17通过。
 - 主审交叉检查上述两个固定SHA：invalid/refresh journal保留令牌使begin返回logout_required，但UI仅connected/policyError显示logout；storage clear失败同样缺清除重试。交作者修复和加测试；native的journal恢复还需localCleared=false。navigation承担native非作者固定SHA审查。
+
+## 第二次稳定实现审查（进行中）
+
+- API稳定 `1d5ddd76a1cdea28a6d7cdc5e8b948655bd867b5`（继承bd28e0fbb）主审在独立review worktree实际执行 `go test ./model ./controller ./middleware ./router ./cmd/db-migrate -run 'Desktop|OAuthProvider|MigrationArgs' -count=1 -timeout=90s` 全部退出0；middleware无匹配测试，不计为桌面权限验证。
+- 主审在review worktree增加临时故障探针：先安装再将marker.version设999，要求apply拒绝；`go test ./model -run '^TestG1ReviewMigrationUnknownVersion$' -count=1 -timeout=30s` 失败（实际返回nil）。该阻断已交server修复，探针不混入集成代码。
+- 主审发现 `HardDeleteUserWithData` / `deleteUserDataTx` 绕过桌面撤销；备份恢复同一user id可能复活连接。要求在既有用户锁事务内撤销、缺schema回滚删除、恢复不复活回归。另要求实际token/connection归属与scope检查、清理候选避免旧active连接饥饿和逐批预算。
+- native第二稳定 `81a145a` 的generation/revision、立即状态发布、journal localCleared和重复userinfo修复经navigation非作者复查；T06实际多请求401/403运输测试仍在补齐。
+- navigation非作者发现原deep-link插件get_current和new-url广播会把auth URL送入WebView；已交native修复，不能因Rust回调处理正确而视为凭证隔离通过。原import冷/热入口须保持。
+- T12修复 `4864283`（继承216d7ba）主审确认invalid/未清除状态有显式Disconnect、清除成功后恢复Connect；作者针对native81a145a类型检查/20项测试通过。等待最终原生修复后集成复验。
