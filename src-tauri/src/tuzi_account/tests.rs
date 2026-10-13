@@ -799,6 +799,13 @@ async fn verify_go_business(s: &AccountService) {
         .await
         .unwrap();
     assert_eq!(reveal["data"]["key"], key);
+    assert!(key.starts_with("sk-"), "desktop reveal returns callable model-key format");
+    let state = s.state();
+    let user = state.identity.as_ref().unwrap().user_id.clone();
+    assert!(s.with_confirmed_model_source(&user,state.generation,"999999999",key,||Ok(())).is_err());
+    assert!(s.with_confirmed_model_source(&user,state.generation,id,"sk-synthetic-wrong-key",||Ok(())).is_err());
+    s.with_confirmed_model_source(&user,state.generation,id,key,||Ok(())).unwrap();
+    assert!(s.with_confirmed_model_source(&user,state.generation,id,key,||Ok(())).is_err());
     s.provider_qualification(s.state().generation,id,&["synthetic-g2-model".into()],"chat").await.unwrap();
     assert!(s.provider_qualification(s.state().generation,id,&["synthetic-g2-model".into()],"gemini").await.is_err());
     assert!(s.provider_qualification(s.state().generation,id,&["synthetic-missing-model".into()],"chat").await.is_err());
