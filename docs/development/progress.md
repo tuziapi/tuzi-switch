@@ -127,3 +127,5 @@ API `8c0f887f1` 在独立review worktree的五包定向测试与未知marker版�
 仍受限：MySQL精确版本/主日志库拓扑、PG实库、多实例Redis与DDL/负载/回退实测；Windows/Linux安全存储及安装包；macOS实际默认浏览器、完整网站登录/2FA、OS冷暖回跳。G1代码交付完成不等于这些任务完整验收通过；T19～T22未开始、发布未完成。未使用生产端点/不明DSN，无push/PR/部署。
 
 建议可进入G2本地开发，须新任务授权；不建议上线。最少后续环境信息是脱敏MySQL版本及拓扑、可用隔离DB/Redis测试环境、Windows/Linux/macOS安装包测试设备。缺少这些不阻塞冻结契约下的G2普通实现，但阻塞相应实库/平台/首版验收。本轮停在G1检查点。
+
+最终补验：native34f4274（与集成原生代码一致）＋API集成5abbe82f6在真实macOS Keychain/Go loopback再次1项通过，消除早期API配对版本限制；服务和唯一条目清理完成。精确命令及证据见g1-verification末尾，未扩大浏览器/平台/数据库通过范围。

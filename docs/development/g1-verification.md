@@ -80,7 +80,7 @@ C `ec78f883dc536a35fbbd72ae88305227d0a1ef4c` / S `615f501207b1c6d02be765fad97c46
 
 ### 真实本地跨仓库/系统存储配对（限定范围）
 
-固定 native `bcdc0b1` 与 API `ad2c8f61e`（native最终只加maintenance预算；API后续包含限流、迁移并发和授权页防重复提交修复及测试，已在最终API定向/网站测试复验，但真实Go＋Keychain配对未在最终API SHA重跑）。API独立worktree用 `TUZI_DESKTOP_LOOPBACK_PORT_FILE=/tmp/tuzi-native-g1-keychain-origin go test ./router -run '^TestDesktopLoopbackFixture$' -count=1 -v`，显式127.0.0.1随机端口、t.TempDir SQLite、合成user/client、单实例限流；fixture login只构造网站session，未走真实登录/2FA。
+固定 native `bcdc0b1` 与 API `ad2c8f61e`（native最终只加maintenance预算；API后续包含限流、迁移并发和授权页防重复提交修复及测试，已在最终API定向/网站测试复验，早期配对不单独证明最终组合；最终版本复验见下）。API独立worktree用 `TUZI_DESKTOP_LOOPBACK_PORT_FILE=/tmp/tuzi-native-g1-keychain-origin go test ./router -run '^TestDesktopLoopbackFixture$' -count=1 -v`，显式127.0.0.1随机端口、t.TempDir SQLite、合成user/client、单实例限流；fixture login只构造网站session，未走真实登录/2FA。
 
 native以portfile实际origin运行 `TUZI_NATIVE_TEST_ORIGIN=http://127.0.0.1:<实际端口> CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target cargo test --manifest-path src-tauri/Cargo.toml --lib tuzi_account::tests::real_go_loopback_pair -- --ignored --exact`：1通过。真实Go context/approve→native callback→exchange→userinfo→强制本地AT过期→实际RT轮换并从macOS Keychain读回一致→logout→AT拒绝/旧RT失效。唯一UUID SystemStore namespace、合成凭证、不打印令牌；显式delete后get_secret确认NoEntry，RAII异常清理。portfile.stop停止Go fixture且PASS，t.TempDir清理DB。
 
@@ -89,3 +89,8 @@ native以portfile实际origin运行 `TUZI_NATIVE_TEST_ORIGIN=http://127.0.0.1:<�
 ### 未验证与交付结论
 
 G1代码、当前可用本地验证、独立审查及阶段提交已交付。T02～T07跨环境/平台验收受限，不标完整通过；T12状态壳已交付但G2业务未实现。真实MySQL/PG、共享Redis多实例、数据库副本迁移/回退/负载、Windows/Linux、macOS安装包和完整网站浏览器路径未验证。T19～T22未开始，未发布、未用户完整验收。已停止本地fixture，没有生产访问/登记/迁移/远程操作。后续G2需新任务授权，环境信息按open-questions Q02/Q04/Q09/Q10收集。
+
+
+### 最终版本真实配对补验
+
+主智能体核验2026-10-13最终日志：native `34f4274de126b25d06745e7364b78167d2de712f`（与客户端集成src-tauri无差异）＋API集成 `5abbe82f69ffb9fa754a2a4533b1a5b6a1cfbd28`（代码检查点615f501之后仅文档）复验通过。API命令 `TUZI_DESKTOP_LOOPBACK_PORT_FILE=/tmp/tuzi-g1-final-api-origin go test ./router -run '^TestDesktopLoopbackFixture$' -count=1 -v`；native命令同前，实际受信测试origin为 `http://127.0.0.1:50133`。账户真实Go＋SystemStore Keychain测试1通过/0失败；条目delete后NoEntry断言通过，Go fixture停止PASS，临时SQLite和port/stop文件已清理。证据 `/tmp/tuzi-g1-final-native-pair.txt`、`/tmp/tuzi-g1-final-api-fixture.txt`；没有代码变更。最终API限流/迁移/授权页修复后的配对证据现已闭合，完整浏览器/平台/实库限制仍不变。
