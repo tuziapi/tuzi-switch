@@ -28,3 +28,10 @@
 
 - 规范非作者预审：navigation检查当前B3修订，发现IF-10 error_count和分桶可能被误读。已明确error_count只统计type6错误日志，不包括type2 error_charged；桶按桌面start/interval而非直接透传原自动桶。补G2 fixture：type2 error_charged + type6 → result均error但error_count=1。该预审尚非稳定提交审查。
 - T02非作者代码审查：主智能体检查稳定bd28e0fbb8a65477461328e93955dc21cd186216，发现schema/独立开关偏离、AutoMigrate既存表未拒不兼容、已安装丢表静默修复、清理缺围栏/暂停等阻断问题；已退回server修复，尚未集成/通过。
+
+## 稳定规范审查与阶段提交
+
+- 客户端规范/协作基线提交 `4aa2343`；API指针/协作基线提交 `196aef035`；两端集成分支均codex/tuzi-assistant-dev。定向提交AGENTS和开发文档，未提交Word/product-plan预览附件。
+- navigation非作者审查稳定C `4aa2343`（交叉API `72af0d4de`），两项IF-10口径/分桶问题已闭合，未发现其他阻断规范问题。设计审查不代替实现、系统存储或回退实测。
+- 主智能体在独立审查worktree `/Users/syd08/Documents/tuzi/tuzi-api-g1-review`、分支codex/g1-server-review、稳定 `bd28e0fbb` 执行 `go test ./model -run '^TestDesktop' -count=1`，退出0。该提交有已报告阻断设计偏离，测试通过不代表可集成；作者正修复。
+- 当前本机Darwin arm64，Go/Cargo/Bun/Node/pnpm可用；未发现docker/mysql/psql可执行文件。SQLite测试可用，MySQL/PostgreSQL真实运行仍未验证，不读取不明DSN补齐。

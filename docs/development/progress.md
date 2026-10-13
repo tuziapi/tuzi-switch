@@ -86,3 +86,7 @@ T01记录：C/S起点为source-audit的两个SHA；当前既有分支均codex/tu
 - 主智能体负责公共契约/进度/指针和集成；server负责T02/T03/T07，worktree /Users/syd08/Documents/tuzi/tuzi-api-g1-server，codex/g1-server；native负责T04/T05/T06与lib.rs，/Users/syd08/Documents/tuzi-switch-g1-native，codex/g1-native；navigation负责T12/App.tsx/UI/i18n，/Users/syd08/Documents/tuzi-switch-g1-navigation，codex/g1-navigation。各自从对应集成起点建立，不共享可写目录。
 - ADR-003闭合日志/退款/累计与窗口统计、安装标记/required、兼容回退和keyring3.6/固定HTTP；B3/desktop-v1.1保持scope/OAuth wire/寿命，G2日志增加refunded语义。设计闭合不等于代码通过。
 - T02/T04/T12实施中，后续T03/T05/T06/T07按依赖；作者定向测试→稳定SHA非作者审查→修复复验→本地集成。代码/测试/真实联调/发布尚未完成。实际证据登记g1-verification.md。
+
+### G1阶段提交与审查（进行中）
+
+文档配对C `4aa2343` / S `196aef035`，均集成codex/tuzi-assistant-dev。navigation非作者稳定文档审查无剩余阻断。server首T02提交 `bd28e0fbb` 尚未集成：主智能体非作者审查要求修复schema/独立开关、显式迁移不兼容拒绝/已装缺失、清理锁围栏等；定向测试通过但不能标T02完成。原生与导航接线/测试继续。所有业务交付SHA与最终测试待登记，不建议此刻进入G2。
