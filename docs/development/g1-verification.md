@@ -35,3 +35,9 @@
 - navigation非作者审查稳定C `4aa2343`（交叉API `72af0d4de`），两项IF-10口径/分桶问题已闭合，未发现其他阻断规范问题。设计审查不代替实现、系统存储或回退实测。
 - 主智能体在独立审查worktree `/Users/syd08/Documents/tuzi/tuzi-api-g1-review`、分支codex/g1-server-review、稳定 `bd28e0fbb` 执行 `go test ./model -run '^TestDesktop' -count=1`，退出0。该提交有已报告阻断设计偏离，测试通过不代表可集成；作者正修复。
 - 当前本机Darwin arm64，Go/Cargo/Bun/Node/pnpm可用；未发现docker/mysql/psql可执行文件。SQLite测试可用，MySQL/PostgreSQL真实运行仍未验证，不读取不明DSN补齐。
+
+## 原生与导航首提交审查（尚未闭合）
+
+- native `94fa489` 作者报告：`cargo test --lib tuzi_account` 9通过/1忽略；显式真实macOS Keychain测试1通过，唯一合成条目删除后NoEntry。主审尚待复验，三平台不据此通过。
+- navigation `216d7ba` 作者报告：TS类型检查、Vite renderer构建通过（既有bundle大小警告）；AccountPage/AppSwitcher/App定向测试17通过。
+- 主审交叉检查上述两个固定SHA：invalid/refresh journal保留令牌使begin返回logout_required，但UI仅connected/policyError显示logout；storage clear失败同样缺清除重试。交作者修复和加测试；native的journal恢复还需localCleared=false。navigation承担native非作者固定SHA审查。
