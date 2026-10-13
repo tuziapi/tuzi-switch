@@ -101,4 +101,5 @@ export const brandedRoutes = (
 ];
 
 export const claudeDesktopProviderPresets: ClaudeDesktopProviderPreset[] = [
+  {name: "兔子主站 · Anthropic 代理", websiteUrl: "https://api.tu-zi.com", category: "third_party", baseUrl: "https://apius.tu-zi.com", apiKeyField: "ANTHROPIC_AUTH_TOKEN", mode: "proxy", apiFormat: "anthropic"},
 ];

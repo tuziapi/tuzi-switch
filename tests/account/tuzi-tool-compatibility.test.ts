@@ -23,3 +23,10 @@ describe('account tool creation',()=>{
   }
  });
 });
+
+it('resolves virtual default per model using visible pricing metadata',()=>{
+ const key={status:1,group:'default',model_limits:'',unlimited_quota:true};
+ const model={model_name:'synthetic',enable_groups:['special'],supported_endpoint_types:['responses']};
+ expect(tuziToolCompatibility(key,model,'codex','responses','MacIntel',{usable_group:{special:'Special'},default_effective_group:'ordinary',default_resolution:{synthetic:{effective_group:'special'}}})).toBeNull();
+ expect(tuziToolCompatibility(key,model,'codex','responses','MacIntel',{usable_group:{ordinary:'Ordinary'},default_effective_group:'special'})).toBe('Key 分组与模型不兼容');
+});
