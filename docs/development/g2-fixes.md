@@ -15,3 +15,20 @@
 - 两仓 `git diff --check` 通过。此次未重跑 Rust、完整 Go→Rust 配对或安装包构建：原生 IPC、OAuth、工具写入及契约无变化；上述证据不冒充全阶段重新独立验收。
 
 结论：两项缺陷已修复并通过定向回归。此前独立验收发现的失败不能由原 G2 “已通过”记录覆盖；修复后供重新验收。本轮不启动 G3、不 push/PR/部署或访问生产；MySQL/PG、多实例、跨平台和完整浏览器门槛仍按 G2 验证记录执行。回退使用各仓本地修复提交的 git revert；无 schema 回退，回退会重新引入本次缺陷，不作为推荐运行版本。
+
+## R3/P2：总览当日消费刷新窗口（2026-10-14）
+
+本轮仅修复 T13 / AC-06、AC-15 原有当日消费与跨午夜要求。客户端代码提交 `8462c0012a8fd91a6678ba03a7c25e340ab1f89d`，分支 codex/tuzi-assistant-dev；API、原生 IPC、接口契约及依赖未改变。用户独立复验记录保持原样，不以作者修复记录代替重新独立验收。
+
+根因是 Overview 在首次挂载时固定起止时间。现将当天本地零点、当前时刻及系统 IANA 时区的计算移到每次实际读取中；趋势与汇总作为一个逻辑查询发起，共用同一窗口、同一取消信号，全部成功后一起更新。读取失败保留已有错误/旧数据语义，旧数据显示自己的范围，不混用不同批次汇总和趋势。抽出 useAccountRead 复用原查询的账户/连接/代次隔离、隐藏取消、显示恢复、focus/失效重读、只读重试策略；原 useDesktop 调用方式保持不变，无新增轮询或定时器。
+
+验证：
+
+- `TZ=Asia/Shanghai pnpm exec vitest run tests/account/desktop-business.test.tsx`：26 项通过。
+- `TZ=America/New_York pnpm exec vitest run tests/account/desktop-business.test.tsx -t 'overview time window'`：5 项通过，21 项按过滤跳过。含 2026-03-08 夏令时跳时当天本地零点/当前时刻和发送的时区断言。
+- `pnpm exec vitest run tests/account tests/components/AccountPage.test.tsx tests/components/AppSwitcher.accountCompatibility.test.tsx tests/integration/App.test.tsx`：6 文件、53 项通过。
+- `pnpm typecheck`、`git diff --check` 通过。
+
+新增回归使用真实 Overview/QueryClient，仅 mock 原生传输及 Date：同日10:00→12:30失效重读、23:50→次日00:10隐藏后恢复、夏令时日、旧日请求取消后迟到；均断言实际请求起止范围，趋势/汇总同窗口，隐藏不发新读请求，普通组件重渲染不增加请求，旧结果不覆盖新日结果。未改系统时间或调用生产服务。
+
+结论：R3 已实现修复并通过上述定向回归，交付供独立复验；不据此代为宣布完整 G2 产品验收或 G3 通过。未重跑 Go/Rust 配对或构建安装包（本次无该层修改），未 push/PR/上线。回退使用本次代码提交的 git revert，会恢复旧窗口缺陷，不推荐作为运行状态。
