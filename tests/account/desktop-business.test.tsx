@@ -199,6 +199,181 @@ describe("identity-isolated native business queries", () => {
   });
 });
 describe("overview time window", () => {
+  it.each([
+    [
+      "same-day invalidation",
+      new Date(2026, 9, 14, 10, 0),
+      new Date(2026, 9, 14, 12, 30),
+      false,
+    ],
+    [
+      "visible again after midnight",
+      new Date(2026, 9, 14, 23, 50),
+      new Date(2026, 9, 15, 0, 10),
+      true,
+    ],
+    [
+      "local daylight-saving day",
+      new Date(2026, 2, 8, 1, 30),
+      new Date(2026, 2, 8, 4, 30),
+      true,
+    ],
+  ])(
+    "recomputes the paired consumption window on %s",
+    async (_name, opened, refreshed, visibility) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(opened);
+        vi.mocked(desktopRequest).mockImplementation(async (req) => {
+          if (req.path.endsWith("/account"))
+            return env({
+              username: "synthetic",
+              group: "default",
+              quota: "1",
+              used_quota: "1",
+              request_count: "1",
+              money,
+            });
+          const range = Object.fromEntries(req.query ?? []);
+          if (req.path.endsWith("/summary"))
+            return env({
+              call_count: "1",
+              quota: "1",
+              prompt_tokens: "1",
+              completion_tokens: "1",
+            });
+          return env({
+            chart: [],
+            table: [],
+            start_time: Number(range.start_time),
+            end_time: Number(range.end_time),
+          });
+        });
+        const { wrapper, client } = setup();
+        const view = render(<Overview state={state} />, { wrapper });
+        const calls = () =>
+          vi
+            .mocked(desktopRequest)
+            .mock.calls.map(([r]) => r)
+            .filter((r) => r.path.includes("/usage"));
+        await waitFor(() => expect(calls()).toHaveLength(2));
+        const assertWindow = (offset: number, time: Date) => {
+          const start = new Date(time);
+          start.setHours(0, 0, 0, 0);
+          for (const req of calls().slice(offset, offset + 2)) {
+            expect(Object.fromEntries(req.query ?? [])).toMatchObject({
+              start_time: String(start.getTime() / 1000),
+              end_time: String(time.getTime() / 1000),
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            });
+          }
+        };
+        assertWindow(0, opened);
+        if (visibility) {
+          act(() => {
+            Object.defineProperty(document, "visibilityState", {
+              configurable: true,
+              value: "hidden",
+            });
+            document.dispatchEvent(new Event("visibilitychange"));
+          });
+        }
+        vi.setSystemTime(refreshed);
+        if (visibility) {
+          await act(async () => {
+            await client.invalidateQueries({ queryKey: ["account"] });
+          });
+          expect(calls()).toHaveLength(2);
+          act(() => {
+            Object.defineProperty(document, "visibilityState", {
+              configurable: true,
+              value: "visible",
+            });
+            document.dispatchEvent(new Event("visibilitychange"));
+          });
+        } else {
+          await act(async () => {
+            await client.invalidateQueries({ queryKey: ["account"] });
+          });
+        }
+        await waitFor(() => expect(calls()).toHaveLength(4));
+        assertWindow(2, refreshed);
+        view.rerender(<Overview state={state} localStatus="changed" />);
+        expect(calls()).toHaveLength(4);
+        view.unmount();
+        client.clear();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+  it("does not let a canceled previous-day read replace the new paired result", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date(2026, 9, 14, 23, 50));
+      const finishes: Array<() => void> = [];
+      const signals: AbortSignal[] = [];
+      let delayed = true;
+      vi.mocked(desktopRequest).mockImplementation(async (req, signal) => {
+        if (req.path.endsWith("/account"))
+          return env({
+            username: "synthetic",
+            group: "default",
+            quota: "1",
+            used_quota: "1",
+            request_count: "1",
+            money,
+          });
+        const range = Object.fromEntries(req.query ?? []);
+        const result = req.path.endsWith("/summary")
+          ? env({
+              call_count: delayed ? "111" : "222",
+              quota: "1",
+              prompt_tokens: "1",
+              completion_tokens: "1",
+            })
+          : env({
+              chart: [],
+              table: [],
+              start_time: Number(range.start_time),
+              end_time: Number(range.end_time),
+            });
+        if (delayed) {
+          signals.push(signal!);
+          return new Promise((resolve) => finishes.push(() => resolve(result)));
+        }
+        return result;
+      });
+      const { wrapper, client } = setup();
+      const view = render(<Overview state={state} />, { wrapper });
+      await waitFor(() => expect(finishes).toHaveLength(2));
+      act(() => {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          value: "hidden",
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await waitFor(() => expect(signals.every((s) => s.aborted)).toBe(true));
+      delayed = false;
+      vi.setSystemTime(new Date(2026, 9, 15, 0, 10));
+      act(() => {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          value: "visible",
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await screen.findByText(/222/);
+      await act(async () => finishes.forEach((finish) => finish()));
+      expect(screen.queryByText(/111/)).not.toBeInTheDocument();
+      expect(screen.getByText(/222/)).toBeVisible();
+      view.unmount();
+      client.clear();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("pins summary and trend to the same explicit local day window", async () => {
     vi.mocked(desktopRequest).mockImplementation(async (req) => {
       if (req.path.endsWith("/account"))

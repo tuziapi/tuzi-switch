@@ -1,8 +1,7 @@
 import { formatMoney } from "@/lib/accountMoney";
-import { type AccountState } from "@/lib/api/account";
+import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type { DesktopAccount, Usage, UsageValues } from "@/lib/api/desktop";
-import { useDesktop } from "@/lib/query/desktop";
-import { useState } from "react";
+import { useAccountRead, useDesktop } from "@/lib/query/desktop";
 import { useTranslation } from "react-i18next";
 import { date, QueryState, WebEntry } from "./BusinessShared";
 export function Overview({
@@ -19,25 +18,46 @@ export function Overview({
     {},
     60000,
   );
-  const [window] = useState(() => {
-    const now = new Date();
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    return {
-      start_time: Math.floor(start.getTime() / 1000),
-      end_time: Math.floor(now.getTime() / 1000),
-    };
-  });
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const usage = useDesktop<Usage>(state, "/api/desktop/usage", {
-    timezone,
-    ...window,
-    interval_seconds: 3600,
-  });
-  const daily = useDesktop<UsageValues>(state, "/api/desktop/usage/summary", {
-    timezone,
-    ...window,
-  });
+  const consumption = useAccountRead(
+    state,
+    "overview-consumption",
+    {},
+    async (signal) => {
+      // Recompute on every actual read (including focus, reconnect and invalidation).
+      // Both endpoints use exactly this window, even if the requests span midnight.
+      const now = new Date();
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const query: [string, string][] = [
+        ["timezone", timezone],
+        ["start_time", String(Math.floor(start.getTime() / 1000))],
+        ["end_time", String(Math.floor(now.getTime() / 1000))],
+      ];
+      const [usage, daily] = await Promise.all([
+        desktopRequest<Usage>(
+          {
+            method: "GET",
+            path: "/api/desktop/usage",
+            query: [...query, ["interval_seconds", "3600"]],
+            generation: state.generation,
+          },
+          signal,
+        ),
+        desktopRequest<UsageValues>(
+          {
+            method: "GET",
+            path: "/api/desktop/usage/summary",
+            query,
+            generation: state.generation,
+          },
+          signal,
+        ),
+      ]);
+      return { usage, daily, timezone };
+    },
+  );
+  const { usage, daily, timezone } = consumption.data ?? {};
   return (
     <>
       <QueryState query={account} />
@@ -67,24 +87,22 @@ export function Overview({
         </dl>
       )}
       <h3>{t("account.business.daily")}</h3>
-      <QueryState query={usage} />
-      <QueryState query={daily} />
-      {daily.data && (
+      <QueryState query={consumption} />
+      {daily && (
         <p>
-          {t("account.business.records")}: {daily.data.data.call_count} ·{" "}
+          {t("account.business.records")}: {daily.data.call_count} ·{" "}
           {account.data
-            ? formatMoney(daily.data.data.quota, account.data.data.money)
-            : daily.data.data.quota + " quota"}{" "}
-          · tokens: {daily.data.data.prompt_tokens} /{" "}
-          {daily.data.data.completion_tokens}
+            ? formatMoney(daily.data.quota, account.data.data.money)
+            : daily.data.quota + " quota"}{" "}
+          · tokens: {daily.data.prompt_tokens} / {daily.data.completion_tokens}
         </p>
       )}
       <p>{t("account.business.usageNotice")}</p>
-      {usage.data && (
+      {usage && (
         <>
           <p>
-            {timezone} · [{date(usage.data.data.start_time)},{" "}
-            {date(usage.data.data.end_time)})
+            {timezone} · [{date(usage.data.start_time)},{" "}
+            {date(usage.data.end_time)})
           </p>
           <table>
             <thead>
@@ -96,7 +114,7 @@ export function Overview({
               </tr>
             </thead>
             <tbody>
-              {usage.data.data.chart.map((b) => (
+              {usage.data.chart.map((b) => (
                 <tr key={b.bucket_start}>
                   <td>{date(b.bucket_start)}</td>
                   <td>{b.call_count}</td>

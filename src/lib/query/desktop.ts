@@ -9,6 +9,36 @@ export function useDesktop<T>(
   staleTime = 30000,
   poll = false,
 ) {
+  return useAccountRead(
+    state,
+    path,
+    query,
+    (signal) =>
+      desktopRequest<T>(
+        {
+          method: "GET",
+          path,
+          query: Object.entries(query)
+            .filter(([, v]) => v !== undefined && v !== "")
+            .map(([k, v]) => [k, String(v)]),
+          generation: state.generation,
+        },
+        signal,
+      ),
+    staleTime,
+    poll,
+  );
+}
+
+/** A logical read may group requests that must share one snapshot/window. */
+export function useAccountRead<T>(
+  state: AccountState,
+  path: string,
+  query: Record<string, string | number | boolean | undefined>,
+  read: (signal: AbortSignal) => Promise<T>,
+  staleTime = 30000,
+  poll = false,
+) {
   const client = useQueryClient();
   const key = accountQueryKey(state, path, query);
   useEffect(() => {
@@ -31,17 +61,7 @@ export function useDesktop<T>(
   return useQuery({
     queryKey: accountQueryKey(state, path, query),
     queryFn: async ({ signal }) => {
-      const result = await desktopRequest<T>(
-        {
-          method: "GET",
-          path,
-          query: Object.entries(query)
-            .filter(([, v]) => v !== undefined && v !== "")
-            .map(([k, v]) => [k, String(v)]),
-          generation: state.generation,
-        },
-        signal,
-      );
+      const result = await read(signal);
       if (signal.aborted) throw new Error("cancelled");
       return result;
     },
