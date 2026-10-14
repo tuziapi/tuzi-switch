@@ -469,6 +469,127 @@ describe("business actions and secret lifetime", () => {
       vi.mocked(desktopRequest).mock.calls.filter(([r]) => r.method === "POST"),
     ).toHaveLength(1);
   });
+  it.each(["create", "edit", "status", "delete"])(
+    "keeps uncertain %s locked through failed verification and unrelated actions",
+    async (kind) => {
+      let failed = false;
+      let rejectRead = true;
+      let finishRead: (() => void) | undefined;
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      vi.mocked(desktopRequest).mockImplementation(async (req) => {
+        if (req.path.endsWith("/reveal"))
+          return env({ key: "sk-synthetic-reveal-only" });
+        if (req.method !== "GET") {
+          failed = true;
+          throw { code: "transport_error", outcomeUnknown: true };
+        }
+        if (req.path.endsWith("key-groups"))
+          return env([{ id: "default", label: "Default" }]);
+        if (failed && rejectRead) {
+          await new Promise<void>((resolve) => {
+            finishRead = resolve;
+          });
+          throw { code: "transport_error" };
+        }
+        if (req.path === `/api/desktop/keys/${key.id}`) {
+          if (kind === "delete" && failed)
+            throw { code: "not_found", status: 404 };
+          return env(key);
+        }
+        return env({
+          page: 1,
+          page_size: 20,
+          total: "1",
+          has_more: false,
+          items: [key],
+        });
+      });
+      const { wrapper } = setup();
+      render(<Keys state={state} />, { wrapper });
+      await screen.findByText(/Synthetic key/);
+      const click = (name: string) =>
+        fireEvent.click(screen.getByRole("button", { name }));
+      if (kind === "create" || kind === "edit") {
+        click(
+          kind === "create"
+            ? zh.account.business.create
+            : zh.account.business.details,
+        );
+        const name = await screen.findByRole("textbox", {
+          name: zh.account.business.name,
+        });
+        fireEvent.change(name, { target: { value: "Synthetic changed" } });
+        click(zh.account.business.save);
+      } else
+        click(
+          kind === "status"
+            ? zh.account.business.disable
+            : zh.account.business.delete,
+        );
+      await screen.findByText(zh.account.business.unknownOutcome);
+      click(zh.account.business.verify);
+      await waitFor(() => expect(finishRead).toBeDefined());
+      expect(
+        screen.getByRole("button", { name: zh.account.business.verify }),
+      ).toBeDisabled();
+      const readsBefore = vi.mocked(desktopRequest).mock.calls.length;
+      click(zh.account.business.verify);
+      expect(vi.mocked(desktopRequest).mock.calls).toHaveLength(readsBefore);
+      await act(async () => finishRead!());
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: zh.account.business.verify }),
+        ).toBeEnabled(),
+      );
+      expect(
+        screen.getByText(zh.account.business.unknownOutcome),
+      ).toBeVisible();
+      for (const name of [
+        zh.account.business.create,
+        zh.account.business.details,
+        zh.account.business.disable,
+        zh.account.business.delete,
+      ]) {
+        expect(screen.getByRole("button", { name })).toBeDisabled();
+        click(name);
+      }
+      if (kind === "create" || kind === "edit") {
+        expect(
+          screen.getByRole("button", { name: zh.account.business.save }),
+        ).toBeDisabled();
+        expect(
+          screen.getByRole("button", { name: zh.account.cancel }),
+        ).toBeDisabled();
+      }
+      click(zh.account.business.reveal);
+      await screen.findByDisplayValue("sk-synthetic-reveal-only");
+      expect(
+        screen.getByText(zh.account.business.unknownOutcome),
+      ).toBeVisible();
+      rejectRead = false;
+      click(zh.account.business.verify);
+      await screen.findByRole("button", {
+        name: zh.account.business.verifyAcknowledge,
+      });
+      expect(
+        screen.getByText(zh.account.business.unknownOutcome),
+      ).toBeVisible();
+      click(zh.account.business.verifyAcknowledge);
+      expect(
+        screen.queryByText(zh.account.business.unknownOutcome),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: zh.account.business.save }),
+      ).not.toBeInTheDocument();
+      expect(
+        vi
+          .mocked(desktopRequest)
+          .mock.calls.filter(
+            ([r]) => r.method !== "GET" && !r.path.endsWith("/reveal"),
+          ),
+      ).toHaveLength(1);
+    },
+  );
   it("recovers an uncertain profile write only after a successful reread", async () => {
     let writes = 0;
     vi.mocked(desktopRequest).mockImplementation(async (req) => {

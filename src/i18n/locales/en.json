@@ -2807,6 +2807,8 @@
       "unknownOutcome": "The write outcome is unknown. It will not be retried automatically. Reread and verify before another action.",
       "refresh": "Refresh",
       "verify": "Reread to verify",
+      "verifyReview": "Compare these current records with your original action. A reread does not prove that the request succeeded or failed. Acknowledging closes the original action without retrying it.",
+      "verifyAcknowledge": "Reviewed results; close original action",
       "logsNotice": "Log totals cover the selected records and are not net account accounting. Call result, charging, and refunds are separate. Missing historical states are unknown. Default: last 7 days; [start,end), maximum 90 days, Unix seconds.",
       "type": "Log type",
       "trend": "Trend",

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { type AccountState } from "@/lib/api/account";
+import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type {
+  DesktopError,
   DesktopKey,
   DesktopPricing,
   KeyWrite,
@@ -70,7 +71,89 @@ export function Keys({
     state,
     "/api/desktop/key-groups",
   );
-  const { write, busy, error, clear } = useWrite(state);
+  const { write: performWrite, busy, error, clear } = useWrite(state);
+  const reveal = useWrite(state);
+  const operation = useRef<{
+    method: string;
+    path: string;
+    body?: unknown;
+  } | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const verificationLock = useRef(false);
+  const [verified, setVerified] = useState<DesktopKey[] | null>(null);
+  const [verifyError, setVerifyError] = useState<DesktopError | null>(null);
+  const write: typeof performWrite = async (method, path, body) => {
+    if (busy || error?.outcomeUnknown) return;
+    operation.current = { method, path, body };
+    setVerified(null);
+    return performWrite(method, path, body);
+  };
+  const session = `${state.identity?.connectionId}:${state.generation}`;
+  const latestSession = useRef(session);
+  latestSession.current = session;
+  useEffect(() => {
+    operation.current = null;
+    setVerified(null);
+    setVerifyError(null);
+    setForm(null);
+    setSelected(null);
+    clearSecret();
+    clear();
+  }, [session]);
+  const verify = async () => {
+    const requestSession = session;
+    const op = operation.current;
+    if (!op || verificationLock.current) return;
+    verificationLock.current = true;
+    setVerifying(true);
+    setVerified(null);
+    setVerifyError(null);
+    try {
+      let items: DesktopKey[];
+      if (op.method === "POST") {
+        items = [];
+        for (let page = 1; page <= 100; page++) {
+          const result = await desktopRequest<Page<DesktopKey>>({
+            method: "GET",
+            path: "/api/desktop/keys",
+            generation: state.generation,
+            query: [
+              ["keyword", (op.body as KeyWrite).name],
+              ["page_size", "100"],
+              ["page", String(page)],
+            ],
+          });
+          if (!current.current || latestSession.current !== requestSession)
+            return;
+          items.push(...result.data.items);
+          if (!result.data.has_more) break;
+          // Never unlock on a partial or unbounded listing.
+          if (page === 100) throw { code: "verificationIncomplete" };
+        }
+      } else {
+        try {
+          const result = await desktopRequest<DesktopKey>({
+            method: "GET",
+            path: op.path.replace(/\/status$/, ""),
+            generation: state.generation,
+          });
+          items = [result.data];
+        } catch (e) {
+          if (op.method !== "DELETE" || (e as DesktopError).status !== 404)
+            throw e;
+          items = [];
+        }
+      }
+      if (current.current && latestSession.current === requestSession)
+        setVerified(items);
+    } catch (e) {
+      if (current.current && latestSession.current === requestSession)
+        setVerifyError(e as DesktopError);
+    } finally {
+      verificationLock.current = false;
+      if (current.current) setVerifying(false);
+    }
+  };
   useEffect(() => {
     clearSecret();
     const timer = window.setTimeout(() => clearSecret(), 60000);
@@ -172,6 +255,7 @@ export function Keys({
         ))}
       </div>
       <Button
+        disabled={busy || !!error?.outcomeUnknown}
         onClick={() => {
           clear();
           setSelected(null);
@@ -193,6 +277,7 @@ export function Keys({
             quota {k.remain_quota} / {k.used_quota} · {date(k.expired_time)}
           </p>
           <Button
+            disabled={busy || !!error?.outcomeUnknown}
             onClick={() => {
               setSelected(k.id);
               setForm(null);
@@ -226,11 +311,11 @@ export function Keys({
             {t("account.business.delete")}
           </Button>
           <Button
-            disabled={busy || state.status === "offline"}
+            disabled={busy || reveal.busy || state.status === "offline"}
             onClick={async () => {
               clearSecret();
               const epoch = secretEpoch.current;
-              const r = await write<{ key: string }>(
+              const r = await reveal.write<{ key: string }>(
                 "POST",
                 `/api/desktop/keys/${k.id}/reveal`,
               );
@@ -263,19 +348,78 @@ export function Keys({
         />
       )}
       <WriteError error={error} />
+      <WriteError error={reveal.error} />
       {error?.outcomeUnknown && (
-        <Button
-          onClick={async () => {
-            await list.refetch();
-            if (selected) await detail.refetch();
-            clear();
-          }}
-        >
-          {t("account.business.verify")}
-        </Button>
+        <>
+          <Button disabled={verifying} onClick={() => void verify()}>
+            {t("account.business.verify")}
+          </Button>
+          <WriteError error={verifyError} />
+          {verified && (
+            <div>
+              <p>{t("account.business.verifyReview")}</p>
+              <p>
+                {t(
+                  operation.current?.method === "POST"
+                    ? "account.business.create"
+                    : operation.current?.method === "DELETE"
+                      ? "account.business.delete"
+                      : "account.business.save",
+                )}
+              </p>
+              {Object.entries(
+                (operation.current?.body ?? {}) as Record<string, unknown>,
+              ).map(([field, value]) => (
+                <p key={field}>
+                  {t(
+                    `account.business.${({ remain_quota: "quota", expired_time: "expiry", status: "keyFilter.status" } as Record<string, string>)[field] ?? field}`,
+                    { defaultValue: field },
+                  )}
+                  : {String(value)}
+                </p>
+              ))}
+              {verified.length === 0 && <p>{t("account.business.empty")}</p>}
+              {verified.map((k) => (
+                <dl key={k.id}>
+                  <dt>ID</dt>
+                  <dd>{k.id}</dd>
+                  {Object.keys(defaultKey).map((field) => (
+                    <div key={field}>
+                      <dt>
+                        {t(
+                          `account.business.${({ remain_quota: "quota", expired_time: "expiry", status: "keyFilter.status" } as Record<string, string>)[field] ?? field}`,
+                          {
+                            defaultValue: field,
+                          },
+                        )}
+                      </dt>
+                      <dd>{String(k[field as keyof KeyWrite] ?? "")}</dd>
+                    </div>
+                  ))}
+                  <dt>{t("account.business.keyFilter.status")}</dt>
+                  <dd>{t(`account.business.keyStatus.${k.status}`)}</dd>
+                </dl>
+              ))}
+              <Button
+                onClick={() => {
+                  setForm(null);
+                  setSelected(null);
+                  setOriginal(null);
+                  clearSecret();
+                  setVerified(null);
+                  operation.current = null;
+                  clear();
+                  void list.refetch();
+                }}
+              >
+                {t("account.business.verifyAcknowledge")}
+              </Button>
+            </div>
+          )}
+        </>
       )}
       {copyFailed && <p role="alert">{t("account.business.errors.generic")}</p>}
-      {busy && (
+      {(busy || reveal.busy) && (
         <Button onClick={clearSecret}>{t("account.business.close")}</Button>
       )}
       {secret && (
@@ -364,6 +508,7 @@ export function Keys({
           </Button>
           <Button
             type="button"
+            disabled={!!error?.outcomeUnknown}
             onClick={() => {
               setSelected(null);
               setForm(null);
