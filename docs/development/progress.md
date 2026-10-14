@@ -183,3 +183,7 @@ API 当前 HEAD 为 `20f797d33`，客户端继续为 `74aa8ed5de159e7ea2c7150e47
 完整任务—AC—接口—实现—证据、命令、逐工具测试、固定 SHA 审查、复现与配对回退顺序见 [g2-verification.md](g2-verification.md) 和 [ADR-005](decisions/0005-g2-local-tool-transactions.md)。后续纯文档提交不改变上述代码配对。
 
 发布与验收：未 push、PR、部署、生产访问/登记/迁移或付费测试；用户产品验收未代确认。T19—T22、真实 MySQL 版本/主库及 LOG_DB 拓扑、Redis 多实例、Windows/Linux 实机、三平台安装包和完整浏览器/2FA 尚待后续授权验证。G2 检查点通过，本目标停止，不进入 G3。
+
+## G2 R1/R2 修复（2026-10-14）
+
+按本轮修复授权，R1 IP 规范化与 R2 未知写入核实保护已实现并通过定向回归。C `29437625f85fcb8680386c5264670b6b0d498c97` / S `931b9bb12831c91a52c615ac031cedd56645fbcc`，均本地集成于 codex/tuzi-assistant-dev；范围、命令、结果和限制见 [g2-fixes.md](g2-fixes.md)。保留独立验收历史，修复交付供复验；不自动进入 G3，未推送或发布。
