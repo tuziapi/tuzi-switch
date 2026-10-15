@@ -166,6 +166,12 @@ API 当前 HEAD 为 `20f797d33`，客户端继续为 `74aa8ed5de159e7ea2c7150e47
 
 结论：修复后的 G1 检查点通过，**具备在新任务授权下进入 G2 本地开发的条件**；本轮停在 G1，不自动进入 G2，也不宣称可以上线。
 
+## G1 独立复验与下一阶段（2026-10-14）
+
+用户请求复验后，当前执行者核查 C `8e8ff2a974ebfd4565b7936dc02d5f3f06b8d897` / S `1cc7027863a2229fb5ffbc7f866c9cbc70a2e112` 及 R1/R2 修复增量，重跑五包定向 Go、三个相关 Go 包和网站授权测试，全部通过；上次独立探针在实际修复链复测亦通过。结论：G1 本地研发门禁通过，未发现当前检查范围内进入 G2 的阻断。证据与限制见 [g1-acceptance-review.md](g1-acceptance-review.md) 最新章节；不宣称全平台、实库、完整浏览器或正式产品验收通过。
+
+建议下一目标为 G2 服务端 T08～T11 / 客户端 T13～T18 的业务实现、本地隔离验证和独立审查。目标提示词只在聊天中提供，不存入项目；它是基于现有 PRD 的执行入口建议，不是新增产品要求，也不代表用户已授权本轮执行 G2。本轮仅验收及文档记录，无业务修改、提交、推送、上线；原 Word/预览文件保留。T19～T22 及 Q02/Q04/Q09 对应实库/平台/发布门禁继续待办。
+
 ## G2 本地研发检查点（2026-10-14，最终）
 
 本目标已授权 G2 本地编码、隔离验证、非作者审查、阶段提交和本地集成。T08—T11、T13—T18 全部完成范围内实现和 G2 本地验收，无剩余阻塞；TA-AC-1.5-B3 / desktop-v1.1 / desktop-v1 不变。上方 G1/未开始记录属于历史，不代表本轮状态。
@@ -184,10 +190,83 @@ API 当前 HEAD 为 `20f797d33`，客户端继续为 `74aa8ed5de159e7ea2c7150e47
 
 发布与验收：未 push、PR、部署、生产访问/登记/迁移或付费测试；用户产品验收未代确认。T19—T22、真实 MySQL 版本/主库及 LOG_DB 拓扑、Redis 多实例、Windows/Linux 实机、三平台安装包和完整浏览器/2FA 尚待后续授权验证。G2 检查点通过，本目标停止，不进入 G3。
 
+## G2 用户请求的独立验收（2026-10-14，最新结论）
+
+本轮按用户“G2开发完成，请验收”的授权复核两仓库，结论为 **G2 暂不通过**，覆盖上方作者交付记录中“无剩余阻塞/检查点通过”的状态判断，历史验证证据保留。审查 HEAD 为 C `b78743fdcc352b3fb9d3b54cb53a04284db04eb1` / S `38ce291b661a4ff08ba73223c2cc750383f53b69`，运行代码仍为上方最终配对 SHA，基线不变。
+
+- R1（P1，T08/T14、AC-07）：桌面 Key 写入接受逗号/空格分隔的多个 IP，但实际模型鉴权只按换行解析；禁止 IP 列表可能失效，允许 IP 列表会误拦。独立 HTTP 写入→数据库→实际模型解析/成员判断已复现。
+- R2（P2，T14、AC-07/15）：Key 写入结果未知时，核实回读失败仍 clear 并解锁保存，可能重复创建。真实 React/QueryClient 隔离探针已复现；应同时检查创建/详情/取消/reveal 清除同一错误状态的旁路。
+- 本轮 typecheck、113 项前端、renderer 构建、31 项账户 Rust、12 项工具事务、五 Go 包定向和性能全包测试通过；显式真实 Go HTTP/合成 SQLite → Rust 业务配对 1 通过，fixture正常停止，系统安全存储专用条目删除断言通过。现有回归未覆盖 R1/R2，不能据此关闭缺陷。
+
+完整证据、修复验收要求与后续环境限制见 [g2-acceptance-review.md](g2-acceptance-review.md)。先修复两项并重新验收 G2，再决定进入 G3；两项均属既有需求，不需要新增产品范围确认。本轮只验收/隔离测试/文档记录，不修业务、不 commit/push/PR/上线、不自动进入 G3；原有未提交文档和附件保留，目标提示词未写入项目。
+
 ## G2 R1/R2 修复（2026-10-14）
 
 按本轮修复授权，R1 IP 规范化与 R2 未知写入核实保护已实现并通过定向回归。C `29437625f85fcb8680386c5264670b6b0d498c97` / S `931b9bb12831c91a52c615ac031cedd56645fbcc`，均本地集成于 codex/tuzi-assistant-dev；范围、命令、结果和限制见 [g2-fixes.md](g2-fixes.md)。保留独立验收历史，修复交付供复验；不自动进入 G3，未推送或发布。
 
+## G2 修复后独立复验（2026-10-14，最新状态）
+
+核查 C HEAD `f9f153f19ca6413da9e17656b05e1175fa4d407d` / S HEAD `8ecf6c84ae5e97a95c7b42e56edd6ed658b4fa05`，两仓仍为 codex/tuzi-assistant-dev，基线不变。**R1/R2 独立复验通过并关闭；新发现 R3（P2，T13、AC-06/15），G2仍暂不通过，先修复再进入G3执行。**
+
+R3：Overview 首次挂载后固定当日 start/end；跨午夜隐藏再显示触发重新读取时仍请求昨日窗口，同日重新读取也遗漏首次打开后的消费。独立真实组件/QueryClient/visibilitychange 探针在 10-14 23:50→10-15 00:10 的起止时间断言均失败。该场景已在T13原任务验证要求中，不是新增范围。
+
+本轮 typecheck、12文件117项前端、renderer构建、五Go包定向、性能全包、原IP六场景及原Key失败回读探针均通过；当前HEAD真实Go HTTP/合成SQLite→Rust业务配对1通过，专用Keychain条目/临时服务/DB/标记清理。未改动的Rust账户和七工具事务复用前次通过证据，不声称本轮重跑全部Rust用例。完整任务覆盖复核、R3复现及修复标准见 [g2-acceptance-review.md](g2-acceptance-review.md) 最新章节。
+
+G3的T19/T20/T21与Q02/Q04/Q09环境门槛保持待办；不把本地通过等同全平台、实库或发布验收。本轮仅复验及记录，未修改业务、提交、推送或上线；原有文档/附件保留。
+
 ## G2 R3 总览时间窗口修复（2026-10-14）
 
 按用户本轮授权，仅修复 T13 当日消费刷新/跨午夜问题，客户端 `8462c0012a8fd91a6678ba03a7c25e340ab1f89d` 已本地提交于 codex/tuzi-assistant-dev。每次实际读取重算本地当日窗口，汇总与趋势共用范围并成对更新；保留隐藏取消、账户隔离，不增加轮询。6 文件 53 项前端回归、类型检查通过；上海与纽约（含 DST）总览时间测试通过。完整命令与限制见 [g2-fixes.md](g2-fixes.md) 的 R3 章节。修复供独立复验，保留此前验收发现，不进入 G3，未推送或发布；API/原生/契约无修改。
+
+## G2 最终独立复验（2026-10-14，最新结论）
+
+**R1/R2/R3均关闭，G2本地研发门禁通过，具备进入G3验证阶段的条件。** C HEAD `43ac2941036042453b0753f6df47d0048117448f`（R3代码 `8462c0012a8fd91a6678ba03a7c25e340ab1f89d`）/ S HEAD `8ecf6c84ae5e97a95c7b42e56edd6ed658b4fa05`（代码 `931b9bb12831c91a52c615ac031cedd56645fbcc`），均 codex/tuzi-assistant-dev，基线不变。
+
+原独立R3跨午夜探针及R2失败回读探针通过；本轮typecheck、12文件121项前端、纽约时区含DST的5项窗口测试、renderer构建通过。增量审查确认每次实际读取重算当日窗口，汇总/趋势同参数、成对更新；隐藏取消、迟到结果丢弃、账号隔离与原页面回归通过。API/Rust无增量，复用前两轮Go/Rust/真实业务配对证据，未在本轮重跑或声称完整浏览器/安装包联调。
+
+当前检查范围内无剩余已确认G2阻断；完整证据和限制见 [g2-acceptance-review.md](g2-acceptance-review.md) 最新章节。下一阶段T19先行，T20/T21按依赖推进；Q02/Q04/Q09实际环境/设备/容量事实仍待落实，缺条件的验证保持阻塞。G2通过不等于G3或正式产品/发布验收通过。本轮仅复验与文档记录，无业务修改、commit/push/PR/生产操作，不自动执行G3；原有未提交内容保留。
+
+## T19 本地功能预览子集（2026-10-14）
+
+用户授权补齐本地环境并体验功能。新增 debug-only 固定 localhost origin/test client、独立预览 bundle 和数据目录、隔离合成 SQLite/Login/OAuth/desktop 服务与严格 Vite 代理启动方式，契约 B3 / desktop-v1.1 / desktop-v1 不变。实际 Chrome 登录→完整权限授权→macOS 协议回调→原生系统安全存储→桌面已连接及总览/模型页展示通过。debug .app 构建、原账户回归 31 项和新增 pending 隔离重启回归 1 项通过。详见 [本地预览记录](local-preview.md)、[ADR-006](decisions/0006-local-preview.md)。两仓基于 C 43ac294 / S 8ecf6c8 的本地增量，未提交、推送或部署；既有脏文档保留。当前服务留给用户体验，重启脚本使用后续环境清理改进。不是 T19 全项或 G3/发布验收。
+
+### 本地完整网站准备（2026-10-14，最新）
+
+后续用户本地添加渠道并发送模型请求，暴露 fixture 漏挂 `/v1` relay 路由的 404。已挂载原 `SetRelayRouter`、初始化渠道缓存并重启保留用户数据；3180/5180 无凭证 POST 均由原鉴权返回标准 401。未代发上游请求，实际模型响应/扣费/日志待用户测试；不再将此启动模式描述为不支持 relay。
+
+按用户补充授权，保留原网站名称与支付行为，改为完整 API/Dashboard 路由及独立持久 SQLite，共用账户、密钥、日志和资料。此前仅桌面 fixture 的路由/账户 DTO 不完整导致原网站显示异常，临时数据库也不适合连续体验。首次合成数据包括余额、密钥及 27 条日志；启动脚本严格绑定独立端口并保留数据，助手本地充值/兑换/资料入口跳转原本地网站页面。未配置真实支付商户或模型上游，不模拟付款成功。
+
+全新目录初始化、重启不重复播种、原网站真实登录与主要接口、桌面账户/密钥/分组/资料/模型/能力及资料写入后网站回读均通过；SQLite 保留字迁移执行测试、Rust 固定网页入口测试、debug .app 构建和脚本语法检查通过。最终服务已启动在 5180/3180，助手已运行，用户交互验收待完成。当前版本原生浏览器登录链路尚未重新完成，不复用历史 UI 验证冒充本轮结果。记录见 [local-preview.md](local-preview.md)。本轮未提交、推送或上线，既有修改保留。
+
+## V01 兔子账户前端视觉优化（2026-10-14）
+
+按用户本轮授权，在 `codex/account-visual-v01` 基于客户端 `43ac2941036042453b0753f6df47d0048117448f` 完成八个账户页面、表单和配置面板的视觉优化。仅展示结构、账户专用样式、现有数据可视化及展示文案；App/工具管理/请求逻辑/后端未因本任务修改，B3 / desktop-v1.1 不变。已有未提交文档、原生本地预览改动和附件保留，未混合提交。
+
+类型检查、改动文件格式与 diff 检查通过；8 文件 61 项账户/工具兼容回归通过；最终 renderer 与 macOS debug 本地预览构建通过。浏览器实际逐页验证全部八页及深浅主题、600/900/1280 窗口、加载/空/错误/离线/未连接状态；macOS 最终构建补查本地账户数据及工具管理。原生资料表单读取与完整写入链路不作通过声明，完整资料展示使用隔离真实组件预览验证。截图、参考差异、具体命令及限制见 [V01 验证与预览](account-visual-v01/README.md)。未提交、推送、发布或执行 G3 全项/支付/生产操作。
+
+## 2026-10-15 本地提交与原开发分支恢复
+
+用户明确授权整理既有改动为本地提交，并切回原分支且保留全部提交。此次仅整理 G1/G2 验收记录、T19 本地预览子集及 V01 视觉优化，不新增产品范围；基线 TA-AC-1.5-B3 / desktop-v1.1 / desktop-v1 不变。上文各轮“未提交”保留为历史，本节为当前状态。
+
+客户端已从 codex/account-visual-v01 切回 codex/tuzi-assistant-dev 并完成 fast-forward；原分支包含全部新提交，无冲突或历史重写。API 仍为 codex/tuzi-assistant-dev。
+
+| 内容 | 本地提交 |
+|---|---|
+| 客户端 G1/G2 验收记录 | d6913bc |
+| 客户端 T19 预览隔离及授权 pending 命名空间修复 | 6d792f8 |
+| 客户端 V01 页面、测试与视觉证据（当前配对代码） | 493cd81509460c0bbd8c3fe9ead52bb3a93133b5 |
+| API 持久化预览 fixture、严格代理与说明（当前配对代码） | 575800f9bbeda3692266c9f8b70f63677c362812 |
+
+本轮验证（macOS 本机，未重启既有预览服务）：
+
+- `pnpm typecheck`、`pnpm build:renderer` 通过；既有包体积、动态导入和浏览器数据提示保留。
+- `pnpm test:unit --run tests/components/AccountPage.test.tsx tests/account tests/components/AppSwitcher.accountCompatibility.test.tsx tests/integration/App.test.tsx tests/components/ProviderList.test.tsx tests/components/ProviderActions.test.tsx`：8 文件 61 项通过。
+- `pnpm exec prettier --check src/components/account/*.tsx src/components/account/account.css src/i18n/locales/{zh,en,ja}.json tests/account/desktop-business.test.tsx tests/visual/*` 通过。
+- src-tauri 中 `cargo test --lib tuzi_account`：沙箱内因本机 TCP bind 权限失败；获工具权限后重跑 32 通过、3 忽略。忽略真实安全存储及真实 Go 配对用例，本轮未代替执行。
+- src-tauri 中 `cargo test --lib --features local-preview business_allowlist_and_web_urls`：1 通过。
+- API `go test ./router -run '^(TestPreviewSQLiteReservedColumn|TestDesktopLocalPreview)$' -count=1` 通过；SQLite 保留字测试执行，服务 fixture 因无 opt-in 环境变量跳过。
+- 两仓 `git diff --check`、客户端 `bash -n scripts/build-local-preview.sh`、API `bash -n scripts/desktop-local-preview.sh` 通过。
+
+代码已提交，以上定向验证通过；本轮未重新执行完整浏览器/原生写入联调或三平台验收，不将历史截图和组件测试作为新增功能验收。G3 T19—T21 全项、G4 T22 和用户产品验收仍未完成。未 push、PR、部署、生产访问或迁移；本轮代码配对不是部署证明。原 Word 与 docs/product-plan-v1.5 附件继续保留未跟踪状态，没有纳入提交；本地数据库、日志、会话密钥及构建产物不提交。
+
+回退：视觉优化可独立 revert 493cd81；若撤回配套本地预览，先停止使用预览客户端/服务，再 revert 客户端 6d792f8，最后 revert API 575800f9b。保留本地独立数据及原有用户配置，不用 Git 清理数据。后续真正发布仍按 T22 另行授权并核查版本和部署顺序，本轮不执行发布。
