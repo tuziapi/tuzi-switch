@@ -173,6 +173,7 @@ mockIPC(async (command, args) => {
   switch (request.path) {
     case "/api/desktop/capabilities":
       return envelope({
+        release: { profile: "phase1", overview: true, keys: true },
         native: Object.fromEntries(
           [
             "account",

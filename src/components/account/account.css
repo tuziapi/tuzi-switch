@@ -968,3 +968,101 @@
 .dark .account-notice {
   color: #8ac4ff;
 }
+
+/* Phase 1: one full-width key workspace, with a compact connection strip. */
+.account-shell.account-phase1 {
+  display: flex;
+  flex-direction: column;
+}
+.account-phase1 > .account-connection {
+  margin: 0;
+  padding: 10px 24px;
+  border-top: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.account-phase1 .account-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+.account-phase1 .account-connection > .flex {
+  margin-left: auto;
+}
+.account-phase1 .account-connection button {
+  padding: 5px 10px;
+}
+.account-phase1 .account-content {
+  padding: 18px 24px;
+  gap: 12px;
+}
+.account-phase1 .account-content > .account-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.account-phase1 .account-content > .account-metrics > div {
+  padding: 14px 16px;
+}
+.account-phase1 .account-content > .account-metrics dd {
+  margin-top: 6px;
+  font-size: 24px;
+  overflow-wrap: anywhere;
+}
+.account-phase1 .account-content > .account-metrics .account-token-value {
+  font-size: 20px;
+}
+.account-metrics-note {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.account-key-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.account-key-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 150px));
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.account-phase1 .account-key-filters input,
+.account-phase1 .account-key-filters select {
+  height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.account-key-create {
+  flex-shrink: 0;
+}
+.account-phase1 th,
+.account-phase1 td {
+  padding: 11px 12px;
+}
+@media (max-width: 650px) {
+  .account-phase1 .account-content {
+    padding: 14px 12px;
+  }
+  .account-phase1 .account-content > .account-metrics {
+    gap: 6px;
+  }
+  .account-phase1 .account-content > .account-metrics > div {
+    padding: 10px 8px;
+  }
+  .account-phase1 .account-content > .account-metrics dd {
+    font-size: 18px;
+  }
+  .account-phase1 .account-content > .account-metrics .account-token-value {
+    font-size: 15px;
+  }
+  .account-key-filters {
+    gap: 5px;
+  }
+  .account-key-toolbar {
+    gap: 6px;
+  }
+}

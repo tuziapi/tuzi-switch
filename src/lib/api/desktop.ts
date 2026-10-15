@@ -33,6 +33,7 @@ export interface DesktopAccount {
 export interface Capabilities {
   scope_version: string;
   required_scopes: string[];
+  release?: { profile: string; overview: boolean; keys: boolean };
   native: Record<
     | "account"
     | "keys"

@@ -1,4 +1,3 @@
-import { TuziProviderRecovery } from "@/components/providers/TuziProviderDialog";
 import { type AccountState } from "@/lib/api/account";
 import type {
   Capabilities,
@@ -12,13 +11,12 @@ import { Keys } from "./Keys";
 import { Logs } from "./Logs";
 import { ModelsPage } from "./ModelsPage";
 import { Overview } from "./Overview";
+import { AccountMetrics } from "./AccountMetrics";
 import { ProfilePage } from "./ProfilePage";
 export { Keys, Logs, ModelsPage, Overview, ProfilePage, WebEntry };
 export function AccountBusiness({
   state,
   page,
-  onConfigure,
-  localStatus,
 }: {
   state: AccountState;
   localStatus?: string;
@@ -32,58 +30,25 @@ export function AccountBusiness({
     {},
     60000,
   );
-  const feature =
-    page === "overview"
-      ? "account"
-      : page === "modelsStatus"
-        ? "performance"
-        : page === "profile"
-          ? "profile_read"
-          : page;
   const enabled =
-    page === "topup" || page === "redeem"
-      ? caps.data?.data.web[page === "redeem" ? "redemption" : "topup"]
-      : caps.data?.data.native[feature as keyof Capabilities["native"]];
+    page === "keys" &&
+    (caps.data?.data.release?.keys ?? caps.data?.data.native.keys);
   return (
     <>
       <div className="account-capabilities">
         <QueryState query={caps} />
       </div>
-      {(page === "overview" || page === "keys") && (
-        <div className="account-recovery">
-          <TuziProviderRecovery />
-        </div>
-      )}
       {enabled === false && (
         <p role="alert">{t("account.business.unavailable")}</p>
       )}
       {enabled && (
         <>
-          {page === "overview" && (
-            <Overview state={state} localStatus={localStatus} />
-          )}{" "}
-          {page === "keys" && <Keys state={state} onConfigure={onConfigure} />}{" "}
-          {page === "logs" && <Logs state={state} />}{" "}
-          {page === "profile" && (
-            <ProfilePage
-              state={state}
-              canWrite={!!caps.data?.data.native.profile_write}
-              personalAllowed={!!caps.data?.data.web.personal}
-            />
-          )}{" "}
-          {(page === "models" || page === "modelsStatus") && (
-            <ModelsPage
-              state={state}
-              performance={page === "modelsStatus"}
-              onConfigure={onConfigure}
-            />
-          )}{" "}
-          {(page === "topup" || page === "redeem") && (
-            <WebEntry
-              target={page === "topup" ? "topup" : "redemption"}
-              allowed={!!enabled}
-            />
-          )}
+          <AccountMetrics
+            state={state}
+            accountEnabled={!!caps.data?.data.native.account}
+            usageEnabled={!!caps.data?.data.native.usage}
+          />
+          <Keys state={state} />
         </>
       )}
     </>

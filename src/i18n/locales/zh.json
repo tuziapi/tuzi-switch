@@ -2905,7 +2905,8 @@
         "sort_by": "排序字段",
         "sort_order": "排序方向",
         "expired_only": "仅已过期",
-        "negative_quota_only": "仅负额度"
+        "negative_quota_only": "仅负额度",
+        "token": "密钥后4位"
       },
       "logFilter": {
         "start_timestamp": "开始 Unix 秒",
@@ -2938,7 +2939,13 @@
       "localUnknown": "本机状态未读取",
       "proxyRunning": "本机代理正在运行",
       "proxyStopped": "本机代理未运行",
-      "secretSearch": "请只搜索名称或掩码；完整 Key 不会发送到查询 URL。"
+      "secretSearch": "请只搜索名称或掩码；完整 Key 不会发送到查询 URL。",
+      "keyPlaceholder": {
+        "keyword": "名称",
+        "token": "密钥后4位",
+        "group": "分组",
+        "status": "全部状态"
+      }
     },
     "visual": {
       "actions": "操作",

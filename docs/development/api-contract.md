@@ -109,3 +109,9 @@ IF-13 GET model必需≤256字节、hours1/6/24默认24、group单值或groups�
 IF-14 GET需要profile:read；PATCH同时需要profile:read与profile:write，避免写操作响应泄露未授权读取字段。GET恰 `user_id:string,username:string,email:string,display_name:string,language:string,accept_unset_model_ratio_model:bool,high_concurrency_enabled:bool,record_ip_log:bool`；email可空字符串，无外部绑定ID。PATCH仅最后五项、至少一项，未知/null全请求400无部分写。显示名1～20 Unicode字符，历史空名读取可空；language仅zh-CN/zh-TW/en/fr/ru/ja/vi，旧空/未知读取回退zh-CN不写回；价格默认false，IP旧nil有效true。保持网站说明/账号阈值，主动保存才改变。事务合并settings、保留旧未知字段，显示名+settings原子更新；损坏JSON500，缺setting列503/capability false，不覆盖空对象。成功回完整ProfileDTO。
 
 IF-15固定钱包 `https://api.tu-zi.com/console/topup`（兑换同页无虚构锚点）、资料 `/console/personal`、Coding `https://coding.tu-zi.com/reseller/`、GACCode `https://gaccode.com/subscriptions`。默认浏览器、不传凭证、不自动提交；网页账号可不同，回来仅刷新桌面当前账号。通知/边栏/签到/全部安全操作网站完成。
+
+## 2026-10-15 Phase 1 桌面开放面
+
+本轮用户确认首期仅开放总览摘要和 API 密钥。`GET /api/desktop/capabilities` 在 `data.release` 返回当前桌面开放面：`{profile:"phase1", overview:boolean, keys:boolean}`；`native` 仍表示底层技术能力，不代表当前公开。当前阶段对 `/api/desktop/logs`、`/api/desktop/models`、`/api/desktop/model-performance`、`/api/desktop/profile` 及其子路径统一返回 `403 desktop_feature_unavailable`。充值/兑换/个人资料网站入口在 Phase 1 客户端不提供；API 站原有网站路由不受影响。
+
+API 密钥列表首期允许 `keyword`（名称）、`token`（密钥片段）、`group`、`status` 四类筛选；客户端仅发送短密钥片段，不发送完整密钥。总览摘要继续使用 `account:read` 与 `usage:read`，不因隐藏调用明细而关闭 usage 汇总。

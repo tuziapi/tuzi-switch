@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import i18n from "i18next";
 import zh from "@/i18n/locales/zh.json";
-import { AccountPage, ACCOUNT_PAGES } from "@/components/account/AccountPage";
+import { AccountPage } from "@/components/account/AccountPage";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 
 vi.mock("@/lib/api/account", async (original) => ({
@@ -38,16 +38,17 @@ async function setup(state?: AccountState) {
 }
 
 describe("G1 account navigation and native state projection", () => {
-  it("keeps every account entry reachable without initiating authorization", async () => {
+  it("shows only the phase-one key workspace without a sidebar", async () => {
     const { account } = await setup();
-    for (const page of ACCOUNT_PAGES) {
-      fireEvent.click(
-        screen.getByRole("button", { name: zh.account.pages[page] }),
-      );
-      expect(
-        screen.getByRole("region", { name: zh.account.pages[page] }),
-      ).toHaveTextContent(zh.account.connectRequired);
-    }
+    expect(
+      screen.getByRole("region", { name: zh.account.pages.keys }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: zh.account.pages.overview }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: zh.account.pages.logs }),
+    ).not.toBeInTheDocument();
     expect(account.startLogin).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: zh.account.connect }));
     await waitFor(() => expect(account.startLogin).toHaveBeenCalledTimes(1));

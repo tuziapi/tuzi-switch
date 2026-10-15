@@ -267,3 +267,9 @@ G1 r1收尾：T02/T03/T06/T07上述四缺陷已在稳定C1ddb9b6/S155efcaf3完�
 逐项 AC、接口、实现及证据见 [g2-verification.md](g2-verification.md)；最终配对 C `49ea2584c2a6f8f9699ef62eb210aa63e778d268` / S `665f318466afce017a8db89c349eeedefcf7f3ea`，两端均已本地集成至 `codex/tuzi-assistant-dev`。真实 Go HTTP/合成 SQLite → Rust 业务配对通过，七工具临时配置事务与独立审查通过。
 
 T19—T22 尚未执行：G2 配对不等于完整浏览器/安装包联调或三平台、实 MySQL/PG、Redis 多实例验收。复现和 G3 环境准备清单见验证记录；后续阶段及推送、发布须另行授权，本目标到此停止。
+
+## T23 — Phase 1 桌面开放面与密钥工作区
+
+- 归属：C/S；依赖：T08、T13、T14、T19。
+- 交付：服务端 Phase 1 路由闸门与 release capabilities；客户端无侧栏密钥工作区、四项总览摘要、单行四筛选；隐藏页面不发请求；API 站普通控制台不变。
+- 验证：隐藏桌面路由直接访问返回 `desktop_feature_unavailable`；密钥名称/片段/分组/状态筛选；账户切换、断开、离线和总览今日窗口回归。

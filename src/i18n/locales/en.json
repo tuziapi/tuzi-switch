@@ -2905,7 +2905,8 @@
         "sort_by": "Sort field",
         "sort_order": "Sort direction",
         "expired_only": "Expired only",
-        "negative_quota_only": "Negative quota only"
+        "negative_quota_only": "Negative quota only",
+        "token": "Last 4 key characters"
       },
       "logFilter": {
         "start_timestamp": "Start Unix seconds",
@@ -2938,7 +2939,13 @@
       "localUnknown": "Local status not read",
       "proxyRunning": "Local proxy running",
       "proxyStopped": "Local proxy stopped",
-      "secretSearch": "Search names or masks only. A complete Key will not be sent in a query URL."
+      "secretSearch": "Search names or masks only. A complete Key will not be sent in a query URL.",
+      "keyPlaceholder": {
+        "keyword": "Name",
+        "token": "Last 4 key characters",
+        "group": "Group",
+        "status": "All statuses"
+      }
     },
     "visual": {
       "actions": "Actions",

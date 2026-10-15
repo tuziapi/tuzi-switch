@@ -222,7 +222,6 @@ describe("App integration with MSW", () => {
         "account.status.disconnected",
       ),
     );
-    fireEvent.click(screen.getByRole("button", { name: "account.pages.keys" }));
     expect(screen.getByText("account.connectRequired")).toBeInTheDocument();
     expect(screen.getByText("兔子switch")).toBeInTheDocument();
     expect(screen.getByTestId("app-switcher")).toBeInTheDocument();

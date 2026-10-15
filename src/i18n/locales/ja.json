@@ -2898,7 +2898,8 @@
         "sort_by": "並べ替えフィールド",
         "sort_order": "並べ替え順",
         "expired_only": "期限切れのみ",
-        "negative_quota_only": "負の割当量のみ"
+        "negative_quota_only": "負の割当量のみ",
+        "token": "キー末尾4文字"
       },
       "logFilter": {
         "start_timestamp": "開始 Unix 秒",
@@ -2931,7 +2932,13 @@
       "localUnknown": "ローカル状態未取得",
       "proxyRunning": "ローカルプロキシ実行中",
       "proxyStopped": "ローカルプロキシ停止中",
-      "secretSearch": "名前またはマスクだけを検索してください。完全な Key はクエリ URL に送信しません。"
+      "secretSearch": "名前またはマスクだけを検索してください。完全な Key はクエリ URL に送信しません。",
+      "keyPlaceholder": {
+        "keyword": "名前",
+        "token": "キー末尾4文字",
+        "group": "グループ",
+        "status": "すべての状態"
+      }
     },
     "visual": {
       "actions": "操作",

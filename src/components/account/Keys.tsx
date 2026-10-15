@@ -1,4 +1,3 @@
-import { FilterBar } from "./BusinessShared";
 import { Button } from "@/components/ui/button";
 import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type {
@@ -215,60 +214,70 @@ export function Keys({
         <p className="account-empty">{t("account.business.empty")}</p>
       )}
       {secretSearch && <p role="alert">{t("account.business.secretSearch")}</p>}
-      <p className="account-notice">{t("account.business.toolImpact")}</p>
-      <FilterBar visible={3}>
-        {[
-          "keyword",
-          "group",
-          "status",
-          "last_used_before",
-          "sort_by",
-          "sort_order",
-        ].map((k) => (
-          <Field
-            key={k}
-            label={t(`account.business.keyFilter.${k}`)}
-            value={filters[k] ?? ""}
-            onChange={(v) => {
-              if (k === "keyword" && /^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
-                setSecretSearch(true);
-                return;
-              }
-              setSecretSearch(false);
-              setFilters((f) => ({ ...f, [k]: v }));
+      <div className="account-key-toolbar">
+        <div className="account-key-filters">
+          {["keyword", "token", "group"].map((field) => (
+            <input
+              key={field}
+              aria-label={t(`account.business.keyFilter.${field}`)}
+              placeholder={t(`account.business.keyPlaceholder.${field}`)}
+              value={filters[field] ?? ""}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (
+                  (field === "token" && !/^[A-Za-z0-9]{0,4}$/.test(value)) ||
+                  (field === "keyword" && /^sk-[A-Za-z0-9_-]{20,}$/.test(value))
+                ) {
+                  setSecretSearch(true);
+                  return;
+                }
+                setSecretSearch(false);
+                setFilters((previous) => ({ ...previous, [field]: value }));
+                setPage(1);
+                setSelected(null);
+                clearSecret();
+              }}
+            />
+          ))}
+          <select
+            aria-label={t("account.business.keyFilter.status")}
+            value={filters.status ?? ""}
+            onChange={(event) => {
+              setFilters((previous) => ({
+                ...previous,
+                status: event.target.value,
+              }));
               setPage(1);
               setSelected(null);
               clearSecret();
             }}
-          />
-        ))}
-        {["expired_only", "negative_quota_only"].map((k) => (
-          <Check
-            key={k}
-            label={t(`account.business.keyFilter.${k}`)}
-            value={filters[k] === "true"}
-            onChange={(v) => {
-              setFilters((f) => ({ ...f, [k]: v ? "true" : "" }));
-              clearSecret();
-              setSelected(null);
-              setPage(1);
-            }}
-          />
-        ))}
-      </FilterBar>
-      <Button
-        className="account-page-action"
-        disabled={busy || !!error?.outcomeUnknown}
-        onClick={() => {
-          clear();
-          setSelected(null);
-          setOriginal(null);
-          setForm(defaultKey);
-          clearSecret();
-        }}
-      >
-        {t("account.business.create")}
-      </Button>
+          >
+            <option value="">
+              {t("account.business.keyPlaceholder.status")}
+            </option>
+            {[1, 2, 3, 4].map((status) => (
+              <option key={status} value={status}>
+                {t(`account.business.keyStatus.${status}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button
+          className="account-key-create"
+          disabled={busy || !!error?.outcomeUnknown}
+          onClick={() => {
+            clear();
+            setSelected(null);
+            setOriginal(null);
+            setForm(defaultKey);
+            clearSecret();
+          }}
+        >
+          {t("account.business.create")}
+        </Button>
+      </div>
 
       <div className="account-table-scroll">
         <table className="account-key-table">
