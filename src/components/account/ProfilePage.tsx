@@ -59,13 +59,21 @@ export function ProfilePage({
     <>
       <QueryState query={query} />
       {query.data && (
-        <p>
-          {query.data.data.username} · {query.data.data.email}
-        </p>
+        <div className="account-card account-profile-identity">
+          <div className="account-avatar">
+            {query.data.data.username.slice(0, 1).toUpperCase()}
+          </div>
+          <div>
+            <h3>{query.data.data.display_name || query.data.data.username}</h3>
+            <p>
+              {query.data.data.username} · {query.data.data.email}
+            </p>
+          </div>
+        </div>
       )}
       {form && (
         <form
-          className="space-y-3"
+          className="account-profile-form"
           onSubmit={(e) => {
             e.preventDefault();
             void save();
@@ -94,7 +102,7 @@ export function ProfilePage({
               "record_ip_log",
             ] as const
           ).map((k) => (
-            <div key={k}>
+            <div className="account-card account-preference" key={k}>
               <Check
                 label={t(`account.business.${k}`)}
                 value={form[k]}
@@ -105,15 +113,21 @@ export function ProfilePage({
               </p>
             </div>
           ))}
-          <Button
-            disabled={!canWrite || busy || !!error?.outcomeUnknown}
-            type="submit"
-          >
-            {t("account.business.save")}
-          </Button>
-          <Button type="button" onClick={() => void verify()}>
-            {t("account.business.verify")}
-          </Button>
+          <div className="account-form-actions">
+            <Button
+              disabled={!canWrite || busy || !!error?.outcomeUnknown}
+              type="submit"
+            >
+              {t("account.business.save")}
+            </Button>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => void verify()}
+            >
+              {t("account.business.verify")}
+            </Button>
+          </div>
         </form>
       )}
       <WriteError error={error} />

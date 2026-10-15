@@ -557,7 +557,7 @@ describe("business actions and secret lifetime", () => {
       screen.getByRole("button", { name: zh.account.business.save }),
     );
     await waitFor(() => expect(finish).toBeDefined());
-    fireEvent.click(screen.getByRole("button", { name: zh.account.cancel }));
+    fireEvent.click(screen.getByRole("button", { name: zh.common.cancel }));
     await act(async () =>
       finish(env({ id: "99", key: "SYNTHETIC_CANCELED_CREATED_SECRET" })),
     );
@@ -592,11 +592,17 @@ describe("business actions and secret lifetime", () => {
       { wrapper },
     );
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "→" })).toBeEnabled(),
+      expect(
+        screen.getByRole("button", { name: zh.account.business.next }),
+      ).toBeEnabled(),
     );
-    fireEvent.click(screen.getByRole("button", { name: "→" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.business.next }),
+    );
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "←" })).toBeDisabled(),
+      expect(
+        screen.getByRole("button", { name: zh.account.business.previous }),
+      ).toBeDisabled(),
     );
     expect(
       screen.getByRole("button", {
@@ -733,7 +739,7 @@ describe("business actions and secret lifetime", () => {
           screen.getByRole("button", { name: zh.account.business.save }),
         ).toBeDisabled();
         expect(
-          screen.getByRole("button", { name: zh.account.cancel }),
+          screen.getByRole("button", { name: zh.common.cancel }),
         ).toBeDisabled();
       }
       click(zh.account.business.reveal);

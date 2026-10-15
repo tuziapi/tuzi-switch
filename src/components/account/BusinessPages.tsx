@@ -46,8 +46,14 @@ export function AccountBusiness({
       : caps.data?.data.native[feature as keyof Capabilities["native"]];
   return (
     <>
-      <QueryState query={caps} />
-      {(page === "overview" || page === "keys") && <TuziProviderRecovery />}
+      <div className="account-capabilities">
+        <QueryState query={caps} />
+      </div>
+      {(page === "overview" || page === "keys") && (
+        <div className="account-recovery">
+          <TuziProviderRecovery />
+        </div>
+      )}
       {enabled === false && (
         <p role="alert">{t("account.business.unavailable")}</p>
       )}

@@ -1,3 +1,16 @@
+import {
+  LayoutDashboard,
+  KeyRound,
+  ListFilter,
+  Activity,
+  Plus,
+  Gift,
+  UserRound,
+  Grid2X2,
+  Rabbit,
+  ArrowUpRight,
+} from "lucide-react";
+import "./account.css";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -73,104 +86,126 @@ export function AccountPage({
     }
   };
   return (
-    <section
-      className="flex flex-col gap-6 p-6 max-w-6xl w-full mx-auto"
-      aria-label={t("account.title")}
-    >
-      <div className="rounded-xl border bg-card p-5 space-y-3">
-        <h1 className="text-xl font-semibold">{t("account.title")}</h1>
-        <p role="status" aria-live="polite">
-          {t(`account.status.${isLoading ? "loading" : state.status}`)}
-        </p>
-        {connected && state.identity && (
-          <p>
-            {state.identity.displayName || state.identity.username}{" "}
-            <span className="text-muted-foreground">
-              @{state.identity.username}
-            </span>
+    <section className="account-shell" aria-label={t("account.title")}>
+      <aside className="account-sidebar">
+        <div className="account-brand">
+          <Rabbit size={24} aria-hidden="true" />
+          {t("account.title")}
+        </div>{" "}
+        <nav className="account-nav" aria-label={t("account.pagesLabel")}>
+          {ACCOUNT_PAGES.map((id) => (
+            <Button
+              key={id}
+              variant={page === id ? "default" : "outline"}
+              aria-current={page === id ? "page" : undefined}
+              onClick={() => setPage(id)}
+            >
+              {(() => {
+                const Icon = {
+                  overview: LayoutDashboard,
+                  keys: KeyRound,
+                  logs: ListFilter,
+                  modelsStatus: Activity,
+                  topup: Plus,
+                  redeem: Gift,
+                  profile: UserRound,
+                  models: Grid2X2,
+                }[id];
+                return <Icon size={16} aria-hidden="true" />;
+              })()}
+              <span>{t(`account.pages.${id}`)}</span>
+              {(id === "topup" || id === "redeem") && (
+                <ArrowUpRight size={12} aria-hidden="true" />
+              )}
+            </Button>
+          ))}
+        </nav>
+        <div className="account-connection">
+          <div className="account-avatar">
+            <Rabbit size={20} aria-hidden="true" />
+          </div>
+          <p role="status" aria-live="polite">
+            {t(`account.status.${isLoading ? "loading" : state.status}`)}
           </p>
-        )}
-        <p className="text-sm text-muted-foreground">
-          {t("account.toolsIndependent")}
-        </p>
-        {state.status === "offline" && <p>{t("account.offlineHint")}</p>}
-        {state.error && (
-          <p role="alert">
-            {t(`account.errors.${state.error.code}`, {
-              defaultValue: t("account.errors.generic"),
-            })}
+          {connected && state.identity && (
+            <p>
+              {state.identity.displayName || state.identity.username}{" "}
+              <span className="text-muted-foreground">
+                @{state.identity.username}
+              </span>
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground">
+            {t("account.toolsIndependent")}
           </p>
-        )}
-        {state.localCleared === true && state.remoteRevoked === false && (
-          <p role="alert">{t("account.remoteNotRevoked")}</p>
-        )}
-        {retrySeconds > 0 && (
-          <p>{t("account.retryAfter", { seconds: retrySeconds })}</p>
-        )}
-        {actionFailed && <p role="alert">{t("account.actionFailed")}</p>}
-        <div className="flex flex-wrap gap-2">
-          {!pending && !connected && !policyError && !requiresCleanup && (
-            <Button
-              disabled={busy || isLoading || retrySeconds > 0}
-              onClick={() => void run(account.startLogin)}
-            >
-              {t("account.connect")}
-            </Button>
+          {state.status === "offline" && <p>{t("account.offlineHint")}</p>}
+          {state.error && (
+            <p role="alert">
+              {t(`account.errors.${state.error.code}`, {
+                defaultValue: t("account.errors.generic"),
+              })}
+            </p>
           )}
-          {pending && (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void run(account.cancelLogin)}
-            >
-              {t("account.cancel")}
-            </Button>
+          {state.localCleared === true && state.remoteRevoked === false && (
+            <p role="alert">{t("account.remoteNotRevoked")}</p>
           )}
-          {(connected || policyError || state.status === "error") && (
-            <Button
-              variant="outline"
-              disabled={
-                busy ||
-                isLoading ||
-                retrySeconds > 0 ||
-                state.status === "refreshing"
-              }
-              onClick={() => void run(account.retry)}
-            >
-              {t("account.retry")}
-            </Button>
+          {retrySeconds > 0 && (
+            <p>{t("account.retryAfter", { seconds: retrySeconds })}</p>
           )}
-          {!pending && (connected || policyError || requiresCleanup) && (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void run(account.logout)}
-            >
-              {t("account.disconnect")}
-            </Button>
-          )}
+          {actionFailed && <p role="alert">{t("account.actionFailed")}</p>}
+          <div className="flex flex-wrap gap-2">
+            {!pending && !connected && !policyError && !requiresCleanup && (
+              <Button
+                disabled={busy || isLoading || retrySeconds > 0}
+                onClick={() => void run(account.startLogin)}
+              >
+                {t("account.connect")}
+              </Button>
+            )}
+            {pending && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void run(account.cancelLogin)}
+              >
+                {t("account.cancel")}
+              </Button>
+            )}
+            {(connected || policyError || state.status === "error") && (
+              <Button
+                variant="outline"
+                disabled={
+                  busy ||
+                  isLoading ||
+                  retrySeconds > 0 ||
+                  state.status === "refreshing"
+                }
+                onClick={() => void run(account.retry)}
+              >
+                {t("account.retry")}
+              </Button>
+            )}
+            {!pending && (connected || policyError || requiresCleanup) && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void run(account.logout)}
+              >
+                {t("account.disconnect")}
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
-      <nav
-        className="flex flex-wrap gap-2"
-        aria-label={t("account.pagesLabel")}
-      >
-        {ACCOUNT_PAGES.map((id) => (
-          <Button
-            key={id}
-            variant={page === id ? "default" : "outline"}
-            aria-current={page === id ? "page" : undefined}
-            onClick={() => setPage(id)}
-          >
-            {t(`account.pages.${id}`)}
-          </Button>
-        ))}
-      </nav>
+      </aside>
       <section
-        className="rounded-xl border p-5 space-y-3"
+        className="account-content"
+        data-account-page={page}
         aria-label={t(`account.pages.${page}`)}
       >
-        <h2 className="font-semibold">{t(`account.pages.${page}`)}</h2>
+        <header className="account-page-heading">
+          <h1>{t(`account.pages.${page}`)}</h1>
+          <p>{t(`account.visual.descriptions.${page}`)}</p>
+        </header>
         {!connected && <p>{t("account.connectRequired")}</p>}
         {connected && state.identity ? (
           <AccountBusiness

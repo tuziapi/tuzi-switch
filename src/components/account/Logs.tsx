@@ -1,3 +1,4 @@
+import { FilterBar } from "./BusinessShared";
 import { Button } from "@/components/ui/button";
 import { type AccountState } from "@/lib/api/account";
 import type { Log, Page, Summary } from "@/lib/api/desktop";
@@ -41,7 +42,7 @@ export function Logs({ state }: { state: AccountState }) {
   return (
     <>
       <p>{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
-      <div className="grid grid-cols-3 gap-2">
+      <FilterBar visible={4}>
         {[
           "start_timestamp",
           "end_timestamp",
@@ -82,8 +83,10 @@ export function Logs({ state }: { state: AccountState }) {
             ))}
           </select>
         </label>
-      </div>
+      </FilterBar>
       <Button
+        className="account-page-action"
+        variant="outline"
         onClick={() => {
           void list.refetch();
           void summary.refetch();
@@ -92,10 +95,10 @@ export function Logs({ state }: { state: AccountState }) {
       >
         {t("account.business.refresh")}
       </Button>
-      <p>{t("account.business.logsNotice")}</p>
+      <p className="account-notice">{t("account.business.logsNotice")}</p>
       <QueryState query={list} />
       {list.data?.data.items.length === 0 && (
-        <p>{t("account.business.empty")}</p>
+        <p className="account-empty">{t("account.business.empty")}</p>
       )}
       <QueryState query={summary} />
       {summary.data && (
@@ -107,7 +110,11 @@ export function Logs({ state }: { state: AccountState }) {
           {date(summary.data.data.end_timestamp)})
         </p>
       )}
-      <LogRows items={list.data?.data.items ?? []} select={setRequest} />
+      <LogRows
+        items={list.data?.data.items ?? []}
+        select={setRequest}
+        selectedRequest={request}
+      />
       {list.data && (
         <Pager
           page={page}
@@ -121,26 +128,28 @@ export function Logs({ state }: { state: AccountState }) {
       <QueryState query={statistics} />
       {statistics.data && (
         <>
-          <h3>{t("account.business.trend")}</h3>
-          {statistics.data.data.trend.map((b) => (
-            <p key={b.start_timestamp}>
-              {date(b.start_timestamp)}: {b.record_count} · quota {b.quota}
-            </p>
-          ))}
-          {statistics.data.data.by_model.map((b) => (
-            <p key={b.model_name}>
-              {b.model_name}: {b.record_count} · quota {b.quota}
-            </p>
-          ))}
-          {statistics.data.data.by_error.map((b) => (
-            <p key={b.error_code}>
-              {b.error_code}: {b.record_count}
-            </p>
-          ))}
+          <section className="account-card account-log-statistics">
+            <h3>{t("account.business.trend")}</h3>
+            {statistics.data.data.trend.map((b) => (
+              <p key={b.start_timestamp}>
+                {date(b.start_timestamp)}: {b.record_count} · quota {b.quota}
+              </p>
+            ))}
+            {statistics.data.data.by_model.map((b) => (
+              <p key={b.model_name}>
+                {b.model_name}: {b.record_count} · quota {b.quota}
+              </p>
+            ))}
+            {statistics.data.data.by_error.map((b) => (
+              <p key={b.error_code}>
+                {b.error_code}: {b.record_count}
+              </p>
+            ))}
+          </section>
         </>
       )}
       {request && (
-        <section>
+        <section className="account-card account-detail">
           <h3>
             {t("account.business.requestSummary")} {request}
           </h3>
@@ -160,55 +169,75 @@ export function Logs({ state }: { state: AccountState }) {
 function LogRows({
   items,
   select,
+  selectedRequest,
 }: {
   items: Log[];
   select?: (id: string) => void;
+  selectedRequest?: string;
 }) {
   const { t } = useTranslation();
   return (
-    <table>
-      <thead>
-        <tr>
-          {[
-            "time",
-            "model",
-            "result",
-            "billing",
-            "quota",
-            "tokens",
-            "duration",
-          ].map((k) => (
-            <th key={k}>{t(`account.business.${k}`)}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((l) => (
-          <tr key={l.id}>
-            <td>{date(l.created_at)}</td>
-            <td>
-              {l.model_name} · {l.token_name} · {l.group}
-            </td>
-            <td>{t(`account.business.resultStatus.${l.result}`)}</td>
-            <td>{t(`account.business.billingStatus.${l.billing_status}`)}</td>
-            <td>{l.quota}</td>
-            <td>
-              {l.prompt_tokens} / {l.completion_tokens}
-            </td>
-            <td>
-              {l.duration_ms} ms {l.is_stream ? "stream" : ""}
-              {l.error_code && (
-                <p>{t(`account.business.callError.${l.error_code}`)}</p>
-              )}
-              {select && l.request_id && (
-                <Button onClick={() => select(l.request_id)}>
-                  {t("account.business.requestSummary")}
-                </Button>
-              )}
-            </td>
+    <div className="account-table-scroll account-log-table">
+      <table>
+        <thead>
+          <tr>
+            {[
+              "time",
+              "model",
+              "result",
+              "billing",
+              "quota",
+              "tokens",
+              "duration",
+            ].map((k) => (
+              <th key={k}>{t(`account.business.${k}`)}</th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {items.map((l) => (
+            <tr
+              key={l.id}
+              className={
+                selectedRequest && l.request_id === selectedRequest
+                  ? "is-selected"
+                  : undefined
+              }
+            >
+              <td>{date(l.created_at)}</td>
+              <td>
+                <strong>{l.model_name}</strong>
+                <small>
+                  {l.token_name} · {l.group}
+                </small>
+              </td>
+              <td>
+                <span
+                  className={`account-badge ${l.result === "success" ? "is-success" : l.result === "error" ? "is-error" : ""}`}
+                >
+                  {t(`account.business.resultStatus.${l.result}`)}
+                </span>
+              </td>
+              <td>{t(`account.business.billingStatus.${l.billing_status}`)}</td>
+              <td>{l.quota}</td>
+              <td>
+                {l.prompt_tokens} / {l.completion_tokens}
+              </td>
+              <td>
+                {l.duration_ms} ms {l.is_stream ? "stream" : ""}
+                {l.error_code && (
+                  <p>{t(`account.business.callError.${l.error_code}`)}</p>
+                )}
+                {select && l.request_id && (
+                  <Button variant="link" onClick={() => select(l.request_id)}>
+                    {t("account.business.requestSummary")}
+                  </Button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

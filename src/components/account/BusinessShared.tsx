@@ -1,3 +1,11 @@
+import {
+  ExternalLink,
+  Wallet,
+  Gift,
+  UserRound,
+  ArrowUpRight,
+  LoaderCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   desktopRequest,
@@ -7,7 +15,7 @@ import {
 } from "@/lib/api/account";
 import type { DesktopError } from "@/lib/api/desktop";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { Children, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 export const date = (n: number) =>
   n > 0 ? new Date(n * 1000).toLocaleString() : n === -1 ? "∞" : "—";
@@ -23,7 +31,7 @@ export function Field({
   type?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1">
+    <label className="account-field">
       {label}
       <input
         className="border rounded p-2 bg-background"
@@ -45,7 +53,7 @@ export function Check({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="block">
+    <label className="account-check">
       <input
         type="checkbox"
         checked={value}
@@ -69,7 +77,12 @@ export function QueryState({
   const e = query.error as DesktopError | null;
   return (
     <>
-      {query.isLoading && <p>{t("account.business.loading")}</p>}
+      {query.isLoading && (
+        <p className="account-loading" role="status">
+          <LoaderCircle size={16} aria-hidden="true" />
+          {t("account.business.loading")}
+        </p>
+      )}
       {e && (
         <p role="alert">
           {t(`account.business.errors.${e.code}`, {
@@ -79,7 +92,7 @@ export function QueryState({
         </p>
       )}
       {query.data && (
-        <p className="text-xs text-muted-foreground">
+        <p className="account-updated">
           {t("account.business.updated")}{" "}
           {new Date(query.dataUpdatedAt).toLocaleString()}
         </p>
@@ -98,12 +111,20 @@ export function Pager({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex gap-2">
-      <Button disabled={page === 1} onClick={() => onChange(page - 1)}>
+    <div className="account-pager">
+      <Button
+        variant="outline"
+        disabled={page === 1}
+        onClick={() => onChange(page - 1)}
+      >
         {t("account.business.previous")}
       </Button>
       <span>{page}</span>
-      <Button disabled={!more} onClick={() => onChange(page + 1)}>
+      <Button
+        variant="outline"
+        disabled={!more}
+        onClick={() => onChange(page + 1)}
+      >
         {t("account.business.next")}
       </Button>
     </div>
@@ -165,7 +186,19 @@ export function WebEntry({
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
   return (
-    <div>
+    <div className={`account-web-entry account-web-${target}`}>
+      <div className="account-web-icon">
+        {target === "topup" ? (
+          <Wallet />
+        ) : target === "redemption" ? (
+          <Gift />
+        ) : target === "personal" ? (
+          <UserRound />
+        ) : (
+          <ArrowUpRight />
+        )}
+      </div>
+      <h3>{t(`account.business.web.${target}`)}</h3>
       <p>{t("account.business.browserAccount")}</p>
       <Button
         disabled={!allowed}
@@ -174,10 +207,34 @@ export function WebEntry({
           void openAccountWeb(target).catch(() => setFailed(true));
         }}
       >
-        {t(`account.business.web.${target}`)}
+        {t(`account.business.web.${target}`)}{" "}
+        <ExternalLink size={14} aria-hidden="true" />
       </Button>
       {!allowed && <p>{t("account.business.unavailable")}</p>}
       {failed && <p role="alert">{t("account.business.errors.generic")}</p>}
+    </div>
+  );
+}
+
+/** Disclosure changes only layout: every existing filter remains mounted. */
+export function FilterBar({
+  children,
+  visible = 3,
+}: {
+  children: ReactNode;
+  visible?: number;
+}) {
+  const { t } = useTranslation();
+  const fields = Children.toArray(children);
+  return (
+    <div className="account-filter-bar">
+      <div className="account-filters">{fields.slice(0, visible)}</div>
+      {fields.length > visible && (
+        <details className="account-more-filters">
+          <summary>{t("account.visual.moreFilters")}</summary>
+          <div className="account-filters">{fields.slice(visible)}</div>
+        </details>
+      )}
     </div>
   );
 }

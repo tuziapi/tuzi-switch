@@ -2939,6 +2939,45 @@
       "proxyRunning": "Local proxy running",
       "proxyStopped": "Local proxy stopped",
       "secretSearch": "Search names or masks only. A complete Key will not be sent in a query URL."
+    },
+    "visual": {
+      "actions": "Actions",
+      "remainingUsed": "Remaining / used",
+      "todayTokens": "Tokens today",
+      "todayCalls": "Consumption calls today",
+      "todayCost": "Consumption today",
+      "accountInfo": "Account information",
+      "dailyTrend": "Consumption today",
+      "details": "Data details",
+      "localTools": "Local tools",
+      "subscriptions": "Separate subscriptions and credits",
+      "series": "Half-hour success rate",
+      "descriptions": {
+        "overview": "Tuzi API account · excludes separate Codex / GACCode usage",
+        "keys": "Manage API keys and configure local tools",
+        "logs": "Account requests and billing records",
+        "modelsStatus": "Model and group service quality",
+        "profile": "Manage your profile and preferences; restricted actions open on the web",
+        "models": "Explore models, pricing, groups and endpoints",
+        "topup": "Add account credit on the Tuzi website",
+        "redeem": "Redeem a code on the Tuzi website"
+      },
+      "time": "Time",
+      "successRate": "Success rate",
+      "latency": "Latency",
+      "ttft": "TTFT",
+      "throughput": "Throughput",
+      "moreFilters": "More filters",
+      "seriesHint": "Darker bars indicate higher success rates; gray means no samples. Hover for time and values.",
+      "columns": {
+        "name": "Key name",
+        "group": "Group",
+        "keyQuota": "Remaining / used quota",
+        "status": "Status",
+        "expiry": "Expires",
+        "actions": "Actions"
+      },
+      "modelInfo": "Model information"
     }
   }
 }

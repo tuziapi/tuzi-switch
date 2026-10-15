@@ -2939,6 +2939,45 @@
       "proxyRunning": "本机代理正在运行",
       "proxyStopped": "本机代理未运行",
       "secretSearch": "请只搜索名称或掩码；完整 Key 不会发送到查询 URL。"
+    },
+    "visual": {
+      "actions": "操作",
+      "remainingUsed": "剩余 / 已用",
+      "todayTokens": "今日 Tokens",
+      "todayCalls": "今日消费调用",
+      "todayCost": "今日消耗",
+      "accountInfo": "账户信息",
+      "dailyTrend": "今日消耗趋势",
+      "details": "数据明细",
+      "localTools": "本机工具",
+      "subscriptions": "独立订阅与积分",
+      "series": "半小时成功率",
+      "descriptions": {
+        "overview": "兔子 API 主站账户 · 不包含 Codex / GACCode 独立用量",
+        "keys": "管理兔子调用密钥，并配置到本机工具",
+        "logs": "兔子账户的调用与计费记录",
+        "modelsStatus": "查看模型和分组的服务质量",
+        "profile": "管理账户资料与偏好，受限操作在网页完成",
+        "models": "搜索兔子现有模型，了解价格、分组与接入方式",
+        "topup": "在兔子网页补充账户额度",
+        "redeem": "在兔子网页使用兑换码"
+      },
+      "time": "时间",
+      "successRate": "成功率",
+      "latency": "延迟",
+      "ttft": "首字延迟",
+      "throughput": "吞吐",
+      "moreFilters": "更多筛选",
+      "seriesHint": "颜色深浅表示成功率，灰色表示暂无样本；悬停查看时间与数值。",
+      "columns": {
+        "name": "密钥名称",
+        "group": "分组",
+        "keyQuota": "剩余 / 已用额度",
+        "status": "状态",
+        "expiry": "到期时间",
+        "actions": "操作"
+      },
+      "modelInfo": "模型信息"
     }
   }
 }

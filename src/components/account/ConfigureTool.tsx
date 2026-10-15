@@ -115,12 +115,12 @@ export function ConfigureTool({
     <section
       role="dialog"
       aria-label={t("account.business.configure")}
-      className="border rounded p-5 space-y-3"
+      className="account-configure-dialog"
     >
       <h2>{t("account.business.configure")}</h2>
       <p>{t("account.business.configureNotice")}</p>
       <label>
-        {t("account.business.search")}
+        {t("account.business.modelFilter.search")}
         <input
           value={search}
           onChange={(e) => {
@@ -130,16 +130,25 @@ export function ConfigureTool({
           }}
         />
       </label>
-      <Button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-        ←
-      </Button>
-      <span>{page}</span>
-      <Button
-        disabled={!models.data?.data.pagination.has_more}
-        onClick={() => setPage(page + 1)}
-      >
-        →
-      </Button>
+      <div className="account-pager">
+        <Button
+          variant="outline"
+          aria-label={t("account.business.previous")}
+          disabled={page <= 1}
+          onClick={() => setPage(page - 1)}
+        >
+          ←
+        </Button>
+        <span>{page}</span>
+        <Button
+          variant="outline"
+          aria-label={t("account.business.next")}
+          disabled={!models.data?.data.pagination.has_more}
+          onClick={() => setPage(page + 1)}
+        >
+          →
+        </Button>
+      </div>
       <label>
         {t("account.business.model")}
         <select
@@ -192,15 +201,17 @@ export function ConfigureTool({
           )}
         </p>
       )}
-      <Button
-        disabled={busy || !!reason || !!models.error}
-        onClick={() => void reveal()}
-      >
-        {t("account.business.revealAndContinue")}
-      </Button>
-      <Button disabled={false} onClick={onClose}>
-        {t("account.cancel")}
-      </Button>
+      <div className="account-form-actions">
+        <Button
+          disabled={busy || !!reason || !!models.error}
+          onClick={() => void reveal()}
+        >
+          {t("account.business.revealAndContinue")}
+        </Button>
+        <Button variant="outline" disabled={false} onClick={onClose}>
+          {t("common.cancel")}
+        </Button>
+      </div>
     </section>
   );
 }

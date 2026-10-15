@@ -1,3 +1,4 @@
+import { FilterBar } from "./BusinessShared";
 import { Button } from "@/components/ui/button";
 import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type {
@@ -211,10 +212,11 @@ export function Keys({
     <>
       <QueryState query={list} />
       {list.data?.data.items.length === 0 && (
-        <p>{t("account.business.empty")}</p>
+        <p className="account-empty">{t("account.business.empty")}</p>
       )}
       {secretSearch && <p role="alert">{t("account.business.secretSearch")}</p>}
-      <div className="grid grid-cols-3 gap-2">
+      <p className="account-notice">{t("account.business.toolImpact")}</p>
+      <FilterBar visible={3}>
         {[
           "keyword",
           "group",
@@ -253,8 +255,9 @@ export function Keys({
             }}
           />
         ))}
-      </div>
+      </FilterBar>
       <Button
+        className="account-page-action"
         disabled={busy || !!error?.outcomeUnknown}
         onClick={() => {
           clear();
@@ -266,77 +269,125 @@ export function Keys({
       >
         {t("account.business.create")}
       </Button>
-      <p>{t("account.business.toolImpact")}</p>
-      {list.data?.data.items.map((k) => (
-        <article className="border rounded p-3 space-y-2" key={k.id}>
-          <p>
-            {k.name} · {k.masked_key} · {k.group} ·{" "}
-            {t(`account.business.keyStatus.${k.status}`)}
-          </p>
-          <p>
-            quota {k.remain_quota} / {k.used_quota} · {date(k.expired_time)}
-          </p>
-          <Button
-            disabled={busy || !!error?.outcomeUnknown}
-            onClick={() => {
-              setSelected(k.id);
-              setForm(null);
-              clearSecret();
-              clear();
-            }}
-          >
-            {t("account.business.details")}
-          </Button>
-          <Button
-            disabled={busy || !!error?.outcomeUnknown}
-            onClick={() =>
-              void write("PATCH", `/api/desktop/keys/${k.id}/status`, {
-                status: k.status === 1 ? 2 : 1,
-              })
-            }
-          >
-            {t(
-              k.status === 1
-                ? "account.business.disable"
-                : "account.business.enable",
-            )}
-          </Button>
-          <Button
-            disabled={busy || !!error?.outcomeUnknown}
-            onClick={() => {
-              if (window.confirm(t("account.business.deleteConfirm")))
-                void write("DELETE", `/api/desktop/keys/${k.id}`);
-            }}
-          >
-            {t("account.business.delete")}
-          </Button>
-          <Button
-            disabled={busy || reveal.busy || state.status === "offline"}
-            onClick={async () => {
-              clearSecret();
-              const epoch = secretEpoch.current;
-              const r = await reveal.write<{ key: string }>(
-                "POST",
-                `/api/desktop/keys/${k.id}/reveal`,
-              );
-              if (r && current.current && epoch === secretEpoch.current) {
-                setSecret(r.key);
-                window.setTimeout(() => {
-                  if (current.current && epoch === secretEpoch.current)
-                    clearSecret();
-                }, 60000);
-              }
-            }}
-          >
-            {t("account.business.reveal")}
-          </Button>
-          {onConfigure && (
-            <Button onClick={() => onConfigure(k)}>
-              {t("account.business.configure")}
-            </Button>
-          )}
-        </article>
-      ))}
+
+      <div className="account-table-scroll">
+        <table className="account-key-table">
+          <thead>
+            <tr>
+              {["name", "group", "keyQuota", "status", "expiry", "actions"].map(
+                (label) => (
+                  <th key={label}>{t(`account.visual.columns.${label}`)}</th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {list.data?.data.items.map((k) => (
+              <tr key={k.id}>
+                <td>
+                  <strong>{k.name}</strong>
+                  <small>{k.masked_key}</small>
+                </td>
+                <td>{k.group || "—"}</td>
+                <td>
+                  <span>
+                    {k.remain_quota} / {k.used_quota}
+                  </span>
+                  <small>quota · {t("account.visual.remainingUsed")}</small>
+                </td>
+                <td>
+                  <span
+                    className={`account-badge ${k.status === 1 ? "is-success" : ""}`}
+                  >
+                    {t(`account.business.keyStatus.${k.status}`)}
+                  </span>
+                </td>
+                <td>{date(k.expired_time)}</td>
+                <td>
+                  <div className="account-row-actions">
+                    <Button
+                      variant="link"
+                      disabled={busy || !!error?.outcomeUnknown}
+                      onClick={() => {
+                        setSelected(k.id);
+                        setForm(null);
+                        clearSecret();
+                        clear();
+                      }}
+                    >
+                      {t("account.business.details")}
+                    </Button>
+                    <Button
+                      variant="link"
+                      disabled={busy || !!error?.outcomeUnknown}
+                      onClick={() =>
+                        void write(
+                          "PATCH",
+                          `/api/desktop/keys/${k.id}/status`,
+                          {
+                            status: k.status === 1 ? 2 : 1,
+                          },
+                        )
+                      }
+                    >
+                      {t(
+                        k.status === 1
+                          ? "account.business.disable"
+                          : "account.business.enable",
+                      )}
+                    </Button>
+                    <Button
+                      variant="link"
+                      disabled={busy || !!error?.outcomeUnknown}
+                      onClick={() => {
+                        if (window.confirm(t("account.business.deleteConfirm")))
+                          void write("DELETE", `/api/desktop/keys/${k.id}`);
+                      }}
+                    >
+                      {t("account.business.delete")}
+                    </Button>
+                    <Button
+                      variant="link"
+                      disabled={
+                        busy || reveal.busy || state.status === "offline"
+                      }
+                      onClick={async () => {
+                        clearSecret();
+                        const epoch = secretEpoch.current;
+                        const r = await reveal.write<{ key: string }>(
+                          "POST",
+                          `/api/desktop/keys/${k.id}/reveal`,
+                        );
+                        if (
+                          r &&
+                          current.current &&
+                          epoch === secretEpoch.current
+                        ) {
+                          setSecret(r.key);
+                          window.setTimeout(() => {
+                            if (
+                              current.current &&
+                              epoch === secretEpoch.current
+                            )
+                              clearSecret();
+                          }, 60000);
+                        }
+                      }}
+                    >
+                      {t("account.business.reveal")}
+                    </Button>
+                    {onConfigure && (
+                      <Button variant="link" onClick={() => onConfigure(k)}>
+                        {t("account.business.configure")}
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {list.data && (
         <Pager
           page={page}
@@ -378,7 +429,9 @@ export function Keys({
                   : {String(value)}
                 </p>
               ))}
-              {verified.length === 0 && <p>{t("account.business.empty")}</p>}
+              {verified.length === 0 && (
+                <p className="account-empty">{t("account.business.empty")}</p>
+              )}
               {verified.map((k) => (
                 <dl key={k.id}>
                   <dt>ID</dt>
@@ -448,8 +501,13 @@ export function Keys({
             e.preventDefault();
             void save();
           }}
-          className="space-y-2"
+          className="account-editor"
         >
+          <h3>
+            {t(
+              selected ? "account.business.details" : "account.business.create",
+            )}
+          </h3>
           <Field
             label={t("account.business.name")}
             value={form.name}
@@ -503,21 +561,24 @@ export function Keys({
               onChange={(v) => update(k, v)}
             />
           ))}
-          <Button type="submit" disabled={busy || !!error?.outcomeUnknown}>
-            {t("account.business.save")}
-          </Button>
-          <Button
-            type="button"
-            disabled={!!error?.outcomeUnknown}
-            onClick={() => {
-              setSelected(null);
-              setForm(null);
-              clearSecret();
-              clear();
-            }}
-          >
-            {t("account.cancel")}
-          </Button>
+          <div className="account-form-actions">
+            <Button type="submit" disabled={busy || !!error?.outcomeUnknown}>
+              {t("account.business.save")}
+            </Button>
+            <Button
+              variant="outline"
+              type="button"
+              disabled={!!error?.outcomeUnknown}
+              onClick={() => {
+                setSelected(null);
+                setForm(null);
+                clearSecret();
+                clear();
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
+          </div>
         </form>
       )}
     </>

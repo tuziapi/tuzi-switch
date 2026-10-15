@@ -50,7 +50,7 @@ export function PricingDetails({
   const override = object(personal[model.model_name]);
   const groups = object(object(meta.group_model_pricing)[effective]);
   return (
-    <section>
+    <section className="account-pricing">
       <h4>
         {t("account.business.effectivePrice")} · {effective || "—"}
       </h4>

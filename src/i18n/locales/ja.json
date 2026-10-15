@@ -2932,6 +2932,45 @@
       "proxyRunning": "ローカルプロキシ実行中",
       "proxyStopped": "ローカルプロキシ停止中",
       "secretSearch": "名前またはマスクだけを検索してください。完全な Key はクエリ URL に送信しません。"
+    },
+    "visual": {
+      "actions": "操作",
+      "remainingUsed": "残量 / 使用済み",
+      "todayTokens": "本日のトークン",
+      "todayCalls": "本日の消費リクエスト",
+      "todayCost": "本日の消費",
+      "accountInfo": "アカウント情報",
+      "dailyTrend": "本日の消費推移",
+      "details": "データ詳細",
+      "localTools": "ローカルツール",
+      "subscriptions": "独立サブスクリプションとポイント",
+      "series": "30分ごとの成功率",
+      "descriptions": {
+        "overview": "Tuzi API アカウント · Codex / GACCode の独立使用量は含みません",
+        "keys": "API キーの管理とローカルツールの設定",
+        "logs": "アカウントのリクエストと課金記録",
+        "modelsStatus": "モデルとグループのサービス品質",
+        "profile": "プロフィールと設定を管理し、制限付き操作はウェブで行います",
+        "models": "モデル、価格、グループ、接続方法を確認",
+        "topup": "Tuzi ウェブサイトで残高を追加",
+        "redeem": "Tuzi ウェブサイトでコードを引き換え"
+      },
+      "time": "時間",
+      "successRate": "成功率",
+      "latency": "レイテンシ",
+      "ttft": "TTFT",
+      "throughput": "スループット",
+      "moreFilters": "その他のフィルター",
+      "seriesHint": "色が濃いほど成功率が高く、灰色はサンプルなしです。ホバーで時刻と値を表示します。",
+      "columns": {
+        "name": "キー名",
+        "group": "グループ",
+        "keyQuota": "残量 / 使用済み quota",
+        "status": "状態",
+        "expiry": "有効期限",
+        "actions": "操作"
+      },
+      "modelInfo": "モデル情報"
     }
   }
 }
