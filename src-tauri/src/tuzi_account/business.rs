@@ -402,6 +402,12 @@ pub fn account_cancel_request(service: tauri::State<'_, Arc<AccountService>>, re
     }
 }
 fn web_target(target: &str) -> Option<&'static str> {
+    #[cfg(feature = "local-preview")]
+    match target {
+        "topup" | "redemption" => return Some("http://127.0.0.1:5180/console/topup"),
+        "personal" => return Some("http://127.0.0.1:5180/console/personal"),
+        _ => {}
+    }
     match target {
         "topup" | "redemption" => Some("https://api.tu-zi.com/console/topup"),
         "personal" => Some("https://api.tu-zi.com/console/personal"),

@@ -22,6 +22,19 @@ impl TokenStore for MemoryStore {
     }
 }
 #[test]
+fn isolated_origin_pending_survives_restart_without_production_namespace() {
+    let store = Arc::new(MemoryStore::default());
+    let origin = "http://127.0.0.1:5180";
+    let client = "tuzi-switch-desktop-test";
+    let service = AccountService::with_store(store.clone(), origin, client).unwrap();
+    let (_, url) = service.begin().unwrap();
+    assert!(url.starts_with("http://127.0.0.1:5180/oauth/authorize?"));
+    let restarted = AccountService::with_store(store.clone(), origin, client).unwrap();
+    assert_eq!(restarted.state().status, "authorizing");
+    assert_eq!(store.record.lock().unwrap().as_ref().unwrap().client, client);
+    assert!(AccountService::with_store(store, "https://example.com", client).is_err());
+}
+#[test]
 fn callback_rejects_ambiguous_and_untrusted_inputs() {
     let state = "S".repeat(43);
     for tail in [

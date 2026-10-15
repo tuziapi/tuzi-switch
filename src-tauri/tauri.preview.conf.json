@@ -1,0 +1,6 @@
+{
+  "productName": "兔子助手",
+  "identifier": "com.tuziswitch.desktop.preview",
+  "app": { "windows": [{ "label": "main", "title": "兔子助手", "width": 1100, "height": 760, "visible": false }] },
+  "bundle": { "createUpdaterArtifacts": false }
+}

@@ -18,8 +18,16 @@ use url::Url;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub mod business;
+#[cfg(all(feature = "local-preview", not(debug_assertions)))]
+compile_error!("local-preview is restricted to debug builds");
+#[cfg(not(feature = "local-preview"))]
 const ORIGIN: &str = "https://api.tu-zi.com";
+#[cfg(feature = "local-preview")]
+const ORIGIN: &str = "http://127.0.0.1:5180";
+#[cfg(not(feature = "local-preview"))]
 const CLIENT: &str = "tuzi-switch-desktop";
+#[cfg(feature = "local-preview")]
+const CLIENT: &str = "tuzi-switch-desktop-test";
 const CALLBACK: &str = "tuziswitch://auth/callback";
 const SCOPES: &str = "account:read token:read token:write token:reveal logs:read usage:read models:read profile:read profile:write offline_access";
 fn now() -> i64 {
@@ -227,7 +235,11 @@ impl AccountService {
         Ok(Self {
             inner: Mutex::new(Inner {
                 model_key_proof: None,
-                record: Record::default(),
+                record: Record {
+                    origin: origin.into(),
+                    client: client.into(),
+                    ..Record::default()
+                },
                 state: AccountState::default(),
                 loaded: false,
                 cleanup_token: None,
