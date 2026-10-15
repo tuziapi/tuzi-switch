@@ -70,3 +70,17 @@ API 集成分支为 `codex/tuzi-assistant-dev`，当前集成 HEAD 为 `20f797d3
 ### 未验证限制
 
 本次使用隔离 SQLite、合成用户/令牌和本地 HTTP 服务，没有连接生产。仍未验证 `go test -race`、真实 MySQL/PostgreSQL、共享 Redis 多实例、Windows/Linux、安装包冷暖回跳、真实默认浏览器完整登录/2FA 和跨平台联调。R2 新测试没有单独增加“未知 Content-Length 且恰好 64 KiB 成功边界”及 revoke 超限状态断言；代码审查未发现绕过，该项作为后续测试增强记录，不构成当前阻断。
+
+## 用户请求后的独立复验（2026-10-14）
+
+结论：**R1/R2 独立复验通过；当前 G1 本地研发门禁通过，可以在新任务授权后开始 G2。** 本结论不等于 T19～T22、三平台、实库或正式发布验收完成。
+
+- 固定版本：客户端 HEAD `8e8ff2a974ebfd4565b7936dc02d5f3f06b8d897`，API HEAD `1cc7027863a2229fb5ffbc7f866c9cbc70a2e112`，均为 `codex/tuzi-assistant-dev`。相对上次独立验收客户端仅有文档变更，业务代码检查点仍为 `74aa8ed5de159e7ea2c7150e47e449fc660387eb`；API 运行代码已含 R2 `1ff07d190` 和 R1 `20f797d33`。
+- 检查 API 修复差异、路由与解析/鉴权/限流链：桌面精确识别且保持纯网站会话；旧客户端保持 UserAuth；表单首次解析前限制 64 KiB，错误立即拒绝，控制器复用解析结果。桌面 form 控制器拒绝任何非空 query，未把 query 分流差异认定为可成功换码/刷新绕过。
+- `env -u TUZI_DESKTOP_LOOPBACK_PORT_FILE go test ./model ./controller ./middleware ./router ./cmd/db-migrate -run 'Desktop|OAuthProvider|MigrationArgs' -count=1 -timeout=120s`：五包通过。
+- `env -u TUZI_DESKTOP_LOOPBACK_PORT_FILE go test ./middleware ./controller ./router -count=1 -timeout=120s`：三个相关包通过。
+- API web 目录 `bun test src/helpers/desktopAuthorization.test.js src/pages/OAuthAuthorize/index.test.jsx`：8 项通过、28 断言。
+- 重用上次独立探针输入，但在新的临时 overlay 中把 R1 当前链改为实际 `OAuthProviderAuthorizeSession()`，避免继续测试已废弃的全局纯会话链。`go test -overlay=<临时overlay.json> ./router -run '^TestG1Acceptance' -count=1 -timeout=60s -v`：两项通过。71,914 字节 form 在控制器单独/中间件加控制器两条链均为 400 invalid_request；合法旧客户端系统令牌请求在原链/新分流链均为 200。只记录状态，不记录签发凭证。
+- 两仓库 `git diff --check` 通过。客户端无业务增量，本轮未重复原生/UI 全量测试或真实 Keychain/Go 配对；其既有证据及限制继续保留。本轮无新增子智能体、业务修改、分支、commit、push、部署或生产访问；Word/预览未跟踪文件保留。
+
+下一阶段为任务计划 G2：服务端 T08～T11，客户端 T13～T18。用户将相应提示词提交为新任务/目标才构成 G2 编码授权。

@@ -137,3 +137,7 @@ C1ddb9b6 + S155efcaf3，Darwin arm64，显式Go loopback + t.TempDir SQLite合�
 - 集成：`go test ./model ./controller ./middleware ./router ./cmd/db-migrate -run 'Desktop|OAuthProvider|MigrationArgs' -count=1 -timeout=120s` 通过；`go test ./middleware ./controller ./router -count=1` 通过；`git diff --check` 通过。
 
 仍未验证 `go test -race`、真实 MySQL/PostgreSQL、共享 Redis 多实例、Windows/Linux、安装包回跳、真实浏览器完整登录/2FA 和跨平台联调。R2 未单独增加未知长度恰好 64 KiB 成功边界与 revoke 超限状态断言，审查未发现实现绕过，作为后续增强记录。修复后的 G1 检查点具备在新任务授权下进入 G2 本地开发的条件；本轮不进入 G2、不发布。
+
+## 2026-10-14 独立复验补证
+
+当前 C `8e8ff2a974ebfd4565b7936dc02d5f3f06b8d897` / S `1cc7027863a2229fb5ffbc7f866c9cbc70a2e112`。客户端增量仅文档；服务端 R1/R2 代码及正式回归经当前执行者复查。五包 Desktop/OAuthProvider/MigrationArgs 定向 Go 测试、middleware/controller/router 三包测试均通过（`-count=1 -timeout=120s`，unset loopback fixture 环境变量）；网站授权 8 项/28 断言通过。两项独立临时 overlay 探针通过：71,914 字节 form 两条链均 400，旧客户端有效系统令牌在原 UserAuth/现实际分流链均 200。详细命令、范围和未重复验证项见 [g1-acceptance-review.md](g1-acceptance-review.md)。G1 本地研发门禁通过，后续 G2 编码仍需用户提交新目标；无生产/远程操作。
