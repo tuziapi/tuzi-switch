@@ -35,9 +35,15 @@ export function useAutoCompact(
     const el = containerRef.current;
     if (!el) return;
 
-    const ro = new ResizeObserver(() => {
+    let pendingMeasure: ReturnType<typeof setTimeout> | undefined;
+    const measure = () => {
+      clearTimeout(pendingMeasure);
       // During expand animation, ignore resize events to prevent flicker
-      if (Date.now() < lockUntilRef.current) return;
+      const remaining = lockUntilRef.current - Date.now();
+      if (remaining > 0) {
+        pendingMeasure = setTimeout(measure, remaining);
+        return;
+      }
 
       if (!compact) {
         // Overflow detected → switch to compact
@@ -58,9 +64,17 @@ export function useAutoCompact(
           setCompact(false);
         }
       }
-    });
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    // Tool actions are replaced after their exit animation. Their width can
+    // change while the available container width stays exactly the same.
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    measure();
+    return () => {
+      ro.disconnect();
+      clearTimeout(pendingMeasure);
+    };
   }, [compact, layoutKey]);
 
   return compact;

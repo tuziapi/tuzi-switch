@@ -88,10 +88,6 @@ export function AccountPage({
   return (
     <section className="account-shell" aria-label={t("account.title")}>
       <aside className="account-sidebar">
-        <div className="account-brand">
-          <Rabbit size={24} aria-hidden="true" />
-          {t("account.title")}
-        </div>{" "}
         <nav className="account-nav" aria-label={t("account.pagesLabel")}>
           {ACCOUNT_PAGES.map((id) => (
             <Button

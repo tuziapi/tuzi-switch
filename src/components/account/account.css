@@ -13,15 +13,6 @@
   background: hsl(var(--muted) / 0.45);
   border-right: 1px solid hsl(var(--border));
 }
-.account-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: hsl(var(--primary));
-  font-size: 20px;
-  font-weight: 650;
-  margin: 0 10px 24px;
-}
 .account-nav {
   display: flex;
   flex-direction: column;
@@ -426,9 +417,6 @@
     border-right: 0;
     border-bottom: 1px solid hsl(var(--border));
     padding: 12px;
-  }
-  .account-brand {
-    margin-bottom: 12px;
   }
   .account-nav {
     display: grid;
