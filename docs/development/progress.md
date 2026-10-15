@@ -270,3 +270,19 @@ G3的T19/T20/T21与Q02/Q04/Q09环境门槛保持待办；不把本地通过等�
 代码已提交，以上定向验证通过；本轮未重新执行完整浏览器/原生写入联调或三平台验收，不将历史截图和组件测试作为新增功能验收。G3 T19—T21 全项、G4 T22 和用户产品验收仍未完成。未 push、PR、部署、生产访问或迁移；本轮代码配对不是部署证明。原 Word 与 docs/product-plan-v1.5 附件继续保留未跟踪状态，没有纳入提交；本地数据库、日志、会话密钥及构建产物不提交。
 
 回退：视觉优化可独立 revert 493cd81；若撤回配套本地预览，先停止使用预览客户端/服务，再 revert 客户端 6d792f8，最后 revert API 575800f9b。保留本地独立数据及原有用户配置，不用 Git 清理数据。后续真正发布仍按 T22 另行授权并核查版本和部署顺序，本轮不执行发布。
+
+## T12-N01 账户与工具平级导航（2026-10-15）
+
+用户确认预览的导航层级并授权“开始改吧”。客户端在 `codex/account-peer-navigation` 基于 `960daa887b18d9f9e2b1701783e7c08086e0c8c9` 实施；沿用真实应用原有样式。移除独立的“兔子账户 / 工具管理”栏，将账户放到七工具切换栏最左侧，账户页保留兔子switch品牌、设置入口和账户内部导航。账户与工具分别显示当前选中状态，从账户可直接返回此前所选工具；账户不写入最近工具偏好。
+
+宽度充足时显示图标和完整名称，空间不足时统一收为图标并保留名称提示。真实窗口验证发现工具栏宽度缓存会使账户页保持收起，已在页面或工具切换时重测，并增加该场景回归。仅修改 React 展示和布局逻辑，无 API、原生业务、凭证或接口契约变更；基线 B3 / desktop-v1.1 / desktop-v1 不变。
+
+验证环境为本机 macOS，结果如下：
+
+- `pnpm typecheck` 通过。
+- `pnpm test:unit --run tests/hooks/useAutoCompact.test.tsx tests/components/AccountPage.test.tsx tests/account tests/components/AppSwitcher.accountCompatibility.test.tsx tests/integration/App.test.tsx tests/components/ProviderList.test.tsx tests/components/ProviderActions.test.tsx`：9 文件 63 项通过，覆盖账户/工具切换、七工具兼容、原工具回归与布局宽度缓存。
+- `bash scripts/build-local-preview.sh` 通过，生成最终 macOS debug 预览应用；现有浏览器数据、动态导入和 Rust dead_code 警告保留。
+- 真实原生窗口检查账户首位、原品牌顶栏、账户与 Claude 往返、宽窗口完整名称、约 904px 窄窗口图标以及从较长工具栏切回账户时重新展开。最终应用已打开；只核对导航和布局，不认定本轮已完成 OAuth 或账户写入联调。
+- 修改的 TS/TSX 文件 `pnpm exec prettier --check` 通过，`git diff --check` 通过。
+
+代码与上述定向验证完成，用户视觉验收待完成。未推送、创建 PR、合并或发布，不替代 G3 全项/跨平台验收；既有未跟踪产品文档和 Word 附件保持原状。本任务可通过独立本地提交 revert 回退。

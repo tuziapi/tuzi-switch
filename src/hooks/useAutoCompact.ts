@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 /**
  * Detects whether the container's children overflow the available width
@@ -11,10 +17,19 @@ import { useEffect, useRef, useState, type RefObject } from "react";
  */
 export function useAutoCompact(
   containerRef: RefObject<HTMLDivElement | null>,
+  layoutKey?: string,
 ): boolean {
   const [compact, setCompact] = useState(false);
   const normalWidthRef = useRef(0);
   const lockUntilRef = useRef(0);
+
+  // Account and individual tools have different toolbar actions. A width cached
+  // for the previous layout must not keep a shorter toolbar collapsed.
+  useLayoutEffect(() => {
+    normalWidthRef.current = 0;
+    lockUntilRef.current = 0;
+    setCompact(false);
+  }, [layoutKey]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -46,7 +61,7 @@ export function useAutoCompact(
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [compact]);
+  }, [compact, layoutKey]);
 
   return compact;
 }

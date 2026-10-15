@@ -140,8 +140,19 @@ vi.mock("@/components/ConfirmDialog", () => ({
 }));
 
 vi.mock("@/components/AppSwitcher", () => ({
-  AppSwitcher: ({ activeApp, onSwitch }: any) => (
+  AppSwitcher: ({
+    activeApp,
+    onSwitch,
+    onSelectAccount,
+    accountSelected,
+  }: any) => (
     <div data-testid="app-switcher">
+      <button
+        onClick={onSelectAccount}
+        aria-current={accountSelected ? "page" : undefined}
+      >
+        account.title
+      </button>
       <span>{activeApp}</span>
       <button onClick={() => onSwitch("claude")}>switch-claude</button>
       <button onClick={() => onSwitch("codex")}>switch-codex</button>
@@ -213,7 +224,12 @@ describe("App integration with MSW", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "account.pages.keys" }));
     expect(screen.getByText("account.connectRequired")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "account.tools" }));
+    expect(screen.getByText("兔子switch")).toBeInTheDocument();
+    expect(screen.getByTestId("app-switcher")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "account.tools" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("switch-claude"));
     expect(await screen.findByTestId("provider-list")).toBeInTheDocument();
     fireEvent.click(screen.getByText("switch-openclaw"));
     expect(await screen.findByTitle("workspace.manage")).toBeInTheDocument();

@@ -296,7 +296,10 @@ function App() {
   const effectiveUsageProvider = useLastValidValue(usageProvider);
 
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const isToolbarCompact = useAutoCompact(toolbarRef);
+  const isToolbarCompact = useAutoCompact(
+    toolbarRef,
+    `${currentView}:${activeApp}`,
+  );
 
   useUsageCacheBridge();
 
@@ -1304,7 +1307,7 @@ function App() {
             className="flex items-center gap-1"
             style={{ WebkitAppRegion: "no-drag" } as any}
           >
-            {currentView !== "providers" ? (
+            {currentView !== "providers" && currentView !== "account" ? (
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -1321,7 +1324,6 @@ function App() {
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
                 <h1 className="text-lg font-semibold">
-                  {currentView === "account" && t("account.title")}
                   {currentView === "settings" && t("settings.title")}
                   {currentView === "prompts" &&
                     t("prompts.title", { appName: t(`apps.${activeApp}`) })}
@@ -1528,15 +1530,21 @@ function App() {
                     </Button>
                   </>
                 )}
+                {(currentView === "providers" || currentView === "account") && (
+                  <AppSwitcher
+                    activeApp={activeApp}
+                    accountSelected={currentView === "account"}
+                    onSelectAccount={() => setCurrentView("account")}
+                    onSwitch={(app) => {
+                      setActiveApp(app);
+                      setCurrentView("providers");
+                    }}
+                    visibleApps={visibleApps}
+                    compact={isToolbarCompact}
+                  />
+                )}
                 {currentView === "providers" && (
                   <>
-                    <AppSwitcher
-                      activeApp={activeApp}
-                      onSwitch={setActiveApp}
-                      visibleApps={visibleApps}
-                      compact={isToolbarCompact}
-                    />
-
                     <div className="flex items-center gap-1 p-1 bg-muted rounded-xl">
                       <AnimatePresence mode="wait">
                         <motion.div
@@ -1715,27 +1723,6 @@ function App() {
         </div>
       </header>
 
-      <nav
-        aria-label={t("account.navigation", {
-          defaultValue: "兔子账户与工具管理",
-        })}
-        className="flex gap-2 px-6 py-2 border-b"
-      >
-        <Button
-          variant={currentView === "account" ? "default" : "ghost"}
-          aria-current={currentView === "account" ? "page" : undefined}
-          onClick={() => setCurrentView("account")}
-        >
-          {t("account.title")}
-        </Button>
-        <Button
-          variant={currentView !== "account" ? "default" : "ghost"}
-          aria-current={currentView !== "account" ? "page" : undefined}
-          onClick={() => setCurrentView("providers")}
-        >
-          {t("account.tools")}
-        </Button>
-      </nav>
       <main className="flex-1 min-h-0 flex flex-col overflow-y-auto animate-fade-in">
         {isOpenClawView && openclawHealthWarnings.length > 0 && (
           <OpenClawHealthBanner warnings={openclawHealthWarnings} />
