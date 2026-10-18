@@ -12,17 +12,17 @@ Rust 使用固定可信 origin、禁重定向、无 Cookie 的专用 HTTP client
 
 ## 安全存储及连接生命周期
 
-沿用 keyring 3.6 原生后端，macOS Keychain、Windows Credential Manager、Linux Secret Service；不可用不得退明文。B 使用版本 2 安全记录，标识 auth_source/system-token、固定 origin、已验证 user ID、连接代次及系统令牌；精确字段以最终源码与测试证据为准。秘密不进 SQLite、工具配置/备份、导出、WebDAV、前端持久缓存、日志、错误/截图。
+沿用 keyring 3.6 原生后端，macOS Keychain、Windows Credential Manager、Linux Secret Service；不可用不得退明文。B 的 `Record` v2 字段为 `version/origin/client/generation/tokens/identity`，没有 `auth_source` 字段；`tokens` 保存系统令牌、已验证 user ID 和 connection ID，`identity` 保存身份投影。恢复同时校验版本、固定 origin 和 client。秘密不进 SQLite、工具配置/备份、导出、WebDAV、前端持久缓存、日志、错误/截图。
 
-旧 v1 A AT/RT/pending/journal 不能解释为 B。恢复检测后只投影 reconnect_required/明确重连说明，不恢复 OAuth、自动换码或删除业务数据。新记录只在明确新连接验证成功后写；保存失败不进入 connected、不返回令牌。重启时读取原生记录并回读身份，网络错误保留可重试状态；无效/轮换/禁用时停止旧业务并清账户缓存，不能用到期/刷新模型解释。
+旧 v1 A AT/RT/pending/journal 不能解释为 B。恢复检测后只投影 reconnect_required/明确重连说明，不恢复 OAuth、自动换码或删除业务数据。明确连接先递增代次并将不含 tokens/identity 的空 v2 记录持久化，成功后才进入 verifying 并验证输入，防止验证失败或中断后恢复旧账户。空记录写失败不开始验证，明确报告存储错误；验证成功后再保存含身份和令牌的 v2 记录，第二次保存失败也不进入 connected、不返回令牌。重启时读取原生记录并回读身份，网络错误保留可重试状态；无效/轮换/禁用时停止旧业务并清账户缓存，不能用到期/刷新模型解释。
 
-系统令牌没有原站独立 TTL，不自动轮换、不实现 refresh/revoke。本地 disconnect 删除本机安全记录及临时账户状态，安全删除失败须明确错误，不能伪报成功；不请求站点生成/轮换，不声称远程失效。用户需主动在网站轮换才能使共享旧令牌失效，且会影响其他接入。改密码对系统令牌失效未有证据，不照搬 A 承诺。
+系统令牌没有原站独立 TTL，不自动轮换、不实现 refresh/revoke。本地 disconnect/logout 递增代次，以不含 tokens/identity 的空 v2 记录（tombstone）覆盖安全存储，并清内存身份及临时账户状态，不是删除安全存储条目。覆盖失败仍清本轮内存状态，但报告 error 且 `localCleared=false`，不能宣称已清除磁盘凭证；不请求站点生成/轮换，不声称远程失效。用户需主动在网站轮换才能使共享旧令牌失效，且会影响其他接入。改密码对系统令牌失效未有证据，不照搬 A 承诺。
 
 ## 状态、缓存和异常
 
-保持单一活跃账户。切号/断开/重连开始时先递增 generation，取消原生和 React 账户请求，清账户命名空间、身份、筛选选择/图表/预填和临时模型 Key，再建立新身份。读/写/后台回读/错误都检查代次；迟到响应不能改新缓存或表单。已发远端写无法保证取消，旧账号结果标记待核实，不能显示给新账号。
+保持单一活跃账户。明确 connect（包括切换或重新粘贴连接）在空记录持久成功后发布新 generation；logout 发布新 generation，二者向原生 pending 业务请求发送取消信号。retry 仅重验已保存身份，沿用当前代次，不等同新连接。React 在代次/connection ID 改变或身份清空时取消并移除账户查询，清旧筛选选择/图表/预填和临时模型 Key。原生业务请求在发出和返回时校验代次，React 也检查状态 revision/查询 AbortSignal，迟到响应不能改新缓存或表单。取消信号只停止本机等待，已发远端写无法保证撤销，旧账号结果可能待核实，不能显示给新账号。
 
-账户 cache key 至少含 auth_source、origin、user_id、connection_id/generation、feature、filters、contract_version；模型加 snapshot/schema。仅内存缓存，重启离线无数据则显示离线。正常切页去重，隐藏页不触发请求，窗口隐藏暂停轮询；读请求有界超时/重试、指数退避抖动及 Retry-After，不秒级拉日志。不可恢复认证失败不显示旧身份缓存，普通网络错误不销毁凭证或供应商。
+当前账户 query key 包含账户命名空间、固定 origin、`system-token-v1`、user ID、connection ID、generation、feature 和 filters（契约标记亦在 key 中）；B 来源由这一命名空间/契约表达，不要求安全记录另存 `auth_source`。模型响应仍按 snapshot/schema 处理。仅内存缓存，重启离线无数据则显示离线。正常切页去重，隐藏页不触发请求，窗口隐藏暂停轮询；读请求有界超时/重试及 Retry-After，不秒级拉日志。不可恢复认证失败不显示旧身份缓存，普通网络错误不销毁凭证或供应商。
 
 原站 HTTP200 success:false 必须按业务失败解析；认证错误、账户禁用、无资格、限流、5xx 和无数据各有反馈。写超时不盲重试、回读确认。原生投影只包含业务最小数据，不将管理角色字段或敏感资料泄到页面；这限制助手调用面，不能缩小泄露系统令牌的服务端权限。
 

@@ -8,6 +8,7 @@
 - 网站领域已实现完整取令牌引导，读取与轮换分离，35/5 测试及 build 通过；真实过期会话回跳正在复核。
 - API agent 报告 B01 五 Go suite 及隔离 5180 普通/管理员完整原站业务 HTTP 通过；当前 API HEAD8e851ab84，主执行者登记最终完整 SHA/命令。
 - 本文档阶段：当前 PRD/契约/技术方案重写 B4；B3 四份原样快照保留；新增 ADR008、完整功能迁移/兼容矩阵，旧任务/进度保留并标历史。
+- B05 源码校对补充：按最终集成 worktree 的原生 `Record/connect/logout/business_request` 和 React query 源码修正 v2 字段（无 auth_source）、连接先空记录后验证、断开 tombstone、取消信号/代次及 retry 语义；local-preview 顶部新增当前 B 指引，原 A 全部记录保留。此项仅文档核对，不代替原生/UI 测试；最终 SHA/证据仍由集成负责人登记。
 - B05 文档检查：当前文档相对链接、AC-01～18/IF-01～16 覆盖、四份 B3 snapshot 与起点 Git 原文逐字节一致、`git diff --check` 均通过；未为文档运行安装/构建/业务测试。
 - 待最终补充：native/UI 全量适配与定向结果、实际 OS 存储/真实 UI 层联调、A 本地 DB 只读事实、两仓本地 commit 配对、预览和用户验收步骤。
 - 真实 MySQL/PG/生产拓扑、三平台 OS/安装包、完整旧站登录/支付和用户验收未完成，未推送、PR、部署、生产迁移或发布。SQLite/Mock/build 各只证明对应层。

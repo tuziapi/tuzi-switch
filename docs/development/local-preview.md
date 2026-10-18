@@ -1,4 +1,18 @@
-# 本地功能预览
+# 当前 B 本地预览（2026-10-18）
+
+当前有效基线 `TA-AC-1.5-B4` / 契约 `system-token-v1`。当前流程为“前往获取系统令牌”→网站登录/定位安全卡片→查看并复制账户系统令牌→返回助手粘贴并连接；不再使用账户 OAuth 授权、回调或换码。生产可信引导地址为 `https://api.tu-zi.com/console/personal?source=tuzi-assistant#system-token`；本轮验证只使用隔离本机站点与合成凭证，不使用生产账户。
+
+- 两仓最终分支均为 `codex/tuzi-assistant-system-token`；客户端集成 worktree `/Users/syd08/Documents/tuzi-switch-system-token`，API 集成 worktree `/Users/syd08/Documents/tuzi/tuzi-api-system-token`。精确配对 SHA、实际运行包、启动命令和证据由集成负责人补入 [progress](progress.md) 与 [兼容记录](cross-repo-compatibility.md)，分支名不证明运行版本。
+- 当前 B 隔离 API/网站入口使用 `http://127.0.0.1:5180`；最终服务端口、代理目标、客户端 UI/原生启动方式以集成记录为准，不能直接照抄下方 A 的 3180/5180 配对脚本。
+- 默认 Phase 1 仅公开 API 密钥页及顶部四概要；隐藏页面和配置到工具保留实现，仅开发验收可检查，不因预览自动发布。
+- 系统令牌由原生安全存储保存；旧 A v1 连接需按新流程重连。B 本地断开覆盖空 v2 记录，不轮换网站共享令牌。已有 A 预览数据库、表和业务数据保留，不自动删除或清空。
+- 全程仅合成数据，不配置真实上游、不实际支付或调用付费模型；实际 OS 存储、原生/UI 联调、用户验收、三平台与数据库限制分别记录，未推送或发布。
+
+以下整段保留的是 A 的历史操作与证据，**不是当前 B 的启动或连接指引**。其中“当前使用”“当前服务”等措辞均属于所记载历史时点。
+
+---
+
+# 历史 A 本地功能预览
 
 2026-10-14，T19 本机交互预览子集；B3 / desktop-v1.1 / desktop-v1。
 

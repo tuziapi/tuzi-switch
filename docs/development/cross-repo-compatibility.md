@@ -6,7 +6,7 @@
 
 | 当前实现/能力 | B 对应原站接口/适配 | 测试方式 | 当前发布可见性 |
 |---|---|---|---|
-| AccountPage/原生连接 | bootstrap + self；粘贴/验证/安全记录 v2；A 提示重连，无 OAuth | 合成令牌正常/无效/轮换/禁用/网络/存储故障/重启/切号迟到；真实 OS/UI 分层 | 连接区公开 |
+| AccountPage/原生连接 | bootstrap + self；连接先持久空 v2 再验证保存；断开覆盖空 v2 tombstone；generation/取消信号隔离，A 提示重连，无 OAuth | 合成令牌正常/无效/轮换/禁用/网络/存储故障/重启/切号迟到；真实 OS/UI 分层 | 连接区公开 |
 | 网站个人设置/安全卡片 | token/current 只读；token 主动生成/轮换；可信来源/return_to/锚点 | 登录/已登录/过期恢复、复制不轮换、剪贴板/读取失败、普通模式及开放重定向 | API 网站正常可用，助手引导新增 |
 | AccountMetrics/Overview | self + log/self/stat?summary=true，全量 SQL，时区边界和日志 coverage | >150 模型完整汇总、type2/6/7、空/关闭/缺日志、普通/管理员仅本人 | 顶部四项公开；完整总览隐藏 |
 | Keys 列表/四筛选/分页/组 | token/、token/search、token/group，原站分页适配 | 名称/短片段/组/状态、分页/金额/身份隔离 | 公开 |
