@@ -1,6 +1,6 @@
 # B4 功能迁移与跨仓库兼容记录
 
-基线 `TA-AC-1.5-B4`，契约 `system-token-v1`。此表覆盖已实现功能，**实现适配、接口可用及发布可见性不是同一状态**。当前证据按 progress 最终集成记录更新，未填最终 SHA 不代表已联调。
+基线 `TA-AC-1.5-B4`，契约 `system-token-v1`。此表覆盖已实现功能，**实现适配、接口可用及发布可见性不是同一状态**。分层验证和限制见 [B4验证报告](system-token-verification.md)。
 
 ## 功能迁移矩阵
 
@@ -28,8 +28,8 @@
 
 | 仓库 | 核查起点 | B 最终集成分支 | 最终 SHA/状态 |
 |---|---|---|---|
-| 客户端 | codex/tuzi-assistant-dev / c3902fe7c4fc847e769b23d7712092a30aa67c57 | codex/tuzi-assistant-system-token | 集成负责人完成 native/UI/docs 后填入 |
-| API 最新网站 | codex/unified-currency-display / dded57caedc376c4399f778ebb2147748bc24743 | codex/tuzi-assistant-system-token | 当前 API agent 报告 8e851ab84；最终核验后填完整 SHA |
+| 客户端 | codex/tuzi-assistant-dev / c3902fe7c4fc847e769b23d7712092a30aa67c57 | codex/tuzi-assistant-system-token | 代码 `05419d66f48066fee78a9adf95590484cb78c639`；后续仅文档提交 |
+| API 最新网站 | codex/unified-currency-display / dded57caedc376c4399f778ebb2147748bc24743 | codex/tuzi-assistant-system-token | 代码 `382e22e4c6a66adf9397b1ccc93c8852011045b1`；后续仅文档提交 |
 | A API（仅审计） | codex/tuzi-assistant-dev / 111497e6f | 不作为 B 起点 | /api/desktop、独立 OAuth/required/hooks/cleanup 不集成；不清表 |
 
 网站领域提交 b84552a156120307e0d24c8d091a008c884391f7（引导）及 1f66fc7ac1725492528f52aa08e32c2b895538d0（严格隔离代理）；集成 cherry-pick 后 SHA 可不同，应登记最终 HEAD。预存用户 Word/产品附件仅原工作区留存，不提交。
@@ -49,6 +49,4 @@
 
 ## 当前验证证据与限制
 
-- 网站领域：5 文件 35 测试通过，Bun build 通过；组件测试 Mock 浏览器原语/API，MemoryRouter 为真实路由，不认作完整登录浏览器联调。过期会话真实回跳待集成复核。
-- API agent 报告：bootstrap/后续 Header、轮换/禁用、原子 Key/profile PATCH、>150 模型 summary、五 Go suite 通过；5180 隔离 HTTP 普通/管理员 bootstrap/self/groups/Key CRUD/reveal/pricing/models/perf/profile/full-summary 通过；管理员仅本人零值与普通合成消费分离。最终命令/完整 SHA 由主执行者登记。
-- SQLite 为隔离合成数据；真实 MySQL/PostgreSQL、生产拓扑/数据、完整旧站 OAuth/支付、三平台安全存储未验证。原生与真实 UI 最终结果、现有本地 DB 只读事实及预览启动方法待主执行者补充，不虚报。
+最终集成复跑：前端66、账户Rust24（含真实Go及macOS安全存储）、七工具事务12、五Go包均通过；网站37+103和build通过。真实网站过期登录回跳与定位、最终B桌面连接/重启/断开/错误/切号/本人隔离通过。隐藏业务经真实原生路由配对及组件测试通过，保持隐藏；未逐页UI验收。MySQL/PG、三平台发行安装包、完整旧站OAuth/支付及用户验收未完成。详细命令、DB只读结果与脱敏截图见 [验证报告](system-token-verification.md)。两仓只本地提交，未推送或发布。

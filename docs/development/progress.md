@@ -2,16 +2,15 @@
 
 # B4 当前本地迁移（2026-10-18）
 
-目标及授权来自本轮 goal-objective.md：A→B 全业务本地迁移，保持 Phase 1。两仓最终分支 `codex/tuzi-assistant-system-token`，精确配对和兼容见 [cross-repo-compatibility.md](cross-repo-compatibility.md)。当前各域本地实现/验证在集成中；本条不是整体通过声明。
+目标及授权来自本轮 goal-objective.md：A→B 全业务本地迁移，保持 Phase 1。本地代码、文档、定向测试和隔离联调完成；用户验收、完整平台/实库门禁及发布未完成。两仓分支均 `codex/tuzi-assistant-system-token`。
 
-- 起点：C c3902fe7c4fc847e769b23d7712092a30aa67c57；S 最新网站 dded57caedc376c4399f778ebb2147748bc24743；原客户端 Word/产品附件未跟踪保持，不覆盖。
-- 网站领域已实现完整取令牌引导，读取与轮换分离，35/5 测试及 build 通过；真实过期会话回跳正在复核。
-- API agent 报告 B01 五 Go suite 及隔离 5180 普通/管理员完整原站业务 HTTP 通过；当前 API HEAD8e851ab84，主执行者登记最终完整 SHA/命令。
-- 本文档阶段：当前 PRD/契约/技术方案重写 B4；B3 四份原样快照保留；新增 ADR008、完整功能迁移/兼容矩阵，旧任务/进度保留并标历史。
-- B05 源码校对补充：按最终集成 worktree 的原生 `Record/connect/logout/business_request` 和 React query 源码修正 v2 字段（无 auth_source）、连接先空记录后验证、断开 tombstone、取消信号/代次及 retry 语义；local-preview 顶部新增当前 B 指引，原 A 全部记录保留。此项仅文档核对，不代替原生/UI 测试；最终 SHA/证据仍由集成负责人登记。
-- B05 文档检查：当前文档相对链接、AC-01～18/IF-01～16 覆盖、四份 B3 snapshot 与起点 Git 原文逐字节一致、`git diff --check` 均通过；未为文档运行安装/构建/业务测试。
-- 待最终补充：native/UI 全量适配与定向结果、实际 OS 存储/真实 UI 层联调、A 本地 DB 只读事实、两仓本地 commit 配对、预览和用户验收步骤。
-- 真实 MySQL/PG/生产拓扑、三平台 OS/安装包、完整旧站登录/支付和用户验收未完成，未推送、PR、部署、生产迁移或发布。SQLite/Mock/build 各只证明对应层。
+- 客户端代码 `05419d66f48066fee78a9adf95590484cb78c639`；API/网站代码 `382e22e4c6a66adf9397b1ccc93c8852011045b1`。随后仅文档提交不改变被测代码；精确配对见 [兼容记录](cross-repo-compatibility.md)。
+- 最终集成复跑：typecheck通过，前端9文件66测试，账户Rust24/24（含真实Go+macOS安全存储），七工具事务12/12，五Go包全部通过；网站37+103测试/build通过，本地debug app构建通过。
+- 网站真实已登录定位、复制成功反馈、过期401→登录→安全卡片返回通过；读取复制不轮换已由current/DB一致性验证。UI复制剪贴板字节未获证明，故不虚报。
+- 最终B实际app已验证普通账户连接、重启恢复、本地断开后重启、无效令牌、普通/管理员切号与管理员仅本人。用户允许系统钥匙串访问后完成，无安全绕过。完整隐藏功能经真实Rust→Go与组件测试覆盖，默认仍隐藏，未逐页面点击验收。
+- A实际本地数据库/安装标记仅只读核查并保留，B独立库无A表/钩子/清理；原工作区未改，Word/产品附件保留。B4文档/ADR008/迁移矩阵齐全，B3历史快照和下方A记录保留。
+- 详细命令、证据、预览与用户验收步骤、权限/失效及上线/回退计划见 [B4验证报告](system-token-verification.md)。未使用真实凭证、生产数据、支付或付费模型调用；未push/PR/部署/迁移/发布。
+- MySQL/PG、三平台发行安全存储/安装包、完整旧网站OAuth/支付、生产容量和用户验收仍未验证，不由本地通过代替。
 
 ---
 
