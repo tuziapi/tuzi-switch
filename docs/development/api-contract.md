@@ -72,4 +72,12 @@ PATCH `/api/user/self` 仅接受 `display_name,language,accept_unset_model_ratio
 
 ## 网站令牌读取与轮换
 
-GET `/api/user/token/current` 只读当前已有系统令牌（data 字符串），不创建不轮换；GET `/api/user/token` 保留原站主动生成/轮换语义。两者禁止缓存；卡片仅在安全区域活跃时读取，秘密仅 React 临时内存。正常复制复用已读值，剪贴板失败展示可选字段；读取失败与空值区分。轮换独立确认共享接入影响。引导态只改变标签页/定位，return_to 受可信站内路径约束，不能形成 OAuth 或把令牌送回客户端。
+GET `/api/user/token/current` 只读当前已有系统令牌（data 字符串），不创建不轮换；GET `/api/user/token` 保留原站主动生成/轮换语义。两者禁止缓存；卡片仅在安全区域活跃时读取，秘密仅 React 临时内存。正常复制复用已读值，剪贴板失败展示可选字段；读取失败与空值区分。轮换独立确认共享接入影响。引导态改变标签页/定位，并在成功复制后尝试打开固定导航深链；普通个人设置只复制。return_to 受可信站内路径约束，不能形成 OAuth 或把令牌送回客户端。
+
+## B09 导航及展示约定（2026-10-19）
+
+HTTP 路由、认证和 DTO 不变，契约仍为 `system-token-v1`。唯一账户导航 URI 为 `tuziswitch://account/connect`，拒绝 query、fragment、userinfo、port 和其他路径，不接受令牌、账户 ID 或任意目标。只唤起并定位账户页，用户仍手动粘贴和连接；原生事件加一次性 pending IPC 覆盖热/冷启动，旧账户 OAuth 回调继续丢弃。
+
+人民币默认、USD 可切换，仅非敏感币种偏好可持久保存。额度显示和高级金额输入按服务器 `quota_per_unit`、`usd_exchange_rate` 精确十进制换算，不硬编码汇率，不改变已有 quota；永久到期值仍为 -1。创建和详情状态独立，删除仅明确确认才发送 DELETE，写入结果未知时保持回读门禁。
+
+配置来源仍使用既有站点/用户/token/app/provider 证明；投影只返回当前仍存在且 app 匹配的供应商，保留历史关联记录用于备份恢复。此投影不新增远程接口，不推断未知来源，不扫描工具 Key。

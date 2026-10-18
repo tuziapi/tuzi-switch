@@ -2,7 +2,11 @@
 
 基线 `TA-AC-1.5-B4`，契约 `system-token-v1`。此表覆盖已实现功能，**实现适配、接口可用及发布可见性不是同一状态**。分层验证和限制见 [B4验证报告](system-token-verification.md)。
 
-## 最新代码配对：B08本地主分支同步
+## 最新代码配对：B09账户体验
+
+2026-10-19，两仓均为 `codex/tuzi-assistant-system-token`：客户端 `1bfb98bb76eaacfd03b467cf3232406cbc7149de` + API/网站 `924cd70711daf852c18ff513394300808ac1c668`；HTTP 契约仍为 `system-token-v1`。后续文档提交不改变被测代码。72项客户端、38项网站、49项原生（另2忽略）、类型与两端构建通过；局部真实UI通过。固定导航唤起受浏览器工具安全策略阻挡，未实测完整工具UI保存；详见 [B09验证](account-improvements-verification.md)。
+
+## 历史代码配对：B08本地主分支同步
 
 2026-10-18，两仓 `codex/tuzi-assistant-system-token`：客户端 `8bcb34a82a15d9f92594b1c8212605eb485cb506` + API `eb6816259289ddc0c0f8a0bd8d0914a06709ee02`；契约 `system-token-v1` 不变。客户端纳入 `origin/main` 的 `01546a835a33fd8c1da75f4b67b0816f204e752b`，API纳入 `origin/dev` 的 `a770d4511eb1b9ac7d0707f85a8e3c03e39b5102`。后续仅文档提交不改被测代码；下文迁移/P2/P3配对为此前时点。验证有3项合并前既有失败，未新做真实原生/UI联调或发布；详见 [同步验证与回退](mainline-sync-verification.md)。
 
@@ -16,7 +20,7 @@
 | Keys 列表/四筛选/分页/组 | token/、token/search、token/group，原站分页适配 | 名称/短片段/组/状态、分页/金额/身份隔离 | 公开 |
 | Key CRUD/启停/高级条件 | POST token/；PATCH token/:id 只写提供列；DELETE | 零/false/清空/缺省/null/未知字段、归属、并发网站高级字段不丢 | 公开 |
 | Key reveal/copy | POST token/:id/key；统一单个 sk- 模型 Key；短期内存 | 完整可调用格式、复制/失败、无长期 cache/日志/URL | 公开 |
-| ConfigureTool/现有表单与 Rust 事务 | 仅模型 Key，原站 groups/pricing/模型资格 + 既有来源证明 | 七工具临时写集/备份/失败补偿/未知来源/切号清草稿，禁止真实模型调用 | 保留实现，Phase 1 入口隐藏 |
+| ConfigureTool/现有表单与 Rust 事务 | 仅模型 Key，原站 groups/pricing/模型资格 + 既有来源证明 | 七工具临时写集/备份/失败补偿/未知来源/切号清草稿，禁止真实模型调用 | B09 单 Key 入口公开，其他页面仍隐藏 |
 | Logs/请求摘要 | log/self、search、request/:id，脱敏普通投影 | 筛选/范围/分页/跨账号/错误与计费分离，无原始 body/渠道 | 隐藏，开发可验 |
 | UsageChart/统计 | full summary/statistics + data/consumption_stats?self=true/data/self | 全量趋势/分布无截断、退款/延迟/时区/管理员 self=true | 隐藏，顶部仅 summary |
 | ModelsPage/PricingDetails | pricing、pricing/models，系统令牌 optional auth/快照适配 | 个人价/分组/复杂计价、snapshot/切号、无效令牌不降匿名 | 隐藏 |
@@ -53,6 +57,6 @@
 
 后续上线（未执行）：先另获授权，部署并验证 API/网站向后兼容扩展，再 B 客户端，保持 Phase 1，完成平台/数据库/性能及用户验收。回退优先客户端/引导、再兼容 API；保留数据/schema。若先回 API，新客户端报不兼容不自动切认证。疑似泄露由用户主动网站轮换，提醒共享失效；本地断开不能当远端撤销。push/PR/部署/生产迁移均未授权。
 
-## 当前验证证据与限制
+## 首次 B4 迁移验证证据与限制（历史时点）
 
 最终集成复跑：前端66、账户Rust24（含真实Go及macOS安全存储）、七工具事务12、五Go包均通过；网站37+103和build通过。真实网站过期登录回跳与定位、最终B桌面连接/重启/断开/错误/切号/本人隔离通过。隐藏业务经真实原生路由配对及组件测试通过，保持隐藏；未逐页UI验收。MySQL/PG、三平台发行安装包、完整旧站OAuth/支付及用户验收未完成。详细命令、DB只读结果与脱敏截图见 [验证报告](system-token-verification.md)。两仓只本地提交，未推送或发布。

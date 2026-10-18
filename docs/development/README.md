@@ -1,10 +1,12 @@
 # 账户中心与工具管理开发基线
 
-当前有效基线：`TA-AC-1.5-B4`；契约：`system-token-v1`；日期：2026-10-18（Asia/Shanghai）。本轮用户明确授权账户接入由 A（桌面 OAuth、`/api/desktop`）迁移至 B（网站复制账户系统令牌、原生安全保存、调用原站业务接口），允许两仓本地编码、隔离验证、独立 worktree、子智能体、提交及集成。禁止 push、PR、远程合并、发布、部署、生产迁移、生产数据、真实凭证、实际支付和付费模型调用。
+当前有效基线：`TA-AC-1.5-B4`；契约：`system-token-v1`；日期：2026-10-19（Asia/Shanghai）。本轮用户明确授权账户接入由 A（桌面 OAuth、`/api/desktop`）迁移至 B（网站复制账户系统令牌、原生安全保存、调用原站业务接口），允许两仓本地编码、隔离验证、独立 worktree、子智能体、提交及集成。禁止 push、PR、远程合并、发布、部署、生产迁移、生产数据、真实凭证、实际支付和付费模型调用。
 
 最终集成分支两仓均为 `codex/tuzi-assistant-system-token`，替代本任务旧 API 集成分支要求；分支名不证明部署。当前代码、测试、联调、用户验收和发布状态分别见 [progress.md](progress.md)，配对 SHA 及兼容限制见 [跨仓库兼容记录](cross-repo-compatibility.md)。本地代码/定向验证/隔离联调已完成，分层证据与未完成门禁见 [B4验证报告](system-token-verification.md)；用户验收和发布未完成。
 
-最新本地同步：2026-10-18 `B08-local-mainline-sync` 已将 API `origin/dev`、客户端 `origin/main` merge 到上述 B 分支，精确代码配对和既有失败见 [主分支同步验证](mainline-sync-verification.md)。未发布，历史联调不自动代表本次同步后联调。
+最新本地改进：2026-10-19 `B09-account-improvements` 完成用户九项账户体验需求。精确代码配对、分层验证与限制见 [B09验证记录](account-improvements-verification.md)。
+
+此前本地同步：2026-10-18 `B08-local-mainline-sync` 已将 API `origin/dev`、客户端 `origin/main` merge 到上述 B 分支，精确代码配对和既有失败见 [主分支同步验证](mainline-sync-verification.md)。未发布，历史联调不自动代表本次同步后联调。
 
 ## 权威文件与阅读顺序
 
@@ -25,7 +27,7 @@ Word v1.5 留存不动，SHA-256 `48dfdb009fb48ddff4689e97223159396997083425852e
 
 B4 的批准来源为本轮目标文件（2026-10-18，`goal-objective.md`）：保留所有业务和当前隐藏状态，仅替换账户认证及接入，不实施未来 SSO。B3 有效文档的原样历史快照见 [history/b3-oauth-a](history/b3-oauth-a/README.md)。历史文档内相对链接按快照原目录解析，仅供审计；执行以本目录 B4 为准。旧 `desktop-v1.1`、桌面 scope/AT/RT/撤销/表迁移/Phase 1 服务端闸门不再是 B 的有效要求；替代范围逐项见 ADR-008。七工具、资料、金额、日志、事务和发布可见性要求继续有效。
 
-Phase 1 仍只公开 API 密钥页和顶部四项概要，其他已实现页面及配置到工具入口保持隐藏；不删除、不降级为空壳。B 系统令牌具有原站账户/角色实际权限，客户端隐藏和原生操作白名单不构成服务端最小权限。
+2026-10-19 B09 用户补充授权：Phase 1 公开 API 密钥页、顶部四项概要和每条 Key 的配置到工具入口；其他已实现页面保持隐藏，不加载其请求，不删除、不降级为空壳。B 系统令牌具有原站账户/角色实际权限，客户端隐藏和原生操作白名单不构成服务端最小权限。
 
 ## 本轮源码基准与交付规则
 

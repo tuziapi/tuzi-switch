@@ -1,0 +1,81 @@
+# B09 账户体验改进验证记录
+
+2026-10-19，基线 `TA-AC-1.5-B4`，契约 `system-token-v1`。本轮执行用户批准的九项账户体验需求；代码与定向验证完成，局部真实 UI 通过，完整手工验收有下述限制，未发布。没有更改 HTTP 路由、数据库 schema、付费调用或生产配置；仅开放用户指定的单 Key 配置入口，其他隐藏页面保持隐藏。
+
+## 两仓配对与工作区保护
+
+| 仓库 | 目录 | 起点 SHA | 本次代码提交 |
+|---|---|---|---|
+| 客户端 | `/Users/syd08/Documents/tuzi-switch-system-token` | `9a6a0af6606dd5c2c336b1d8940408895b3970ba` | `1bfb98bb76eaacfd03b467cf3232406cbc7149de` |
+| API/网站 | `/Users/syd08/Documents/tuzi/tuzi-api-system-token` | `11e14cb511607c91f9af9bf9e97ba1c785f93bd1` | `924cd70711daf852c18ff513394300808ac1c668` |
+
+两仓均在 `codex/tuzi-assistant-system-token` 修改及本地提交；后续文档提交只记录此代码配对，不循环把自身 SHA 写入自身。原有客户端 `tests/config/opencodeProviderPresets.test.ts` 修改未改动、未暂存、未提交，SHA-256 保持 `dac1a3c2b9ae4b34a3b212fb01ece1329255986527cb0cbc1bf67515e42f9904`。无 reset/清理、push、PR、部署、生产操作或真实凭证。
+
+## 九项需求对应结果
+
+| 项 | 交付 | 证据 |
+|---|---|---|
+| 1 | 网站说明精确改为“用于API调用的身份验证令牌，可以用此连接兔子助手，请妥善保管” | 网站组件测试、实际安全卡片截图 |
+| 2 | 仅助手引导复制成功后尝试 `tuziswitch://account/connect`，提供手动打开入口；普通设置只复制 | 网站回归、原生严格 URL 解析；冷/暖实际唤起受限 |
+| 3 | 居中连接卡片、等宽对齐按钮，“连接”，约3.5秒错误提示且聚焦输入框 | 账户组件测试、最终 app 实机截图 |
+| 4 | 空 Key 提示位于密钥表内，四概要与列表之间不再有大块消费占位 | 空态回归、账户 UI 核验 |
+| 5 | 仅显式确认触发删除；取消/Esc零请求，重复确认只请求一次 | 新增回归；实际取消后两条 Key 均保留 |
+| 6 | 创建/详情/编辑/查看密钥独立弹窗；名称+分组为主，默认不限额度、永不到期，高级选项折叠，使用金额/日期输入 | 默认创建/只读详情回归、实际弹窗核验 |
+| 7 | 创建草稿与详情隔离，迟到详情响应不覆盖创建内容；显式编辑才进入编辑表单 | 延迟响应回归 |
+| 8 | 默认人民币，可切 USD；使用站点元数据和精确十进制金额换算；永久到期显示“永不到期” | 金额精度回归；实际 ¥730→USD100→人民币 |
+| 9 | 独立突出配置按钮，七工具按平台和兼容条件展示；已有来源定位现有配置，新增复用事务表单，保存后停留工具页并可返回账户 | 来源/跨账户/协议筛选组件测试、七工具原生事务回归、实际选项核验 |
+
+删除根因是 Tauri 中异步 `window.confirm` 返回 Promise，被旧代码直接当作 truthy；现在采用组件确认弹窗，确认按钮执行删除。配置来源投影按 provider id 和 app_type 关联现存供应商，已删除供应商不再误标为已配置，历史来源记录不删除。
+
+## 定向测试与构建
+
+环境：本机 macOS，现有 pnpm/Bun/Rust 环境；测试仅合成值。API 业务服务未改，本轮未重复无关 Go 全包测试。所有下列命令退出0。
+
+客户端工作目录为上表客户端目录：
+
+```sh
+pnpm exec vitest run tests/account/account-improvements.test.tsx tests/components/AccountPage.test.tsx tests/account/desktop-business.test.tsx tests/account/tuzi-tool-compatibility.test.ts tests/account/account-query.test.tsx tests/components/AppSwitcher.accountCompatibility.test.tsx tests/integration/App.test.tsx tests/components/ProviderList.test.tsx tests/components/ProviderActions.test.tsx
+pnpm typecheck
+CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target cargo test --manifest-path src-tauri/Cargo.toml --lib tuzi_ -- --test-threads=1
+CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target bash scripts/build-local-preview.sh
+```
+
+- 前端9文件72测试通过（`/tmp/tuzi-b09-client-final.log`）；最后为空态“创建第一个密钥”按钮补充写入结果未知时的禁用保护后，重跑 `pnpm exec vitest run tests/account/account-improvements.test.tsx tests/account/desktop-business.test.tsx`，2文件35测试通过（`/tmp/tuzi-b09-client-review.log`）。35是72中相关子集复跑，不重复相加。
+- 类型检查实际执行 `tsc --noEmit` 通过（`/tmp/tuzi-b09-typecheck.log`）。
+- 原生49通过、2默认忽略（真实Keychain/Go opt-in 未在本轮重跑），包含七工具事务与来源投影回归（`/tmp/tuzi-b09-rust-final.log`）。
+- 最终预览构建在全部代码修正后通过（`/tmp/tuzi-b09-app-build-final-css.log`）；实际 app 路径 `/Users/syd08/Documents/tuzi-switch/src-tauri/target/debug/bundle/macos/兔子助手.app`。共享 target 目录，源码来自 B worktree。
+
+API 的 `web/` 目录：
+
+```sh
+bun test ./src/components/settings/personal/cards/SystemTokenCard.test.jsx ./src/helpers/auth.return-target.test.jsx ./src/helpers/loginReturnTarget.test.js ./src/helpers/auth.test.jsx ./src/components/settings/PersonalSetting.alert-migration.test.jsx
+bun run build
+```
+
+网站5文件38测试通过（其中系统令牌卡片8项），`/tmp/tuzi-b09-web-tests.log`；构建通过，`/tmp/tuzi-b09-web-build.log`。选定前端文件 Prettier 检查、两仓 `git diff --check` 通过。
+
+非阻断输出包括 MSW 未配置新增 `account_take_open_request` 的提示、网站原有 chunk 大小提示及 Rust 两项既有 dead-code 警告。本轮没有升级依赖来消除这些提示。全仓既有 OpenCode 预设断言、网站旧50vw断言和MiniMax H3预设差异不属于本轮范围；不宣称全套全绿，来源见 [B08同步验证](mainline-sync-verification.md)。
+
+## 真实本地 UI 与限制
+
+本地网站 Vite5180→Go3180，隔离合成库 `~/Library/Application Support/com.tuziswitch.desktop.preview/system-token-api/synthetic.sqlite`，原生隔离目录 `~/Library/Application Support/com.tuziswitch.desktop.preview/home`。未轮换合成账户系统令牌、未删除已有 Key，未添加真实上游或发起付费调用。
+
+已核验：网站原句/安全卡片；四概要与 Key 列表；默认创建、独立详情/编辑、取消删除保留两条 Key；币种切换与永久到期；工具选项；最终构建居中连接页和短暂校验提示。最终重建后初始读取曾等待，随后正常进入未连接页，并经正常粘贴连接到本地合成管理员，最终列表保留两条 Key；未修改安全存储策略或绕过系统授权。
+
+未手工完成的两项：
+
+1. 点击引导复制后浏览器工具以安全策略阻止自定义协议导航，故不换浏览器或借 shell 绕过。网站行为和原生 URL 解析有测试，完整冷/暖 OS 唤起仍需用户在正常浏览器验收。
+2. 当前合成模型仅 `synthetic-g2-model`，无满足 Claude/Codex 的已确认协议资格；实际 UI 正确显示无兼容模型。未改 fixture 或放松条件，未执行完整七工具 UI 保存；兼容筛选和原生事务通过不能冒称这一手工链路通过。
+
+截图均仅合成数据、掩码，不含完整系统令牌或模型 Key：
+
+- [最终连接页及短暂提示](b09-evidence/connect-validation.png)
+- [最终账户与密钥列表](b09-evidence/keys.png)
+- [默认创建弹窗](b09-evidence/create-key.png)
+- [网站简化说明](b09-evidence/website-system-token.png)
+
+Mock/组件/原生测试、实机局部交互分别记录；本轮不替代三平台发行安全存储、MySQL/PG、完整旧网站OAuth/支付、生产性能和用户验收门禁。
+
+## 回退与交付
+
+本轮 HTTP 契约和 schema 不变。必要时经授权分别 `git revert` 上述客户端/网站代码提交，再回退相应文档；保留本地用户修改、业务库和历史来源，不恢复 A、不清库、不轮换共享令牌。跨仓库不是原子提交，回退后重新核对配对与原有 B4 兼容要求。本轮只本地代码和文档提交，不 push、不建 PR、不部署。

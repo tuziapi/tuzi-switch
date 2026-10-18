@@ -1,10 +1,11 @@
-# 当前 B 本地预览（2026-10-18）
+# 当前 B 本地预览（2026-10-19，含B09）
 
-当前有效基线 `TA-AC-1.5-B4` / 契约 `system-token-v1`。当前流程为“前往获取系统令牌”→网站登录/定位安全卡片→查看并复制账户系统令牌→返回助手粘贴并连接；不再使用账户 OAuth 授权、回调或换码。生产可信引导地址为 `https://api.tu-zi.com/console/personal?source=tuzi-assistant#system-token`；本轮验证只使用隔离本机站点与合成凭证，不使用生产账户。
+当前有效基线 `TA-AC-1.5-B4` / 契约 `system-token-v1`。当前流程为“前往获取系统令牌”→网站登录/定位安全卡片→查看并复制账户系统令牌→引导复制后尝试唤起账户页→手动粘贴并点击“连接”；普通个人设置复制不唤起。深链只导航、不携带凭证；不再使用账户 OAuth 授权、回调或换码。生产可信引导地址为 `https://api.tu-zi.com/console/personal?source=tuzi-assistant#system-token`；本轮验证只使用隔离本机站点与合成凭证，不使用生产账户。
 
 - 两仓最终分支均为 `codex/tuzi-assistant-system-token`；客户端集成 worktree `/Users/syd08/Documents/tuzi-switch-system-token`，API 集成 worktree `/Users/syd08/Documents/tuzi/tuzi-api-system-token`。精确配对、实际运行包、启动命令、截图及用户验收步骤见 [B4验证报告](system-token-verification.md)，分支名不证明运行版本。
 - 当前 B 隔离 API/网站入口使用 `http://127.0.0.1:5180`；Vite5180→Go3180；API worktree执行 `bash scripts/system-token-local-preview.sh`，客户端worktree执行 `bash scripts/build-local-preview.sh`，打开最终worktree的debug app。不要照抄下方A脚本。
-- 默认 Phase 1 仅公开 API 密钥页及顶部四概要；隐藏页面和配置到工具保留实现，仅开发验收可检查，不因预览自动发布。
+- B09 最终构建从客户端 B worktree 执行 `CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target bash scripts/build-local-preview.sh`；实际运行包为 `/Users/syd08/Documents/tuzi-switch/src-tauri/target/debug/bundle/macos/兔子助手.app`，共享 target 路径不代表使用原工作区源码。最终包已正常连接本地合成管理员。最新配对、命令、截图及手工验证限制见 [B09验证记录](account-improvements-verification.md)。
+- B09 按用户授权公开 API 密钥页、顶部四概要及每条 Key 的配置入口；其他隐藏页面仍保留且隐藏。配置复用原工具表单，已有配置直接定位，保存后留在工具页并可返回账户。
 - 系统令牌由原生安全存储保存；旧 A v1 连接需按新流程重连。B 本地断开覆盖空 v2 记录，不轮换网站共享令牌。已有 A 预览数据库、表和业务数据保留，不自动删除或清空。
 - 全程仅合成数据，不配置真实上游、不实际支付或调用付费模型；实际 OS 存储、原生/UI 联调、用户验收、三平台与数据库限制分别记录，未推送或发布。
 
