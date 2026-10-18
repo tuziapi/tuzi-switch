@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { ProviderIcon } from "@/components/ProviderIcon";
 import type { AppId } from "@/lib/api";
 import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type {
@@ -27,6 +28,15 @@ const labels: Record<AppId, string> = {
   opencode: "OpenCode",
   openclaw: "OpenClaw",
   hermes: "Hermes",
+};
+const icons: Record<AppId, string> = {
+  claude: "claude",
+  "claude-desktop": "claude",
+  codex: "openai",
+  gemini: "gemini",
+  opencode: "opencode",
+  openclaw: "openclaw",
+  hermes: "hermes",
 };
 interface Source {
   site: string;
@@ -254,6 +264,9 @@ export function ConfigureTool({
                   <small>
                     {saved.length ? "已配置 · 查看配置" : "选择并配置"}
                   </small>
+                </span>
+                <span className="account-tool-icon" aria-hidden="true">
+                  <ProviderIcon icon={icons[id]} name={labels[id]} size={26} />
                 </span>
               </Button>
             );

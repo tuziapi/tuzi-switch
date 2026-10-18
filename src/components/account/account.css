@@ -1186,9 +1186,23 @@
 }
 .account-currency {
   display: flex;
+  gap: 3px;
   padding: 3px;
   border: 1px solid hsl(var(--border));
   border-radius: 10px;
+  background: hsl(var(--muted) / 0.5);
+}
+.account-currency button {
+  min-width: 64px;
+}
+.account-currency button[aria-pressed="true"] {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  box-shadow: 0 1px 3px hsl(var(--primary) / 0.25);
+}
+.account-currency button[aria-pressed="true"]:hover {
+  background: hsl(var(--primary) / 0.9);
 }
 .account-keys-empty {
   padding: 32px 16px;
@@ -1314,9 +1328,15 @@
   height: auto;
   min-height: 66px;
   padding: 14px;
-  justify-content: flex-start;
+  justify-content: space-between;
   text-align: left;
   white-space: normal;
+}
+.account-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .account-tool-grid small {
   display: block;
