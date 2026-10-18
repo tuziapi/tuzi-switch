@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import i18n from "i18next";
+import { toast } from "sonner";
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 import zh from "@/i18n/locales/zh.json";
 import { AccountPage } from "@/components/account/AccountPage";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
@@ -84,9 +86,11 @@ describe("system token connection and phase-one account workspace", () => {
       const { account } = await setup();
       paste(value);
       submit();
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        zh.account.tokenInvalid,
-      );
+      expect(toast.error).toHaveBeenCalledWith(zh.account.tokenInvalid, {
+        duration: 3500,
+      });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.getByLabelText(zh.account.tokenLabel)).toHaveFocus();
       expect(account.connect).not.toHaveBeenCalled();
     },
   );

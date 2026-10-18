@@ -1337,7 +1337,13 @@ pub fn tuzi_provider_sources(
 ) -> Result<Vec<ProviderSource>, String> {
     let state = handle.state::<AppState>();
     let conn = state.db.conn.lock().map_err(|_| "来源关联不可读取")?;
-    let mut stmt=conn.prepare("SELECT site,user_id,token_id,app_type,provider_id FROM tuzi_provider_sources WHERE (?1 IS NULL OR app_type=?1) ORDER BY app_type,provider_id").map_err(|_|"来源关联不可读取")?;
+    read_provider_sources(&conn, app)
+}
+fn read_provider_sources(
+    conn: &rusqlite::Connection,
+    app: Option<String>,
+) -> Result<Vec<ProviderSource>, String> {
+    let mut stmt=conn.prepare("SELECT s.site,s.user_id,s.token_id,s.app_type,s.provider_id FROM tuzi_provider_sources s JOIN providers p ON p.id=s.provider_id AND p.app_type=s.app_type WHERE (?1 IS NULL OR s.app_type=?1) ORDER BY s.app_type,s.provider_id").map_err(|_|"来源关联不可读取")?;
     let rows = stmt
         .query_map([app], |r| {
             Ok(ProviderSource {
@@ -1420,6 +1426,25 @@ mod tests {
     use super::*;
     use serde_json::json;
     use serial_test::serial;
+    #[test]
+    fn configured_sources_only_include_existing_matching_tool_providers() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE providers(id TEXT, app_type TEXT);
+            CREATE TABLE tuzi_provider_sources(site TEXT,user_id TEXT,token_id TEXT,app_type TEXT,provider_id TEXT);
+            INSERT INTO providers VALUES ('existing','codex'),('same-id','claude');
+            INSERT INTO tuzi_provider_sources VALUES
+              ('https://api.tu-zi.com','synthetic-user','101','codex','existing'),
+              ('https://api.tu-zi.com','synthetic-user','102','codex','deleted'),
+              ('https://api.tu-zi.com','synthetic-user','103','codex','same-id');").unwrap();
+        let sources = read_provider_sources(&conn, None).unwrap();
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].provider_id, "existing");
+        assert!(read_provider_sources(&conn, Some("claude".into())).unwrap().is_empty());
+        conn.execute("DELETE FROM providers WHERE id='existing'", []).unwrap();
+        assert!(read_provider_sources(&conn, None).unwrap().is_empty());
+        // Projection must preserve source history for transaction backups/recovery.
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM tuzi_provider_sources", [], |r| r.get::<_, i64>(0)).unwrap(), 3);
+    }
     struct Home {
         _temp: tempfile::TempDir,
         old: Option<std::ffi::OsString>,

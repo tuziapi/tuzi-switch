@@ -6,7 +6,7 @@ mod tests;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
     time::Duration,
 };
 use store::{SystemStore, TokenStore};
@@ -534,9 +534,26 @@ pub fn is_import_input(input: &str) -> bool {
 pub fn is_auth_input(input: &str) -> bool {
     input.to_ascii_lowercase().starts_with("tuziswitch://auth")
 }
-// Old A callbacks are consumed and discarded; never forwarded to the import parser.
-pub fn handle_callback(_app: &tauri::AppHandle, input: &str) -> bool {
-    is_auth_input(input)
+static OPEN_ACCOUNT_PENDING: AtomicBool = AtomicBool::new(false);
+// A navigation route only. Never accept credentials or a caller-supplied destination.
+pub fn is_account_navigation(input: &str) -> bool {
+    Url::parse(input).is_ok_and(|u| u.scheme() == "tuziswitch"
+        && u.host_str() == Some("account") && u.path() == "/connect"
+        && u.query().is_none() && u.fragment().is_none()
+        && u.username().is_empty() && u.password().is_none() && u.port().is_none())
+}
+#[tauri::command]
+pub fn account_take_open_request() -> bool {
+    OPEN_ACCOUNT_PENDING.swap(false, Ordering::SeqCst)
+}
+// Old A callbacks and invalid account links are consumed, never sent to import/logging.
+pub fn handle_callback(app: &tauri::AppHandle, input: &str) -> bool {
+    if is_account_navigation(input) {
+        OPEN_ACCOUNT_PENDING.store(true, Ordering::SeqCst);
+        let _ = app.emit("account-open-requested", ());
+        return true;
+    }
+    is_auth_input(input) || input.to_ascii_lowercase().starts_with("tuziswitch://account")
 }
 #[tauri::command]
 pub async fn account_get_state(

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type { DesktopAccount, UsageValues } from "@/lib/api/desktop";
 import { useAccountRead, useDesktop } from "@/lib/query/desktop";
-import { formatMoney } from "@/lib/accountMoney";
+import { displayAmount, useAccountCurrency } from "./AccountCurrency";
 import { QueryState } from "./BusinessShared";
 
 /** The first release needs only today's summary, not the hidden trend data. */
@@ -16,6 +16,7 @@ export function AccountMetrics({
   usageEnabled: boolean;
 }) {
   const { t } = useTranslation();
+  const currency = useAccountCurrency();
   const account = useDesktop<DesktopAccount>(
     accountEnabled ? state : { ...state, identity: null },
     "/account/account",
@@ -53,7 +54,11 @@ export function AccountMetrics({
           <dt>{t("account.business.balance")}</dt>
           <dd>
             {account.data
-              ? formatMoney(account.data.data.quota, account.data.data.money)
+              ? displayAmount(
+                  account.data.data.quota,
+                  account.data.data.money,
+                  currency,
+                )
               : "—"}
           </dd>
         </div>
@@ -61,7 +66,7 @@ export function AccountMetrics({
           <dt>{t("account.visual.todayCost")}</dt>
           <dd>
             {daily && account.data
-              ? formatMoney(daily.quota, account.data.data.money)
+              ? displayAmount(daily.quota, account.data.data.money, currency)
               : "—"}
           </dd>
         </div>
@@ -78,12 +83,15 @@ export function AccountMetrics({
           </dd>
         </div>
       </dl>
-      <p className="account-metrics-note">
-        {t("account.business.usageNotice")}
+      <p
+        className="account-metrics-note"
+        title={t("account.business.usageNotice")}
+      >
+        今日数据按已记录消费统计 ⓘ
       </p>
       <div className="account-sync">
-        <QueryState query={account} />
-        <QueryState query={consumption} />
+        <QueryState query={account} showUpdated={false} />
+        <QueryState query={consumption} showUpdated={false} />
       </div>
       {(!accountEnabled || !usageEnabled) && (
         <p role="alert">{t("account.business.unavailable")}</p>

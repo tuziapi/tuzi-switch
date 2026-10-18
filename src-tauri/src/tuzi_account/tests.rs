@@ -966,3 +966,11 @@ async fn real_go_system_token_business_pair() {
         }
     }
 }
+
+#[test]
+fn account_navigation_accepts_only_fixed_credential_free_route() {
+    assert!(super::is_account_navigation("tuziswitch://account/connect"));
+    for value in ["tuziswitch://account/connect?token=synthetic", "tuziswitch://account/connect#synthetic", "tuziswitch://account/other", "https://account/connect", "tuziswitch://user@account/connect", "tuziswitch://account:123/connect", "tuziswitch://v1/import?resource=provider"] {
+        assert!(!super::is_account_navigation(value));
+    }
+}

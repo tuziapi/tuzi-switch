@@ -41,3 +41,21 @@ export function formatMoney(quota: string, money: Money, places = 2): string {
     (rounded % scale).toString().padStart(places, "0")
   );
 }
+
+/** Convert a user-entered monetary limit to integer quota, rounded half-up. */
+export function amountToQuota(
+  amount: string,
+  money: Money,
+  currency: "CNY" | "USD",
+): string {
+  if (!/^\d+(\.\d{1,8})?$/.test(amount)) throw new Error("invalid amount");
+  const [a, ad] = decimal(amount);
+  const [unit, ud] = decimal(money.quota_per_unit);
+  const [rate, rd] = decimal(
+    currency === "CNY" ? money.usd_exchange_rate : "1",
+  );
+  if (unit <= 0n || rate <= 0n) throw new Error("invalid money metadata");
+  const n = a * unit * rd,
+    d = ad * ud * rate;
+  return ((2n * n + d) / (2n * d)).toString();
+}

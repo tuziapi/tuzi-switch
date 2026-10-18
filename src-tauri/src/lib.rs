@@ -1248,6 +1248,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_providers,
             tuzi_account::account_get_state,
+            tuzi_account::account_take_open_request,
             tuzi_account::business::account_request,
             tuzi_account::business::account_cancel_request,
             tuzi_account::business::account_open_web,

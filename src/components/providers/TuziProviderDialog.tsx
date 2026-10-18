@@ -46,6 +46,7 @@ export function TuziProviderDialog({draft,onClose,onSaved}:{draft:TuziProviderDr
    try {
      const outcome=await invoke<{backupId:string;enabled:boolean;tested:boolean}>('tuzi_provider_save',{app:draft.appId,provider:pending.provider,previewId:pending.preview.id,source:{site:'https://api.tu-zi.com',userId:draft.userId,tokenId:draft.tokenId,generation:draft.generation}});
      await queryClient.invalidateQueries({queryKey:['providers',draft.appId]});
+     await queryClient.invalidateQueries({queryKey:['tuziProviderSources']});
      toast.success(outcome.enabled?'已保存并按工具规则启用':'已保存，尚未启用',{description:'未执行模型测试。可从本次完整备份恢复。',duration:20000,action:{label:'恢复配置',onClick:()=>{void invoke('tuzi_provider_restore',{backupId:outcome.backupId}).then(async()=>{await queryClient.invalidateQueries({queryKey:['providers',draft.appId]});toast.success('已恢复保存前配置');}).catch(error=>toast.error(String(error)));}}});
      pending.resolve();onSaved?.(pending.provider.id);setPending(null);
    }catch(error){pending.reject(new Error(String(error)));setPending(null);}

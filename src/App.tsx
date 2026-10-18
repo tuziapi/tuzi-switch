@@ -181,10 +181,15 @@ function App() {
     key: DesktopKey;
     model?: DesktopPricing;
   } | null>(null);
+  const [accountToolReturn, setAccountToolReturn] = useState<{
+    app: AppId;
+    providerId?: string;
+  } | null>(null);
   const [tuziDraft, setTuziDraft] = useState<TuziProviderDraft | null>(null);
   useEffect(() => {
     setConfigureKey(null);
     setTuziDraft(null);
+    setAccountToolReturn(null);
   }, [account.state.generation, account.state.identity?.connectionId]);
   useEffect(() => {
     if (!["connected", "refreshing"].includes(account.state.status)) {
@@ -195,6 +200,37 @@ function App() {
 
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
   const [currentView, setCurrentView] = useState<View>(getInitialView);
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    const receive = async () => {
+      const pending = await invoke<boolean>("account_take_open_request");
+      if (pending && !disposed) {
+        setConfigureKey(null);
+        setTuziDraft(null);
+        setCurrentView("account");
+        requestAnimationFrame(() =>
+          document.getElementById("account-system-token")?.focus(),
+        );
+      }
+    };
+    void listen("account-open-requested", () => {
+      void receive().catch(() => {});
+    })
+      .then((stop) => {
+        if (disposed) {
+          stop();
+          return;
+        }
+        unlisten = stop;
+        void receive().catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
   const [settingsDefaultTab, setSettingsDefaultTab] = useState("general");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
@@ -1115,6 +1151,11 @@ function App() {
                     className="space-y-4"
                   >
                     <ProviderList
+                      focusProviderId={
+                        accountToolReturn?.app === activeApp
+                          ? accountToolReturn.providerId
+                          : undefined
+                      }
                       providers={providers}
                       currentProviderId={currentProviderId}
                       appId={activeApp}
@@ -1727,6 +1768,40 @@ function App() {
         {isOpenClawView && openclawHealthWarnings.length > 0 && (
           <OpenClawHealthBanner warnings={openclawHealthWarnings} />
         )}
+        {accountToolReturn &&
+          currentView === "providers" &&
+          activeApp === accountToolReturn.app && (
+            <div className="account-return-bar">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCurrentView("account");
+                  setAccountToolReturn(null);
+                }}
+              >
+                ← 返回兔子账户
+              </Button>
+              <span>
+                {accountToolReturn.providerId
+                  ? `已定位配置：${providers[accountToolReturn.providerId]?.name ?? "正在读取…"}`
+                  : "配置保存后，可在此启用或检查"}
+              </span>
+              {accountToolReturn.providerId &&
+                providers[accountToolReturn.providerId] && (
+                  <Button
+                    variant="link"
+                    onClick={() =>
+                      setEditingProvider(
+                        providers[accountToolReturn.providerId!],
+                      )
+                    }
+                  >
+                    查看配置
+                  </Button>
+                )}
+            </div>
+          )}
         {renderContent()}
       </main>
 
@@ -1737,8 +1812,17 @@ function App() {
           keyDto={configureKey.key}
           model={configureKey.model}
           onClose={() => setConfigureKey(null)}
+          onExisting={(app, providerId) => {
+            setConfigureKey(null);
+            setActiveApp(app);
+            setCurrentView("providers");
+            setAccountToolReturn({ app, providerId });
+          }}
           onReady={(draft) => {
             setConfigureKey(null);
+            setActiveApp(draft.appId);
+            setCurrentView("providers");
+            setAccountToolReturn({ app: draft.appId });
             setTuziDraft(draft);
           }}
         />
@@ -1747,6 +1831,10 @@ function App() {
         <TuziProviderDialog
           draft={tuziDraft}
           onClose={() => setTuziDraft(null)}
+          onSaved={(providerId) => {
+            setAccountToolReturn({ app: tuziDraft.appId, providerId });
+            setTuziDraft(null);
+          }}
         />
       )}
       <AddProviderDialog

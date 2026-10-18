@@ -7,6 +7,7 @@ import type {
 import { useDesktop } from "@/lib/query/desktop";
 import { useTranslation } from "react-i18next";
 import { QueryState, WebEntry } from "./BusinessShared";
+import { CurrencySwitcher } from "./AccountCurrency";
 import { Keys } from "./Keys";
 import { Logs } from "./Logs";
 import { ModelsPage } from "./ModelsPage";
@@ -17,6 +18,7 @@ export { Keys, Logs, ModelsPage, Overview, ProfilePage, WebEntry };
 export function AccountBusiness({
   state,
   page,
+  onConfigure,
 }: {
   state: AccountState;
   localStatus?: string;
@@ -36,19 +38,23 @@ export function AccountBusiness({
   return (
     <>
       <div className="account-capabilities">
-        <QueryState query={caps} />
+        <QueryState query={caps} showUpdated={false} />
       </div>
       {enabled === false && (
         <p role="alert">{t("account.business.unavailable")}</p>
       )}
       {enabled && (
         <>
+          <div className="account-workspace-heading">
+            <h2>{t("account.pages.keys")}</h2>
+            <CurrencySwitcher />
+          </div>
           <AccountMetrics
             state={state}
             accountEnabled={!!caps.data?.data.native.account}
             usageEnabled={!!caps.data?.data.native.usage}
           />
-          <Keys state={state} />
+          <Keys state={state} onConfigure={onConfigure} />
         </>
       )}
     </>

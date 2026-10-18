@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import i18n from "i18next";
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => []) }));
 import { ConfigureTool } from "@/components/account/ConfigureTool";
 import { AccountMetrics } from "@/components/account/AccountMetrics";
 import zh from "@/i18n/locales/zh.json";
@@ -217,13 +218,13 @@ describe("recorded usage availability", () => {
     );
     const values = Array.from(view.container.querySelectorAll("dd"));
     expect(values.map((element) => element.textContent)).toEqual([
-      "USD 1.25",
+      "¥8.79",
       "—",
       "—",
       "—",
     ]);
     expect(
-      screen.getByText(zh.account.business.usageNotice),
+      screen.getByTitle(zh.account.business.usageNotice),
     ).toBeInTheDocument();
   });
 });
@@ -583,9 +584,22 @@ describe("business actions and secret lifetime", () => {
     fireEvent.click(
       screen.getByRole("button", { name: zh.account.business.create }),
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: zh.account.business.save }),
+    fireEvent.change(screen.getByLabelText("名称"), {
+      target: { value: "Synthetic create" },
+    });
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("combobox", { name: "分组" })
+          .querySelector('option[value="default"]') ||
+          screen.queryByText(/Default · 主分组/),
+      ).toBeTruthy(),
     );
+    if (!screen.queryByText(/Default · 主分组/))
+      fireEvent.change(screen.getByRole("combobox", { name: "分组" }), {
+        target: { value: "default" },
+      });
+    fireEvent.click(screen.getByRole("button", { name: "创建" }));
     await waitFor(() => expect(finish).toBeDefined());
     fireEvent.click(screen.getByRole("button", { name: zh.common.cancel }));
     await act(async () =>
@@ -622,6 +636,10 @@ describe("business actions and secret lifetime", () => {
       { wrapper },
     );
     await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Codex/ })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Codex/ }));
+    await waitFor(() =>
       expect(
         screen.getByRole("button", { name: zh.account.business.next }),
       ).toBeEnabled(),
@@ -636,7 +654,7 @@ describe("business actions and secret lifetime", () => {
     );
     expect(
       screen.getByRole("button", {
-        name: zh.account.business.revealAndContinue,
+        name: "下一步",
       }),
     ).toBeDisabled();
     expect(ready).not.toHaveBeenCalled();
@@ -665,16 +683,19 @@ describe("business actions and secret lifetime", () => {
     fireEvent.click(
       screen.getByRole("button", { name: zh.account.business.create }),
     );
+    fireEvent.change(screen.getByLabelText("名称"), {
+      target: { value: "Synthetic uncertain" },
+    });
+    await screen.findByRole("option", { name: "Default" });
     fireEvent.change(
-      screen.getByRole("listbox", { name: zh.account.business.group }),
+      screen.getByRole("combobox", { name: zh.account.business.group }),
       { target: { value: "default" } },
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: zh.account.business.save }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "创建" }));
     await screen.findByText(zh.account.business.unknownOutcome);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: zh.account.business.save }),
+      screen.getByRole("button", { name: zh.account.business.create }),
     ).toBeDisabled();
     expect(
       vi.mocked(desktopRequest).mock.calls.filter(([r]) => r.method === "POST"),
@@ -726,17 +747,24 @@ describe("business actions and secret lifetime", () => {
             ? zh.account.business.create
             : zh.account.business.details,
         );
+        if (kind === "edit") {
+          await waitFor(() =>
+            expect(screen.getByRole("button", { name: "编辑" })).toBeEnabled(),
+          );
+          click("编辑");
+        }
         const name = await screen.findByRole("textbox", {
           name: zh.account.business.name,
         });
         fireEvent.change(name, { target: { value: "Synthetic changed" } });
-        click(zh.account.business.save);
+        click(kind === "create" ? "创建" : zh.account.business.save);
       } else
         click(
           kind === "status"
             ? zh.account.business.disable
             : zh.account.business.delete,
         );
+      if (kind === "delete") click("确认删除");
       await screen.findByText(zh.account.business.unknownOutcome);
       click(zh.account.business.verify);
       await waitFor(() => expect(finishRead).toBeDefined());
@@ -764,16 +792,10 @@ describe("business actions and secret lifetime", () => {
         expect(screen.getByRole("button", { name })).toBeDisabled();
         click(name);
       }
-      if (kind === "create" || kind === "edit") {
-        expect(
-          screen.getByRole("button", { name: zh.account.business.save }),
-        ).toBeDisabled();
-        expect(
-          screen.getByRole("button", { name: zh.common.cancel }),
-        ).toBeDisabled();
-      }
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       click(zh.account.business.reveal);
       await screen.findByDisplayValue("sk-synthetic-reveal-only");
+      click(zh.account.business.close);
       expect(
         screen.getByText(zh.account.business.unknownOutcome),
       ).toBeVisible();

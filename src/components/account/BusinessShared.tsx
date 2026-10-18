@@ -65,7 +65,9 @@ export function Check({
 }
 export function QueryState({
   query,
+  showUpdated = true,
 }: {
+  showUpdated?: boolean;
   query: {
     isLoading: boolean;
     error: unknown;
@@ -91,7 +93,7 @@ export function QueryState({
           {e.retryAfter ? ` (${e.retryAfter}s)` : ""}
         </p>
       )}
-      {query.data && (
+      {showUpdated && query.data && (
         <p className="account-updated">
           {t("account.business.updated")}{" "}
           {new Date(query.dataUpdatedAt).toLocaleString()}

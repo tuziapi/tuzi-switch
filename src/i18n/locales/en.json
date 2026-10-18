@@ -2747,7 +2747,7 @@
     "toolsIndependent": "Your Tuzi account is separate from tool sign-ins. Disconnecting keeps provider settings and tool requests intact.",
     "offlineHint": "The account service is unreachable. The displayed identity is a local record. Check your network and retry.",
     "actionFailed": "The operation failed. Check your account state and try again.",
-    "connect": "Paste and connect",
+    "connect": "Connect",
     "retry": "Retry account state",
     "disconnect": "Disconnect this connection",
     "connectRequired": "Connect to use account features. Tool management remains available.",

@@ -1,6 +1,7 @@
+import { toast } from "sonner";
 import { Rabbit } from "lucide-react";
 import "./account.css";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ type AccountController = ReturnType<typeof useAccount>;
 /** Only sanitized native account state crosses this boundary. Never persist it. */
 export function AccountPage({
   account,
+  onConfigureKey,
 }: {
   account: AccountController;
   localStatus?: string;
@@ -37,6 +39,8 @@ export function AccountPage({
   const [token, setToken] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [tokenInvalid, setTokenInvalid] = useState(false);
+  const tokenInput = useRef<HTMLInputElement>(null);
+  const connectingLock = useRef(false);
   const { state, isLoading } = account;
   const [retrySeconds, setRetrySeconds] = useState(0);
   useEffect(() => {
@@ -72,112 +76,92 @@ export function AccountPage({
   };
   const connect = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (connectingLock.current) return;
     const value = token.trim();
     if (!value || /\s/.test(value)) {
       setTokenInvalid(true);
+      toast.error(t("account.tokenInvalid"), { duration: 3500 });
+      tokenInput.current?.focus();
       return;
     }
     setTokenInvalid(false);
+    connectingLock.current = true;
     setConnecting(true);
     await run(() => account.connect(value));
     setConnecting(false);
+    connectingLock.current = false;
   };
-  return (
-    <section
-      className="account-shell account-phase1"
-      aria-label={t("account.title")}
-    >
-      <div className="account-connection">
-        <div className="account-avatar">
-          <Rabbit size={20} aria-hidden="true" />
-        </div>
-        <p role="status" aria-live="polite">
-          {t(
-            `account.status.${isLoading ? "loading" : connecting ? "verifying" : state.status}`,
-          )}
-        </p>
-        {connected && state.identity && (
-          <p>
-            {state.identity.displayName || state.identity.username}{" "}
-            <span className="text-muted-foreground">
-              @{state.identity.username}
-            </span>
+  if (!connected)
+    return (
+      <section
+        className="account-shell account-phase1 account-disconnected"
+        aria-label={t("account.title")}
+      >
+        <section
+          className="account-connect-card"
+          aria-label={t("account.pages.keys")}
+        >
+          <div className="account-connect-emblem">
+            <Rabbit size={28} />
+          </div>
+          <h2>连接兔子账户</h2>
+          <p className="account-connect-description">
+            {t("account.tokenHint")}
           </p>
-        )}
-        {connected && <p>{t("account.disconnectHint")}</p>}
-        {state.status === "offline" && <p>{t("account.offlineHint")}</p>}
-        {state.error && (
-          <p role="alert">
-            {t(`account.errors.${state.error.code}`, {
-              defaultValue: t("account.errors.generic"),
-            })}
+          <p
+            className="account-connect-status"
+            role="status"
+            aria-live="polite"
+          >
+            {t(
+              `account.status.${isLoading ? "loading" : connecting ? "verifying" : state.status}`,
+            )}
           </p>
-        )}
-        {retrySeconds > 0 && (
-          <p>{t("account.retryAfter", { seconds: retrySeconds })}</p>
-        )}
-        {actionFailed && <p role="alert">{t("account.actionFailed")}</p>}
-        <div className="flex flex-wrap gap-2">
-          {!connected && (
-            <Button
-              variant="outline"
-              disabled={busy || isLoading}
-              onClick={() => void run(account.openTokenPage)}
-            >
-              {t("account.getToken")}
-            </Button>
-          )}
-          {connected && (
-            <Button
-              variant="outline"
-              disabled={
-                busy ||
-                isLoading ||
-                retrySeconds > 0 ||
-                state.status === "refreshing"
-              }
-              onClick={() => void run(account.retry)}
-            >
-              {t("account.retry")}
-            </Button>
-          )}
-          {!pending && (connected || !state.localCleared) && (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void run(account.logout)}
-            >
-              {t("account.disconnect")}
-            </Button>
-          )}
-        </div>
-        {!connected && (
           <form
-            className="account-token-form"
-            onSubmit={(event) => void connect(event)}
+            className="account-connect-form"
+            onSubmit={(e) => void connect(e)}
           >
             <label htmlFor="account-system-token">
               {t("account.tokenLabel")}
             </label>
-            <p id="account-token-hint">{t("account.tokenHint")}</p>
-            <div className="account-token-entry">
-              <Input
-                id="account-system-token"
-                type="password"
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                value={token}
-                disabled={busy || pending || isLoading}
-                aria-describedby="account-token-hint"
-                aria-invalid={tokenInvalid}
-                placeholder={t("account.tokenPlaceholder")}
-                onChange={(event) => {
-                  setToken(event.target.value);
-                  setTokenInvalid(false);
-                  setActionFailed(false);
-                }}
-              />
+            <Input
+              ref={tokenInput}
+              id="account-system-token"
+              type="password"
+              autoFocus
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={token}
+              disabled={busy || pending || isLoading}
+              aria-invalid={tokenInvalid}
+              placeholder={t("account.tokenPlaceholder")}
+              onChange={(e) => {
+                setToken(e.target.value);
+                setTokenInvalid(false);
+                setActionFailed(false);
+              }}
+            />
+            {state.error && (
+              <p role="alert">
+                {t(`account.errors.${state.error.code}`, {
+                  defaultValue: t("account.errors.generic"),
+                })}
+              </p>
+            )}
+            {actionFailed && <p role="alert">{t("account.actionFailed")}</p>}
+            {retrySeconds > 0 && (
+              <p>{t("account.retryAfter", { seconds: retrySeconds })}</p>
+            )}
+            <div className="account-connect-actions">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || isLoading}
+                onClick={() => void run(account.openTokenPage)}
+              >
+                {t("account.getToken")}
+              </Button>
               <Button
                 type="submit"
                 disabled={busy || pending || isLoading || retrySeconds > 0}
@@ -189,23 +173,90 @@ export function AccountPage({
                 )}
               </Button>
             </div>
-            {tokenInvalid && <p role="alert">{t("account.tokenInvalid")}</p>}
           </form>
+          {!pending && !state.localCleared && (
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => void run(account.logout)}
+            >
+              {t("account.disconnect")}
+            </Button>
+          )}
+          <p className="account-connect-footnote">
+            {t("account.connectRequired")}
+          </p>
+        </section>
+      </section>
+    );
+  return (
+    <section
+      className="account-shell account-phase1"
+      aria-label={t("account.title")}
+    >
+      <div className="account-connection">
+        <div className="account-avatar">
+          <Rabbit size={20} aria-hidden="true" />
+        </div>
+        <p role="status" aria-live="polite">
+          {t(`account.status.${isLoading ? "loading" : state.status}`)}
+        </p>
+        {state.identity && (
+          <p>
+            {state.identity.displayName || state.identity.username}{" "}
+            <span className="text-muted-foreground">
+              @{state.identity.username}
+            </span>
+          </p>
         )}
+        <p title={t("account.disconnectHint")}>{t("account.disconnectHint")}</p>
+        {state.status === "offline" && <p>{t("account.offlineHint")}</p>}
+        {state.error && (
+          <p role="alert">
+            {t(`account.errors.${state.error.code}`, {
+              defaultValue: t("account.errors.generic"),
+            })}
+          </p>
+        )}
+        {actionFailed && <p role="alert">{t("account.actionFailed")}</p>}
+        {retrySeconds > 0 && (
+          <p>{t("account.retryAfter", { seconds: retrySeconds })}</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={
+              busy ||
+              isLoading ||
+              retrySeconds > 0 ||
+              state.status === "refreshing"
+            }
+            onClick={() => void run(account.retry)}
+          >
+            {t("account.retry")}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => void run(account.logout)}
+          >
+            {t("account.disconnect")}
+          </Button>
+        </div>
       </div>
       <section
         className="account-content"
         data-account-page={page}
         aria-label={t(`account.pages.${page}`)}
       >
-        {!connected && <p>{t("account.connectRequired")}</p>}
-        {connected && state.identity ? (
+        {state.identity && (
           <AccountBusiness
             key={`${state.identity.connectionId}:${state.generation}:${page}`}
             state={state}
             page={page}
+            onConfigure={onConfigureKey}
           />
-        ) : null}
+        )}
       </section>
     </section>
   );
