@@ -1,3 +1,13 @@
+# B4 当前三项体验跟进（2026-10-19）
+
+B09后续三项微调代码完成：助手引导复制先提示“已复制，正在准备跳转 tuzi-switch…”，1.5秒后尝试固定导航；普通复制不唤起。币种当前项蓝底白字；配置工具选项右侧复用现有图标。HTTP/schema/权限、工具配置资格与写入逻辑不变。
+
+- 最新代码配对：客户端 `58e152c96aef293cfc17fde888a79b6bd462a24e`，API/网站 `1dc35a9e15f5f716f202539b3b54e05f91bcff83`；两仓均为 `codex/tuzi-assistant-system-token`，契约 `system-token-v1`。
+- 客户端4文件49测试、网站5文件45测试、类型检查和两端构建通过。UI验收及本地模型协议核查见 [B09验证记录](account-improvements-verification.md) 文末；构建和Mock测试不代替实际深链唤起或模型调用。
+- 只本地提交，未push/PR/部署/生产操作；既有OpenCode预设测试修改保持未提交。
+
+---
+
 # B4 当前账户体验改进（2026-10-19）
 
 `B09-account-improvements` 九项需求代码完成，定向测试和两端构建通过；局部真实 UI 核验通过，用户验收及发布未完成。两仓继续在 `codex/tuzi-assistant-system-token`，契约 `system-token-v1` 不变。

@@ -4,7 +4,7 @@
 
 最终集成分支两仓均为 `codex/tuzi-assistant-system-token`，替代本任务旧 API 集成分支要求；分支名不证明部署。当前代码、测试、联调、用户验收和发布状态分别见 [progress.md](progress.md)，配对 SHA 及兼容限制见 [跨仓库兼容记录](cross-repo-compatibility.md)。本地代码/定向验证/隔离联调已完成，分层证据与未完成门禁见 [B4验证报告](system-token-verification.md)；用户验收和发布未完成。
 
-最新本地改进：2026-10-19 `B09-account-improvements` 完成用户九项账户体验需求。精确代码配对、分层验证与限制见 [B09验证记录](account-improvements-verification.md)。
+最新本地改进：2026-10-19 `B09-account-improvements` 九项需求及后续三项微调（复制提示后延迟1.5秒唤起、币种激活样式、工具选项右侧图标）代码完成。最新精确配对、分层验证和本地配置条件核查见 [B09验证记录](account-improvements-verification.md) 文末。
 
 此前本地同步：2026-10-18 `B08-local-mainline-sync` 已将 API `origin/dev`、客户端 `origin/main` merge 到上述 B 分支，精确代码配对和既有失败见 [主分支同步验证](mainline-sync-verification.md)。未发布，历史联调不自动代表本次同步后联调。
 

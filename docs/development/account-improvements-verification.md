@@ -79,3 +79,49 @@ Mock/组件/原生测试、实机局部交互分别记录；本轮不替代三�
 ## 回退与交付
 
 本轮 HTTP 契约和 schema 不变。必要时经授权分别 `git revert` 上述客户端/网站代码提交，再回退相应文档；保留本地用户修改、业务库和历史来源，不恢复 A、不清库、不轮换共享令牌。跨仓库不是原子提交，回退后重新核对配对与原有 B4 兼容要求。本轮只本地代码和文档提交，不 push、不建 PR、不部署。
+
+## 2026-10-19 三项体验跟进
+
+用户在B09验收后追加三项要求，本轮仅调整这三处：引导复制成功先展示“已复制，正在准备跳转 tuzi-switch…”，1.5秒后尝试固定导航；人民币/USD当前项蓝底白字；配置弹窗每项右侧复用`ProviderIcon`图标（与现有工具切换栏一致，不新增图片资源）。不修改模型筛选、密钥资格、来源识别、原生配置事务、API路由/权限/schema或其他工具行为。
+
+代码配对（后续文档提交不改变被测代码）：
+
+| 仓库 | 起点 | 本轮代码 SHA |
+|---|---|---|
+| 客户端 | `9070986d084358b82ef22f75a18f575b12b84dcf` | `58e152c96aef293cfc17fde888a79b6bd462a24e` |
+| API/网站 | `10e29bd311448d2a358b9e7ed58e44b6bc48d935` | `1dc35a9e15f5f716f202539b3b54e05f91bcff83` |
+
+两仓均为`codex/tuzi-assistant-system-token`，基线B4/契约`system-token-v1`不变；原有OpenCode预设测试文件SHA-256仍为`dac1a3c2b9ae4b34a3b212fb01ece1329255986527cb0cbc1bf67515e42f9904`，未改动、未暂存、未提交。
+
+### 跟进验证
+
+客户端：
+
+```sh
+pnpm exec vitest run tests/account/account-improvements.test.tsx tests/components/AccountPage.test.tsx tests/account/desktop-business.test.tsx tests/account/tuzi-tool-compatibility.test.ts
+pnpm typecheck
+CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target bash scripts/build-local-preview.sh
+```
+
+4文件49测试、类型检查及最终macOS本地预览构建通过；对应日志为`/tmp/tuzi-b09-followup-client-tests.log`、`/tmp/tuzi-b09-followup-typecheck.log`、`/tmp/tuzi-b09-followup-app-build.log`。本轮未修改Rust/配置事务，不重复无关原生全量测试。
+
+网站`web/`：
+
+```sh
+bun test ./src/components/settings/personal/cards/SystemTokenCard.test.jsx ./src/helpers/auth.return-target.test.jsx ./src/helpers/loginReturnTarget.test.js ./src/helpers/auth.test.jsx ./src/components/settings/PersonalSetting.alert-migration.test.jsx
+bun run build
+```
+
+5文件45测试通过（卡片15项）。新增回归验证1499ms不唤起、1500ms只唤起一次、无凭证深链参数、普通复制无延迟唤起、重复复制重置计时、手动打开去重、卸载/离开引导/离开安全区/开始轮换取消计时，以及剪贴板权限等待中离开引导不触发迟到唤起。最终源码测试及build日志为`/tmp/tuzi-b09-followup-web-tests.log`、`/tmp/tuzi-b09-followup-web-build.log`。改动代码格式和两仓diff检查通过；保留既有chunk/dead-code提示，不宣称全仓测试通过。
+
+### 本地配置条件核查
+
+只读检查隔离SQLite（URI `mode=ro`、`query_only=ON`），`channels`没有记录，`abilities`只有default分组的合成`synthetic-g2-model`。随后启动已有本地预览脚本（5180→3180，未添加渠道），以合成身份只读请求`GET /api/pricing/models`，返回该模型的`enable_groups=[default]`、`supported_endpoint_types=[openai]`；其余4个内置模型均为`openai-video`。因此当前没有Claude所需Anthropic协议或Codex所需Responses协议，配置界面没有对应可选模型符合现有校验。OpenAI Chat候选可用于支持该协议的工具，但本地无真实上游渠道，不能证明实际模型调用可用。
+
+这支持“尚未接入合适渠道/模型会造成不能配置”的判断，不能推断用户其他站点或生产配置。正常配置还需启用且有额度/未过期的Key、匹配分组与模型限制、服务端正确协议元数据。不为通过验收添加渠道、伪造协议或放宽筛选，不执行付费调用。
+
+### 实机验收与交付状态
+
+最终预览构建已打开，但账户页持续停在“正在读取账户状态”，输入与连接按钮禁用；重新打开应用后仍如此，尚无可确认的具体错误。因此本轮币种激活和工具图标未完成实机目视验收，不将组件测试或构建成功视为实机通过。已询问用户是否出现钥匙串访问提示，当前未确认原因，不更改安全存储或账户数据。前轮浏览器安全策略阻止自定义协议导航的限制继续适用，本轮不重试或绕过该拒绝；1.5秒时序和手动恢复通过组件测试验证，不冒称实际冷/暖唤起已验证。
+
+本轮只本地代码和文档提交，未push、PR、部署或操作生产；原历史A/B4/B08/B09证据保留。回退按两仓上述代码提交分别revert及相应文档提交，不清理数据或改动共享令牌。
