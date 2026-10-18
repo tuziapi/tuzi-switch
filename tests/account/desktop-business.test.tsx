@@ -79,7 +79,7 @@ const env = <T,>(data: T): Envelope<T> => ({
   message: "",
   data,
   meta: {
-    contract_version: "system-token-v1.0",
+    contract_version: "system-token-v1",
     request_id: "synthetic",
     generated_at: 1,
   },

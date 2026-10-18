@@ -22,7 +22,7 @@ export const accountQueryKey = (
     state.generation,
     feature,
     filters,
-    "system-token-v1.0",
+    "system-token-v1",
   ] as const;
 
 /** Mount once in App; route changes must never initiate a connection. */
