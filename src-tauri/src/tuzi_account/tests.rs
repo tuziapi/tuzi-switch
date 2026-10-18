@@ -252,7 +252,7 @@ async fn malformed_and_ambiguous_identity_cannot_become_connected() {
     }
 }
 #[tokio::test]
-async fn invalid_input_never_reaches_network_or_vault() {
+async fn invalid_input_never_reaches_network_or_stores_secret() {
     let (origin, fixture, task) = local_server().await;
     for token in [
         "".to_string(),
@@ -264,7 +264,15 @@ async fn invalid_input_never_reaches_network_or_vault() {
         let store = Arc::new(MemoryStore::default());
         let s = service(store.clone(), &origin);
         assert_eq!(s.connect(token).await.error.unwrap().code, "invalid_token");
-        assert_eq!(store.writes.load(Ordering::SeqCst), 0);
+        assert_eq!(store.writes.load(Ordering::SeqCst), 1);
+        assert!(store
+            .record
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .tokens
+            .is_none());
     }
     assert!(fixture.requests.lock().unwrap().is_empty());
     task.abort();
@@ -608,6 +616,36 @@ async fn reconnecting_another_account_replaces_identity_and_invalidates_old_sour
     task.abort();
 }
 
+#[tokio::test]
+async fn invalid_paste_replaces_connected_generation_and_clears_old_source() {
+    let (s, store, fixture, task) = connected().await;
+    let original = s.state();
+    s.remember_model_key_reveal(original.generation, "9", SYNTHETIC_KEY)
+        .unwrap();
+    let invalid = s.connect("synthetic invalid token".into()).await;
+    assert_eq!(invalid.status, "invalid");
+    assert_eq!(invalid.error.unwrap().code, "invalid_token");
+    assert!(invalid.generation > original.generation);
+    assert!(invalid.identity.is_none());
+    assert!(s.inner.lock().unwrap().model_key_proof.is_none());
+    assert!(store
+        .record
+        .lock()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .tokens
+        .is_none());
+    assert_eq!(fixture.requests.lock().unwrap().len(), 1);
+    assert!(s
+        .with_confirmed_source("7", original.generation, || Ok(()))
+        .is_err());
+    assert!(s
+        .with_confirmed_model_source("7", original.generation, "9", SYNTHETIC_KEY, || Ok(()))
+        .is_err());
+    task.abort();
+}
+
 #[test]
 fn obsolete_account_callbacks_are_consumed_without_disabling_import_links() {
     assert!(is_auth_input("tuziswitch://auth/callback?code=synthetic"));
@@ -630,4 +668,276 @@ fn native_secure_store_round_trip() {
     result.unwrap();
     cleanup.unwrap();
     assert!(matches!(entry.get_secret(), Err(keyring::Error::NoEntry)));
+}
+
+// Reproduce against router.TestSystemTokenLocalPreview with its isolated synthetic DB:
+// TUZI_SYSTEM_TOKEN_PAIR_CREDENTIALS=/absolute/private/credentials.json \
+// cargo test --lib tuzi_account::tests::real_go_system_token_business_pair -- --ignored --exact
+// Never use a production credential file. This test refuses non-loopback origins,
+// non-synthetic accounts, and (on Unix) credential files without private 0600 permissions.
+struct PairVaultCleanup {
+    namespace: String,
+}
+impl PairVaultCleanup {
+    fn entry(&self) -> keyring::Entry {
+        keyring::Entry::new(&self.namespace, "active-connection").unwrap()
+    }
+    fn remove_and_verify(&self) {
+        let entry = self.entry();
+        match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => {}
+            Err(_) => panic!("pair vault cleanup failed"),
+        }
+        assert!(
+            matches!(entry.get_secret(), Err(keyring::Error::NoEntry)),
+            "pair vault cleanup verification failed"
+        );
+    }
+}
+impl Drop for PairVaultCleanup {
+    fn drop(&mut self) {
+        let _ = self.entry().delete_credential();
+    }
+}
+fn pair_require(ok: bool, label: &str) -> Result<(), String> {
+    if ok {
+        Ok(())
+    } else {
+        Err(label.into())
+    }
+}
+async fn pair_call(
+    s: &AccountService,
+    method: &str,
+    path: &str,
+    query: Vec<(&str, String)>,
+    body: Option<Value>,
+) -> Result<Value, String> {
+    let req=serde_json::from_value(json!({"method":method,"path":path,"generation":s.state().generation,"query":query,"body":body})).map_err(|_|"pair request construction".to_string())?;
+    s.business_request(req)
+        .await
+        .map(|v| v["data"].clone())
+        .map_err(|e| format!("native {method} {path}: {}", e.code))
+}
+async fn pair_raw(
+    s: &AccountService,
+    token: &str,
+    user: Option<&str>,
+    method: &str,
+    path: &str,
+    body: Option<Value>,
+) -> Result<Value, String> {
+    let mut req = s
+        .http
+        .request(
+            reqwest::Method::from_bytes(method.as_bytes()).unwrap(),
+            format!("{}{path}", s.origin),
+        )
+        .bearer_auth(token);
+    if let Some(user) = user {
+        req = req.header("New-Api-User", user);
+    }
+    if let Some(body) = body {
+        req = req.json(&body);
+    }
+    let response = req
+        .send()
+        .await
+        .map_err(|_| format!("pair raw network {method} {path}"))?;
+    response
+        .json()
+        .await
+        .map_err(|_| format!("pair raw JSON {method} {path}"))
+}
+#[tokio::test]
+#[ignore = "Opt-in real Go localhost + synthetic credentials + unique OS vault pairing; no relay/payment calls"]
+async fn real_go_system_token_business_pair() {
+    let file = std::env::var("TUZI_SYSTEM_TOKEN_PAIR_CREDENTIALS")
+        .expect("explicit private synthetic credentials file required");
+    let metadata = std::fs::symlink_metadata(&file).expect("synthetic credentials file metadata");
+    assert!(
+        metadata.is_file(),
+        "credentials must be a regular file, not symlink"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            metadata.permissions().mode() & 0o777,
+            0o600,
+            "credentials require mode 0600"
+        );
+    }
+    let bytes = zeroize::Zeroizing::new(
+        std::fs::read(file).expect("read private synthetic credentials file"),
+    );
+    let credentials: Value =
+        serde_json::from_slice(&bytes).expect("synthetic credentials JSON shape");
+    let origin = credentials["website_origin"]
+        .as_str()
+        .expect("website_origin required");
+    let parsed = Url::parse(origin).expect("loopback origin URL");
+    assert!(
+        parsed.scheme() == "http"
+            && parsed.host_str() == Some("127.0.0.1")
+            && parsed.port().is_some()
+            && parsed.path() == "/"
+            && parsed.username().is_empty()
+            && parsed.password().is_none()
+            && parsed.query().is_none()
+            && parsed.fragment().is_none(),
+        "only exact localhost HTTP origin permitted"
+    );
+    let mut vaults = Vec::new();
+    for username in ["preview", "preview-admin"] {
+        let token = credentials[username]["system_token"]
+            .as_str()
+            .expect("synthetic system_token required");
+        assert!(
+            token.starts_with("synthetic-system-token-"),
+            "fixture refuses non-synthetic system tokens"
+        );
+        let user = credentials[username]["user_id"]
+            .as_i64()
+            .filter(|id| *id > 0)
+            .expect("synthetic user_id required")
+            .to_string();
+        let client = format!("tuzi-system-token-pair-{}", uuid::Uuid::new_v4());
+        let namespace = format!("tuzi-assistant/account/v1/{origin}/{client}");
+        let cleanup = PairVaultCleanup { namespace };
+        let store = Arc::new(SystemStore::new(origin, &client).unwrap());
+        let s = AccountService::with_store(store.clone(), origin, &client).unwrap();
+        let connected = s.connect(token.into()).await;
+        assert!(connected.status == "connected", "fixture connection failed");
+        assert!(
+            connected
+                .identity
+                .as_ref()
+                .is_some_and(|id| id.user_id == user),
+            "fixture identity mismatch"
+        );
+        let restarted = AccountService::with_store(store, origin, &client).unwrap();
+        assert_eq!(restarted.state().status, "offline");
+        assert_eq!(restarted.retry().await.status, "connected");
+        let s = &restarted;
+        let mut created_id: Option<String> = None;
+        let mut original_profile: Option<Value> = None;
+        let result:Result<(),String>=async {
+            let account=pair_call(s,"GET","/account/account",vec![],None).await?;
+            pair_require(account["user_id"]==user,"own identity projection")?;
+            pair_require(account["quota"]=="50000000"&&account["money"]["base_currency"]=="USD"&&account["money"]["quota_per_unit"]=="500000","money integer/string and USD conversion DTO")?;
+            pair_require(account["used_quota"]==if username=="preview"{"1200000"}else{"0"},"own account used quota")?;
+            let state_wire=serde_json::to_string(&s.state()).unwrap();
+            pair_require(!state_wire.contains(token),"account state secret exclusion")?;
+            let no_auth=s.http.get(format!("{}/api/user/self",s.origin)).header("New-Api-User",&user).send().await.map_err(|_|"unauthenticated request network")?.json::<Value>().await.map_err(|_|"unauthenticated response JSON")?;
+            pair_require(no_auth["success"]!=true,"missing system token cannot read profile")?;
+            let missing=pair_raw(s,token,None,"GET","/api/user/self",None).await?;
+            pair_require(missing["success"]!=true,"subsequent business request requires confirmed user header")?;
+            let wrong=pair_raw(s,token,Some("999999"),"GET","/api/user/self",None).await?;
+            pair_require(wrong["success"]!=true,"wrong confirmed user header rejected")?;
+            let profile=pair_call(s,"GET","/account/profile",vec![],None).await?;
+            pair_require(profile["user_id"]==user,"profile identity")?;
+            original_profile=Some(json!({"display_name":profile["display_name"],"language":profile["language"],"accept_unset_model_ratio_model":profile["accept_unset_model_ratio_model"],"high_concurrency_enabled":profile["high_concurrency_enabled"],"record_ip_log":profile["record_ip_log"]}));
+            let new_profile=pair_call(s,"PATCH","/account/profile",vec![],Some(json!({"display_name":"Native pair fixture","language":"en","record_ip_log":false}))).await?;
+            pair_require(new_profile["display_name"]=="Native pair fixture"&&new_profile["record_ip_log"]==false,"profile partial update and explicit false")?;
+            let groups=pair_call(s,"GET","/account/key-groups",vec![],None).await?;
+            pair_require(groups.as_array().is_some_and(|rows|rows.iter().any(|v|v["id"]=="default")),"group projection")?;
+            let name=format!("npair-{}",uuid::Uuid::new_v4());
+            let created=pair_call(s,"POST","/account/keys",vec![],Some(json!({"name":name,"group":"default","expired_time":-1,"unlimited_quota":false,"remain_quota":"7654321","model_limits_enabled":true,"model_limits":"synthetic-g2-model","allow_ips":"192.0.2.1, 2001:db8::/32","exclude_ips":"198.51.100.1 198.51.100.2"}))).await?;
+            let id=created["id"].as_str().ok_or("created string id")?.to_string();
+            created_id=Some(id.clone());
+            pair_require(created["key"].as_str().is_some_and(|key|key.starts_with("sk-")&&!key.is_empty()),"created full model Key")?;
+            let path=format!("/account/keys/{id}");
+            let detail=pair_call(s,"GET",&path,vec![],None).await?;
+            pair_require(detail["name"]==name&&detail["remain_quota"]=="7654321"&&detail["model_limits_enabled"]==true,"key details and decimal DTO")?;
+            pair_require(detail["allow_ips"]=="192.0.2.1\n2001:db8::/32"&&detail["exclude_ips"]=="198.51.100.1\n198.51.100.2","mixed IP create normalized for actual model parser")?;
+            pair_require(!serde_json::to_string(&detail).unwrap().contains(created["key"].as_str().unwrap()),"read detail must not reveal full Key")?;
+            let list=pair_call(s,"GET","/account/keys",vec![("page","1".into()),("page_size","1".into()),("keyword",name.clone())],None).await?;
+            pair_require(list["items"].as_array().is_some_and(|rows|rows.len()==1)&&list["total"]=="1"&&list["has_more"]==false,"key filtered pagination")?;
+            let first_page=pair_call(s,"GET","/account/keys",vec![("page","1".into()),("page_size","1".into())],None).await?;
+            let second_page=pair_call(s,"GET","/account/keys",vec![("page","2".into()),("page_size","1".into())],None).await?;
+            pair_require(first_page["has_more"]==(username=="preview")&&second_page["items"].as_array().is_some_and(|rows|rows.len()==if username=="preview"{1}else{0}),"key page boundary and has_more")?;
+            // Seed an advanced website-only field using its existing full update,
+            // then ensure a simplified native PATCH cannot overwrite that field.
+            let raw=pair_raw(s,token,Some(&user),"GET",&format!("/api/token/{id}"),None).await?;
+            pair_require(raw["success"]==true,"website key detail")?;
+            let mut advanced=raw["data"].clone();
+            advanced["rate_limits_enabled"]=true.into(); advanced["rate_limits_time"]=60.into(); advanced["rate_limits_count"]=23.into();
+            advanced["routing_preference"]="quality".into();advanced["routing_quality_threshold"]=80.into();
+            let updated=pair_raw(s,token,Some(&user),"PUT","/api/token/",Some(advanced)).await?;
+            pair_require(updated["success"]==true,"website advanced Key update")?;
+            let rename=format!("{name}-edit");
+            pair_call(s,"PATCH",&path,vec![],Some(json!({"name":rename,"remain_quota":"0","allow_ips":"","exclude_ips":"198.51.100.3, 2001:db8::1","model_limits_enabled":false}))).await?;
+            let after=pair_raw(s,token,Some(&user),"GET",&format!("/api/token/{id}"),None).await?;
+            pair_require(after["data"]["rate_limits_enabled"]==true&&after["data"]["rate_limits_count"]==23&&after["data"]["routing_preference"]=="quality"&&after["data"]["routing_quality_threshold"]==80,"native partial patch preserves advanced website fields")?;
+            pair_require(after["data"]["allow_ips"]==""&&after["data"]["exclude_ips"]=="198.51.100.3\n2001:db8::1"&&after["data"]["remain_quota"]==0&&after["data"]["model_limits_enabled"]==false,"patch explicit empty zero false")?;
+            pair_call(s,"PATCH",&format!("{path}/status"),vec![],Some(json!({"status":2}))).await?;
+            let disabled=pair_call(s,"GET",&path,vec![],None).await?;
+            pair_require(disabled["status"]==2,"key status patch")?;
+            let revealed=pair_call(s,"POST",&format!("{path}/reveal"),vec![],None).await?;
+            pair_require(revealed["key"]==created["key"],"reveal exact full Key")?;
+            let g=s.state().generation;
+            pair_require(s.with_confirmed_model_source(&user,g,&id,revealed["key"].as_str().unwrap(),||Ok(())).is_ok(),"real reveal source proof")?;
+            let start=(now()-48*3600).to_string(); let end=(now()+60).to_string();
+            let log_query=||vec![("start_timestamp",start.clone()),("end_timestamp",end.clone())];
+            let summary=pair_call(s,"GET","/account/logs/summary",log_query(),None).await?;
+            let normal=username=="preview";
+            for (field,expected) in [("quota","1200100"),("record_count","27"),("error_count","1"),("prompt_tokens","19210"),("completion_tokens","4805"),("refund_quota","100")] {
+                pair_require(summary[field]==if normal{expected}else{"0"},&format!("own {username} summary {field}"))?;
+            }
+            pair_require(summary["coverage"]=="recorded_logs_only","log coverage semantics")?;
+            let stats=pair_call(s,"GET","/account/logs/statistics",log_query(),None).await?;
+            pair_require(stats["summary"]==summary&&stats["trend"].is_array()&&stats["by_model"].is_array()&&stats["by_error"].is_array(),"statistics DTO and complete summary")?;
+            if normal {
+                let detail=pair_call(s,"GET","/account/logs/requests/synthetic-g2-request",vec![],None).await?;
+                pair_require(detail["items"].as_array().is_some_and(|rows|rows.len()==3),"request log detail preserves own charged/error/refund rows")?;
+            }
+            let mut logs_query=log_query();logs_query.extend([("page","1".into()),("page_size","2".into())]);
+            let logs=pair_call(s,"GET","/account/logs",logs_query,None).await?;
+            pair_require(logs["total"]==if normal{"27"}else{"0"},"own paginated logs")?;
+            pair_require(logs["has_more"]==normal,"logs has_more")?;
+            let usage_query=||vec![("start_time",start.clone()),("end_time",end.clone()),("timezone","UTC".into())];
+            let usage_summary=pair_call(s,"GET","/account/usage/summary",usage_query(),None).await?;
+            pair_require(usage_summary["quota"]==summary["quota"]&&usage_summary["call_count"]==if normal{"25"}else{"0"},"usage summary complete own totals")?;
+            let usage=pair_call(s,"GET","/account/usage",usage_query(),None).await?;
+            pair_require(usage["chart"].is_array()&&usage["table"].is_array()&&usage["coverage"]=="recorded_logs_only","usage series DTO")?;
+            if !normal {pair_require(usage["table"].as_array().unwrap().is_empty(),"admin own usage does not aggregate ordinary account")?;}
+            let models=pair_call(s,"GET","/account/models",vec![("page","1".into()),("page_size","1".into()),("models","synthetic-g2-model".into())],None).await?;
+            pair_require(models["items"].as_array().is_some_and(|rows|rows.len()==1)&&models["pagination"]["total"].is_string(),"model pagination decimal total")?;
+            let perf=pair_call(s,"GET","/account/model-performance",vec![("model","synthetic-g2-model".into()),("hours","48".into()),("resolution","30m".into()),("group","default".into())],None).await?;
+            pair_require(perf["model_name"]=="synthetic-g2-model"&&perf["aggregate"].is_object()&&perf["groups"].is_array(),"single performance DTO")?;
+            let batch=pair_call(s,"POST","/account/model-performance/batch",vec![],Some(json!({"models":["synthetic-g2-model"],"groups":["default"],"hours":48,"resolution":"30m"}))).await?;
+            pair_require(batch.as_array().is_some_and(|rows|rows.len()==1&&rows[0]["model_name"]=="synthetic-g2-model"),"batch performance DTO")?;
+            let bad=serde_json::from_value(json!({"generation":g,"method":"GET","path":"/account/logs/summary","query":[["user_id","999999"]]})).unwrap();
+            pair_require(s.business_request(bad).await.is_err_and(|e|e.code=="invalid_request"),"unknown and ownership params rejected by facade")?;
+            pair_require(!serde_json::to_string(&account).unwrap().contains(token)&&!serde_json::to_string(&profile).unwrap().contains(token),"business projection secret exclusion")?;
+            Ok(())
+        }.await;
+        let key_cleanup = if let Some(id) = created_id {
+            pair_call(s, "DELETE", &format!("/account/keys/{id}"), vec![], None)
+                .await
+                .map(|_| ())
+        } else {
+            Ok(())
+        };
+        let profile_cleanup = if let Some(profile) = original_profile {
+            pair_call(s, "PATCH", "/account/profile", vec![], Some(profile))
+                .await
+                .map(|_| ())
+        } else {
+            Ok(())
+        };
+        let logout = s.logout().await;
+        cleanup.remove_and_verify();
+        vaults.push(cleanup);
+        assert!(key_cleanup.is_ok(), "fixture key cleanup failed");
+        assert!(
+            profile_cleanup.is_ok(),
+            "fixture profile restoration failed"
+        );
+        assert_eq!(logout.status, "disconnected");
+        if let Err(error) = result {
+            panic!("{error}");
+        }
+    }
 }
