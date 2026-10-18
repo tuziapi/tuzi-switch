@@ -1,5 +1,9 @@
 > 当前有效基线为 `TA-AC-1.5-B4` / `system-token-v1`（2026-10-18）。下方 B1～B3、desktop-v1.x、G1/G2/T01～T23 是历史记录，不再作为 B 认证/权限/表迁移或授权边界要求。业务保留和当前 Phase 1 可见性继续有效；以本节、README、ADR-008 和 B 迁移矩阵为准。
 
+# B4 当前主分支同步（2026-10-18）
+
+`B08-local-mainline-sync` 本地完成：C merge `8bcb34a82a15d9f92594b1c8212605eb485cb506` 配对 S merge `eb6816259289ddc0c0f8a0bd8d0914a06709ee02`，两仓分支仍为 `codex/tuzi-assistant-system-token`。分别纳入远程 `main` / `dev`，无冲突；C业务树不变，S保留B扩展。16Go包、Rust47（另2忽略）/52、类型及两端构建通过；前端84通过/1既有失败，网站独立进程361通过/2既有失败，不能标全绿。未复跑原生/UI真实联调、未发布。完整来源、命令、基线复现及限制见 [同步验证](mainline-sync-verification.md)。
+
 # B4 当前本地迁移（2026-10-18）
 
 目标及授权来自本轮 goal-objective.md：A→B 全业务本地迁移，保持 Phase 1。本地代码、文档、定向测试和隔离联调完成；用户验收、完整平台/实库门禁及发布未完成。两仓分支均 `codex/tuzi-assistant-system-token`。

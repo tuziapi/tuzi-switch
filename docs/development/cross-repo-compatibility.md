@@ -2,6 +2,10 @@
 
 基线 `TA-AC-1.5-B4`，契约 `system-token-v1`。此表覆盖已实现功能，**实现适配、接口可用及发布可见性不是同一状态**。分层验证和限制见 [B4验证报告](system-token-verification.md)。
 
+## 最新代码配对：B08本地主分支同步
+
+2026-10-18，两仓 `codex/tuzi-assistant-system-token`：客户端 `8bcb34a82a15d9f92594b1c8212605eb485cb506` + API `eb6816259289ddc0c0f8a0bd8d0914a06709ee02`；契约 `system-token-v1` 不变。客户端纳入 `origin/main` 的 `01546a835a33fd8c1da75f4b67b0816f204e752b`，API纳入 `origin/dev` 的 `a770d4511eb1b9ac7d0707f85a8e3c03e39b5102`。后续仅文档提交不改被测代码；下文迁移/P2/P3配对为此前时点。验证有3项合并前既有失败，未新做真实原生/UI联调或发布；详见 [同步验证与回退](mainline-sync-verification.md)。
+
 ## 功能迁移矩阵
 
 | 当前实现/能力 | B 对应原站接口/适配 | 测试方式 | 当前发布可见性 |
