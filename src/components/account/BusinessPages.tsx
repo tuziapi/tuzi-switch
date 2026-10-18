@@ -26,7 +26,7 @@ export function AccountBusiness({
   const { t } = useTranslation();
   const caps = useDesktop<Capabilities>(
     state,
-    "/api/desktop/capabilities",
+    "/account/capabilities",
     {},
     60000,
   );

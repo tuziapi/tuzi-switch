@@ -11,15 +11,11 @@ export function Logs({ state }: { state: AccountState }) {
   const [page, setPage] = useState(1),
     [filters, setFilters] = useState<Record<string, string>>({}),
     [request, setRequest] = useState("");
-  const list = useDesktop<Page<Log>>(state, "/api/desktop/logs", {
+  const list = useDesktop<Page<Log>>(state, "/account/logs", {
     ...filters,
     page,
   });
-  const summary = useDesktop<Summary>(
-    state,
-    "/api/desktop/logs/summary",
-    filters,
-  );
+  const summary = useDesktop<Summary>(state, "/account/logs/summary", filters);
   const statistics = useDesktop<{
     summary: Summary;
     trend: Summary[];
@@ -30,14 +26,14 @@ export function Logs({ state }: { state: AccountState }) {
       error_count: string;
     }[];
     by_error: { error_code: string; record_count: string }[];
-  }>(state, "/api/desktop/logs/statistics", filters);
+  }>(state, "/account/logs/statistics", filters);
   const detail = useDesktop<{
     request_id: string;
     items: Log[];
     has_more: boolean;
   }>(
     request ? state : { ...state, identity: null },
-    `/api/desktop/logs/requests/${encodeURIComponent(request)}`,
+    `/account/logs/requests/${encodeURIComponent(request)}`,
   );
   return (
     <>

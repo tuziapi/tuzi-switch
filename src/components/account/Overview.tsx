@@ -15,7 +15,7 @@ export function Overview({
   const { t } = useTranslation();
   const account = useDesktop<DesktopAccount>(
     state,
-    "/api/desktop/account",
+    "/account/account",
     {},
     60000,
   );
@@ -39,7 +39,7 @@ export function Overview({
         desktopRequest<Usage>(
           {
             method: "GET",
-            path: "/api/desktop/usage",
+            path: "/account/usage",
             query: [...query, ["interval_seconds", "3600"]],
             generation: state.generation,
           },
@@ -48,7 +48,7 @@ export function Overview({
         desktopRequest<UsageValues>(
           {
             method: "GET",
-            path: "/api/desktop/usage/summary",
+            path: "/account/usage/summary",
             query,
             generation: state.generation,
           },

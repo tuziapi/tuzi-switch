@@ -2735,21 +2735,19 @@
     "status": {
       "loading": "Loading account state",
       "disconnected": "Disconnected",
-      "authorizing": "Complete authorization in your default browser",
-      "exchanging": "Exchanging authorization code",
+      "authorizing": "Copy your account system token from the website and reconnect.",
+      "exchanging": "Copy your account system token from the website and reconnect.",
       "verifying": "Verifying account identity",
       "connected": "Connected",
       "refreshing": "Refreshing connection",
       "offline": "Offline",
-      "invalid": "Authorization expired; reconnect",
+      "invalid": "Connection invalid; paste your system token again",
       "error": "Account connection error"
     },
     "toolsIndependent": "Your Tuzi account is separate from tool sign-ins. Disconnecting keeps provider settings and tool requests intact.",
-    "offlineHint": "The account service is unreachable. This identity is a local record, not confirmation of a valid remote authorization.",
-    "remoteNotRevoked": "Local credentials were cleared, but remote revocation was not confirmed. Revoke this desktop connection in the website profile.",
+    "offlineHint": "The account service is unreachable. The displayed identity is a local record. Check your network and retry.",
     "actionFailed": "The operation failed. Check your account state and try again.",
-    "connect": "Connect in browser",
-    "cancel": "Cancel authorization",
+    "connect": "Paste and connect",
     "retry": "Retry account state",
     "disconnect": "Disconnect this connection",
     "connectRequired": "Connect to use account features. Tool management remains available.",
@@ -2761,7 +2759,13 @@
       "account_disabled": "This account is unavailable. Check its status on the website.",
       "desktop_disabled": "The account service has not enabled desktop connections.",
       "rate_limited": "Too many requests. Please try again later.",
-      "secure_storage_unavailable": "System credential storage is unavailable. Unlock or enable it; credentials will not be stored as plain text."
+      "secure_storage_unavailable": "System credential storage is unavailable. Unlock or enable it; credentials will not be stored as plain text.",
+      "invalid_token": "The system token is invalid or was regenerated. Copy the current token from the website and reconnect.",
+      "legacy_credentials": "Desktop authorization is no longer used. Copy your account system token from the website and reconnect.",
+      "reconnect_required": "Copy your account system token from the website and reconnect.",
+      "secure_storage_failed": "Secure storage failed. Unlock system credential storage and retry; credentials will not be saved as plain text.",
+      "network_error": "The account service is unreachable. Check your network and retry; your input is kept for another attempt.",
+      "account_restricted": "This account is unavailable. Check its status on the website."
     },
     "navigation": "Account and tools",
     "retryAfter": "Retry in {{seconds}} seconds.",
@@ -2861,7 +2865,8 @@
         "invalid_timezone": "Invalid timezone.",
         "conflict": "Data conflict; reread.",
         "not_found": "Record not found.",
-        "contract_mismatch": "Client and server contract versions are incompatible."
+        "contract_mismatch": "Client and server contract versions are incompatible.",
+        "logs_unavailable": "Consumption logs are unavailable, disabled, or have no verifiable records. Consumption cannot be confirmed. Check log settings on the website."
       },
       "keyStatus": {
         "1": "Enabled",
@@ -2985,6 +2990,13 @@
         "actions": "Actions"
       },
       "modelInfo": "Model information"
-    }
+    },
+    "getToken": "Get system token",
+    "tokenLabel": "Account system token",
+    "tokenHint": "Copy your account system token from the API website personal settings, then paste it here. This is different from a model API key.",
+    "tokenPlaceholder": "Paste account system token",
+    "tokenInvalid": "Paste a complete account system token without whitespace.",
+    "verifyingToken": "Verifying…",
+    "disconnectHint": "Disconnecting clears credentials on this device only. The website system token stays valid."
   }
 }

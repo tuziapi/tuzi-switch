@@ -163,7 +163,7 @@ mockIPC(async (command, args) => {
     message: "Synthetic visual fixture",
     data,
     meta: {
-      contract_version: "desktop-v1.1",
+      contract_version: "system-token-v1.0",
       request_id: "synthetic-only",
       generated_at: now,
     },
@@ -171,7 +171,7 @@ mockIPC(async (command, args) => {
   const q = Object.fromEntries(request.query ?? []);
   if (request.method !== "GET") throw { code: "synthetic_preview_read_only" };
   switch (request.path) {
-    case "/api/desktop/capabilities":
+    case "/account/capabilities":
       return envelope({
         release: { profile: "phase1", overview: true, keys: true },
         native: Object.fromEntries(
@@ -188,7 +188,7 @@ mockIPC(async (command, args) => {
         ),
         web: { topup: true, redemption: true, personal: true },
       });
-    case "/api/desktop/account":
+    case "/account/account":
       return envelope({
         user_id: "synthetic-user",
         username: "preview_synthetic",
@@ -200,7 +200,7 @@ mockIPC(async (command, args) => {
         request_count: "2048",
         money,
       });
-    case "/api/desktop/usage/summary":
+    case "/account/usage/summary":
       return envelope(
         empty
           ? {
@@ -211,7 +211,7 @@ mockIPC(async (command, args) => {
             }
           : values,
       );
-    case "/api/desktop/usage":
+    case "/account/usage":
       return envelope({
         source: "usage",
         timezone: q.timezone,
@@ -222,7 +222,7 @@ mockIPC(async (command, args) => {
         chart: empty ? [] : points,
         table: [],
       });
-    case "/api/desktop/keys":
+    case "/account/keys":
       return envelope({
         page: 1,
         page_size: 20,
@@ -232,12 +232,12 @@ mockIPC(async (command, args) => {
           ? []
           : keys.filter((k) => !q.keyword || k.name.includes(q.keyword)),
       });
-    case "/api/desktop/key-groups":
+    case "/account/key-groups":
       return envelope([
         { id: "default", label: "默认分组" },
         { id: "claude", label: "Claude" },
       ]);
-    case "/api/desktop/models":
+    case "/account/models":
       return envelope({
         items: empty
           ? []
@@ -250,14 +250,14 @@ mockIPC(async (command, args) => {
         algorithm_version: "v1",
         pricing_meta: { default_effective_group: "default" },
       });
-    case "/api/desktop/model-performance":
+    case "/account/model-performance":
       return envelope({
         model_name: q.model,
         aggregate: metric,
         groups: [{ ...metric, group: "default" }],
         series_schema: "v1",
       });
-    case "/api/desktop/logs":
+    case "/account/logs":
       return envelope({
         page: 1,
         page_size: 20,
@@ -265,11 +265,11 @@ mockIPC(async (command, args) => {
         has_more: !empty,
         items: empty ? [] : logs,
       });
-    case "/api/desktop/logs/summary":
+    case "/account/logs/summary":
       return envelope(summary);
-    case "/api/desktop/logs/statistics":
+    case "/account/logs/statistics":
       return envelope({ summary, trend: [], by_model: [], by_error: [] });
-    case "/api/desktop/profile":
+    case "/account/profile":
       return envelope({
         user_id: "synthetic-user",
         username: "preview_synthetic",
@@ -395,8 +395,8 @@ function Preview() {
           {
             state,
             isLoading: false,
-            startLogin: async () => state,
-            cancelLogin: async () => state,
+            connect: async () => {},
+            openTokenPage: async () => {},
             logout: async () => state,
             retry: async () => state,
           } as never

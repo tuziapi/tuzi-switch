@@ -31,7 +31,7 @@ export function ConfigureTool({
   const [search, setSearch] = useState(""),
     [page, setPage] = useState(1),
     [snapshot, setSnapshot] = useState("");
-  const models = useDesktop<Models>(state, "/api/desktop/models", {
+  const models = useDesktop<Models>(state, "/account/models", {
     page,
     page_size: 100,
     search,
@@ -89,7 +89,7 @@ export function ConfigureTool({
       const r = await desktopRequest<{ key: string }>(
         {
           method: "POST",
-          path: `/api/desktop/keys/${keyDto.id}/reveal`,
+          path: `/account/keys/${keyDto.id}/reveal`,
           generation: state.generation,
         },
         abort.current.signal,

@@ -16,16 +16,16 @@ export const accountQueryKey = (
   [
     "account",
     "https://api.tu-zi.com",
-    "tuzi-switch-desktop",
+    "system-token-v1",
     state.identity?.userId,
     state.identity?.connectionId,
     state.generation,
     feature,
     filters,
-    "desktop-v1.1",
+    "system-token-v1.0",
   ] as const;
 
-/** Mount once in App; route changes must never initiate authorization. */
+/** Mount once in App; route changes must never initiate a connection. */
 export function useAccount() {
   const client = useQueryClient();
   const eventSequence = useRef(0);
@@ -118,8 +118,8 @@ export function useAccount() {
           }
         : disconnectedAccount),
     isLoading: query.isLoading,
-    startLogin: action(accountApi.startLogin),
-    cancelLogin: action(accountApi.cancelLogin),
+    connect: (token: string) => action(() => accountApi.connect(token))(),
+    openTokenPage: accountApi.openTokenPage,
     logout: action(accountApi.logout),
     retry: action(accountApi.retry),
   };

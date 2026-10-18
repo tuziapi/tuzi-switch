@@ -22,7 +22,7 @@ export function ProfilePage({
   personalAllowed?: boolean;
 }) {
   const { t } = useTranslation();
-  const query = useDesktop<Profile>(state, "/api/desktop/profile", {}, 60000);
+  const query = useDesktop<Profile>(state, "/account/profile", {}, 60000);
   const [form, setForm] = useState<ProfileWrite | null>(null);
   const { write, busy, error, clear } = useWrite(state);
   const readForm = (p: Profile): ProfileWrite => ({
@@ -50,7 +50,7 @@ export function ProfilePage({
       ),
     );
     if (!Object.keys(body).length) return;
-    const p = await write<Profile>("PATCH", "/api/desktop/profile", body);
+    const p = await write<Profile>("PATCH", "/account/profile", body);
     if (p) {
       await verify();
     }

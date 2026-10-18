@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import i18n from "i18next";
 import { ConfigureTool } from "@/components/account/ConfigureTool";
+import { AccountMetrics } from "@/components/account/AccountMetrics";
 import zh from "@/i18n/locales/zh.json";
 import {
   desktopRequest,
@@ -78,7 +79,7 @@ const env = <T,>(data: T): Envelope<T> => ({
   message: "",
   data,
   meta: {
-    contract_version: "desktop-v1.1",
+    contract_version: "system-token-v1.0",
     request_id: "synthetic",
     generated_at: 1,
   },
@@ -148,7 +149,7 @@ describe("identity-isolated native business queries", () => {
     vi.mocked(desktopRequest).mockResolvedValue(env({ owner: "B" }));
     const { wrapper } = setup();
     const hook = renderHook(
-      ({ s }) => useDesktop<{ owner: string }>(s, "/api/desktop/account"),
+      ({ s }) => useDesktop<{ owner: string }>(s, "/account/account"),
       { wrapper, initialProps: { s: state } },
     );
     await waitFor(() => expect(desktopRequest).toHaveBeenCalledTimes(1));
@@ -171,10 +172,9 @@ describe("identity-isolated native business queries", () => {
       status: 403,
     });
     const { wrapper } = setup();
-    const { result } = renderHook(
-      () => useDesktop(state, "/api/desktop/logs"),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useDesktop(state, "/account/logs"), {
+      wrapper,
+    });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.data).toBeUndefined();
     expect(desktopRequest).toHaveBeenCalledTimes(1);
@@ -182,7 +182,7 @@ describe("identity-isolated native business queries", () => {
   it("pauses hidden views and cancels outstanding reads", async () => {
     vi.mocked(desktopRequest).mockImplementation(() => new Promise(() => {}));
     const { wrapper } = setup();
-    const hook = renderHook(() => useDesktop(state, "/api/desktop/logs"), {
+    const hook = renderHook(() => useDesktop(state, "/account/logs"), {
       wrapper,
     });
     await waitFor(() => expect(desktopRequest).toHaveBeenCalledOnce());
@@ -198,6 +198,36 @@ describe("identity-isolated native business queries", () => {
     hook.unmount();
   });
 });
+describe("recorded usage availability", () => {
+  it("keeps daily consumption unknown when logs cannot confirm any records", async () => {
+    vi.mocked(desktopRequest).mockImplementation(async (request) => {
+      if (request.path === "/account/account")
+        return env({ quota: "125", money });
+      throw { code: "logs_unavailable" };
+    });
+    const { wrapper } = setup();
+    const view = render(
+      <AccountMetrics state={state} accountEnabled usageEnabled />,
+      { wrapper },
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        zh.account.business.errors.logs_unavailable,
+      ),
+    );
+    const values = Array.from(view.container.querySelectorAll("dd"));
+    expect(values.map((element) => element.textContent)).toEqual([
+      "USD 1.25",
+      "—",
+      "—",
+      "—",
+    ]);
+    expect(
+      screen.getByText(zh.account.business.usageNotice),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("overview time window", () => {
   it.each([
     [
@@ -672,7 +702,7 @@ describe("business actions and secret lifetime", () => {
           });
           throw { code: "transport_error" };
         }
-        if (req.path === `/api/desktop/keys/${key.id}`) {
+        if (req.path === `/account/keys/${key.id}`) {
           if (kind === "delete" && failed)
             throw { code: "not_found", status: 404 };
           return env(key);

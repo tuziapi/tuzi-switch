@@ -44,13 +44,13 @@ export function ModelsPage({
     [keyId, setKeyId] = useState("");
   const models = useDesktop<Models>(
     state,
-    "/api/desktop/models",
+    "/account/models",
     { ...filters, page, snapshot_id: page > 1 ? snapshot : undefined },
     300000,
   );
   const keys = useDesktop<Page<DesktopKey>>(
     selected && onConfigure ? state : { ...state, identity: null },
-    "/api/desktop/keys",
+    "/account/keys",
     { page: 1, page_size: 100, status: 1 },
   );
   useEffect(() => {
@@ -59,7 +59,7 @@ export function ModelsPage({
   }, [performance, selected, models.data]);
   const quality = useDesktop<Performance>(
     selected ? state : { ...state, identity: null },
-    "/api/desktop/model-performance",
+    "/account/model-performance",
     {
       model: selected?.model_name,
       hours,

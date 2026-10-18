@@ -1066,3 +1066,38 @@
     gap: 6px;
   }
 }
+
+.account-token-form {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 4px;
+  max-width: 720px;
+}
+.account-token-form > label {
+  font-weight: 500;
+}
+.account-token-form > p {
+  color: hsl(var(--muted-foreground));
+}
+.account-token-entry {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.account-token-entry > input {
+  flex: 1;
+  min-width: 0;
+}
+.account-token-entry > button {
+  flex-shrink: 0;
+}
+@media (max-width: 650px) {
+  .account-token-entry {
+    flex-wrap: wrap;
+  }
+  .account-token-entry > input {
+    flex-basis: 100%;
+  }
+}

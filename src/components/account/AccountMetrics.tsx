@@ -18,7 +18,7 @@ export function AccountMetrics({
   const { t } = useTranslation();
   const account = useDesktop<DesktopAccount>(
     accountEnabled ? state : { ...state, identity: null },
-    "/api/desktop/account",
+    "/account/account",
     {},
     60000,
   );
@@ -33,7 +33,7 @@ export function AccountMetrics({
       return desktopRequest<UsageValues>(
         {
           method: "GET",
-          path: "/api/desktop/usage/summary",
+          path: "/account/usage/summary",
           generation: state.generation,
           query: [
             ["timezone", Intl.DateTimeFormat().resolvedOptions().timeZone],

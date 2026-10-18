@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-/** Public native projection. OAuth secrets never cross this boundary. */
+/** Public native projection. Saved account credentials never cross this boundary. */
 export interface AccountState {
   status:
     | "disconnected"
@@ -39,8 +39,9 @@ export const disconnectedAccount: AccountState = {
 };
 export const accountApi = {
   getState: () => invoke<AccountState>("account_get_state"),
-  startLogin: () => invoke<AccountState>("account_start_login"),
-  cancelLogin: () => invoke<AccountState>("account_cancel_login"),
+  connect: (token: string) =>
+    invoke<AccountState>("account_connect", { token }),
+  openTokenPage: () => invoke<void>("account_open_token_page"),
   logout: () => invoke<AccountState>("account_logout"),
   retry: () => invoke<AccountState>("account_retry"),
 };
@@ -53,6 +54,7 @@ export type WebTarget =
   | "gaccode";
 export interface DesktopRequest {
   method: "GET" | "POST" | "PATCH" | "DELETE";
+  /** Controlled native operation ID, never an arbitrary website URL or proxy path. */
   path: string;
   query?: [string, string][];
   body?: unknown;

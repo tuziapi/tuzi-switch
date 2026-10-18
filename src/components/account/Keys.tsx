@@ -59,17 +59,17 @@ export function Keys({
       secretEpoch.current++;
     };
   }, []);
-  const list = useDesktop<Page<DesktopKey>>(state, "/api/desktop/keys", {
+  const list = useDesktop<Page<DesktopKey>>(state, "/account/keys", {
     page,
     ...filters,
   });
   const detail = useDesktop<DesktopKey>(
     selected ? state : { ...state, identity: null },
-    `/api/desktop/keys/${selected}`,
+    `/account/keys/${selected}`,
   );
   const groups = useDesktop<{ id: string; label: string }[]>(
     state,
-    "/api/desktop/key-groups",
+    "/account/key-groups",
   );
   const { write: performWrite, busy, error, clear } = useWrite(state);
   const reveal = useWrite(state);
@@ -115,7 +115,7 @@ export function Keys({
         for (let page = 1; page <= 100; page++) {
           const result = await desktopRequest<Page<DesktopKey>>({
             method: "GET",
-            path: "/api/desktop/keys",
+            path: "/account/keys",
             generation: state.generation,
             query: [
               ["keyword", (op.body as KeyWrite).name],
@@ -193,7 +193,7 @@ export function Keys({
     const epoch = secretEpoch.current;
     const result = await write<DesktopKey | { id: string; key: string }>(
       selected ? "PATCH" : "POST",
-      selected ? `/api/desktop/keys/${selected}` : "/api/desktop/keys",
+      selected ? `/account/keys/${selected}` : "/account/keys",
       body,
     );
     if (result && current.current && epoch === secretEpoch.current) {
@@ -330,13 +330,9 @@ export function Keys({
                       variant="link"
                       disabled={busy || !!error?.outcomeUnknown}
                       onClick={() =>
-                        void write(
-                          "PATCH",
-                          `/api/desktop/keys/${k.id}/status`,
-                          {
-                            status: k.status === 1 ? 2 : 1,
-                          },
-                        )
+                        void write("PATCH", `/account/keys/${k.id}/status`, {
+                          status: k.status === 1 ? 2 : 1,
+                        })
                       }
                     >
                       {t(
@@ -350,7 +346,7 @@ export function Keys({
                       disabled={busy || !!error?.outcomeUnknown}
                       onClick={() => {
                         if (window.confirm(t("account.business.deleteConfirm")))
-                          void write("DELETE", `/api/desktop/keys/${k.id}`);
+                          void write("DELETE", `/account/keys/${k.id}`);
                       }}
                     >
                       {t("account.business.delete")}
@@ -365,7 +361,7 @@ export function Keys({
                         const epoch = secretEpoch.current;
                         const r = await reveal.write<{ key: string }>(
                           "POST",
-                          `/api/desktop/keys/${k.id}/reveal`,
+                          `/account/keys/${k.id}/reveal`,
                         );
                         if (
                           r &&

@@ -3,6 +3,7 @@ import "./account.css";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { AccountBusiness } from "./BusinessPages";
 import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 import type { useAccount } from "@/lib/query/account";
@@ -32,6 +33,10 @@ export function AccountPage({
   const page = "keys";
   const [busy, setBusy] = useState(false);
   const [actionFailed, setActionFailed] = useState(false);
+  // This input exists only in this mounted form, never in query or persistent state.
+  const [token, setToken] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [tokenInvalid, setTokenInvalid] = useState(false);
   const { state, isLoading } = account;
   const [retrySeconds, setRetrySeconds] = useState(0);
   useEffect(() => {
@@ -51,16 +56,9 @@ export function AccountPage({
   const connected = ["connected", "refreshing", "offline"].includes(
     state.status,
   );
-  const policyError = [
-    "insufficient_scope",
-    "unsupported_contract",
-    "account_disabled",
-    "desktop_disabled",
-  ].includes(state.error?.code ?? "");
-  // Native invalid states can retain a refresh journal or expired credentials.
-  // Explicit cleanup is required before a new authorization may replace them.
-  const requiresCleanup =
-    state.status === "invalid" || state.localCleared === false;
+  useEffect(() => {
+    if (connected) setToken("");
+  }, [connected]);
   const run = async (action: () => unknown) => {
     setBusy(true);
     setActionFailed(false);
@@ -72,6 +70,18 @@ export function AccountPage({
       setBusy(false);
     }
   };
+  const connect = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = token.trim();
+    if (!value || /\s/.test(value)) {
+      setTokenInvalid(true);
+      return;
+    }
+    setTokenInvalid(false);
+    setConnecting(true);
+    await run(() => account.connect(value));
+    setConnecting(false);
+  };
   return (
     <section
       className="account-shell account-phase1"
@@ -82,7 +92,9 @@ export function AccountPage({
           <Rabbit size={20} aria-hidden="true" />
         </div>
         <p role="status" aria-live="polite">
-          {t(`account.status.${isLoading ? "loading" : state.status}`)}
+          {t(
+            `account.status.${isLoading ? "loading" : connecting ? "verifying" : state.status}`,
+          )}
         </p>
         {connected && state.identity && (
           <p>
@@ -92,6 +104,7 @@ export function AccountPage({
             </span>
           </p>
         )}
+        {connected && <p>{t("account.disconnectHint")}</p>}
         {state.status === "offline" && <p>{t("account.offlineHint")}</p>}
         {state.error && (
           <p role="alert">
@@ -100,32 +113,21 @@ export function AccountPage({
             })}
           </p>
         )}
-        {state.localCleared === true && state.remoteRevoked === false && (
-          <p role="alert">{t("account.remoteNotRevoked")}</p>
-        )}
         {retrySeconds > 0 && (
           <p>{t("account.retryAfter", { seconds: retrySeconds })}</p>
         )}
         {actionFailed && <p role="alert">{t("account.actionFailed")}</p>}
         <div className="flex flex-wrap gap-2">
-          {!pending && !connected && !policyError && !requiresCleanup && (
-            <Button
-              disabled={busy || isLoading || retrySeconds > 0}
-              onClick={() => void run(account.startLogin)}
-            >
-              {t("account.connect")}
-            </Button>
-          )}
-          {pending && (
+          {!connected && (
             <Button
               variant="outline"
-              disabled={busy}
-              onClick={() => void run(account.cancelLogin)}
+              disabled={busy || isLoading}
+              onClick={() => void run(account.openTokenPage)}
             >
-              {t("account.cancel")}
+              {t("account.getToken")}
             </Button>
           )}
-          {(connected || policyError || state.status === "error") && (
+          {connected && (
             <Button
               variant="outline"
               disabled={
@@ -139,7 +141,7 @@ export function AccountPage({
               {t("account.retry")}
             </Button>
           )}
-          {!pending && (connected || policyError || requiresCleanup) && (
+          {!pending && (connected || !state.localCleared) && (
             <Button
               variant="outline"
               disabled={busy}
@@ -149,6 +151,47 @@ export function AccountPage({
             </Button>
           )}
         </div>
+        {!connected && (
+          <form
+            className="account-token-form"
+            onSubmit={(event) => void connect(event)}
+          >
+            <label htmlFor="account-system-token">
+              {t("account.tokenLabel")}
+            </label>
+            <p id="account-token-hint">{t("account.tokenHint")}</p>
+            <div className="account-token-entry">
+              <Input
+                id="account-system-token"
+                type="password"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={token}
+                disabled={busy || pending || isLoading}
+                aria-describedby="account-token-hint"
+                aria-invalid={tokenInvalid}
+                placeholder={t("account.tokenPlaceholder")}
+                onChange={(event) => {
+                  setToken(event.target.value);
+                  setTokenInvalid(false);
+                  setActionFailed(false);
+                }}
+              />
+              <Button
+                type="submit"
+                disabled={busy || pending || isLoading || retrySeconds > 0}
+              >
+                {t(
+                  connecting || pending
+                    ? "account.verifyingToken"
+                    : "account.connect",
+                )}
+              </Button>
+            </div>
+            {tokenInvalid && <p role="alert">{t("account.tokenInvalid")}</p>}
+          </form>
+        )}
       </div>
       <section
         className="account-content"

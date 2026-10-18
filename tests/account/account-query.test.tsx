@@ -17,8 +17,8 @@ vi.mock("@/lib/api/account", async (original) => ({
   ...(await original<typeof import("@/lib/api/account")>()),
   accountApi: {
     getState: vi.fn(),
-    startLogin: vi.fn(),
-    cancelLogin: vi.fn(),
+    connect: vi.fn(),
+    openTokenPage: vi.fn(),
     logout: vi.fn(),
     retry: vi.fn(),
   },
@@ -115,6 +115,59 @@ describe("account native state and cache isolation", () => {
     const { result } = setup();
     await waitFor(() => expect(result.current.state.status).toBe("error"));
     expect(result.current.state.error?.code).toBe("native_unavailable");
-    expect(accountApi.startLogin).not.toHaveBeenCalled();
+    expect(accountApi.connect).not.toHaveBeenCalled();
+  });
+  it("connects without caching input and invalidates the previous account data", async () => {
+    vi.mocked(accountApi.getState).mockResolvedValue(connected);
+    const next = {
+      ...connected,
+      generation: 4,
+      identity: { ...connected.identity!, connectionId: "synthetic-second" },
+    };
+    vi.mocked(accountApi.connect).mockResolvedValue(next);
+    const { result, client } = setup();
+    await waitFor(() => expect(result.current.state.status).toBe("connected"));
+    client.setQueryData(["account", "private"], { previous: true });
+    await act(() => result.current.connect("synthetic-system-token"));
+    await waitFor(() =>
+      expect(result.current.state.identity?.connectionId).toBe(
+        "synthetic-second",
+      ),
+    );
+    expect(accountApi.connect).toHaveBeenCalledWith("synthetic-system-token");
+    expect(client.getQueryData(["account", "private"])).toBeUndefined();
+    expect(
+      JSON.stringify(
+        client
+          .getQueryCache()
+          .getAll()
+          .map((q) => q.state.data),
+      ),
+    ).not.toContain("synthetic-system-token");
+  });
+  it("ignores a late successful connection after the user disconnects", async () => {
+    vi.mocked(accountApi.getState).mockResolvedValue(disconnectedAccount);
+    let finish!: (state: AccountState) => void;
+    vi.mocked(accountApi.connect).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { result } = setup();
+    await waitFor(() => expect(listener.handler).toBeDefined());
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.connect("synthetic-system-token");
+    });
+    act(() =>
+      listener.handler!({ payload: { ...disconnectedAccount, generation: 4 } }),
+    );
+    await act(async () => {
+      finish(connected);
+      await pending;
+    });
+    await waitFor(() => expect(result.current.state.generation).toBe(4));
+    expect(result.current.state.identity).toBeNull();
   });
 });
