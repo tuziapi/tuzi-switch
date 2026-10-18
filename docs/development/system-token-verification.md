@@ -90,3 +90,18 @@ B 系统令牌具有原站实际角色权限，不是受 scope 限制的 OAuth �
 未验证真实 MySQL/PostgreSQL、生产拓扑/容量、Windows/Linux安全存储、三平台发行安装包、完整旧站第三方OAuth/支付端到端及逐项用户验收。不使用SQLite、组件Mock、截图或编译替代这些门禁。
 
 上线未执行：另获授权后先完成数据库/平台/旧站/容量和用户验收；先兼容 API及网站、后B客户端，保持Phase1。旧API缺bootstrap/PATCH/summary时B明确失败，不降级A或GET+PUT覆盖。回退先客户端/引导后API兼容扩展，用可审查revert，保留数据库、备份和A表；v2记录不能交给A使用，回退须显式重连并复核A表/钩子，不自动恢复旧会话。发现凭证泄露由用户在网站主动轮换，设备断开不等于远端撤销。
+
+## 2026-10-18 P2/P3 定向复查修复
+
+P2：原生资料投影对 `record_ip_log` 缺省、`null` 返回 `true`，保留显式 `true`/`false`；其余两布尔默认不变。新增合成 loopback HTTP→AccountService 测试逐一覆盖四情况。旧代码在 missing 情况断言失败；修复后通过。既有资料组件回归继续验证 true→false 仅提交 `{record_ip_log:false}`。资料页面保持隐藏。
+
+P3：网站改为 Semi `Input readonly`，测试直接加载已安装 Semi Input，验证遮罩/展开/剪贴板失败三种状态均只读、展开后聚焦全选。网络、按钮与弹窗仍为替身。旧 `readOnly` 使两项测试失败，修复后通过，不冒称浏览器端到端验收。
+
+本次命令与结果：
+
+- `CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target cargo test --manifest-path src-tauri/Cargo.toml --lib tuzi_account::tests -- --test-threads=4`：23 通过、2 默认忽略（真实 Go 配对/OS 安全存储本次未复跑）。
+- `pnpm test:unit --run tests/account/desktop-business.test.tsx`：27 通过，包含显式 false 资料部分提交。
+- 网站五文件 Bun 命令同上文：37 通过；真实 Input 只读和选择范围断言纳入原有 7 项卡片测试。
+- 两份 Rust 文件 `rustfmt --edition 2021 --check`、两份网站 JSX `bunx prettier --check`、两仓 `git diff --check`：通过。
+
+配对网站修复 `9f0bdbb1388334cd176c97460adb7e68bbcaaec1`；客户端 P2 由本节同一 Git 提交定位，两仓分支及契约不变。以上是本次代码/定向测试证据；先前联调记录保留其时点含义。本次未重建正在运行的桌面预览、未新增浏览器人工验收，未 push/PR/部署/生产操作或使用真实凭证。

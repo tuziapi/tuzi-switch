@@ -26,6 +26,8 @@
 
 ## 起点及最终配对
 
+2026-10-18 P2/P3 后续修复配对：两仓继续使用 `codex/tuzi-assistant-system-token` / `system-token-v1`。客户端 P2 精确 SHA 由本条与 `profile_record_ip_defaults_match_website_and_preserve_explicit_values` 同一提交定位；配对网站 P3 `9f0bdbb1388334cd176c97460adb7e68bbcaaec1`。下表保留首次迁移交付时点，不代表包含本次修复。两处修复独立、无新增接口/数据库依赖；将来发布沿用原发布门禁，各仓可独立 revert 对应修复，不恢复 A、不触发令牌轮换。
+
 | 仓库 | 核查起点 | B 最终集成分支 | 最终 SHA/状态 |
 |---|---|---|---|
 | 客户端 | codex/tuzi-assistant-dev / c3902fe7c4fc847e769b23d7712092a30aa67c57 | codex/tuzi-assistant-system-token | 代码 `05419d66f48066fee78a9adf95590484cb78c639`；后续仅文档提交 |

@@ -498,13 +498,12 @@ fn project(
             let mut d = pick(v, "username display_name email");
             d["user_id"] = decimal(&v["id"])?;
             d["language"] = settings["language"].as_str().unwrap_or("en").into();
-            for k in [
-                "accept_unset_model_ratio_model",
-                "high_concurrency_enabled",
-                "record_ip_log",
-            ] {
+            for k in ["accept_unset_model_ratio_model", "high_concurrency_enabled"] {
                 d[k] = serde_json::json!(settings[k].as_bool().unwrap_or(false));
             }
+            // Website legacy settings treat missing/null IP logging as enabled.
+            d["record_ip_log"] =
+                serde_json::json!(settings["record_ip_log"].as_bool().unwrap_or(true));
             Ok(d)
         }
         "/account/keys" if r.method == "GET" => page(v, key),

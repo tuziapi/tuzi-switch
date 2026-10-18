@@ -117,6 +117,31 @@ async fn connected() -> (
 }
 
 #[tokio::test]
+async fn profile_record_ip_defaults_match_website_and_preserve_explicit_values() {
+    let (s, _, fixture, task) = connected().await;
+    let generation = s.state().generation;
+    for (label, settings, expected) in [
+        ("missing", json!({}), true),
+        ("null", json!({"record_ip_log": null}), true),
+        ("true", json!({"record_ip_log": true}), true),
+        ("false", json!({"record_ip_log": false}), false),
+    ] {
+        fixture.set(
+            StatusCode::OK,
+            json!({"success":true,"data":{"id":7,"setting":settings.to_string()}}),
+        );
+        let response = s
+            .business_request(request(generation, "GET", "/account/profile"))
+            .await
+            .unwrap();
+        assert_eq!(response["data"]["record_ip_log"], expected, "{label}");
+        assert_eq!(response["data"]["accept_unset_model_ratio_model"], false);
+        assert_eq!(response["data"]["high_concurrency_enabled"], false);
+    }
+    task.abort();
+}
+
+#[tokio::test]
 async fn connect_bootstraps_identity_without_user_header_and_persists_only_in_vault() {
     let (s, store, fixture, task) = connected().await;
     let state = s.state();

@@ -50,6 +50,8 @@
 
 ## 资料原子白名单
 
+资料读取沿用网站设置语义：`record_ip_log` 缺省或 `null` 时为 `true`，显式 `true`/`false` 保留；另外两个布尔资料设置缺省仍为 `false`。页面按回读值计算变化字段，不能把旧账户缺省值误认为已关闭。
+
 PATCH `/api/user/self` 仅接受 `display_name,language,accept_unset_model_ratio_model,high_concurrency_enabled,record_ip_log`，至少一项，未知/null/错误类型拒绝。显示名、语言枚举和价格资格沿用网站校验/限制，不顺带放开 username、role、余额、密码、绑定或通知凭证。事务锁用户，合并实际提供的 settings 项并更新显示名，保留并发/未知项；损坏 JSON 报错，不用空对象覆盖。成功后当前账户回读确认。
 
 ## 全量汇总与时间/覆盖语义
