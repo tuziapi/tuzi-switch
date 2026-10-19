@@ -310,6 +310,7 @@ describe("B09 key workflow regressions", () => {
       expect(screen.getByRole("button", { name: /Codex/ })).toBeEnabled(),
     );
     fireEvent.click(screen.getByRole("button", { name: /Codex/ }));
+    fireEvent.click(screen.getByRole("combobox", { name: "模型" }));
     await screen.findByRole("option", { name: "compatible-fixture" });
     expect(
       screen.queryByRole("option", { name: "incompatible-fixture" }),
@@ -320,9 +321,7 @@ describe("B09 key workflow regressions", () => {
     expect(
       screen.queryByRole("option", { name: "missing-groups-fixture" }),
     ).toBeNull();
-    fireEvent.change(screen.getByRole("combobox", { name: "模型" }), {
-      target: { value: "compatible-fixture" },
-    });
+    fireEvent.click(screen.getByRole("option", { name: "compatible-fixture" }));
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
     await waitFor(() =>
       expect(ready).toHaveBeenCalledWith(

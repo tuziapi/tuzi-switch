@@ -2,6 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandItem,
+} from "@/components/ui/command";
+import { ChevronsUpDown, Check } from "lucide-react";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import type { AppId } from "@/lib/api";
 import { desktopRequest, type AccountState } from "@/lib/api/account";
@@ -61,6 +73,7 @@ export function ConfigureTool({
   onExisting?: (app: AppId, providerId: string) => void;
 }) {
   const [app, setApp] = useState<AppId | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [snapshot, setSnapshot] = useState("");
@@ -274,44 +287,81 @@ export function ConfigureTool({
       </div>
       {app && (
         <div className="account-tool-options">
-          <label>
-            搜索模型
-            <input
-              className="account-tool-select"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-                setSnapshot("");
-                setModel(undefined);
-                setProtocol("");
-              }}
-            />
-          </label>
+          <div className="space-y-2">
+            <span className="text-sm font-medium">选择模型</span>
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-label="模型"
+                  aria-expanded={pickerOpen}
+                  className="w-full justify-between"
+                >
+                  <span className="truncate">
+                    {model?.model_name || "搜索并选择模型"}
+                  </span>
+                  <ChevronsUpDown size={16} className="shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="z-[80] w-[var(--radix-popover-trigger-width)] p-0"
+                onEscapeKeyDown={(event) => event.stopPropagation()}
+              >
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    aria-label="搜索模型"
+                    placeholder="输入模型名称搜索…"
+                    value={search}
+                    onValueChange={(value) => {
+                      setSearch(value);
+                      setPage(1);
+                      setSnapshot("");
+                      setModel(undefined);
+                      setProtocol("");
+                    }}
+                  />
+                  <CommandList>
+                    {models.isFetching ? (
+                      <p className="p-3 text-sm" role="status">
+                        正在加载模型…
+                      </p>
+                    ) : (
+                      choices.map((m) => (
+                        <CommandItem
+                          key={m.model_name}
+                          value={m.model_name}
+                          onSelect={() => {
+                            setModel(m);
+                            setProtocol(compatible(m)[0]?.protocol ?? "");
+                            setPickerOpen(false);
+                          }}
+                        >
+                          <Check
+                            size={16}
+                            className={
+                              model?.model_name === m.model_name
+                                ? "opacity-100"
+                                : "opacity-0"
+                            }
+                          />
+                          {m.model_name}
+                        </CommandItem>
+                      ))
+                    )}
+                    {!models.isFetching && !models.error && !choices.length && (
+                      <p className="p-3 text-sm">
+                        {search
+                          ? "没有匹配结果，请换个关键词。"
+                          : "暂无可用于此工具的模型。"}
+                      </p>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
           <QueryState query={models} showUpdated={false} />
-          <label>
-            模型
-            <select
-              className="account-tool-select"
-              aria-label="模型"
-              value={model?.model_name ?? ""}
-              onChange={(e) => {
-                const m = choices.find((x) => x.model_name === e.target.value);
-                setModel(m);
-                setProtocol(m ? (compatible(m)[0]?.protocol ?? "") : "");
-              }}
-            >
-              <option value="">请选择适用于 {labels[app]} 的模型</option>
-              {choices.map((m) => (
-                <option key={m.model_name}>{m.model_name}</option>
-              ))}
-            </select>
-          </label>
-          {models.data && !choices.length && (
-            <p className="account-form-hint">
-              本页没有与该密钥分组、模型限制和工具协议匹配的模型，请搜索或翻页。
-            </p>
-          )}
           {(page > 1 || models.data?.data.pagination.has_more) && (
             <div className="account-pager">
               <Button
