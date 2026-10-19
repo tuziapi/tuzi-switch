@@ -609,6 +609,66 @@ fn project(
         _ => Err(invalid()),
     }
 }
+// 临时本地模型夹具：仅供测试模型选择与工具配置流程。
+// 默认关闭：AccountService 的 project() 调用后，夹具入口的两行代码已注释。
+// 需要时同时恢复该处 cfg 属性和函数调用，再重新构建并重启本地预览。
+// 仅 local-preview + http://127.0.0.1:5180 生效；普通构建不包含此函数，
+// release 构建禁止 local-preview（见 mod.rs），不要移除这些隔离条件。
+// 开启后为 default 分组补入/替换 gpt-5.6-sol 的 Responses 元数据；
+// 列表和保存前校验共用，仍遵守 Key 权限，不配置 API 渠道，也不证明模型可调用。
+#[cfg(feature = "local-preview")]
+fn local_configuration_fixture(origin: &str, request: &BusinessRequest, mut data: Value) -> Value {
+    const NAME: &str = "gpt-5.6-sol";
+    if origin != "http://127.0.0.1:5180" || request.path != "/account/models" {
+        return data;
+    }
+    let matches = request.query.iter().all(|(k, v)| match k.as_str() {
+        "page" => v == "1",
+        "search" => NAME.contains(&v.to_lowercase()),
+        "group" => v == "default",
+        "endpoint_type" => v == "openai-response",
+        "vendor" | "tag" => v.is_empty(),
+        _ => true,
+    });
+    let names: Vec<_> = request
+        .query
+        .iter()
+        .filter(|(k, _)| k == "models")
+        .collect();
+    if !matches
+        || (!names.is_empty() && !names.iter().any(|(_, v)| v.split(',').any(|n| n == NAME)))
+    {
+        return data;
+    }
+    let Some(items) = data["items"].as_array_mut() else {
+        return data;
+    };
+    let existing = items.iter().position(|item| item["model_name"] == NAME);
+    let fixture = serde_json::json!({
+        "model_name": NAME, "aliases": [], "description": "Local configuration fixture",
+        "description_i18n": "", "tags": "", "vendor_id": "local-preview",
+        "quota_type": 0, "model_ratio": null, "model_price": null,
+        "pricing_unavailable": true, "completion_ratio": null,
+        "enable_groups": ["default"], "supported_endpoint_types": ["openai-response"],
+        "endpoints": {"openai-response": {"path": "/v1/responses", "method": "POST"}},
+        "billing_mode": null, "billing_expr": null, "pricing_version": null, "related_pricing": []
+    });
+    if let Some(index) = existing {
+        items[index] = fixture;
+    } else {
+        items.push(fixture);
+    }
+    if existing.is_none() {
+        if let Some(total) = data["pagination"]["total"]
+            .as_str()
+            .and_then(|v| v.parse::<u64>().ok())
+        {
+            data["pagination"]["total"] = (total + 1).to_string().into();
+        }
+    }
+    data
+}
+
 fn prefix_key(d: &mut Value) -> Result<(), BusinessError> {
     let key = d["key"]
         .as_str()
@@ -727,22 +787,40 @@ impl AccountService {
             .business_request(get(format!("/account/keys/{token_id}"), vec![]))
             .await
             .map_err(|e| e.code)?;
-        let mut query = vec![
-            ("page".into(), "1".into()),
-            ("page_size".into(), "100".into()),
-        ];
-        query.extend(selected_models.iter().map(|m| ("models".into(), m.clone())));
-        let models = self
-            .business_request(get("/account/models".into(), query))
-            .await
-            .map_err(|e| e.code)?;
-        qualified_models(
-            &key["data"],
-            &models["data"],
-            selected_models,
-            protocol,
-            now(),
-        )
+        // The website's exact-model lookup accepts at most three names.
+        // Pin multi-request validation to one snapshot, and never accept a
+        // partial result or combine refreshed snapshots before local writes.
+        const EXACT_MODELS_PER_REQUEST: usize = 3;
+        let mut snapshot: Option<String> = None;
+        for batch in selected_models.chunks(EXACT_MODELS_PER_REQUEST) {
+            let mut query = vec![
+                ("page".into(), "1".into()),
+                ("page_size".into(), "100".into()),
+            ];
+            query.extend(batch.iter().map(|m| ("models".into(), m.clone())));
+            if let Some(id) = &snapshot {
+                query.push(("snapshot_id".into(), id.clone()));
+            }
+            let models = self
+                .business_request(get("/account/models".into(), query))
+                .await
+                .map_err(|e| e.code)?;
+            let data = &models["data"];
+            if selected_models.len() > EXACT_MODELS_PER_REQUEST {
+                let id = data["snapshot_id"]
+                    .as_str()
+                    .filter(|id| !id.is_empty())
+                    .ok_or("invalid_response")?;
+                if data["snapshot_refreshed"] == true
+                    || snapshot.as_ref().is_some_and(|previous| previous != id)
+                {
+                    return Err("snapshot_changed".into());
+                }
+                snapshot = Some(id.to_owned());
+            }
+            qualified_models(&key["data"], data, batch, protocol, now())?;
+        }
+        Ok(())
     }
     fn business_tokens(&self, generation: u64) -> Result<Tokens, BusinessError> {
         self.load();
@@ -915,6 +993,11 @@ impl AccountService {
                     }
                     self.business_tokens(request.generation)?;
                     let data = project(&request, &route, raw, status)?;
+                    // 临时夹具入口（默认关闭）：需要本地测试时同时取消下面两行的注释。
+                    // 在仓库根目录运行 bash scripts/build-local-preview.sh 后重启新预览；
+                    // 测试结束重新注释这两行并重建。关闭时直接使用 API 返回的模型数据。
+                    // #[cfg(feature = "local-preview")]
+                    // let data = local_configuration_fixture(&self.origin, &request, data);
                     if request.method == "POST" {
                         if let Some(token_id) = request
                             .path
@@ -1052,6 +1135,55 @@ pub async fn account_open_web(app: tauri::AppHandle, target: String) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "local-preview")]
+    #[test]
+    fn local_fixture_is_scoped_and_qualifies_without_bypassing_key_rules() {
+        let mut request = BusinessRequest {
+            method: "GET".into(),
+            path: "/account/models".into(),
+            query: vec![],
+            body: None,
+            generation: 1,
+            request_id: None,
+        };
+        let base = serde_json::json!({"items":[],"pagination":{"total":"0"},"pricing_meta":{"usable_group":{"default":"Default"},"default_effective_group":"default"}});
+        assert_eq!(
+            local_configuration_fixture("https://api.tu-zi.com", &request, base.clone()),
+            base
+        );
+        let listed = local_configuration_fixture("http://127.0.0.1:5180", &request, base.clone());
+        assert_eq!(listed["items"][0]["model_name"], "gpt-5.6-sol");
+        assert_eq!(listed["pagination"]["total"], "1");
+        assert_eq!(
+            local_configuration_fixture("http://127.0.0.1:5180", &request, listed.clone()),
+            listed
+        );
+        request.query = vec![("models".into(), "gpt-5.6-sol".into())];
+        let rechecked =
+            local_configuration_fixture("http://127.0.0.1:5180", &request, base.clone());
+        assert_eq!(listed, rechecked);
+        let mut key = serde_json::json!({"status":1,"expired_time":-1,"unlimited_quota":true,"group":"default","model_limits":"","model_limits_enabled":false});
+        let names = vec!["gpt-5.6-sol".into()];
+        assert!(qualified_models(&key, &rechecked, &names, "responses", 100).is_ok());
+        key["status"] = serde_json::json!(2);
+        assert!(qualified_models(&key, &rechecked, &names, "responses", 100).is_err());
+        key["status"] = serde_json::json!(1);
+        key["model_limits_enabled"] = serde_json::json!(true);
+        key["model_limits"] = serde_json::json!("another-model");
+        assert!(qualified_models(&key, &rechecked, &names, "responses", 100).is_err());
+        for (k, v) in [
+            ("page", "2"),
+            ("search", "non-matching"),
+            ("models", "another-model"),
+        ] {
+            request.query = vec![(k.into(), v.into())];
+            assert_eq!(
+                local_configuration_fixture("http://127.0.0.1:5180", &request, base.clone()),
+                base
+            );
+        }
+    }
+
     #[test]
     fn catalog_endpoints_qualify_consistently_without_relaxing_key_checks() {
         let cases: Vec<Value> = serde_json::from_str(include_str!(

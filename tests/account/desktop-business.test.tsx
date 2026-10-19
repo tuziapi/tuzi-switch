@@ -701,9 +701,10 @@ describe("business actions and secret lifetime", () => {
       vi.mocked(desktopRequest).mock.calls.filter(([r]) => r.method === "POST"),
     ).toHaveLength(1);
   });
-  it.each(["create", "edit", "status", "delete"])(
+  it.each(["create", "edit", "status", "delete", "delete404"])(
     "keeps uncertain %s locked through failed verification and unrelated actions",
-    async (kind) => {
+    async (scenario) => {
+      const kind = scenario === "delete404" ? "delete" : scenario;
       let failed = false;
       let rejectRead = true;
       let finishRead: (() => void) | undefined;
@@ -721,11 +722,16 @@ describe("business actions and secret lifetime", () => {
           await new Promise<void>((resolve) => {
             finishRead = resolve;
           });
-          throw { code: "transport_error" };
+          throw kind === "delete"
+            ? { code: "business_error", status: 200 }
+            : { code: "transport_error" };
         }
         if (req.path === `/account/keys/${key.id}`) {
           if (kind === "delete" && failed)
-            throw { code: "not_found", status: 404 };
+            throw {
+              code: "not_found",
+              status: scenario === "delete404" ? 404 : 200,
+            };
           return env(key);
         }
         return env({

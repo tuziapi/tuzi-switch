@@ -15,6 +15,7 @@ import type { CodexCatalogModel } from "@/types";
 
 interface UseCodexConfigStateProps {
   providerId?: string;
+  isCreationPrefill?: boolean;
   initialData?: {
     name?: string;
     settingsConfig?: Record<string, unknown>;
@@ -118,6 +119,7 @@ function migrateLegacyConfig(configStr: string): string {
 export function useCodexConfigState({
   providerId,
   initialData,
+  isCreationPrefill = false,
 }: UseCodexConfigStateProps) {
   const [codexAuth, setCodexAuthState] = useState("{}");
   const [codexConfig, setCodexConfigState] = useState("");
@@ -199,9 +201,20 @@ export function useCodexConfigState({
       setCodexApiKey("");
       setCodexCredentialError("");
 
-      // Read through the provider-bound command so the backend can safely
-      // migrate legacy env keys without allowing arbitrary credential reads.
-      if (resolvedEnvKey) {
+      const prefilledKey = migratedLegacyToken.auth?.OPENAI_API_KEY;
+      // A new account draft has no stored env credential yet. Use its explicit
+      // model Key without reading or overwriting another provider's credential.
+      if (
+        isCreationPrefill &&
+        !providerId &&
+        typeof prefilledKey === "string" &&
+        prefilledKey
+      ) {
+        setCodexApiKey(prefilledKey);
+        setCodexCredentialStatus("loaded");
+        // Read through the provider-bound command so the backend can safely
+        // migrate legacy env keys without allowing arbitrary credential reads.
+      } else if (resolvedEnvKey) {
         setCodexCredentialStatus("loading");
         const command = providerId
           ? invoke<CodexProviderCredentialResponse>(
@@ -257,7 +270,7 @@ export function useCodexConfigState({
     return () => {
       cancelled = true;
     };
-  }, [initialData, providerId, credentialReloadToken]);
+  }, [initialData, providerId, isCreationPrefill, credentialReloadToken]);
 
   const retryCodexCredentialLoad = useCallback(() => {
     setCredentialReloadToken((value) => value + 1);

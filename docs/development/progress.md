@@ -378,6 +378,20 @@ G3的T19/T20/T21与Q02/Q04/Q09环境门槛保持待办；不把本地通过等�
 
 2026-10-19 模型选择器优化：客户端7a5fdb0合并搜索与选择，技术原因只在对话解释；8测试、类型与构建通过，已重启并实机验收下拉空态和Esc交互。API未修改。
 
+2026-10-19 Codex 新建配置 Key 回填修复：显式账户创建草稿直接使用所选模型 Key，保留已有供应商读取凭证逻辑。20 项定向测试、类型和构建通过，新预览实机已确认密码字段填充；未保存配置/调用模型。本轮修复与临时夹具均未提交，详见 B09 验证文末。
+
 ## B16 模型端点兼容（2026-10-19）
 
 代码 `f64ebcc8c2b6a625cb6a6528b32657e9817d75b0` 配对 API `21cd7acd51349407cdc5d332a763907d065f9a86`，两仓 B 分支、system-token-v1 不变。前端/原生共享端点映射，兼容 claude code、gemini generateContent 和 OpenAI-Chat 大小写，保持 Key 校验及工具保存语义。公开 662 模型协议识别核查无原可识别项减少；61 前端、3 原生资格、14 保存回归、类型及 macOS 构建通过。未推送/发布，临时夹具未提交；见 [B16验证](model-endpoint-compatibility-verification.md)。
+
+### B16 本地夹具默认关闭（2026-10-19）
+
+按用户要求，注释 `business.rs` 中临时模型夹具的调用入口，保留实现和测试，补充重新开启/关闭及重建说明；`local-preview`、固定本地 origin、禁止 release 使用预览 feature 的隔离仍保留。仅此本地测试适配，未改变正式模型兼容规则或 API。两仓仍为 B 分支，客户端 HEAD `44a809125bf1f42de1b06ff5ecbce81b531c9ce3` / API HEAD `21cd7acd51349407cdc5d332a763907d065f9a86`，契约不变。
+
+`CARGO_TARGET_DIR=/Users/syd08/Documents/tuzi-switch/src-tauri/target cargo test --manifest-path src-tauri/Cargo.toml --lib --features local-preview tuzi_account::business::`：4 项通过（包含保留夹具的范围/Key 限制回归），日志 `/tmp/tuzi-fixture-disabled-tests.log`；`rustfmt --check --edition 2021 src-tauri/src/tuzi_account/business.rs`、`git diff --check` 和本地备份补丁反向适用性检查通过。源码入口已关闭，本轮未重建或重启应用，旧预览不自动变化。说明及更新后的补丁保存在仓库外 `~/Library/Application Support/com.tuziswitch.desktop.preview/local-responses-fixture/`。本轮全部改动未暂存、未提交、未推送，原有工作树修改保留。
+
+## B17 提交前审查修复（2026-10-19）
+
+按用户要求，仅修复第 1 项删除成功但响应丢失后的确认恢复、第 3 项超过3个模型时工具配置校验失败；第 2 项空分组不修改。API 为本人 Key 的不存在响应补充 `error.code=not_found`，保留 HTTP200/success/message；客户端据明确不存在语义回读并仍需手动确认。原生模型资格查询按3个一批、固定快照串行校验，全部通过才继续原保存事务。
+
+两仓仍为 `codex/tuzi-assistant-system-token`，客户端 HEAD `44a809125bf1f42de1b06ff5ecbce81b531c9ce3`、API HEAD `21cd7acd51349407cdc5d332a763907d065f9a86` 加本轮未提交增量；已有工作树修改保留，默认关闭的夹具入口未变。API 3包回归、前端112项、原生账户40项（1既有忽略）、工具保存14项、类型及格式检查通过。仅本地分层验证，未重建预览或新增完整真实联调，未提交/推送/部署；上线须先 API 再客户端。完整证据及回退见 [B17验证](prepush-fixes-verification.md)。

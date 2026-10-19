@@ -9,6 +9,8 @@ use axum::{
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+mod prepush_regressions;
+
 // All credentials and identities in this module are synthetic local fixtures.
 const SYNTHETIC_TOKEN: &str = "synthetic-account-system-token";
 const SYNTHETIC_KEY: &str = "sk-synthetic-model-key";

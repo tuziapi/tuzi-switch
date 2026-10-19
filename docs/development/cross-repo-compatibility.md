@@ -84,3 +84,11 @@
 ## B16 模型端点兼容（2026-10-19）
 
 客户端 `f64ebcc8c2b6a625cb6a6528b32657e9817d75b0` / API `21cd7acd51349407cdc5d332a763907d065f9a86`，分支均 codex/tuzi-assistant-system-token，B4/system-token-v1。API 无修改；客户端解析现有 supported_endpoint_types/endpoints 字段，不改路由和工具配置写入。正式修复可独立 revert，无迁移或发布操作。临时 local-preview 夹具保留未提交。验证及限制见 [B16验证](model-endpoint-compatibility-verification.md)。
+
+## B17 删除恢复与多模型资格校验（2026-10-19）
+
+配对基准为客户端 `44a809125bf1f42de1b06ff5ecbce81b531c9ce3`、API `21cd7acd51349407cdc5d332a763907d065f9a86`，各自加本轮工作树增量，尚无修复提交 SHA。两仓 `codex/tuzi-assistant-system-token`，B4 / `system-token-v1`，用户后续自行整理提交及推送。
+
+API `GET /api/token/:id` 仅在归属查询确定不存在时新增 `error.code=not_found`；旧 HTTP200/success/message、路由和权限保留，网站及其他 OAuth 调用方不需修改。新客户端删除未知结果回读需配套此扩展，故部署先 API、后客户端；连接旧 API 时仍保守锁定，不将普通失败当删除成功。多模型每批最多3个、固定首批 snapshot_id，沿用现有 pricing 接口，无查询上限或 schema 变更。空分组兼容按用户要求不修改。
+
+回退先客户端、后 API；无迁移、清表或令牌轮换。仅本地测试，未发布，历史真实联调不能替代本轮配对验证。范围、命令、结果及限制见 [B17验证](prepush-fixes-verification.md)。

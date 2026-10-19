@@ -4,7 +4,9 @@
 
 最终集成分支两仓均为 `codex/tuzi-assistant-system-token`，替代本任务旧 API 集成分支要求；分支名不证明部署。当前代码、测试、联调、用户验收和发布状态分别见 [progress.md](progress.md)，配对 SHA 及兼容限制见 [跨仓库兼容记录](cross-repo-compatibility.md)。本地代码/定向验证/隔离联调已完成，分层证据与未完成门禁见 [B4验证报告](system-token-verification.md)；用户验收和发布未完成。
 
-最新 B15：账户配置短暂定位、按密钥命名及连接检查反馈已本地完成；见 [B15验证](provider-feedback-verification.md)。未发布。
+最新 B17：按用户指定修复提交前审查第 1、3 项（删除未知结果回读、多模型分批校验），第 2 项空分组问题保持不变。修改未提交，验证及 API 优先上线顺序见 [B17验证](prepush-fixes-verification.md)。
+
+此前 B15：账户配置短暂定位、按密钥命名及连接检查反馈已本地完成；见 [B15验证](provider-feedback-verification.md)。未发布。
 
 此前 B13：用户明确批准账户系统令牌改用独立本地配置文件、Codex表单移除环境变量字段；见 [ADR-011](decisions/0011-local-account-file-and-hidden-codex-env.md) 和 [B13验证](local-account-file-verification.md)。旧钥匙串不读取，首次更新需重新连接。
 

@@ -765,7 +765,11 @@ function ProviderFormFull({
     handleCodexConfigChange: originalHandleCodexConfigChange,
     resetCodexConfig,
     retryCodexCredentialLoad,
-  } = useCodexConfigState({ providerId, initialData });
+  } = useCodexConfigState({
+    providerId,
+    initialData,
+    isCreationPrefill: appId === "codex" && !editData && !!creationPrefill,
+  });
   useEffect(() => {
     onSubmittingChange?.(
       isSubmitting ||

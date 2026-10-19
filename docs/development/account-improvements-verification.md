@@ -159,3 +159,14 @@ CSS格式与diff检查、macOS预览构建通过（日志 `/tmp/tuzi-modal-text-
 用户确认 `gpt-5.6-sol` 上游支持 `/v1/responses`。客户端提交 `27e364c9` 将 API 标准标识 `openai-response` 加入 TypeScript 兼容筛选、Rust 原生资格校验及回归测试，同时保留历史别名。前端 12 项账户测试、TypeScript 类型检查、Rust 原生定向测试和 macOS 本地预览构建通过。原有未提交 `tests/config/opencodeProviderPresets.test.ts` 保持未修改。
 
 本地合成 API 数据已保留原模型可见状态；尝试直接写入模型端点对象会使定价列表过滤该模型，已恢复，未伪造端点元数据。要让模型实际出现在 Codex 列表，API 管理端仍需为该模型建立包含 `/v1/responses` 的端点组并绑定模型，同时保留原 Chat 端点；客户端代码已可识别该标准标识。未进行模型调用、生产配置或远程操作。
+
+
+## 2026-10-19 Codex 创建草稿 Key 回填修复（本地未提交）
+
+用户报告从账户 Key 配置进入 Codex 表单后 Key 为空。账户草稿已含模型 Key 和新独立 env_key，但 useCodexConfigState 按存量配置读取尚不存在的环境变量，返回 null 后显示 missing。ProviderForm 现在明确传递新建预填标记；仅无 providerId 的显式新建草稿直接使用已有 auth.OPENAI_API_KEY，普通新建和已有供应商的凭证读取语义保持不变。完整模型 Key 仍只在表单内存中，不写日志或额外持久存储。
+
+本地分支 codex/tuzi-assistant-system-token，客户端 HEAD 69bc262744ace2026a841782d1543ed54e394bb1 + 未提交修复；API HEAD 6341a800263460c2a29f065a252b0145d7ac7e7c，未改，B4/system-token-v1。此前 local-preview 模型夹具和用户无关测试修改均保持未提交，未 push、PR、部署或生产操作。
+
+定向验证共 20 项通过：useCodexConfigState 5、ProviderForm 3、账户改进 8、工具兼容 4（ProviderForm 新增回归单独复跑 3 项）。新增回归覆盖预填 Key 不读取未知环境变量、保留用户编辑、编辑已有供应商仍读取绑定凭证；真实 ProviderForm 使用 tuziCreationPrefill 的合成 Key 自动回填、密码输入、提交携带原 Key/独立 env_key/所选模型且不提前调用 save_codex_route。类型检查、diff检查、macOS debug 预览构建通过。日志 /tmp/tuzi-key-prefill-*.log。
+
+新预览正常重启，实机从 sss/default → 配置 → Codex → gpt-5.6-sol → 下一步，API Key 密码字段已填充并出现“显示API Key”按钮；没有点击揭示或保存，没有发起模型调用。界面停留在已填充的新增配置表单供用户继续测试。

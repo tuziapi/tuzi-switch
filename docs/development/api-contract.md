@@ -42,6 +42,8 @@
 
 ## Key 原子部分更新
 
+B17（2026-10-19）：`GET /api/token/:id` 查询本人 Key 不存在（含已删除及不属于本人）时，保留 HTTP 200、`success:false` 和原 `message`，仅增加 `error.code="not_found"`。数据库故障、参数错误不得返回该码。原生保留此符号码；DELETE 结果未知后的回读接受明确 `not_found`（兼容原 404），展示不存在的结果后仍需用户确认才解除写入门禁。不得从错误文案或任意 HTTP200 失败推断删除成功。旧网站和 OAuth 调用方继续按原 envelope 处理；本项恢复能力需要先更新 API，再更新客户端。
+
 新增 PATCH `/api/token/:id` 仅接受至少一项：`name,status,expired_time,remain_quota,unlimited_quota,model_limits_enabled,model_limits,allow_ips,exclude_ips,group`。未知字段/null 拒绝且不部分提交；JSON 类型严格校验。缺项保持，显式 `0`/`false`/空字符串作为有效值交给既有校验（例如空 IP 清除）；名称/分组、额度、模型、IP、到期和状态复用网站业务限制。身份/归属、已用量和高级路由字段不可写。
 
 服务端事务锁定本人行，校验后只写实际提供的列，保留网站并发修改的未提供高级字段；不得客户端 GET 合并全量 PUT。状态修改同一 PATCH `{status:1|2}`，仍遵守过期/耗尽等原校验。旧 GET/POST/PUT/DELETE 调用方兼容。创建后按返回 ID 受控揭示新模型 Key；原生统一为单个 `sk-` 前缀的可调用格式，DB 裸值和原 relay 查找不变。完整值不进查询缓存、搜索 URL、日志或系统令牌存储。
@@ -65,6 +67,8 @@ PATCH `/api/user/self` 仅接受 `display_name,language,accept_unset_model_ratio
 日志页面保留原站本人筛选/分页及请求摘要，原生移除 content/other/IP/channel/上游原文。调用结果只取可信明确状态，缺失为 unknown；失败不推断免费，type2 不推断成功。原生不新增完整请求内容或管理渠道视图。
 
 ## 模型与性能兼容
+
+B17：工具保存前精确查询遵守原站 `models` 每请求最多 3 个不同名称的限制；客户端既有最多 50 个选中模型的界限不变。超过 3 个时串行分批，后续请求携带首批的 `snapshot_id`；缺失快照、快照变化或 `snapshot_refreshed=true` 拒绝本次保存。每批分别检查完整选中模型、协议、分组及 Key 资格，全部通过后才能进入原来源证明和本地事务。任一批失败或账户代次变化均中止，不使用部分成功结果。不修改 API 查询上限、空分组处理及其他资格规则。
 
 原站 pricing/models 的分组、个人覆盖价、折扣、快照、复杂/表达式价格和协议元数据照常；客户端不执行计费表达式、不把缺价当免费、不套统一倍率。请求有效系统令牌可得到账户价；匿名公开参考须标注来源，带无效 Bearer 不可静默匿名降级。切号清 pricing snapshot/缓存，受控 IPC 禁止指定别人的用户/渠道。
 

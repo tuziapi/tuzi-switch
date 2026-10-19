@@ -40,6 +40,48 @@ describe("useCodexConfigState", () => {
     invokeMock.mockReset();
   });
 
+  it("uses an explicit new draft Key without reading a not-yet-created environment variable", () => {
+    invokeMock.mockResolvedValue("SYNTHETIC_OTHER_PROVIDER_KEY");
+    const data = initialData("custom", "TUZI_SWITCH_SYNTHETIC_CODEX_API_KEY");
+    data.settingsConfig.auth = {
+      OPENAI_API_KEY: "SYNTHETIC_SELECTED_MODEL_KEY",
+    };
+    const { result } = renderHook(() =>
+      useCodexConfigState({ initialData: data, isCreationPrefill: true }),
+    );
+    expect(result.current.codexApiKey).toBe("SYNTHETIC_SELECTED_MODEL_KEY");
+    expect(result.current.codexCredentialStatus).toBe("loaded");
+    expect(result.current.codexEnvKey).toBe(
+      "TUZI_SWITCH_SYNTHETIC_CODEX_API_KEY",
+    );
+    expect(invokeMock).not.toHaveBeenCalled();
+    act(() => result.current.handleCodexApiKeyChange("SYNTHETIC_USER_EDIT"));
+    expect(result.current.codexApiKey).toBe("SYNTHETIC_USER_EDIT");
+  });
+
+  it("keeps provider-bound credential loading when editing even if a prefill flag is supplied", async () => {
+    invokeMock.mockResolvedValue({
+      apiKey: "SYNTHETIC_STORED_KEY",
+      migratedFrom: null,
+    });
+    const data = initialData("custom", "TUZI_SWITCH_SYNTHETIC_CODEX_API_KEY");
+    data.settingsConfig.auth = { OPENAI_API_KEY: "SYNTHETIC_DRAFT_KEY" };
+    const { result } = renderHook(() =>
+      useCodexConfigState({
+        providerId: "existing-provider",
+        initialData: data,
+        isCreationPrefill: true,
+      }),
+    );
+    await waitFor(() =>
+      expect(result.current.codexApiKey).toBe("SYNTHETIC_STORED_KEY"),
+    );
+    expect(invokeMock).toHaveBeenCalledWith("read_codex_provider_credential", {
+      providerId: "existing-provider",
+      envKey: "TUZI_SWITCH_SYNTHETIC_CODEX_API_KEY",
+    });
+  });
+
   it("ignores a stale API key response after editing another provider", async () => {
     const providerAKey = deferred<string | null>();
     const providerBKey = deferred<string | null>();

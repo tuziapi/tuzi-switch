@@ -165,7 +165,11 @@ export function Keys({
           });
           items = [result.data];
         } catch (e) {
-          if (op.method !== "DELETE" || (e as DesktopError).status !== 404)
+          if (
+            op.method !== "DELETE" ||
+            ((e as DesktopError).code !== "not_found" &&
+              (e as DesktopError).status !== 404)
+          )
             throw e;
           items = [];
         }
