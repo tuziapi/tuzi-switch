@@ -100,3 +100,9 @@ API `GET /api/token/:id` 仅在归属查询确定不存在时新增 `error.code=
 本次代码配对：客户端 `7e8b2085845b56fbbf3147ffa8510c1982bc10ba`，API `407c9c9287fcf8bccd0fa9601c83dc82ed11e61b`；后续配对说明提交仅改文档。契约仍为 `TA-AC-1.5-B4` / `system-token-v1`。客户端纳入既有 Codex Key 回填、OpenCode 预设回归、默认关闭的本地夹具及兔子图标源文件；B17 第 1、3 项已修复，第 2 项空分组按用户要求保留。
 
 沿用 B17 分层回归结果；本次补跑 ProviderForm/useCodexConfigState/OpenCode 预设 3 文件 10 项测试通过，两仓 diff 检查通过。未扩大声称真实联调/三平台/生产数据库验证。部署仍须先 API 后客户端，回退反向，无迁移、清表或令牌轮换。PR 中记录最终分支 SHA 及配对链接；远程成功状态以实际 GitHub PR 为准。
+
+### B18 API 最新 dev 合并后的配对
+
+用户追加要求 API 在推送前同步最新远程 dev，已将 `680ddc3c446c66a8294c302245233ea7196f5d21` 合并为 API `2e72a8b8786f917ee7ce1bc2dde0ce0ba2dd4425`；客户端业务代码仍为 `7e8b2085845b56fbbf3147ffa8510c1982bc10ba`，之后仅文档变更。两仓 `codex/tuzi-assistant-system-token` / B4 / system-token-v1。
+
+唯一冲突是7份语言文件顶部双方新增翻译，已同时保留助手2条和dev19条内容，JSON/重复键/三方语义检查通过。合并后API17个相关Go包、网站48项引导及95项utils测试、网站构建全部通过；命令与日志见API `docs/tuzi-assistant-development.md` 的 B18 同步记录。此前“本地未提交/未授权推送”是历史阶段状态，本次已获明确提交、推送和创建PR授权；未合并PR或部署。最终远程分支SHA及关联PR以GitHub记录为准，API优先部署及反向回退顺序不变。
