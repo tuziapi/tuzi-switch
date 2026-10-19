@@ -153,3 +153,9 @@ CSS格式与diff检查、macOS预览构建通过（日志 `/tmp/tuzi-modal-text-
 ## 2026-10-19 合并模型选择器
 
 客户端 `7a5fdb0` 将独立搜索输入和select合并为Popover/Command可搜索选择器，保留服务端搜索、分页和兼容筛选。按用户要求不在界面解释渠道/协议原因，仅显示简短空态。8项相关测试、typecheck和macOS预览构建通过，日志 `/tmp/tuzi-picker-test.log`、`/tmp/tuzi-picker-types.log`、`/tmp/tuzi-picker-build.log`。新预览实机确认单一入口、下拉搜索、简短空态及Esc只关闭下拉。未保存工具配置或调用模型。API未修改，仍配对6341a8002。
+
+## 2026-10-19 标准 Responses 端点兼容
+
+用户确认 `gpt-5.6-sol` 上游支持 `/v1/responses`。客户端提交 `27e364c9` 将 API 标准标识 `openai-response` 加入 TypeScript 兼容筛选、Rust 原生资格校验及回归测试，同时保留历史别名。前端 12 项账户测试、TypeScript 类型检查、Rust 原生定向测试和 macOS 本地预览构建通过。原有未提交 `tests/config/opencodeProviderPresets.test.ts` 保持未修改。
+
+本地合成 API 数据已保留原模型可见状态；尝试直接写入模型端点对象会使定价列表过滤该模型，已恢复，未伪造端点元数据。要让模型实际出现在 Codex 列表，API 管理端仍需为该模型建立包含 `/v1/responses` 的端点组并绑定模型，同时保留原 Chat 端点；客户端代码已可识别该标准标识。未进行模型调用、生产配置或远程操作。
