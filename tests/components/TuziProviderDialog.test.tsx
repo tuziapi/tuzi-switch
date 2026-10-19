@@ -78,14 +78,14 @@ function setup(current: TuziProviderDraft = draft) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
       <TuziProviderDialog draft={current} onClose={onClose} onSaved={onSaved} />
     </QueryClientProvider>,
   );
-  return { onSaved, onClose };
+  return { onSaved, onClose, unmount: view.unmount };
 }
-it("submits the actual account form through preview and explicit save", async () => {
+it("adds directly from the actual account form while preserving the native transaction", async () => {
   const { onSaved } = setup();
   await waitFor(() =>
     expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
@@ -93,10 +93,18 @@ it("submits the actual account form through preview and explicit save", async ()
   fireEvent.click(screen.getByRole("button", { name: "common.add" }));
   await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
   expect(preview.mock.calls[0][0].provider.category).toBe("aggregator");
-  expect(save).not.toHaveBeenCalled();
-  fireEvent.click(await screen.findByRole("button", { name: "备份并保存" }));
   await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   expect(save).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText("确认配置变更")).not.toBeInTheDocument();
+  expect(save.mock.calls[0][0]).toMatchObject({
+    previewId: "synthetic-preview",
+    source: {
+      site: "https://api.tu-zi.com",
+      userId: draft.userId,
+      tokenId: draft.tokenId,
+      generation: draft.generation,
+    },
+  });
   expect(
     save.mock.calls[0][0].provider.settingsConfig.auth.OPENAI_API_KEY,
   ).toBe(draft.key);
@@ -142,13 +150,9 @@ it.each([
     if (process.env.TUZI_UPDATE_SYNTHETIC_FIXTURES === "1")
       writeFileSync(path, JSON.stringify(normalized, null, 2) + "\n");
     expect(normalized).toEqual(JSON.parse(readFileSync(path, "utf8")));
-    fireEvent.click(await screen.findByRole("button", { name: "返回修改" }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "common.add" }),
-      ).not.toBeDisabled(),
-    );
-    expect(save).not.toHaveBeenCalled();
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save.mock.calls[0][0].provider).toEqual(provider);
+    expect(screen.queryByText("确认配置变更")).not.toBeInTheDocument();
   },
 );
 
@@ -160,7 +164,7 @@ it("shows preview failures and allows retry without closing the form", async () 
       { once: true },
     ),
   );
-  const { onClose } = setup();
+  const { onClose, onSaved } = setup();
   await waitFor(() =>
     expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
   );
@@ -174,43 +178,126 @@ it("shows preview failures and allows retry without closing the form", async () 
     ),
   );
   expect(onClose).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "common.add" }));
-  expect(
-    await screen.findByRole("button", { name: "备份并保存" }),
-  ).toBeInTheDocument();
-});
-it("deduplicates saves, shows failure and returns to the populated form", async () => {
-  let release!: () => void;
-  server.use(
-    http.post("http://tauri.local/tuzi_provider_save", async () => {
-      save();
-      await new Promise<void>((done) => {
-        release = done;
-      });
-      return new HttpResponse("synthetic save failure", { status: 400 });
-    }),
-  );
-  const { onSaved, onClose } = setup();
-  await waitFor(() =>
-    expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "common.add" }));
-  const button = await screen.findByRole("button", { name: "备份并保存" });
-  fireEvent.click(button);
-  fireEvent.click(button);
-  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
-  expect(screen.getByRole("button", { name: "返回修改" })).toBeDisabled();
-  release();
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "synthetic save failure",
-  );
-  expect(onSaved).not.toHaveBeenCalled();
-  expect(onClose).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "返回修改" }));
+  expect(save).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("API Key")).toHaveValue(draft.key);
   await waitFor(() =>
     expect(
       screen.getByRole("button", { name: "common.add" }),
     ).not.toBeDisabled(),
   );
+  fireEvent.click(screen.getByRole("button", { name: "common.add" }));
+  await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+});
+it("deduplicates saves, preserves input on failure and prepares a fresh plan on retry", async () => {
+  let release!: () => void;
+  server.use(
+    http.post(
+      "http://tauri.local/tuzi_provider_save",
+      async () => {
+        save();
+        await new Promise<void>((done) => {
+          release = done;
+        });
+        return new HttpResponse("synthetic save failure", { status: 400 });
+      },
+      { once: true },
+    ),
+  );
+  const { onSaved, onClose } = setup();
+  await waitFor(() =>
+    expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
+  );
+  const button = screen.getByRole("button", { name: "common.add" });
+  fireEvent.click(button);
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  fireEvent.click(screen.getByRole("button", { name: "common.cancel" }));
+  expect(onClose).not.toHaveBeenCalled();
+  expect(preview).toHaveBeenCalledTimes(1);
+  release();
+  await waitFor(() =>
+    expect(toast.error).toHaveBeenCalledWith(
+      "无法添加供应商",
+      expect.objectContaining({
+        description: expect.stringContaining("synthetic save failure"),
+      }),
+    ),
+  );
+  expect(onSaved).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
+  await waitFor(() => expect(button).not.toBeDisabled());
   expect(screen.getByLabelText("API Key")).toHaveValue(draft.key);
+  fireEvent.click(button);
+  await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+  expect(preview).toHaveBeenCalledTimes(2);
+  expect(save).toHaveBeenCalledTimes(2);
+});
+
+it("blocks duplicate submission and closing while preparing the transaction", async () => {
+  let release!: () => void;
+  server.use(
+    http.post("http://tauri.local/tuzi_provider_preview", async () => {
+      preview();
+      await new Promise<void>((done) => {
+        release = done;
+      });
+      return HttpResponse.json({
+        id: "synthetic-delayed-preview",
+        changes: [],
+      });
+    }),
+  );
+  const { onClose, onSaved } = setup();
+  await waitFor(() =>
+    expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
+  );
+  const button = screen.getByRole("button", { name: "common.add" });
+  fireEvent.click(button);
+  await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  fireEvent.click(screen.getByRole("button", { name: "common.cancel" }));
+  expect(onClose).not.toHaveBeenCalled();
+  expect(save).not.toHaveBeenCalled();
+  release();
+  await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+  expect(preview).toHaveBeenCalledTimes(1);
+  expect(save).toHaveBeenCalledTimes(1);
+});
+
+it("does not start a write if the account form unmounts during preparation", async () => {
+  let release!: () => void;
+  server.use(
+    http.post("http://tauri.local/tuzi_provider_preview", async () => {
+      preview();
+      await new Promise<void>((done) => {
+        release = done;
+      });
+      return HttpResponse.json({
+        id: "synthetic-delayed-preview",
+        changes: [],
+      });
+    }),
+  );
+  const { unmount, onSaved } = setup();
+  await waitFor(() =>
+    expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "common.add" }));
+  await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
+  unmount();
+  release();
+  // Drain the deferred IPC response rather than relying on an arbitrary timeout.
+  await new Promise<void>((done) => {
+    const listener = ({ request }: { request: Request }) => {
+      if (request.url.endsWith("/tuzi_provider_preview")) {
+        server.events.removeListener("request:end", listener);
+        done();
+      }
+    };
+    server.events.on("request:end", listener);
+  });
+  expect(save).not.toHaveBeenCalled();
+  expect(onSaved).not.toHaveBeenCalled();
 });

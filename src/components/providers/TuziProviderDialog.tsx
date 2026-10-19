@@ -3,14 +3,6 @@ import { toast } from "sonner";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AddProviderDialog } from "./AddProviderDialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { generateThirdPartyConfig } from "@/config/codexProviderPresets";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { AppId } from "@/lib/api";
@@ -127,181 +119,93 @@ export function TuziProviderDialog({
   onSaved?: (providerId: string) => void;
 }) {
   const initial = useMemo(() => tuziCreationPrefill(draft), [draft]);
-  type Pending = {
-    provider: Provider;
-    preview: Preview;
-    resolve: (saved: boolean) => void;
-  };
-  const [pending, setPending] = useState<Pending | null>(null);
-  const pendingRef = useRef<Pending | null>(null);
   const savingRef = useRef(false);
   const alive = useRef(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const queryClient = useQueryClient();
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
-      pendingRef.current?.resolve(false);
-      pendingRef.current = null;
     };
   }, []);
-  const finish = (saved: boolean) => {
-    const current = pendingRef.current;
-    pendingRef.current = null;
-    setPending(null);
-    current?.resolve(saved);
-  };
-  const cancel = () => {
-    if (savingRef.current) return;
-    finish(false);
-  };
   const safeError = (error: unknown) =>
     String(error).split(draft.key).join("[已脱敏]");
   return (
-    <>
-      <AddProviderDialog
-        open
-        appId={draft.appId}
-        creationPrefill={initial}
-        onOpenChange={(open) => {
-          if (!open && !savingRef.current) {
-            cancel();
-            onClose();
-          }
-        }}
-        onSubmit={async (value) => {
-          setError("");
-          const { providerKey, ...fields } = value;
-          const provider = {
-            ...fields,
-            id: providerKey || crypto.randomUUID(),
-          } as Provider;
-          try {
-            const preview = await invoke<Preview>("tuzi_provider_preview", {
-              app: draft.appId,
-              provider,
-            });
-            if (!alive.current) return false;
-            const saved = await new Promise<boolean>((resolve) => {
-              const next = { provider, preview, resolve };
-              pendingRef.current = next;
-              setPending(next);
-            });
-            if (!saved) return false;
-          } catch (error) {
-            if (alive.current)
-              toast.error("无法添加供应商", { description: safeError(error) });
-            return false;
-          }
-        }}
-      />
-      <Dialog
-        open={!!pending}
-        onOpenChange={(open) => {
-          if (!open) cancel();
-        }}
-      >
-        <DialogContent
-          zIndex="top"
-          className="max-w-2xl overflow-hidden"
-          onEscapeKeyDown={(event) => {
-            if (savingRef.current) event.preventDefault();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>确认配置变更</DialogTitle>
-            <DialogDescription>
-              模型 Key 已脱敏。保存前会备份配置；不会自动调用模型。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-            <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed">
-              {pending?.preview.changes.join("\n\n")}
-            </pre>
-          </div>
-          {error && <p role="alert" className="shrink-0 px-6 py-3 text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <Button variant="outline" disabled={saving} onClick={cancel}>
-              返回修改
-            </Button>
-            <Button
-              disabled={saving || !!error}
-              onClick={async () => {
-                const current = pendingRef.current;
-                if (!current || savingRef.current) return;
-                savingRef.current = true;
-                setSaving(true);
-                setError("");
-                try {
-                  const outcome = await invoke<{
-                    backupId: string;
-                    enabled: boolean;
-                    tested: boolean;
-                  }>("tuzi_provider_save", {
-                    app: draft.appId,
-                    provider: current.provider,
-                    previewId: current.preview.id,
-                    source: {
-                      site: "https://api.tu-zi.com",
-                      userId: draft.userId,
-                      tokenId: draft.tokenId,
-                      generation: draft.generation,
-                    },
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: ["providers", draft.appId],
-                  });
-                  await queryClient.invalidateQueries({
-                    queryKey: ["tuziProviderSources"],
-                  });
-                  if (!alive.current) return;
-                  toast.success(
-                    outcome.enabled
-                      ? "已保存并按工具规则启用"
-                      : "已保存，尚未启用",
-                    {
-                      description: "未执行模型测试。可从本次完整备份恢复。",
-                      duration: 20000,
-                      action: {
-                        label: "恢复配置",
-                        onClick: () => {
-                          void invoke("tuzi_provider_restore", {
-                            backupId: outcome.backupId,
-                          })
-                            .then(async () => {
-                              await queryClient.invalidateQueries({
-                                queryKey: ["providers", draft.appId],
-                              });
-                              toast.success("已恢复保存前配置");
-                            })
-                            .catch(() =>
-                              toast.error("恢复失败，请核对备份与当前配置"),
-                            );
-                        },
-                      },
-                    },
-                  );
-                  finish(true);
-                  onSaved?.(current.provider.id);
-                } catch (error) {
-                  if (alive.current)
-                    setError(
-                      `保存失败：${safeError(error)}。请返回修改后重新添加。`,
-                    );
-                } finally {
-                  savingRef.current = false;
-                  if (alive.current) setSaving(false);
-                }
-              }}
-            >
-              {saving ? "正在备份并保存…" : "备份并保存"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    <AddProviderDialog
+      open
+      appId={draft.appId}
+      creationPrefill={initial}
+      onOpenChange={(open) => {
+        if (!open && !savingRef.current) onClose();
+      }}
+      onSubmit={async (value) => {
+        if (savingRef.current) return false;
+        savingRef.current = true;
+        const { providerKey, ...fields } = value;
+        const provider = {
+          ...fields,
+          id: providerKey || crypto.randomUUID(),
+        } as Provider;
+        try {
+          // The Add action authorizes the transaction. Prepare a fresh plan for
+          // each attempt so native conflict checks and backups stay intact.
+          const preview = await invoke<Preview>("tuzi_provider_preview", {
+            app: draft.appId,
+            provider,
+          });
+          if (!alive.current) return false;
+          const outcome = await invoke<{
+            backupId: string;
+            enabled: boolean;
+            tested: boolean;
+          }>("tuzi_provider_save", {
+            app: draft.appId,
+            provider,
+            previewId: preview.id,
+            source: {
+              site: "https://api.tu-zi.com",
+              userId: draft.userId,
+              tokenId: draft.tokenId,
+              generation: draft.generation,
+            },
+          });
+          await queryClient.invalidateQueries({
+            queryKey: ["providers", draft.appId],
+          });
+          await queryClient.invalidateQueries({
+            queryKey: ["tuziProviderSources"],
+          });
+          if (!alive.current) return false;
+          toast.success(
+            outcome.enabled ? "已保存并按工具规则启用" : "已保存，尚未启用",
+            {
+              action: {
+                label: "恢复配置",
+                onClick: () => {
+                  void invoke("tuzi_provider_restore", {
+                    backupId: outcome.backupId,
+                  })
+                    .then(async () => {
+                      await queryClient.invalidateQueries({
+                        queryKey: ["providers", draft.appId],
+                      });
+                      toast.success("已恢复保存前配置");
+                    })
+                    .catch(() => toast.error("恢复失败，请核对备份与当前配置"));
+                },
+              },
+            },
+          );
+          onSaved?.(provider.id);
+        } catch (error) {
+          if (alive.current)
+            toast.error("无法添加供应商", { description: safeError(error) });
+          return false;
+        } finally {
+          savingRef.current = false;
+        }
+      }}
+    />
   );
 }
 
