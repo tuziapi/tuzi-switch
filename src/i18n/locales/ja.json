@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "兔子switch",
+    "title": "兔子助手",
     "description": "Claude Code・Codex・Gemini CLI のためのオールインワンアシスタント"
   },
   "common": {
@@ -43,9 +43,9 @@
     "notSet": "未設定"
   },
   "firstRunNotice": {
-    "title": "兔子switch へようこそ",
-    "bodyDefault": "兔子switch は Claude Code / Codex / Gemini CLI の複数プロバイダーをワンクリックで切り替えられるツールです。すでにこれらのツールを設定済みの場合、兔子switch は現在の設定を「default」という名前のプロバイダーとして自動的に保存するので、既存の設定が失われることはありません。",
-    "bodyOfficial": "リストには「Official（公式）」プリセットも用意されており、公式バージョンに戻したくなったらクリックするだけで切り替えられます。切り替える前に現在の設定は自動で default にバックアップされるので、自由に行き来できます。これが 兔子switch の仕組みです 😊",
+    "title": "兔子助手 へようこそ",
+    "bodyDefault": "兔子助手 は Claude Code / Codex / Gemini CLI の複数プロバイダーをワンクリックで切り替えられるツールです。すでにこれらのツールを設定済みの場合、兔子助手 は現在の設定を「default」という名前のプロバイダーとして自動的に保存するので、既存の設定が失われることはありません。",
+    "bodyOfficial": "リストには「Official（公式）」プリセットも用意されており、公式バージョンに戻したくなったらクリックするだけで切り替えられます。切り替える前に現在の設定は自動で default にバックアップされるので、自由に行き来できます。これが 兔子助手 の仕組みです 😊",
     "confirm": "了解しました"
   },
   "apiKeyInput": {
@@ -218,7 +218,7 @@
     "codexSwitchRestartRequired": "切り替えました。反映するにはクライアントを再起動してください",
     "codexRestartRequired": "インポートして有効化しました。Codex を完全に終了してから再起動してください",
     "claudeDesktopRestartRequired": "切り替えました。反映するには Claude Desktop を再起動してください",
-    "claudeDesktopProxyRestartRequired": "切り替えました。兔子switch を起動したまま Claude Desktop を再起動してください",
+    "claudeDesktopProxyRestartRequired": "切り替えました。兔子助手 を起動したまま Claude Desktop を再起動してください",
     "addToConfigSuccess": "設定に追加しました",
     "removeFromConfigSuccess": "設定から削除しました",
     "removeFromConfigFailed": "設定からの削除に失敗しました: {{error}}",
@@ -262,7 +262,7 @@
     "deleteProvider": "プロバイダーを削除",
     "deleteProviderMessage": "プロバイダー「{{name}}」を削除してもよろしいですか？この操作は元に戻せません。",
     "removeProvider": "プロバイダーを解除",
-    "removeProviderMessage": "プロバイダー「{{name}}」を設定から解除してもよろしいですか？\n\n解除後、このプロバイダーは無効になりますが、設定データは 兔子switch に保持されます。いつでも再追加できます。",
+    "removeProviderMessage": "プロバイダー「{{name}}」を設定から解除してもよろしいですか？\n\n解除後、このプロバイダーは無効になりますが、設定データは 兔子助手 に保持されます。いつでも再追加できます。",
     "clearProviderConfig": "プロバイダー設定をクリア",
     "clearCodexProviderConfigMessage": "「{{name}}」の現在の Codex 設定をクリアしますか？\n\n削除されるもの:\n- ~/.codex/config.toml 内のこのプロバイダーに対応する model_provider/profile セクション;\n- 現在の model_provider がこのプロバイダーを指している場合は model_provider = \"\" に変更;\n- tuzi-switch がこのプロバイダー用に作成した Codex profile ファイル;\n- env_key が参照する管理対象の環境変数;\n- プロバイダーカードに保存された API Key / env_key / 書き込み状態。\n\n削除されないもの:\n- プロバイダーカード;\n- ~/.codex/auth.json;\n- 他のプロバイダー設定。\n\n再度使用するには、Key を入力して保存/有効化してください。",
     "clearEnvProviderConfigMessage": "「{{name}}」がクライアントに書き込んだ環境変数設定をクリアしますか？\n\nこのプロバイダーがクライアント設定に書き込んだ API Key / Base URL などの環境変数を削除し、プロバイダーカード内の API Key / 環境変数設定をクリアします。現在のプロバイダーの場合は、現在の使用状態もクリアされます。\n\nプロバイダーカードや他のプロバイダー設定は削除されません。再度使用するには、Key を入力して保存/有効化してください。",
@@ -353,7 +353,7 @@
       },
       "globalProxy": {
         "title": "グローバル送信プロキシ",
-        "description": "兔子switch が外部 API にアクセスする際のプロキシを設定"
+        "description": "兔子助手 が外部 API にアクセスする際のプロキシを設定"
       },
       "data": {
         "title": "データ管理",
@@ -423,7 +423,7 @@
     "themeDark": "ダーク",
     "themeSystem": "システム",
     "importExport": "SQL インポート/エクスポート",
-    "importExportHint": "移行や復元用にデータベースの SQL バックアップをインポート/エクスポートします（インポートは 兔子switch がエクスポートしたバックアップのみ対応）。",
+    "importExportHint": "移行や復元用にデータベースの SQL バックアップをインポート/エクスポートします（インポートは 兔子助手 がエクスポートしたバックアップのみ対応）。",
     "exportConfig": "SQL バックアップをエクスポート",
     "selectConfigFile": "SQL ファイルを選択",
     "noFileSelected": "ファイルが選択されていません。",
@@ -559,7 +559,7 @@
     "windowBehavior": "ウィンドウ動作",
     "windowBehaviorHint": "最小化動作や Claude プラグイン連携を設定します。",
     "launchOnStartup": "起動時に自動実行",
-    "launchOnStartupDescription": "システム起動時に 兔子switch を自動起動します",
+    "launchOnStartupDescription": "システム起動時に 兔子助手 を自動起動します",
     "silentStartup": "サイレント起動",
     "silentStartupDescription": "起動時にメインウィンドウを表示せず、トレイのみで起動",
     "autoLaunchFailed": "自動起動の設定に失敗しました",
@@ -581,8 +581,8 @@
     },
     "skillStorage": {
       "title": "スキル保存場所",
-      "description": "兔子switch がスキルのマスターコピーを保存するディレクトリを選択します",
-      "ccSwitch": "兔子switch",
+      "description": "兔子助手 がスキルのマスターコピーを保存するディレクトリを選択します",
+      "ccSwitch": "兔子助手",
       "unified": "~/.agents/skills",
       "ccSwitchHint": "スキルは ~/.tuzi-switch/skills/ に保存され、シンボリックリンクまたはコピーで各アプリに同期されます。",
       "unifiedHint": "スキルは ~/.agents/skills/ に保存されます（Agent Skills オープン標準）。対応ツール（Claude Code、Codex、Gemini CLI など）はこのディレクトリのスキルを直接検出します。",
@@ -630,8 +630,8 @@
     },
     "configDirectoryOverride": "設定ディレクトリの上書き（詳細）",
     "configDirectoryDescription": "WSL などで Claude Code や Codex を使う場合、ここで設定ディレクトリを WSL 側に合わせるとデータを揃えられます。",
-    "appConfigDir": "兔子switch 設定ディレクトリ",
-    "appConfigDirDescription": "兔子switch の保存場所をカスタマイズします（クラウド同期フォルダを指定すると設定を同期できます）",
+    "appConfigDir": "兔子助手 設定ディレクトリ",
+    "appConfigDirDescription": "兔子助手 の保存場所をカスタマイズします（クラウド同期フォルダを指定すると設定を同期できます）",
     "browsePlaceholderApp": "例: C:\\\\Users\\\\Administrator\\\\.tuzi-switch",
     "claudeConfigDir": "Claude Code 設定ディレクトリ",
     "claudeConfigDirDescription": "Claude の設定ディレクトリ（settings.json）を上書きし、claude.json（MCP）も同じ場所に置きます。",
@@ -669,7 +669,7 @@
     "updatePageOpened": "ダウンロードページを開きました。新しいバージョンを手動でインストールしてください。",
     "updateInstalledRestarting": "更新をインストールしました。再起動後に反映されます。",
     "updateRestartTitle": "更新をインストールしました",
-    "updateRestartMessage": "新しいバージョンのインストールが完了しました。反映するには 兔子switch の再起動が必要です。今すぐ再起動しますか？",
+    "updateRestartMessage": "新しいバージョンのインストールが完了しました。反映するには 兔子助手 の再起動が必要です。今すぐ再起動しますか？",
     "checkUpdateFailed": "更新の確認に失敗しました。時間をおいて再試行してください。",
     "openReleaseNotesFailed": "リリースノートの表示に失敗しました",
     "releaseNotes": "リリースノート",
@@ -691,7 +691,7 @@
     "importFailedError": "設定のインポートに失敗しました: {{message}}",
     "exportFailedError": "設定のエクスポートに失敗しました:",
     "restartRequired": "再起動が必要です",
-    "restartRequiredMessage": "兔子switch の設定ディレクトリを変更すると再起動が必要です。今すぐ再起動しますか？",
+    "restartRequiredMessage": "兔子助手 の設定ディレクトリを変更すると再起動が必要です。今すぐ再起動しますか？",
     "restartNow": "今すぐ再起動",
     "restartLater": "後で再起動",
     "restartFailed": "アプリの再起動に失敗しました。手動で閉じて再度開いてください。",
@@ -781,7 +781,7 @@
       "fixed": "固定",
       "notDetected": "未検出",
       "waitingForRoute": "ローカルルートの起動待ち",
-      "securityNote": "Key の値は表示せず、変数名のみ表示します。派生 Key は Tuzi Switch 管理の非公開ファイルだけに保存され、システム環境変数は変更しません。無効化すると live config.toml を復元し、管理対象の個人設定を削除します。"
+      "securityNote": "Key の値は表示せず、変数名のみ表示します。派生 Key は 兔子助手 管理の非公開ファイルだけに保存され、システム環境変数は変更しません。無効化すると live config.toml を復元し、管理対象の個人設定を削除します。"
     },
     "unifyCodexSessionHistory": "Codex セッション履歴を統一",
     "unifyCodexSessionHistoryDescription": "オンにすると、Codex 自身の設定優先順位でこの端末の有効なプロバイダー ID を初回に解析し、共有履歴バケットとして固定します。新規環境では custom を使用します。その後の切替では API URL、env_key、API Key のみ変更されます。変更後は Codex／ターミナルを完全に終了して再起動してください。既存の公式セッションは自動バックアップ後に移行できます。バックエンドをまたぐ再開は encrypted_content を復号できず失敗する場合があります。",
@@ -1481,7 +1481,7 @@
       "deleteConfirm": "サーバー「{{id}}」を削除しますか？この操作は元に戻せません。",
       "noServers": "まだサーバーがありません",
       "enabledApps": "有効なアプリ",
-      "noImportFound": "インポートする MCP サーバーが見つかりませんでした。すべてのサーバーは 兔子switch で管理されています。",
+      "noImportFound": "インポートする MCP サーバーが見つかりませんでした。すべてのサーバーは 兔子助手 で管理されています。",
       "importSuccess": "{{count}} 個の MCP サーバーをインポートしました",
       "apps": {
         "claude": "Claude",
@@ -2026,10 +2026,10 @@
     "noInstalledDescription": "リポジトリからスキルを発見してインストールするか、既存のスキルをインポートしてください",
     "discover": "スキルを発見",
     "import": "既存をインポート",
-    "importDescription": "兔子switch 統合管理にインポートするスキルを選択してください",
+    "importDescription": "兔子助手 統合管理にインポートするスキルを選択してください",
     "importSuccess": "{{count}} 件のスキルをインポートしました",
     "importSelected": "選択をインポート ({{count}})",
-    "noUnmanagedFound": "インポートするスキルが見つかりませんでした。すべてのスキルは 兔子switch で管理されています。",
+    "noUnmanagedFound": "インポートするスキルが見つかりませんでした。すべてのスキルは 兔子助手 で管理されています。",
     "foundIn": "発見場所",
     "local": "ローカル",
     "uninstallConfirm": "「{{name}}」をアンインストールしますか？すべてのアプリからこのスキルが削除され、削除前にローカルバックアップが自動作成されます。",
@@ -2073,7 +2073,7 @@
   },
   "deeplink": {
     "confirmImport": "プロバイダーのインポートを確認",
-    "confirmImportDescription": "次の設定をディープリンクから 兔子switch へインポートします",
+    "confirmImportDescription": "次の設定をディープリンクから 兔子助手 へインポートします",
     "importPrompt": "プロンプトをインポート",
     "importPromptDescription": "このシステムプロンプトをインポートするか確認してください",
     "importMcp": "MCP サーバーをインポート",

@@ -345,12 +345,12 @@ jobs:
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" \
-              --title "兔子switch $TAG" \
+              --title "兔子助手 $TAG" \
               --notes-file "$NOTES_FILE" \
               --draft
           else
             gh release create "$TAG" \
-              --title "兔子switch $TAG" \
+              --title "兔子助手 $TAG" \
               --notes-file "$NOTES_FILE" \
               --draft \
               --latest=false
@@ -409,7 +409,7 @@ jobs:
 
           const manifest = {
             version,
-            notes: `兔子switch ${tag}`,
+            notes: `兔子助手 ${tag}`,
             pub_date: new Date().toISOString(),
             platforms,
           };

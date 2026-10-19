@@ -769,7 +769,7 @@ fn reject_symlink_if_present(path: &Path) -> Result<(), AppError> {
 
 fn skill_conflict() -> AppError {
     AppError::Config(format!(
-        "Codex Skill {SKILL_NAME} 已存在且不属于 Tuzi Switch，已拒绝覆盖"
+        "Codex Skill {SKILL_NAME} 已存在且不属于 兔子助手，已拒绝覆盖"
     ))
 }
 

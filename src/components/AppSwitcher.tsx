@@ -1,8 +1,9 @@
 import type { AppId } from "@/lib/api";
 import type { VisibleApps } from "@/types";
-import { Monitor, Rabbit, Terminal } from "lucide-react";
+import { Monitor, Terminal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ProviderIcon } from "@/components/ProviderIcon";
+import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import { cn } from "@/lib/utils";
 
 interface AppSwitcherProps {
@@ -94,7 +95,7 @@ export function AppSwitcher({
           onClick={onSelectAccount}
           className={buttonClass(accountSelected)}
         >
-          <Rabbit
+          <TuziAccountIcon
             size={iconSize}
             className="flex-shrink-0"
             aria-hidden="true"

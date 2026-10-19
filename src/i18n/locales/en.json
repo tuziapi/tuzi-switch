@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "兔子switch",
+    "title": "兔子助手",
     "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
   },
   "common": {
@@ -43,9 +43,9 @@
     "notSet": "Not Set"
   },
   "firstRunNotice": {
-    "title": "Welcome to 兔子switch",
-    "bodyDefault": "兔子switch lets you switch between multiple Claude Code / Codex / Gemini CLI providers with a single click. If you already had these tools configured, 兔子switch has saved your existing setup as a provider named “default” so none of your previous configuration is lost.",
-    "bodyOfficial": "An “Official” preset is also included in the list — click it any time you want to switch back to the official default. 兔子switch automatically backs up your current config to “default” before switching, so you can move back and forth freely. That's how 兔子switch works 😊",
+    "title": "Welcome to 兔子助手",
+    "bodyDefault": "兔子助手 lets you switch between multiple Claude Code / Codex / Gemini CLI providers with a single click. If you already had these tools configured, 兔子助手 has saved your existing setup as a provider named “default” so none of your previous configuration is lost.",
+    "bodyOfficial": "An “Official” preset is also included in the list — click it any time you want to switch back to the official default. 兔子助手 automatically backs up your current config to “default” before switching, so you can move back and forth freely. That's how 兔子助手 works 😊",
     "confirm": "Got it"
   },
   "apiKeyInput": {
@@ -218,7 +218,7 @@
     "codexSwitchRestartRequired": "Switched successfully. Restart the client to apply changes.",
     "codexRestartRequired": "Imported and enabled. Fully quit and reopen Codex before use.",
     "claudeDesktopRestartRequired": "Switched successfully. Restart Claude Desktop to apply changes.",
-    "claudeDesktopProxyRestartRequired": "Switched successfully. Keep 兔子switch running and restart Claude Desktop to apply changes.",
+    "claudeDesktopProxyRestartRequired": "Switched successfully. Keep 兔子助手 running and restart Claude Desktop to apply changes.",
     "addToConfigSuccess": "Added to config",
     "removeFromConfigSuccess": "Removed from config",
     "removeFromConfigFailed": "Failed to remove from config: {{error}}",
@@ -262,7 +262,7 @@
     "deleteProvider": "Delete Provider",
     "deleteProviderMessage": "Are you sure you want to delete provider \"{{name}}\"? This action cannot be undone.",
     "removeProvider": "Remove Provider",
-    "removeProviderMessage": "Are you sure you want to remove provider \"{{name}}\" from the configuration?\n\nAfter removal, this provider will no longer be active, but the configuration data will be retained in 兔子switch. You can re-add it at any time.",
+    "removeProviderMessage": "Are you sure you want to remove provider \"{{name}}\" from the configuration?\n\nAfter removal, this provider will no longer be active, but the configuration data will be retained in 兔子助手. You can re-add it at any time.",
     "clearProviderConfig": "Clear Provider Config",
     "clearCodexProviderConfigMessage": "Clear the current Codex configuration for \"{{name}}\"?\n\nThis will remove:\n- The provider's model_provider/profile sections from ~/.codex/config.toml;\n- model_provider will be set to \"\" if it currently points to this provider;\n- The Codex profile file created by tuzi-switch for this provider;\n- The managed environment variable referenced by env_key;\n- The API Key / env_key / written-state stored on the provider card.\n\nThis will not delete:\n- The provider card;\n- ~/.codex/auth.json;\n- Other provider configurations.\n\nTo use this provider again, fill in the key and save/enable it again.",
     "clearEnvProviderConfigMessage": "Clear the environment-variable configuration written by \"{{name}}\" to the client?\n\nThis will remove API Key / Base URL environment variables written by this provider to the client config and clear the API Key / environment settings stored on the provider card. If it is the current provider, the current active state will be cleared.\n\nThis will not delete the provider card or other provider configurations. To use it again, fill in the key and save/enable it again.",
@@ -353,7 +353,7 @@
       },
       "globalProxy": {
         "title": "Global Outbound Proxy",
-        "description": "Configure proxy for 兔子switch to access external APIs"
+        "description": "Configure proxy for 兔子助手 to access external APIs"
       },
       "data": {
         "title": "Data Management",
@@ -423,7 +423,7 @@
     "themeDark": "Dark",
     "themeSystem": "System",
     "importExport": "SQL Import/Export",
-    "importExportHint": "Import or export database SQL backups for migration or restore (import supports only backups exported by 兔子switch).",
+    "importExportHint": "Import or export database SQL backups for migration or restore (import supports only backups exported by 兔子助手).",
     "exportConfig": "Export SQL Backup",
     "selectConfigFile": "Select SQL File",
     "noFileSelected": "No configuration file selected.",
@@ -559,7 +559,7 @@
     "windowBehavior": "Window Behavior",
     "windowBehaviorHint": "Configure window minimize and Claude plugin integration policies.",
     "launchOnStartup": "Launch on Startup",
-    "launchOnStartupDescription": "Automatically run 兔子switch when system starts",
+    "launchOnStartupDescription": "Automatically run 兔子助手 when system starts",
     "silentStartup": "Silent Startup",
     "silentStartupDescription": "Start in background mode without showing main window",
     "autoLaunchFailed": "Failed to set auto-launch",
@@ -581,8 +581,8 @@
     },
     "skillStorage": {
       "title": "Skill Storage Location",
-      "description": "Choose where 兔子switch stores the master copies of your skills",
-      "ccSwitch": "兔子switch",
+      "description": "Choose where 兔子助手 stores the master copies of your skills",
+      "ccSwitch": "兔子助手",
       "unified": "~/.agents/skills",
       "ccSwitchHint": "Skills are stored in ~/.tuzi-switch/skills/ and synced to each app via symlink or copy.",
       "unifiedHint": "Skills are stored in ~/.agents/skills/, the Agent Skills open standard. Compatible tools (Claude Code, Codex, Gemini CLI, etc.) discover skills here natively.",
@@ -630,8 +630,8 @@
     },
     "configDirectoryOverride": "Configuration Directory Override (Advanced)",
     "configDirectoryDescription": "When using Claude Code or Codex in environments like WSL, you can manually specify the configuration directory to the one in WSL to keep provider data consistent with the main environment.",
-    "appConfigDir": "兔子switch Configuration Directory",
-    "appConfigDirDescription": "Customize the storage location for 兔子switch configuration (point to cloud sync folder to enable config sync)",
+    "appConfigDir": "兔子助手 Configuration Directory",
+    "appConfigDirDescription": "Customize the storage location for 兔子助手 configuration (point to cloud sync folder to enable config sync)",
     "browsePlaceholderApp": "e.g., C:\\Users\\Administrator\\.tuzi-switch",
     "claudeConfigDir": "Claude Code Configuration Directory",
     "claudeConfigDirDescription": "Override Claude configuration directory (settings.json) and keep claude.json (MCP) alongside it.",
@@ -669,7 +669,7 @@
     "updatePageOpened": "Opened the download page. Please download and install the new version manually.",
     "updateInstalledRestarting": "Update installed. Restart the app to apply it.",
     "updateRestartTitle": "Update Installed",
-    "updateRestartMessage": "The new version has been installed. Restart 兔子switch to apply it now?",
+    "updateRestartMessage": "The new version has been installed. Restart 兔子助手 to apply it now?",
     "checkUpdateFailed": "Failed to check for updates, please try again later.",
     "openReleaseNotesFailed": "Failed to open release notes",
     "releaseNotes": "Release Notes",
@@ -696,7 +696,7 @@
     "importFailedError": "Import config failed: {{message}}",
     "exportFailedError": "Export config failed:",
     "restartRequired": "Restart Required",
-    "restartRequiredMessage": "Modifying the 兔子switch configuration directory requires restarting the application to take effect. Restart now?",
+    "restartRequiredMessage": "Modifying the 兔子助手 configuration directory requires restarting the application to take effect. Restart now?",
     "restartNow": "Restart Now",
     "restartLater": "Restart Later",
     "restartFailed": "Application restart failed, please manually close and reopen.",
@@ -786,7 +786,7 @@
       "fixed": "FIXED",
       "notDetected": "Not detected",
       "waitingForRoute": "Waiting for local route",
-      "securityNote": "Only variable names are shown, never key values. The derived key is stored only in a Tuzi Switch managed private file; system environment variables are not changed. Disabling restores live config.toml and removes the managed personalization block."
+      "securityNote": "Only variable names are shown, never key values. The derived key is stored only in a 兔子助手 managed private file; system environment variables are not changed. Disabling restores live config.toml and removes the managed personalization block."
     },
     "unifyCodexSessionHistory": "Unified Codex session history",
     "unifyCodexSessionHistoryDescription": "When enabled, Codex resolves the machine's effective provider id using its real configuration precedence and fixes it as the shared history bucket; fresh installs use custom. Provider switches then change only the API URL, env_key, and API Key. Fully quit and restart Codex/the terminal after a change. Existing official sessions can be migrated with an automatic backup. Resuming across backends may still fail when encrypted_content cannot be decrypted by the new backend.",
@@ -1486,7 +1486,7 @@
       "deleteConfirm": "Are you sure you want to delete server \"{{id}}\"? This action cannot be undone.",
       "noServers": "No servers yet",
       "enabledApps": "Enabled Apps",
-      "noImportFound": "No MCP servers to import found. All servers are already managed by 兔子switch.",
+      "noImportFound": "No MCP servers to import found. All servers are already managed by 兔子助手.",
       "importSuccess": "Successfully imported {{count}} MCP servers",
       "apps": {
         "claude": "Claude",
@@ -2031,10 +2031,10 @@
     "noInstalledDescription": "Discover and install skills from repositories, or import existing skills",
     "discover": "Discover Skills",
     "import": "Import Existing",
-    "importDescription": "Select skills to import into 兔子switch unified management",
+    "importDescription": "Select skills to import into 兔子助手 unified management",
     "importSuccess": "Successfully imported {{count}} skills",
     "importSelected": "Import Selected ({{count}})",
-    "noUnmanagedFound": "No skills to import found. All skills are already managed by 兔子switch.",
+    "noUnmanagedFound": "No skills to import found. All skills are already managed by 兔子助手.",
     "foundIn": "Found in",
     "local": "Local",
     "uninstallConfirm": "Are you sure you want to uninstall \"{{name}}\"? This will remove the skill from all apps and create a local backup first.",
@@ -2078,7 +2078,7 @@
   },
   "deeplink": {
     "confirmImport": "Confirm Import Provider",
-    "confirmImportDescription": "The following configuration will be imported from deep link into 兔子switch",
+    "confirmImportDescription": "The following configuration will be imported from deep link into 兔子助手",
     "importPrompt": "Import Prompt",
     "importPromptDescription": "Please confirm whether to import this system prompt",
     "importMcp": "Import MCP Servers",
@@ -2101,7 +2101,7 @@
     "endpoint": "API Endpoint",
     "apiKey": "API Key",
     "codexTicketApiKeyPending": "Securely retrieved after confirmation",
-    "codexTicketNotice": "After confirmation, Tuzi Switch will use a one-time ticket valid for 180 seconds to retrieve the API Key from Tuzi Store, then import and enable the provider. The real Key is never included in the link.",
+    "codexTicketNotice": "After confirmation, 兔子助手 will use a one-time ticket valid for 180 seconds to retrieve the API Key from Tuzi Store, then import and enable the provider. The real Key is never included in the link.",
     "codexTicketImport": "Import and enable",
     "icon": "Icon",
     "model": "Model",

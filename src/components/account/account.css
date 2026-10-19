@@ -1362,13 +1362,7 @@
   gap: 8px;
   font-size: 13px;
 }
-.account-return-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  font-size: 13px;
-}
+
 @media (max-width: 700px) {
   .account-connect-card {
     padding: 24px;

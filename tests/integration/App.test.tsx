@@ -38,8 +38,10 @@ vi.mock("@/components/providers/ProviderList", () => ({
     onClearConfig,
     onOpenWebsite,
     onCreate,
+    focusProviderId,
   }: any) => (
     <div>
+      <div data-testid="focused-provider">{focusProviderId}</div>
       <div data-testid="provider-list">{JSON.stringify(providers)}</div>
       <div data-testid="current-provider">{currentProviderId}</div>
       <button onClick={() => onSwitch(providers[currentProviderId])}>
@@ -189,6 +191,41 @@ const renderApp = (AppComponent: ComponentType) => {
   );
 };
 
+// Keep real account pages for existing tests; this fixture isolates App's
+// navigation after a successful tool transaction without writing tool files.
+vi.mock("@/components/account/AccountPage", async (original) => {
+  const real =
+    await original<typeof import("@/components/account/AccountPage")>();
+  return {
+    ...real,
+    AccountPage: (props: any) =>
+      props.account.state.identity?.username === "synthetic-b10" ? (
+        <button onClick={() => props.onConfigureKey({ id: "synthetic-key" })}>
+          configure-synthetic-key
+        </button>
+      ) : (
+        <real.AccountPage {...props} />
+      ),
+  };
+});
+vi.mock("@/components/account/ConfigureTool", () => ({
+  ConfigureTool: ({ onReady, state }: any) => (
+    <button
+      onClick={() => onReady({ appId: "codex", generation: state.generation })}
+    >
+      prepare-synthetic-config
+    </button>
+  ),
+}));
+vi.mock("@/components/providers/TuziProviderDialog", async (original) => ({
+  ...(await original<
+    typeof import("@/components/providers/TuziProviderDialog")
+  >()),
+  TuziProviderDialog: ({ onSaved }: any) => (
+    <button onClick={() => onSaved("codex-1")}>save-synthetic-config</button>
+  ),
+}));
+
 describe("App integration with MSW", () => {
   beforeEach(() => {
     localStorage.removeItem("tuzi-switch-last-view");
@@ -198,6 +235,9 @@ describe("App integration with MSW", () => {
       ),
       http.post("http://tauri.local/get_current_import_urls", () =>
         HttpResponse.json([]),
+      ),
+      http.post("http://tauri.local/account_take_open_request", () =>
+        HttpResponse.json(false),
       ),
     );
     resetProviderState();
@@ -223,7 +263,7 @@ describe("App integration with MSW", () => {
       ),
     );
     expect(screen.getByText("account.connectRequired")).toBeInTheDocument();
-    expect(screen.getByText("兔子switch")).toBeInTheDocument();
+    expect(screen.getByText("兔子助手")).toBeInTheDocument();
     expect(screen.getByTestId("app-switcher")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "account.tools" }),
@@ -235,6 +275,51 @@ describe("App integration with MSW", () => {
     fireEvent.click(screen.getByText("switch-claude"));
     expect(await screen.findByTitle("skills.manage")).toBeInTheDocument();
     expect(screen.getByTitle("sessionManager.title")).toBeInTheDocument();
+  });
+
+  it("keeps saved configuration focused without an account return banner", async () => {
+    server.use(
+      http.post("http://tauri.local/account_get_state", () =>
+        HttpResponse.json({
+          ...disconnectedAccount,
+          status: "connected",
+          generation: 10,
+          identity: {
+            userId: "synthetic-user",
+            username: "synthetic-b10",
+            displayName: "Synthetic B10",
+            connectionId: "synthetic-b10",
+          },
+        }),
+      ),
+    );
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    await screen.findByTestId("provider-list");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "firstRunNotice.confirm" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "account.title" }));
+    fireEvent.click(await screen.findByText("configure-synthetic-key"));
+    fireEvent.click(await screen.findByText("prepare-synthetic-config"));
+    expect(
+      screen.queryByText("配置保存后，可在此启用或检查"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByText("save-synthetic-config"));
+    await waitFor(() =>
+      expect(screen.getByTestId("focused-provider")).toHaveTextContent(
+        "codex-1",
+      ),
+    );
+    expect(screen.queryByText("← 返回兔子账户")).not.toBeInTheDocument();
+    expect(screen.queryByText(/已定位配置：/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "account.title" }));
+    expect(
+      await screen.findByText("configure-synthetic-key"),
+    ).toBeInTheDocument();
   });
 
   it("covers basic provider flows via real hooks", async () => {

@@ -7,7 +7,7 @@
   <array>
     <dict>
       <key>CFBundleURLName</key>
-      <string>Tuzi Switch Deep Link</string>
+      <string>兔子助手 Deep Link</string>
       <key>CFBundleURLSchemes</key>
       <array>
         <string>tuziswitch</string>

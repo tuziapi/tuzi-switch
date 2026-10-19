@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { Rabbit } from "lucide-react";
+import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import "./account.css";
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -102,7 +102,7 @@ export function AccountPage({
           aria-label={t("account.pages.keys")}
         >
           <div className="account-connect-emblem">
-            <Rabbit size={28} />
+            <TuziAccountIcon size={40} />
           </div>
           <h2>连接兔子账户</h2>
           <p className="account-connect-description">
@@ -196,7 +196,7 @@ export function AccountPage({
     >
       <div className="account-connection">
         <div className="account-avatar">
-          <Rabbit size={20} aria-hidden="true" />
+          <TuziAccountIcon size={24} />
         </div>
         <p role="status" aria-live="polite">
           {t(`account.status.${isLoading ? "loading" : state.status}`)}

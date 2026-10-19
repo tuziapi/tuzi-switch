@@ -181,7 +181,7 @@ function App() {
     key: DesktopKey;
     model?: DesktopPricing;
   } | null>(null);
-  const [accountToolReturn, setAccountToolReturn] = useState<{
+  const [accountProviderFocus, setAccountProviderFocus] = useState<{
     app: AppId;
     providerId?: string;
   } | null>(null);
@@ -189,7 +189,7 @@ function App() {
   useEffect(() => {
     setConfigureKey(null);
     setTuziDraft(null);
-    setAccountToolReturn(null);
+    setAccountProviderFocus(null);
   }, [account.state.generation, account.state.identity?.connectionId]);
   useEffect(() => {
     if (!["connected", "refreshing"].includes(account.state.status)) {
@@ -1152,8 +1152,8 @@ function App() {
                   >
                     <ProviderList
                       focusProviderId={
-                        accountToolReturn?.app === activeApp
-                          ? accountToolReturn.providerId
+                        accountProviderFocus?.app === activeApp
+                          ? accountProviderFocus.providerId
                           : undefined
                       }
                       providers={providers}
@@ -1399,7 +1399,7 @@ function App() {
                         : "text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300",
                     )}
                   >
-                    兔子switch
+                    兔子助手
                   </a>
                 </div>
                 <Button
@@ -1768,40 +1768,6 @@ function App() {
         {isOpenClawView && openclawHealthWarnings.length > 0 && (
           <OpenClawHealthBanner warnings={openclawHealthWarnings} />
         )}
-        {accountToolReturn &&
-          currentView === "providers" &&
-          activeApp === accountToolReturn.app && (
-            <div className="account-return-bar">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setCurrentView("account");
-                  setAccountToolReturn(null);
-                }}
-              >
-                ← 返回兔子账户
-              </Button>
-              <span>
-                {accountToolReturn.providerId
-                  ? `已定位配置：${providers[accountToolReturn.providerId]?.name ?? "正在读取…"}`
-                  : "配置保存后，可在此启用或检查"}
-              </span>
-              {accountToolReturn.providerId &&
-                providers[accountToolReturn.providerId] && (
-                  <Button
-                    variant="link"
-                    onClick={() =>
-                      setEditingProvider(
-                        providers[accountToolReturn.providerId!],
-                      )
-                    }
-                  >
-                    查看配置
-                  </Button>
-                )}
-            </div>
-          )}
         {renderContent()}
       </main>
 
@@ -1816,13 +1782,13 @@ function App() {
             setConfigureKey(null);
             setActiveApp(app);
             setCurrentView("providers");
-            setAccountToolReturn({ app, providerId });
+            setAccountProviderFocus({ app, providerId });
           }}
           onReady={(draft) => {
             setConfigureKey(null);
             setActiveApp(draft.appId);
             setCurrentView("providers");
-            setAccountToolReturn({ app: draft.appId });
+            setAccountProviderFocus({ app: draft.appId });
             setTuziDraft(draft);
           }}
         />
@@ -1832,7 +1798,7 @@ function App() {
           draft={tuziDraft}
           onClose={() => setTuziDraft(null)}
           onSaved={(providerId) => {
-            setAccountToolReturn({ app: tuziDraft.appId, providerId });
+            setAccountProviderFocus({ app: tuziDraft.appId, providerId });
             setTuziDraft(null);
           }}
         />

@@ -4,7 +4,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "兔子switch",
+        "title": "兔子助手",
         "titleBarStyle": "Visible",
         "visible": false,
         "minWidth": 900,
