@@ -48,7 +48,7 @@ export function CurrencySwitcher() {
             listeners.forEach((fn) => fn());
           }}
         >
-          {value === "CNY" ? "人民币" : "USD"}
+          {value}
         </Button>
       ))}
     </div>

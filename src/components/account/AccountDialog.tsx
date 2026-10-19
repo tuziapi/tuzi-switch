@@ -33,6 +33,7 @@ export function AccountDialog({
       }}
     >
       <DialogContent
+        zIndex="alert"
         className="account-modal"
         {...(!description ? { "aria-describedby": undefined } : {})}
       >
