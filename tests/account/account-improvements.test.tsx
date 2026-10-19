@@ -277,6 +277,16 @@ describe("B09 key workflow regressions", () => {
                 supported_endpoint_types: ["responses"],
               },
               {
+                model_name: "missing-protocol-fixture",
+                enable_groups: ["default"],
+                supported_endpoint_types: null,
+              },
+              {
+                model_name: "missing-groups-fixture",
+                enable_groups: null,
+                supported_endpoint_types: ["responses"],
+              },
+              {
                 model_name: "incompatible-fixture",
                 enable_groups: ["default"],
                 supported_endpoint_types: ["gemini"],
@@ -303,6 +313,12 @@ describe("B09 key workflow regressions", () => {
     await screen.findByRole("option", { name: "compatible-fixture" });
     expect(
       screen.queryByRole("option", { name: "incompatible-fixture" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("option", { name: "missing-protocol-fixture" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("option", { name: "missing-groups-fixture" }),
     ).toBeNull();
     fireEvent.change(screen.getByRole("combobox", { name: "模型" }), {
       target: { value: "compatible-fixture" },
