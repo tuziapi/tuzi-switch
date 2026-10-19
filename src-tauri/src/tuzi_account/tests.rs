@@ -117,6 +117,28 @@ async fn connected() -> (
 }
 
 #[tokio::test]
+async fn local_file_connection_survives_restart_and_disconnect_without_keychain() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("account/connection.json");
+    let (origin, fixture, task) = local_server().await;
+    let create = || AccountService::with_store(
+        Arc::new(LocalFileStore::at(path.clone())), &origin, CLIENT).unwrap();
+    let first = create();
+    assert_eq!(first.state().status, "disconnected");
+    assert_eq!(first.connect(SYNTHETIC_TOKEN.into()).await.status, "connected");
+    let restarted = create();
+    assert_eq!(restarted.state().status, "offline");
+    assert_eq!(restarted.retry().await.status, "connected");
+    assert_eq!(fixture.requests.lock().unwrap().len(), 2);
+    let projection = serde_json::to_string(&restarted.state()).unwrap();
+    assert!(!projection.contains(SYNTHETIC_TOKEN));
+    assert_eq!(restarted.logout().await.status, "disconnected");
+    assert_eq!(create().state().status, "disconnected");
+    assert!(!std::fs::read_to_string(&path).unwrap().contains(SYNTHETIC_TOKEN));
+    task.abort();
+}
+
+#[tokio::test]
 async fn profile_record_ip_defaults_match_website_and_preserve_explicit_values() {
     let (s, _, fixture, task) = connected().await;
     let generation = s.state().generation;
@@ -142,7 +164,7 @@ async fn profile_record_ip_defaults_match_website_and_preserve_explicit_values()
 }
 
 #[tokio::test]
-async fn connect_bootstraps_identity_without_user_header_and_persists_only_in_vault() {
+async fn connect_bootstraps_identity_without_user_header_and_persists_only_in_native_store() {
     let (s, store, fixture, task) = connected().await;
     let state = s.state();
     assert_eq!(state.identity.as_ref().unwrap().user_id, "7");
@@ -303,7 +325,7 @@ async fn invalid_input_never_reaches_network_or_stores_secret() {
     task.abort();
 }
 #[tokio::test]
-async fn vault_failures_before_request_or_after_verification_never_fall_back_to_plaintext() {
+async fn storage_failures_before_request_or_after_verification_do_not_report_connected() {
     for fail_at in [1, 2] {
         let (origin, fixture, task) = local_server().await;
         let store = Arc::new(MemoryStore::default());
@@ -324,7 +346,7 @@ async fn vault_failures_before_request_or_after_verification_never_fall_back_to_
     }
 }
 #[test]
-fn vault_read_failure_does_not_report_an_empty_successful_store() {
+fn storage_read_failure_does_not_report_an_empty_successful_store() {
     let store = Arc::new(MemoryStore::default());
     *store.fail_read.lock().unwrap() = true;
     let s = service(store, ORIGIN);
@@ -334,7 +356,7 @@ fn vault_read_failure_does_not_report_an_empty_successful_store() {
     assert_eq!(state.error.unwrap().code, "secure_storage_unavailable");
 }
 #[tokio::test]
-async fn local_disconnect_clears_vault_without_remote_revocation() {
+async fn local_disconnect_clears_store_without_remote_revocation() {
     let (s, store, fixture, task) = connected().await;
     let generation = s.state().generation;
     let disconnected = s.logout().await;
@@ -679,51 +701,11 @@ fn obsolete_account_callbacks_are_consumed_without_disabling_import_links() {
     assert!(is_import_input("tuziswitch://v1/import?data=synthetic"));
     assert!(!is_import_input("tuziswitch://user@v1/import"));
 }
-#[test]
-#[ignore = "Real OS secure-store test; uses a unique synthetic entry and removes it"]
-fn native_secure_store_round_trip() {
-    let name = format!("tuzi-assistant-test-{}", uuid::Uuid::new_v4());
-    let entry = keyring::Entry::new(&name, "synthetic-test").unwrap();
-    let result = (|| {
-        entry.set_secret(b"synthetic-not-a-credential")?;
-        assert_eq!(entry.get_secret()?, b"synthetic-not-a-credential");
-        Ok::<_, keyring::Error>(())
-    })();
-    let cleanup = entry.delete_credential();
-    result.unwrap();
-    cleanup.unwrap();
-    assert!(matches!(entry.get_secret(), Err(keyring::Error::NoEntry)));
-}
-
 // Reproduce against router.TestSystemTokenLocalPreview with its isolated synthetic DB:
 // TUZI_SYSTEM_TOKEN_PAIR_CREDENTIALS=/absolute/private/credentials.json \
 // cargo test --lib tuzi_account::tests::real_go_system_token_business_pair -- --ignored --exact
 // Never use a production credential file. This test refuses non-loopback origins,
 // non-synthetic accounts, and (on Unix) credential files without private 0600 permissions.
-struct PairVaultCleanup {
-    namespace: String,
-}
-impl PairVaultCleanup {
-    fn entry(&self) -> keyring::Entry {
-        keyring::Entry::new(&self.namespace, "active-connection").unwrap()
-    }
-    fn remove_and_verify(&self) {
-        let entry = self.entry();
-        match entry.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => {}
-            Err(_) => panic!("pair vault cleanup failed"),
-        }
-        assert!(
-            matches!(entry.get_secret(), Err(keyring::Error::NoEntry)),
-            "pair vault cleanup verification failed"
-        );
-    }
-}
-impl Drop for PairVaultCleanup {
-    fn drop(&mut self) {
-        let _ = self.entry().delete_credential();
-    }
-}
 fn pair_require(ok: bool, label: &str) -> Result<(), String> {
     if ok {
         Ok(())
@@ -775,7 +757,7 @@ async fn pair_raw(
         .map_err(|_| format!("pair raw JSON {method} {path}"))
 }
 #[tokio::test]
-#[ignore = "Opt-in real Go localhost + synthetic credentials + unique OS vault pairing; no relay/payment calls"]
+#[ignore = "Opt-in real Go localhost + synthetic credentials + isolated local credential file pairing; no relay/payment calls"]
 async fn real_go_system_token_business_pair() {
     let file = std::env::var("TUZI_SYSTEM_TOKEN_PAIR_CREDENTIALS")
         .expect("explicit private synthetic credentials file required");
@@ -813,7 +795,7 @@ async fn real_go_system_token_business_pair() {
             && parsed.fragment().is_none(),
         "only exact localhost HTTP origin permitted"
     );
-    let mut vaults = Vec::new();
+    let local_files = tempfile::tempdir().unwrap();
     for username in ["preview", "preview-admin"] {
         let token = credentials[username]["system_token"]
             .as_str()
@@ -828,9 +810,8 @@ async fn real_go_system_token_business_pair() {
             .expect("synthetic user_id required")
             .to_string();
         let client = format!("tuzi-system-token-pair-{}", uuid::Uuid::new_v4());
-        let namespace = format!("tuzi-assistant/account/v1/{origin}/{client}");
-        let cleanup = PairVaultCleanup { namespace };
-        let store = Arc::new(SystemStore::new(origin, &client).unwrap());
+        let store_path = local_files.path().join(format!("{username}/connection.json"));
+        let store = Arc::new(LocalFileStore::at(store_path.clone()));
         let s = AccountService::with_store(store.clone(), origin, &client).unwrap();
         let connected = s.connect(token.into()).await;
         assert!(connected.status == "connected", "fixture connection failed");
@@ -841,7 +822,7 @@ async fn real_go_system_token_business_pair() {
                 .is_some_and(|id| id.user_id == user),
             "fixture identity mismatch"
         );
-        let restarted = AccountService::with_store(store, origin, &client).unwrap();
+        let restarted = AccountService::with_store(store.clone(), origin, &client).unwrap();
         assert_eq!(restarted.state().status, "offline");
         assert_eq!(restarted.retry().await.status, "connected");
         let s = &restarted;
@@ -953,8 +934,8 @@ async fn real_go_system_token_business_pair() {
             Ok(())
         };
         let logout = s.logout().await;
-        cleanup.remove_and_verify();
-        vaults.push(cleanup);
+        std::fs::remove_file(&store_path).unwrap();
+        assert!(store.read().unwrap().is_none());
         assert!(key_cleanup.is_ok(), "fixture key cleanup failed");
         assert!(
             profile_cleanup.is_ok(),

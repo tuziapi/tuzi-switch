@@ -76,10 +76,9 @@ function migrateLegacyConfig(configStr: string): string {
   output.push(`disable_response_storage = true`);
   output.push("");
 
-  // Copy existing [model_providers.xxx] section, adding env_key if missing
+  // Preserve existing provider references; missing names are allocated on save.
   const lines = result.split("\n");
   let inModelProviders = false;
-  let hasEnvKey = false;
   let wroteModelProviders = false;
 
   for (const line of lines) {
@@ -94,26 +93,17 @@ function migrateLegacyConfig(configStr: string): string {
         line.trim().startsWith("[") &&
         !line.trim().startsWith("[model_providers.")
       ) {
-        if (!hasEnvKey) {
-          output.push(`env_key = "OPENAI_API_KEY"`);
-        }
         inModelProviders = false;
         output.push(line);
       } else {
-        if (line.trim().startsWith("env_key")) hasEnvKey = true;
         output.push(line);
       }
     }
   }
 
-  if (inModelProviders && !hasEnvKey) {
-    output.push(`env_key = "OPENAI_API_KEY"`);
-  }
-
   if (!wroteModelProviders) {
     output.push(`[model_providers.${providerName}]`);
     output.push(`name = "${providerName}"`);
-    output.push(`env_key = "OPENAI_API_KEY"`);
     output.push(`wire_api = "responses"`);
     output.push(`requires_openai_auth = false`);
   }

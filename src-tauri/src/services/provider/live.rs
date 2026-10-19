@@ -208,6 +208,11 @@ fn next_codex_managed_index(
     exclude_provider_id: Option<&str>,
 ) -> Result<u8, AppError> {
     let mut indexes = Vec::new();
+    for key in crate::codex_config::read_managed_env_block().keys() {
+        if let Some(index) = codex_managed_index("", key, family) {
+            indexes.push(index);
+        }
+    }
 
     if let Ok(live_config) = crate::codex_config::read_codex_config_text() {
         collect_codex_managed_indexes_from_config(&live_config, family, &mut indexes);
@@ -284,6 +289,11 @@ pub(crate) fn normalize_codex_managed_provider_for_storage(
     provider: &mut Provider,
     exclude_provider_id: Option<&str>,
 ) -> Result<(), AppError> {
+    let existing_env_key = match exclude_provider_id {
+        Some(id) => db.get_provider_by_id(id, AppType::Codex.as_str())?
+            .as_ref().and_then(codex_provider_env_key),
+        None => None,
+    };
     let Some(obj) = provider.settings_config.as_object_mut() else {
         return Ok(());
     };
@@ -296,6 +306,21 @@ pub(crate) fn normalize_codex_managed_provider_for_storage(
     }
 
     let route_id = codex_active_route_id(config_str).unwrap_or_default();
+    if let Some(existing_env_key) = existing_env_key {
+        // Editing must not renumber or migrate an already-bound credential,
+        // even when the endpoint or route family has changed.
+        let mut doc = config_str.parse::<DocumentMut>()
+            .map_err(|_| AppError::Config("Codex 配置格式无效，请重新导入配置".into()))?;
+        if let Some(table) = doc.get_mut("model_providers")
+            .and_then(|providers| providers.get_mut(&route_id))
+            .and_then(|provider| provider.as_table_mut())
+        {
+            table["env_key"] = toml_edit::value(&existing_env_key);
+        }
+        obj.insert("config".to_string(), Value::String(doc.to_string()));
+        obj.insert("env".to_string(), json!({ "envKey": existing_env_key }));
+        return Ok(());
+    }
     let env_key = codex_active_provider_string_field(config_str, "env_key").unwrap_or_default();
     let base_url = codex_active_provider_string_field(config_str, "base_url").unwrap_or_default();
     if route_id == "custom" {
@@ -2066,6 +2091,28 @@ mod tests {
     use serde_json::json;
     use serial_test::serial;
     use std::sync::{Mutex, OnceLock};
+
+    #[test]
+    fn editing_codex_keeps_bound_env_key_even_when_route_changes_or_name_is_shared() {
+        let db = Database::memory().unwrap();
+        let settings = json!({
+            "auth": {}, "env": { "envKey": "STALE_METADATA_KEY" },
+            "config": "model_provider = \"legacy\"\n[model_providers.legacy]\nbase_url = \"https://api.tu-zi.com/coding\"\nenv_key = \"CODING_CODEX_API_KEY\"\n"
+        });
+        let original = Provider::with_id("synthetic-edit".into(), "Synthetic".into(), settings.clone(), None);
+        db.save_provider("codex", &original).unwrap();
+        let other = Provider::with_id("synthetic-shared".into(), "Synthetic shared".into(), settings, None);
+        db.save_provider("codex", &other).unwrap();
+        let mut edited = original.clone();
+        edited.settings_config["config"] = json!("model_provider = \"provider-tuzi01\"\n[model_providers.provider-tuzi01]\nbase_url = \"https://api.tu-zi.com/v1\"\nenv_key = \"TUZI01_CODEX_API_KEY\"\n");
+        normalize_codex_managed_provider_for_storage(&db, &mut edited, Some(&original.id)).unwrap();
+        assert_eq!(codex_provider_env_key(&edited).as_deref(), Some("CODING_CODEX_API_KEY"));
+        assert_eq!(edited.settings_config["env"]["envKey"], "CODING_CODEX_API_KEY");
+        let text = edited.settings_config["config"].as_str().unwrap();
+        assert!(text.contains("https://api.tu-zi.com/v1"));
+        assert!(!text.contains("TUZI01_CODEX_API_KEY"));
+        assert!(!migrate_codex_provider_credential(Some(&original), &edited).unwrap());
+    }
 
     fn test_guard() -> std::sync::MutexGuard<'static, ()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();

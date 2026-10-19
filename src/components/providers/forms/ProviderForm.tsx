@@ -74,13 +74,16 @@ import {
   extractCodexWireApi,
   getCodexProviderEnvKeyFromSettings,
   hasApiKeyField,
-  isCodexEnvKeyDuplicate,
   removeCodexExperimentalBearerToken,
   setCodexBaseUrl as setCodexBaseUrlInConfig,
   setCodexEnvKey as setCodexEnvKeyInConfig,
   setCodexModelName as setCodexModelNameInConfig,
   setCodexWireApi,
 } from "@/utils/providerConfigUtils";
+import {
+  CODEX_ENV_KEY_PATTERN,
+  resolveCodexFormEnvKey,
+} from "@/utils/codexFormEnvKey";
 import { mergeProviderMeta } from "@/utils/providerMetaUtils";
 import { getCodexCustomTemplate } from "@/config/codexTemplates";
 import CodexConfigEditor from "./CodexConfigEditor";
@@ -276,7 +279,6 @@ const CODEX_TUZI_ROUTE_PREFIX = "provider-tuzi";
 const CODEX_TUZI_ENV_PATTERN = /^TUZI(\d{2})_CODEX_API_KEY$/;
 const CODEX_CODING_ROUTE_PREFIX = "provider-coding";
 const CODEX_CODING_ENV_PATTERN = /^CODING(\d{2})_CODEX_API_KEY$/;
-const CODEX_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const isCodexTuziPreset = (preset: CodexProviderPreset) =>
   preset.icon === "tuzi" ||
@@ -781,7 +783,6 @@ function ProviderFormFull({
     useState<CodexChatReasoning>(
       () => initialData?.meta?.codexChatReasoning ?? {},
     );
-  const [codexEnvKeyError, setCodexEnvKeyError] = useState("");
   const [localCodexApiFormat, setLocalCodexApiFormat] =
     useState<CodexApiFormat>(() => {
       if (initialData?.meta?.apiFormat === "openai_chat") {
@@ -824,20 +825,6 @@ function ProviderFormFull({
       });
     },
     [setCodexConfig, debouncedValidate],
-  );
-
-  const handleCodexEnvKeyChange = useCallback(
-    (value: string) => {
-      const sanitized = value.replace(/[^A-Za-z0-9_]/g, "");
-      setCodexEnvKey(sanitized);
-      setCodexEnvKeyError("");
-      setCodexConfig((prev) => {
-        const updated = setCodexEnvKeyInConfig(prev, sanitized);
-        debouncedValidate(updated);
-        return updated;
-      });
-    },
-    [setCodexConfig, setCodexEnvKey, debouncedValidate],
   );
 
   useEffect(() => {
@@ -1344,69 +1331,47 @@ function ProviderFormFull({
           defaultValue: "请填写供应商名称",
         }),
       );
-    } else if (appId === "codex") {
+    }
+    if (appId === "codex") {
       const rawSubmittedEnvKey = (
         getCodexProviderEnvKeyFromSettings({
           config: codexConfig,
           env: { envKey: codexEnvKey },
         }) || codexEnvKey
       ).trim();
-      const submittedEnvKey = normalizeManagedCodexEnvKey(
-        codexBaseUrl,
-        rawSubmittedEnvKey,
-      );
-
-      if (category !== "official" && !submittedEnvKey) {
-        const message = t("providerForm.envKeyRequired", {
-          defaultValue: "请填写环境变量名",
-        });
-        setCodexEnvKeyError(message);
-        toast.error(message);
-        return;
-      }
-
-      if (submittedEnvKey && !CODEX_ENV_KEY_PATTERN.test(submittedEnvKey)) {
-        const message = t("providerForm.envKeyInvalid", {
-          defaultValue:
-            "环境变量名只能以字母或下划线开头，并且只能包含字母、数字、下划线",
-        });
-        setCodexEnvKeyError(message);
-        toast.error(message);
-        return;
-      }
-
-      const initialEnvKey = getCodexProviderEnvKeyFromSettings(
-        initialData?.settingsConfig,
-      );
-
-      let finalEnvKey = submittedEnvKey;
-      if (
-        finalEnvKey &&
-        isCodexEnvKeyDuplicate(finalEnvKey, {
-          currentEnvKey: initialEnvKey,
-          currentProviderId: providerId,
-          providers: existingCodexProviders,
-        })
-      ) {
-        let counter = 1;
-        while (
-          isCodexEnvKeyDuplicate(`${finalEnvKey}_${counter}`, {
-            currentEnvKey: initialEnvKey,
-            currentProviderId: providerId,
-            providers: existingCodexProviders,
-          })
-        ) {
-          counter++;
+      const initialEnvKey = isEditMode
+        ? getCodexProviderEnvKeyFromSettings(editData?.settingsConfig)
+        : "";
+      let providers = existingCodexProviders;
+      let environment = shellEnvKeys;
+      if (!initialEnvKey && (category !== "official" || rawSubmittedEnvKey)) {
+        try {
+          // Do not allocate from a not-yet-loaded or stale form query.
+          [providers, environment] = await Promise.all([
+            providersApi.getAll("codex"),
+            invoke<Record<string, string>>("read_all_codex_env_keys"),
+          ]);
+        } catch {
+          toast.error(t("providerForm.codexAllocationUnavailable"));
+          return;
         }
-        finalEnvKey = `${finalEnvKey}_${counter}`;
-
-        toast.success(
-          t("providerForm.envKeyAutoRenamed", {
-            defaultValue: `环境变量名冲突，已自动调整为 ${finalEnvKey}`,
-          }),
-        );
       }
-      setCodexEnvKeyError("");
+      const finalEnvKey = resolveCodexFormEnvKey({
+        existingEnvKey: initialEnvKey,
+        candidate: normalizeManagedCodexEnvKey(
+          codexBaseUrl,
+          rawSubmittedEnvKey,
+        ),
+        official: category === "official",
+        providers,
+        shellEnvKeys: environment,
+      });
+      if (finalEnvKey && !CODEX_ENV_KEY_PATTERN.test(finalEnvKey)) {
+        // A malformed existing reference cannot be silently renamed. Give a
+        // recovery action rather than asking to edit a hidden form field.
+        toast.error(t("providerForm.codexReferenceInvalid"));
+        return;
+      }
 
       if (finalEnvKey !== rawSubmittedEnvKey) {
         setCodexEnvKey(finalEnvKey);
@@ -1619,10 +1584,15 @@ function ProviderFormFull({
       return;
     }
 
-    await performSubmit(
-      values,
-      appId === "codex" ? overriddenEnvKey : undefined,
-    );
+    try {
+      await performSubmit(
+        values,
+        appId === "codex" ? overriddenEnvKey : undefined,
+      );
+    } catch (error) {
+      if (appId !== "codex") throw error;
+      // Codex save failures are reported above; keep this form open.
+    }
   };
 
   const performSubmit = async (
@@ -1716,7 +1686,11 @@ function ProviderFormFull({
           env: { envKey: string };
           modelCatalog?: { models: CodexCatalogModel[] };
         } = {
-          auth: creationPrefill ? { OPENAI_API_KEY: codexApiKey } : resolvedCodexEnvKey ? {} : codexAuthObject,
+          auth: creationPrefill
+            ? { OPENAI_API_KEY: codexApiKey }
+            : resolvedCodexEnvKey
+              ? {}
+              : codexAuthObject,
           config: normalizedCodexConfig,
           env: { envKey: resolvedCodexEnvKey },
         };
@@ -1724,33 +1698,9 @@ function ProviderFormFull({
           configObj.modelCatalog = { models: normalizedCatalogModels };
         }
         settingsConfig = JSON.stringify(configObj);
-      } catch (err) {
-        let fallbackConfig = (codexConfig ?? "").trim()
-          ? removeCodexExperimentalBearerToken(
-              setCodexWireApi(codexConfig ?? "", "responses"),
-            )
-          : (codexConfig ?? "");
-        const fallbackEnvKey = (
-          resolvedEnvKeyOverride ||
-          getCodexProviderEnvKeyFromSettings({
-            config: fallbackConfig,
-            env: { envKey: codexEnvKey },
-          }) ||
-          codexEnvKey
-        ).trim();
-        if (fallbackEnvKey) {
-          fallbackConfig = setCodexEnvKeyInConfig(
-            fallbackConfig,
-            fallbackEnvKey,
-          );
-        }
-        settingsConfig = JSON.stringify({
-          auth: fallbackEnvKey ? {} : parseCodexAuthObject(codexAuth),
-          config: fallbackConfig,
-          env: {
-            envKey: fallbackEnvKey,
-          },
-        });
+      } catch {
+        toast.error(t("providerForm.codexSaveFailed"));
+        throw new Error("Codex configuration save failed");
       }
     } else if (appId === "gemini") {
       try {
@@ -2798,9 +2748,6 @@ function ProviderFormFull({
           {appId === "codex" && (
             <CodexFormFields
               providerId={providerId}
-              codexEnvKey={codexEnvKey}
-              onEnvKeyChange={handleCodexEnvKeyChange}
-              envKeyError={codexEnvKeyError}
               codexApiKey={codexApiKey}
               onApiKeyChange={handleCodexApiKeyChange}
               credentialStatus={codexCredentialStatus}

@@ -1,4 +1,4 @@
-//! Account system-token connection. Credentials stay in the operating-system vault.
+//! Account system-token connection. Credentials stay in a private native local file.
 pub mod business;
 mod store;
 mod prefill;
@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
     time::Duration,
 };
-use store::{SystemStore, TokenStore};
+use store::{LocalFileStore, TokenStore};
 use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 use url::Url;
@@ -21,7 +21,7 @@ compile_error!("local-preview is restricted to debug builds");
 const ORIGIN: &str = "https://api.tu-zi.com";
 #[cfg(feature = "local-preview")]
 const ORIGIN: &str = "http://127.0.0.1:5180";
-// Keep the vault namespace so an A record is recognized, never interpreted as B.
+// Keep account identity stable; old Keychain records are not read or migrated.
 #[cfg(not(feature = "local-preview"))]
 const CLIENT: &str = "tuzi-switch-desktop";
 #[cfg(feature = "local-preview")]
@@ -235,7 +235,7 @@ impl AccountService {
     }
 
     pub fn new() -> Result<Self, AccountError> {
-        Self::with_store(Arc::new(SystemStore::new(ORIGIN, CLIENT)?), ORIGIN, CLIENT)
+        Self::with_store(Arc::new(LocalFileStore::new(ORIGIN, CLIENT)?), ORIGIN, CLIENT)
     }
     fn with_store(
         store: Arc<dyn TokenStore>,
