@@ -178,23 +178,6 @@ export function TuziProviderDialog({
           if (!alive.current) return false;
           toast.success(
             outcome.enabled ? "已保存并按工具规则启用" : "已保存，尚未启用",
-            {
-              action: {
-                label: "恢复配置",
-                onClick: () => {
-                  void invoke("tuzi_provider_restore", {
-                    backupId: outcome.backupId,
-                  })
-                    .then(async () => {
-                      await queryClient.invalidateQueries({
-                        queryKey: ["providers", draft.appId],
-                      });
-                      toast.success("已恢复保存前配置");
-                    })
-                    .catch(() => toast.error("恢复失败，请核对备份与当前配置"));
-                },
-              },
-            },
           );
           onSaved?.(provider.id);
         } catch (error) {
