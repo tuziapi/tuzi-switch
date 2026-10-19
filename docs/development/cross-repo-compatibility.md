@@ -80,3 +80,7 @@
 ## B12 账户配置直接保存（2026-10-19）
 
 客户端代码 `1ba0376a34ef7e4ff6e391a3af7c9622ef1cedf8` 配对未修改 API HEAD `21cd7acd51349407cdc5d332a763907d065f9a86`；两仓 `codex/tuzi-assistant-system-token`，`system-token-v1` 不变。仅客户端取消额外确认界面，后台依次使用原 preview/save IPC，账户来源/资格/备份恢复语义保留。代码与文档可独立 revert，API 无需配套变更，无部署/迁移；验证基于含原有未提交修复的工作树。最新本地预览已重启，完整实机添加及其他平台仍待验收，详见 [B12验证](provider-direct-save-verification.md)。
+
+## B16 模型端点兼容（2026-10-19）
+
+客户端 `f64ebcc8c2b6a625cb6a6528b32657e9817d75b0` / API `21cd7acd51349407cdc5d332a763907d065f9a86`，分支均 codex/tuzi-assistant-system-token，B4/system-token-v1。API 无修改；客户端解析现有 supported_endpoint_types/endpoints 字段，不改路由和工具配置写入。正式修复可独立 revert，无迁移或发布操作。临时 local-preview 夹具保留未提交。验证及限制见 [B16验证](model-endpoint-compatibility-verification.md)。
