@@ -85,3 +85,7 @@ HTTP 路由、认证和 DTO 不变，契约仍为 `system-token-v1`。唯一账�
 ## B11 客户端预填补充（2026-10-19）
 
 HTTP 契约仍为 `system-token-v1`。网站回跳地址严格保持无参数 `tuziswitch://account/connect`，不传令牌或用户身份。经用户确认，新客户端可在自身点击获取令牌后5分钟内，按 [ADR-010](decisions/0010-token-prefill-and-provider-drafts.md) 单次读取剪贴板并填入空连接表单，仍需用户确认连接。不是网站传回凭证，也不证明剪贴板来源。现站生成的系统令牌29～32位 Base62是自动预填候选限制，不改变原服务端令牌认证；其他合法旧格式可手动粘贴。旧客户端/旧网站继续兼容。
+
+## B13本地凭证存储兼容
+
+HTTP路由、认证、DTO及system-token-v1不变。账户原生后端改用独立本地JSON，不调用钥匙串；已有IPC错误码secure_storage_unavailable/secure_storage_failed继续兼容，界面含义更新为本地账户文件访问/保存失败，storage_invalid提供损坏后重连提示。普通IPC仍不返回保存的令牌。详见ADR-011。

@@ -4,7 +4,9 @@
 
 最终集成分支两仓均为 `codex/tuzi-assistant-system-token`，替代本任务旧 API 集成分支要求；分支名不证明部署。当前代码、测试、联调、用户验收和发布状态分别见 [progress.md](progress.md)，配对 SHA 及兼容限制见 [跨仓库兼容记录](cross-repo-compatibility.md)。本地代码/定向验证/隔离联调已完成，分层证据与未完成门禁见 [B4验证报告](system-token-verification.md)；用户验收和发布未完成。
 
-最新 B12：按用户确认将账户配置的“添加”改为直接保存，后台保留校验、备份和恢复；见 [B12验证](provider-direct-save-verification.md)。
+最新 B13：用户明确批准账户系统令牌改用独立本地配置文件、Codex表单移除环境变量字段；见 [ADR-011](decisions/0011-local-account-file-and-hidden-codex-env.md) 和 [B13验证](local-account-file-verification.md)。旧钥匙串不读取，首次更新需重新连接。
+
+此前 B12：按用户确认将账户配置的“添加”改为直接保存，后台保留校验、备份和恢复；见 [B12验证](provider-direct-save-verification.md)。
 
 此前 B11：标题行高、受控令牌预填、兔子线路预填和供应商保存修复已实施，分层验证见 [B11验证](token-prefill-provider-verification.md) / [ADR-010](decisions/0010-token-prefill-and-provider-drafts.md)。两仓仍在用户指定 B 分支，本地开发，无远程或发布。
 
@@ -39,4 +41,4 @@ B4 的批准来源为本轮目标文件（2026-10-18，`goal-objective.md`）：
 
 迁移开始核查：C `codex/tuzi-assistant-dev` / `c3902fe7c4fc847e769b23d7712092a30aa67c57`，只有既有未跟踪 Word/产品附件；S 最新网站 `codex/unified-currency-display` / `dded57caedc376c4399f778ebb2147748bc24743`，工作区干净；A API 分支 `codex/tuzi-assistant-dev` / `111497e6f` 仅用于差异审计。B 服务端以最新网站为底，不整体回退或整批挑入 A。
 
-本地阶段提交、相称检查、隔离合成数据及预览已授权；远程和生产仍需新授权。文档改动仅跑链接、编号和一致性检查；代码负责人记录实际命令、环境及结果，Mock、构建、HTTP、原生层和真实 UI 分层报告。发布前仍需三平台安全存储、实际 MySQL/其他数据库、性能、网站旧接入和用户验收证据，不能用限制说明替代通过。
+本地阶段提交、相称检查、隔离合成数据及预览已授权；远程和生产仍需新授权。文档改动仅跑链接、编号和一致性检查；代码负责人记录实际命令、环境及结果，Mock、构建、HTTP、原生层和真实 UI 分层报告。发布前仍需三平台本地凭证文件权限/恢复、实际 MySQL/其他数据库、性能、网站旧接入和用户验收证据，不能用限制说明替代通过。

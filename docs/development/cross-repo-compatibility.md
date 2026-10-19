@@ -2,7 +2,11 @@
 
 基线 `TA-AC-1.5-B4`，契约 `system-token-v1`。此表覆盖已实现功能，**实现适配、接口可用及发布可见性不是同一状态**。分层验证和限制见 [B4验证报告](system-token-verification.md)。
 
-## 最新代码配对：B11连接与配置修复
+## 最新代码配对：B13本地账户文件与隐藏变量
+
+客户端 `d7b41dcdbae715d9ece2762753ae339c16e8a8ff` / API `21cd7acd51349407cdc5d332a763907d065f9a86`（本任务未改API）。两仓指定system-token分支，HTTP/DTO/schema不变。用户明确批准本地明文账户文件替代OS钥匙串，旧记录不迁移、首次需重连；Codex变量仅界面隐藏并保持编辑绑定。分层验证及含既有未提交预填补丁的工作树限制见 [B13验证](local-account-file-verification.md)。只本地提交和预览，无发布。
+
+## 历史代码配对：B11连接与配置修复
 
 客户端 `b61f39a2b7c318ffa1b9ba12f1286664ca66c45d` / API网站 `68b5b3bf6b8768b932c2b0bc247223644272c258`，两仓 `codex/tuzi-assistant-system-token`，`system-token-v1` 不变。固定无参数回跳与旧客户端/网站兼容；原生受控单次预填，不自动连接；兔子线路草稿分类、标识与保存反馈修复。HTTP/权限/schema无改动，保留来源/资格/事务。完整工作树验证56前端/48网站/54原生及3预览测试通过；含已有未提交Codex回填修复，不能当干净HEAD单独验证。截图与隔离七工具保存恢复、真实OS回跳及当前运行窗口限制见 [B11验证](token-prefill-provider-verification.md)。未发布，可分别revert，无清库或令牌轮换。
 

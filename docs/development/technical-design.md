@@ -10,13 +10,15 @@ Rust 使用固定可信 origin、禁重定向、无 Cookie 的专用 HTTP client
 
 `/account/*` 是 IPC 逻辑操作，不是网络端点；Rust 验证方法、精确路径/ID、查询字段/类型/上限及请求 body，再映射原站路由。拒绝绝对 URL、路径逃逸、额外 Header、管理员参数和未列操作；成功 payload 转为旧页面 DTO，删除原站额外字段。保留 owner/原生权限校验和取消 requestId，不因改接入扩大功能。
 
-## 安全存储及连接生命周期
+## 本地账户文件及连接生命周期（B13）
 
-沿用 keyring 3.6 原生后端，macOS Keychain、Windows Credential Manager、Linux Secret Service；不可用不得退明文。B 的 `Record` v2 字段为 `version/origin/client/generation/tokens/identity`，没有 `auth_source` 字段；`tokens` 保存系统令牌、已验证 user ID 和 connection ID，`identity` 保存身份投影。恢复同时校验版本、固定 origin 和 client。秘密不进 SQLite、工具配置/备份、导出、WebDAV、前端持久缓存、日志、错误/截图。
+按2026-10-19用户明确要求，账户系统令牌由原生 LocalFileStore 写入独立本地明文JSON，不再调用 keyring/Keychain。这是批准的存储方案替换，不是失败时降级。位置为系统用户本地数据目录下 `com.tuziswitch.desktop/account/<SHA256(origin + NUL + client)>.json`，预览使用 `com.tuziswitch.desktop.preview/account/`。该位置独立于可迁移应用配置、SQLite、工具配置和WebDAV；系统级备份及同用户进程不在应用权限隔离承诺内。Unix目录0700、文件0600，Windows继承当前用户本地数据目录ACL。原子临时文件替换、大小限制和符号链接拒绝；失败仅返回固定错误码，不泄露原文。
 
-旧 v1 A AT/RT/pending/journal 不能解释为 B。恢复检测后只投影 reconnect_required/明确重连说明，不恢复 OAuth、自动换码或删除业务数据。明确连接先递增代次并将不含 tokens/identity 的空 v2 记录持久化，成功后才进入 verifying 并验证输入，防止验证失败或中断后恢复旧账户。空记录写失败不开始验证，明确报告存储错误；验证成功后再保存含身份和令牌的 v2 记录，第二次保存失败也不进入 connected、不返回令牌。重启时读取原生记录并回读身份，网络错误保留可重试状态；无效/轮换/禁用时停止旧业务并清账户缓存，不能用到期/刷新模型解释。
+B的Record v2仍包含version/origin/client/generation/tokens/identity。恢复校验版本、固定origin和client；普通IPC不返回令牌。旧钥匙串记录不读取、不迁移、不删除，首次更新需重新连接。macOS已通过本地验证，Windows/Linux实际文件权限与安装升级仍待对应平台验收。
 
-系统令牌没有原站独立 TTL，不自动轮换、不实现 refresh/revoke。本地 disconnect/logout 递增代次，以不含 tokens/identity 的空 v2 记录（tombstone）覆盖安全存储，并清内存身份及临时账户状态，不是删除安全存储条目。覆盖失败仍清本轮内存状态，但报告 error 且 `localCleared=false`，不能宣称已清除磁盘凭证；不请求站点生成/轮换，不声称远程失效。用户需主动在网站轮换才能使共享旧令牌失效，且会影响其他接入。改密码对系统令牌失效未有证据，不照搬 A 承诺。
+若本地文件中出现旧 v1 A AT/RT/pending/journal，不能解释为 B。恢复检测后只投影 reconnect_required/明确重连说明，不恢复 OAuth、自动换码或删除业务数据。明确连接先递增代次并将不含 tokens/identity 的空 v2 记录持久化，成功后才进入 verifying 并验证输入，防止验证失败或中断后恢复旧账户。空记录写失败不开始验证，明确报告存储错误；验证成功后再保存含身份和令牌的 v2 记录，第二次保存失败也不进入 connected、不返回令牌。重启时读取原生记录并回读身份，网络错误保留可重试状态；无效/轮换/禁用时停止旧业务并清账户缓存，不能用到期/刷新模型解释。
+
+系统令牌没有原站独立 TTL，不自动轮换、不实现 refresh/revoke。本地 disconnect/logout 递增代次，以不含 tokens/identity 的空 v2 记录（tombstone）覆盖本地账户文件，并清内存身份及临时账户状态，不是轮换网站令牌，也不操作旧钥匙串条目。覆盖失败仍清本轮内存状态，但报告 error 且 `localCleared=false`，不能宣称已清除磁盘凭证；不请求站点生成/轮换，不声称远程失效。用户需主动在网站轮换才能使共享旧令牌失效，且会影响其他接入。改密码对系统令牌失效未有证据，不照搬 A 承诺。
 
 ## 状态、缓存和异常
 
