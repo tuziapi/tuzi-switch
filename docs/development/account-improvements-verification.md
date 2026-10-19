@@ -149,3 +149,7 @@ CSS格式与diff检查、macOS预览构建通过（日志 `/tmp/tuzi-modal-text-
 本地只读模型接口确认存在supported_endpoint_types为null的模型。选择工具触发兼容筛选时直接调用.some导致渲染异常。客户端代码 `59c9400` 为协议/分组数组增加类型检查，缺失元数据按不兼容排除，不放宽配置资格。API HEAD仍为 `6341a800263460c2a29f065a252b0145d7ac7e7c`，未修改API或渠道，契约不变。
 
 扩展既有组件回归：混合正常模型、null协议、null分组，点击Codex仍可选择合法模型并继续；缺失元数据模型不显示。account-improvements与tuzi-tool-compatibility两文件11项通过，typecheck、diff和macOS预览构建通过。日志 `/tmp/tuzi-config-null-tests.log`、`/tmp/tuzi-config-null-types.log`、`/tmp/tuzi-config-null-build.log`。重启新预览后实机点击原测试Key配置→Codex，页面正常显示搜索/模型选择及无匹配提示，未再白屏；未揭示密钥、保存配置或调用模型。原有无关修改保留，仅本地提交。
+
+## 2026-10-19 合并模型选择器
+
+客户端 `7a5fdb0` 将独立搜索输入和select合并为Popover/Command可搜索选择器，保留服务端搜索、分页和兼容筛选。按用户要求不在界面解释渠道/协议原因，仅显示简短空态。8项相关测试、typecheck和macOS预览构建通过，日志 `/tmp/tuzi-picker-test.log`、`/tmp/tuzi-picker-types.log`、`/tmp/tuzi-picker-build.log`。新预览实机确认单一入口、下拉搜索、简短空态及Esc只关闭下拉。未保存工具配置或调用模型。API未修改，仍配对6341a8002。
