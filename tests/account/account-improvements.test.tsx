@@ -334,6 +334,81 @@ describe("B09 key workflow regressions", () => {
       ),
     );
   });
+  it.each([
+    {
+      appId: "claude",
+      label: /^Claude 选择并配置$/,
+      protocol: "anthropic",
+      endpoint: "claude code",
+      path: "/v1/messages",
+    },
+    {
+      appId: "gemini",
+      label: /^Gemini 选择并配置$/,
+      protocol: "gemini",
+      endpoint: "gemini generateContent",
+      path: "/v1beta/models/{model}:generateContent",
+    },
+    {
+      appId: "openclaw",
+      label: /^OpenClaw 选择并配置$/,
+      protocol: "chat",
+      endpoint: "OpenAI-Chat",
+      path: "/v1/chat/completions",
+    },
+  ])(
+    "selects catalog endpoint labels and preserves the Key/model for $appId",
+    async ({ appId, label, protocol, endpoint, path }) => {
+      const ready = vi.fn();
+      vi.mocked(invoke).mockResolvedValue([]);
+      vi.mocked(desktopRequest).mockImplementation(async (req) =>
+        req.method === "POST"
+          ? (env({ key: "SYNTHETIC_MODEL_KEY" }) as never)
+          : (env({
+              items: [
+                {
+                  model_name: "synthetic-catalog-model",
+                  enable_groups: ["default"],
+                  supported_endpoint_types: [endpoint],
+                  endpoints: { [endpoint]: { path, method: "POST" } },
+                },
+              ],
+              pagination: { has_more: false },
+              snapshot_id: "fixture",
+              pricing_meta: {},
+            }) as never),
+      );
+      setup(
+        <ConfigureTool
+          state={state}
+          keyDto={key}
+          onClose={vi.fn()}
+          onReady={ready}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: label })).toBeEnabled(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      fireEvent.click(screen.getByRole("combobox", { name: "模型" }));
+      fireEvent.click(
+        await screen.findByRole("option", { name: "synthetic-catalog-model" }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+      await waitFor(() =>
+        expect(ready).toHaveBeenCalledWith(
+          expect.objectContaining({
+            appId,
+            protocol,
+            model: "synthetic-catalog-model",
+            key: "SYNTHETIC_MODEL_KEY",
+            tokenId: "101",
+          }),
+        ),
+      );
+    },
+  );
+
   it("converts monetary input using exact station rate without changing stored existing quota", () => {
     expect(amountToQuota("7.30", money, "CNY")).toBe("500000");
     expect(amountToQuota("1", money, "USD")).toBe("500000");

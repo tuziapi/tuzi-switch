@@ -1,6 +1,8 @@
 //! Bounded desktop facade. No caller-controlled origin or authorization headers.
 use super::*;
 use serde_json::Value;
+mod endpoint_compatibility;
+use endpoint_compatibility::{endpoint_aliases, supports_protocol};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -620,32 +622,6 @@ fn prefix_key(d: &mut Value) -> Result<(), BusinessError> {
     Ok(())
 }
 
-fn endpoint_aliases(protocol: &str) -> &'static [&'static str] {
-    match protocol {
-        "anthropic" => &["anthropic", "anthropic-messages", "anthropic_messages"],
-        "responses" => &[
-            "openai-response",
-            "openai-responses",
-            "responses",
-            "codex_responses",
-        ],
-        "chat" => &[
-            "openai",
-            "openai-chat",
-            "chat",
-            "openai_chat",
-            "openai_completions",
-        ],
-        "gemini" => &[
-            "gemini",
-            "google",
-            "gemini-native",
-            "gemini_native",
-            "google_generative_ai",
-        ],
-        _ => &[],
-    }
-}
 fn qualified_models(
     key: &Value,
     data: &Value,
@@ -712,13 +688,7 @@ fn qualified_models(
         }) {
             return Err(denied());
         }
-        let endpoints = model["supported_endpoint_types"]
-            .as_array()
-            .ok_or_else(denied)?;
-        if !endpoints.iter().any(|e| {
-            e.as_str()
-                .is_some_and(|v| endpoint_aliases(protocol).contains(&v))
-        }) {
+        if !supports_protocol(model, protocol) {
             return Err(denied());
         }
     }
@@ -1082,6 +1052,50 @@ pub async fn account_open_web(app: tauri::AppHandle, target: String) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn catalog_endpoints_qualify_consistently_without_relaxing_key_checks() {
+        let cases: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/tuzi-endpoint-compatibility.json"
+        ))
+        .unwrap();
+        let key = serde_json::json!({"status":1,"expired_time":-1,"unlimited_quota":true,"group":"default","model_limits":"","model_limits_enabled":false});
+        let names = vec!["synthetic-model".into()];
+        for case in cases {
+            let data = serde_json::json!({"items":[case["model"]],"pricing_meta":{"usable_group":{"default":"Default"}}});
+            for protocol in ["anthropic", "responses", "chat", "gemini"] {
+                let expected = case["protocols"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|v| v == protocol);
+                assert_eq!(
+                    qualified_models(&key, &data, &names, protocol, 100).is_ok(),
+                    expected,
+                    "case {} / {protocol}",
+                    case["name"]
+                );
+                if expected {
+                    for patch in [
+                        serde_json::json!({"status":2}),
+                        serde_json::json!({"expired_time":99}),
+                        serde_json::json!({"unlimited_quota":false,"remain_quota":"0"}),
+                        serde_json::json!({"group":"other"}),
+                        serde_json::json!({"model_limits_enabled":true,"model_limits":"another-model"}),
+                    ] {
+                        let mut denied_key = key.clone();
+                        denied_key
+                            .as_object_mut()
+                            .unwrap()
+                            .extend(patch.as_object().unwrap().clone());
+                        assert!(
+                            qualified_models(&denied_key, &data, &names, protocol, 100).is_err()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn provider_qualification_checks_current_key_models_and_virtual_default() {
         let mut key = serde_json::json!({"status":1,"expired_time":-1,"unlimited_quota":false,"remain_quota":"9007199254740993123","group":"default","model_limits_enabled":true,"model_limits":"synthetic-model"});

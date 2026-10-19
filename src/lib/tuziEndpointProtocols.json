@@ -1,0 +1,42 @@
+{
+  "anthropic": {
+    "aliases": ["anthropic", "anthropic-messages", "anthropic_messages"],
+    "catalogAliases": ["claude code"],
+    "paths": ["/v1/messages"]
+  },
+  "responses": {
+    "aliases": [
+      "openai-response",
+      "openai-responses",
+      "responses",
+      "codex_responses"
+    ],
+    "catalogAliases": [],
+    "paths": ["/v1/responses"]
+  },
+  "chat": {
+    "aliases": [
+      "openai",
+      "openai-chat",
+      "chat",
+      "openai_chat",
+      "openai_completions"
+    ],
+    "catalogAliases": [],
+    "paths": ["/v1/chat/completions"]
+  },
+  "gemini": {
+    "aliases": [
+      "gemini",
+      "google",
+      "gemini-native",
+      "gemini_native",
+      "google_generative_ai"
+    ],
+    "catalogAliases": ["gemini generatecontent"],
+    "paths": [
+      "/v1beta/models/{model}:generateContent",
+      "/v1/models/{model}:generateContent"
+    ]
+  }
+}

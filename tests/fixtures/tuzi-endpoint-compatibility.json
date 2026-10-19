@@ -1,0 +1,536 @@
+[
+  {
+    "name": "standard anthropic",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic"]
+    },
+    "protocols": ["anthropic"]
+  },
+  {
+    "name": "standard anthropic-messages",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic-messages"]
+    },
+    "protocols": ["anthropic"]
+  },
+  {
+    "name": "standard anthropic_messages",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic_messages"]
+    },
+    "protocols": ["anthropic"]
+  },
+  {
+    "name": "standard openai-response",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai-response"]
+    },
+    "protocols": ["responses"]
+  },
+  {
+    "name": "standard openai-responses",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai-responses"]
+    },
+    "protocols": ["responses"]
+  },
+  {
+    "name": "standard responses",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["responses"]
+    },
+    "protocols": ["responses"]
+  },
+  {
+    "name": "standard codex_responses",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["codex_responses"]
+    },
+    "protocols": ["responses"]
+  },
+  {
+    "name": "standard openai",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai"]
+    },
+    "protocols": ["chat"]
+  },
+  {
+    "name": "standard openai-chat",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai-chat"]
+    },
+    "protocols": ["chat"]
+  },
+  {
+    "name": "standard chat",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["chat"]
+    },
+    "protocols": ["chat"]
+  },
+  {
+    "name": "standard openai_chat",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai_chat"]
+    },
+    "protocols": ["chat"]
+  },
+  {
+    "name": "standard openai_completions",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai_completions"]
+    },
+    "protocols": ["chat"]
+  },
+  {
+    "name": "standard gemini",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["gemini"]
+    },
+    "protocols": ["gemini"]
+  },
+  {
+    "name": "standard google",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["google"]
+    },
+    "protocols": ["gemini"]
+  },
+  {
+    "name": "standard gemini-native",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["gemini-native"]
+    },
+    "protocols": ["gemini"]
+  },
+  {
+    "name": "standard gemini_native",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["gemini_native"]
+    },
+    "protocols": ["gemini"]
+  },
+  {
+    "name": "standard google_generative_ai",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["google_generative_ai"]
+    },
+    "protocols": ["gemini"]
+  },
+  {
+    "name": "live Claude label",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["OpenAI-Chat", "claude code"],
+      "endpoints": {
+        "OpenAI-Chat": {
+          "path": "/v1/chat/completions",
+          "method": "POST"
+        },
+        "claude code": {
+          "path": "/v1/messages",
+          "method": "POST"
+        }
+      }
+    },
+    "protocols": ["chat", "anthropic"]
+  },
+  {
+    "name": "live Gemini label",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["OpenAI-Chat", "gemini generateContent"],
+      "endpoints": {
+        "OpenAI-Chat": {
+          "path": "/v1/chat/completions",
+          "method": "POST"
+        },
+        "gemini generateContent": {
+          "path": "/v1beta/models/{model}:generateContent",
+          "method": "POST"
+        }
+      }
+    },
+    "protocols": ["chat", "gemini"]
+  },
+  {
+    "name": "normalized known labels",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": [" OPENAI-CHAT ", " CLAUDE CODE "],
+      "endpoints": {
+        "openai-chat": {
+          "path": " /v1/chat/completions/ ",
+          "method": " post "
+        },
+        "claude code": {
+          "path": "/v1/messages/"
+        }
+      }
+    },
+    "protocols": ["chat", "anthropic"]
+  },
+  {
+    "name": "string endpoint detail",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["claude code"],
+      "endpoints": {
+        "claude code": "/v1/messages"
+      }
+    },
+    "protocols": ["anthropic"]
+  },
+  {
+    "name": "custom alias needs path",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["claude code"]
+    },
+    "protocols": []
+  },
+  {
+    "name": "custom Gemini alias needs path",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["gemini generateContent"]
+    },
+    "protocols": []
+  },
+  {
+    "name": "unknown label cannot grant access",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["Custom Model"],
+      "endpoints": {
+        "Custom Model": {
+          "path": "/v1/messages",
+          "method": "POST"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "canonical conflicting endpoint",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic"],
+      "endpoints": {
+        "anthropic": {
+          "path": "/v1/images/generations",
+          "method": "POST"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "custom alias conflicting endpoint",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["claude code"],
+      "endpoints": {
+        "claude code": {
+          "path": "/v1/images/generations",
+          "method": "POST"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "GET does not qualify",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic"],
+      "endpoints": {
+        "anthropic": {
+          "path": "/v1/messages",
+          "method": "GET"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "malformed method",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai"],
+      "endpoints": {
+        "openai": {
+          "path": "/v1/chat/completions",
+          "method": 2
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "malformed path",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic"],
+      "endpoints": {
+        "anthropic": {
+          "path": 4
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "malformed detail",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic"],
+      "endpoints": {
+        "anthropic": []
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "null list",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": null,
+      "endpoints": {
+        "anthropic": {
+          "path": "/v1/messages"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "object list",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": {
+        "anthropic": true
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "mixed entries",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": [null, {}, 1, "openai-response"]
+    },
+    "protocols": ["responses"]
+  },
+  {
+    "name": "empty list",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": []
+    },
+    "protocols": []
+  },
+  {
+    "name": "undeclared custom detail",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai"],
+      "endpoints": {
+        "claude code": {
+          "path": "/v1/messages"
+        }
+      }
+    },
+    "protocols": ["chat"]
+  },
+  {
+    "name": "unknown model name does not infer protocol",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": []
+    },
+    "protocols": []
+  },
+  {
+    "name": "responses compact alone not compatible",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai-response-compact"],
+      "endpoints": {
+        "openai-response-compact": {
+          "path": "/v1/responses/compact"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "responses mislabeled compact",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai-response"],
+      "endpoints": {
+        "openai-response": {
+          "path": "/v1/responses/compact"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "external endpoint is not followed",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic"],
+      "endpoints": {
+        "anthropic": {
+          "path": "https://elsewhere.invalid/v1/messages"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "live video and image endpoints",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["openai-video", "image-generation"],
+      "endpoints": {
+        "openai-video": {
+          "path": "/v1/videos"
+        },
+        "image-generation": {
+          "path": "/v1/images/generations"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "legacy standard with no path",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["anthropic"],
+      "endpoints": {
+        "anthropic": {
+          "method": "POST"
+        }
+      }
+    },
+    "protocols": ["anthropic"]
+  },
+  {
+    "name": "null detail for standard",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["gemini"],
+      "endpoints": {
+        "gemini": null
+      }
+    },
+    "protocols": ["gemini"]
+  },
+  {
+    "name": "Gemini v1 template",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["gemini generateContent"],
+      "endpoints": {
+        "gemini generateContent": {
+          "path": "/v1/models/{model}:generateContent",
+          "method": "POST"
+        }
+      }
+    },
+    "protocols": ["gemini"]
+  },
+  {
+    "name": "custom method missing path",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["claude code"],
+      "endpoints": {
+        "claude code": {
+          "method": "POST"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "model specific image endpoint not Gemini CLI",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["banana 谷歌 端点"],
+      "endpoints": {
+        "banana 谷歌 端点": {
+          "path": "/v1beta/gemini-2.5-flash-image:generateContent"
+        }
+      }
+    },
+    "protocols": []
+  }
+]

@@ -1,3 +1,4 @@
+import { supportsTuziProtocol } from './tuziEndpointCompatibility';
 import type { AppId } from '@/lib/api';
 export type TuziProtocol = 'anthropic' | 'responses' | 'chat' | 'gemini';
 export interface TuziProviderDraft { appId: AppId; key: string; tokenId: string; userId: string; generation: number; protocol: TuziProtocol; model?: string; name?: string }
@@ -15,7 +16,7 @@ export const TUZI_TOOL_TARGETS: {appId: AppId; protocol: TuziProtocol; endpoint:
   {appId:'hermes',protocol:'responses',endpoint:'https://api.tu-zi.com/v1'},
   {appId:'hermes',protocol:'anthropic',endpoint:'https://api.tu-zi.com/v1'},
 ];
-export function tuziToolCompatibility(key: {status:number; group:string; model_limits:string; model_limits_enabled?:boolean; expired_time?:number; remain_quota?:string; unlimited_quota?:boolean}, model: {model_name:string; enable_groups:string[]; supported_endpoint_types:string[]}, appId:AppId, protocol:TuziProtocol, platform = navigator.platform, pricingMeta?:Record<string,unknown>): string | null {
+export function tuziToolCompatibility(key: {status:number; group:string; model_limits:string; model_limits_enabled?:boolean; expired_time?:number; remain_quota?:string; unlimited_quota?:boolean}, model: {model_name:string; enable_groups:string[]; supported_endpoint_types:string[]; endpoints?: unknown}, appId:AppId, protocol:TuziProtocol, platform = navigator.platform, pricingMeta?:Record<string,unknown>): string | null {
   if (appId==='claude-desktop' && /linux/i.test(platform)) return 'Claude Desktop 在 Linux 不支持';
   if (!TUZI_TOOL_TARGETS.some(t=>t.appId===appId&&t.protocol===protocol)) return '工具不支持此协议';
   if (key.status!==1) return 'Key 未启用';
@@ -30,7 +31,6 @@ export function tuziToolCompatibility(key: {status:number; group:string; model_l
   if (!Array.isArray(model.enable_groups) || !model.enable_groups.some(g=>effectiveGroups.includes(g)&&(Object.keys(visible).length===0||g in visible))) return 'Key 分组与模型不兼容';
   const limits=key.model_limits.split(',').map(x=>x.trim()).filter(Boolean);
   if (key.model_limits_enabled && limits.length && !limits.includes(model.model_name)) return 'Key 模型限制不允许此模型';
-  const aliases:Record<TuziProtocol,string[]>={anthropic:['anthropic','anthropic-messages','anthropic_messages'],responses:['openai-response','openai-responses','responses','codex_responses'],chat:['openai','openai-chat','chat','openai_chat','openai_completions'],gemini:['gemini','google','gemini-native','gemini_native','google_generative_ai']};
-  if (!Array.isArray(model.supported_endpoint_types) || !model.supported_endpoint_types.some(e=>aliases[protocol].includes(e))) return '模型端点与工具协议不兼容';
+  if (!supportsTuziProtocol(model, protocol)) return '模型端点与工具协议不兼容';
   return null;
 }
