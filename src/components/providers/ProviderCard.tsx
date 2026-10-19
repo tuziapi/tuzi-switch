@@ -377,7 +377,7 @@ export function ProviderCard({
 
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2 min-h-7">
-              <h3 className="text-base font-semibold leading-6">
+              <h3 className="provider-card-title text-base font-medium leading-6">
                 {provider.name}
               </h3>
 

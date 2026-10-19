@@ -145,6 +145,13 @@ html.dark {
   color-scheme: dark;
 }
 
+/* Use the named Chinese face for consistent title weight on macOS. */
+.provider-card-title {
+  font-family:
+    "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
 ::-webkit-scrollbar {
   display: none;
 }
