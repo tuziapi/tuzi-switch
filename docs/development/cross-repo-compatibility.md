@@ -92,3 +92,11 @@
 API `GET /api/token/:id` 仅在归属查询确定不存在时新增 `error.code=not_found`；旧 HTTP200/success/message、路由和权限保留，网站及其他 OAuth 调用方不需修改。新客户端删除未知结果回读需配套此扩展，故部署先 API、后客户端；连接旧 API 时仍保守锁定，不将普通失败当删除成功。多模型每批最多3个、固定首批 snapshot_id，沿用现有 pricing 接口，无查询上限或 schema 变更。空分组兼容按用户要求不修改。
 
 回退先客户端、后 API；无迁移、清表或令牌轮换。仅本地测试，未发布，历史真实联调不能替代本轮配对验证。范围、命令、结果及限制见 [B17验证](prepush-fixes-verification.md)。
+
+## B18 提交与 PR 交付（2026-10-19）
+
+用户在 B17 修复后明确授权：提交并推送两个 `codex/tuzi-assistant-system-token` 分支的全部现有修改，API 创建目标为 `dev` 的 PR，客户端创建目标为 `main` 的 PR；不包含合并、部署或生产操作。本节取代此前阶段“保持未提交/不推送”的当前状态，历史验证记录按原时点保留。
+
+本次代码配对：客户端 `7e8b2085845b56fbbf3147ffa8510c1982bc10ba`，API `407c9c9287fcf8bccd0fa9601c83dc82ed11e61b`；后续配对说明提交仅改文档。契约仍为 `TA-AC-1.5-B4` / `system-token-v1`。客户端纳入既有 Codex Key 回填、OpenCode 预设回归、默认关闭的本地夹具及兔子图标源文件；B17 第 1、3 项已修复，第 2 项空分组按用户要求保留。
+
+沿用 B17 分层回归结果；本次补跑 ProviderForm/useCodexConfigState/OpenCode 预设 3 文件 10 项测试通过，两仓 diff 检查通过。未扩大声称真实联调/三平台/生产数据库验证。部署仍须先 API 后客户端，回退反向，无迁移、清表或令牌轮换。PR 中记录最终分支 SHA 及配对链接；远程成功状态以实际 GitHub PR 为准。
