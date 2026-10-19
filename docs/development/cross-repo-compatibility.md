@@ -72,3 +72,7 @@
 ## 首次 B4 迁移验证证据与限制（历史时点）
 
 最终集成复跑：前端66、账户Rust24（含真实Go及macOS安全存储）、七工具事务12、五Go包均通过；网站37+103和build通过。真实网站过期登录回跳与定位、最终B桌面连接/重启/断开/错误/切号/本人隔离通过。隐藏业务经真实原生路由配对及组件测试通过，保持隐藏；未逐页UI验收。MySQL/PG、三平台发行安装包、完整旧站OAuth/支付及用户验收未完成。详细命令、DB只读结果与脱敏截图见 [验证报告](system-token-verification.md)。两仓只本地提交，未推送或发布。
+
+## B12 账户配置直接保存（2026-10-19）
+
+客户端代码 `1ba0376a34ef7e4ff6e391a3af7c9622ef1cedf8` 配对未修改 API HEAD `21cd7acd51349407cdc5d332a763907d065f9a86`；两仓 `codex/tuzi-assistant-system-token`，`system-token-v1` 不变。仅客户端取消额外确认界面，后台依次使用原 preview/save IPC，账户来源/资格/备份恢复语义保留。代码与文档可独立 revert，API 无需配套变更，无部署/迁移；验证基于含原有未提交修复的工作树。最新本地预览已重启，完整实机添加及其他平台仍待验收，详见 [B12验证](provider-direct-save-verification.md)。

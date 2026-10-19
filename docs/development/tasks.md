@@ -15,6 +15,7 @@
 | B07 | 本地交付，依赖 B06 | 两仓最终 codex/tuzi-assistant-system-token 配对 SHA、契约、预览/验收步骤、上线/回退仅计划 | 本地交付完成；配对/预览/验收与上线回退计划见system-token-verification；未远程/发布 |
 | B09 | 账户体验，依赖 B01～B08 | 用户九项需求：短文案、引导复制唤起、连接布局、Key空态、确认删除、独立弹窗与默认表单、草稿隔离、币种/永久到期、单Key工具配置 | 九项需求及三项体验跟进代码完成；跟进49客户端/45网站测试及两端构建通过，详见 [B09验证](account-improvements-verification.md) 文末；真实唤起和完整工具UI保存仍有限制，未发布 |
 | B11 | 连接与配置修复，依赖 B09/B10 | 标题完整显示；5分钟单次回跳填入、手动连接；兔子线路预填所选Key；完整添加/失败/取消/恢复 | 本地实现及分层验证完成，见 [B11验证](token-prefill-provider-verification.md)；真实OS回跳/Windows/Linux及用户验收受限，未发布 |
+| B12 | 账户配置流程统一，依赖 B11 | 移除额外确认，添加直接保存；后台保留来源/资格校验、完整备份、失败恢复，失败保留输入并可重试 | 实施与验证见 [B12验证](provider-direct-save-verification.md)；仅本地 |
 | B10 | 品牌与视觉，依赖 B09 | 名称统一、品牌兔子图标、令牌柔和高亮、移除工具页返回提示；保留定位和安装身份 | 本地代码/定向验证完成；客户端29项、网站48项、原生6项通过，两端构建通过；局部UI已核验，用户验收/Windows升级/发布未完成，见 [B10验证](brand-ui-verification.md) |
 | B08 | 本地主分支同步 | API origin/dev、客户端 origin/main merge至两仓B分支；保留功能、更新配对及验证 | 本地merge完成，无冲突；定向验证及3项既有失败见mainline-sync-verification；未发布 |
 

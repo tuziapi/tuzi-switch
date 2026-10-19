@@ -4,7 +4,9 @@
 
 最终集成分支两仓均为 `codex/tuzi-assistant-system-token`，替代本任务旧 API 集成分支要求；分支名不证明部署。当前代码、测试、联调、用户验收和发布状态分别见 [progress.md](progress.md)，配对 SHA 及兼容限制见 [跨仓库兼容记录](cross-repo-compatibility.md)。本地代码/定向验证/隔离联调已完成，分层证据与未完成门禁见 [B4验证报告](system-token-verification.md)；用户验收和发布未完成。
 
-最新 B11：标题行高、受控令牌预填、兔子线路预填和供应商保存修复已实施，分层验证见 [B11验证](token-prefill-provider-verification.md) / [ADR-010](decisions/0010-token-prefill-and-provider-drafts.md)。两仓仍在用户指定 B 分支，本地开发，无远程或发布。
+最新 B12：按用户确认将账户配置的“添加”改为直接保存，后台保留校验、备份和恢复；见 [B12验证](provider-direct-save-verification.md)。
+
+此前 B11：标题行高、受控令牌预填、兔子线路预填和供应商保存修复已实施，分层验证见 [B11验证](token-prefill-provider-verification.md) / [ADR-010](decisions/0010-token-prefill-and-provider-drafts.md)。两仓仍在用户指定 B 分支，本地开发，无远程或发布。
 
 此前 B10：名称统一“兔子助手”、账户品牌图标、网站令牌短暂柔和高亮、移除工具页返回提示均本地完成；兼容身份及分层验证见 [B10验证](brand-ui-verification.md) 与 [ADR-009](decisions/0009-assistant-brand-identity.md)。未发布，用户验收待完成。
 
