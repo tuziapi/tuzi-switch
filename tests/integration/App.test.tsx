@@ -38,10 +38,10 @@ vi.mock("@/components/providers/ProviderList", () => ({
     onClearConfig,
     onOpenWebsite,
     onCreate,
-    focusProviderId,
+    focusRequest,
   }: any) => (
     <div>
-      <div data-testid="focused-provider">{focusProviderId}</div>
+      <div data-testid="focused-provider">{focusRequest?.providerId}</div>
       <div data-testid="provider-list">{JSON.stringify(providers)}</div>
       <div data-testid="current-provider">{currentProviderId}</div>
       <button onClick={() => onSwitch(providers[currentProviderId])}>

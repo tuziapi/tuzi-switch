@@ -74,7 +74,7 @@ function Preview() {
               connect: async () => {},
               openTokenPage: async () => {},
               logout: async () => {},
-              retry: async () => {},
+              retry: async () => disconnectedAccount,
             }}
           />
         </>

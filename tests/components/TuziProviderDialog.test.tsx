@@ -8,7 +8,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, expect, it, vi } from "vitest";
-import { TuziProviderDialog } from "@/components/providers/TuziProviderDialog";
+import {
+  TuziProviderDialog,
+  tuziCreationPrefill,
+} from "@/components/providers/TuziProviderDialog";
 import { server } from "../msw/server";
 
 const draft = {
@@ -131,7 +134,7 @@ it.each([
     fireEvent.click(screen.getByRole("button", { name: "common.add" }));
     await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
     const provider = preview.mock.calls[0][0].provider;
-    expect(provider.name).toBe("兔子线路");
+    expect(provider.name).toBe("兔子线路-Synthetic key");
     expect(provider.icon).toBe("tuzi");
     expect(provider.category).toBe("aggregator");
     expect(JSON.stringify(provider)).toContain(draft.key);
@@ -300,4 +303,13 @@ it("does not start a write if the account form unmounts during preparation", asy
   });
   expect(save).not.toHaveBeenCalled();
   expect(onSaved).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["  我的密钥  ", "兔子线路-我的密钥"],
+  ["", "兔子线路"],
+  ["   ", "兔子线路"],
+  ['测试"密钥\\A', '兔子线路-测试"密钥\\A'],
+])("names a new provider from key %j", (keyName, expected) => {
+  expect(tuziCreationPrefill({ ...draft, name: keyName })?.name).toBe(expected);
 });

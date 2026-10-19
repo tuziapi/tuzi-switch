@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -186,6 +186,10 @@ function App() {
     providerId?: string;
   } | null>(null);
   const [tuziDraft, setTuziDraft] = useState<TuziProviderDraft | null>(null);
+  const clearAccountProviderFocus = useCallback(
+    () => setAccountProviderFocus(null),
+    [],
+  );
   useEffect(() => {
     setConfigureKey(null);
     setTuziDraft(null);
@@ -202,6 +206,13 @@ function App() {
   const [accountReturnRequest, setAccountReturnRequest] = useState(0);
   const [currentView, setCurrentView] = useState<View>(getInitialView);
   useEffect(() => {
+    if (
+      accountProviderFocus &&
+      (currentView !== "providers" || activeApp !== accountProviderFocus.app)
+    )
+      setAccountProviderFocus(null);
+  }, [activeApp, currentView, accountProviderFocus]);
+  useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
     const receive = async () => {
@@ -210,7 +221,7 @@ function App() {
         setConfigureKey(null);
         setTuziDraft(null);
         setCurrentView("account");
-        setAccountReturnRequest(value => value + 1);
+        setAccountReturnRequest((value) => value + 1);
         requestAnimationFrame(() =>
           document.getElementById("account-system-token")?.focus(),
         );
@@ -1154,11 +1165,12 @@ function App() {
                     className="space-y-4"
                   >
                     <ProviderList
-                      focusProviderId={
+                      focusRequest={
                         accountProviderFocus?.app === activeApp
-                          ? accountProviderFocus.providerId
+                          ? accountProviderFocus
                           : undefined
                       }
+                      onFocusComplete={clearAccountProviderFocus}
                       providers={providers}
                       currentProviderId={currentProviderId}
                       appId={activeApp}

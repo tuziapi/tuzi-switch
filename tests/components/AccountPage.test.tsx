@@ -1,9 +1,15 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import i18n from "i18next";
 import { toast } from "sonner";
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 import zh from "@/i18n/locales/zh.json";
 import { AccountPage } from "@/components/account/AccountPage";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
@@ -23,7 +29,7 @@ const makeAccount = (state: AccountState = disconnectedAccount) => ({
   connect: vi.fn(async (_token: string) => {}),
   openTokenPage: vi.fn(async () => {}),
   logout: vi.fn(async () => {}),
-  retry: vi.fn(async () => {}),
+  retry: vi.fn(async () => state),
 });
 
 async function setup(state?: AccountState) {
@@ -250,4 +256,83 @@ describe("system token connection and phase-one account workspace", () => {
       screen.getByRole("button", { name: zh.account.getToken }),
     ).toBeEnabled();
   });
+});
+
+it("checks once while pending and confirms a verified connection", async () => {
+  const { account } = await setup(connected);
+  let finish!: (state: AccountState) => void;
+  account.retry.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: zh.account.retry }));
+  const button = screen.getByRole("button", {
+    name: zh.account.checkingConnection,
+  });
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  expect(account.retry).toHaveBeenCalledTimes(1);
+  await act(async () => finish(connected));
+  expect(toast.success).toHaveBeenCalledWith(zh.account.connectionSuccess);
+  expect(screen.getByRole("button", { name: zh.account.retry })).toBeEnabled();
+});
+it.each(["offline", "invalid", "disconnected"] as const)(
+  "does not report success for resolved %s state",
+  async (status) => {
+    vi.mocked(toast.success).mockClear();
+    const { account } = await setup(connected);
+    account.retry.mockResolvedValueOnce({
+      ...connected,
+      status,
+      error: { code: "network_error", message: "SYNTHETIC PRIVATE TEXT" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: zh.account.retry }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(zh.account.connectionFailed, {
+        description: zh.account.errors.network_error,
+      }),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText("SYNTHETIC PRIVATE TEXT"),
+    ).not.toBeInTheDocument();
+  },
+);
+it("reports IPC failure without exposing native error details", async () => {
+  const { account } = await setup(connected);
+  account.retry.mockRejectedValueOnce(new Error("SYNTHETIC PRIVATE TEXT"));
+  fireEvent.click(screen.getByRole("button", { name: zh.account.retry }));
+  await waitFor(() =>
+    expect(toast.error).toHaveBeenCalledWith(zh.account.connectionFailed, {
+      description: zh.account.actionFailed,
+    }),
+  );
+});
+it("suppresses a result for a replaced account or an unmounted page", async () => {
+  vi.mocked(toast.success).mockClear();
+  const { account, unmount } = await setup(connected);
+  account.retry.mockResolvedValueOnce({
+    ...connected,
+    generation: connected.generation + 1,
+  });
+  fireEvent.click(screen.getByRole("button", { name: zh.account.retry }));
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: zh.account.retry }),
+    ).toBeEnabled(),
+  );
+  expect(toast.success).not.toHaveBeenCalled();
+  let finish!: (state: AccountState) => void;
+  account.retry.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: zh.account.retry }));
+  unmount();
+  await act(async () => finish(connected));
+  expect(toast.success).not.toHaveBeenCalled();
 });

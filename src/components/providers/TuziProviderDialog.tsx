@@ -21,6 +21,8 @@ export function tuziCreationPrefill(
     (t) => t.appId === draft.appId && t.protocol === draft.protocol,
   )!.endpoint;
   const model = draft.model ?? "";
+  const keyName = draft.name?.trim();
+  const name = keyName ? `兔子线路-${keyName}` : "兔子线路";
   let settingsConfig: Record<string, unknown> = {};
   let meta: Provider["meta"];
   if (draft.appId === "claude" || draft.appId === "claude-desktop") {
@@ -95,7 +97,7 @@ export function tuziCreationPrefill(
       models: model ? [{ id: model }] : [],
     };
   return {
-    name: "兔子线路",
+    name,
     notes: draft.name ? `账户密钥：${draft.name}` : undefined,
     websiteUrl: "https://api.tu-zi.com",
     settingsConfig,

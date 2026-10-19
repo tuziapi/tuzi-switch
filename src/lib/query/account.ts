@@ -121,6 +121,10 @@ export function useAccount() {
     connect: (token: string) => action(() => accountApi.connect(token))(),
     openTokenPage: accountApi.openTokenPage,
     logout: action(accountApi.logout),
-    retry: action(accountApi.retry),
+    retry: async () => {
+      await action(accountApi.retry)();
+      // Return the reconciled state, never a stale IPC success after logout.
+      return client.getQueryData<AccountState>(stateKey)!;
+    },
   };
 }

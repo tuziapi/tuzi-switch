@@ -1,6 +1,6 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ReactElement } from "react";
 import type { Provider } from "@/types";
 import { ProviderList } from "@/components/providers/ProviderList";
@@ -123,6 +123,14 @@ function renderWithQueryClient(ui: ReactElement) {
 }
 
 beforeEach(() => {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
   useDragSortMock.mockReset();
   useSortableMock.mockReset();
   providerCardRenderSpy.mockClear();
@@ -308,4 +316,103 @@ describe("ProviderList Component", () => {
       screen.getByText("No providers match your search."),
     ).toBeInTheDocument();
   });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+it.each([false, true])(
+  "locates once and expires (reduced motion: %s), then can locate the same provider again",
+  (reduced) => {
+    vi.useFakeTimers();
+    const provider = createProvider();
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const complete = vi.fn();
+    const client = new QueryClient();
+    vi.mocked(window.matchMedia).mockReturnValue({
+      ...window.matchMedia(""),
+      matches: reduced,
+    });
+    const request = { providerId: provider.id };
+    const show = (
+      providers: Record<string, Provider>,
+      focusRequest = request,
+    ) => (
+      <QueryClientProvider client={client}>
+        <ProviderList
+          providers={providers}
+          focusRequest={focusRequest}
+          onFocusComplete={complete}
+          currentProviderId={provider.id}
+          appId="claude"
+          onSwitch={vi.fn()}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+          onDuplicate={vi.fn()}
+          onOpenWebsite={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+    const { container, rerender } = render(show({}));
+    act(() => vi.advanceTimersByTime(3000));
+    expect(complete).not.toHaveBeenCalled();
+    useDragSortMock.mockReturnValue({
+      sortedProviders: [provider],
+      sensors: [],
+      handleDragEnd: vi.fn(),
+    });
+    rerender(show({ [provider.id]: provider }));
+    act(() => vi.advanceTimersByTime(100));
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll).toHaveBeenCalledWith({
+      block: "center",
+      behavior: reduced ? "auto" : "smooth",
+    });
+    expect(
+      container.querySelector('[data-account-focused="true"]'),
+    ).not.toBeNull();
+    // Ordinary query refetch must not restart scrolling or the lifetime.
+    rerender(show({ [provider.id]: { ...provider } }));
+    act(() => vi.advanceTimersByTime(2400));
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[data-account-focused="true"]')).toBeNull();
+    expect(screen.getByTestId(`is-current-${provider.id}`)).toHaveTextContent(
+      "current",
+    );
+    rerender(show({ [provider.id]: provider }, { ...request }));
+    act(() => vi.advanceTimersByTime(100));
+    expect(scroll).toHaveBeenCalledTimes(2);
+    expect(
+      container.querySelector('[data-account-focused="true"]'),
+    ).not.toBeNull();
+  },
+);
+
+it("cancels pending location work when leaving the list", () => {
+  vi.useFakeTimers();
+  const provider = createProvider();
+  const complete = vi.fn();
+  const scroll = vi.fn();
+  HTMLElement.prototype.scrollIntoView = scroll;
+  const { unmount } = renderWithQueryClient(
+    <ProviderList
+      providers={{ [provider.id]: provider }}
+      focusRequest={{ providerId: provider.id }}
+      onFocusComplete={complete}
+      currentProviderId=""
+      appId="claude"
+      onSwitch={vi.fn()}
+      onEdit={vi.fn()}
+      onDelete={vi.fn()}
+      onDuplicate={vi.fn()}
+      onOpenWebsite={vi.fn()}
+    />,
+  );
+  unmount();
+  act(() => vi.advanceTimersByTime(3000));
+  expect(scroll).not.toHaveBeenCalled();
+  expect(complete).not.toHaveBeenCalled();
 });

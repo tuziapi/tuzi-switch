@@ -171,3 +171,28 @@ describe("account native state and cache isolation", () => {
     expect(result.current.state.identity).toBeNull();
   });
 });
+
+it("returns reconciled retry state after a newer disconnect event", async () => {
+  vi.mocked(accountApi.getState).mockResolvedValue(connected);
+  let finish!: (state: AccountState) => void;
+  vi.mocked(accountApi.retry).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { result } = setup();
+  await waitFor(() => expect(result.current.state.status).toBe("connected"));
+  const pending = result.current.retry();
+  const loggedOut = {
+    ...disconnectedAccount,
+    generation: connected.generation + 1,
+  };
+  act(() => listener.handler!({ payload: loggedOut }));
+  let returned: AccountState | undefined;
+  await act(async () => {
+    finish(connected);
+    returned = await pending;
+  });
+  expect(returned).toEqual(loggedOut);
+});

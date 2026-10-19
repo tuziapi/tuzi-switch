@@ -21,7 +21,7 @@ const account = {
   connect: vi.fn(async () => {}),
   openTokenPage: vi.fn(async () => {}),
   logout: vi.fn(async () => {}),
-  retry: vi.fn(async () => {}),
+  retry: vi.fn(async () => disconnectedAccount),
 };
 const input = () =>
   document.getElementById("account-system-token") as HTMLInputElement;

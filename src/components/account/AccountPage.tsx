@@ -46,6 +46,15 @@ export function AccountPage({
   const [tokenInvalid, setTokenInvalid] = useState(false);
   const tokenInput = useRef<HTMLInputElement>(null);
   const connectingLock = useRef(false);
+  const checkingLock = useRef(false);
+  const [checking, setChecking] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const { state, isLoading } = account;
   const [retrySeconds, setRetrySeconds] = useState(0);
   useEffect(() => {
@@ -128,6 +137,35 @@ export function AccountPage({
     await run(() => account.connect(value));
     setConnecting(false);
     connectingLock.current = false;
+  };
+  const checkConnection = async () => {
+    if (checkingLock.current) return;
+    checkingLock.current = true;
+    setChecking(true);
+    await run(async () => {
+      try {
+        const next = await account.retry();
+        if (!alive.current || next.generation !== state.generation) return;
+        if (next.status === "connected" && next.identity && !next.error) {
+          toast.success(t("account.connectionSuccess"));
+        } else {
+          toast.error(t("account.connectionFailed"), {
+            description: next.error
+              ? t(`account.errors.${next.error.code}`, {
+                  defaultValue: t("account.errors.generic"),
+                })
+              : t(`account.status.${next.status}`),
+          });
+        }
+      } catch {
+        if (alive.current)
+          toast.error(t("account.connectionFailed"), {
+            description: t("account.actionFailed"),
+          });
+      }
+    });
+    checkingLock.current = false;
+    if (alive.current) setChecking(false);
   };
   if (!connected)
     return (
@@ -276,9 +314,9 @@ export function AccountPage({
               retrySeconds > 0 ||
               state.status === "refreshing"
             }
-            onClick={() => void run(account.retry)}
+            onClick={() => void checkConnection()}
           >
-            {t("account.retry")}
+            {t(checking ? "account.checkingConnection" : "account.retry")}
           </Button>
           <Button
             variant="outline"
