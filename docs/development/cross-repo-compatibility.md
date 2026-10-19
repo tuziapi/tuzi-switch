@@ -2,7 +2,11 @@
 
 基线 `TA-AC-1.5-B4`，契约 `system-token-v1`。此表覆盖已实现功能，**实现适配、接口可用及发布可见性不是同一状态**。分层验证和限制见 [B4验证报告](system-token-verification.md)。
 
-## 最新代码配对：B10品牌与视觉
+## 最新代码配对：B11连接与配置修复
+
+客户端 `b61f39a2b7c318ffa1b9ba12f1286664ca66c45d` / API网站 `68b5b3bf6b8768b932c2b0bc247223644272c258`，两仓 `codex/tuzi-assistant-system-token`，`system-token-v1` 不变。固定无参数回跳与旧客户端/网站兼容；原生受控单次预填，不自动连接；兔子线路草稿分类、标识与保存反馈修复。HTTP/权限/schema无改动，保留来源/资格/事务。完整工作树验证56前端/48网站/54原生及3预览测试通过；含已有未提交Codex回填修复，不能当干净HEAD单独验证。截图与隔离七工具保存恢复、真实OS回跳及当前运行窗口限制见 [B11验证](token-prefill-provider-verification.md)。未发布，可分别revert，无清库或令牌轮换。
+
+## 历史代码配对：B10品牌与视觉
 
 2026-10-19，客户端 `d60182c8eb0255b9822b72722914d7cd44f9bc6e` + API/网站 `26abbcdd2e7386cf1cc3c29e7fde80171380a102`，两仓 `codex/tuzi-assistant-system-token`，契约 `system-token-v1`。名称/图标/高亮/返回提示修改，内部身份和数据保持兼容；固定旧 MSI UpgradeCode。工作树含原有未提交修复，分层证据及局限见 [B10验证](brand-ui-verification.md)。局部本地UI通过，用户验收及发布未完成。两端可独立revert，无数据迁移或令牌轮换。
 

@@ -90,3 +90,9 @@ API B 基于最新网站而不是 A 分支；A `/api/desktop`、独立 OAuth 表
 原生精确解析无参数账户导航链接，设置一次性 pending 标志并发送事件；React 先注册监听再消费 pending，处理冷启动，切到账户并聚焦输入。链接不携带凭证，不连接、不轮换。无效账户链接和旧 A 回调不进入导入解析/日志。
 
 单条 Key 的配置按钮打开工具选择弹窗，复用兼容模型与原 TuziProviderDialog。已有来源需 JOIN 当前 provider 的 id 与 app_type，避免已删除或其他工具同 ID 被误认；不删历史来源。保存使来源查询失效，转到对应工具页、滚动突出供应商并提供返回账户入口。换号清选择、草稿和返回上下文。没有兼容模型时明确提示，不削弱协议/资格过滤，不代发模型测试。
+
+## B11：受控剪贴板预填及创建草稿（2026-10-19）
+
+按用户确认实施 [ADR-010](decisions/0010-token-prefill-and-provider-drafts.md)。许可仅原生内存，5分钟/单次/generation/固定回跳限制；前端空输入及修订序号保护，不自动连接，不增加持久缓存或令牌 URL。新增 IPC `account_take_token_prefill` / `account_cancel_token_prefill`，原 `account_open_token_page` 负责许可；网站 HTTP 不变。
+
+显式创建分类从 initialData 初始化并随表单提交；兔子线路名称/图标及 Codex TOML 默认参数保留，选中模型和独立环境键覆盖默认值。三种附加工具草稿带唯一 providerKey，保存采用该值。确认正文滚动、按钮固定、提交去重、取消保留表单、错误可见，来源/资格/事务检查保持。B10 已取消工具页返回提示；上文 B09 返回入口记录仅为历史。
