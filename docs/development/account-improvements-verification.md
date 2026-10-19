@@ -143,3 +143,9 @@ bun run build
 用户明确问题为字形发虚而非颜色。本轮仅账户弹窗改为inset/margin自动居中、height:fit-content，移除自身transform与动画，避免平移/缩放合成层影响字形；未改变颜色、字号、遮罩和业务行为。客户端代码 `04b44c4f083e8eb4481384ffa9e7d122e796d28d`，API仍为 `6341a800263460c2a29f065a252b0145d7ac7e7c`。两仓B分支和契约不变。
 
 CSS格式与diff检查、macOS预览构建通过（日志 `/tmp/tuzi-modal-text-build.log`）；纯CSS改动未新增镜像测试。正常重启预览后账户恢复，打开原测试Key配置弹窗，确认居中、工具项和关闭入口正常。截图不足以证明屏幕细微锐度差异，根因仍属渲染假设，待用户对当前新预览确认。未读取完整密钥、保存工具配置或执行模型调用；原有无关测试修改保留。
+
+## 2026-10-19 配置工具白屏修复
+
+本地只读模型接口确认存在supported_endpoint_types为null的模型。选择工具触发兼容筛选时直接调用.some导致渲染异常。客户端代码 `59c9400` 为协议/分组数组增加类型检查，缺失元数据按不兼容排除，不放宽配置资格。API HEAD仍为 `6341a800263460c2a29f065a252b0145d7ac7e7c`，未修改API或渠道，契约不变。
+
+扩展既有组件回归：混合正常模型、null协议、null分组，点击Codex仍可选择合法模型并继续；缺失元数据模型不显示。account-improvements与tuzi-tool-compatibility两文件11项通过，typecheck、diff和macOS预览构建通过。日志 `/tmp/tuzi-config-null-tests.log`、`/tmp/tuzi-config-null-types.log`、`/tmp/tuzi-config-null-build.log`。重启新预览后实机点击原测试Key配置→Codex，页面正常显示搜索/模型选择及无匹配提示，未再白屏；未揭示密钥、保存配置或调用模型。原有无关修改保留，仅本地提交。
