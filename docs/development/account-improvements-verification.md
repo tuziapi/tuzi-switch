@@ -135,3 +135,5 @@ bun run build
 客户端代码 `ad0fcb1074c1550811639654bbc358b6756e9d48`，配对未修改的API HEAD `6341a800263460c2a29f065a252b0145d7ac7e7c`，同名B分支，契约不变。仅CurrencySwitcher标签显示CNY、AccountDialog使用既有alert层级60（原40低于工具栏50），不修改全局弹窗或工具栏层级。原有未提交测试修改保持不变。
 
 `pnpm exec vitest run tests/account/account-improvements.test.tsx tests/components/AccountPage.test.tsx` 19项通过；`pnpm typecheck`、两文件Prettier检查、diff检查及既有macOS预览构建命令通过。日志为 `/tmp/tuzi-b09-cny-tests.log`、`/tmp/tuzi-b09-cny-typecheck.log`、`/tmp/tuzi-b09-cny-build.log`。UI仍为旧进程，重启连续被电脑工具以用户正在改变窗口状态阻止，未强制终止；新构建实机目视未通过验收。仅本地提交，无push/PR/部署，回退使用代码提交revert。
+
+补充实机验收（2026-10-19）：用户反馈看不到效果后，确认旧进程仍显示“人民币”。通过正常退出应用后重新启动同一路径的最新预览，账户自动恢复，界面已显示CNY；打开配置弹窗后，顶部兔子switch与七工具栏均随背景变暗、模糊，弹窗保持正常亮度。两项实机目视通过，解除上一段的新构建复验限制。未修改业务代码、账户或工具配置。
