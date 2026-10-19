@@ -28,7 +28,7 @@ Rust 使用固定可信 origin、禁重定向、无 Cookie 的专用 HTTP client
 
 ## 网站引导与凭证边界
 
-固定 URL `/console/personal?source=tuzi-assistant#system-token`。PrivateRoute 保存完整受信站内 return_to，现有登录及 OAuth 登录回调保持来源/查询/锚点，失败可回登录再继续。只在精确引导条件选择安全 tab、渲染后滚动焦点/适度高亮；普通默认 tab 不变。
+固定 URL `/console/personal?source=tuzi-assistant#system-token`。PrivateRoute 保存完整受信站内 return_to，现有登录及 OAuth 登录回调保持来源/查询/锚点，失败可回登录再继续。只在精确引导条件选择安全 tab、渲染后滚动聚焦、卡片细边/淡色背景强调2秒再以400ms淡出（减少动画时无平滑滚动/过渡）；普通默认 tab 不变。
 
 SystemTokenCard 分开 read/current、copy、generate、rotate。只读接口不改变令牌；空值才提供明确生成按钮，读失败只给重试；轮换独立 Modal 说明共享失效。介绍使用 PRD 指定短句；引导态复制成功后仅唤起固定账户导航 URI，普通复制不跳转，失败显示可选明文；失效登录清旧网站身份并保留目标重新登录。令牌不进 URL/重定向/埋点/日志，无自动回传、OAuth 或未来 SSO 实施。
 

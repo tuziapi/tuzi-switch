@@ -2,7 +2,11 @@
 
 基线 `TA-AC-1.5-B4`，契约 `system-token-v1`。此表覆盖已实现功能，**实现适配、接口可用及发布可见性不是同一状态**。分层验证和限制见 [B4验证报告](system-token-verification.md)。
 
-## 最新代码配对：B09三项体验跟进
+## 最新代码配对：B10品牌与视觉
+
+2026-10-19，客户端 `d60182c8eb0255b9822b72722914d7cd44f9bc6e` + API/网站 `26abbcdd2e7386cf1cc3c29e7fde80171380a102`，两仓 `codex/tuzi-assistant-system-token`，契约 `system-token-v1`。名称/图标/高亮/返回提示修改，内部身份和数据保持兼容；固定旧 MSI UpgradeCode。工作树含原有未提交修复，分层证据及局限见 [B10验证](brand-ui-verification.md)。局部本地UI通过，用户验收及发布未完成。两端可独立revert，无数据迁移或令牌轮换。
+
+## 历史代码配对：B09三项体验跟进
 
 2026-10-19，客户端 `58e152c96aef293cfc17fde888a79b6bd462a24e` + API/网站 `1dc35a9e15f5f716f202539b3b54e05f91bcff83`，两仓分支 `codex/tuzi-assistant-system-token`；契约仍为 `system-token-v1`。只增加引导复制提示与1.5秒延迟、币种选中样式和工具选项右侧已有图标，无HTTP/schema/资格校验变更。49客户端/45网站测试、类型检查、网站及macOS预览构建通过。实机和本地模型协议核查的具体证据与限制见 [B09验证](account-improvements-verification.md) 文末；后续文档提交不改变被测代码。分别revert相应代码及文档即可回退，不清库或恢复A；未发布。
 
