@@ -409,3 +409,7 @@ G3的T19/T20/T21与Q02/Q04/Q09环境门槛保持待办；不把本地通过等�
 用户追加要求 API 在推送前同步最新远程 dev，已将 `680ddc3c446c66a8294c302245233ea7196f5d21` 合并为 API `2e72a8b8786f917ee7ce1bc2dde0ce0ba2dd4425`；客户端业务代码仍为 `7e8b2085845b56fbbf3147ffa8510c1982bc10ba`，之后仅文档变更。两仓 `codex/tuzi-assistant-system-token` / B4 / system-token-v1。
 
 唯一冲突是7份语言文件顶部双方新增翻译，已同时保留助手2条和dev19条内容，JSON/重复键/三方语义检查通过。合并后API17个相关Go包、网站48项引导及95项utils测试、网站构建全部通过；命令与日志见API `docs/tuzi-assistant-development.md` 的 B18 同步记录。此前“本地未提交/未授权推送”是历史阶段状态，本次已获明确提交、推送和创建PR授权；未合并PR或部署。最终远程分支SHA及关联PR以GitHub记录为准，API优先部署及反向回退顺序不变。
+
+### B18 保留原发布文案
+
+用户明确要求撤回工作流中3处名称修改：两处Release标题及一处更新清单notes继续使用“兔子switch”，`.github/workflows/build.yml` 与目标main保持一致。客户端窗口/图标/账户品牌及其他已提交实现均保留；此次仅恢复发布文案，无运行逻辑改动。完成精确3处差异及diff检查后提交，再推送并创建目标main的PR。
