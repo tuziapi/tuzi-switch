@@ -129,3 +129,9 @@ bun run build
 前轮浏览器安全策略阻止自定义协议导航的限制继续适用，本轮不重试或绕过该拒绝；1.5秒时序和手动恢复通过组件测试验证，不冒称实际冷/暖唤起已验证。
 
 本轮只本地代码和文档提交，未push、PR、部署或操作生产；原历史A/B4/B08/B09证据保留。回退按两仓上述代码提交分别revert及相应文档提交，不清理数据或改动共享令牌。
+
+## 2026-10-19 CNY标签与遮罩修正
+
+客户端代码 `ad0fcb1074c1550811639654bbc358b6756e9d48`，配对未修改的API HEAD `6341a800263460c2a29f065a252b0145d7ac7e7c`，同名B分支，契约不变。仅CurrencySwitcher标签显示CNY、AccountDialog使用既有alert层级60（原40低于工具栏50），不修改全局弹窗或工具栏层级。原有未提交测试修改保持不变。
+
+`pnpm exec vitest run tests/account/account-improvements.test.tsx tests/components/AccountPage.test.tsx` 19项通过；`pnpm typecheck`、两文件Prettier检查、diff检查及既有macOS预览构建命令通过。日志为 `/tmp/tuzi-b09-cny-tests.log`、`/tmp/tuzi-b09-cny-typecheck.log`、`/tmp/tuzi-b09-cny-build.log`。UI仍为旧进程，重启连续被电脑工具以用户正在改变窗口状态阻止，未强制终止；新构建实机目视未通过验收。仅本地提交，无push/PR/部署，回退使用代码提交revert。
