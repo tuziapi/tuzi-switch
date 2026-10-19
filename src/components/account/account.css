@@ -1229,6 +1229,14 @@
   border-radius: 16px;
   overflow: hidden;
 }
+/* Keep text on the layout plane instead of a translated/scaled modal layer. */
+.account-modal[data-state] {
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  transform: none;
+  animation: none;
+}
 .account-modal-body {
   min-height: 0;
   overflow-y: auto;
