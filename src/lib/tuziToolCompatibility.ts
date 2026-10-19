@@ -30,7 +30,7 @@ export function tuziToolCompatibility(key: {status:number; group:string; model_l
   if (!Array.isArray(model.enable_groups) || !model.enable_groups.some(g=>effectiveGroups.includes(g)&&(Object.keys(visible).length===0||g in visible))) return 'Key 分组与模型不兼容';
   const limits=key.model_limits.split(',').map(x=>x.trim()).filter(Boolean);
   if (key.model_limits_enabled && limits.length && !limits.includes(model.model_name)) return 'Key 模型限制不允许此模型';
-  const aliases:Record<TuziProtocol,string[]>={anthropic:['anthropic','anthropic-messages','anthropic_messages'],responses:['openai-responses','responses','codex_responses'],chat:['openai','openai-chat','chat','openai_chat','openai_completions'],gemini:['gemini','google','gemini-native','gemini_native','google_generative_ai']};
+  const aliases:Record<TuziProtocol,string[]>={anthropic:['anthropic','anthropic-messages','anthropic_messages'],responses:['openai-response','openai-responses','responses','codex_responses'],chat:['openai','openai-chat','chat','openai_chat','openai_completions'],gemini:['gemini','google','gemini-native','gemini_native','google_generative_ai']};
   if (!Array.isArray(model.supported_endpoint_types) || !model.supported_endpoint_types.some(e=>aliases[protocol].includes(e))) return '模型端点与工具协议不兼容';
   return null;
 }

@@ -274,7 +274,7 @@ describe("B09 key workflow regressions", () => {
               {
                 model_name: "compatible-fixture",
                 enable_groups: ["default"],
-                supported_endpoint_types: ["responses"],
+                supported_endpoint_types: ["openai-response"],
               },
               {
                 model_name: "missing-protocol-fixture",
@@ -284,7 +284,7 @@ describe("B09 key workflow regressions", () => {
               {
                 model_name: "missing-groups-fixture",
                 enable_groups: null,
-                supported_endpoint_types: ["responses"],
+                supported_endpoint_types: ["openai-response"],
               },
               {
                 model_name: "incompatible-fixture",

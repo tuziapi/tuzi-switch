@@ -623,7 +623,12 @@ fn prefix_key(d: &mut Value) -> Result<(), BusinessError> {
 fn endpoint_aliases(protocol: &str) -> &'static [&'static str] {
     match protocol {
         "anthropic" => &["anthropic", "anthropic-messages", "anthropic_messages"],
-        "responses" => &["openai-responses", "responses", "codex_responses"],
+        "responses" => &[
+            "openai-response",
+            "openai-responses",
+            "responses",
+            "codex_responses",
+        ],
         "chat" => &[
             "openai",
             "openai-chat",
@@ -1080,9 +1085,16 @@ mod tests {
     #[test]
     fn provider_qualification_checks_current_key_models_and_virtual_default() {
         let mut key = serde_json::json!({"status":1,"expired_time":-1,"unlimited_quota":false,"remain_quota":"9007199254740993123","group":"default","model_limits_enabled":true,"model_limits":"synthetic-model"});
-        let mut data = serde_json::json!({"items":[{"model_name":"synthetic-model","enable_groups":["vip"],"supported_endpoint_types":["openai-responses"]}],"pricing_meta":{"usable_group":{"vip":"VIP"},"default_effective_group":"vip","default_resolution":{}}});
+        let mut data = serde_json::json!({"items":[{"model_name":"synthetic-model","enable_groups":["vip"],"supported_endpoint_types":["openai-response"]}],"pricing_meta":{"usable_group":{"vip":"VIP"},"default_effective_group":"vip","default_resolution":{}}});
         let names = vec!["synthetic-model".into()];
         assert!(qualified_models(&key, &data, &names, "responses", 100).is_ok());
+        for alias in endpoint_aliases("responses") {
+            data["items"][0]["supported_endpoint_types"] = serde_json::json!([alias]);
+            assert!(qualified_models(&key, &data, &names, "responses", 100).is_ok());
+        }
+        data["items"][0]["supported_endpoint_types"] = serde_json::json!(["openai"]);
+        assert!(qualified_models(&key, &data, &names, "responses", 100).is_err());
+        data["items"][0]["supported_endpoint_types"] = serde_json::json!(["openai-response"]);
         for protocol in ["chat", "gemini", "anthropic", "unknown"] {
             assert!(qualified_models(&key, &data, &names, protocol, 100).is_err());
         }
