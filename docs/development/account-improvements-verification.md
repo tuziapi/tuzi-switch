@@ -137,3 +137,9 @@ bun run build
 `pnpm exec vitest run tests/account/account-improvements.test.tsx tests/components/AccountPage.test.tsx` 19项通过；`pnpm typecheck`、两文件Prettier检查、diff检查及既有macOS预览构建命令通过。日志为 `/tmp/tuzi-b09-cny-tests.log`、`/tmp/tuzi-b09-cny-typecheck.log`、`/tmp/tuzi-b09-cny-build.log`。UI仍为旧进程，重启连续被电脑工具以用户正在改变窗口状态阻止，未强制终止；新构建实机目视未通过验收。仅本地提交，无push/PR/部署，回退使用代码提交revert。
 
 补充实机验收（2026-10-19）：用户反馈看不到效果后，确认旧进程仍显示“人民币”。通过正常退出应用后重新启动同一路径的最新预览，账户自动恢复，界面已显示CNY；打开配置弹窗后，顶部兔子switch与七工具栏均随背景变暗、模糊，弹窗保持正常亮度。两项实机目视通过，解除上一段的新构建复验限制。未修改业务代码、账户或工具配置。
+
+## 2026-10-19 弹窗文字发虚跟进
+
+用户明确问题为字形发虚而非颜色。本轮仅账户弹窗改为inset/margin自动居中、height:fit-content，移除自身transform与动画，避免平移/缩放合成层影响字形；未改变颜色、字号、遮罩和业务行为。客户端代码 `04b44c4f083e8eb4481384ffa9e7d122e796d28d`，API仍为 `6341a800263460c2a29f065a252b0145d7ac7e7c`。两仓B分支和契约不变。
+
+CSS格式与diff检查、macOS预览构建通过（日志 `/tmp/tuzi-modal-text-build.log`）；纯CSS改动未新增镜像测试。正常重启预览后账户恢复，打开原测试Key配置弹窗，确认居中、工具项和关闭入口正常。截图不足以证明屏幕细微锐度差异，根因仍属渲染假设，待用户对当前新预览确认。未读取完整密钥、保存工具配置或执行模型调用；原有无关测试修改保留。
