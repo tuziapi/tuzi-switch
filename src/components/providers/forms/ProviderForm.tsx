@@ -428,6 +428,7 @@ export interface ProviderFormProps {
   onManageUniversalProviders?: () => void;
   onSubmittingChange?: (isSubmitting: boolean) => void;
   initialData?: {
+    providerKey?: string;
     name?: string;
     websiteUrl?: string;
     notes?: string;
@@ -1815,6 +1816,8 @@ function ProviderFormFull({
     if (isAnyOmoCategory && !payload.presetCategory) {
       payload.presetCategory = category;
     }
+
+    if (creationPrefill) payload.presetCategory = category;
 
     if (activePreset) {
       payload.presetId = activePreset.id;

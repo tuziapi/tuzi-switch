@@ -1,0 +1,30 @@
+{
+  "name": "兔子线路",
+  "notes": "账户密钥：Synthetic key",
+  "websiteUrl": "https://api.tu-zi.com",
+  "settingsConfig": {
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://apius.tu-zi.com",
+      "ANTHROPIC_AUTH_TOKEN": "sk-SYNTHETIC_ACCOUNT_MODEL_KEY",
+      "ANTHROPIC_MODEL": "synthetic-model"
+    }
+  },
+  "icon": "tuzi",
+  "category": "aggregator",
+  "meta": {
+    "apiFormat": "anthropic",
+    "claudeDesktopMode": "proxy",
+    "claudeDesktopModelRoutes": {
+      "claude-sonnet-4-6": {
+        "model": "synthetic-model"
+      }
+    },
+    "custom_endpoints": {
+      "https://apius.tu-zi.com": {
+        "url": "https://apius.tu-zi.com",
+        "addedAt": 1
+      }
+    }
+  },
+  "id": "tuzi-synthetic-claude-desktop"
+}

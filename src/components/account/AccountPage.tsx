@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import "./account.css";
@@ -25,9 +26,11 @@ type AccountController = ReturnType<typeof useAccount>;
 /** Only sanitized native account state crosses this boundary. Never persist it. */
 export function AccountPage({
   account,
+  tokenReturnRequest = 0,
   onConfigureKey,
 }: {
   account: AccountController;
+  tokenReturnRequest?: number;
   localStatus?: string;
   onConfigureKey?: (key: DesktopKey, model?: DesktopPricing) => void;
 }) {
@@ -37,6 +40,8 @@ export function AccountPage({
   const [actionFailed, setActionFailed] = useState(false);
   // This input exists only in this mounted form, never in query or persistent state.
   const [token, setToken] = useState("");
+  const inputRevision = useRef(0);
+  const [prefilled, setPrefilled] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [tokenInvalid, setTokenInvalid] = useState(false);
   const tokenInput = useRef<HTMLInputElement>(null);
@@ -63,6 +68,37 @@ export function AccountPage({
   useEffect(() => {
     if (connected) setToken("");
   }, [connected]);
+  useEffect(
+    () => () => {
+      inputRevision.current++;
+      void invoke("account_cancel_token_prefill").catch(() => {});
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!tokenReturnRequest || isLoading) return;
+    if (connected || pending || connectingLock.current || token) {
+      void invoke("account_cancel_token_prefill").catch(() => {});
+      return;
+    }
+    let alive = true;
+    const revision = inputRevision.current;
+    void invoke<string | null>("account_take_token_prefill")
+      .then((value) => {
+        if (alive && revision === inputRevision.current && value) {
+          setToken(value);
+          setPrefilled(true);
+          setTokenInvalid(false);
+          tokenInput.current?.focus();
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+    // Input edits invalidate the outstanding read immediately via inputRevision.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenReturnRequest, state.generation, connected, pending, isLoading]);
   const run = async (action: () => unknown) => {
     setBusy(true);
     setActionFailed(false);
@@ -85,6 +121,8 @@ export function AccountPage({
       return;
     }
     setTokenInvalid(false);
+    inputRevision.current++;
+    void invoke("account_cancel_token_prefill").catch(() => {});
     connectingLock.current = true;
     setConnecting(true);
     await run(() => account.connect(value));
@@ -137,11 +175,15 @@ export function AccountPage({
               aria-invalid={tokenInvalid}
               placeholder={t("account.tokenPlaceholder")}
               onChange={(e) => {
+                inputRevision.current++;
+                setPrefilled(false);
+                void invoke("account_cancel_token_prefill").catch(() => {});
                 setToken(e.target.value);
                 setTokenInvalid(false);
                 setActionFailed(false);
               }}
             />
+            {prefilled && <p role="status">{t("account.tokenPrefilled")}</p>}
             {state.error && (
               <p role="alert">
                 {t(`account.errors.${state.error.code}`, {
@@ -158,7 +200,10 @@ export function AccountPage({
                 type="button"
                 variant="outline"
                 disabled={busy || isLoading}
-                onClick={() => void run(account.openTokenPage)}
+                onClick={() => {
+                  setPrefilled(false);
+                  void run(account.openTokenPage);
+                }}
               >
                 {t("account.getToken")}
               </Button>

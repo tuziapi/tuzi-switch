@@ -33,7 +33,7 @@ interface AddProviderDialogProps {
       providerKey?: string;
       suggestedDefaults?: OpenClawSuggestedDefaults;
     },
-  ) => Promise<void> | void;
+  ) => Promise<void | false> | void | false;
 }
 
 export function AddProviderDialog({
@@ -46,7 +46,8 @@ export function AddProviderDialog({
   const { t } = useTranslation();
   // OpenCode and OpenClaw don't support universal providers
   const showUniversalTab =
-    !creationPrefill && appId !== "opencode" &&
+    !creationPrefill &&
+    appId !== "opencode" &&
     appId !== "openclaw" &&
     appId !== "hermes" &&
     appId !== "claude-desktop";
@@ -262,8 +263,8 @@ export function AddProviderDialog({
         providerData.suggestedDefaults = values.suggestedDefaults;
       }
 
-      await onSubmit(providerData);
-      onOpenChange(false);
+      const result = await onSubmit(providerData);
+      if (result !== false) onOpenChange(false);
     },
     [appId, onSubmit, onOpenChange],
   );
@@ -348,7 +349,7 @@ export function AddProviderDialog({
         // OpenCode/OpenClaw: directly show form without tabs
         <ProviderForm
           appId={appId}
-              creationPrefill={creationPrefill}
+          creationPrefill={creationPrefill}
           submitLabel={t("common.add")}
           onSubmit={handleSubmit}
           onCancel={() => onOpenChange(false)}

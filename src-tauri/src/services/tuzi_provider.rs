@@ -754,7 +754,7 @@ fn validate_provider(app: &AppType, provider: &Provider) -> Result<(), AppError>
         || endpoint.trim_end_matches('/') != expected
         || !key.starts_with("sk-")
         || key.contains(['\r', '\n'])
-        || provider.category.as_deref() != Some("third_party")
+        || !matches!(provider.category.as_deref(), Some("third_party" | "aggregator"))
     {
         return Err(AppError::Config(
             "账户 Key 配置必须使用主站兼容协议、固定端点和模型 Key".into(),
@@ -1520,6 +1520,34 @@ mod tests {
     fn manifest(id: &str) -> Manifest {
         serde_json::from_slice(&fs::read(backup_directory().join(id).join("after.json")).unwrap())
             .unwrap()
+    }
+    #[test]
+    #[serial]
+    fn actual_frontend_form_payloads_save_and_restore_all_seven_tools() {
+        // These synthetic payloads are checked against actual React form submissions.
+        for (app, payload) in [
+            (AppType::Claude, include_str!("../../../tests/fixtures/b11-provider-claude.json")),
+            (AppType::ClaudeDesktop, include_str!("../../../tests/fixtures/b11-provider-claude-desktop.json")),
+            (AppType::Codex, include_str!("../../../tests/fixtures/b11-provider-codex.json")),
+            (AppType::Gemini, include_str!("../../../tests/fixtures/b11-provider-gemini.json")),
+            (AppType::OpenCode, include_str!("../../../tests/fixtures/b11-provider-opencode.json")),
+            (AppType::OpenClaw, include_str!("../../../tests/fixtures/b11-provider-openclaw.json")),
+            (AppType::Hermes, include_str!("../../../tests/fixtures/b11-provider-hermes.json")),
+        ] {
+            let _home = Home::new();
+            let state = state();
+            let provider: Provider = serde_json::from_str(payload).unwrap();
+            #[cfg(not(any(target_os = "macos", windows)))]
+            if matches!(app, AppType::ClaudeDesktop) { continue; }
+            let plan = preview(&state, app.clone(), &provider).unwrap_or_else(|e| panic!("{} preview: {e}", app.as_str()));
+            assert!(plan.changes.iter().all(|value| !value.contains("sk-SYNTHETIC_ACCOUNT_MODEL_KEY")));
+            let saved = save_confirmed(&state, app.as_str().into(), provider.clone(), plan.id, &source())
+                .unwrap_or_else(|e| panic!("{} save: {e}", app.as_str()));
+            assert!(!saved.tested);
+            assert!(state.db.get_provider_by_id(&provider.id, app.as_str()).unwrap().is_some());
+            restore_backup(&state, &saved.backup_id).unwrap();
+            assert!(state.db.get_provider_by_id(&provider.id, app.as_str()).unwrap().is_none());
+        }
     }
     #[test]
     #[serial]

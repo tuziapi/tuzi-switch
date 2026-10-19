@@ -1,0 +1,25 @@
+{
+  "name": "兔子线路",
+  "notes": "账户密钥：Synthetic key",
+  "settingsConfig": {
+    "env": {
+      "GOOGLE_GEMINI_BASE_URL": "https://api.tu-zi.com",
+      "GEMINI_API_KEY": "sk-SYNTHETIC_ACCOUNT_MODEL_KEY",
+      "GEMINI_MODEL": "synthetic-model"
+    },
+    "config": {}
+  },
+  "icon": "tuzi",
+  "category": "aggregator",
+  "meta": {
+    "commonConfigEnabled": false,
+    "endpointAutoSelect": true,
+    "custom_endpoints": {
+      "https://api.tu-zi.com": {
+        "url": "https://api.tu-zi.com",
+        "addedAt": 1
+      }
+    }
+  },
+  "id": "tuzi-synthetic-gemini"
+}

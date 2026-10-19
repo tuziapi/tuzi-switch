@@ -1254,6 +1254,8 @@ pub fn run() {
             tuzi_account::business::account_open_web,
             tuzi_account::account_connect,
             tuzi_account::account_open_token_page,
+            tuzi_account::account_take_token_prefill,
+            tuzi_account::account_cancel_token_prefill,
             tuzi_account::account_logout,
             tuzi_account::account_retry,
             commands::get_current_provider,

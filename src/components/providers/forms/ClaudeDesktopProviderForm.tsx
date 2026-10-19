@@ -527,7 +527,7 @@ export function ClaudeDesktopProviderForm({
       settingsConfig: JSON.stringify(settingsConfig, null, 2),
       meta,
       presetId: activePreset?.id,
-      presetCategory: activePreset?.category,
+      presetCategory: activePreset?.category ?? initialData?.category,
     });
   };
 

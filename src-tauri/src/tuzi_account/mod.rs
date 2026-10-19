@@ -1,6 +1,7 @@
 //! Account system-token connection. Credentials stay in the operating-system vault.
 pub mod business;
 mod store;
+mod prefill;
 #[cfg(test)]
 mod tests;
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,7 @@ use std::{
     time::Duration,
 };
 use store::{SystemStore, TokenStore};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 use url::Url;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -121,6 +122,7 @@ struct ModelKeyProof {
     expires: i64,
 }
 struct Inner {
+    token_prefill: Option<prefill::TokenPrefill>,
     model_key_proof: Option<ModelKeyProof>,
     record: Record,
     state: AccountState,
@@ -255,6 +257,7 @@ impl AccountService {
             .map_err(|_| AccountError::new("http_unavailable"))?;
         Ok(Self {
             inner: Mutex::new(Inner {
+                token_prefill: None,
                 model_key_proof: None,
                 record: Record {
                     origin: origin.into(),
@@ -338,6 +341,7 @@ impl AccountService {
             i.state.error = Some(e);
             if invalid {
                 i.model_key_proof = None;
+                i.token_prefill = None;
                 i.state.identity = None;
             }
             self.publish(&mut i.state);
@@ -391,6 +395,7 @@ impl AccountService {
             }
             i.record = r;
             i.model_key_proof = None;
+            i.token_prefill = None;
             i.state = AccountState {
                 status: "verifying".into(),
                 generation,
@@ -502,6 +507,7 @@ impl AccountService {
         let result = self.persist(&r);
         i.record = r;
         i.model_key_proof = None;
+        i.token_prefill = None;
         i.state = AccountState {
             generation,
             ..Default::default()
@@ -549,6 +555,11 @@ pub fn account_take_open_request() -> bool {
 // Old A callbacks and invalid account links are consumed, never sent to import/logging.
 pub fn handle_callback(app: &tauri::AppHandle, input: &str) -> bool {
     if is_account_navigation(input) {
+        if let Some(service) = app.try_state::<Arc<AccountService>>() {
+            if let Some(pending) = service.inner.lock().unwrap().token_prefill.as_mut() {
+                pending.returned();
+            }
+        }
         OPEN_ACCOUNT_PENDING.store(true, Ordering::SeqCst);
         let _ = app.emit("account-open-requested", ());
         return true;
@@ -574,13 +585,43 @@ pub async fn account_connect(
     Ok(service.connect(token).await)
 }
 #[tauri::command]
-pub async fn account_open_token_page(app: tauri::AppHandle) -> Result<(), AccountError> {
-    app.opener()
-        .open_url(
-            format!("{ORIGIN}/console/personal?source=tuzi-assistant#system-token"),
-            None::<&str>,
-        )
-        .map_err(|_| AccountError::new("browser_unavailable"))
+pub async fn account_open_token_page(app: tauri::AppHandle, service: tauri::State<'_, Arc<AccountService>>) -> Result<(), AccountError> {
+    service.load();
+    {
+        let mut inner = service.inner.lock().unwrap();
+        inner.token_prefill = if inner.state.identity.is_none() && inner.state.status != "verifying" {
+            Some(prefill::TokenPrefill::new(inner.state.generation))
+        } else { None };
+    }
+    let result = app.opener().open_url(
+        format!("{ORIGIN}/console/personal?source=tuzi-assistant#system-token"), None::<&str>,
+    ).map_err(|_| AccountError::new("browser_unavailable"));
+    if result.is_err() { service.inner.lock().unwrap().token_prefill = None; }
+    result
+}
+#[tauri::command]
+pub fn account_cancel_token_prefill(service: tauri::State<'_, Arc<AccountService>>) {
+    service.inner.lock().unwrap().token_prefill = None;
+}
+#[tauri::command]
+pub async fn account_take_token_prefill(service: tauri::State<'_, Arc<AccountService>>) -> Result<Option<String>, AccountError> {
+    let service = service.inner().clone();
+    Ok(tokio::task::spawn_blocking(move || service.take_token_prefill(|| {
+        arboard::Clipboard::new().ok()?.get_text().ok()
+    })).await.ok().flatten())
+}
+impl AccountService {
+    fn take_token_prefill(&self, read: impl FnOnce() -> Option<String>) -> Option<String> {
+        let mut inner = self.inner.lock().unwrap();
+        // Consume before touching the clipboard, including rejection/read failure.
+        let pending = inner.token_prefill.take()?;
+        if !pending.permits(inner.state.generation) || inner.state.identity.is_some() || inner.state.status == "verifying" {
+            return None;
+        }
+        let mut value = read()?;
+        if prefill::is_system_token_candidate(&value) { Some(value) }
+        else { value.zeroize(); None }
+    }
 }
 #[tauri::command]
 pub async fn account_logout(

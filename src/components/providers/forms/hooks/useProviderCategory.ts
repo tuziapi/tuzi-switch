@@ -26,13 +26,13 @@ export function useProviderCategory({
   initialCategory,
 }: UseProviderCategoryProps) {
   const [category, setCategory] = useState<ProviderCategory | undefined>(
-    // 编辑模式：使用 initialCategory
-    isEditMode ? initialCategory : undefined,
+    // Explicit account creation drafts carry a category without a preset ID.
+    initialCategory,
   );
 
   useEffect(() => {
     // 编辑模式：只在初始化时设置，后续不自动更新
-    if (isEditMode) {
+    if (isEditMode || !selectedPresetId) {
       setCategory(initialCategory);
       return;
     }

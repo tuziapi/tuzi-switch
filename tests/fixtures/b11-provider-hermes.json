@@ -1,0 +1,26 @@
+{
+  "name": "兔子线路",
+  "notes": "账户密钥：Synthetic key",
+  "settingsConfig": {
+    "base_url": "https://api.tu-zi.com/v1",
+    "api_key": "sk-SYNTHETIC_ACCOUNT_MODEL_KEY",
+    "api_mode": "codex_responses",
+    "models": [
+      {
+        "id": "synthetic-model"
+      }
+    ]
+  },
+  "icon": "tuzi",
+  "category": "aggregator",
+  "meta": {
+    "endpointAutoSelect": true,
+    "custom_endpoints": {
+      "https://api.tu-zi.com/v1": {
+        "url": "https://api.tu-zi.com/v1",
+        "addedAt": 1
+      }
+    }
+  },
+  "id": "tuzi-synthetic-hermes"
+}

@@ -10,6 +10,7 @@ import {
 
 interface UseOpencodeFormStateParams {
   initialData?: {
+    providerKey?: string;
     settingsConfig?: Record<string, unknown>;
   };
   appId: string;
@@ -49,7 +50,7 @@ export function useOpencodeFormState({
 
   const [opencodeProviderKey, setOpencodeProviderKey] = useState<string>(() => {
     if (appId !== "opencode") return "";
-    return providerId || "";
+    return providerId || initialData?.providerKey || "";
   });
 
   const [opencodeNpm, setOpencodeNpm] = useState<string>(() => {

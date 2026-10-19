@@ -6,6 +6,7 @@ import { OPENCLAW_DEFAULT_CONFIG } from "../helpers/opencodeFormUtils";
 
 interface UseOpenclawFormStateParams {
   initialData?: {
+    providerKey?: string;
     settingsConfig?: Record<string, unknown>;
   };
   appId: AppId;
@@ -69,7 +70,7 @@ export function useOpenclawFormState({
 
   const [openclawProviderKey, setOpenclawProviderKey] = useState<string>(() => {
     if (appId !== "openclaw") return "";
-    return providerId || "";
+    return providerId || initialData?.providerKey || "";
   });
 
   const [openclawBaseUrl, setOpenclawBaseUrl] = useState<string>(() => {

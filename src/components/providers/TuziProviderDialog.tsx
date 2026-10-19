@@ -1,56 +1,308 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { invoke } from '@tauri-apps/api/core';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AddProviderDialog } from './AddProviderDialog';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
-import type { AppId } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import type { Provider } from '@/types';
-import { TUZI_TOOL_TARGETS, type TuziProviderDraft } from '@/lib/tuziToolCompatibility';
-import type { ProviderFormProps } from './forms/ProviderForm';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { invoke } from "@tauri-apps/api/core";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AddProviderDialog } from "./AddProviderDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { generateThirdPartyConfig } from "@/config/codexProviderPresets";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import type { AppId } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import type { Provider } from "@/types";
+import {
+  TUZI_TOOL_TARGETS,
+  type TuziProviderDraft,
+} from "@/lib/tuziToolCompatibility";
+import type { ProviderFormProps } from "./forms/ProviderForm";
 
-export function tuziCreationPrefill(draft:TuziProviderDraft):ProviderFormProps['initialData'] {
- const endpoint=TUZI_TOOL_TARGETS.find(t=>t.appId===draft.appId&&t.protocol===draft.protocol)!.endpoint;
- const model=draft.model??'';
- let settingsConfig:Record<string,unknown>={};
- let meta:Provider['meta'];
- if (draft.appId==='claude'||draft.appId==='claude-desktop') {
-   settingsConfig={env:{ANTHROPIC_BASE_URL:endpoint,ANTHROPIC_AUTH_TOKEN:draft.key,...(model?{ANTHROPIC_MODEL:model}:{})}};
-   meta={apiFormat:'anthropic',...(draft.appId==='claude-desktop'?{claudeDesktopMode:'proxy' as const,...(model?{claudeDesktopModelRoutes:{'claude-sonnet-4-6':{model}}}:{})}: {})};
- } else if(draft.appId==='codex') {
-   const suffix=crypto.randomUUID().replace(/-/g,'').slice(0,12).toUpperCase();
-   const envKey=`TUZI_SWITCH_${suffix}_CODEX_API_KEY`;
-   settingsConfig={auth:{OPENAI_API_KEY:draft.key},env:{envKey},config:`model_provider = "custom"\n${model?`model = "${model.replace(/"/g,'')}"\n`:''}[model_providers.custom]\nname = "Tuzi"\nbase_url = "${endpoint}"\nwire_api = "responses"\nenv_key = "${envKey}"\n`};
- } else if(draft.appId==='gemini') settingsConfig={env:{GEMINI_API_KEY:draft.key,GOOGLE_GEMINI_BASE_URL:endpoint,...(model?{GEMINI_MODEL:model}:{})},config:{}};
- else if(draft.appId==='opencode') settingsConfig={npm:{responses:'@ai-sdk/openai',chat:'@ai-sdk/openai-compatible',anthropic:'@ai-sdk/anthropic',gemini:'@ai-sdk/google'}[draft.protocol],options:{baseURL:endpoint,apiKey:draft.key},models:model?{[model]:{name:model}}:{}};
- else if(draft.appId==='openclaw') settingsConfig={baseUrl:endpoint,apiKey:draft.key,api:draft.protocol==='anthropic'?'anthropic-messages':'openai-completions',models:model?[{id:model,name:model}]:[]};
- else settingsConfig={base_url:endpoint,api_key:draft.key,api_mode:draft.protocol==='anthropic'?'anthropic_messages':'codex_responses',models:model?[{id:model}]:[]};
- return {name:draft.name??'兔子主站',websiteUrl:'https://api.tu-zi.com',settingsConfig,category:'third_party',meta};
+export function tuziCreationPrefill(
+  draft: TuziProviderDraft,
+): ProviderFormProps["initialData"] {
+  const endpoint = TUZI_TOOL_TARGETS.find(
+    (t) => t.appId === draft.appId && t.protocol === draft.protocol,
+  )!.endpoint;
+  const model = draft.model ?? "";
+  let settingsConfig: Record<string, unknown> = {};
+  let meta: Provider["meta"];
+  if (draft.appId === "claude" || draft.appId === "claude-desktop") {
+    settingsConfig = {
+      env: {
+        ANTHROPIC_BASE_URL: endpoint,
+        ANTHROPIC_AUTH_TOKEN: draft.key,
+        ...(model ? { ANTHROPIC_MODEL: model } : {}),
+      },
+    };
+    meta = {
+      apiFormat: "anthropic",
+      ...(draft.appId === "claude-desktop"
+        ? {
+            claudeDesktopMode: "proxy" as const,
+            ...(model
+              ? { claudeDesktopModelRoutes: { "claude-sonnet-4-6": { model } } }
+              : {}),
+          }
+        : {}),
+    };
+  } else if (draft.appId === "codex") {
+    const suffix = crypto
+      .randomUUID()
+      .replace(/-/g, "")
+      .slice(0, 12)
+      .toUpperCase();
+    const envKey = `TUZI_SWITCH_${suffix}_CODEX_API_KEY`;
+    settingsConfig = {
+      auth: { OPENAI_API_KEY: draft.key },
+      env: { envKey },
+      config: generateThirdPartyConfig("兔子线路", endpoint, envKey, model),
+    };
+  } else if (draft.appId === "gemini")
+    settingsConfig = {
+      env: {
+        GEMINI_API_KEY: draft.key,
+        GOOGLE_GEMINI_BASE_URL: endpoint,
+        ...(model ? { GEMINI_MODEL: model } : {}),
+      },
+      config: {},
+    };
+  else if (draft.appId === "opencode")
+    settingsConfig = {
+      npm: {
+        responses: "@ai-sdk/openai",
+        chat: "@ai-sdk/openai-compatible",
+        anthropic: "@ai-sdk/anthropic",
+        gemini: "@ai-sdk/google",
+      }[draft.protocol],
+      options: { baseURL: endpoint, apiKey: draft.key },
+      models: model ? { [model]: { name: model } } : {},
+    };
+  else if (draft.appId === "openclaw")
+    settingsConfig = {
+      baseUrl: endpoint,
+      apiKey: draft.key,
+      api:
+        draft.protocol === "anthropic"
+          ? "anthropic-messages"
+          : "openai-completions",
+      models: model ? [{ id: model, name: model }] : [],
+    };
+  else
+    settingsConfig = {
+      base_url: endpoint,
+      api_key: draft.key,
+      api_mode:
+        draft.protocol === "anthropic"
+          ? "anthropic_messages"
+          : "codex_responses",
+      models: model ? [{ id: model }] : [],
+    };
+  return {
+    name: "兔子线路",
+    notes: draft.name ? `账户密钥：${draft.name}` : undefined,
+    websiteUrl: "https://api.tu-zi.com",
+    settingsConfig,
+    category: "aggregator",
+    icon: "tuzi",
+    meta,
+    providerKey: `tuzi-${crypto.randomUUID()}`,
+  };
 }
-interface Preview {id:string; changes:string[]}
-export function TuziProviderDialog({draft,onClose,onSaved}:{draft:TuziProviderDraft;onClose:()=>void;onSaved?:(providerId:string)=>void}) {
- const initial=useMemo(()=>tuziCreationPrefill(draft),[draft]);
- const [pending,setPending]=useState<{provider:Provider;preview:Preview;resolve:()=>void;reject:(error:Error)=>void}|null>(null);
- const pendingRef=useRef(pending);
- pendingRef.current=pending;
- useEffect(()=>()=>{pendingRef.current?.reject(new Error('账户或创建草稿已关闭'));pendingRef.current=null;},[]);
- const queryClient=useQueryClient();
- const cancel=()=>{pending?.reject(new Error('已取消保存'));setPending(null);onClose();};
- return <><AddProviderDialog open appId={draft.appId} creationPrefill={initial} onOpenChange={open=>{if(!open)cancel();}} onSubmit={async value=>{
-   const provider={...value,id:crypto.randomUUID()} as Provider;
-   const preview=await invoke<Preview>('tuzi_provider_preview',{app:draft.appId,provider});
-   await new Promise<void>((resolve,reject)=>setPending({provider,preview,resolve,reject}));
- }}/><ConfirmDialog isOpen={!!pending} title="确认配置变更" message={pending ? `${pending.preview.changes.join('\n')}\n模型 Key 已脱敏。保存前将完成全部文件和本地状态备份；保存、启用和测试是独立结果，不自动调用模型。` : ''} confirmText="备份并保存" cancelText="取消" onCancel={()=>{pending?.reject(new Error('已取消保存'));setPending(null);}} onConfirm={async()=>{
-   if(!pending)return;
-   try {
-     const outcome=await invoke<{backupId:string;enabled:boolean;tested:boolean}>('tuzi_provider_save',{app:draft.appId,provider:pending.provider,previewId:pending.preview.id,source:{site:'https://api.tu-zi.com',userId:draft.userId,tokenId:draft.tokenId,generation:draft.generation}});
-     await queryClient.invalidateQueries({queryKey:['providers',draft.appId]});
-     await queryClient.invalidateQueries({queryKey:['tuziProviderSources']});
-     toast.success(outcome.enabled?'已保存并按工具规则启用':'已保存，尚未启用',{description:'未执行模型测试。可从本次完整备份恢复。',duration:20000,action:{label:'恢复配置',onClick:()=>{void invoke('tuzi_provider_restore',{backupId:outcome.backupId}).then(async()=>{await queryClient.invalidateQueries({queryKey:['providers',draft.appId]});toast.success('已恢复保存前配置');}).catch(error=>toast.error(String(error)));}}});
-     pending.resolve();onSaved?.(pending.provider.id);setPending(null);
-   }catch(error){pending.reject(new Error(String(error)));setPending(null);}
- }}/></>;
+interface Preview {
+  id: string;
+  changes: string[];
+}
+export function TuziProviderDialog({
+  draft,
+  onClose,
+  onSaved,
+}: {
+  draft: TuziProviderDraft;
+  onClose: () => void;
+  onSaved?: (providerId: string) => void;
+}) {
+  const initial = useMemo(() => tuziCreationPrefill(draft), [draft]);
+  type Pending = {
+    provider: Provider;
+    preview: Preview;
+    resolve: (saved: boolean) => void;
+  };
+  const [pending, setPending] = useState<Pending | null>(null);
+  const pendingRef = useRef<Pending | null>(null);
+  const savingRef = useRef(false);
+  const alive = useRef(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      pendingRef.current?.resolve(false);
+      pendingRef.current = null;
+    };
+  }, []);
+  const finish = (saved: boolean) => {
+    const current = pendingRef.current;
+    pendingRef.current = null;
+    setPending(null);
+    current?.resolve(saved);
+  };
+  const cancel = () => {
+    if (savingRef.current) return;
+    finish(false);
+  };
+  const safeError = (error: unknown) =>
+    String(error).split(draft.key).join("[已脱敏]");
+  return (
+    <>
+      <AddProviderDialog
+        open
+        appId={draft.appId}
+        creationPrefill={initial}
+        onOpenChange={(open) => {
+          if (!open && !savingRef.current) {
+            cancel();
+            onClose();
+          }
+        }}
+        onSubmit={async (value) => {
+          setError("");
+          const { providerKey, ...fields } = value;
+          const provider = {
+            ...fields,
+            id: providerKey || crypto.randomUUID(),
+          } as Provider;
+          try {
+            const preview = await invoke<Preview>("tuzi_provider_preview", {
+              app: draft.appId,
+              provider,
+            });
+            if (!alive.current) return false;
+            const saved = await new Promise<boolean>((resolve) => {
+              const next = { provider, preview, resolve };
+              pendingRef.current = next;
+              setPending(next);
+            });
+            if (!saved) return false;
+          } catch (error) {
+            if (alive.current)
+              toast.error("无法添加供应商", { description: safeError(error) });
+            return false;
+          }
+        }}
+      />
+      <Dialog
+        open={!!pending}
+        onOpenChange={(open) => {
+          if (!open) cancel();
+        }}
+      >
+        <DialogContent
+          zIndex="top"
+          className="max-w-2xl overflow-hidden"
+          onEscapeKeyDown={(event) => {
+            if (savingRef.current) event.preventDefault();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>确认配置变更</DialogTitle>
+            <DialogDescription>
+              模型 Key 已脱敏。保存前会备份配置；不会自动调用模型。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed">
+              {pending?.preview.changes.join("\n\n")}
+            </pre>
+          </div>
+          {error && <p role="alert" className="shrink-0 px-6 py-3 text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button variant="outline" disabled={saving} onClick={cancel}>
+              返回修改
+            </Button>
+            <Button
+              disabled={saving || !!error}
+              onClick={async () => {
+                const current = pendingRef.current;
+                if (!current || savingRef.current) return;
+                savingRef.current = true;
+                setSaving(true);
+                setError("");
+                try {
+                  const outcome = await invoke<{
+                    backupId: string;
+                    enabled: boolean;
+                    tested: boolean;
+                  }>("tuzi_provider_save", {
+                    app: draft.appId,
+                    provider: current.provider,
+                    previewId: current.preview.id,
+                    source: {
+                      site: "https://api.tu-zi.com",
+                      userId: draft.userId,
+                      tokenId: draft.tokenId,
+                      generation: draft.generation,
+                    },
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: ["providers", draft.appId],
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: ["tuziProviderSources"],
+                  });
+                  if (!alive.current) return;
+                  toast.success(
+                    outcome.enabled
+                      ? "已保存并按工具规则启用"
+                      : "已保存，尚未启用",
+                    {
+                      description: "未执行模型测试。可从本次完整备份恢复。",
+                      duration: 20000,
+                      action: {
+                        label: "恢复配置",
+                        onClick: () => {
+                          void invoke("tuzi_provider_restore", {
+                            backupId: outcome.backupId,
+                          })
+                            .then(async () => {
+                              await queryClient.invalidateQueries({
+                                queryKey: ["providers", draft.appId],
+                              });
+                              toast.success("已恢复保存前配置");
+                            })
+                            .catch(() =>
+                              toast.error("恢复失败，请核对备份与当前配置"),
+                            );
+                        },
+                      },
+                    },
+                  );
+                  finish(true);
+                  onSaved?.(current.provider.id);
+                } catch (error) {
+                  if (alive.current)
+                    setError(
+                      `保存失败：${safeError(error)}。请返回修改后重新添加。`,
+                    );
+                } finally {
+                  savingRef.current = false;
+                  if (alive.current) setSaving(false);
+                }
+              }}
+            >
+              {saving ? "正在备份并保存…" : "备份并保存"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 interface RecoveryEntry {backupId:string;app:string;providerId:string;createdAt:number;manualRecovery:boolean;backupPath:string}

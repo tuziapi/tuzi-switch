@@ -10,6 +10,7 @@ import {
 
 interface UseHermesFormStateParams {
   initialData?: {
+    providerKey?: string;
     settingsConfig?: Record<string, unknown>;
   };
   appId: AppId;
@@ -88,7 +89,7 @@ export function useHermesFormState({
 
   const [hermesProviderKey, setHermesProviderKey] = useState<string>(() => {
     if (appId !== "hermes") return "";
-    return providerId || "";
+    return providerId || initialData?.providerKey || "";
   });
 
   const [hermesBaseUrl, setHermesBaseUrl] = useState<string>(() => {

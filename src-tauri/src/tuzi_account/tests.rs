@@ -974,3 +974,34 @@ fn account_navigation_accepts_only_fixed_credential_free_route() {
         assert!(!super::is_account_navigation(value));
     }
 }
+
+#[test]
+fn clipboard_prefill_is_one_use_and_never_reads_without_permission() {
+    let service = service(Default::default(), ORIGIN);
+    service.state();
+    let arm = || {
+        let mut inner = service.inner.lock().unwrap();
+        let mut pending = prefill::TokenPrefill::new(inner.state.generation);
+        pending.returned();
+        inner.token_prefill = Some(pending);
+    };
+    assert!(service.take_token_prefill(|| panic!("unarmed clipboard read")).is_none());
+    arm();
+    assert_eq!(service.take_token_prefill(|| Some("A".repeat(30))), Some("A".repeat(30)));
+    assert!(service.take_token_prefill(|| panic!("replayed clipboard read")).is_none());
+    arm();
+    assert!(service.take_token_prefill(|| None).is_none());
+    assert!(service.take_token_prefill(|| panic!("read failure must consume permission")).is_none());
+    arm();
+    assert!(service.take_token_prefill(|| Some("sk-synthetic-model-key".into())).is_none());
+    arm();
+    service.inner.lock().unwrap().state.generation += 1;
+    assert!(service.take_token_prefill(|| panic!("stale generation clipboard read")).is_none());
+    arm();
+    service.inner.lock().unwrap().state.status = "verifying".into();
+    assert!(service.take_token_prefill(|| panic!("connection already started")).is_none());
+    service.inner.lock().unwrap().state.status = "connected".into();
+    arm();
+    service.inner.lock().unwrap().state.identity = Some(Identity {user_id:"synthetic".into(),username:"synthetic".into(),display_name:"synthetic".into(),connection_id:"synthetic".into()});
+    assert!(service.take_token_prefill(|| panic!("connected clipboard read")).is_none());
+}

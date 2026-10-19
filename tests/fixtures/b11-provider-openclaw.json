@@ -1,0 +1,27 @@
+{
+  "name": "兔子线路",
+  "notes": "账户密钥：Synthetic key",
+  "settingsConfig": {
+    "baseUrl": "https://api.tu-zi.com/v1",
+    "apiKey": "sk-SYNTHETIC_ACCOUNT_MODEL_KEY",
+    "api": "openai-completions",
+    "models": [
+      {
+        "id": "synthetic-model",
+        "name": "synthetic-model"
+      }
+    ]
+  },
+  "icon": "tuzi",
+  "category": "aggregator",
+  "meta": {
+    "endpointAutoSelect": true,
+    "custom_endpoints": {
+      "https://api.tu-zi.com/v1": {
+        "url": "https://api.tu-zi.com/v1",
+        "addedAt": 1
+      }
+    }
+  },
+  "id": "tuzi-synthetic-openclaw"
+}

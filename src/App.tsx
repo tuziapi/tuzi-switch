@@ -199,6 +199,7 @@ function App() {
   }, [account.state.status]);
 
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
+  const [accountReturnRequest, setAccountReturnRequest] = useState(0);
   const [currentView, setCurrentView] = useState<View>(getInitialView);
   useEffect(() => {
     let disposed = false;
@@ -209,6 +210,7 @@ function App() {
         setConfigureKey(null);
         setTuziDraft(null);
         setCurrentView("account");
+        setAccountReturnRequest(value => value + 1);
         requestAnimationFrame(() =>
           document.getElementById("account-system-token")?.focus(),
         );
@@ -1065,6 +1067,7 @@ function App() {
         case "account":
           return (
             <AccountPage
+              tokenReturnRequest={accountReturnRequest}
               account={account}
               localStatus={t(
                 isProxyRunning
