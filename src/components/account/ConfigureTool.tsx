@@ -131,13 +131,6 @@ function ConfigureToolSession({
     m.model_name.toLowerCase().includes(search.trim().toLowerCase()),
   );
   const choices = matching.filter((m) => compatible(m).length > 0);
-  const unknown =
-    app === "codex"
-      ? []
-      : matching.filter(
-          (m) =>
-            !TUZI_TOOL_TARGETS.some((t) => supportsTuziProtocol(m, t.protocol)),
-        );
   const selected = targets.find((t) => t.protocol === protocol);
   const currentModel = items.find((m) => m.model_name === model?.model_name);
   const reason =
@@ -338,27 +331,13 @@ function ConfigureToolSession({
                         </CommandItem>
                       ))
                     )}
-                    {!models.isFetching &&
-                      !models.error &&
-                      unknown.map((m) => (
-                        <CommandItem
-                          key={m.model_name}
-                          value={m.model_name}
-                          disabled
-                        >
-                          {m.model_name} · 暂无法确认兼容性
-                        </CommandItem>
-                      ))}
-                    {!models.isFetching &&
-                      !models.error &&
-                      !choices.length &&
-                      !unknown.length && (
-                        <p className="p-3 text-sm">
-                          {search
-                            ? "没有匹配结果，请换个关键词。"
-                            : "暂无可用于此工具的模型。"}
-                        </p>
-                      )}
+                    {!models.isFetching && !models.error && !choices.length && (
+                      <p className="p-3 text-sm">
+                        {search
+                          ? "没有匹配的可用模型。"
+                          : "暂无可用于此工具的模型。"}
+                      </p>
+                    )}
                   </CommandList>
                 </Command>
               </PopoverContent>
@@ -367,9 +346,9 @@ function ConfigureToolSession({
           <QueryState query={models} showUpdated={false} />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              {app === "codex"
-                ? `已获取 ${items.length} 个模型，与“获取模型列表”一致。`
-                : "已读取此 Key 的完整模型列表；按工具协议筛选。"}
+              {models.data && !models.error
+                ? `已获取 ${items.length} 个模型`
+                : null}
             </span>
             <Button
               variant="link"

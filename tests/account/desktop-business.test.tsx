@@ -637,6 +637,114 @@ describe("business actions and secret lifetime", () => {
       screen.queryByDisplayValue("SYNTHETIC_CANCELED_CREATED_SECRET"),
     ).toBeNull();
   });
+  it.each([
+    ["Claude", "claude", "anthropic", "claude code"],
+    ["Claude Desktop", "claude-desktop", "anthropic", "claude code"],
+    ["Gemini", "gemini", "gemini", "gemini generateContent"],
+    ["OpenCode", "opencode", "anthropic", "claude code"],
+    ["OpenClaw", "openclaw", "anthropic", "claude code"],
+    ["Hermes", "hermes", "anthropic", "claude code"],
+  ])(
+    "offers known catalog aliases without endpoint details for %s",
+    async (label, app, protocol, alias) => {
+      Element.prototype.scrollIntoView = vi.fn();
+      vi.mocked(desktopRequest).mockImplementation(async (req) =>
+        req.path.endsWith("/reveal")
+          ? (env({ key: "SYNTHETIC_MODEL_KEY" }) as never)
+          : (env({
+              items: [
+                {
+                  model_name: "synthetic-compatible",
+                  supported_endpoint_types: [alias],
+                },
+                {
+                  model_name: "synthetic-unknown",
+                  supported_endpoint_types: ["unverified-label"],
+                },
+                {
+                  model_name: "synthetic-image",
+                  supported_endpoint_types: ["image-generation"],
+                },
+              ],
+            }) as never),
+      );
+      const onReady = vi.fn();
+      const { wrapper } = setup();
+      render(
+        <ConfigureTool
+          state={state}
+          keyDto={key}
+          onClose={vi.fn()}
+          onReady={onReady}
+        />,
+        { wrapper },
+      );
+      const tool = screen.getByRole("button", {
+        name: new RegExp(`^${label}\\s+选择并配置$`),
+      });
+      await waitFor(() => expect(tool).toBeEnabled());
+      fireEvent.click(tool);
+      await screen.findByText("已获取 3 个模型");
+      fireEvent.click(screen.getByRole("combobox"));
+      expect(
+        await screen.findByRole("option", { name: "synthetic-compatible" }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("option")).toHaveLength(1);
+      expect(screen.queryByText(/暂无法确认兼容性/)).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("搜索模型"), {
+        target: { value: "unknown" },
+      });
+      expect(
+        await screen.findByText("没有匹配的可用模型。"),
+      ).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("搜索模型"), {
+        target: { value: "" },
+      });
+      fireEvent.click(
+        await screen.findByRole("option", { name: "synthetic-compatible" }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+      await waitFor(() =>
+        expect(onReady).toHaveBeenCalledWith(
+          expect.objectContaining({
+            appId: app,
+            protocol,
+            model: "synthetic-compatible",
+          }),
+        ),
+      );
+    },
+  );
+  it("shows an empty state when all fetched models are hidden", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.mocked(desktopRequest).mockResolvedValue(
+      env({
+        items: [
+          { model_name: "synthetic-unknown", supported_endpoint_types: [] },
+        ],
+      }),
+    );
+    const { wrapper } = setup();
+    render(
+      <ConfigureTool
+        state={state}
+        keyDto={key}
+        onClose={vi.fn()}
+        onReady={vi.fn()}
+      />,
+      { wrapper },
+    );
+    const tool = screen.getByRole("button", { name: /Gemini/ });
+    await waitFor(() => expect(tool).toBeEnabled());
+    fireEvent.click(tool);
+    await screen.findByText("已获取 1 个模型");
+    expect(screen.getByRole("button", { name: "下一步" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("combobox"));
+    expect(
+      await screen.findByText("暂无可用于此工具的模型。"),
+    ).toBeInTheDocument();
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+  });
   it("loads the complete Key model list including models beyond the old first page", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     vi.mocked(desktopRequest).mockResolvedValue(
@@ -672,6 +780,8 @@ describe("business actions and secret lifetime", () => {
     expect(await screen.findByText("gpt-6.1-sol")).toBeInTheDocument();
     expect(screen.getByText("gpt-6-astra")).toBeInTheDocument();
     expect(screen.getAllByRole("option")).toHaveLength(132);
+    expect(screen.getByText("已获取 132 个模型")).toBeInTheDocument();
+    expect(screen.queryByText(/与“获取模型列表”一致/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("option", { name: "gpt-6-astra" }));
     expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled();
     expect(

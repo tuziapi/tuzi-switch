@@ -1,7 +1,12 @@
 {
   "anthropic": {
-    "aliases": ["anthropic", "anthropic-messages", "anthropic_messages"],
-    "catalogAliases": ["claude code"],
+    "aliases": [
+      "anthropic",
+      "anthropic-messages",
+      "anthropic_messages",
+      "claude code"
+    ],
+    "catalogAliases": [],
     "paths": ["/v1/messages"]
   },
   "responses": {
@@ -31,9 +36,10 @@
       "google",
       "gemini-native",
       "gemini_native",
-      "google_generative_ai"
+      "google_generative_ai",
+      "gemini generatecontent"
     ],
-    "catalogAliases": ["gemini generatecontent"],
+    "catalogAliases": [],
     "paths": [
       "/v1beta/models/{model}:generateContent",
       "/v1/models/{model}:generateContent"

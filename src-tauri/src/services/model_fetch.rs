@@ -419,6 +419,29 @@ mod tests {
     }
 
     #[test]
+    fn shared_decoder_preserves_models_api_aliases_without_endpoint_details() {
+        let models = decode_models(
+            br#"{"data":[
+            {"id":"synthetic-gemini","supported_endpoint_types":["gemini generateContent"]},
+            {"id":"synthetic-claude","supported_endpoint_types":["claude code"]},
+            {"id":"synthetic-claude","supported_endpoint_types":["claude code"]},
+            {"id":"synthetic-unknown"},
+            {"id":" "}
+        ]}"#,
+        )
+        .unwrap();
+        assert_eq!(models.len(), 3);
+        assert_eq!(models[0].id, "synthetic-claude");
+        assert_eq!(models[0].supported_endpoint_types, ["claude code"]);
+        assert_eq!(
+            models[1].supported_endpoint_types,
+            ["gemini generateContent"]
+        );
+        assert!(models.iter().all(|model| model.endpoints.is_none()));
+        assert!(models[2].supported_endpoint_types.is_empty());
+    }
+
+    #[test]
     fn test_parse_response() {
         let json = r#"{"object":"list","data":[{"id":"gpt-4","object":"model","owned_by":"openai"},{"id":"claude-3-sonnet","object":"model","owned_by":"anthropic"}]}"#;
         let resp: ModelsResponse = serde_json::from_str(json).unwrap();

@@ -221,22 +221,22 @@
     "protocols": ["anthropic"]
   },
   {
-    "name": "custom alias needs path",
+    "name": "models API Claude label without endpoint details",
     "model": {
       "model_name": "synthetic-model",
       "enable_groups": ["default"],
       "supported_endpoint_types": ["claude code"]
     },
-    "protocols": []
+    "protocols": ["anthropic"]
   },
   {
-    "name": "custom Gemini alias needs path",
+    "name": "models API Gemini label without endpoint details",
     "model": {
       "model_name": "synthetic-model",
       "enable_groups": ["default"],
       "supported_endpoint_types": ["gemini generateContent"]
     },
-    "protocols": []
+    "protocols": ["gemini"]
   },
   {
     "name": "unknown label cannot grant access",
@@ -506,7 +506,7 @@
     "protocols": ["gemini"]
   },
   {
-    "name": "custom method missing path",
+    "name": "known Claude label with POST and omitted path",
     "model": {
       "model_name": "synthetic-model",
       "enable_groups": ["default"],
@@ -517,7 +517,7 @@
         }
       }
     },
-    "protocols": []
+    "protocols": ["anthropic"]
   },
   {
     "name": "model specific image endpoint not Gemini CLI",
@@ -528,6 +528,39 @@
       "endpoints": {
         "banana 谷歌 端点": {
           "path": "/v1beta/gemini-2.5-flash-image:generateContent"
+        }
+      }
+    },
+    "protocols": []
+  },
+  {
+    "name": "models API normalized anthropic label",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": [" CLAUDE CODE "]
+    },
+    "protocols": ["anthropic"]
+  },
+  {
+    "name": "models API normalized gemini label",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": [" GEMINI GENERATECONTENT "]
+    },
+    "protocols": ["gemini"]
+  },
+  {
+    "name": "known Gemini label with conflicting method",
+    "model": {
+      "model_name": "synthetic-model",
+      "enable_groups": ["default"],
+      "supported_endpoint_types": ["gemini generateContent"],
+      "endpoints": {
+        "gemini generateContent": {
+          "path": "/v1beta/models/{model}:generateContent",
+          "method": "GET"
         }
       }
     },
