@@ -129,6 +129,31 @@ fn next_legacy_codex_provider_env_key(
     ))
 }
 
+fn persist_codex_submitted_key(provider: &mut Provider) -> Result<(), AppError> {
+    if provider.category.as_deref() == Some("official") {
+        return Ok(());
+    }
+    if let Some(env_key) = codex_provider_env_key(provider) {
+        if let Some(key) = provider
+            .settings_config
+            .pointer("/auth/OPENAI_API_KEY")
+            .and_then(Value::as_str)
+            .filter(|key| !key.is_empty())
+            .map(str::to_owned)
+        {
+            crate::codex_config::write_managed_env_key(&env_key, &key)?;
+        }
+        if let Some(auth) = provider
+            .settings_config
+            .get_mut("auth")
+            .and_then(Value::as_object_mut)
+        {
+            auth.remove("OPENAI_API_KEY");
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn migrate_legacy_codex_provider_for_switch(
     db: &Database,
     provider: &Provider,
@@ -1654,6 +1679,26 @@ impl ProviderService {
         add_to_live: bool,
     ) -> Result<bool, AppError> {
         let _operation = OperationGuard::acquire()?;
+        let result = if matches!(app_type, AppType::Codex) {
+            let target = provider.clone();
+            crate::services::tuzi_provider::codex_transaction::run(state, &target, || {
+                Self::add_inner(state, app_type.clone(), provider, add_to_live)
+            })
+        } else {
+            Self::add_inner(state, app_type.clone(), provider, add_to_live)
+        };
+        if result.is_ok() {
+            Self::reconcile_codex_image_compat_after_change(state, &app_type);
+        }
+        result
+    }
+
+    fn add_inner(
+        state: &AppState,
+        app_type: AppType,
+        provider: Provider,
+        add_to_live: bool,
+    ) -> Result<bool, AppError> {
         let mut provider = provider;
         if matches!(app_type, AppType::Codex) {
             if let Some(text) = provider
@@ -1671,6 +1716,7 @@ impl ProviderService {
         if matches!(app_type, AppType::Codex) {
             normalize_codex_managed_provider_for_storage(state.db.as_ref(), &mut provider, None)?;
             migrate_codex_provider_credential(Some(&submitted_provider), &provider)?;
+            persist_codex_submitted_key(&mut provider)?;
             if current.is_none() {
                 if let Some(config_text) = provider
                     .settings_config
@@ -1729,6 +1775,26 @@ impl ProviderService {
         provider: Provider,
     ) -> Result<bool, AppError> {
         let _operation = OperationGuard::acquire()?;
+        let result = if matches!(app_type, AppType::Codex) {
+            let target = provider.clone();
+            crate::services::tuzi_provider::codex_transaction::run(state, &target, || {
+                Self::update_inner(state, app_type.clone(), original_id, provider)
+            })
+        } else {
+            Self::update_inner(state, app_type.clone(), original_id, provider)
+        };
+        if result.is_ok() {
+            Self::reconcile_codex_image_compat_after_change(state, &app_type);
+        }
+        result
+    }
+
+    fn update_inner(
+        state: &AppState,
+        app_type: AppType,
+        original_id: Option<&str>,
+        provider: Provider,
+    ) -> Result<bool, AppError> {
         let mut provider = provider;
         if matches!(app_type, AppType::Codex) {
             if let Some(text) = provider
@@ -1757,6 +1823,7 @@ impl ProviderService {
                 Some(original_id.as_str()),
             )?;
             migrate_codex_provider_credential(Some(&submitted_provider), &provider)?;
+            persist_codex_submitted_key(&mut provider)?;
             migrate_codex_provider_credential(existing_provider.as_ref(), &provider)?;
             if is_current {
                 if let Some(config_text) = provider
@@ -2276,20 +2343,32 @@ impl ProviderService {
                 id
             );
 
-            futures::executor::block_on(
-                state
-                    .proxy_service
-                    .hot_switch_provider_inner(app_type.as_str(), id),
-            )
-            .map_err(|e| AppError::Message(format!("热切换失败: {e}")))?;
+            let apply = || {
+                futures::executor::block_on(
+                    state.proxy_service.hot_switch_provider_inner(app_type.as_str(), id),
+                ).map_err(|e| AppError::Message(format!("热切换失败: {e}")))
+            };
+            if matches!(app_type, AppType::Codex) {
+                crate::services::tuzi_provider::codex_transaction::run(state, _provider, apply)?;
+            } else {
+                apply()?;
+            }
 
             // Note: No Live config write, no MCP sync
             // The proxy server will route requests to the new provider via is_current
             return Ok(SwitchResult::default());
         }
 
-        // Normal mode: full switch with Live config write
-        Self::switch_normal(state, app_type, id, &providers)
+        // Normal activation owns credentials, files, backfill and current-state updates.
+        let result = if matches!(app_type, AppType::Codex) {
+            crate::services::tuzi_provider::codex_transaction::run(state, _provider, || {
+                Self::switch_normal(state, app_type.clone(), id, &providers)
+            })
+        } else {
+            Self::switch_normal(state, app_type.clone(), id, &providers)
+        };
+        if result.is_ok() { Self::reconcile_codex_image_compat_after_change(state, &app_type); }
+        result
     }
 
     /// Normal switch flow (non-proxy mode)

@@ -466,3 +466,7 @@ R02 用户实际验收未通过：额外协议过滤导致模型仍缺失。R03 
 ## R08 Codex 同名 provider（2026-10-21）
 
 用户批准不同供应商卡片共享 `custom` 等 TOML 标识，替代 R04 全局唯一及未启用预注册规则。保存与生效分离，启用时整体替换目标表，独立凭证和账户事务保留；同名往返切换、未启用编辑、删除、MCP及账户恢复合成回归通过。API、搜索清空未改；仅本地，未推送/发布，实际验收待用户完成。见 [R08验证](r08-codex-duplicate-provider-verification.md) 与 [ADR-013](decisions/0013-codex-card-local-provider-ids.md)。
+
+## R09 Codex 配置失败补偿（2026-10-21）
+
+用户明确授权修复后提交、推送并创建客户端目标 main 的 PR；不含合并或发布。普通表单准备不提前写Key；Codex普通保存/启用及供应商页代理热切换加入补偿，覆盖数据库、当前状态、配置文件和独立凭证；账户事务继续复用。逐写入点错误、数据库/代理备份错误及外部冲突回归通过。全库单元1415通过、1既有历史恢复失败、1忽略，详细限制见 [R09验证](r09-codex-transaction-verification.md) 与 [ADR-014](decisions/0014-codex-save-activation-compensation.md)。API与暂缓的搜索清空未改。

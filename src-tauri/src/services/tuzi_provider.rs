@@ -1,4 +1,5 @@
 //! Account-originated creation backs up the complete adapter write set before any write.
+pub(crate) mod codex_transaction;
 use crate::{
     app_config::AppType, database::Database, error::AppError, provider::Provider, store::AppState,
 };
@@ -1433,6 +1434,268 @@ mod tests {
     use super::*;
     use serde_json::json;
     use serial_test::serial;
+    fn ordinary_codex(id: &str, key: &str) -> Provider {
+        Provider::with_id(
+            id.into(),
+            format!("Synthetic-{id}"),
+            json!({
+                "auth":{"OPENAI_API_KEY":key},
+                "config":format!("model_provider = \"custom\"\nmodel = \"synthetic-model\"\n[model_providers.custom]\nname = {id:?}\nbase_url = \"https://{id}.invalid/v1\"\nenv_key = \"TUZI_SWITCH_{id}_CODEX_API_KEY\"\nwire_api = \"responses\"\n")
+            }),
+            None,
+        )
+    }
+
+    #[test]
+    #[serial]
+    fn ordinary_codex_add_update_switch_compensate_each_file_write_failure() {
+        for operation in ["add", "update", "switch"] {
+            let mut failures = 0;
+            let mut completed = false;
+            for failure_at in 1..25 {
+                let _home = Home::new();
+                let state = state();
+                let a = ordinary_codex("R09A", "sk-synthetic-original");
+                let b = ordinary_codex("R09B", "sk-synthetic-second");
+                if operation != "add" {
+                    super::super::ProviderService::add(&state, AppType::Codex, a.clone(), false)
+                        .unwrap();
+                }
+                if operation != "add" {
+                    state.db.conn.lock().unwrap().execute("INSERT INTO provider_health(provider_id,app_type,updated_at) VALUES ('R09A','codex','synthetic')", []).unwrap();
+                }
+                if operation == "switch" {
+                    super::super::ProviderService::add(&state, AppType::Codex, b.clone(), false)
+                        .unwrap();
+                }
+                state
+                    .db
+                    .set_setting("synthetic-unrelated", "preserved")
+                    .unwrap();
+                let target = if operation == "switch" {
+                    b
+                } else {
+                    let mut edited = a;
+                    edited.settings_config["auth"]["OPENAI_API_KEY"] = json!("sk-synthetic-edited");
+                    edited
+                };
+                let files = write_set(&AppType::Codex, &target)
+                    .unwrap()
+                    .into_iter()
+                    .map(capture)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap();
+                let before = db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap();
+                let current = super::super::ProviderService::current(&state, AppType::Codex).unwrap();
+                FAIL_WRITE_AT.with(|f| f.set(Some(failure_at)));
+                let result = match operation {
+                    "add" => super::super::ProviderService::add(
+                        &state,
+                        AppType::Codex,
+                        target.clone(),
+                        false,
+                    )
+                    .map(|_| ()),
+                    "update" => super::super::ProviderService::update(
+                        &state,
+                        AppType::Codex,
+                        None,
+                        target.clone(),
+                    )
+                    .map(|_| ()),
+                    _ => super::super::ProviderService::switch(&state, AppType::Codex, &target.id)
+                        .map(|_| ()),
+                };
+                let injected = FAIL_WRITE_AT.with(|f| f.replace(None)).is_none();
+                if !injected {
+                    result.unwrap();
+                    let saved = state
+                        .db
+                        .get_provider_by_id(&target.id, "codex")
+                        .unwrap()
+                        .unwrap();
+                    assert!(saved
+                        .settings_config
+                        .pointer("/auth/OPENAI_API_KEY")
+                        .is_none());
+                    completed = true;
+                    break;
+                }
+                assert!(result.is_err(), "{operation} write {failure_at} must fail");
+                failures += 1;
+                files_unchanged(&files).unwrap_or_else(|e| panic!("{operation}/{failure_at}: {e}"));
+                assert_eq!(
+                    db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap(),
+                    before,
+                    "{operation}/{failure_at}"
+                );
+                assert_eq!(
+                    super::super::ProviderService::current(&state, AppType::Codex).unwrap(),
+                    current
+                );
+                if operation != "add" {
+                    assert_eq!(
+                        state
+                            .db
+                            .conn
+                            .lock()
+                            .unwrap()
+                            .query_row(
+                                "SELECT COUNT(*) FROM provider_health WHERE provider_id='R09A'",
+                                [],
+                                |r| r.get::<_, i64>(0)
+                            )
+                            .unwrap(),
+                        1
+                    );
+                }
+            }
+            assert!(
+                completed,
+                "{operation} must eventually complete successfully"
+            );
+            assert!(
+                failures >= 3,
+                "exercise failures after partial writes for {operation}"
+            );
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn ordinary_codex_proxy_backup_failure_restores_current_and_backup() {
+        let _home = Home::new();
+        let state = state();
+        let a = ordinary_codex("R09PA", "sk-synthetic-a");
+        let b = ordinary_codex("R09PB", "sk-synthetic-b");
+        super::super::ProviderService::add(&state, AppType::Codex, a.clone(), false).unwrap();
+        super::super::ProviderService::add(&state, AppType::Codex, b.clone(), false).unwrap();
+        futures::executor::block_on(
+            state
+                .db
+                .save_live_backup("codex", &a.settings_config.to_string()),
+        )
+        .unwrap();
+        let before = state.db.snapshot_to_memory().unwrap();
+        let files = write_set(&AppType::Codex, &b)
+            .unwrap()
+            .into_iter()
+            .map(capture)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        state.db.conn.lock().unwrap().execute_batch("CREATE TRIGGER synthetic_fail_backup BEFORE INSERT ON proxy_live_backup BEGIN SELECT RAISE(ABORT,'synthetic backup failure'); END;").unwrap();
+        assert!(super::super::ProviderService::switch(&state, AppType::Codex, &b.id).is_err());
+        files_unchanged(&files).unwrap();
+        assert_eq!(
+            db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap(),
+            db_signature(&before).unwrap()
+        );
+        assert_eq!(
+            super::super::ProviderService::current(&state, AppType::Codex).unwrap(),
+            a.id
+        );
+        assert_eq!(
+            futures::executor::block_on(state.db.get_live_backup("codex"))
+                .unwrap()
+                .unwrap()
+                .original_config,
+            a.settings_config.to_string()
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn ordinary_codex_database_failure_restores_submitted_key() {
+        let _home = Home::new();
+        let state = state();
+        let provider = ordinary_codex("R09DB", "sk-synthetic-before");
+        super::super::ProviderService::add(&state, AppType::Codex, provider.clone(), false).unwrap();
+        let files = write_set(&AppType::Codex, &provider)
+            .unwrap()
+            .into_iter()
+            .map(capture)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        let before = db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap();
+        state.db.conn.lock().unwrap().execute_batch("CREATE TRIGGER synthetic_fail_update BEFORE UPDATE ON providers WHEN NEW.id='R09DB' BEGIN SELECT RAISE(ABORT,'synthetic database failure'); END;").unwrap();
+        let mut changed = provider;
+        changed.settings_config["auth"]["OPENAI_API_KEY"] = json!("sk-synthetic-after");
+        assert!(super::super::ProviderService::update(&state, AppType::Codex, None, changed).is_err());
+        files_unchanged(&files).unwrap();
+        assert_eq!(
+            db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn ordinary_codex_restore_failure_reports_retained_private_backup() {
+        let _home = Home::new();
+        let state = state();
+        let provider = ordinary_codex("R09RECOVERY", "sk-synthetic-key");
+        FAIL_WRITE_AT.with(|f| f.set(Some(3)));
+        RESTORE_FAIL_AT.with(|f| f.set(Some(1)));
+        let result = super::super::ProviderService::add(&state, AppType::Codex, provider, false);
+        FAIL_WRITE_AT.with(|f| f.set(None));
+        RESTORE_FAIL_AT.with(|f| f.set(None));
+        assert!(result.unwrap_err().to_string().contains("保留备份"));
+        let dir = fs::read_dir(crate::config::get_app_config_dir().join("codex-operation-backups"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        assert!(dir.join("before.db").is_file());
+        assert!(dir.join("before.json").is_file());
+        let backup = Connection::open(dir.join("before.db")).unwrap();
+        assert_eq!(
+            backup
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE name='proxy_request_logs'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            assert_eq!(
+                fs::metadata(dir.join("before.db"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn ordinary_codex_external_edit_is_not_overwritten_and_keeps_private_backup() {
+        let _home = Home::new();
+        let state = state();
+        let provider = ordinary_codex("R09EXTERNAL", "sk-synthetic-key");
+        let _operation = super::super::provider::OperationGuard::acquire().unwrap();
+        let path = crate::codex_config::get_codex_config_path();
+        let result: Result<(), AppError> = codex_transaction::run(&state, &provider, || {
+            crate::config::atomic_write(&path, b"model = \"synthetic\"\n")?;
+            fs::write(&path, b"# synthetic external edit\n").unwrap();
+            Err(AppError::Config("synthetic operation failure".into()))
+        });
+        assert!(result.unwrap_err().to_string().contains("保留备份"));
+        assert_eq!(fs::read(&path).unwrap(), b"# synthetic external edit\n");
+        let backups = crate::config::get_app_config_dir().join("codex-operation-backups");
+        assert_eq!(fs::read_dir(backups).unwrap().count(), 1);
+    }
+
     #[test]
     fn configured_sources_only_include_existing_matching_tool_providers() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();

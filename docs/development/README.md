@@ -74,3 +74,7 @@ R02 用户实际验收未通过：额外协议过滤导致模型仍缺失。R03 
 ## R08 Codex 同名 provider（2026-10-21）
 
 不同卡片可使用相同 provider 标识，独立保存凭证，只有生效卡片写入当前配置；替代 R04 全局唯一和未启用预注册规则。见 [ADR-013](decisions/0013-codex-card-local-provider-ids.md)、[R08验证](r08-codex-duplicate-provider-verification.md)。API 契约不变，仅本地验证，未发布。
+
+## R09 Codex 保存与启用失败补偿（2026-10-21）
+
+普通配置准备不再提前写Key，最终保存/启用在原生层处理写入和失败恢复；设计与验证见 [ADR-014](decisions/0014-codex-save-activation-compensation.md)、[R09记录](r09-codex-transaction-verification.md)。用户已授权提交、推送和创建客户端 PR；不包含合并/发布。此前“仅本地、不推送”是各阶段历史授权记录。全量单元仍有1项既有历史恢复失败，实际发布验收尚未完成。

@@ -1077,6 +1077,7 @@ fn read_windows_env_keys() -> HashMap<String, String> {
 
 /// Write a user environment variable on Windows using setx
 fn write_windows_env_key(env_key: &str, value: &str) -> Result<(), AppError> {
+    crate::services::tuzi_provider::codex_transaction::before_environment_write(env_key, value)?;
     use std::process::Command;
     let output = Command::new("setx")
         .arg(env_key)

@@ -543,19 +543,12 @@ fn save_codex_route_inner(
         serde_json::json!({ "auth": {}, "config": route_draft }),
         None,
     );
-    let submitted_provider = provider.clone();
     crate::services::provider::normalize_codex_managed_provider_for_storage(
         state.db.as_ref(),
         &mut provider,
         providerId.as_deref(),
     )
     .map_err(|e| e.to_string())?;
-    crate::services::provider::migrate_codex_provider_credential(
-        Some(&submitted_provider),
-        &provider,
-    )
-    .map_err(|e| e.to_string())?;
-
     let normalized_config = provider
         .settings_config
         .get("config")
@@ -568,13 +561,9 @@ fn save_codex_route_inner(
     // Prepare the card only. ProviderService applies it if/when it becomes current.
     codex_config::validate_provider_tables(normalized_config).map_err(|e| e.to_string())?;
 
-    // Write API key to shell rc
-    if !apiKey.is_empty() {
-        codex_config::write_managed_env_key(&normalized_env_key, &apiKey)
-            .map_err(|e| e.to_string())?;
-    }
-
-    codex_config::ensure_codex_provider_env_ready(normalized_config).map_err(|e| e.to_string())?;
+    // Compatibility argument only: preparation must not mutate any credential.
+    // The final add/update receives the key transiently and persists it transactionally.
+    let _ = apiKey;
 
     Ok(SaveCodexRouteResult {
         route_id: normalized_route_id,

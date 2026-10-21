@@ -885,7 +885,8 @@ fn save_codex_route_prepares_duplicate_route_without_changing_live() {
     write_codex_live_atomic(&json!({}), Some(original)).unwrap();
     let before = std::fs::read(get_codex_config_path()).unwrap();
     let state = create_test_state().unwrap();
-    let _ = home;
+    let before_env = std::fs::read(home.join(".zshrc")).ok();
+    let before_key_file = std::fs::read(home.join(".codex/.env")).ok();
     let result = save_codex_route_test_hook(
         &state,
         "codex".into(),
@@ -899,6 +900,8 @@ fn save_codex_route_prepares_duplicate_route_without_changing_live() {
         None,
     );
     assert_eq!(result.unwrap().route_id, "codex");
+    assert_eq!(std::fs::read(home.join(".zshrc")).ok(), before_env);
+    assert_eq!(std::fs::read(home.join(".codex/.env")).ok(), before_key_file);
     assert_eq!(std::fs::read(get_codex_config_path()).unwrap(), before);
 
 }
@@ -934,7 +937,7 @@ fn save_codex_route_first_add_roundtrip_preserves_names_for_all_endpoints() {
         let provider = Provider::with_id(
             "synthetic-r04".into(),
             "Synthetic R04".into(),
-            json!({"auth":{}, "config":saved.config}),
+            json!({"auth":{"OPENAI_API_KEY":"SYNTHETIC_R04_VALUE"}, "config":saved.config}),
             None,
         );
         ProviderService::add(&state, AppType::Codex, provider.clone(), false).unwrap();
@@ -1041,7 +1044,7 @@ trust_level = "untrusted"
     assert_eq!(std::fs::read_to_string(get_codex_config_path()).unwrap(), existing_live_config);
     ProviderService::add(&state, AppType::Codex, Provider::with_id(
         "edited-r08".into(), "兔子线路-我的配置".into(),
-        json!({"auth": {}, "config": saved_route.config}), None,
+        json!({"auth": {"OPENAI_API_KEY":"sk-test"}, "config": saved_route.config}), None,
     ), false).unwrap();
 
     switch_provider_test_hook(&state, AppType::Codex, "edited-r08").unwrap();
@@ -1706,7 +1709,7 @@ fn codex_same_route_cards_keep_credentials_and_replace_whole_active_table() {
         Provider::with_id(
             id.into(),
             id.into(),
-            json!({"auth":{}, "config":saved.config}),
+            json!({"auth":{"OPENAI_API_KEY":format!("sk-synthetic-r08-{id}")}, "config":saved.config}),
             None,
         )
     };
@@ -1775,5 +1778,49 @@ fn codex_same_route_cards_keep_credentials_and_replace_whole_active_table() {
     assert_eq!(
         std::fs::read(get_codex_config_path()).unwrap(),
         before_delete
+    );
+}
+
+// R09 regression: a rejected profile write must not change current state.
+#[test]
+fn codex_failed_profile_write_keeps_previous_current_state() {
+    let _guard = test_mutex().lock().unwrap();
+    reset_test_fs();
+    ensure_test_home();
+    let state = create_test_state().unwrap();
+    for id in ["audit-a", "audit-b"] {
+        let env_key = format!("SYNTHETIC_AUDIT_{}_KEY", id.replace('-', "_"));
+        write_codex_env_key(env_key.clone(), format!("sk-synthetic-{id}")).unwrap();
+        let config = format!("model_provider = \"custom\"\nmodel = \"gpt-6-astra\"\n[model_providers.custom]\nname = {id:?}\nbase_url = \"https://{id}.invalid/v1\"\nenv_key = {env_key:?}\nwire_api = \"responses\"\n");
+        ProviderService::add(
+            &state,
+            AppType::Codex,
+            Provider::with_id(
+                id.into(),
+                id.into(),
+                json!({"auth":{}, "config":config}),
+                None,
+            ),
+            false,
+        )
+        .unwrap();
+    }
+    switch_provider_test_hook(&state, AppType::Codex, "audit-a").unwrap();
+    let before = std::fs::read(get_codex_config_path()).unwrap();
+    // Deterministic filesystem failure without changing permissions or real files.
+    let blocked_profile = get_codex_config_path()
+        .parent()
+        .unwrap()
+        .join("audit-b.config.toml");
+    std::fs::create_dir_all(blocked_profile).unwrap();
+    assert!(switch_provider_test_hook(&state, AppType::Codex, "audit-b").is_err());
+    assert_eq!(std::fs::read(get_codex_config_path()).unwrap(), before);
+    assert_eq!(
+        ProviderService::current(&state, AppType::Codex).unwrap(),
+        "audit-a"
+    );
+    assert_eq!(
+        state.db.get_current_provider("codex").unwrap().as_deref(),
+        Some("audit-a")
     );
 }

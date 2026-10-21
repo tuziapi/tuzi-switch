@@ -1601,12 +1601,19 @@ impl ProxyService {
             && normalize_codex_history_bucket
             && crate::settings::unify_codex_session_history()
         {
-            tauri::async_runtime::spawn_blocking(
-                crate::codex_history_migration::ensure_codex_history_anchor,
-            )
-            .await
-            .map_err(|error| format!("解析 Codex 统一会话桶任务失败: {error}"))?
-            .map_err(|error| format!("无法确定 Codex 统一会话桶: {error}"))?;
+            if crate::services::tuzi_provider::account_backup_active() {
+                // Provider commands already run on a blocking thread. Keep writes
+                // on that thread so the transaction's file journal observes them.
+                crate::codex_history_migration::ensure_codex_history_anchor()
+                    .map_err(|error| format!("无法确定 Codex 统一会话桶: {error}"))?;
+            } else {
+                tauri::async_runtime::spawn_blocking(
+                    crate::codex_history_migration::ensure_codex_history_anchor,
+                )
+                .await
+                .map_err(|error| format!("解析 Codex 统一会话桶任务失败: {error}"))?
+                .map_err(|error| format!("无法确定 Codex 统一会话桶: {error}"))?;
+            }
         }
         let mut effective_settings =
             build_effective_settings_with_common_config(self.db.as_ref(), &app_type_enum, provider)
