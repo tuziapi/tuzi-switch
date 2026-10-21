@@ -609,29 +609,29 @@ describe("business actions and secret lifetime", () => {
       screen.queryByDisplayValue("SYNTHETIC_CANCELED_CREATED_SECRET"),
     ).toBeNull();
   });
-  it("resets the configuration model snapshot after page two is rejected", async () => {
-    vi.mocked(desktopRequest).mockImplementation(async (req) => {
-      if (req.query?.some(([name, value]) => name === "page" && value === "2"))
-        throw { code: "snapshot_changed", status: 409 };
-      return env({
-        items: [],
-        pagination: { page: 1, page_size: 100, total: "101", has_more: true },
-        snapshot_id: "synthetic-snapshot",
-        snapshot_refreshed: false,
-        api_version: 1,
-        schema_version: "1",
-        algorithm_version: "1",
-        pricing_meta: {},
-      });
-    });
+  it("loads the complete Key model list including models beyond the old first page", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.mocked(desktopRequest).mockResolvedValue(
+      env({
+        items: [
+          ...Array.from({ length: 130 }, (_, i) => ({
+            model_name: `synthetic-${i}`,
+            supported_endpoint_types: ["anthropic"],
+          })),
+          ...["gpt-6.1-sol", "gpt-6-astra"].map((model_name) => ({
+            model_name,
+            supported_endpoint_types: ["openai-response"],
+          })),
+        ],
+      }),
+    );
     const { wrapper } = setup();
-    const ready = vi.fn();
     render(
       <ConfigureTool
         state={state}
         keyDto={key}
         onClose={vi.fn()}
-        onReady={ready}
+        onReady={vi.fn()}
       />,
       { wrapper },
     );
@@ -639,29 +639,17 @@ describe("business actions and secret lifetime", () => {
       expect(screen.getByRole("button", { name: /Codex/ })).toBeEnabled(),
     );
     fireEvent.click(screen.getByRole("button", { name: /Codex/ }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: zh.account.business.next }),
-      ).toBeEnabled(),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: zh.account.business.next }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: zh.account.business.previous }),
-      ).toBeDisabled(),
-    );
-    expect(
-      screen.getByRole("button", {
-        name: "下一步",
-      }),
-    ).toBeDisabled();
-    expect(ready).not.toHaveBeenCalled();
+    await waitFor(() => expect(desktopRequest).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("combobox"));
+    expect(await screen.findByText("gpt-6.1-sol")).toBeInTheDocument();
+    expect(screen.getByText("gpt-6-astra")).toBeInTheDocument();
     expect(
       vi
         .mocked(desktopRequest)
-        .mock.calls.every(([req]) => req.method === "GET"),
+        .mock.calls.every(
+          ([req]) =>
+            req.path === `/account/keys/${key.id}/models` && !req.query?.length,
+        ),
     ).toBe(true);
   });
   it("does not replay an uncertain create", async () => {

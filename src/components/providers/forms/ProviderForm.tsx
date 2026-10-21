@@ -1,3 +1,4 @@
+import { validateCodexConfigDocument } from "@/utils/codexConfigValidation";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { useForm } from "react-hook-form";
@@ -70,7 +71,6 @@ import {
 import type { UniversalProviderPreset } from "@/config/universalProviderPresets";
 import {
   applyTemplateValues,
-  extractCodexBaseUrl,
   extractCodexWireApi,
   getCodexProviderEnvKeyFromSettings,
   hasApiKeyField,
@@ -831,32 +831,6 @@ function ProviderFormFull({
     [setCodexConfig, debouncedValidate],
   );
 
-  useEffect(() => {
-    if (appId !== "codex" || category === "official") return;
-
-    const selectedBaseUrl = codexBaseUrl.trim();
-    if (!selectedBaseUrl) return;
-
-    const configBaseUrl = extractCodexBaseUrl(codexConfig)?.trim() ?? "";
-    if (configBaseUrl === selectedBaseUrl) return;
-
-    setCodexConfig((prev) => {
-      const prevBaseUrl = extractCodexBaseUrl(prev)?.trim() ?? "";
-      if (prevBaseUrl === selectedBaseUrl) return prev;
-
-      const updated = setCodexBaseUrlInConfig(prev, selectedBaseUrl);
-      debouncedValidate(updated);
-      return updated;
-    });
-  }, [
-    appId,
-    category,
-    codexBaseUrl,
-    codexConfig,
-    setCodexConfig,
-    debouncedValidate,
-  ]);
-
   const handleFetchModels = useCallback(() => {
     if (!codexBaseUrl || !codexApiKey) {
       showFetchModelsError(null, t, {
@@ -1337,6 +1311,14 @@ function ProviderFormFull({
       );
     }
     if (appId === "codex") {
+      const validation = validateCodexConfigDocument(
+        codexConfig,
+        category !== "official",
+      );
+      if (validation) {
+        toast.error(validation);
+        return;
+      }
       const rawSubmittedEnvKey = (
         getCodexProviderEnvKeyFromSettings({
           config: codexConfig,
@@ -1653,6 +1635,12 @@ function ProviderFormFull({
           normalizedCodexConfig,
           normalizedCatalogModels[0]?.model || codexModelName,
         );
+
+        const validation = validateCodexConfigDocument(
+          normalizedCodexConfig,
+          category !== "official",
+        );
+        if (validation) throw new Error(validation);
 
         const routeIdMatch = normalizedCodexConfig.match(
           /^\s*model_provider\s*=\s*"([^"]+)"/m,

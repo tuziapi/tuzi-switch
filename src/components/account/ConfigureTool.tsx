@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { supportsTuziProtocol } from "@/lib/tuziEndpointCompatibility";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -20,13 +21,11 @@ import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type {
   DesktopKey,
   DesktopPricing,
-  Models,
   DesktopError,
 } from "@/lib/api/desktop";
 import { useDesktop } from "@/lib/query/desktop";
 import {
   TUZI_TOOL_TARGETS,
-  tuziToolCompatibility,
   type TuziProviderDraft,
 } from "@/lib/tuziToolCompatibility";
 import { AccountDialog } from "./AccountDialog";
@@ -57,7 +56,7 @@ interface Source {
   app: AppId;
   providerId: string;
 }
-export function ConfigureTool({
+function ConfigureToolSession({
   state,
   keyDto,
   model: initial,
@@ -75,9 +74,13 @@ export function ConfigureTool({
   const [app, setApp] = useState<AppId | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [snapshot, setSnapshot] = useState("");
-  const [model, setModel] = useState<DesktopPricing | undefined>(initial);
+  const [model, setModel] = useState<
+    | Pick<
+        DesktopPricing,
+        "model_name" | "supported_endpoint_types" | "endpoints"
+      >
+    | undefined
+  >(initial);
   const [protocol, setProtocol] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<DesktopError | null>(null);
@@ -87,15 +90,16 @@ export function ConfigureTool({
     retry: false,
     staleTime: 0,
   });
-  const models = useDesktop<Models>(
+  const models = useDesktop<{
+    items: Pick<
+      DesktopPricing,
+      "model_name" | "supported_endpoint_types" | "endpoints"
+    >[];
+  }>(
     app ? state : { ...state, identity: null },
-    "/account/models",
-    {
-      page,
-      page_size: 100,
-      search,
-      snapshot_id: page > 1 ? snapshot : undefined,
-    },
+    `/account/keys/${keyDto.id}/models`,
+    {},
+    0,
   );
   const alive = useRef(true),
     lock = useRef(false),
@@ -108,23 +112,6 @@ export function ConfigureTool({
       abort.current.abort();
     };
   }, []);
-  useEffect(() => {
-    if (!models.data) return;
-    setSnapshot(models.data.data.snapshot_id);
-    if (models.data.data.snapshot_refreshed) {
-      setPage(1);
-      setModel(undefined);
-      setProtocol("");
-    }
-  }, [models.data]);
-  useEffect(() => {
-    if ((models.error as DesktopError | null)?.code === "snapshot_changed") {
-      setPage(1);
-      setSnapshot("");
-      setModel(undefined);
-      setProtocol("");
-    }
-  }, [models.error]);
   const existing =
     sources.data?.filter(
       (s) =>
@@ -133,35 +120,35 @@ export function ConfigureTool({
         s.tokenId === keyDto.id,
     ) ?? [];
   const targets = TUZI_TOOL_TARGETS.filter((t) => t.appId === app);
-  const compatible = (m: DesktopPricing) =>
-    targets.filter(
-      (t) =>
-        !tuziToolCompatibility(
-          keyDto,
-          m,
-          t.appId,
-          t.protocol,
-          undefined,
-          models.data?.data.pricing_meta,
-        ),
-    );
-  const choices = (models.data?.data.items ?? []).filter(
-    (m) => compatible(m).length > 0,
+  const compatible = (
+    m: Pick<DesktopPricing, "supported_endpoint_types" | "endpoints">,
+  ) => targets.filter((target) => supportsTuziProtocol(m, target.protocol));
+  const items = models.data?.data.items ?? [];
+  const matching = items.filter((m) =>
+    m.model_name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+  const choices = matching.filter((m) => compatible(m).length > 0);
+  const unknown = matching.filter(
+    (m) => !TUZI_TOOL_TARGETS.some((t) => supportsTuziProtocol(m, t.protocol)),
   );
   const selected = targets.find((t) => t.protocol === protocol);
+  const currentModel = items.find((m) => m.model_name === model?.model_name);
   const reason =
-    selected && model
-      ? tuziToolCompatibility(
-          keyDto,
-          model,
-          selected.appId,
-          selected.protocol,
-          undefined,
-          models.data?.data.pricing_meta,
-        )
+    selected &&
+    currentModel &&
+    compatible(currentModel).some((t) => t.protocol === selected.protocol)
+      ? null
       : "请选择可用模型";
   const proceed = async () => {
-    if (!selected || !model || reason || models.error || lock.current) return;
+    if (
+      !selected ||
+      !model ||
+      reason ||
+      models.error ||
+      models.isFetching ||
+      lock.current
+    )
+      return;
     lock.current = true;
     setBusy(true);
     setError(null);
@@ -216,6 +203,8 @@ export function ConfigureTool({
                 busy ||
                 !!reason ||
                 !!models.error ||
+                models.isFetching ||
+                !!unavailable ||
                 sources.isLoading ||
                 !!sources.error
               }
@@ -254,6 +243,7 @@ export function ConfigureTool({
                 key={id}
                 variant={app === id ? "secondary" : "outline"}
                 disabled={
+                  busy ||
                   sources.isLoading ||
                   !!sources.error ||
                   (!saved.length && !!unavailable)
@@ -267,8 +257,6 @@ export function ConfigureTool({
                   setModel(undefined);
                   setProtocol("");
                   setSearch("");
-                  setPage(1);
-                  setSnapshot("");
                   setError(null);
                 }}
               >
@@ -289,7 +277,7 @@ export function ConfigureTool({
         <div className="account-tool-options">
           <div className="space-y-2">
             <span className="text-sm font-medium">选择模型</span>
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <Popover modal open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -305,7 +293,7 @@ export function ConfigureTool({
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                className="z-[80] w-[var(--radix-popover-trigger-width)] p-0"
+                className="z-[80] w-[var(--radix-popover-trigger-width)] max-h-[var(--radix-popover-content-available-height)] overflow-hidden p-0"
                 onEscapeKeyDown={(event) => event.stopPropagation()}
               >
                 <Command shouldFilter={false}>
@@ -313,15 +301,9 @@ export function ConfigureTool({
                     aria-label="搜索模型"
                     placeholder="输入模型名称搜索…"
                     value={search}
-                    onValueChange={(value) => {
-                      setSearch(value);
-                      setPage(1);
-                      setSnapshot("");
-                      setModel(undefined);
-                      setProtocol("");
-                    }}
+                    onValueChange={setSearch}
                   />
-                  <CommandList>
+                  <CommandList className="max-h-[min(300px,calc(var(--radix-popover-content-available-height)-44px))] overscroll-contain">
                     {models.isFetching ? (
                       <p className="p-3 text-sm" role="status">
                         正在加载模型…
@@ -349,46 +331,43 @@ export function ConfigureTool({
                         </CommandItem>
                       ))
                     )}
-                    {!models.isFetching && !models.error && !choices.length && (
-                      <p className="p-3 text-sm">
-                        {search
-                          ? "没有匹配结果，请换个关键词。"
-                          : "暂无可用于此工具的模型。"}
-                      </p>
-                    )}
+                    {!models.isFetching &&
+                      !models.error &&
+                      unknown.map((m) => (
+                        <CommandItem
+                          key={m.model_name}
+                          value={m.model_name}
+                          disabled
+                        >
+                          {m.model_name} · 暂无法确认兼容性
+                        </CommandItem>
+                      ))}
+                    {!models.isFetching &&
+                      !models.error &&
+                      !choices.length &&
+                      !unknown.length && (
+                        <p className="p-3 text-sm">
+                          {search
+                            ? "没有匹配结果，请换个关键词。"
+                            : "暂无可用于此工具的模型。"}
+                        </p>
+                      )}
                   </CommandList>
                 </Command>
               </PopoverContent>
             </Popover>
           </div>
           <QueryState query={models} showUpdated={false} />
-          {(page > 1 || models.data?.data.pagination.has_more) && (
-            <div className="account-pager">
-              <Button
-                variant="outline"
-                disabled={page <= 1}
-                onClick={() => {
-                  setPage((p) => p - 1);
-                  setModel(undefined);
-                  setProtocol("");
-                }}
-              >
-                上一页
-              </Button>
-              <span>{page}</span>
-              <Button
-                variant="outline"
-                disabled={!models.data?.data.pagination.has_more}
-                onClick={() => {
-                  setPage((p) => p + 1);
-                  setModel(undefined);
-                  setProtocol("");
-                }}
-              >
-                下一页
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>已读取此 Key 的完整模型列表；按工具协议筛选。</span>
+            <Button
+              variant="link"
+              disabled={models.isFetching || busy}
+              onClick={() => void models.refetch()}
+            >
+              刷新模型
+            </Button>
+          </div>
           {model && compatible(model).length > 1 && (
             <label>
               接口格式
@@ -419,5 +398,17 @@ export function ConfigureTool({
         </div>
       )}
     </AccountDialog>
+  );
+}
+
+// Remount per account/Key so late reads or reveal results cannot cross selections.
+export function ConfigureTool(
+  props: ComponentProps<typeof ConfigureToolSession>,
+) {
+  return (
+    <ConfigureToolSession
+      key={`${props.state.generation}:${props.state.identity?.userId}:${props.keyDto.id}`}
+      {...props}
+    />
   );
 }

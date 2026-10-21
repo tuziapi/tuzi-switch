@@ -527,6 +527,9 @@ fn save_codex_route_inner(
         .map(str::trim)
         .filter(|config| !config.is_empty());
 
+    if let Some(config) = source_config {
+        codex_config::validate_provider_tables(config).map_err(|e| e.to_string())?;
+    }
     let route_draft = if let Some(config) = source_config {
         codex_config::save_route_to_config_with_provider_config(
             config,
@@ -596,14 +599,6 @@ fn save_codex_route_inner(
     let normalized_base_url = codex_active_provider_field(normalized_config, "base_url")
         .unwrap_or_else(|| baseUrl.clone());
 
-    // Write API key to shell rc
-    if !apiKey.is_empty() {
-        codex_config::write_managed_env_key(&normalized_env_key, &apiKey)
-            .map_err(|e| e.to_string())?;
-    }
-
-    codex_config::ensure_codex_provider_env_ready(normalized_config).map_err(|e| e.to_string())?;
-
     // Write route section to config.toml
     let existing = codex_config::read_codex_config_text().map_err(|e| e.to_string())?;
     let existing_with_edits = if source_config.is_some() {
@@ -629,6 +624,17 @@ fn save_codex_route_inner(
         Some(&modelReasoningEffort),
     )
     .map_err(|e| e.to_string())?;
+
+    codex_config::validate_provider_tables(&updated).map_err(|e| e.to_string())?;
+    codex_config::validate_provider_tables(&profile_config).map_err(|e| e.to_string())?;
+
+    // Write API key to shell rc
+    if !apiKey.is_empty() {
+        codex_config::write_managed_env_key(&normalized_env_key, &apiKey)
+            .map_err(|e| e.to_string())?;
+    }
+
+    codex_config::ensure_codex_provider_env_ready(normalized_config).map_err(|e| e.to_string())?;
 
     let profile_name = profileName
         .as_deref()

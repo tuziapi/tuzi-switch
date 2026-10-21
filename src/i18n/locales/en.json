@@ -2759,6 +2759,8 @@
     "connectRequired": "Connect to use account features. Tool management remains available.",
     "stagePending": "This page is not implemented yet. This stage provides account connection and state management.",
     "errors": {
+      "model_list_unavailable": "Unable to load models for this Key. Check its permissions or your connection, then refresh.",
+      "provider_selection_not_qualified": "This Key’s status, model access, or protocol has changed. Refresh the models and try again.",
       "generic": "The account service is unavailable. Retry or check its configuration.",
       "insufficient_scope": "Required permissions are missing. Ask the service administrator to check the desktop client configuration.",
       "unsupported_contract": "Client and account service versions are incompatible.",

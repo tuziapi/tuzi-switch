@@ -2061,6 +2061,46 @@ pub fn validate_config_toml(text: &str) -> Result<(), AppError> {
         .map_err(|e| AppError::toml(Path::new("config.toml"), e))
 }
 
+/// Reject incomplete provider tables before credentials or live files are written.
+/// An explicit empty [model_providers] parent is valid and is not a repair target.
+pub fn validate_provider_tables(text: &str) -> Result<(), AppError> {
+    let doc: toml::Table =
+        toml::from_str(text).map_err(|_| AppError::Config("TOML 格式不完整或有误".into()))?;
+    if let Some(value) = doc.get("model_providers") {
+        let providers = value
+            .as_table()
+            .ok_or_else(|| AppError::Config("model_providers 必须是配置表".into()))?;
+        for (id, value) in providers {
+            if value
+                .as_table()
+                .and_then(|p| p.get("name"))
+                .and_then(toml::Value::as_str)
+                .is_none_or(|n| n.trim().is_empty())
+            {
+                return Err(AppError::Config(format!(
+                    "供应商 {id} 缺少 name，请补齐或移除确认无用的残缺配置段"
+                )));
+            }
+        }
+    }
+    if let Some(id) = doc.get("model_provider") {
+        let id = id
+            .as_str()
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| AppError::Config("model_provider 无效".into()))?;
+        let found = doc
+            .get("model_providers")
+            .and_then(toml::Value::as_table)
+            .is_some_and(|p| p.contains_key(id));
+        if !found && !["openai", "ollama", "lmstudio"].contains(&id) {
+            return Err(AppError::Config(
+                "model_provider 没有对应的供应商配置段".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// 读取并校验 `~/.codex/config.toml`，返回文本（可能为空）
 pub fn read_and_validate_codex_config_text() -> Result<String, AppError> {
     let s = read_codex_config_text()?;
@@ -3900,6 +3940,26 @@ pub fn remove_codex_toml_base_url_if(toml_str: &str, predicate: impl Fn(&str) ->
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn provider_table_validation_accepts_parent_and_rejects_partial_edits() {
+        let valid = r#"model_provider = "custom"
+[model_providers]
+[model_providers.custom]
+name = "Synthetic"
+base_url = "https://example.invalid/v1"
+"#;
+        assert!(super::validate_provider_tables(valid).is_ok());
+        assert!(super::validate_provider_tables(&format!(
+            "{valid}[model_providers.custo]\nbase_url = \"https://example.invalid/v1\"\n"
+        ))
+        .is_err());
+        assert!(super::validate_provider_tables(&valid.replace(
+            "model_provider = \"custom\"",
+            "model_provider = \"missing\""
+        ))
+        .is_err());
+    }
+
     use super::*;
     use serial_test::serial;
     use std::sync::Mutex;

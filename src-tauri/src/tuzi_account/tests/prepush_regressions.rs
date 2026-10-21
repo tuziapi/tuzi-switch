@@ -34,7 +34,6 @@ async fn token_not_found_code_survives_http_200_without_masking_other_failures()
 struct CatalogFixture {
     mode: &'static str,
     batches: Arc<Mutex<Vec<Vec<String>>>>,
-    snapshots: Arc<Mutex<Vec<Option<String>>>>,
     entered: Arc<tokio::sync::Notify>,
     release: Arc<tokio::sync::Notify>,
 }
@@ -46,7 +45,20 @@ async fn catalog_server(
     CatalogFixture,
     tokio::task::JoinHandle<()>,
 ) {
-    async fn endpoint(State(f): State<CatalogFixture>, uri: axum::http::Uri) -> Response {
+    async fn endpoint(
+        State(f): State<CatalogFixture>,
+        uri: axum::http::Uri,
+        headers: axum::http::HeaderMap,
+    ) -> Response {
+        if uri.path() == "/v1/models" {
+            assert_eq!(headers["authorization"], "Bearer sk-SYNTHETIC_MODEL_KEY");
+            assert!(!headers.contains_key("New-Api-User"));
+        } else {
+            assert_eq!(
+                headers["authorization"],
+                format!("Bearer {SYNTHETIC_TOKEN}")
+            );
+        }
         if uri.path() == "/api/user/self/bootstrap" {
             return Json(json!({"success":true,"data":{"id":7,"username":"synthetic-user"}}))
                 .into_response();
@@ -54,56 +66,32 @@ async fn catalog_server(
         if uri.path() == "/api/token/9" {
             return Json(json!({"success":true,"data":{"id":9,"status":1,"group":"default","expired_time":-1,"remain_quota":100,"used_quota":0,"unlimited_quota":true,"model_limits_enabled":false,"model_limits":""}})).into_response();
         }
-        assert_eq!(uri.path(), "/api/pricing/models");
-        let query: Vec<_> = url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes())
-            .into_owned()
-            .collect();
-        let names: Vec<String> = query
-            .iter()
-            .filter(|(k, _)| k == "models")
-            .map(|(_, v)| v.clone())
-            .collect();
-        let snapshot = query
-            .iter()
-            .find(|(k, _)| k == "snapshot_id")
-            .map(|(_, v)| v.clone());
-        let index = {
-            let mut batches = f.batches.lock().unwrap();
-            batches.push(names.clone());
-            batches.len()
-        };
-        f.snapshots.lock().unwrap().push(snapshot);
-        // Match the real Go endpoint limit, including its failing HTTP status.
-        if names.len() > 3 || (index > 1 && f.mode == "error") {
-            return (StatusCode::BAD_REQUEST, Json(json!({"success":false}))).into_response();
+        if uri.path() == "/api/token/9/key" {
+            return Json(json!({"success":true,"data":{"key":"SYNTHETIC_MODEL_KEY"}}))
+                .into_response();
         }
-        if index > 1 && f.mode == "logout" {
+        assert_eq!(uri.path(), "/v1/models");
+        f.batches.lock().unwrap().push(vec!["complete-list".into()]);
+        if f.mode == "error" {
+            return (StatusCode::BAD_GATEWAY, Json(json!({"error":"synthetic"}))).into_response();
+        }
+        if f.mode == "logout" {
             f.entered.notify_one();
             f.release.notified().await;
         }
-        let mut items: Vec<_> = names.iter().map(|name| json!({
-            "model_name":name, "enable_groups":["default"], "supported_endpoint_types":["openai-response"]
+        let mut items: Vec<_> = (0..130).map(|n| json!({
+            "id":format!("synthetic-model-{n}"), "supported_endpoint_types":["openai-response"]
         })).collect();
-        if index > 1 {
-            match f.mode {
-                "missing" => {
-                    items.clear();
-                }
-                "protocol" => {
-                    items[0]["supported_endpoint_types"] = json!(["anthropic"]);
-                }
-                "group" => {
-                    items[0]["enable_groups"] = json!(["unavailable"]);
-                }
-                _ => {}
+        match f.mode {
+            "missing" => {
+                items.clear();
             }
+            "protocol" => {
+                items[0]["supported_endpoint_types"] = json!(["anthropic"]);
+            }
+            _ => {}
         }
-        Json(json!({
-            "success":true,"data":items,"pagination":{"total":names.len()},
-            "snapshot_id":if f.mode == "no_snapshot" { "" } else if index > 1 && f.mode == "snapshot" { "synthetic-new" } else { "synthetic-original" },
-            "snapshot_refreshed":index > 1 && f.mode == "refreshed",
-            "meta":{"usable_group":{"default":"Default"},"default_effective_group":"default"}
-        })).into_response()
+        Json(json!({"data":items})).into_response()
     }
     let fixture = CatalogFixture {
         mode,
@@ -122,18 +110,14 @@ async fn catalog_server(
 }
 
 #[tokio::test]
-async fn multi_model_qualification_batches_and_rejects_incomplete_or_changed_catalogs() {
+async fn complete_key_models_qualify_and_reject_missing_or_incompatible_models() {
     for (mode, count, expected) in [
         ("ok", 3, Ok(())),
         ("ok", 4, Ok(())),
         ("ok", 50, Ok(())),
         ("missing", 4, Err("provider_selection_not_qualified")),
         ("protocol", 4, Err("provider_selection_not_qualified")),
-        ("group", 4, Err("provider_selection_not_qualified")),
-        ("snapshot", 4, Err("snapshot_changed")),
-        ("refreshed", 4, Err("snapshot_changed")),
-        ("no_snapshot", 4, Err("invalid_response")),
-        ("error", 4, Err("invalid_request")),
+        ("error", 4, Err("model_list_unavailable")),
     ] {
         let (service, fixture, task) = catalog_server(mode).await;
         let names: Vec<_> = (0..count).map(|n| format!("synthetic-model-{n}")).collect();
@@ -145,23 +129,29 @@ async fn multi_model_qualification_batches_and_rejects_incomplete_or_changed_cat
             expected.as_ref().map_err(|e| *e),
             "{mode}/{count}"
         );
-        let batches = fixture.batches.lock().unwrap();
-        assert!(batches.iter().all(|b| !b.is_empty() && b.len() <= 3));
-        if expected.is_ok() {
-            assert_eq!(batches.iter().flatten().cloned().collect::<Vec<_>>(), names);
-        }
-        let snapshots = fixture.snapshots.lock().unwrap();
-        assert_eq!(snapshots[0], None);
-        assert!(snapshots
-            .iter()
-            .skip(1)
-            .all(|id| id.as_deref() == Some("synthetic-original")));
+        assert_eq!(fixture.batches.lock().unwrap().len(), 1);
         task.abort();
     }
 }
 
 #[tokio::test]
-async fn multi_model_qualification_rejects_logout_between_batches() {
+async fn key_model_listing_returns_all_models_without_secret() {
+    let (service, _, task) = catalog_server("ok").await;
+    let result = service
+        .business_request(request(
+            service.state().generation,
+            "GET",
+            "/account/keys/9/models",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(result["data"]["items"].as_array().unwrap().len(), 130);
+    assert!(!result.to_string().contains("SYNTHETIC_MODEL_KEY"));
+    task.abort();
+}
+
+#[tokio::test]
+async fn key_model_qualification_rejects_logout_during_fetch() {
     let (service, fixture, task) = catalog_server("logout").await;
     let worker = service.clone();
     let pending = tokio::spawn(async move {

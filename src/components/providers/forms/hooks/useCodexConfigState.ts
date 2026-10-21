@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { parse as parseToml } from "smol-toml";
+import { useState, useCallback, useEffect } from "react";
 import {
   extractCodexBaseUrl,
   setCodexBaseUrl as setCodexBaseUrlInConfig,
@@ -7,9 +8,7 @@ import {
   getCodexEnvKey,
   getCodexProviderEnvKeyFromSettings,
   migrateCodexExperimentalBearerToken,
-  removeCodexExperimentalBearerToken,
 } from "@/utils/providerConfigUtils";
-import { normalizeTomlText } from "@/utils/textNormalization";
 import { invoke } from "@tauri-apps/api/core";
 import type { CodexCatalogModel } from "@/types";
 
@@ -56,60 +55,7 @@ function migrateLegacyConfig(configStr: string): string {
     );
   }
 
-  // Extract model_provider name from top-level
-  const providerMatch = result.match(/^\s*model_provider\s*=\s*"([^"]+)"/m);
-  if (!providerMatch) return result.trim() + "\n";
-  const providerName = providerMatch[1];
-
-  // Extract model and model_reasoning_effort from top-level
-  const modelMatch = result.match(/^\s*model\s*=\s*"([^"]+)"/m);
-  const effortMatch = result.match(
-    /^\s*model_reasoning_effort\s*=\s*"([^"]+)"/m,
-  );
-  const model = modelMatch?.[1] || "gpt-6-astra";
-  const effort = effortMatch?.[1] || "high";
-
-  // Build new format
-  const output: string[] = [];
-  output.push(`model_provider = "${providerName}"`);
-  output.push(`model = "${model}"`);
-  output.push(`model_reasoning_effort = "${effort}"`);
-  output.push(`disable_response_storage = true`);
-  output.push("");
-
-  // Preserve existing provider references; missing names are allocated on save.
-  const lines = result.split("\n");
-  let inModelProviders = false;
-  let wroteModelProviders = false;
-
-  for (const line of lines) {
-    if (line.trim().startsWith("[model_providers.")) {
-      inModelProviders = true;
-      wroteModelProviders = true;
-      output.push(line);
-      continue;
-    }
-    if (inModelProviders) {
-      if (
-        line.trim().startsWith("[") &&
-        !line.trim().startsWith("[model_providers.")
-      ) {
-        inModelProviders = false;
-        output.push(line);
-      } else {
-        output.push(line);
-      }
-    }
-  }
-
-  if (!wroteModelProviders) {
-    output.push(`[model_providers.${providerName}]`);
-    output.push(`name = "${providerName}"`);
-    output.push(`wire_api = "responses"`);
-    output.push(`requires_openai_auth = false`);
-  }
-
-  return output.join("\n");
+  return result;
 }
 
 /**
@@ -135,9 +81,6 @@ export function useCodexConfigState({
     useState<CodexCredentialStatus>(initialData ? "loading" : "idle");
   const [codexCredentialError, setCodexCredentialError] = useState("");
   const [credentialReloadToken, setCredentialReloadToken] = useState(0);
-
-  const isUpdatingCodexBaseUrlRef = useRef(false);
-  const isUpdatingCodexModelNameRef = useRef(false);
 
   // 初始化 Codex 配置（编辑模式）
   useEffect(() => {
@@ -276,18 +219,16 @@ export function useCodexConfigState({
     setCredentialReloadToken((value) => value + 1);
   }, []);
 
-  // 与 TOML 配置保持基础 URL 同步
+  // A partially typed document is a draft, never a request to repair it.
   useEffect(() => {
-    if (isUpdatingCodexBaseUrlRef.current) return;
-    const extracted = extractCodexBaseUrl(codexConfig) || "";
-    setCodexBaseUrl((prev) => (prev === extracted ? prev : extracted));
-  }, [codexConfig]);
-
-  // 与 TOML 配置保持模型名称同步
-  useEffect(() => {
-    if (isUpdatingCodexModelNameRef.current) return;
-    const extracted = extractCodexModelName(codexConfig) || "";
-    setCodexModelName((prev) => (prev === extracted ? prev : extracted));
+    try {
+      parseToml(codexConfig);
+    } catch {
+      return;
+    }
+    setCodexBaseUrl(extractCodexBaseUrl(codexConfig) || "");
+    setCodexModelName(extractCodexModelName(codexConfig) || "");
+    setCodexEnvKey(getCodexEnvKey(codexConfig) || "");
   }, [codexConfig]);
 
   // 验证 Codex Auth JSON (legacy compatibility)
@@ -334,11 +275,7 @@ export function useCodexConfigState({
     (url: string) => {
       const sanitized = url.trim();
       setCodexBaseUrl(sanitized);
-      isUpdatingCodexBaseUrlRef.current = true;
       setCodexConfig((prev) => setCodexBaseUrlInConfig(prev, sanitized));
-      setTimeout(() => {
-        isUpdatingCodexBaseUrlRef.current = false;
-      }, 0);
     },
     [setCodexConfig],
   );
@@ -347,36 +284,16 @@ export function useCodexConfigState({
     (modelName: string) => {
       const trimmed = modelName.trim();
       setCodexModelName(trimmed);
-      isUpdatingCodexModelNameRef.current = true;
       setCodexConfig((prev) => setCodexModelNameInConfig(prev, trimmed));
-      setTimeout(() => {
-        isUpdatingCodexModelNameRef.current = false;
-      }, 0);
     },
     [setCodexConfig],
   );
 
   const handleCodexConfigChange = useCallback(
     (value: string) => {
-      const normalized = removeCodexExperimentalBearerToken(
-        normalizeTomlText(value),
-      );
-      setCodexConfig(normalized);
-
-      if (!isUpdatingCodexBaseUrlRef.current) {
-        const extracted = extractCodexBaseUrl(normalized) || "";
-        if (extracted !== codexBaseUrl) setCodexBaseUrl(extracted);
-      }
-      if (!isUpdatingCodexModelNameRef.current) {
-        const extractedModel = extractCodexModelName(normalized) || "";
-        if (extractedModel !== codexModelName)
-          setCodexModelName(extractedModel);
-      }
-      // Sync env_key from config
-      const newEnvKey = getCodexEnvKey(normalized) || "";
-      if (newEnvKey !== codexEnvKey) setCodexEnvKey(newEnvKey);
+      setCodexConfig(value);
     },
-    [setCodexConfig, codexBaseUrl, codexModelName, codexEnvKey],
+    [setCodexConfig],
   );
 
   // 重置配置（用于预设切换时，新建模式下不预填充 key）

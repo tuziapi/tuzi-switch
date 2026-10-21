@@ -1655,6 +1655,15 @@ impl ProviderService {
     ) -> Result<bool, AppError> {
         let _operation = OperationGuard::acquire()?;
         let mut provider = provider;
+        if matches!(app_type, AppType::Codex) {
+            if let Some(text) = provider
+                .settings_config
+                .get("config")
+                .and_then(Value::as_str)
+            {
+                crate::codex_config::validate_provider_tables(text)?;
+            }
+        }
         let submitted_provider = provider.clone();
         let current = state.db.get_current_provider(app_type.as_str())?;
         // Normalize Claude model keys
@@ -1726,6 +1735,15 @@ impl ProviderService {
     ) -> Result<bool, AppError> {
         let _operation = OperationGuard::acquire()?;
         let mut provider = provider;
+        if matches!(app_type, AppType::Codex) {
+            if let Some(text) = provider
+                .settings_config
+                .get("config")
+                .and_then(Value::as_str)
+            {
+                crate::codex_config::validate_provider_tables(text)?;
+            }
+        }
         let submitted_provider = provider.clone();
         let original_id = original_id.unwrap_or(provider.id.as_str()).to_string();
         let provider_id_changed = original_id != provider.id;

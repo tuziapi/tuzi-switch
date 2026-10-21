@@ -438,3 +438,7 @@ API PR #277 已合入 dev；公开入口响应头 `x-new-api-version: dev-202610
 发布前本机 macOS 验证：`pnpm typecheck`、账户与工具配置 6 文件112项测试、updater 2项测试、`pnpm build:renderer`、内置图片兼容脚本3项Python测试通过；`cargo test --locked --lib tuzi_account` 40通过/1既有真实配对测试忽略，`cargo test --locked --lib services::tuzi_provider` 14通过，均使用合成数据。四份版本一致，`git diff --check` 通过。保留既有 React DOM 嵌套、浏览器数据和打包体积警告；不宣称完成三平台安装运行或新的真实账户联调。
 
 计划通过 v1.4.0 标签触发现有 Build & Release，生成 macOS Apple Silicon、Windows x86_64 和 Linux x86_64 安装包及已配置签名的更新清单；此条记录时远程构建/Release 尚未完成，以 GitHub 工作流和 Release 附件为准。历史未授权发布文字属于各阶段时点状态。旧 A 预览用户需重新粘贴系统令牌，原钥匙串不自动迁移或删除。回退保留旧 Release 和用户数据，客户端优先于 API，不重写标签、不清表或轮换令牌。
+
+## R02 v1.4.1 本地缺陷修复（2026-10-21）
+
+用户授权在 `codex/tuzi-assistant-system-token` 修复 Key 模型列表、下拉滚动和 Codex TOML 编辑/保存，并打开本地构建测试。客户端实现与145项前端、41项账户测试通过；全库原生1405通过、1项历史恢复测试失败、1忽略，明确保留限制。独立测试应用已构建并打开，API未改动，未推送/发布，实际Key及用户验收待完成。详见 [R02验证](r02-model-editor-verification.md) 和 [ADR-012](decisions/0012-key-model-list-and-toml-drafts.md)。

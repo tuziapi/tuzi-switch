@@ -676,6 +676,7 @@ fn validate_provider(app: &AppType, provider: &Provider) -> Result<(), AppError>
                     "Codex 账户配置不能夹带其他认证字段".into(),
                 ));
             }
+            crate::codex_config::validate_provider_tables(&toml)?;
             let doc = toml
                 .parse::<toml_edit::DocumentMut>()
                 .map_err(|_| AppError::Config("Codex TOML 无效".into()))?;

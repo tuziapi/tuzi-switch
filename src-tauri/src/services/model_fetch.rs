@@ -14,6 +14,10 @@ use std::time::Duration;
 pub struct FetchedModel {
     pub id: String,
     pub owned_by: Option<String>,
+    #[serde(default)]
+    pub supported_endpoint_types: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoints: Option<serde_json::Value>,
 }
 
 /// OpenAI 兼容的 /v1/models 响应格式
@@ -26,6 +30,10 @@ struct ModelsResponse {
 struct ModelEntry {
     id: String,
     owned_by: Option<String>,
+    #[serde(default)]
+    supported_endpoint_types: Option<Vec<String>>,
+    #[serde(default)]
+    endpoints: Option<serde_json::Value>,
 }
 
 const FETCH_TIMEOUT_SECS: u64 = 15;
@@ -82,23 +90,7 @@ pub async fn fetch_models(
         let status = response.status();
 
         if status.is_success() {
-            let resp: ModelsResponse = response
-                .json()
-                .await
-                .map_err(|e| format!("Failed to parse response: {e}"))?;
-
-            let mut models: Vec<FetchedModel> = resp
-                .data
-                .unwrap_or_default()
-                .into_iter()
-                .map(|m| FetchedModel {
-                    id: m.id,
-                    owned_by: m.owned_by,
-                })
-                .collect();
-
-            models.sort_by(|a, b| a.id.cmp(&b.id));
-            return Ok(models);
+            return read_models_response(response).await;
         }
 
         if status == StatusCode::NOT_FOUND || status == StatusCode::METHOD_NOT_ALLOWED {
@@ -115,6 +107,47 @@ pub async fn fetch_models(
         "All candidates failed: {}",
         last_err.unwrap_or_else(|| "no candidates".to_string())
     ))
+}
+
+/// Shared bounded decoder for manual model fetch and account-owned Key reads.
+/// Never expose response bodies (which can echo credentials) in account errors.
+pub(crate) async fn read_models_response(
+    mut response: reqwest::Response,
+) -> Result<Vec<FetchedModel>, String> {
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status().as_u16()));
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| "Model list read failed")?
+    {
+        if bytes.len() + chunk.len() > 8 * 1024 * 1024 {
+            return Err("Model list too large".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    decode_models(&bytes)
+}
+
+fn decode_models(bytes: &[u8]) -> Result<Vec<FetchedModel>, String> {
+    let response: ModelsResponse =
+        serde_json::from_slice(bytes).map_err(|_| "Failed to parse model list")?;
+    let entries = response.data.ok_or("Missing model list")?;
+    let mut models: Vec<_> = entries
+        .into_iter()
+        .filter(|m| !m.id.trim().is_empty())
+        .map(|m| FetchedModel {
+            id: m.id,
+            owned_by: m.owned_by,
+            supported_endpoint_types: m.supported_endpoint_types.unwrap_or_default(),
+            endpoints: m.endpoints,
+        })
+        .collect();
+    models.sort_by(|a, b| a.id.cmp(&b.id));
+    models.dedup_by(|a, b| a.id == b.id);
+    Ok(models)
 }
 
 /// 构造「模型列表端点」的候选 URL 列表

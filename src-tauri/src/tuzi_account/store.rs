@@ -21,7 +21,12 @@ const MAX_RECORD_BYTES: u64 = 64 * 1024;
 
 impl LocalFileStore {
     pub fn new(origin: &str, client: &str) -> Result<Self, AccountError> {
-        let root = dirs::data_local_dir().ok_or_else(AccountError::storage)?;
+        let root = std::env::var("CC_SWITCH_TEST_HOME")
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+            .map(|v| PathBuf::from(v.trim()).join(".local/share"))
+            .or_else(dirs::data_local_dir)
+            .ok_or_else(AccountError::storage)?;
         #[cfg(feature = "local-preview")]
         let application = "com.tuziswitch.desktop.preview";
         #[cfg(not(feature = "local-preview"))]

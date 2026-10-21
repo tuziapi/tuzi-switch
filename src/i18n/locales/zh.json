@@ -2759,6 +2759,8 @@
     "connectRequired": "连接账户后可使用账户功能，工具管理不受影响。",
     "stagePending": "此页面尚未实现；当前阶段仅提供账户连接与状态管理。",
     "errors": {
+      "model_list_unavailable": "无法获取此 Key 的模型列表，请检查密钥权限或网络后刷新。",
+      "provider_selection_not_qualified": "此 Key 的状态、模型权限或协议已变化，请刷新模型列表后重试。",
       "generic": "账户服务暂不可用，请重试或检查服务配置。",
       "insufficient_scope": "授权缺少必要权限，请联系服务管理员检查桌面客户端配置。",
       "unsupported_contract": "客户端与账户服务版本不兼容，请检查版本。",

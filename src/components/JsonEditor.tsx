@@ -3,13 +3,15 @@ import { EditorView, basicSetup } from "codemirror";
 import { json } from "@codemirror/lang-json";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { EditorState } from "@codemirror/state";
+import { Annotation, EditorState, Transaction } from "@codemirror/state";
 import { placeholder } from "@codemirror/view";
 import { linter, Diagnostic } from "@codemirror/lint";
 import { useTranslation } from "react-i18next";
 import { Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatJSON } from "@/utils/formatters";
+
+const externalSync = Annotation.define<boolean>();
 
 interface JsonEditorProps {
   id?: string;
@@ -37,6 +39,9 @@ const JsonEditor: React.FC<JsonEditorProps> = ({
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   // JSON linter 函数
   const jsonLinter = useMemo(
@@ -143,9 +148,12 @@ const JsonEditor: React.FC<JsonEditorProps> = ({
       sizingTheme,
       jsonLinter,
       EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
+        if (
+          update.docChanged &&
+          !update.transactions.some((tr) => tr.annotation(externalSync))
+        ) {
           const newValue = update.state.doc.toString();
-          onChange(newValue);
+          onChangeRef.current(newValue);
         }
       }),
     ];
@@ -213,14 +221,31 @@ const JsonEditor: React.FC<JsonEditorProps> = ({
   // 当 value 从外部改变时更新编辑器内容
   useEffect(() => {
     if (viewRef.current && viewRef.current.state.doc.toString() !== value) {
-      const transaction = viewRef.current.state.update({
-        changes: {
-          from: 0,
-          to: viewRef.current.state.doc.length,
-          insert: value,
-        },
+      const current = viewRef.current.state.doc.toString();
+      let from = 0;
+      while (
+        from < current.length &&
+        from < value.length &&
+        current[from] === value[from]
+      )
+        from++;
+      let oldEnd = current.length,
+        newEnd = value.length;
+      while (
+        oldEnd > from &&
+        newEnd > from &&
+        current[oldEnd - 1] === value[newEnd - 1]
+      ) {
+        oldEnd--;
+        newEnd--;
+      }
+      viewRef.current.dispatch({
+        changes: { from, to: oldEnd, insert: value.slice(from, newEnd) },
+        annotations: [
+          externalSync.of(true),
+          Transaction.addToHistory.of(false),
+        ],
       });
-      viewRef.current.dispatch(transaction);
     }
   }, [value]);
 

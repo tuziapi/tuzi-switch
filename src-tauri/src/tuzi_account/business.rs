@@ -82,6 +82,7 @@ fn allowed(method: &str, path: &str) -> bool {
                     ("GET" | "PATCH" | "DELETE", None)
                         | ("PATCH", Some("status"))
                         | ("POST", Some("reveal"))
+                        | ("GET", Some("models"))
                 );
             }
             if method == "GET" {
@@ -682,13 +683,7 @@ fn prefix_key(d: &mut Value) -> Result<(), BusinessError> {
     Ok(())
 }
 
-fn qualified_models(
-    key: &Value,
-    data: &Value,
-    names: &[String],
-    protocol: &str,
-    timestamp: i64,
-) -> Result<(), String> {
+fn validate_tool_key(key: &Value, timestamp: i64) -> Result<(), String> {
     let denied = || "provider_selection_not_qualified".to_string();
     if key["status"].as_i64() != Some(1) {
         return Err(denied());
@@ -706,12 +701,18 @@ fn qualified_models(
             return Err(denied());
         }
     }
-    let groups: Vec<&str> = key["group"]
-        .as_str()
-        .ok_or_else(denied)?
-        .split(',')
-        .map(str::trim)
-        .collect();
+    Ok(())
+}
+
+fn qualified_models(
+    key: &Value,
+    data: &Value,
+    names: &[String],
+    protocol: &str,
+    timestamp: i64,
+) -> Result<(), String> {
+    validate_tool_key(key, timestamp)?;
+    let denied = || "provider_selection_not_qualified".to_string();
     let limits: Vec<&str> = key["model_limits"]
         .as_str()
         .ok_or_else(denied)?
@@ -720,8 +721,6 @@ fn qualified_models(
         .filter(|s| !s.is_empty())
         .collect();
     let items = data["items"].as_array().ok_or_else(denied)?;
-    let meta = &data["pricing_meta"];
-    let visible = meta["usable_group"].as_object().ok_or_else(denied)?;
     for name in names {
         if key["model_limits_enabled"].as_bool() == Some(true)
             && !limits.is_empty()
@@ -733,21 +732,6 @@ fn qualified_models(
             .iter()
             .find(|m| m["model_name"].as_str() == Some(name.as_str()))
             .ok_or_else(denied)?;
-        let effective = meta["default_resolution"][name]["effective_group"]
-            .as_str()
-            .or_else(|| meta["default_effective_group"].as_str())
-            .unwrap_or("");
-        let enabled = model["enable_groups"].as_array().ok_or_else(denied)?;
-        if !groups.iter().any(|g| {
-            let g = if *g == "default" && !effective.is_empty() {
-                effective
-            } else {
-                *g
-            };
-            g != "auto" && visible.contains_key(g) && enabled.iter().any(|v| v.as_str() == Some(g))
-        }) {
-            return Err(denied());
-        }
         if !supports_protocol(model, protocol) {
             return Err(denied());
         }
@@ -775,53 +759,71 @@ impl AccountService {
         {
             return Err("invalid_provider_selection".into());
         }
-        let get = |path: String, query: Vec<(String, String)>| BusinessRequest {
-            method: "GET".into(),
-            path,
-            query,
-            body: None,
-            generation,
-            request_id: None,
-        };
-        let key = self
-            .business_request(get(format!("/account/keys/{token_id}"), vec![]))
+        let data = self
+            .key_model_catalog(generation, token_id)
             .await
             .map_err(|e| e.code)?;
-        // The website's exact-model lookup accepts at most three names.
-        // Pin multi-request validation to one snapshot, and never accept a
-        // partial result or combine refreshed snapshots before local writes.
-        const EXACT_MODELS_PER_REQUEST: usize = 3;
-        let mut snapshot: Option<String> = None;
-        for batch in selected_models.chunks(EXACT_MODELS_PER_REQUEST) {
-            let mut query = vec![
-                ("page".into(), "1".into()),
-                ("page_size".into(), "100".into()),
-            ];
-            query.extend(batch.iter().map(|m| ("models".into(), m.clone())));
-            if let Some(id) = &snapshot {
-                query.push(("snapshot_id".into(), id.clone()));
-            }
-            let models = self
-                .business_request(get("/account/models".into(), query))
-                .await
-                .map_err(|e| e.code)?;
-            let data = &models["data"];
-            if selected_models.len() > EXACT_MODELS_PER_REQUEST {
-                let id = data["snapshot_id"]
-                    .as_str()
-                    .filter(|id| !id.is_empty())
-                    .ok_or("invalid_response")?;
-                if data["snapshot_refreshed"] == true
-                    || snapshot.as_ref().is_some_and(|previous| previous != id)
-                {
-                    return Err("snapshot_changed".into());
-                }
-                snapshot = Some(id.to_owned());
-            }
-            qualified_models(&key["data"], data, batch, protocol, now())?;
-        }
-        Ok(())
+        qualified_models(&data["key"], &data, selected_models, protocol, now())
     }
+
+    // Fixed origin, owned Key only. Listing does not reveal the secret to the
+    // renderer or create/consume the one-use proof used by provider_save.
+    async fn key_model_catalog(
+        &self,
+        generation: u64,
+        token_id: &str,
+    ) -> Result<Value, BusinessError> {
+        let token = self.business_tokens(generation)?;
+        let request = |method, suffix: &str| {
+            self.http
+                .request(
+                    method,
+                    format!("{}/api/token/{}{}", self.origin, token_id, suffix),
+                )
+                .bearer_auth(&token.access_token)
+                .header("New-Api-User", &token.user_id)
+                .timeout(Duration::from_secs(15))
+        };
+        let detail = self
+            .business_response(request(reqwest::Method::GET, ""), false)
+            .await?;
+        let current_key = key(&detail["data"])?;
+        validate_tool_key(&current_key, now())
+            .map_err(|_| BusinessError::new("provider_selection_not_qualified", false))?;
+        self.business_tokens(generation)?;
+        let revealed = self
+            .business_response(request(reqwest::Method::POST, "/key"), false)
+            .await?;
+        let mut secret = pick(&revealed["data"], "key");
+        prefix_key(&mut secret)?;
+        let secret =
+            zeroize::Zeroizing::new(secret["key"].as_str().ok_or_else(invalid)?.to_owned());
+        self.business_tokens(generation)?;
+        let response = self
+            .http
+            .get(format!("{}/v1/models", self.origin))
+            .bearer_auth(secret.as_str())
+            .timeout(Duration::from_secs(15))
+            .send()
+            .await
+            .map_err(|_| BusinessError::new("network_uncertain", false))?;
+        let models = crate::services::model_fetch::read_models_response(response)
+            .await
+            .map_err(|_| BusinessError::new("model_list_unavailable", false))?;
+        self.business_tokens(generation)?;
+        let limits: Vec<_> = current_key["model_limits"]
+            .as_str()
+            .unwrap_or("")
+            .split(',')
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .collect();
+        let items: Vec<_> = models.into_iter()
+            .filter(|m| current_key["model_limits_enabled"] != true || limits.is_empty() || limits.contains(&m.id.as_str()))
+            .map(|m| serde_json::json!({"model_name":m.id,"supported_endpoint_types":m.supported_endpoint_types,"endpoints":m.endpoints})).collect();
+        Ok(serde_json::json!({"items":items,"key":current_key}))
+    }
+
     fn business_tokens(&self, generation: u64) -> Result<Tokens, BusinessError> {
         self.load();
         let i = self.inner.lock().unwrap();
@@ -892,6 +894,32 @@ impl AccountService {
         }
         let readonly = request.method == "GET";
         let token = self.business_tokens(request.generation)?;
+        if let Some(token_id) = request
+            .path
+            .strip_prefix("/account/keys/")
+            .and_then(|p| p.strip_suffix("/models"))
+        {
+            if !request.query.is_empty() {
+                return Err(invalid());
+            }
+            if *cancellation.borrow() {
+                return Err(BusinessError::new("request_cancelled", false));
+            }
+            let result = tokio::select! {
+                result = self.key_model_catalog(request.generation, token_id) => result,
+                _ = cancellation.changed() => Err(BusinessError::new("request_cancelled", false)),
+            };
+            self.business_tokens(request.generation)?;
+            if let Err(e) = &result {
+                if matches!(
+                    e.code.as_str(),
+                    "invalid_token" | "account_disabled" | "identity_mismatch"
+                ) {
+                    self.fail(request.generation, AccountError::new(&e.code), true);
+                }
+            }
+            return result.map(|data| envelope(serde_json::json!({"items":data["items"]})));
+        }
         let route = Route::new(&request)?;
         if request.path == "/account/capabilities" {
             return Ok(envelope(capabilities()));
@@ -1211,7 +1239,6 @@ mod tests {
                         serde_json::json!({"status":2}),
                         serde_json::json!({"expired_time":99}),
                         serde_json::json!({"unlimited_quota":false,"remain_quota":"0"}),
-                        serde_json::json!({"group":"other"}),
                         serde_json::json!({"model_limits_enabled":true,"model_limits":"another-model"}),
                     ] {
                         let mut denied_key = key.clone();
@@ -1229,7 +1256,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_qualification_checks_current_key_models_and_virtual_default() {
+    fn provider_qualification_checks_current_key_and_token_catalog() {
         let mut key = serde_json::json!({"status":1,"expired_time":-1,"unlimited_quota":false,"remain_quota":"9007199254740993123","group":"default","model_limits_enabled":true,"model_limits":"synthetic-model"});
         let mut data = serde_json::json!({"items":[{"model_name":"synthetic-model","enable_groups":["vip"],"supported_endpoint_types":["openai-response"]}],"pricing_meta":{"usable_group":{"vip":"VIP"},"default_effective_group":"vip","default_resolution":{}}});
         let names = vec!["synthetic-model".into()];
@@ -1256,8 +1283,9 @@ mod tests {
         key["model_limits"] = serde_json::json!("other-model");
         assert!(qualified_models(&key, &data, &names, "responses", 100).is_err());
         key["model_limits"] = serde_json::json!("synthetic-model");
-        data["pricing_meta"]["usable_group"] = serde_json::json!({});
-        assert!(qualified_models(&key, &data, &names, "responses", 100).is_err());
+        // Group/virtual-default permissions are already enforced by /v1/models.
+        data["pricing_meta"] = Value::Null;
+        assert!(qualified_models(&key, &data, &names, "responses", 100).is_ok());
         assert!(qualified_models(&key, &data, &["missing".into()], "responses", 100).is_err());
     }
 }

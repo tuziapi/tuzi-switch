@@ -320,7 +320,7 @@ describe("B09 key workflow regressions", () => {
     ).toBeNull();
     expect(
       screen.queryByRole("option", { name: "missing-groups-fixture" }),
-    ).toBeNull();
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("option", { name: "compatible-fixture" }));
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
     await waitFor(() =>
