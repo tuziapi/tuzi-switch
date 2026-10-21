@@ -1690,8 +1690,17 @@ function ProviderFormFull({
           configObj.modelCatalog = { models: normalizedCatalogModels };
         }
         settingsConfig = JSON.stringify(configObj);
-      } catch {
-        toast.error(t("providerForm.codexSaveFailed"));
+      } catch (error) {
+        const detail =
+          typeof error === "string"
+            ? error
+            : error instanceof Error
+              ? error.message
+              : "";
+        const conflict =
+          detail.includes("Codex provider 标识") ||
+          detail.includes("Codex 凭证索引");
+        toast.error(conflict ? detail : t("providerForm.codexSaveFailed"));
         throw new Error("Codex configuration save failed");
       }
     } else if (appId === "gemini") {
@@ -2075,6 +2084,7 @@ function ProviderFormFull({
           preset.endpointCandidates?.[0] || "https://api.tu-zi.com/v1",
           envKey,
           "gpt-6-astra",
+          nextTuziRoute.routeId,
         );
         defaultApiKey = shellEnvKeys?.[envKey] ?? "";
         if (nextTuziRoute.index > 1) {
@@ -2091,6 +2101,7 @@ function ProviderFormFull({
           preset.endpointCandidates?.[0] || "https://api.tu-zi.com/coding",
           envKey,
           "gpt-6-astra",
+          nextCodingRoute.routeId,
         );
         defaultApiKey = shellEnvKeys?.[envKey] ?? "";
         if (nextCodingRoute.index > 1) {
@@ -2143,6 +2154,7 @@ function ProviderFormFull({
             preset.endpointCandidates?.[0] || "",
             envKey,
             "gpt-6-astra",
+            newRouteId,
           );
         }
       }

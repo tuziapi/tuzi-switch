@@ -44,13 +44,14 @@ export function generateThirdPartyConfig(
   baseUrl: string,
   envKey: string,
   modelName = "gpt-6-astra",
+  routeId = "custom",
 ): string {
-  return `model_provider = "custom"
+  return `model_provider = "${routeId}"
 model = "${modelName}"
 model_reasoning_effort = "high"
 disable_response_storage = true
 
-[model_providers.custom]
+[model_providers.${routeId}]
 name = "${providerName}"
 base_url = "${baseUrl}"
 env_key = "${envKey}"

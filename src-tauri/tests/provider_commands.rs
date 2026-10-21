@@ -877,72 +877,87 @@ fn codex_seed_and_legacy_tuzi_purge_keep_tuzi_route() {
 }
 
 #[test]
-fn save_codex_route_numbers_tuzi_route_without_overwriting_existing_tuzi() {
-    let _guard = test_mutex().lock().expect("acquire test mutex");
+fn save_codex_route_rejects_conflicting_live_route_before_writes() {
+    let _guard = test_mutex().lock().unwrap();
     reset_test_fs();
-    let _home = ensure_test_home();
-
-    let existing_config = r#"model_provider = "custom"
-model = "gpt-5.4"
-
-[model_providers.tuzi]
-name = "tuzi"
-base_url = "https://api.tu-zi.com/v1"
-env_key = "TUZI_CODEX_API_KEY"
-wire_api = "responses"
-requires_openai_auth = false
-
-[model_providers.custom]
-name = "custom"
-base_url = "https://api.tu-zi.com/coding"
-wire_api = "responses"
-requires_openai_auth = false
-"#;
-    write_codex_live_atomic(&json!({}), Some(existing_config)).expect("seed codex config");
-
-    let state = create_test_state().expect("create test state");
-
-    let saved_route = save_codex_route_test_hook(
+    let home = ensure_test_home();
+    let original = "model_provider = \"codex\"\n[model_providers.codex]\nname = \"Existing\"\nbase_url = \"https://existing.invalid/v1\"\n";
+    write_codex_live_atomic(&json!({}), Some(original)).unwrap();
+    let before = std::fs::read(get_codex_config_path()).unwrap();
+    let state = create_test_state().unwrap();
+    let before_env = std::fs::read(home.join(".zshrc")).ok();
+    let result = save_codex_route_test_hook(
         &state,
-        "tuzi".to_string(),
-        "https://api.tu-zi.com/v1".to_string(),
-        "TUZI_CODEX_API_KEY".to_string(),
-        "sk-test".to_string(),
-        "gpt-5.5".to_string(),
-        "high".to_string(),
-        Some("兔子线路-我的配置".to_string()),
+        "codex".into(),
+        "https://api.tu-zi.com/v1".into(),
+        "TUZI01_CODEX_API_KEY".into(),
+        "SYNTHETIC_R04".into(),
+        "gpt-6-astra".into(),
+        "high".into(),
+        Some("Synthetic".into()),
         None,
         None,
-    )
-    .expect("save codex route");
-    assert_eq!(saved_route.route_id, "provider-tuzi01");
-    assert_eq!(saved_route.env_key, "TUZI01_CODEX_API_KEY");
-    assert!(
-        saved_route
-            .config
-            .contains("model_provider = \"provider-tuzi01\""),
-        "returned config should match the normalized route so provider storage does not jump again"
     );
+    assert!(result.unwrap_err().contains("冲突"));
+    assert_eq!(std::fs::read(get_codex_config_path()).unwrap(), before);
+    assert_eq!(std::fs::read(home.join(".zshrc")).ok(), before_env);
+}
 
-    let config_text = std::fs::read_to_string(tuzi_switch_lib::get_codex_config_path())
-        .expect("read codex config");
-    assert!(
-        config_text.contains("[model_providers.tuzi]\nname = \"tuzi\"\nbase_url = \"https://api.tu-zi.com/v1\"\nenv_key = \"TUZI_CODEX_API_KEY\""),
-        "existing user-owned tuzi provider must be preserved"
-    );
-    assert!(
-        config_text.contains("[model_providers.provider-tuzi01]"),
-        "save_codex_route should register the next tuzi-switch route"
-    );
-    assert!(
-        config_text.contains("env_key = \"TUZI01_CODEX_API_KEY\""),
-        "save_codex_route should write the numbered env key"
-    );
-    let zshrc = std::fs::read_to_string(_home.join(".zshrc")).expect("read managed env rc");
-    assert!(
-        zshrc.contains("export TUZI01_CODEX_API_KEY='sk-test'"),
-        "save_codex_route should create the matching managed env key"
-    );
+#[test]
+fn save_codex_route_first_add_roundtrip_preserves_names_for_all_endpoints() {
+    let _guard = test_mutex().lock().unwrap();
+    for endpoint in [
+        "https://api.tu-zi.com/v1",
+        "https://api.tu-zi.com/coding",
+        "https://third-party.invalid/v1",
+    ] {
+        reset_test_fs();
+        let _home = ensure_test_home();
+        let state = create_test_state().unwrap();
+        let config = format!("model_provider = \"codex\"\nmodel = \"gpt-6-astra\"\n[model_providers.codex]\nname = \"My custom name\"\nbase_url = {endpoint:?}\nenv_key = \"SYNTHETIC_R04_KEY\"\nwire_api = \"responses\"\nrequires_openai_auth = false\n[mcp_servers.synthetic]\ncommand = \"synthetic\"\n");
+        let saved = save_codex_route_test_hook(
+            &state,
+            "codex".into(),
+            endpoint.into(),
+            "SYNTHETIC_R04_KEY".into(),
+            "SYNTHETIC_R04_VALUE".into(),
+            "gpt-6-astra".into(),
+            "high".into(),
+            Some("Synthetic R04".into()),
+            None,
+            Some(config),
+        )
+        .unwrap();
+        assert_eq!(saved.route_id, "codex");
+        let provider = Provider::with_id(
+            "synthetic-r04".into(),
+            "Synthetic R04".into(),
+            json!({"auth":{}, "config":saved.config}),
+            None,
+        );
+        ProviderService::add(&state, AppType::Codex, provider.clone(), false).unwrap();
+        let stored = state
+            .db
+            .get_provider_by_id(&provider.id, "codex")
+            .unwrap()
+            .unwrap();
+        for text in [
+            stored.settings_config["config"]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+            std::fs::read_to_string(get_codex_config_path()).unwrap(),
+        ] {
+            let parsed: toml::Table = toml::from_str(&text).unwrap();
+            assert_eq!(parsed["model_provider"].as_str(), Some("codex"));
+            assert_eq!(
+                parsed["model_providers"]["codex"]["name"].as_str(),
+                Some("My custom name")
+            );
+            assert!(parsed.contains_key("mcp_servers"));
+        }
+        ProviderService::update(&state, AppType::Codex, None, stored).unwrap();
+    }
 }
 
 #[test]

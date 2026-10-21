@@ -93,7 +93,7 @@ it("keeps the cursor and raw draft intact without generating provider fragments"
   const finalDraft =
     editor()
       .state.doc.toString()
-      .replace("[model_providers.custom]", "[model_providers.cd]") +
+      .replace(/\[model_providers\.[^\]]+\]/, "[model_providers.cd]") +
     '\n[mcp_servers.synthetic]\ncommand = "synthetic-command"\n';
   await act(async () =>
     editor().dispatch({

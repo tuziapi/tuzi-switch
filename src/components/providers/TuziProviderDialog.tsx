@@ -54,7 +54,13 @@ export function tuziCreationPrefill(
     settingsConfig = {
       auth: { OPENAI_API_KEY: draft.key },
       env: { envKey },
-      config: generateThirdPartyConfig("兔子线路", endpoint, envKey, model),
+      config: generateThirdPartyConfig(
+        "兔子线路",
+        endpoint,
+        envKey,
+        model,
+        `tuzi-${suffix.toLowerCase()}`,
+      ),
     };
   } else if (draft.appId === "gemini")
     settingsConfig = {

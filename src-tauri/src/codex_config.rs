@@ -1311,7 +1311,9 @@ fn build_model_provider_section(
             )));
         };
 
-        table["name"] = toml_edit::value(route_id);
+        if !table.contains_key("name") {
+            table["name"] = toml_edit::value(route_id);
+        }
         table["base_url"] = toml_edit::value(base_url);
         if !table.contains_key("wire_api") {
             table["wire_api"] = toml_edit::value("responses");
