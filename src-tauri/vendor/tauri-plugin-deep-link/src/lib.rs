@@ -541,7 +541,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R, Option<config::Config>> {
         .on_event(|_app, _event| {
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             if let tauri::RunEvent::Opened { urls } = _event {
-    
+
                 emit_import_urls(_app, urls);
                 _app.state::<DeepLink<R>>()
                     .current

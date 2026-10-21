@@ -84,7 +84,8 @@ export function useApiKeyLink({
     // 再按 category 模糊匹配
     if (!formWebsiteUrl && category) {
       const matchedPreset = presetEntries.find(
-        (entry) => entry.preset.category === category && (entry.preset as any).apiKeyUrl,
+        (entry) =>
+          entry.preset.category === category && (entry.preset as any).apiKeyUrl,
       );
       if (matchedPreset) {
         return (matchedPreset.preset as any).apiKeyUrl || "";

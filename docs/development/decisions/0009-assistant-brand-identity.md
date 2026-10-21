@@ -1,5 +1,11 @@
 # ADR-009：兔子助手显示名称与既有安装身份兼容
 
+## 2026-10-21 正式 Windows 发行身份核正（R01）
+
+首次发布流水线暴露 MSI light.exe 打包失败。下文旧中文名推导只针对未覆盖的本地配置，遗漏 `scripts/tauri-release-config.cjs --desktop-product-name` 从 v1.3.1 起实际将 Windows/Linux 产品名覆盖为 `tuzi switch`。因此正式 MSI 旧身份应为 UUIDv5 DNS(`tuzi switch.exe.app.x64`) = `9462cc07-4102-53d3-9279-a97d4fe6a920`，安装目录及注册表路径由模板 `{{product_name}}` 取实际发行名称。
+
+本次恢复模板参数化并固定真实旧 UpgradeCode，避免在默认 en-US MSI 中新增不可编码的中文目录/键名，也避免新版使用另一升级代码。保留应用内“兔子助手”和现有正式安装包英文名称。v1.4.0 标签保持原样且未发布，修正随 v1.4.1 重建；新增 Windows verbose 日志以保留打包诊断。最终是否解决打包失败以真实 Windows Actions 为准，MSI 实机升级仍不冒称已验收。
+
 日期：2026-10-19（Asia/Shanghai）；状态：已采纳；任务 B10；基线 `TA-AC-1.5-B4` / 契约 `system-token-v1`。
 
 用户确认四项本地修改：统一显示名称、账户兔子图标、网站令牌柔和高亮、移除工具页账户返回提示。本次不改变认证、协议或工具配置事务。

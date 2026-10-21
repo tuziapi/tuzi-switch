@@ -71,13 +71,13 @@
         <Property Id="ARPURLUPDATEINFO" Value="{{homepage}}"/>
         {{/if}}
 
-        <!-- Keep legacy install/registry identity while the displayed product name changes. -->
+        <!-- The release config keeps product_name at the published Windows identity. -->
         <Property Id="INSTALLDIR">
           <!-- First attempt: Search for "InstallDir" -->
-          <RegistrySearch Id="PrevInstallDirWithName" Root="HKCU" Key="Software\\{{manufacturer}}\\兔子switch" Name="InstallDir" Type="raw" />
+          <RegistrySearch Id="PrevInstallDirWithName" Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="InstallDir" Type="raw" />
 
           <!-- Second attempt: If the first fails, search for the default key value (this is how the nsis installer currently stores the path) -->
-          <RegistrySearch Id="PrevInstallDirNoName" Root="HKCU" Key="Software\\{{manufacturer}}\\兔子switch" Type="raw" />
+          <RegistrySearch Id="PrevInstallDirNoName" Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Type="raw" />
         </Property>
 
         <!-- launch app checkbox -->
@@ -113,12 +113,12 @@
                 <Component Id="ApplicationShortcutDesktop" Guid="*">
                     <Shortcut Id="ApplicationDesktopShortcut" Name="{{product_name}}" Description="Runs {{product_name}}" Target="[!Path]" WorkingDirectory="INSTALLDIR" />
                     <RemoveFolder Id="DesktopFolder" On="uninstall" />
-                    <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\兔子switch" Name="Desktop Shortcut" Type="integer" Value="1" KeyPath="yes" />
+                    <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Desktop Shortcut" Type="integer" Value="1" KeyPath="yes" />
                 </Component>
             </Directory>
             <Directory Id="LocalAppDataFolder">
                 <Directory Id="TauriLocalAppDataPrograms" Name="Programs">
-                    <Directory Id="INSTALLDIR" Name="兔子switch"/>
+                    <Directory Id="INSTALLDIR" Name="{{product_name}}"/>
                 </Directory>
             </Directory>
             <Directory Id="ProgramMenuFolder">
@@ -128,7 +128,7 @@
 
         <DirectoryRef Id="INSTALLDIR">
             <Component Id="RegistryEntries" Guid="*">
-                <RegistryKey Root="HKCU" Key="Software\\{{manufacturer}}\\兔子switch">
+                <RegistryKey Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}">
                     <RegistryValue Name="InstallDir" Type="string" Value="[INSTALLDIR]" KeyPath="yes" />
                 </RegistryKey>
                 <!-- Change the Root to HKCU for perUser installations -->
@@ -147,7 +147,7 @@
             </Component>
             <Component Id="Path" Guid="{{path_component_guid}}" Win64="$(var.Win64)">
                 <File Id="Path" Source="{{main_binary_path}}" KeyPath="no" Checksum="yes"/>
-                <RegistryValue Root="HKCU" Key="Software\{{manufacturer}}\兔子switch" Name="PathComponent" Type="integer" Value="1" KeyPath="yes" />
+                <RegistryValue Root="HKCU" Key="Software\{{manufacturer}}\{{product_name}}" Name="PathComponent" Type="integer" Value="1" KeyPath="yes" />
                 {{#each file_associations as |association| ~}}
                 {{#each association.ext as |ext| ~}}
                 <ProgId Id="{{../../product_name}}.{{ext}}" Advertise="yes" Description="{{association.description}}">
@@ -190,7 +190,7 @@
 							  On="uninstall" />
 
 				<RegistryValue Root="HKCU"
-							   Key="Software\\{{manufacturer}}\\兔子switch"
+							   Key="Software\\{{manufacturer}}\\{{product_name}}"
 							   Name="Uninstaller Shortcut"
 							   Type="integer"
 							   Value="1"
@@ -209,7 +209,7 @@
                     <ShortcutProperty Key="System.AppUserModel.ID" Value="{{bundle_id}}"/>
                 </Shortcut>
                 <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
-                <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\兔子switch" Name="Start Menu Shortcut" Type="integer" Value="1" KeyPath="yes"/>
+                <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Start Menu Shortcut" Type="integer" Value="1" KeyPath="yes"/>
            </Component>
         </DirectoryRef>
 

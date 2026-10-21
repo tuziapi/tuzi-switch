@@ -172,7 +172,7 @@ jobs:
           else
             RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --desktop-product-name)"
           fi
-          pnpm tauri build --config "$RELEASE_CONFIG"
+          pnpm tauri build --verbose --config "$RELEASE_CONFIG"
       - name: Collect assets
         shell: pwsh
         run: |

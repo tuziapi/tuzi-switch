@@ -294,10 +294,17 @@ export function getPresetModelDefaults(
 }
 
 export const opencodeProviderPresets: OpenCodeProviderPreset[] = [
-  ...([
-    ["Responses", "@ai-sdk/openai", "https://api.tu-zi.com/v1"],
-    ["Chat", "@ai-sdk/openai-compatible", "https://api.tu-zi.com/v1"],
-    ["Anthropic", "@ai-sdk/anthropic", "https://api.tu-zi.com/v1"],
-    ["Gemini", "@ai-sdk/google", "https://api.tu-zi.com"],
-  ] as const).map(([protocol, npm, baseURL]) => ({name: `兔子主站 · ${protocol}`, websiteUrl: "https://api.tu-zi.com", category: "third_party" as const, settingsConfig: {npm, options: {baseURL, apiKey: ""}, models: {}}})),
+  ...(
+    [
+      ["Responses", "@ai-sdk/openai", "https://api.tu-zi.com/v1"],
+      ["Chat", "@ai-sdk/openai-compatible", "https://api.tu-zi.com/v1"],
+      ["Anthropic", "@ai-sdk/anthropic", "https://api.tu-zi.com/v1"],
+      ["Gemini", "@ai-sdk/google", "https://api.tu-zi.com"],
+    ] as const
+  ).map(([protocol, npm, baseURL]) => ({
+    name: `兔子主站 · ${protocol}`,
+    websiteUrl: "https://api.tu-zi.com",
+    category: "third_party" as const,
+    settingsConfig: { npm, options: { baseURL, apiKey: "" }, models: {} },
+  })),
 ];

@@ -1,3 +1,13 @@
+# R01 v1.4.1 正式安装包已发布（2026-10-21）
+
+用户本轮授权的合并核查、版本更新、构建及 GitHub Release 发布完成。客户端 PR #48 已合入 main（`25b76e9be74c63ccc131be91ae3faa48811faf65`），API PR #277 已合入 dev（`70e5f2b2f624c7b721064cedc9994238973a8875`）。本次客户端发行代码/标签 `v1.4.1` 指向 `9b4e702b2ae973571221c9aa877f8fec0498c045`，契约仍为 `system-token-v1`；API 工作区未修改、未执行服务端部署或迁移。
+
+- [Build & Release 39569723161](https://github.com/tuziapi/tuzi-switch/actions/runs/39569723161) 全部成功，Windows MSI/NSIS、macOS Apple Silicon、Linux x86_64 安装包均生成并上传。
+- [兔子switch v1.4.1](https://github.com/tuziapi/tuzi-switch/releases/tag/v1.4.1) 于北京时间 2026-10-21 16:51 发布；非草稿、非预发布，GitHub latest 指向该版本。12 个附件涵盖安装包、三平台更新签名、安装脚本及 latest.json。
+- 已下载核对 Release latest.json 与 release-manifest 分支清单完全一致；版本 1.4.1，darwin-aarch64/windows-x86_64/linux-x86_64 三平台均具非空签名且下载 URL 对应实际附件。此处是清单/附件核查，未另做安装包签名密码学复验。
+- 发布前 typecheck、账户前端112项、更新器2项、图片回退脚本3项、Rust账户40项（另1项默认忽略）、供应商14项及 renderer build 通过。Windows 打包元数据修正后的三平台正式构建通过；未替用户安装覆盖应用，也未完成三平台安装/运行人工验收或完整产品验收。
+- v1.4.0 首次构建 Windows MSI 失败、未公开 Release，其标签保留；v1.4.1 恢复正式旧版英文发行产品名对应的 MSI 升级标识及参数化 WiX 路径，详见 ADR-009。旧账户 OAuth/钥匙串预览用户升级后需重新粘贴系统令牌，不自动迁移或删除旧钥匙串。
+
 # B13 本地账户配置文件与隐藏环境变量（2026-10-19）
 
 按用户明确要求，账户系统令牌改用原生独立本地JSON，不再访问钥匙串；旧用户首次需重新粘贴。Codex新增/编辑移除环境变量输入与说明，新增自动避重、编辑保留原名、旧缺失兼容。代码 `d7b41dcdbae715d9ece2762753ae339c16e8a8ff` 配对未修改API `21cd7acd51349407cdc5d332a763907d065f9a86`，两仓指定B分支、契约system-token-v1。47前端、35账户原生（1默认忽略）、29供应商原生、七工具隔离回归、类型和macOS构建通过；实际新包启动无账户钥匙串框、新增字段移除及最终重启恢复本地合成账户已核验，其他平台和用户验收未完成。保留先前未提交补丁；详见 [B13验证](local-account-file-verification.md) / [ADR-011](decisions/0011-local-account-file-and-hidden-codex-env.md)。未推送或发布。
@@ -70,6 +80,10 @@ B09后续三项微调代码完成：助手引导复制先提示“已复制，�
 # 以下为历史 A 进度（保留证据）
 
 # 当前阶段与跨仓库进度
+
+## R01 Windows 打包修正，版本改为 v1.4.1（2026-10-21）
+
+v1.4.0 工作流 `39566508003`：macOS/Linux 构建和产物上传成功；Windows release 程序编译通过，MSI light.exe 打包失败，publish-release 因依赖失败跳过，未创建公开 Release。对比 v1.3.1 发现 B10 WiX 模板硬编码中文安装目录/键名，且固定 UpgradeCode 与实际发行脚本的英文产品名不符。恢复 product_name 参数化、固定真实旧版正式 MSI UpgradeCode，并为 Windows 构建启用 verbose 日志；见 ADR-009 最新核正。v1.4.0 标签不重写，应用版本改为 v1.4.1 后重建。此前通过的业务测试继续适用，新增变更只涉及版本与安装打包元数据，真实打包结果以新工作流为准。
 
 基线 `TA-AC-1.5-B3`，更新2026-10-13。阶段：**G1本地开发检查点已交付（desktop-v1.1），本次独立验收发现两项待修复缺陷，暂不通过进入G2的检查；完整平台/环境验收受限，未发布。**
 
@@ -413,3 +427,14 @@ G3的T19/T20/T21与Q02/Q04/Q09环境门槛保持待办；不把本地通过等�
 ### B18 保留原发布文案
 
 用户明确要求撤回工作流中3处名称修改：两处Release标题及一处更新清单notes继续使用“兔子switch”，`.github/workflows/build.yml` 与目标main保持一致。客户端窗口/图标/账户品牌及其他已提交实现均保留；此次仅恢复发布文案，无运行逻辑改动。完成精确3处差异及diff检查后提交，再推送并创建目标main的PR。
+
+
+## R01 v1.4.0 安装包发布准备（2026-10-21）
+
+用户本轮明确授权检查已合并 PR、更新版本、构建安装包并发布 GitHub Release。客户端 PR #48 已于北京时间 2026-10-21 15:04 合入 main，合并 SHA `25b76e9be74c63ccc131be91ae3faa48811faf65`。本次从该 main 建立 `codex/release-1.4.0`，仅将 package.json、Tauri 配置、Cargo.toml 和 Cargo.lock 的应用版本由 1.3.1 同步更新至 1.4.0；使用显式 Git 操作，不执行带自动 push 的 npm version/postversion。基线 B4 / system-token-v1 不变。
+
+API PR #277 已合入 dev；公开入口响应头 `x-new-api-version: dev-20261020-09db95bd7440`，GitHub compare 确认该 SHA 包含 #277 合并提交 `70e5f2b2f624c7b721064cedc9994238973a8875`。这只核实公开入口版本标识，不替代所有实例或生产数据库验收。API 本地目录未修改。
+
+发布前本机 macOS 验证：`pnpm typecheck`、账户与工具配置 6 文件112项测试、updater 2项测试、`pnpm build:renderer`、内置图片兼容脚本3项Python测试通过；`cargo test --locked --lib tuzi_account` 40通过/1既有真实配对测试忽略，`cargo test --locked --lib services::tuzi_provider` 14通过，均使用合成数据。四份版本一致，`git diff --check` 通过。保留既有 React DOM 嵌套、浏览器数据和打包体积警告；不宣称完成三平台安装运行或新的真实账户联调。
+
+计划通过 v1.4.0 标签触发现有 Build & Release，生成 macOS Apple Silicon、Windows x86_64 和 Linux x86_64 安装包及已配置签名的更新清单；此条记录时远程构建/Release 尚未完成，以 GitHub 工作流和 Release 附件为准。历史未授权发布文字属于各阶段时点状态。旧 A 预览用户需重新粘贴系统令牌，原钥匙串不自动迁移或删除。回退保留旧 Release 和用户数据，客户端优先于 API，不重写标签、不清表或轮换令牌。

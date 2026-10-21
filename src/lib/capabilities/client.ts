@@ -53,9 +53,12 @@ export async function getCapabilityManifest(
 export async function invokeCapability<TData = unknown, TPayload = unknown>(
   request: CapabilityRequest<TPayload>,
 ): Promise<TData> {
-  const response = await invoke<CapabilityResponse<TData>>("invoke_capability", {
-    request,
-  });
+  const response = await invoke<CapabilityResponse<TData>>(
+    "invoke_capability",
+    {
+      request,
+    },
+  );
   if (!response.ok) {
     throw new Error(response.error?.message || "Capability invocation failed");
   }
@@ -72,24 +75,27 @@ export async function supportsCapability(
 }
 
 export function isVersionCompatible(version: string, range: string): boolean {
-  return range.split(/\s+/).filter(Boolean).every((rule) => {
-    if (rule.startsWith(">=")) {
-      return compareVersions(version, rule.slice(2)) >= 0;
-    }
-    if (rule.startsWith(">")) {
-      return compareVersions(version, rule.slice(1)) > 0;
-    }
-    if (rule.startsWith("<=")) {
-      return compareVersions(version, rule.slice(2)) <= 0;
-    }
-    if (rule.startsWith("<")) {
-      return compareVersions(version, rule.slice(1)) < 0;
-    }
-    if (rule.startsWith("=")) {
-      return compareVersions(version, rule.slice(1)) === 0;
-    }
-    return compareVersions(version, rule) === 0;
-  });
+  return range
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((rule) => {
+      if (rule.startsWith(">=")) {
+        return compareVersions(version, rule.slice(2)) >= 0;
+      }
+      if (rule.startsWith(">")) {
+        return compareVersions(version, rule.slice(1)) > 0;
+      }
+      if (rule.startsWith("<=")) {
+        return compareVersions(version, rule.slice(2)) <= 0;
+      }
+      if (rule.startsWith("<")) {
+        return compareVersions(version, rule.slice(1)) < 0;
+      }
+      if (rule.startsWith("=")) {
+        return compareVersions(version, rule.slice(1)) === 0;
+      }
+      return compareVersions(version, rule) === 0;
+    });
 }
 
 function compareVersions(a: string, b: string): number {
@@ -104,9 +110,5 @@ function compareVersions(a: string, b: string): number {
 
 function parseSemverCore(version: string): [number, number, number] {
   const parts = version.replace(/^v/, "").split("-")[0].split(".");
-  return [
-    Number(parts[0] || 0),
-    Number(parts[1] || 0),
-    Number(parts[2] || 0),
-  ];
+  return [Number(parts[0] || 0), Number(parts[1] || 0), Number(parts[2] || 0)];
 }

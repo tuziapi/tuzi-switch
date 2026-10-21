@@ -66,7 +66,10 @@ export function UpdateBadge({ className = "", onOpenAbout }: UpdateBadgeProps) {
       downloadedBytesRef.current += event.downloaded ?? 0;
       if (totalBytesRef.current > 0) {
         setProgress(
-          Math.min(100, (downloadedBytesRef.current / totalBytesRef.current) * 100),
+          Math.min(
+            100,
+            (downloadedBytesRef.current / totalBytesRef.current) * 100,
+          ),
         );
       }
       return;
