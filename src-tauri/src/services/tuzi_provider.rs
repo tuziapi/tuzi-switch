@@ -1845,6 +1845,7 @@ mod tests {
         let first_bytes = fs::read(&managed).unwrap();
         let mut second = provider(&AppType::Codex);
         second.name = "Synthetic second Codex".into();
+        second.settings_config["auth"]["OPENAI_API_KEY"] = json!("sk-synthetic-second-model-key-R07");
         second.settings_config["env"]["envKey"] = json!("TUZI_SWITCH_SECOND_CODEX_API_KEY");
         second.settings_config["config"] =
             json!(second.settings_config["config"].as_str().unwrap().replace(
@@ -1861,6 +1862,21 @@ mod tests {
         let both = fs::read_to_string(&managed).unwrap();
         assert!(both.contains("TUZI_SWITCH_SYNTHETIC_CODEX_API_KEY"));
         assert!(both.contains("TUZI_SWITCH_SECOND_CODEX_API_KEY"));
+        // Use the production async resolver used by model checks and proxying,
+        // after the real account save has stripped inline auth from the DB.
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        for (id, expected) in [
+            (&first.id, "sk-synthetic-model-key-T15"),
+            (&second.id, "sk-synthetic-second-model-key-R07"),
+        ] {
+            let stored = state.db.get_provider_by_id(id, "codex").unwrap().unwrap();
+            assert_eq!(stored.settings_config["auth"], json!({}));
+            let auth = runtime
+                .block_on(crate::proxy::providers::resolve_codex_auth(&stored))
+                .expect("saved provider credential must resolve");
+            assert_eq!(auth.api_key, expected);
+        }
+
         restore_backup(&state, &saved.backup_id).unwrap();
         assert_eq!(fs::read(managed).unwrap(), first_bytes);
         assert!(state
