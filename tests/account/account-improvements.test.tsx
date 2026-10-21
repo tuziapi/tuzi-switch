@@ -255,7 +255,7 @@ describe("B09 key workflow regressions", () => {
     expect(ready).not.toHaveBeenCalled();
     expect(desktopRequest).not.toHaveBeenCalled();
   });
-  it("does not mistake another account source for configured; filters incompatible models and forwards chosen tool", async () => {
+  it("does not mistake another account source for configured; mirrors manual Codex models and forwards chosen tool", async () => {
     vi.mocked(invoke).mockResolvedValue([
       {
         site: "https://api.tu-zi.com",
@@ -314,10 +314,10 @@ describe("B09 key workflow regressions", () => {
     await screen.findByRole("option", { name: "compatible-fixture" });
     expect(
       screen.queryByRole("option", { name: "incompatible-fixture" }),
-    ).toBeNull();
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("option", { name: "missing-protocol-fixture" }),
-    ).toBeNull();
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("option", { name: "missing-groups-fixture" }),
     ).toBeInTheDocument();

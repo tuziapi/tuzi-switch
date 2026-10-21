@@ -1105,7 +1105,13 @@ pub async fn tuzi_provider_save(
         .to_owned();
     let (protocol, models) = selected_models(&target, &provider)?;
     service
-        .provider_qualification(source.generation, &source.token_id, &models, protocol)
+        .provider_qualification(
+            source.generation,
+            &source.token_id,
+            &models,
+            protocol,
+            target.as_str(),
+        )
         .await?;
     service.with_confirmed_model_source(
         &source.user_id,

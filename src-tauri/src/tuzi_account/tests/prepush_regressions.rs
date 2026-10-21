@@ -122,7 +122,13 @@ async fn complete_key_models_qualify_and_reject_missing_or_incompatible_models()
         let (service, fixture, task) = catalog_server(mode).await;
         let names: Vec<_> = (0..count).map(|n| format!("synthetic-model-{n}")).collect();
         let result = service
-            .provider_qualification(service.state().generation, "9", &names, "responses")
+            .provider_qualification(
+                service.state().generation,
+                "9",
+                &names,
+                "responses",
+                "opencode",
+            )
             .await;
         assert_eq!(
             result.as_ref().map_err(String::as_str),
@@ -159,7 +165,13 @@ async fn key_model_qualification_rejects_logout_during_fetch() {
             .map(|n| format!("synthetic-model-{n}"))
             .collect::<Vec<_>>();
         worker
-            .provider_qualification(worker.state().generation, "9", &names, "responses")
+            .provider_qualification(
+                worker.state().generation,
+                "9",
+                &names,
+                "responses",
+                "opencode",
+            )
             .await
     });
     tokio::time::timeout(Duration::from_secs(3), fixture.entered.notified())
@@ -169,4 +181,29 @@ async fn key_model_qualification_rejects_logout_during_fetch() {
     fixture.release.notify_one();
     assert_eq!(pending.await.unwrap(), Err("stale_account".into()));
     task.abort();
+}
+
+#[tokio::test]
+async fn codex_uses_key_membership_without_requiring_responses_metadata() {
+    for (mode, expected) in [
+        ("protocol", Ok(())),
+        ("missing", Err("provider_selection_not_qualified")),
+        ("error", Err("model_list_unavailable")),
+    ] {
+        let (service, _, task) = catalog_server(mode).await;
+        let result = service
+            .provider_qualification(
+                service.state().generation,
+                "9",
+                &["synthetic-model-0".into()],
+                "responses",
+                "codex",
+            )
+            .await;
+        assert_eq!(
+            result.as_ref().map(|_| ()).map_err(String::as_str),
+            expected
+        );
+        task.abort();
+    }
 }

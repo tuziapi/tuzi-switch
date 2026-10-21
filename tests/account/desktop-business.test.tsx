@@ -620,7 +620,7 @@ describe("business actions and secret lifetime", () => {
           })),
           ...["gpt-6.1-sol", "gpt-6-astra"].map((model_name) => ({
             model_name,
-            supported_endpoint_types: ["openai-response"],
+            supported_endpoint_types: ["openai"],
           })),
         ],
       }),
@@ -643,6 +643,9 @@ describe("business actions and secret lifetime", () => {
     fireEvent.click(screen.getByRole("combobox"));
     expect(await screen.findByText("gpt-6.1-sol")).toBeInTheDocument();
     expect(screen.getByText("gpt-6-astra")).toBeInTheDocument();
+    expect(screen.getAllByRole("option")).toHaveLength(132);
+    fireEvent.click(screen.getByRole("option", { name: "gpt-6-astra" }));
+    expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled();
     expect(
       vi
         .mocked(desktopRequest)

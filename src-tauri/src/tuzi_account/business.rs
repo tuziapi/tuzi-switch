@@ -710,6 +710,7 @@ fn qualified_models(
     names: &[String],
     protocol: &str,
     timestamp: i64,
+    require_protocol_metadata: bool,
 ) -> Result<(), String> {
     validate_tool_key(key, timestamp)?;
     let denied = || "provider_selection_not_qualified".to_string();
@@ -732,7 +733,7 @@ fn qualified_models(
             .iter()
             .find(|m| m["model_name"].as_str() == Some(name.as_str()))
             .ok_or_else(denied)?;
-        if !supports_protocol(model, protocol) {
+        if require_protocol_metadata && !supports_protocol(model, protocol) {
             return Err(denied());
         }
     }
@@ -748,6 +749,7 @@ impl AccountService {
         token_id: &str,
         selected_models: &[String],
         protocol: &str,
+        app: &str,
     ) -> Result<(), String> {
         if token_id.parse::<u64>().ok().filter(|n| *n > 0).is_none()
             || selected_models.is_empty()
@@ -763,7 +765,16 @@ impl AccountService {
             .key_model_catalog(generation, token_id)
             .await
             .map_err(|e| e.code)?;
-        qualified_models(&data["key"], &data, selected_models, protocol, now())
+        // Codex mirrors manual /v1/models selection. Metadata is descriptive,
+        // not a complete statement of relay Responses support.
+        qualified_models(
+            &data["key"],
+            &data,
+            selected_models,
+            protocol,
+            now(),
+            app != "codex",
+        )
     }
 
     // Fixed origin, owned Key only. Listing does not reveal the secret to the
@@ -1192,13 +1203,13 @@ mod tests {
         assert_eq!(listed, rechecked);
         let mut key = serde_json::json!({"status":1,"expired_time":-1,"unlimited_quota":true,"group":"default","model_limits":"","model_limits_enabled":false});
         let names = vec!["gpt-5.6-sol".into()];
-        assert!(qualified_models(&key, &rechecked, &names, "responses", 100).is_ok());
+        assert!(qualified_models(&key, &rechecked, &names, "responses", 100, true).is_ok());
         key["status"] = serde_json::json!(2);
-        assert!(qualified_models(&key, &rechecked, &names, "responses", 100).is_err());
+        assert!(qualified_models(&key, &rechecked, &names, "responses", 100, true).is_err());
         key["status"] = serde_json::json!(1);
         key["model_limits_enabled"] = serde_json::json!(true);
         key["model_limits"] = serde_json::json!("another-model");
-        assert!(qualified_models(&key, &rechecked, &names, "responses", 100).is_err());
+        assert!(qualified_models(&key, &rechecked, &names, "responses", 100, true).is_err());
         for (k, v) in [
             ("page", "2"),
             ("search", "non-matching"),
@@ -1229,7 +1240,7 @@ mod tests {
                     .iter()
                     .any(|v| v == protocol);
                 assert_eq!(
-                    qualified_models(&key, &data, &names, protocol, 100).is_ok(),
+                    qualified_models(&key, &data, &names, protocol, 100, true).is_ok(),
                     expected,
                     "case {} / {protocol}",
                     case["name"]
@@ -1247,7 +1258,8 @@ mod tests {
                             .unwrap()
                             .extend(patch.as_object().unwrap().clone());
                         assert!(
-                            qualified_models(&denied_key, &data, &names, protocol, 100).is_err()
+                            qualified_models(&denied_key, &data, &names, protocol, 100, true)
+                                .is_err()
                         );
                     }
                 }
@@ -1260,33 +1272,35 @@ mod tests {
         let mut key = serde_json::json!({"status":1,"expired_time":-1,"unlimited_quota":false,"remain_quota":"9007199254740993123","group":"default","model_limits_enabled":true,"model_limits":"synthetic-model"});
         let mut data = serde_json::json!({"items":[{"model_name":"synthetic-model","enable_groups":["vip"],"supported_endpoint_types":["openai-response"]}],"pricing_meta":{"usable_group":{"vip":"VIP"},"default_effective_group":"vip","default_resolution":{}}});
         let names = vec!["synthetic-model".into()];
-        assert!(qualified_models(&key, &data, &names, "responses", 100).is_ok());
+        assert!(qualified_models(&key, &data, &names, "responses", 100, true).is_ok());
         for alias in endpoint_aliases("responses") {
             data["items"][0]["supported_endpoint_types"] = serde_json::json!([alias]);
-            assert!(qualified_models(&key, &data, &names, "responses", 100).is_ok());
+            assert!(qualified_models(&key, &data, &names, "responses", 100, true).is_ok());
         }
         data["items"][0]["supported_endpoint_types"] = serde_json::json!(["openai"]);
-        assert!(qualified_models(&key, &data, &names, "responses", 100).is_err());
+        assert!(qualified_models(&key, &data, &names, "responses", 100, true).is_err());
         data["items"][0]["supported_endpoint_types"] = serde_json::json!(["openai-response"]);
         for protocol in ["chat", "gemini", "anthropic", "unknown"] {
-            assert!(qualified_models(&key, &data, &names, protocol, 100).is_err());
+            assert!(qualified_models(&key, &data, &names, protocol, 100, true).is_err());
         }
         key["status"] = serde_json::json!(2);
-        assert!(qualified_models(&key, &data, &names, "responses", 100).is_err());
+        assert!(qualified_models(&key, &data, &names, "responses", 100, true).is_err());
         key["status"] = serde_json::json!(1);
         key["expired_time"] = serde_json::json!(99);
-        assert!(qualified_models(&key, &data, &names, "responses", 100).is_err());
+        assert!(qualified_models(&key, &data, &names, "responses", 100, true).is_err());
         key["expired_time"] = serde_json::json!(-1);
         key["remain_quota"] = serde_json::json!("0");
-        assert!(qualified_models(&key, &data, &names, "responses", 100).is_err());
+        assert!(qualified_models(&key, &data, &names, "responses", 100, true).is_err());
         key["remain_quota"] = serde_json::json!("1");
         key["model_limits"] = serde_json::json!("other-model");
-        assert!(qualified_models(&key, &data, &names, "responses", 100).is_err());
+        assert!(qualified_models(&key, &data, &names, "responses", 100, true).is_err());
         key["model_limits"] = serde_json::json!("synthetic-model");
         // Group/virtual-default permissions are already enforced by /v1/models.
         data["pricing_meta"] = Value::Null;
-        assert!(qualified_models(&key, &data, &names, "responses", 100).is_ok());
-        assert!(qualified_models(&key, &data, &["missing".into()], "responses", 100).is_err());
+        assert!(qualified_models(&key, &data, &names, "responses", 100, true).is_ok());
+        assert!(
+            qualified_models(&key, &data, &["missing".into()], "responses", 100, true).is_err()
+        );
     }
 }
 

@@ -122,15 +122,22 @@ function ConfigureToolSession({
   const targets = TUZI_TOOL_TARGETS.filter((t) => t.appId === app);
   const compatible = (
     m: Pick<DesktopPricing, "supported_endpoint_types" | "endpoints">,
-  ) => targets.filter((target) => supportsTuziProtocol(m, target.protocol));
+  ) =>
+    app === "codex"
+      ? targets
+      : targets.filter((target) => supportsTuziProtocol(m, target.protocol));
   const items = models.data?.data.items ?? [];
   const matching = items.filter((m) =>
     m.model_name.toLowerCase().includes(search.trim().toLowerCase()),
   );
   const choices = matching.filter((m) => compatible(m).length > 0);
-  const unknown = matching.filter(
-    (m) => !TUZI_TOOL_TARGETS.some((t) => supportsTuziProtocol(m, t.protocol)),
-  );
+  const unknown =
+    app === "codex"
+      ? []
+      : matching.filter(
+          (m) =>
+            !TUZI_TOOL_TARGETS.some((t) => supportsTuziProtocol(m, t.protocol)),
+        );
   const selected = targets.find((t) => t.protocol === protocol);
   const currentModel = items.find((m) => m.model_name === model?.model_name);
   const reason =
@@ -359,7 +366,11 @@ function ConfigureToolSession({
           </div>
           <QueryState query={models} showUpdated={false} />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>已读取此 Key 的完整模型列表；按工具协议筛选。</span>
+            <span>
+              {app === "codex"
+                ? `已获取 ${items.length} 个模型，与“获取模型列表”一致。`
+                : "已读取此 Key 的完整模型列表；按工具协议筛选。"}
+            </span>
             <Button
               variant="link"
               disabled={models.isFetching || busy}

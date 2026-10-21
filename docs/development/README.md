@@ -50,3 +50,7 @@ B4 的批准来源为本轮目标文件（2026-10-18，`goal-objective.md`）：
 ## R02 v1.4.1 本地缺陷修复（2026-10-21）
 
 用户授权在 `codex/tuzi-assistant-system-token` 修复 Key 模型列表、下拉滚动和 Codex TOML 编辑/保存，并打开本地构建测试。客户端实现与145项前端、41项账户测试通过；全库原生1405通过、1项历史恢复测试失败、1忽略，明确保留限制。独立测试应用已构建并打开，API未改动，未推送/发布，实际Key及用户验收待完成。详见 [R02验证](r02-model-editor-verification.md) 和 [ADR-012](decisions/0012-key-model-list-and-toml-drafts.md)。
+
+## R03 Codex 模型列表实际验收纠正（2026-10-21）
+
+R02 用户实际验收未通过：额外协议过滤导致模型仍缺失。R03 将 Codex 展示/选择与手动获取列表统一，保存保持 Key 权限及成员检查，其他工具不变。前端96项、原生账户42项通过（1真实配对忽略），API未改，详见 [R03验证](r03-codex-model-list-verification.md)。实际账户验收仍待完成。
