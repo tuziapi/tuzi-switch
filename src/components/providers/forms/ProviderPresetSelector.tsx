@@ -155,7 +155,11 @@ export function ProviderPresetSelector({
       }
     }
 
-    return preset.websiteUrl || presetCategoryLabels[category] || t("providerPreset.other");
+    return (
+      preset.websiteUrl ||
+      presetCategoryLabels[category] ||
+      t("providerPreset.other")
+    );
   };
 
   return (

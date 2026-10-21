@@ -194,19 +194,117 @@ export function TuziProviderDialog({
   );
 }
 
-interface RecoveryEntry {backupId:string;app:string;providerId:string;createdAt:number;manualRecovery:boolean;backupPath:string}
-export function TuziProviderRecovery({appId}:{appId?:AppId}={}) {
- const client=useQueryClient();
- const [open,setOpen]=useState(false);
- const [selected,setSelected]=useState<RecoveryEntry|null>(null);
- const [busy,setBusy]=useState(false);
- const sources=useQuery({queryKey:['tuziProviderSources',appId],queryFn:()=>invoke<{site:string;userId:string;tokenId:string;app:string;providerId:string}[]>('tuzi_provider_sources',{app:appId??null}),enabled:open,staleTime:0});
- const backups=useQuery({queryKey:['tuziProviderBackups',appId],queryFn:()=>invoke<RecoveryEntry[]>('tuzi_provider_backups',{app:appId??null}),enabled:open,staleTime:0});
- return <><Button variant="outline" onClick={()=>setOpen(!open)}>工具配置备份与恢复</Button>{open&&<div className="space-y-2 rounded border p-3">
- <p className="text-sm">恢复会还原本次保存前的工具文件与供应商状态。检测到后续修改时停止，保留当前配置。</p>
- <p className="text-sm">已知本地来源关联（历史未关联卡片保持未知）：</p>{sources.data?.map(source=><p key={`${source.app}-${source.providerId}`} className="text-sm">{source.app} · {source.site} · 用户 {source.userId} · Key {source.tokenId} · 卡片 {source.providerId}</p>)}{sources.error&&<p role="alert">{String(sources.error)}</p>}
- {backups.isLoading&&<p>正在读取本机备份…</p>}{backups.error&&<p role="alert">{String(backups.error)}</p>}
- {backups.data?.length===0&&<p>暂无可恢复的本机备份。</p>}
- {backups.data?.map(entry=><div key={entry.backupId} className="flex items-center justify-between gap-2 text-sm"><span>{entry.app} · {new Date(entry.createdAt*1000).toLocaleString()} · {entry.backupId.slice(0,8)}</span><span>{entry.manualRecovery?`需人工核对：${entry.backupPath}`:<Button variant="outline" size="sm" disabled={busy} onClick={()=>setSelected(entry)}>恢复</Button>}</span></div>)}
- </div>}<ConfirmDialog isOpen={!!selected} title="恢复工具配置" message="确认恢复至该次保存前的完整状态？恢复会核对文件和数据库，若已被其他操作修改则中止。" confirmText="核对并恢复" cancelText="取消" onCancel={()=>setSelected(null)} onConfirm={async()=>{if(!selected||busy)return;setBusy(true);try{await invoke('tuzi_provider_restore',{backupId:selected.backupId});await client.invalidateQueries({queryKey:['providers']});await backups.refetch();toast.success('已恢复保存前配置');setSelected(null);}catch(error){toast.error(String(error));}finally{setBusy(false);}}}/></>;
+interface RecoveryEntry {
+  backupId: string;
+  app: string;
+  providerId: string;
+  createdAt: number;
+  manualRecovery: boolean;
+  backupPath: string;
+}
+export function TuziProviderRecovery({ appId }: { appId?: AppId } = {}) {
+  const client = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<RecoveryEntry | null>(null);
+  const [busy, setBusy] = useState(false);
+  const sources = useQuery({
+    queryKey: ["tuziProviderSources", appId],
+    queryFn: () =>
+      invoke<
+        {
+          site: string;
+          userId: string;
+          tokenId: string;
+          app: string;
+          providerId: string;
+        }[]
+      >("tuzi_provider_sources", { app: appId ?? null }),
+    enabled: open,
+    staleTime: 0,
+  });
+  const backups = useQuery({
+    queryKey: ["tuziProviderBackups", appId],
+    queryFn: () =>
+      invoke<RecoveryEntry[]>("tuzi_provider_backups", { app: appId ?? null }),
+    enabled: open,
+    staleTime: 0,
+  });
+  return (
+    <>
+      <Button variant="outline" onClick={() => setOpen(!open)}>
+        工具配置备份与恢复
+      </Button>
+      {open && (
+        <div className="space-y-2 rounded border p-3">
+          <p className="text-sm">
+            恢复会还原本次保存前的工具文件与供应商状态。检测到后续修改时停止，保留当前配置。
+          </p>
+          <p className="text-sm">
+            已知本地来源关联（历史未关联卡片保持未知）：
+          </p>
+          {sources.data?.map((source) => (
+            <p key={`${source.app}-${source.providerId}`} className="text-sm">
+              {source.app} · {source.site} · 用户 {source.userId} · Key{" "}
+              {source.tokenId} · 卡片 {source.providerId}
+            </p>
+          ))}
+          {sources.error && <p role="alert">{String(sources.error)}</p>}
+          {backups.isLoading && <p>正在读取本机备份…</p>}
+          {backups.error && <p role="alert">{String(backups.error)}</p>}
+          {backups.data?.length === 0 && <p>暂无可恢复的本机备份。</p>}
+          {backups.data?.map((entry) => (
+            <div
+              key={entry.backupId}
+              className="flex items-center justify-between gap-2 text-sm"
+            >
+              <span>
+                {entry.app} ·{" "}
+                {new Date(entry.createdAt * 1000).toLocaleString()} ·{" "}
+                {entry.backupId.slice(0, 8)}
+              </span>
+              <span>
+                {entry.manualRecovery ? (
+                  `需人工核对：${entry.backupPath}`
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => setSelected(entry)}
+                  >
+                    恢复
+                  </Button>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <ConfirmDialog
+        isOpen={!!selected}
+        title="恢复工具配置"
+        message="确认恢复至该次保存前的完整状态？恢复会核对文件和数据库，若已被其他操作修改则中止。"
+        confirmText="核对并恢复"
+        cancelText="取消"
+        onCancel={() => setSelected(null)}
+        onConfirm={async () => {
+          if (!selected || busy) return;
+          setBusy(true);
+          try {
+            await invoke("tuzi_provider_restore", {
+              backupId: selected.backupId,
+            });
+            await client.invalidateQueries({ queryKey: ["providers"] });
+            await backups.refetch();
+            toast.success("已恢复保存前配置");
+            setSelected(null);
+          } catch (error) {
+            toast.error(String(error));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    </>
+  );
 }
