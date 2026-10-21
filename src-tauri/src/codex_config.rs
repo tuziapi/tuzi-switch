@@ -1178,6 +1178,42 @@ pub fn save_route_to_config(
     )
 }
 
+pub(crate) fn merge_codex_config_edits(existing: &str, edited: &str) -> Result<String, AppError> {
+    fn merge_item(target: &mut toml_edit::Item, source: &toml_edit::Item) {
+        if let (Some(target_table), Some(source_table)) =
+            (target.as_table_like_mut(), source.as_table_like())
+        {
+            for (key, source_item) in source_table.iter() {
+                match target_table.get_mut(key) {
+                    Some(target_item) => merge_item(target_item, source_item),
+                    None => {
+                        target_table.insert(key, source_item.clone());
+                    }
+                }
+            }
+        } else {
+            *target = source.clone();
+        }
+    }
+
+    let mut target = if existing.trim().is_empty() {
+        DocumentMut::new()
+    } else {
+        existing
+            .parse::<DocumentMut>()
+            .map_err(|e| AppError::Config(format!("Invalid existing Codex config.toml: {e}")))?
+    };
+    let mut source = edited
+        .parse::<DocumentMut>()
+        .map_err(|e| AppError::Config(format!("Invalid edited Codex config.toml: {e}")))?;
+    // Other routes may be stale snapshots from backfill. Only the active route is
+    // replaced by save_route_to_config_with_provider_config, never deep-merged.
+    source.remove("model_providers");
+    source.remove("profiles");
+    merge_item(target.as_item_mut(), source.as_item());
+    Ok(target.to_string())
+}
+
 /// Save a route while preserving any future/optional fields already present
 /// under the provider's own `[model_providers.<route>]` table.
 pub fn save_route_to_config_with_provider_config(
@@ -1194,13 +1230,16 @@ pub fn save_route_to_config_with_provider_config(
     let provider_section =
         build_model_provider_section(route_id, base_url, env_key, provider_config)?;
 
-    let mut lines: Vec<String> = existing_config.lines().map(|l| l.to_string()).collect();
-
-    // Remove existing sections for this route
-    let profile_header = format!("[profiles.{}]", route_id);
-    let provider_header = format!("[model_providers.{}]", route_id);
-    lines = remove_section(&lines, &profile_header);
-    lines = remove_section(&lines, &provider_header);
+    // Remove the whole table structurally, including nested and quoted tables.
+    // A different card can own the same route ID with entirely different fields.
+    let mut existing = existing_config.parse::<DocumentMut>()
+        .map_err(|e| AppError::Config(format!("Invalid existing Codex config.toml: {e}")))?;
+    for key in ["profiles", "model_providers"] {
+        if let Some(table) = existing.get_mut(key).and_then(|item| item.as_table_like_mut()) {
+            table.remove(route_id);
+        }
+    }
+    let mut lines: Vec<String> = existing.to_string().lines().map(str::to_owned).collect();
 
     // Remove empty parent headers
     lines.retain(|l| l.trim() != "[profiles]" && l.trim() != "[model_providers]");
@@ -1332,41 +1371,13 @@ fn build_model_provider_section(
     }
     doc.as_table_mut().remove("experimental_bearer_token");
 
-    extract_model_provider_section_text(&doc.to_string(), route_id).ok_or_else(|| {
-        AppError::Message(format!(
-            "Failed to render Codex provider section for '{route_id}'"
-        ))
-    })
-}
-
-fn extract_model_provider_section_text(config_text: &str, route_id: &str) -> Option<String> {
-    let header = format!("[model_providers.{route_id}]");
-    let nested_prefix = format!("[model_providers.{route_id}.");
-    let mut result = Vec::new();
-    let mut in_section = false;
-
-    for line in config_text.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') {
-            if trimmed == header || trimmed.starts_with(&nested_prefix) {
-                in_section = true;
-            } else if in_section {
-                break;
-            }
-        }
-
-        if in_section {
-            result.push(line);
-        }
-    }
-
-    if result.is_empty() {
-        None
-    } else {
-        let mut text = result.join("\n");
-        text.push('\n');
-        Some(text)
-    }
+    let provider = doc["model_providers"][route_id].clone();
+    let mut isolated = DocumentMut::new();
+    let mut providers = toml_edit::Table::new();
+    providers.set_implicit(true);
+    providers.insert(route_id, provider);
+    isolated["model_providers"] = toml_edit::Item::Table(providers);
+    Ok(isolated.to_string())
 }
 
 /// Remove a route's [profiles.xxx] and [model_providers.xxx] sections from config.toml.
@@ -2798,14 +2809,8 @@ fn normalize_codex_live_config_model_provider_with_preferred_anchor<'a>(
     let stable_provider_id = stable_anchor.id.as_str();
 
     if stable_provider_id == source_provider_id {
-        if let Some(provider_table) = doc
-            .get_mut("model_providers")
-            .and_then(|item| item.as_table_mut())
-            .and_then(|providers| providers.get_mut(source_provider_id.as_str()))
-            .and_then(|item| item.as_table_mut())
-        {
-            apply_codex_provider_anchor_fields(provider_table, &stable_anchor);
-        }
+        // Same route does not mean same card. Preserve the newly selected card's
+        // display name instead of copying the previous card's history anchor name.
         return Ok(doc.to_string());
     }
 
@@ -5854,6 +5859,48 @@ X-TUZI-IMAGE-TOKEN = "stale"
         assert_eq!(
             provider.get("base_url").and_then(toml::Value::as_str),
             Some("https://production.api/v1")
+        );
+    }
+
+    #[test]
+    fn save_route_replaces_quoted_table_without_leaking_old_nested_fields() {
+        let existing = r#"model_provider = "custom"
+    [model_providers."custom"]
+    name = "Old"
+    base_url = "https://old.invalid/v1"
+    [model_providers."custom".http_headers]
+    x-old = "old"
+    [model_providers.other]
+    name = "Unrelated"
+    [mcp_servers.synthetic]
+    command = "synthetic"
+    "#;
+        let selected = r#"model_provider = "custom"
+    [model_providers."custom"]
+    name = "New"
+    wire_api = "responses"
+    "#;
+        let result = save_route_to_config_with_provider_config(
+            existing,
+            "custom",
+            "https://new.invalid/v1",
+            "SYNTHETIC_R08_KEY",
+            "gpt-6-astra",
+            "high",
+            Some(selected),
+        )
+        .unwrap();
+        let doc: toml::Table = toml::from_str(&result).unwrap();
+        let route = &doc["model_providers"]["custom"];
+        assert_eq!(route["name"].as_str(), Some("New"));
+        assert!(route.get("http_headers").is_none());
+        assert_eq!(
+            doc["model_providers"]["other"]["name"].as_str(),
+            Some("Unrelated")
+        );
+        assert_eq!(
+            doc["mcp_servers"]["synthetic"]["command"].as_str(),
+            Some("synthetic")
         );
     }
 

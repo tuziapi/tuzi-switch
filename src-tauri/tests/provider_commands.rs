@@ -877,7 +877,7 @@ fn codex_seed_and_legacy_tuzi_purge_keep_tuzi_route() {
 }
 
 #[test]
-fn save_codex_route_rejects_conflicting_live_route_before_writes() {
+fn save_codex_route_prepares_duplicate_route_without_changing_live() {
     let _guard = test_mutex().lock().unwrap();
     reset_test_fs();
     let home = ensure_test_home();
@@ -885,7 +885,7 @@ fn save_codex_route_rejects_conflicting_live_route_before_writes() {
     write_codex_live_atomic(&json!({}), Some(original)).unwrap();
     let before = std::fs::read(get_codex_config_path()).unwrap();
     let state = create_test_state().unwrap();
-    let before_env = std::fs::read(home.join(".zshrc")).ok();
+    let _ = home;
     let result = save_codex_route_test_hook(
         &state,
         "codex".into(),
@@ -898,9 +898,9 @@ fn save_codex_route_rejects_conflicting_live_route_before_writes() {
         None,
         None,
     );
-    assert!(result.unwrap_err().contains("冲突"));
+    assert_eq!(result.unwrap().route_id, "codex");
     assert_eq!(std::fs::read(get_codex_config_path()).unwrap(), before);
-    assert_eq!(std::fs::read(home.join(".zshrc")).ok(), before_env);
+
 }
 
 #[test]
@@ -914,6 +914,8 @@ fn save_codex_route_first_add_roundtrip_preserves_names_for_all_endpoints() {
         reset_test_fs();
         let _home = ensure_test_home();
         let state = create_test_state().unwrap();
+        // Preserve an existing Codex history anchor while testing card save semantics.
+        write_codex_live_atomic(&json!({}), Some("model_provider = \"codex\"\n[model_providers.codex]\nname = \"My custom name\"\n")).unwrap();
         let config = format!("model_provider = \"codex\"\nmodel = \"gpt-6-astra\"\n[model_providers.codex]\nname = \"My custom name\"\nbase_url = {endpoint:?}\nenv_key = \"SYNTHETIC_R04_KEY\"\nwire_api = \"responses\"\nrequires_openai_auth = false\n[mcp_servers.synthetic]\ncommand = \"synthetic\"\n");
         let saved = save_codex_route_test_hook(
             &state,
@@ -936,6 +938,7 @@ fn save_codex_route_first_add_roundtrip_preserves_names_for_all_endpoints() {
             None,
         );
         ProviderService::add(&state, AppType::Codex, provider.clone(), false).unwrap();
+        switch_provider_test_hook(&state, AppType::Codex, &provider.id).unwrap();
         let stored = state
             .db
             .get_provider_by_id(&provider.id, "codex")
@@ -1035,6 +1038,13 @@ trust_level = "untrusted"
         "managed route fields should still be updated"
     );
 
+    assert_eq!(std::fs::read_to_string(get_codex_config_path()).unwrap(), existing_live_config);
+    ProviderService::add(&state, AppType::Codex, Provider::with_id(
+        "edited-r08".into(), "兔子线路-我的配置".into(),
+        json!({"auth": {}, "config": saved_route.config}), None,
+    ), false).unwrap();
+
+    switch_provider_test_hook(&state, AppType::Codex, "edited-r08").unwrap();
     let live_config =
         std::fs::read_to_string(get_codex_config_path()).expect("read updated live config");
     assert!(
@@ -1669,5 +1679,101 @@ fn switch_provider_codex_missing_auth_returns_error_and_keeps_state() {
         current_id.as_deref(),
         Some("invalid"),
         "failed switch must not persist the invalid provider as current"
+    );
+}
+
+#[test]
+fn codex_same_route_cards_keep_credentials_and_replace_whole_active_table() {
+    let _guard = test_mutex().lock().unwrap();
+    reset_test_fs();
+    ensure_test_home();
+    let state = create_test_state().unwrap();
+    let prepare = |id: &str, extra: &str, editing: bool| {
+        let config = format!("model_provider = \"custom\"\nmodel = \"gpt-6-astra\"\n[model_providers.custom]\nname = {id:?}\nbase_url = \"https://{id}.invalid/v1\"\nenv_key = \"SYNTHETIC_R08_{id}_KEY\"\n{extra}\n");
+        let saved = save_codex_route_test_hook(
+            &state,
+            "custom".into(),
+            format!("https://{id}.invalid/v1"),
+            format!("SYNTHETIC_R08_{id}_KEY"),
+            format!("sk-synthetic-r08-{id}"),
+            "gpt-6-astra".into(),
+            "high".into(),
+            Some(id.into()),
+            editing.then(|| id.into()),
+            Some(config),
+        )
+        .unwrap();
+        Provider::with_id(
+            id.into(),
+            id.into(),
+            json!({"auth":{}, "config":saved.config}),
+            None,
+        )
+    };
+    write_codex_live_atomic(
+        &json!({}),
+        Some("[mcp_servers.synthetic]\ncommand = \"synthetic\"\n"),
+    )
+    .unwrap();
+    let a = prepare(
+        "A",
+        "request_max_retries = 7\n[model_providers.custom.http_headers]\nx-a = \"a\"",
+        false,
+    );
+    ProviderService::add(&state, AppType::Codex, a, false).unwrap();
+    switch_provider_test_hook(&state, AppType::Codex, "A").unwrap();
+    let first = std::fs::read(get_codex_config_path()).unwrap();
+    let b = prepare("B", "", false);
+    assert_eq!(std::fs::read(get_codex_config_path()).unwrap(), first);
+    ProviderService::add(&state, AppType::Codex, b, false).unwrap();
+    assert_eq!(std::fs::read(get_codex_config_path()).unwrap(), first);
+    let b = prepare("B", "request_max_retries = 2", true);
+    ProviderService::update(&state, AppType::Codex, None, b).unwrap();
+    assert_eq!(std::fs::read(get_codex_config_path()).unwrap(), first);
+    for id in ["B", "A", "B", "A"] {
+        switch_provider_test_hook(&state, AppType::Codex, id).unwrap();
+        let text = std::fs::read_to_string(get_codex_config_path()).unwrap();
+        let doc: toml::Table = toml::from_str(&text).unwrap();
+        let route = doc["model_providers"]["custom"].as_table().unwrap();
+        assert_eq!(route["name"].as_str(), Some(id));
+        assert_eq!(
+            route["base_url"].as_str().unwrap(),
+            format!("https://{id}.invalid/v1")
+        );
+        assert_eq!(
+            route["env_key"].as_str().unwrap(),
+            format!("SYNTHETIC_R08_{id}_KEY")
+        );
+        assert_eq!(
+            route["request_max_retries"].as_integer(),
+            Some(if id == "A" { 7 } else { 2 })
+        );
+        assert_eq!(route.contains_key("http_headers"), id == "A");
+        assert!(doc["mcp_servers"].get("synthetic").is_some());
+        let keys = read_all_codex_env_keys().unwrap();
+        assert_eq!(
+            keys.get("SYNTHETIC_R08_A_KEY").map(String::as_str),
+            Some("sk-synthetic-r08-A")
+        );
+        assert_eq!(
+            keys.get("SYNTHETIC_R08_B_KEY").map(String::as_str),
+            Some("sk-synthetic-r08-B")
+        );
+    }
+    let a = prepare("A", "request_max_retries = 9", true);
+    ProviderService::update(&state, AppType::Codex, None, a).unwrap();
+    let before_delete = std::fs::read(get_codex_config_path()).unwrap();
+    let doc: toml::Table = toml::from_str(std::str::from_utf8(&before_delete).unwrap()).unwrap();
+    assert_eq!(
+        doc["model_providers"]["custom"]["request_max_retries"].as_integer(),
+        Some(9)
+    );
+    assert!(doc["model_providers"]["custom"]
+        .get("http_headers")
+        .is_none());
+    ProviderService::delete(&state, AppType::Codex, "B").unwrap();
+    assert_eq!(
+        std::fs::read(get_codex_config_path()).unwrap(),
+        before_delete
     );
 }

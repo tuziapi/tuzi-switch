@@ -1851,7 +1851,7 @@ mod tests {
             json!(second.settings_config["config"].as_str().unwrap().replace(
                 "TUZI_SWITCH_SYNTHETIC_CODEX_API_KEY",
                 "TUZI_SWITCH_SECOND_CODEX_API_KEY"
-            ).replace("model_provider = \"custom\"", "model_provider = \"second\"").replace("[model_providers.custom]", "[model_providers.second]"));
+            ));
         state
             .db
             .set_setting("synthetic-unrelated", "preserve-me")

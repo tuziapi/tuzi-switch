@@ -247,71 +247,8 @@ pub(crate) fn normalize_codex_managed_provider_for_storage(
     provider: &mut Provider,
     exclude_provider_id: Option<&str>,
 ) -> Result<(), AppError> {
-    validate_codex_route_ownership(db, provider, exclude_provider_id)?;
-    normalize_codex_credential_for_storage(db, provider, exclude_provider_id)?;
-    validate_codex_route_ownership(db, provider, exclude_provider_id)
-}
-
-fn validate_codex_route_ownership(
-    db: &Database,
-    provider: &Provider,
-    exclude_provider_id: Option<&str>,
-) -> Result<(), AppError> {
-    let submitted = provider
-        .settings_config
-        .get("config")
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    let route = codex_active_route_id(submitted).unwrap_or_default();
-    if !route.is_empty() {
-        for (id, other) in db.get_all_providers(AppType::Codex.as_str())? {
-            if exclude_provider_id == Some(id.as_str()) {
-                continue;
-            }
-            let other_text = other
-                .settings_config
-                .get("config")
-                .and_then(Value::as_str)
-                .unwrap_or("");
-            if codex_active_route_id(other_text).as_deref() == Some(route.as_str()) {
-                return Err(AppError::Config(format!("Codex provider 标识 {route} 已被其他供应商使用，请修改 model_provider 和对应配置段后重试")));
-            }
-        }
-        // A live route not owned by this edited provider must not be overwritten.
-        let owns_route = exclude_provider_id
-            .map(|id| db.get_provider_by_id(id, AppType::Codex.as_str()))
-            .transpose()?
-            .flatten()
-            .and_then(|p| {
-                p.settings_config
-                    .get("config")
-                    .and_then(Value::as_str)
-                    .and_then(codex_active_route_id)
-            })
-            .as_deref()
-            == Some(route.as_str());
-        if !owns_route {
-            let live = crate::codex_config::read_codex_config_text()?;
-            let live_doc: toml::Table = toml::from_str(&live)
-                .map_err(|_| AppError::Config("现有 Codex 配置格式无效，请先检查配置".into()))?;
-            let draft_doc: toml::Table = toml::from_str(submitted)
-                .map_err(|_| AppError::Config("Codex 配置格式无效".into()))?;
-            let table = |doc: &toml::Table| {
-                doc.get("model_providers")
-                    .and_then(toml::Value::as_table)
-                    .and_then(|p| p.get(&route))
-                    .cloned()
-            };
-            if let Some(existing) = table(&live_doc) {
-                if Some(existing) != table(&draft_doc) {
-                    return Err(AppError::Config(format!(
-                        "Codex provider 标识 {route} 与现有配置冲突，请更换标识后重试"
-                    )));
-                }
-            }
-        }
-    }
-    Ok(())
+    // Provider IDs are local to each saved card; only credentials must be independent.
+    normalize_codex_credential_for_storage(db, provider, exclude_provider_id)
 }
 
 fn normalize_codex_credential_for_storage(
@@ -451,47 +388,6 @@ pub(crate) fn migrate_codex_provider_credential(
         return Ok(false);
     };
     crate::codex_config::copy_managed_env_key_if_missing(&previous_env_key, &normalized_env_key)
-}
-
-pub(crate) fn ensure_codex_provider_registered(provider: &Provider) -> Result<(), AppError> {
-    let obj = provider
-        .settings_config
-        .as_object()
-        .ok_or_else(|| AppError::Config("Codex 供应商配置必须是 JSON 对象".to_string()))?;
-    let config_str = obj.get("config").and_then(|v| v.as_str()).unwrap_or("");
-    if config_str.trim().is_empty() {
-        return Ok(());
-    }
-
-    let route_id = codex_active_route_id(config_str).unwrap_or_else(|| "tuziswitch".to_string());
-    let existing = crate::codex_config::read_codex_config_text().unwrap_or_default();
-    let mut env_key = codex_active_provider_string_field(config_str, "env_key").unwrap_or_default();
-    if env_key.is_empty() {
-        if let Some(env_obj) = provider.settings_config.get("env") {
-            if let Some(ek) = env_obj.get("envKey").and_then(|v| v.as_str()) {
-                env_key = ek.to_string();
-            }
-        }
-    }
-
-    let model =
-        codex_top_level_string_field(config_str, "model").unwrap_or_else(|| "gpt-5.5".to_string());
-    let effort = codex_top_level_string_field(config_str, "model_reasoning_effort")
-        .unwrap_or_else(|| "high".to_string());
-    let base_url = codex_active_provider_string_field(config_str, "base_url").unwrap_or_default();
-
-    let updated = crate::codex_config::save_route_to_config_with_provider_config(
-        &existing,
-        &route_id,
-        &base_url,
-        &env_key,
-        &model,
-        &effort,
-        Some(config_str),
-    )?;
-    crate::codex_config::write_codex_live_config_atomic(Some(&updated))?;
-    crate::codex_config::write_codex_profile_config(&provider.name, config_str)?;
-    Ok(())
 }
 
 pub(crate) fn sanitize_claude_settings_for_live(settings: &Value) -> Value {
@@ -1266,7 +1162,8 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
             }
 
             write_codex_profile_config(&provider.name, config_str)?;
-            let existing = read_codex_config_text().unwrap_or_default();
+            let existing = read_codex_config_text()?;
+            let existing = crate::codex_config::merge_codex_config_edits(&existing, config_str)?;
 
             let model = codex_top_level_string_field(config_str, "model")
                 .unwrap_or_else(|| "gpt-5.5".to_string());

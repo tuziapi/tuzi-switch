@@ -69,7 +69,7 @@ pub(crate) use live::{
 
 // Internal re-exports
 use live::{
-    ensure_codex_provider_registered, remove_hermes_provider_from_live,
+    remove_hermes_provider_from_live,
     remove_openclaw_provider_from_live, remove_opencode_provider_from_live, write_gemini_live,
 };
 use usage::validate_usage_script;
@@ -1708,11 +1708,6 @@ impl ProviderService {
         }
 
         // For other apps: Check if sync is needed (if this is current provider, or no current provider)
-        // 当前 Codex 供应商会在 write_live_with_common_config 中完成线路注册与
-        // profile 写入；这里只为非当前供应商预注册，避免首次保存重复落盘。
-        if matches!(app_type, AppType::Codex) && current.is_some() {
-            ensure_codex_provider_registered(&provider)?;
-        }
         if current.is_none() {
             // No current provider, set as current and sync
             state
@@ -1911,12 +1906,6 @@ impl ProviderService {
 
         // For other apps: Check if this is current provider (use effective current, not just DB)
         let is_current = effective_current.as_deref() == Some(provider.id.as_str());
-
-        // 非当前 Codex 供应商仍需预注册到配置中，便于之后切换；当前供应商
-        // 会在下方 live 写入时完成同一操作，不重复写 config/profile 文件。
-        if matches!(app_type, AppType::Codex) && !is_current {
-            ensure_codex_provider_registered(&provider)?;
-        }
 
         if is_current {
             // 如果 Claude 代理接管处于激活状态，并且代理服务正在运行：

@@ -70,3 +70,7 @@ R02 用户实际验收未通过：额外协议过滤导致模型仍缺失。R03 
 ## R07 Codex账户凭证读取（2026-10-21）
 
 修复账户生成的TUZI_SWITCH独立凭证引用被模型检查/代理读取规则拒绝的问题；旧引用和安全边界保留，无凭证迁移。定向回归及复用R06数据的R07测试包见 [R07验证](r07-codex-credential-verification.md)。本地实施，未发布。
+
+## R08 Codex 同名 provider（2026-10-21）
+
+不同卡片可使用相同 provider 标识，独立保存凭证，只有生效卡片写入当前配置；替代 R04 全局唯一和未启用预注册规则。见 [ADR-013](decisions/0013-codex-card-local-provider-ids.md)、[R08验证](r08-codex-duplicate-provider-verification.md)。API 契约不变，仅本地验证，未发布。

@@ -462,3 +462,7 @@ R02 用户实际验收未通过：额外协议过滤导致模型仍缺失。R03 
 ## R07 Codex账户凭证读取（2026-10-21）
 
 按用户修复及重新构建授权，新增TUZI_SWITCH独立引用识别并接入资格/缓存门；不再错误拒绝账户保存生成的env_key。58项Codex、14项账户工具、31项模型检查、29项供应商定向测试通过，包含真实隔离保存→数据库去明文→异步读取两条不同Key。API与搜索清空逻辑未改；R07沿用R06隔离数据，仍不切换日常Codex。详见 [R07记录](r07-codex-credential-verification.md)，无push/PR/发布，实际Key验收待用户执行。
+
+## R08 Codex 同名 provider（2026-10-21）
+
+用户批准不同供应商卡片共享 `custom` 等 TOML 标识，替代 R04 全局唯一及未启用预注册规则。保存与生效分离，启用时整体替换目标表，独立凭证和账户事务保留；同名往返切换、未启用编辑、删除、MCP及账户恢复合成回归通过。API、搜索清空未改；仅本地，未推送/发布，实际验收待用户完成。见 [R08验证](r08-codex-duplicate-provider-verification.md) 与 [ADR-013](decisions/0013-codex-card-local-provider-ids.md)。
