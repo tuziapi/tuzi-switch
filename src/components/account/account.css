@@ -1408,3 +1408,16 @@
     animation: none;
   }
 }
+
+/* Keep search feedback below the toolbar and reserve its height. */
+.account-key-search-feedback {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.account-key-search-feedback .animate-spin {
+  flex-shrink: 0;
+}

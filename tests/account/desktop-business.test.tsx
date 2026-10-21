@@ -139,6 +139,34 @@ describe("decimal money contract", () => {
   });
 });
 describe("identity-isolated native business queries", () => {
+  it("never retains previous rows across an account generation change", async () => {
+    vi.mocked(desktopRequest).mockResolvedValueOnce(env({ owner: "A" }));
+    const { wrapper } = setup();
+    const hook = renderHook(
+      ({ s, page }) =>
+        useDesktop<{ owner: string }>(
+          s,
+          "/account/keys",
+          { page },
+          30000,
+          false,
+          true,
+        ),
+      { wrapper, initialProps: { s: state, page: 1 } },
+    );
+    await waitFor(() => expect(hook.result.current.data?.data.owner).toBe("A"));
+    vi.mocked(desktopRequest).mockImplementation(() => new Promise(() => {}));
+    hook.rerender({ s: state, page: 2 });
+    expect(hook.result.current.data?.data.owner).toBe("A");
+    expect(hook.result.current.isPlaceholderData).toBe(true);
+    hook.rerender({
+      s: { ...state, generation: state.generation + 1 },
+      page: 2,
+    });
+    expect(hook.result.current.data).toBeUndefined();
+    hook.unmount();
+  });
+
   it("discards delayed results after identity changes and cancels old signal", async () => {
     let finish!: (v: Envelope<{ owner: string }>) => void;
     vi.mocked(desktopRequest).mockImplementationOnce(
@@ -654,6 +682,75 @@ describe("business actions and secret lifetime", () => {
             req.path === `/account/keys/${key.id}/models` && !req.query?.length,
         ),
     ).toBe(true);
+  });
+  it("waits for a complete suffix and retains rows while refreshing", async () => {
+    const page = env({
+      items: [key],
+      page: 1,
+      page_size: 20,
+      total: "1",
+      has_more: false,
+    });
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.path.endsWith("key-groups")) return env([]) as never;
+      if (
+        req.path === "/account/keys" &&
+        req.query?.some(([k]) => k === "token")
+      )
+        return new Promise(() => {});
+      return page as never;
+    });
+    const { wrapper } = setup();
+    render(<Keys state={state} />, { wrapper });
+    await screen.findByText("Synthetic key");
+    vi.mocked(desktopRequest).mockClear();
+    const input = screen.getByLabelText(zh.account.business.keyFilter.token);
+    fireEvent.change(input, { target: { value: "s" } });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 350));
+    });
+    expect(desktopRequest).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.change(input, { target: { value: "aB19" } });
+    await waitFor(() =>
+      expect(desktopRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/account/keys",
+          query: expect.arrayContaining([["token", "aB19"]]),
+        }),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByText("Synthetic key")).toBeInTheDocument();
+    expect(screen.queryByText("没有找到匹配的密钥")).toBeNull();
+  });
+  it("shows a retry instead of an empty-result message after a search failure", async () => {
+    vi.mocked(desktopRequest).mockImplementation(async (req) => {
+      if (req.path.endsWith("key-groups")) return env([]) as never;
+      if (
+        req.path === "/account/keys" &&
+        req.query?.some(([k]) => k === "keyword")
+      )
+        throw { code: "network_uncertain" };
+      return env({
+        items: [key],
+        page: 1,
+        page_size: 20,
+        total: "1",
+        has_more: false,
+      }) as never;
+    });
+    const { wrapper } = setup();
+    render(<Keys state={state} />, { wrapper });
+    await screen.findByText("Synthetic key");
+    fireEvent.change(
+      screen.getByLabelText(zh.account.business.keyFilter.keyword),
+      { target: { value: "test" } },
+    );
+    expect(
+      await screen.findByRole("button", { name: "重试" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("没有找到匹配的密钥")).toBeNull();
   });
   it("does not replay an uncertain create", async () => {
     vi.mocked(desktopRequest).mockImplementation(async (req) => {

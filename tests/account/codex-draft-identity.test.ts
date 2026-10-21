@@ -20,7 +20,7 @@ it("gives new account drafts independent routes and credentials before editing",
     ),
   );
   expect(first.model_provider).not.toBe(second.model_provider);
-  const table = (doc: ReturnType<typeof parse>) =>
+  const table = (doc: typeof first) =>
     (doc.model_providers as Record<string, Record<string, unknown>>)[
       String(doc.model_provider)
     ];

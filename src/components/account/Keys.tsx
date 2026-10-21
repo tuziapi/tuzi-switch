@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { LoaderCircle } from "lucide-react";
 import { AccountDialog } from "./AccountDialog";
 import { KeyEditor } from "./KeyEditor";
 import { displayAmount, useAccountCurrency } from "./AccountCurrency";
@@ -48,6 +49,35 @@ export function Keys({
     [original, setOriginal] = useState<KeyWrite | null>(null),
     [secret, setSecret] = useState(""),
     [secretSearch, setSecretSearch] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string>>(
+    {},
+  );
+  const [composing, setComposing] = useState(false);
+  const trimmedFilters = Object.fromEntries(
+    Object.entries(filters).map(([k, v]) => [k, v.trim()]),
+  );
+  const filterHint = secretSearch
+    ? "请输入名称或密钥最后 4 位，不要粘贴完整 Key。"
+    : trimmedFilters.token && trimmedFilters.token.length !== 4
+      ? "输满密钥最后 4 位后搜索。"
+      : trimmedFilters.keyword &&
+          new TextEncoder().encode(trimmedFilters.keyword).length < 2
+        ? "名称至少输入 2 个英文字母或 1 个汉字。"
+        : "";
+  const filterSignature = JSON.stringify(trimmedFilters);
+  const appliedSignature = JSON.stringify(appliedFilters);
+  const waiting = filterSignature !== appliedSignature;
+  useEffect(() => {
+    if (composing || filterHint || !waiting) return;
+    const timer = window.setTimeout(
+      () => {
+        setAppliedFilters(trimmedFilters);
+        setPage(1);
+      },
+      trimmedFilters.status !== appliedFilters.status ? 0 : 300,
+    );
+    return () => window.clearTimeout(timer);
+  }, [filterSignature, appliedSignature, composing, filterHint]);
   const [deleting, setDeleting] = useState<DesktopKey | null>(null);
   const writeLock = useRef(false);
   const currency = useAccountCurrency();
@@ -71,10 +101,17 @@ export function Keys({
       secretEpoch.current++;
     };
   }, []);
-  const list = useDesktop<Page<DesktopKey>>(state, "/account/keys", {
-    page,
-    ...filters,
-  });
+  const list = useDesktop<Page<DesktopKey>>(
+    state,
+    "/account/keys",
+    {
+      page,
+      ...appliedFilters,
+    },
+    30000,
+    false,
+    true,
+  );
   const detail = useDesktop<DesktopKey>(
     selected ? state : { ...state, identity: null },
     `/account/keys/${selected}`,
@@ -263,8 +300,6 @@ export function Keys({
   };
   return (
     <>
-      <QueryState query={list} />
-      {secretSearch && <p role="alert">{t("account.business.secretSearch")}</p>}
       <div className="account-key-toolbar">
         <div className="account-key-filters">
           {["keyword", "token", "group"].map((field) => (
@@ -275,18 +310,21 @@ export function Keys({
               value={filters[field] ?? ""}
               autoComplete="off"
               spellCheck={false}
+              aria-describedby="key-search-feedback"
+              onCompositionStart={() => setComposing(true)}
+              onCompositionEnd={() => setComposing(false)}
               onChange={(event) => {
                 const value = event.target.value;
                 if (
                   (field === "token" && !/^[A-Za-z0-9]{0,4}$/.test(value)) ||
-                  (field === "keyword" && /^sk-[A-Za-z0-9_-]{20,}$/.test(value))
+                  (field === "keyword" &&
+                    /^sk-[A-Za-z0-9_-]{20,}$/.test(value.trim()))
                 ) {
                   setSecretSearch(true);
                   return;
                 }
                 setSecretSearch(false);
                 setFilters((previous) => ({ ...previous, [field]: value }));
-                setPage(1);
                 setSelected(null);
                 clearSecret();
               }}
@@ -296,11 +334,11 @@ export function Keys({
             aria-label={t("account.business.keyFilter.status")}
             value={filters.status ?? ""}
             onChange={(event) => {
+              setSecretSearch(false);
               setFilters((previous) => ({
                 ...previous,
                 status: event.target.value,
               }));
-              setPage(1);
               setSelected(null);
               clearSecret();
             }}
@@ -337,7 +375,35 @@ export function Keys({
         </Button>
       </div>
 
-      <div className="account-table-scroll">
+      <div
+        id="key-search-feedback"
+        className="account-key-search-feedback"
+        role="status"
+        aria-live="polite"
+      >
+        {filterHint ? (
+          <span>{filterHint}</span>
+        ) : list.error && !waiting ? (
+          <>
+            <span>未能读取密钥列表，请重试。</span>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => void list.refetch()}
+            >
+              重试
+            </Button>
+          </>
+        ) : list.isFetching || waiting || composing ? (
+          <>
+            <LoaderCircle size={14} className="animate-spin" />
+            <span>正在更新列表…</span>
+          </>
+        ) : (
+          <span>{list.data ? `共 ${list.data.data.total} 个密钥` : ""}</span>
+        )}
+      </div>
+      <div className="account-table-scroll" aria-busy={list.isFetching}>
         <table className="account-key-table">
           <thead>
             <tr>
@@ -354,6 +420,17 @@ export function Keys({
             </tr>
           </thead>
           <tbody>
+            {!list.data && (
+              <tr>
+                <td colSpan={onConfigure ? 7 : 6}>
+                  <div className="account-keys-empty">
+                    {list.error
+                      ? "列表暂不可用，请点击重试。"
+                      : "正在读取密钥…"}
+                  </div>
+                </td>
+              </tr>
+            )}
             {list.data?.data.items.map((k) => (
               <tr key={k.id}>
                 <td>
@@ -472,59 +549,66 @@ export function Keys({
                 )}
               </tr>
             ))}
-            {list.data?.data.items.length === 0 && (
-              <tr>
-                <td colSpan={onConfigure ? 7 : 6}>
-                  <div className="account-keys-empty">
-                    <strong>
-                      {Object.values(filters).some(Boolean)
-                        ? "没有找到匹配的密钥"
-                        : "还没有 API 密钥"}
-                    </strong>
-                    <p>
-                      {Object.values(filters).some(Boolean)
-                        ? "调整筛选条件后再试试"
-                        : "创建一个密钥，即可用于 API 调用或配置到工具。"}
-                    </p>
-                    {!Object.values(filters).some(Boolean) && (
-                      <Button
-                        variant="outline"
-                        disabled={busy || !!error?.outcomeUnknown}
-                        onClick={() => {
-                          clear();
-                          setSelected(null);
-                          setOriginal(null);
-                          clearSecret();
-                          const g = groups.data?.data ?? [];
-                          setForm({
-                            ...defaultKey,
-                            group:
-                              g.find((x) => x.id === "default")?.id ??
-                              g[0]?.id ??
-                              "",
-                          });
-                        }}
-                      >
-                        创建第一个密钥
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            )}
+            {!list.isFetching &&
+              !waiting &&
+              !filterHint &&
+              !list.error &&
+              list.data?.data.items.length === 0 && (
+                <tr>
+                  <td colSpan={onConfigure ? 7 : 6}>
+                    <div className="account-keys-empty">
+                      <strong>
+                        {Object.values(filters).some(Boolean)
+                          ? "没有找到匹配的密钥"
+                          : "还没有 API 密钥"}
+                      </strong>
+                      <p>
+                        {Object.values(filters).some(Boolean)
+                          ? "调整筛选条件后再试试"
+                          : "创建一个密钥，即可用于 API 调用或配置到工具。"}
+                      </p>
+                      {!Object.values(filters).some(Boolean) && (
+                        <Button
+                          variant="outline"
+                          disabled={busy || !!error?.outcomeUnknown}
+                          onClick={() => {
+                            clear();
+                            setSelected(null);
+                            setOriginal(null);
+                            clearSecret();
+                            const g = groups.data?.data ?? [];
+                            setForm({
+                              ...defaultKey,
+                              group:
+                                g.find((x) => x.id === "default")?.id ??
+                                g[0]?.id ??
+                                "",
+                            });
+                          }}
+                        >
+                          创建第一个密钥
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
           </tbody>
         </table>
       </div>
-      {list.data && (page > 1 || list.data.data.has_more) && (
-        <Pager
-          page={page}
-          more={list.data.data.has_more}
-          onChange={(next) => {
-            clearSecret();
-            setPage(next);
-          }}
-        />
-      )}
+      {list.data &&
+        !waiting &&
+        !list.isPlaceholderData &&
+        (page > 1 || list.data.data.has_more) && (
+          <Pager
+            page={page}
+            more={list.data.data.has_more}
+            onChange={(next) => {
+              clearSecret();
+              setPage(next);
+            }}
+          />
+        )}
       <WriteError error={error} />
       <WriteError error={reveal.error} />
       {error?.outcomeUnknown && (

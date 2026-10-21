@@ -8,6 +8,7 @@ export function useDesktop<T>(
   query: Record<string, string | number | boolean | undefined> = {},
   staleTime = 30000,
   poll = false,
+  keepPrevious = false,
 ) {
   return useAccountRead(
     state,
@@ -27,6 +28,7 @@ export function useDesktop<T>(
       ),
     staleTime,
     poll,
+    keepPrevious,
   );
 }
 
@@ -38,6 +40,7 @@ export function useAccountRead<T>(
   read: (signal: AbortSignal) => Promise<T>,
   staleTime = 30000,
   poll = false,
+  keepPrevious = false,
 ) {
   const client = useQueryClient();
   const key = accountQueryKey(state, path, query);
@@ -70,6 +73,14 @@ export function useAccountRead<T>(
       !!state.identity &&
       ["connected", "refreshing"].includes(state.status),
     staleTime,
+    placeholderData: keepPrevious
+      ? (previous, previousQuery) =>
+          key
+            .slice(0, 7)
+            .every((part, index) => part === previousQuery?.queryKey[index])
+            ? previous
+            : undefined
+      : undefined,
     gcTime: 300000,
     retry: false,
     refetchOnWindowFocus: true,

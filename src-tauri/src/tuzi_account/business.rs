@@ -148,6 +148,17 @@ impl Route {
             }
         }
         let mut query = r.query.clone();
+        if p == "/account/keys" && r.method == "GET" {
+            for (name, value) in &mut query {
+                if name == "token" && !value.is_empty() {
+                    // Renderer supplies only the last four characters, never a Key.
+                    if value.len() != 4 || !value.bytes().all(|c| c.is_ascii_alphanumeric()) {
+                        return Err(BusinessError::new("invalid_key_suffix", false));
+                    }
+                    *value = format!("%{value}");
+                }
+            }
+        }
         let mut body = r.body.clone();
         if let Some(b) = body.as_mut() {
             let allowed = if p == "/account/profile" {
@@ -1173,6 +1184,28 @@ pub async fn account_open_web(app: tauri::AppHandle, target: String) -> Result<(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn key_suffix_is_mapped_to_a_suffix_pattern_without_accepting_full_secrets() {
+        let mut request = BusinessRequest {
+            method: "GET".into(),
+            path: "/account/keys".into(),
+            query: vec![("token".into(), "aB19".into())],
+            body: None,
+            generation: 1,
+            request_id: None,
+        };
+        let route = Route::new(&request).unwrap();
+        assert_eq!(route.path, "/api/token/");
+        assert_eq!(route.query, vec![("token".into(), "%aB19".into())]);
+        for value in ["s", "abc", "%abc", "abcde", "sk-SYNTHETIC_SECRET"] {
+            request.query[0].1 = value.into();
+            assert_eq!(
+                Route::new(&request).err().unwrap().code,
+                "invalid_key_suffix"
+            );
+        }
+    }
+
     use super::*;
     #[cfg(feature = "local-preview")]
     #[test]
