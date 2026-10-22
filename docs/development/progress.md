@@ -470,3 +470,11 @@ R02 用户实际验收未通过：额外协议过滤导致模型仍缺失。R03 
 ## R09 Codex 配置失败补偿（2026-10-21）
 
 用户明确授权修复后提交、推送并创建客户端目标 main 的 PR；不含合并或发布。普通表单准备不提前写Key；Codex普通保存/启用及供应商页代理热切换加入补偿，覆盖数据库、当前状态、配置文件和独立凭证；账户事务继续复用。逐写入点错误、数据库/代理备份错误及外部冲突回归通过。全库单元1415通过、1既有历史恢复失败、1忽略，详细限制见 [R09验证](r09-codex-transaction-verification.md) 与 [ADR-014](decisions/0014-codex-save-activation-compensation.md)。API与暂缓的搜索清空未改。
+
+## R10 v1.4.2 安装包发布（2026-10-22）
+
+用户明确授权重新构建并发布1.4.2。基于已合入main的PR #49（`4ca14359d45cfc63d28ecca04c4961de5df53e38`），在`codex/release-1.4.2`同步四处应用版本；保留生产应用标识、Windows安装升级标识与“兔子switch”发布标题。B4/system-token-v1及API不变；暂缓的后四位清空筛选问题不纳入。本轮发布授权覆盖必要的版本提交、推送、发布PR合并、标签和现有GitHub发布流水线，不执行npm version/postversion。
+
+本地类型检查、12文件143项前端回归、renderer构建、3项图片兼容Python测试通过。原生定向验证及远程构建结果见本节后续记录。此前全量原生测试1415通过/1既有历史恢复失败/1忽略，本轮不把它标记为已修复；三平台安装运行和真实账户付费调用未执行。发布说明见[1.4.2说明](release-1.4.2-notes.md)。流水线负责重新构建macOS ARM、Windows x86_64、Linux x86_64及更新清单；发布完成以GitHub Release和工作流结果为准。回退使用已发布旧安装包并保留数据，不重写标签或删除凭证。
+
+R10原生定向验证：`cargo test --locked --manifest-path src-tauri/Cargo.toml --lib services::tuzi_provider -- --test-threads=1` 19通过；`--test provider_commands -- --test-threads=1` 21通过。所有测试使用隔离合成配置。日志位于本机`/tmp/r10-{native,integration,front,typecheck,renderer}.log`，diff检查通过。此记录时尚未发布，不将本地验证冒充Release完成。
