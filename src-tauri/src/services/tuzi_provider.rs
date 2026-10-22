@@ -756,7 +756,10 @@ fn validate_provider(app: &AppType, provider: &Provider) -> Result<(), AppError>
         || endpoint.trim_end_matches('/') != expected
         || !key.starts_with("sk-")
         || key.contains(['\r', '\n'])
-        || !matches!(provider.category.as_deref(), Some("third_party" | "aggregator"))
+        || !matches!(
+            provider.category.as_deref(),
+            Some("third_party" | "aggregator")
+        )
     {
         return Err(AppError::Config(
             "账户 Key 配置必须使用主站兼容协议、固定端点和模型 Key".into(),
@@ -1486,7 +1489,8 @@ mod tests {
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap();
                 let before = db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap();
-                let current = super::super::ProviderService::current(&state, AppType::Codex).unwrap();
+                let current =
+                    super::super::ProviderService::current(&state, AppType::Codex).unwrap();
                 FAIL_WRITE_AT.with(|f| f.set(Some(failure_at)));
                 let result = match operation {
                     "add" => super::super::ProviderService::add(
@@ -1609,7 +1613,8 @@ mod tests {
         let _home = Home::new();
         let state = state();
         let provider = ordinary_codex("R09DB", "sk-synthetic-before");
-        super::super::ProviderService::add(&state, AppType::Codex, provider.clone(), false).unwrap();
+        super::super::ProviderService::add(&state, AppType::Codex, provider.clone(), false)
+            .unwrap();
         let files = write_set(&AppType::Codex, &provider)
             .unwrap()
             .into_iter()
@@ -1620,7 +1625,9 @@ mod tests {
         state.db.conn.lock().unwrap().execute_batch("CREATE TRIGGER synthetic_fail_update BEFORE UPDATE ON providers WHEN NEW.id='R09DB' BEGIN SELECT RAISE(ABORT,'synthetic database failure'); END;").unwrap();
         let mut changed = provider;
         changed.settings_config["auth"]["OPENAI_API_KEY"] = json!("sk-synthetic-after");
-        assert!(super::super::ProviderService::update(&state, AppType::Codex, None, changed).is_err());
+        assert!(
+            super::super::ProviderService::update(&state, AppType::Codex, None, changed).is_err()
+        );
         files_unchanged(&files).unwrap();
         assert_eq!(
             db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap(),
@@ -1709,11 +1716,19 @@ mod tests {
         let sources = read_provider_sources(&conn, None).unwrap();
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].provider_id, "existing");
-        assert!(read_provider_sources(&conn, Some("claude".into())).unwrap().is_empty());
-        conn.execute("DELETE FROM providers WHERE id='existing'", []).unwrap();
+        assert!(read_provider_sources(&conn, Some("claude".into()))
+            .unwrap()
+            .is_empty());
+        conn.execute("DELETE FROM providers WHERE id='existing'", [])
+            .unwrap();
         assert!(read_provider_sources(&conn, None).unwrap().is_empty());
         // Projection must preserve source history for transaction backups/recovery.
-        assert_eq!(conn.query_row("SELECT COUNT(*) FROM tuzi_provider_sources", [], |r| r.get::<_, i64>(0)).unwrap(), 3);
+        assert_eq!(
+            conn.query_row("SELECT COUNT(*) FROM tuzi_provider_sources", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            3
+        );
     }
     struct Home {
         _temp: tempfile::TempDir,
@@ -1796,27 +1811,68 @@ mod tests {
     fn actual_frontend_form_payloads_save_and_restore_all_seven_tools() {
         // These synthetic payloads are checked against actual React form submissions.
         for (app, payload) in [
-            (AppType::Claude, include_str!("../../../tests/fixtures/b11-provider-claude.json")),
-            (AppType::ClaudeDesktop, include_str!("../../../tests/fixtures/b11-provider-claude-desktop.json")),
-            (AppType::Codex, include_str!("../../../tests/fixtures/b11-provider-codex.json")),
-            (AppType::Gemini, include_str!("../../../tests/fixtures/b11-provider-gemini.json")),
-            (AppType::OpenCode, include_str!("../../../tests/fixtures/b11-provider-opencode.json")),
-            (AppType::OpenClaw, include_str!("../../../tests/fixtures/b11-provider-openclaw.json")),
-            (AppType::Hermes, include_str!("../../../tests/fixtures/b11-provider-hermes.json")),
+            (
+                AppType::Claude,
+                include_str!("../../../tests/fixtures/b11-provider-claude.json"),
+            ),
+            (
+                AppType::ClaudeDesktop,
+                include_str!("../../../tests/fixtures/b11-provider-claude-desktop.json"),
+            ),
+            (
+                AppType::Codex,
+                include_str!("../../../tests/fixtures/b11-provider-codex.json"),
+            ),
+            (
+                AppType::Gemini,
+                include_str!("../../../tests/fixtures/b11-provider-gemini.json"),
+            ),
+            (
+                AppType::OpenCode,
+                include_str!("../../../tests/fixtures/b11-provider-opencode.json"),
+            ),
+            (
+                AppType::OpenClaw,
+                include_str!("../../../tests/fixtures/b11-provider-openclaw.json"),
+            ),
+            (
+                AppType::Hermes,
+                include_str!("../../../tests/fixtures/b11-provider-hermes.json"),
+            ),
         ] {
             let _home = Home::new();
             let state = state();
             let provider: Provider = serde_json::from_str(payload).unwrap();
             #[cfg(not(any(target_os = "macos", windows)))]
-            if matches!(app, AppType::ClaudeDesktop) { continue; }
-            let plan = preview(&state, app.clone(), &provider).unwrap_or_else(|e| panic!("{} preview: {e}", app.as_str()));
-            assert!(plan.changes.iter().all(|value| !value.contains("sk-SYNTHETIC_ACCOUNT_MODEL_KEY")));
-            let saved = save_confirmed(&state, app.as_str().into(), provider.clone(), plan.id, &source())
-                .unwrap_or_else(|e| panic!("{} save: {e}", app.as_str()));
+            if matches!(app, AppType::ClaudeDesktop) {
+                continue;
+            }
+            let plan = preview(&state, app.clone(), &provider)
+                .unwrap_or_else(|e| panic!("{} preview: {e}", app.as_str()));
+            assert!(plan
+                .changes
+                .iter()
+                .all(|value| !value.contains("sk-SYNTHETIC_ACCOUNT_MODEL_KEY")));
+            let saved = save_confirmed(
+                &state,
+                app.as_str().into(),
+                provider.clone(),
+                plan.id,
+                &source(),
+            )
+            .unwrap_or_else(|e| panic!("{} save: {e}", app.as_str()));
             assert!(!saved.tested);
-            assert!(state.db.get_provider_by_id(&provider.id, app.as_str()).unwrap().is_some());
+            assert!(state
+                .db
+                .get_provider_by_id(&provider.id, app.as_str())
+                .unwrap()
+                .is_some());
             restore_backup(&state, &saved.backup_id).unwrap();
-            assert!(state.db.get_provider_by_id(&provider.id, app.as_str()).unwrap().is_none());
+            assert!(state
+                .db
+                .get_provider_by_id(&provider.id, app.as_str())
+                .unwrap()
+                .is_none());
         }
     }
     #[test]
@@ -2108,7 +2164,8 @@ mod tests {
         let first_bytes = fs::read(&managed).unwrap();
         let mut second = provider(&AppType::Codex);
         second.name = "Synthetic second Codex".into();
-        second.settings_config["auth"]["OPENAI_API_KEY"] = json!("sk-synthetic-second-model-key-R07");
+        second.settings_config["auth"]["OPENAI_API_KEY"] =
+            json!("sk-synthetic-second-model-key-R07");
         second.settings_config["env"]["envKey"] = json!("TUZI_SWITCH_SECOND_CODEX_API_KEY");
         second.settings_config["config"] =
             json!(second.settings_config["config"].as_str().unwrap().replace(

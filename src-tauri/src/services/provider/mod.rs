@@ -69,8 +69,8 @@ pub(crate) use live::{
 
 // Internal re-exports
 use live::{
-    remove_hermes_provider_from_live,
-    remove_openclaw_provider_from_live, remove_opencode_provider_from_live, write_gemini_live,
+    remove_hermes_provider_from_live, remove_openclaw_provider_from_live,
+    remove_opencode_provider_from_live, write_gemini_live,
 };
 use usage::validate_usage_script;
 
@@ -2345,8 +2345,11 @@ impl ProviderService {
 
             let apply = || {
                 futures::executor::block_on(
-                    state.proxy_service.hot_switch_provider_inner(app_type.as_str(), id),
-                ).map_err(|e| AppError::Message(format!("热切换失败: {e}")))
+                    state
+                        .proxy_service
+                        .hot_switch_provider_inner(app_type.as_str(), id),
+                )
+                .map_err(|e| AppError::Message(format!("热切换失败: {e}")))
             };
             if matches!(app_type, AppType::Codex) {
                 crate::services::tuzi_provider::codex_transaction::run(state, _provider, apply)?;
@@ -2367,7 +2370,9 @@ impl ProviderService {
         } else {
             Self::switch_normal(state, app_type.clone(), id, &providers)
         };
-        if result.is_ok() { Self::reconcile_codex_image_compat_after_change(state, &app_type); }
+        if result.is_ok() {
+            Self::reconcile_codex_image_compat_after_change(state, &app_type);
+        }
         result
     }
 

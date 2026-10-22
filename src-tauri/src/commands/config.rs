@@ -489,8 +489,8 @@ fn save_codex_route_inner(
     providerId: Option<String>,
     configText: Option<String>,
 ) -> Result<SaveCodexRouteResult, String> {
-    let _operation = crate::services::provider::OperationGuard::acquire()
-        .map_err(|e| e.to_string())?;
+    let _operation =
+        crate::services::provider::OperationGuard::acquire().map_err(|e| e.to_string())?;
     let source_config = configText
         .as_deref()
         .map(str::trim)

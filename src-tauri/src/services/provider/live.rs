@@ -2052,15 +2052,31 @@ mod tests {
             "auth": {}, "env": { "envKey": "STALE_METADATA_KEY" },
             "config": "model_provider = \"legacy\"\n[model_providers.legacy]\nbase_url = \"https://api.tu-zi.com/coding\"\nenv_key = \"CODING_CODEX_API_KEY\"\n"
         });
-        let original = Provider::with_id("synthetic-edit".into(), "Synthetic".into(), settings.clone(), None);
+        let original = Provider::with_id(
+            "synthetic-edit".into(),
+            "Synthetic".into(),
+            settings.clone(),
+            None,
+        );
         db.save_provider("codex", &original).unwrap();
-        let other = Provider::with_id("synthetic-shared".into(), "Synthetic shared".into(), settings, None);
+        let other = Provider::with_id(
+            "synthetic-shared".into(),
+            "Synthetic shared".into(),
+            settings,
+            None,
+        );
         db.save_provider("codex", &other).unwrap();
         let mut edited = original.clone();
         edited.settings_config["config"] = json!("model_provider = \"provider-tuzi01\"\n[model_providers.provider-tuzi01]\nbase_url = \"https://api.tu-zi.com/v1\"\nenv_key = \"TUZI01_CODEX_API_KEY\"\n");
         normalize_codex_managed_provider_for_storage(&db, &mut edited, Some(&original.id)).unwrap();
-        assert_eq!(codex_provider_env_key(&edited).as_deref(), Some("CODING_CODEX_API_KEY"));
-        assert_eq!(edited.settings_config["env"]["envKey"], "CODING_CODEX_API_KEY");
+        assert_eq!(
+            codex_provider_env_key(&edited).as_deref(),
+            Some("CODING_CODEX_API_KEY")
+        );
+        assert_eq!(
+            edited.settings_config["env"]["envKey"],
+            "CODING_CODEX_API_KEY"
+        );
         let text = edited.settings_config["config"].as_str().unwrap();
         assert!(text.contains("https://api.tu-zi.com/v1"));
         assert!(!text.contains("TUZI01_CODEX_API_KEY"));

@@ -119,9 +119,9 @@ describe("Codex forms without environment variable inputs", () => {
       "CUSTOM_CODEX_API_KEY",
     );
     // Draft preparation no longer writes the key. The final native save must receive it.
-    expect(JSON.parse(submit.mock.calls[0][0].settingsConfig).auth.OPENAI_API_KEY).toBe(
-      "SYNTHETIC_MODEL_KEY",
-    );
+    expect(
+      JSON.parse(submit.mock.calls[0][0].settingsConfig).auth.OPENAI_API_KEY,
+    ).toBe("SYNTHETIC_MODEL_KEY");
   });
   it("recovers a legacy configuration without a name using its own stored Key", async () => {
     const submit = setup(data(), true);

@@ -1233,10 +1233,14 @@ pub fn save_route_to_config_with_provider_config(
 
     // Remove the whole table structurally, including nested and quoted tables.
     // A different card can own the same route ID with entirely different fields.
-    let mut existing = existing_config.parse::<DocumentMut>()
+    let mut existing = existing_config
+        .parse::<DocumentMut>()
         .map_err(|e| AppError::Config(format!("Invalid existing Codex config.toml: {e}")))?;
     for key in ["profiles", "model_providers"] {
-        if let Some(table) = existing.get_mut(key).and_then(|item| item.as_table_like_mut()) {
+        if let Some(table) = existing
+            .get_mut(key)
+            .and_then(|item| item.as_table_like_mut())
+        {
             table.remove(route_id);
         }
     }

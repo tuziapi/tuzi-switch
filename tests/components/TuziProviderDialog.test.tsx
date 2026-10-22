@@ -144,6 +144,17 @@ it.each([
         "TUZI_SWITCH_SYNTHETIC_CODEX_API_KEY",
       ),
     );
+    if (appId === "codex") {
+      const suffix = /^TUZI_SWITCH_([A-F0-9]{12})_CODEX_API_KEY$/.exec(
+        provider.settingsConfig.env.envKey,
+      )?.[1];
+      expect(suffix).toBeDefined();
+      normalized.settingsConfig.config =
+        normalized.settingsConfig.config.replaceAll(
+          `tuzi-${suffix!.toLowerCase()}`,
+          "tuzi-synthetic",
+        );
+    }
     normalized.id = `tuzi-synthetic-${appId}`;
     for (const endpoint of Object.values(
       normalized.meta?.custom_endpoints ?? {},

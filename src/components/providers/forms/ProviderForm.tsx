@@ -1678,11 +1678,12 @@ function ProviderFormFull({
           env: { envKey: string };
           modelCatalog?: { models: CodexCatalogModel[] };
         } = {
-          auth: creationPrefill || (resolvedCodexEnvKey && codexApiKey)
-            ? { OPENAI_API_KEY: codexApiKey }
-            : resolvedCodexEnvKey
-              ? {}
-              : codexAuthObject,
+          auth:
+            creationPrefill || (resolvedCodexEnvKey && codexApiKey)
+              ? { OPENAI_API_KEY: codexApiKey }
+              : resolvedCodexEnvKey
+                ? {}
+                : codexAuthObject,
           config: normalizedCodexConfig,
           env: { envKey: resolvedCodexEnvKey },
         };

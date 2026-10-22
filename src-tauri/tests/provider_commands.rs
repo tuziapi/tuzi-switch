@@ -901,9 +901,11 @@ fn save_codex_route_prepares_duplicate_route_without_changing_live() {
     );
     assert_eq!(result.unwrap().route_id, "codex");
     assert_eq!(std::fs::read(home.join(".zshrc")).ok(), before_env);
-    assert_eq!(std::fs::read(home.join(".codex/.env")).ok(), before_key_file);
+    assert_eq!(
+        std::fs::read(home.join(".codex/.env")).ok(),
+        before_key_file
+    );
     assert_eq!(std::fs::read(get_codex_config_path()).unwrap(), before);
-
 }
 
 #[test]
@@ -918,7 +920,13 @@ fn save_codex_route_first_add_roundtrip_preserves_names_for_all_endpoints() {
         let _home = ensure_test_home();
         let state = create_test_state().unwrap();
         // Preserve an existing Codex history anchor while testing card save semantics.
-        write_codex_live_atomic(&json!({}), Some("model_provider = \"codex\"\n[model_providers.codex]\nname = \"My custom name\"\n")).unwrap();
+        write_codex_live_atomic(
+            &json!({}),
+            Some(
+                "model_provider = \"codex\"\n[model_providers.codex]\nname = \"My custom name\"\n",
+            ),
+        )
+        .unwrap();
         let config = format!("model_provider = \"codex\"\nmodel = \"gpt-6-astra\"\n[model_providers.codex]\nname = \"My custom name\"\nbase_url = {endpoint:?}\nenv_key = \"SYNTHETIC_R04_KEY\"\nwire_api = \"responses\"\nrequires_openai_auth = false\n[mcp_servers.synthetic]\ncommand = \"synthetic\"\n");
         let saved = save_codex_route_test_hook(
             &state,
@@ -1041,11 +1049,22 @@ trust_level = "untrusted"
         "managed route fields should still be updated"
     );
 
-    assert_eq!(std::fs::read_to_string(get_codex_config_path()).unwrap(), existing_live_config);
-    ProviderService::add(&state, AppType::Codex, Provider::with_id(
-        "edited-r08".into(), "兔子线路-我的配置".into(),
-        json!({"auth": {"OPENAI_API_KEY":"sk-test"}, "config": saved_route.config}), None,
-    ), false).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(get_codex_config_path()).unwrap(),
+        existing_live_config
+    );
+    ProviderService::add(
+        &state,
+        AppType::Codex,
+        Provider::with_id(
+            "edited-r08".into(),
+            "兔子线路-我的配置".into(),
+            json!({"auth": {"OPENAI_API_KEY":"sk-test"}, "config": saved_route.config}),
+            None,
+        ),
+        false,
+    )
+    .unwrap();
 
     switch_provider_test_hook(&state, AppType::Codex, "edited-r08").unwrap();
     let live_config =
