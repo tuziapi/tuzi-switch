@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 import { toast } from "sonner";
 import { LoaderCircle } from "lucide-react";
 import { AccountDialog } from "./AccountDialog";
@@ -120,8 +121,8 @@ export function Keys({
     state,
     "/account/key-groups",
   );
-  const { write: performWrite, busy, error, clear } = useWrite(state);
-  const reveal = useWrite(state);
+  const { write: performWrite, busy, error, clear } = useWrite(state, true);
+  const reveal = useWrite(state, true);
   const operation = useRef<{
     method: string;
     path: string;
@@ -736,7 +737,9 @@ export function Keys({
               <Button
                 onClick={async () => {
                   try {
-                    await navigator.clipboard.writeText(secret);
+                    await trackOperation("keys", "copy", {}, () =>
+                      navigator.clipboard.writeText(secret),
+                    );
                     toast.success("已复制密钥");
                   } catch {
                     toast.error("复制失败，请选中密钥手动复制");

@@ -1,3 +1,4 @@
+import { trackInteraction } from "@/lib/analytics";
 import { supportsTuziProtocol } from "@/lib/tuziEndpointCompatibility";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -253,6 +254,10 @@ function ConfigureToolSession({
                     onExisting(id, saved[0].providerId);
                     return;
                   }
+                  if (app !== id)
+                    trackInteraction("configure_tool", "select_tool", {
+                      tool: id,
+                    });
                   setApp(id);
                   setModel(undefined);
                   setProtocol("");

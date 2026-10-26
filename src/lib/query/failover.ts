@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { failoverApi } from "@/lib/api/failover";
 import { toast } from "sonner";
@@ -204,7 +205,12 @@ export function useSetAutoFailoverEnabled() {
 
   return useMutation({
     mutationFn: ({ appType, enabled }: { appType: string; enabled: boolean }) =>
-      failoverApi.setAutoFailoverEnabled(appType, enabled),
+      trackOperation(
+        "proxy",
+        enabled ? "failover_enable" : "failover_disable",
+        { tool: appType },
+        () => failoverApi.setAutoFailoverEnabled(appType, enabled),
+      ),
 
     // 乐观更新
     onMutate: async ({ appType, enabled }) => {

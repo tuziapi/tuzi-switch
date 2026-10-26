@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { backupsApi } from "@/lib/api";
 
@@ -14,12 +15,16 @@ export function useBackupManager() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => backupsApi.createDbBackup(),
+    mutationFn: () =>
+      trackOperation("config", "backup", {}, () => backupsApi.createDbBackup()),
     onSuccess: () => refetch(),
   });
 
   const restoreMutation = useMutation({
-    mutationFn: (filename: string) => backupsApi.restoreDbBackup(filename),
+    mutationFn: (filename: string) =>
+      trackOperation("config", "restore", {}, () =>
+        backupsApi.restoreDbBackup(filename),
+      ),
     onSuccess: async () => {
       // Invalidate all queries to refresh data from restored database
       await queryClient.invalidateQueries();

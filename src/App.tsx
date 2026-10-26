@@ -1,3 +1,5 @@
+import { useAnalyticsView } from "@/hooks/useAnalyticsView";
+import { trackInteraction } from "@/lib/analytics";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
@@ -205,6 +207,12 @@ function App() {
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
   const [accountReturnRequest, setAccountReturnRequest] = useState(0);
   const [currentView, setCurrentView] = useState<View>(getInitialView);
+  useAnalyticsView(
+    currentView,
+    currentView === "account" || currentView === "settings"
+      ? undefined
+      : activeApp,
+  );
   useEffect(() => {
     if (
       accountProviderFocus &&
@@ -984,7 +992,7 @@ function App() {
       }
     }
 
-    await addProvider(duplicatedProvider);
+    await addProvider(duplicatedProvider, "duplicate");
   };
 
   const handleOpenTerminal = async (provider: Provider) => {
@@ -1085,7 +1093,10 @@ function App() {
                   ? "account.business.proxyRunning"
                   : "account.business.proxyStopped",
               )}
-              onConfigureKey={(key, model) => setConfigureKey({ key, model })}
+              onConfigureKey={(key, model) => {
+                trackInteraction("configure_tool", "open");
+                setConfigureKey({ key, model });
+              }}
             />
           );
         case "settings":

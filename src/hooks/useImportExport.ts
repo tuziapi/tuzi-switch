@@ -1,3 +1,4 @@
+import { beginOperation, errorOutcome, trackOperation } from "@/lib/analytics";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -80,10 +81,12 @@ export function useImportExport(
     setIsImporting(true);
     setStatus("importing");
     setErrorMessage(null);
+    const finish = beginOperation("config", "import");
 
     try {
       const result = await settingsApi.importConfigFromFile(selectedFile);
       if (!result.success) {
+        finish("failure", { code: "validation" });
         setStatus("error");
         const message =
           result.message ||
@@ -103,6 +106,7 @@ export function useImportExport(
 
       const syncResult = await syncCurrentProvidersLiveSafe();
       if (syncResult.ok) {
+        finish("success");
         setStatus("success");
         toast.success(
           t("settings.importSuccess", {
@@ -115,6 +119,7 @@ export function useImportExport(
           "[useImportExport] Failed to sync live config",
           syncResult.error,
         );
+        finish("partial", { code: "write_failed" });
         setStatus("partial-success");
         toast.warning(
           t("settings.importPartialSuccess", {
@@ -124,6 +129,7 @@ export function useImportExport(
         );
       }
     } catch (error) {
+      finish(errorOutcome(error), error);
       console.error("[useImportExport] Failed to import config", error);
       setStatus("error");
       const message =
@@ -155,7 +161,13 @@ export function useImportExport(
         return;
       }
 
-      const result = await settingsApi.exportConfigToFile(destination);
+      const result = await trackOperation(
+        "config",
+        "export",
+        {},
+        () => settingsApi.exportConfigToFile(destination),
+        (result) => (result.success ? "success" : "failure"),
+      );
       if (result.success) {
         const displayPath = result.filePath ?? destination;
         toast.success(

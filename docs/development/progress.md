@@ -1,3 +1,9 @@
+# ANALYTICS-02 第一期操作统计（2026-10-26）
+
+用户确认方案后，在 `codex/umami-operation-events` 基于 `c699711` 实施统一白名单上报、导航去重与关键操作提交/结果统计。无 API/原生业务/依赖改动。新增11项合成统计测试通过，相关18文件214项回归通过（含先前9项统计测试），类型、renderer构建、macOS debug app构建、格式与差异检查通过。已启动本地包；桌面自动化读取受应用标识冲突/超时限制，新增事件真实网络/后台入库与三平台验收尚未完成。未推送或发布，原有附件保留。用户此前已确认基础访问上报成功。
+
+事件字典、测试命令、环境过滤、submit/result 计数口径和回退见 [操作统计说明](analytics-events.md) / [ADR-015](decisions/0015-operation-analytics.md)。
+
 # ANALYTICS-01 同步最新 main 并接入 Umami（2026-10-26）
 
 用户授权同步远程 main，保留基础统计脚本，不加自定义事件。旧分支 codex/umami-basic-analytics / 3e39ee6 基于旧版 1.3.1，保留作历史；当前从 origin/main `1a32301`（v1.4.2）建立 codex/umami-main-sync，仅迁入 Umami HTML 脚本与 CSP 域名放行，保留新版页面标题、账户实现及发布配置。原有未跟踪产品文档/附件保持，API 未改；不推送或发布。

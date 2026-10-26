@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 import {
   useMutation,
   useQuery,
@@ -75,7 +76,10 @@ export function useInstallSkill() {
     }: {
       skill: DiscoverableSkill;
       currentApp: AppId;
-    }) => skillsApi.installUnified(skill, currentApp),
+    }) =>
+      trackOperation("skills", "install", { tool: currentApp }, () =>
+        skillsApi.installUnified(skill, currentApp),
+      ),
     onSuccess: (installedSkill, _vars, _ctx) => {
       const { skill } = _vars;
       // 直接更新 installed 缓存
@@ -117,9 +121,9 @@ export function useUninstallSkill() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, skillKey }: { id: string; skillKey: string }) =>
-      skillsApi
-        .uninstallUnified(id)
-        .then((result) => ({ ...result, skillKey })),
+      trackOperation("skills", "uninstall", {}, () =>
+        skillsApi.uninstallUnified(id),
+      ).then((result) => ({ ...result, skillKey })),
     onSuccess: ({ skillKey }, _vars) => {
       // 直接更新 installed 缓存，移除该 skill
       queryClient.setQueryData<InstalledSkill[]>(
@@ -156,7 +160,10 @@ export function useRestoreSkillBackup() {
     }: {
       backupId: string;
       currentApp: AppId;
-    }) => skillsApi.restoreBackup(backupId, currentApp),
+    }) =>
+      trackOperation("skills", "restore", { tool: currentApp }, () =>
+        skillsApi.restoreBackup(backupId, currentApp),
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["skills", "installed"] });
       queryClient.invalidateQueries({ queryKey: ["skills", "backups"] });
@@ -204,7 +211,9 @@ export function useImportSkillsFromApps() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (imports: ImportSkillSelection[]) =>
-      skillsApi.importFromApps(imports),
+      trackOperation("skills", "import", {}, () =>
+        skillsApi.importFromApps(imports),
+      ),
     onSuccess: (importedSkills) => {
       // 直接更新 installed 缓存
       queryClient.setQueryData<InstalledSkill[]>(
@@ -269,7 +278,10 @@ export function useInstallSkillsFromZip() {
     }: {
       filePath: string;
       currentApp: AppId;
-    }) => skillsApi.installFromZip(filePath, currentApp),
+    }) =>
+      trackOperation("skills", "install", { tool: currentApp }, () =>
+        skillsApi.installFromZip(filePath, currentApp),
+      ),
     onSuccess: (installedSkills) => {
       // 直接更新 installed 缓存
       queryClient.setQueryData<InstalledSkill[]>(

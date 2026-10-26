@@ -1,3 +1,4 @@
+import { beginOperation, errorOutcome } from "@/lib/analytics";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { invoke } from "@tauri-apps/api/core";
@@ -149,6 +150,9 @@ export function TuziProviderDialog({
       onSubmit={async (value) => {
         if (savingRef.current) return false;
         savingRef.current = true;
+        const finish = beginOperation("configure_tool", "save", {
+          tool: draft.appId,
+        });
         const { providerKey, ...fields } = value;
         const provider = {
           ...fields,
@@ -161,7 +165,10 @@ export function TuziProviderDialog({
             app: draft.appId,
             provider,
           });
-          if (!alive.current) return false;
+          if (!alive.current) {
+            finish("unknown");
+            return false;
+          }
           const outcome = await invoke<{
             backupId: string;
             enabled: boolean;
@@ -177,6 +184,7 @@ export function TuziProviderDialog({
               generation: draft.generation,
             },
           });
+          finish("success");
           await queryClient.invalidateQueries({
             queryKey: ["providers", draft.appId],
           });
@@ -189,6 +197,7 @@ export function TuziProviderDialog({
           );
           onSaved?.(provider.id);
         } catch (error) {
+          finish(errorOutcome(error), error);
           if (alive.current)
             toast.error("无法添加供应商", { description: safeError(error) });
           return false;

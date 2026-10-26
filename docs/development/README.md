@@ -1,5 +1,7 @@
 # 账户中心与工具管理开发基线
 
+2026-10-26：用户确认第一期客户端操作统计方案，ANALYTICS-02 在最新 main v1.4.2 基础上本地实施；事件范围、隐私边界与验证见 [操作统计说明](analytics-events.md)。不改变账户契约或授权发布。
+
 当前有效基线：`TA-AC-1.5-B4`；契约：`system-token-v1`；日期：2026-10-19（Asia/Shanghai）。本轮用户明确授权账户接入由 A（桌面 OAuth、`/api/desktop`）迁移至 B（网站复制账户系统令牌、原生安全保存、调用原站业务接口），允许两仓本地编码、隔离验证、独立 worktree、子智能体、提交及集成。禁止 push、PR、远程合并、发布、部署、生产迁移、生产数据、真实凭证、实际支付和付费模型调用。
 
 最终集成分支两仓均为 `codex/tuzi-assistant-system-token`，替代本任务旧 API 集成分支要求；分支名不证明部署。当前代码、测试、联调、用户验收和发布状态分别见 [progress.md](progress.md)，配对 SHA 及兼容限制见 [跨仓库兼容记录](cross-repo-compatibility.md)。本地代码/定向验证/隔离联调已完成，分层证据与未完成门禁见 [B4验证报告](system-token-verification.md)；用户验收和发布未完成。

@@ -1,3 +1,4 @@
+import { beginOperation, errorOutcome } from "@/lib/analytics";
 import {
   ExternalLink,
   Wallet,
@@ -132,7 +133,7 @@ export function Pager({
     </div>
   );
 }
-export function useWrite(state: AccountState) {
+export function useWrite(state: AccountState, trackKeys = false) {
   const client = useQueryClient();
   const current = useRef(state);
   current.current = state;
@@ -144,6 +145,23 @@ export function useWrite(state: AccountState) {
     body?: unknown,
   ): Promise<T | undefined> => {
     const generation = state.generation;
+    const statusOnly =
+      body &&
+      typeof body === "object" &&
+      Object.keys(body).length === 1 &&
+      "status" in body;
+    const action = path.endsWith("/reveal")
+      ? "reveal"
+      : method === "DELETE"
+        ? "delete"
+        : method === "POST"
+          ? "create"
+          : statusOnly
+            ? (body as { status: number }).status === 1
+              ? "enable"
+              : "disable"
+            : "edit";
+    const finish = trackKeys ? beginOperation("keys", action) : undefined;
     setBusy(true);
     setError(null);
     try {
@@ -151,12 +169,16 @@ export function useWrite(state: AccountState) {
       if (
         current.current.generation !== generation ||
         !current.current.identity
-      )
+      ) {
+        finish?.("unknown");
         return;
+      }
+      finish?.("success");
       if (!path.endsWith("/reveal"))
         void client.invalidateQueries({ queryKey: ["account"] });
       return r.data;
     } catch (e) {
+      finish?.(errorOutcome(e), e);
       if (current.current.generation === generation)
         setError(e as DesktopError);
     } finally {

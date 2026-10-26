@@ -72,9 +72,14 @@ export function useProviderActions(
         suggestedDefaults?: OpenClawSuggestedDefaults;
         addToLive?: boolean;
       },
+      analyticsAction: "add" | "duplicate" = "add",
     ) => {
       const enhanced = injectCodingPlanUsageScript(activeApp, provider);
-      await addProviderMutation.mutateAsync(enhanced);
+      await addProviderMutation.mutateAsync(
+        analyticsAction === "duplicate"
+          ? { ...enhanced, analyticsAction }
+          : enhanced,
+      );
 
       // OpenClaw: register models to allowlist after adding provider
       if (activeApp === "openclaw" && provider.suggestedDefaults) {
