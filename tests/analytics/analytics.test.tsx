@@ -38,7 +38,7 @@ describe("analytics boundary", () => {
     ).rejects.toBe(error);
     expect(track.mock.calls).toEqual([
       [
-        "providers_edit",
+        "编辑供应商",
         {
           version: "synthetic-version",
           environment: "development",
@@ -50,7 +50,7 @@ describe("analytics boundary", () => {
         },
       ],
       [
-        "providers_edit",
+        "编辑供应商",
         {
           version: "synthetic-version",
           environment: "development",

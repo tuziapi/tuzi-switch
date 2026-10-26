@@ -105,7 +105,7 @@ describe("real operation hooks with synthetic native responses", () => {
     });
     expect(track).toHaveBeenCalledTimes(2);
     expect(track.mock.lastCall).toEqual([
-      "account_connect",
+      "连接兔子账户",
       expect.objectContaining({
         stage: "result",
         outcome: "failure",
@@ -172,12 +172,12 @@ describe("real operation hooks with synthetic native responses", () => {
     await act(async () => {
       await result.current.write.mutateAsync(server);
     });
-    expect(track.mock.lastCall?.[0]).toBe("mcp_add");
+    expect(track.mock.lastCall?.[0]).toBe("添加 MCP 服务");
     client.setQueryData(["mcp", "all"], { "synthetic-server": server });
     await act(async () => {
       await result.current.write.mutateAsync(server);
     });
-    expect(track.mock.lastCall?.[0]).toBe("mcp_edit");
+    expect(track.mock.lastCall?.[0]).toBe("编辑 MCP 服务");
     expect(track).toHaveBeenCalledTimes(4);
   });
 
@@ -195,8 +195,8 @@ describe("real operation hooks with synthetic native responses", () => {
       });
     });
     expect(track.mock.calls.map((call) => call[0])).toEqual([
-      "providers_duplicate",
-      "providers_duplicate",
+      "复制供应商",
+      "复制供应商",
     ]);
     const native = invoke.mock.calls.find(
       (call) => call[0] === "add_provider",

@@ -20,6 +20,77 @@ const actions = {
 } as const;
 export type AnalyticsModule = keyof typeof actions;
 export type AnalyticsAction = (typeof actions)[AnalyticsModule][number];
+/** User-visible Umami event names; machine-readable properties remain stable. */
+const eventNames = {
+  navigation: {
+    view: "页面访问",
+  },
+  account: {
+    get_token: "获取账户令牌",
+    connect: "连接兔子账户",
+    check: "检查账户连接",
+    disconnect: "断开兔子账户",
+  },
+  keys: {
+    create: "创建密钥",
+    edit: "编辑密钥",
+    enable: "启用密钥",
+    disable: "停用密钥",
+    delete: "删除密钥",
+    reveal: "查看密钥",
+    copy: "复制密钥",
+  },
+  configure_tool: {
+    open: "打开配置到工具",
+    select_tool: "选择配置目标工具",
+    save: "保存密钥到工具",
+  },
+  providers: {
+    add: "添加供应商",
+    edit: "编辑供应商",
+    duplicate: "复制供应商",
+    delete: "删除供应商",
+    switch: "切换供应商",
+  },
+  skills: {
+    install: "安装技能",
+    import: "导入技能",
+    uninstall: "卸载技能",
+    restore: "恢复技能备份",
+  },
+  mcp: {
+    add: "添加 MCP 服务",
+    edit: "编辑 MCP 服务",
+    import: "导入 MCP 服务",
+    delete: "删除 MCP 服务",
+    enable: "启用 MCP 服务",
+    disable: "停用 MCP 服务",
+  },
+  prompts: {
+    add: "添加提示词",
+    edit: "编辑提示词",
+    delete: "删除提示词",
+    enable: "启用提示词",
+    disable: "停用提示词",
+    import: "导入提示词",
+  },
+  proxy: {
+    start: "启动本地代理",
+    stop: "停止本地代理",
+    failover_enable: "开启故障转移",
+    failover_disable: "关闭故障转移",
+  },
+  config: {
+    import: "导入配置",
+    export: "导出配置",
+    backup: "创建配置备份",
+    restore: "恢复配置备份",
+    sync_upload: "上传 WebDAV 同步",
+    sync_download: "下载 WebDAV 同步",
+  },
+} satisfies {
+  [M in AnalyticsModule]: Record<(typeof actions)[M][number], string>;
+};
 export type AnalyticsContext = { tool?: string; page?: string };
 export type Outcome = "success" | "failure" | "unknown" | "partial";
 type ErrorCategory =
@@ -148,9 +219,12 @@ function emit(
     if (outcome === "failure" || outcome === "unknown" || outcome === "partial")
       data.error_category = errorCategory(error);
     // Neither synchronous errors nor rejected telemetry promises affect the operation.
-    void Promise.resolve(tracker.track(`${module}_${action}`, data)).catch(
-      () => {},
-    );
+    void Promise.resolve(
+      tracker.track(
+        (eventNames[module] as Record<string, string>)[action],
+        data,
+      ),
+    ).catch(() => {});
   } catch {
     /* Analytics must never interrupt the UI. */
   }
