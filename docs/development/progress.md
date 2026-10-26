@@ -1,3 +1,9 @@
+# ANALYTICS-01 同步最新 main 并接入 Umami（2026-10-26）
+
+用户授权同步远程 main，保留基础统计脚本，不加自定义事件。旧分支 codex/umami-basic-analytics / 3e39ee6 基于旧版 1.3.1，保留作历史；当前从 origin/main `1a32301`（v1.4.2）建立 codex/umami-main-sync，仅迁入 Umami HTML 脚本与 CSP 域名放行，保留新版页面标题、账户实现及发布配置。原有未跟踪产品文档/附件保持，API 未改；不推送或发布。
+
+本机 macOS 的 `pnpm build:renderer`、`pnpm typecheck`、改动 HTML/JSON 的 Prettier 检查及 `git diff --check` 通过；构建保留既有浏览器数据、动态导入与包体积警告。桌面真实上报及 Umami 后台入库尚未验证。直接嵌入脚本也适用于开发/预览页面，未增加环境过滤。
+
 # R01 v1.4.1 正式安装包已发布（2026-10-21）
 
 用户本轮授权的合并核查、版本更新、构建及 GitHub Release 发布完成。客户端 PR #48 已合入 main（`25b76e9be74c63ccc131be91ae3faa48811faf65`），API PR #277 已合入 dev（`70e5f2b2f624c7b721064cedc9994238973a8875`）。本次客户端发行代码/标签 `v1.4.1` 指向 `9b4e702b2ae973571221c9aa877f8fec0498c045`，契约仍为 `system-token-v1`；API 工作区未修改、未执行服务端部署或迁移。
