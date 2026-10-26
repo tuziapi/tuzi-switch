@@ -1,3 +1,11 @@
+# NAV-01 默认启动账户 Tab（2026-10-26）
+
+按用户要求，在 `codex/account-default-tab` 基于 `c6416c5` 将 App 初始页面固定为账户，移除旧 `tuzi-switch-last-view` 的读取/写入与校验代码，不删除用户存储内容。最近工具选择及手动切换保持；已连接和未连接沿用各自账户界面。从托盘显示现存窗口不会重置当前页面。无 API/原生业务/依赖变更，包含之前中文埋点。
+
+本机 macOS：`pnpm typecheck`；`pnpm test:unit --run tests/integration/App.test.tsx tests/components/AppSwitcher.accountCompatibility.test.tsx tests/components/AccountPage.test.tsx tests/analytics`（5文件40项）；`pnpm exec prettier --check src/App.tsx tests/integration/App.test.tsx`；`git diff --check` 均通过。既有 App 集成用例增加无历史/历史工具页/历史设置页的启动断言，保留已连接配置到工具、七工具操作与账户往返回归；工具操作测试显式先切到工具页。
+
+`pnpm tauri build --debug --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'` 通过，含 renderer 构建，产物为 `src-tauri/target/debug/bundle/macos/兔子助手.app`。保留既有构建警告；未声称三平台或真实原生 UI 人工验收通过。当前运行实例需退出后重新打开本地包查看启动行为。本轮独立本地提交，未推送或发布，原有附件保留。
+
 # ANALYTICS-02 第一期操作统计（2026-10-26）
 
 ### 后续：中文事件名称

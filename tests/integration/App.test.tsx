@@ -229,6 +229,7 @@ vi.mock("@/components/providers/TuziProviderDialog", async (original) => ({
 describe("App integration with MSW", () => {
   beforeEach(() => {
     localStorage.removeItem("tuzi-switch-last-view");
+    localStorage.removeItem("tuzi-switch-last-app");
     server.use(
       http.post("http://tauri.local/account_get_state", () =>
         HttpResponse.json(disconnectedAccount),
@@ -245,37 +246,43 @@ describe("App integration with MSW", () => {
     toastErrorMock.mockReset();
   });
 
-  it("keeps tools usable while switching through disconnected account pages", async () => {
-    const { default: App } = await import("@/App");
-    renderApp(App);
-    await screen.findByTestId("provider-list");
-    const notice = await screen.findByRole("button", {
-      name: "firstRunNotice.confirm",
-    });
-    fireEvent.click(notice);
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "account.title" }));
-    await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent(
-        "account.status.disconnected",
-      ),
-    );
-    expect(screen.getByText("account.connectRequired")).toBeInTheDocument();
-    expect(screen.getByText("兔子助手")).toBeInTheDocument();
-    expect(screen.getByTestId("app-switcher")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "account.tools" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("switch-claude"));
-    expect(await screen.findByTestId("provider-list")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("switch-openclaw"));
-    expect(await screen.findByTitle("workspace.manage")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("switch-claude"));
-    expect(await screen.findByTitle("skills.manage")).toBeInTheDocument();
-    expect(screen.getByTitle("sessionManager.title")).toBeInTheDocument();
-  });
+  it.each([null, "providers", "settings"])(
+    "starts on account despite saved view %s and keeps tools usable",
+    async (savedView) => {
+      if (savedView) localStorage.setItem("tuzi-switch-last-view", savedView);
+      localStorage.setItem("tuzi-switch-last-app", "codex");
+      const { default: App } = await import("@/App");
+      renderApp(App);
+      await screen.findByTestId("app-switcher");
+      const notice = await screen.findByRole("button", {
+        name: "firstRunNotice.confirm",
+      });
+      fireEvent.click(notice);
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      await waitFor(() =>
+        expect(screen.getByRole("status")).toHaveTextContent(
+          "account.status.disconnected",
+        ),
+      );
+      expect(screen.getByText("account.connectRequired")).toBeInTheDocument();
+      expect(screen.queryByTestId("provider-list")).not.toBeInTheDocument();
+      expect(localStorage.getItem("tuzi-switch-last-app")).toBe("codex");
+      expect(screen.getByText("兔子助手")).toBeInTheDocument();
+      expect(screen.getByTestId("app-switcher")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "account.tools" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText("switch-claude"));
+      expect(await screen.findByTestId("provider-list")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("switch-openclaw"));
+      expect(await screen.findByTitle("workspace.manage")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("switch-claude"));
+      expect(await screen.findByTitle("skills.manage")).toBeInTheDocument();
+      expect(screen.getByTitle("sessionManager.title")).toBeInTheDocument();
+    },
+  );
 
   it("keeps saved configuration focused without an account return banner", async () => {
     server.use(
@@ -295,14 +302,13 @@ describe("App integration with MSW", () => {
     );
     const { default: App } = await import("@/App");
     renderApp(App);
-    await screen.findByTestId("provider-list");
+    await screen.findByTestId("app-switcher");
     fireEvent.click(
       await screen.findByRole("button", { name: "firstRunNotice.confirm" }),
     );
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    fireEvent.click(screen.getByRole("button", { name: "account.title" }));
     fireEvent.click(await screen.findByText("configure-synthetic-key"));
     fireEvent.click(await screen.findByText("prepare-synthetic-config"));
     expect(
@@ -325,6 +331,7 @@ describe("App integration with MSW", () => {
   it("covers basic provider flows via real hooks", async () => {
     const { default: App } = await import("@/App");
     renderApp(App);
+    fireEvent.click(await screen.findByText("switch-claude"));
 
     await waitFor(() =>
       expect(screen.getByTestId("provider-list").textContent).toContain(
@@ -382,6 +389,7 @@ describe("App integration with MSW", () => {
   it("shows toast when auto sync fails in background", async () => {
     const { default: App } = await import("@/App");
     renderApp(App);
+    fireEvent.click(await screen.findByText("switch-claude"));
 
     await waitFor(() =>
       expect(screen.getByTestId("provider-list").textContent).toContain(
@@ -410,6 +418,7 @@ describe("App integration with MSW", () => {
 
     const { default: App } = await import("@/App");
     renderApp(App);
+    fireEvent.click(await screen.findByText("switch-claude"));
 
     await waitFor(() =>
       expect(screen.getByTestId("provider-list").textContent).toContain(
