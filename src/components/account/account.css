@@ -1421,3 +1421,85 @@
 .account-key-search-feedback .animate-spin {
   flex-shrink: 0;
 }
+
+/* UI-02: account workspace within the new application shell. */
+.account-shell.account-phase1 {
+  background: hsl(var(--background));
+}
+.account-phase1 > .account-connection {
+  min-height: 56px;
+  padding-inline: clamp(18px, 3vw, 36px);
+  background: hsl(var(--card));
+}
+.account-phase1 .account-content {
+  width: min(100%, 1320px);
+  margin: 0 auto;
+  padding: 24px clamp(18px, 3vw, 36px) 40px;
+}
+.account-phase1 .account-content > .account-metrics > div,
+.account-phase1 .account-card,
+.account-phase1 .account-editor,
+.account-phase1 .account-profile-form,
+.account-phase1 .account-web-entry {
+  border-color: hsl(var(--border));
+  border-radius: 14px;
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 0.05));
+}
+.account-phase1 .account-content > .account-metrics > div {
+  padding: 18px;
+}
+.account-phase1 .account-content > .account-metrics dt,
+.account-phase1 .account-content > .account-metrics small {
+  color: hsl(var(--muted-foreground));
+}
+.account-phase1 .account-content > .account-metrics dd {
+  color: hsl(var(--foreground));
+  font-variant-numeric: tabular-nums;
+}
+.account-phase1 .account-page-heading h1 {
+  font-size: 22px;
+  letter-spacing: -0.35px;
+}
+.account-phase1 .account-key-toolbar,
+.account-phase1 .account-filter-bar {
+  border-radius: 12px;
+}
+.account-phase1 .account-table-scroll,
+.account-phase1 .account-filters {
+  border-color: hsl(var(--border));
+  background: hsl(var(--muted) / 0.24);
+}
+.account-phase1 tbody tr:hover {
+  background: hsl(var(--foreground) / 0.035);
+}
+.account-shell.account-disconnected {
+  background: radial-gradient(
+    circle at 50% 0%,
+    hsl(var(--muted) / 0.7),
+    transparent 48%
+  );
+}
+.account-disconnected .account-connect-card {
+  border-radius: 18px;
+  background: hsl(var(--card));
+  box-shadow: 0 18px 50px rgb(16 24 40 / 0.08);
+}
+@media (max-width: 900px) {
+  .account-phase1 .account-content {
+    padding-inline: 18px;
+  }
+}
+@media (max-width: 1100px) {
+  .account-phase1 .account-key-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .account-phase1 .account-key-filters {
+    flex-basis: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .account-phase1 .account-key-create {
+    margin-left: auto;
+  }
+}

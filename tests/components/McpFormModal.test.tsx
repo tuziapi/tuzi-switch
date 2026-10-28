@@ -357,7 +357,7 @@ type = "stdio"
       enabled: true,
       description: "Old desc",
       server: { type: "stdio", command: "old" },
-      apps: { claude: true, codex: false, gemini: false },
+      apps: { claude: true, codex: false, gemini: false, pi: true },
     } as McpServer;
 
     const { onSave } = renderForm({
@@ -391,6 +391,9 @@ type = "stdio"
       claude: true,
       codex: false,
       gemini: false,
+      grokbuild: false,
+      pi: true,
+      mcode: false,
     });
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave).toHaveBeenCalledWith();
@@ -436,9 +439,29 @@ type = "stdio"
       opencode: false,
       openclaw: false,
       hermes: false,
+      grokbuild: false,
+      pi: false,
+      mcode: false,
     });
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("保存时携带新工具选择", async () => {
+    renderForm();
+    fireEvent.change(screen.getByPlaceholderText("mcp.form.titlePlaceholder"), {
+      target: { value: "native-tools" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("mcp.form.jsonPlaceholder"), {
+      target: { value: '{"type":"stdio","command":"fixture"}' },
+    });
+    fireEvent.click(screen.getByLabelText("Grok Build"));
+    fireEvent.click(screen.getByLabelText("Pi"));
+    fireEvent.click(screen.getByLabelText("MiniMax Code"));
+    fireEvent.click(screen.getByText("common.add"));
+    await waitFor(() => expect(upsertMock).toHaveBeenCalledTimes(1));
+    const [entry] = upsertMock.mock.calls.at(-1) ?? [];
+    expect(entry.apps).toMatchObject({ grokbuild: true, pi: true, mcode: true });
   });
 
   it("保存失败时展示翻译后的错误并恢复按钮", async () => {

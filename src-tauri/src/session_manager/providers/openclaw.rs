@@ -446,20 +446,16 @@ mod tests {
         .expect("write session");
         std::fs::write(
             sessions_dir.join("sessions.json"),
-            format!(
-                r#"{{
-                  "agent:main:main": {{
+            serde_json::to_vec(&serde_json::json!({
+                "agent:main:main": {
                     "sessionId": "session-123",
-                    "sessionFile": "{}"
-                  }},
-                  "agent:main:other": {{
+                    "sessionFile": session_path,
+                },
+                "agent:main:other": {
                     "sessionId": "session-456",
-                    "sessionFile": "{}/session-456.jsonl"
-                  }}
-                }}"#,
-                session_path.display(),
-                sessions_dir.display()
-            ),
+                    "sessionFile": sessions_dir.join("session-456.jsonl"),
+                },
+            })).expect("serialize index"),
         )
         .expect("write index");
 

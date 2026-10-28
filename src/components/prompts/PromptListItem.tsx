@@ -25,7 +25,7 @@ const PromptListItem: React.FC<PromptListItemProps> = ({
   const enabled = prompt.enabled === true;
 
   return (
-    <div className="group relative h-16 rounded-xl border border-border-default bg-muted/50 p-4 transition-all duration-300 hover:bg-muted hover:border-border-default/80 hover:shadow-sm">
+    <div className="group relative min-h-16 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40">
       <div className="flex items-center gap-4 h-full">
         {/* Toggle 开关 */}
         <div className="flex-shrink-0">
@@ -36,7 +36,9 @@ const PromptListItem: React.FC<PromptListItemProps> = ({
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-foreground mb-1">{prompt.name}</h3>
+          <h3 className="font-medium text-foreground mb-1 break-words">
+            {prompt.name}
+          </h3>
           {prompt.description && (
             <p className="text-sm text-muted-foreground truncate">
               {prompt.description}

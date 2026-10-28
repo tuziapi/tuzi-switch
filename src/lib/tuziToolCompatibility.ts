@@ -1,8 +1,10 @@
 import { supportsTuziProtocol } from "./tuziEndpointCompatibility";
 import type { AppId } from "@/lib/api";
+import type { NativeTool } from "@/lib/api/nativeTools";
+export type TuziTool = AppId | NativeTool;
 export type TuziProtocol = "anthropic" | "responses" | "chat" | "gemini";
-export interface TuziProviderDraft {
-  appId: AppId;
+export interface TuziProviderDraft<T extends TuziTool = AppId> {
+  appId: T;
   key: string;
   tokenId: string;
   userId: string;
@@ -12,7 +14,7 @@ export interface TuziProviderDraft {
   name?: string;
 }
 export const TUZI_TOOL_TARGETS: {
-  appId: AppId;
+  appId: TuziTool;
   protocol: TuziProtocol;
   endpoint: string;
 }[] = [
@@ -60,6 +62,16 @@ export const TUZI_TOOL_TARGETS: {
     protocol: "anthropic",
     endpoint: "https://api.tu-zi.com/v1",
   },
+  ...(["grokbuild", "pi", "mcode"] as const).flatMap((appId) =>
+    (["responses", "chat", "anthropic"] as const).map((protocol) => ({
+      appId,
+      protocol,
+      endpoint:
+        appId !== "grokbuild" && protocol === "anthropic"
+          ? "https://api.tu-zi.com"
+          : "https://api.tu-zi.com/v1",
+    })),
+  ),
 ];
 export function tuziToolCompatibility(
   key: {
@@ -77,7 +89,7 @@ export function tuziToolCompatibility(
     supported_endpoint_types: string[];
     endpoints?: unknown;
   },
-  appId: AppId,
+  appId: TuziTool,
   protocol: TuziProtocol,
   platform = navigator.platform,
   pricingMeta?: Record<string, unknown>,

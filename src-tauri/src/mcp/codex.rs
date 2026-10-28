@@ -62,20 +62,25 @@ pub fn import_from_codex(config: &mut MultiAppConfig) -> Result<usize, AppError>
     let servers = config.mcp.servers.get_or_insert_with(HashMap::new);
 
     let mut changed_total = 0usize;
+    let mut errors = Vec::new();
 
     // helper：处理一组 servers 表
     let mut import_servers_tbl = |servers_tbl: &toml::value::Table| {
         let mut changed = 0usize;
         for (id, entry_val) in servers_tbl.iter() {
             let Some(entry_tbl) = entry_val.as_table() else {
+                errors.push(format!("{id}: MCP 条目不是表"));
                 continue;
             };
 
             // type 缺省为 stdio
-            let typ = entry_tbl
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("stdio");
+            let typ = entry_tbl.get("type").and_then(|v| v.as_str()).unwrap_or(
+                if entry_tbl.contains_key("url") {
+                    "http"
+                } else {
+                    "stdio"
+                },
+            );
 
             // 构建 JSON 规范
             let mut spec = serde_json::Map::new();
@@ -84,7 +89,7 @@ pub fn import_from_codex(config: &mut MultiAppConfig) -> Result<usize, AppError>
             // 核心字段（需要手动处理的字段）
             let core_fields = match typ {
                 "stdio" => vec!["type", "command", "args", "env", "cwd"],
-                "http" | "sse" => vec!["type", "url", "http_headers"],
+                "http" | "sse" => vec!["type", "url", "headers", "http_headers"],
                 _ => vec!["type"],
             };
 
@@ -145,7 +150,8 @@ pub fn import_from_codex(config: &mut MultiAppConfig) -> Result<usize, AppError>
                 }
                 _ => {
                     log::warn!("跳过未知类型 '{typ}' 的 Codex MCP 项 '{id}'");
-                    return changed;
+                    errors.push(format!("{id}: 不支持的 MCP 类型"));
+                    continue;
                 }
             }
 
@@ -204,7 +210,6 @@ pub fn import_from_codex(config: &mut MultiAppConfig) -> Result<usize, AppError>
 
                 if let Some(val) = json_val {
                     spec.insert(key.clone(), val);
-                    log::debug!("导入扩展字段 '{key}' = {toml_val:?}");
                 }
             }
 
@@ -212,7 +217,7 @@ pub fn import_from_codex(config: &mut MultiAppConfig) -> Result<usize, AppError>
 
             // 校验：单项失败继续处理
             if let Err(e) = validate_server_spec(&spec_v) {
-                log::warn!("跳过无效 Codex MCP 项 '{id}': {e}");
+                errors.push(format!("{id}: {e}"));
                 continue;
             }
 
@@ -237,6 +242,7 @@ pub fn import_from_codex(config: &mut MultiAppConfig) -> Result<usize, AppError>
                             gemini: false,
                             opencode: false,
                             hermes: false,
+                            ..Default::default()
                         },
                         description: None,
                         homepage: None,
@@ -269,6 +275,12 @@ pub fn import_from_codex(config: &mut MultiAppConfig) -> Result<usize, AppError>
         }
     }
 
+    if !errors.is_empty() {
+        return Err(AppError::McpValidation(format!(
+            "该来源未导入：{}",
+            errors.join("; ")
+        )));
+    }
     Ok(changed_total)
 }
 
@@ -361,14 +373,9 @@ pub fn sync_single_server_to_codex(
     let mut doc = if config_path.exists() {
         let content =
             std::fs::read_to_string(&config_path).map_err(|e| AppError::io(&config_path, e))?;
-        // 尝试解析现有配置，如果失败则创建新文档（容错处理）
-        match content.parse::<toml_edit::DocumentMut>() {
-            Ok(doc) => doc,
-            Err(e) => {
-                log::warn!("解析 Codex config.toml 失败: {e}，将创建新配置");
-                toml_edit::DocumentMut::new()
-            }
-        }
+        content
+            .parse::<toml_edit::DocumentMut>()
+            .map_err(|_| AppError::McpValidation("Codex config.toml 无效，原文件已保留".into()))?
     } else {
         toml_edit::DocumentMut::new()
     };
@@ -420,8 +427,9 @@ pub fn remove_server_from_codex(id: &str) -> Result<(), AppError> {
     let mut doc = match content.parse::<toml_edit::DocumentMut>() {
         Ok(doc) => doc,
         Err(e) => {
-            log::warn!("解析 Codex config.toml 失败: {e}，跳过删除操作");
-            return Ok(());
+            return Err(AppError::McpValidation(format!(
+                "Codex config.toml 无效，原文件已保留: {e}"
+            )));
         }
     };
 
@@ -559,7 +567,7 @@ fn json_value_to_toml_item(value: &Value, field_name: &str) -> Option<toml_edit:
 /// 1. 核心字段（type, command, args, url, headers, env, cwd）使用强类型处理
 /// 2. 扩展字段（timeout、retry 等）通过白名单列表自动转换
 /// 3. 其他未知字段使用通用转换器尝试转换
-fn json_server_to_toml_table(spec: &Value) -> Result<toml_edit::Table, AppError> {
+pub(super) fn json_server_to_toml_table(spec: &Value) -> Result<toml_edit::Table, AppError> {
     use toml_edit::{Array, Item, Table};
 
     let mut t = Table::new();
@@ -569,7 +577,7 @@ fn json_server_to_toml_table(spec: &Value) -> Result<toml_edit::Table, AppError>
     // 定义核心字段（已在下方处理，跳过通用转换）
     let core_fields = match typ {
         "stdio" => vec!["type", "command", "args", "env", "cwd"],
-        "http" | "sse" => vec!["type", "url", "http_headers"],
+        "http" | "sse" => vec!["type", "url", "headers", "http_headers"],
         _ => vec!["type"],
     };
 
@@ -668,9 +676,9 @@ fn json_server_to_toml_table(spec: &Value) -> Result<toml_edit::Table, AppError>
 
                 // 记录扩展字段的处理
                 if extended_fields.contains(&key.as_str()) {
-                    log::debug!("已转换扩展字段 '{key}' = {value:?}");
+                    log::debug!("已转换扩展字段 '{key}'");
                 } else {
-                    log::info!("已转换自定义字段 '{key}' = {value:?}");
+                    log::debug!("已转换自定义字段 '{key}'");
                 }
             }
         }

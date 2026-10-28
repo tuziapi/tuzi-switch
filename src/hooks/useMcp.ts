@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { mcpApi } from "@/lib/api/mcp";
 import type { McpServer } from "@/types";
 import type { AppId } from "@/lib/api/types";
+import type { NativeTool } from "@/lib/api/nativeTools";
 
 /**
  * 查询所有 MCP 服务器（统一管理）
@@ -31,7 +32,7 @@ export function useUpsertMcpServer() {
         {},
         () => mcpApi.upsertUnifiedServer(server),
       ),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
     },
   });
@@ -49,13 +50,13 @@ export function useToggleMcpApp() {
       enabled,
     }: {
       serverId: string;
-      app: AppId;
+      app: AppId | NativeTool;
       enabled: boolean;
     }) =>
       trackOperation("mcp", enabled ? "enable" : "disable", { tool: app }, () =>
         mcpApi.toggleApp(serverId, app, enabled),
       ),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
     },
   });
@@ -69,7 +70,7 @@ export function useDeleteMcpServer() {
   return useMutation({
     mutationFn: (id: string) =>
       trackOperation("mcp", "delete", {}, () => mcpApi.deleteUnifiedServer(id)),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
     },
   });
@@ -83,7 +84,7 @@ export function useImportMcpFromApps() {
   return useMutation({
     mutationFn: () =>
       trackOperation("mcp", "import", {}, () => mcpApi.importFromApps()),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
     },
   });

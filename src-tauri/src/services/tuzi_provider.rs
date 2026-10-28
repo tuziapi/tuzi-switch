@@ -164,6 +164,28 @@ fn restore_environment(record: &Option<EnvironmentRecord>) -> Result<(), AppErro
     }
     Ok(())
 }
+// Restore only the named synthetic variables after Windows tests exercise setx/reg.
+#[cfg(all(test, windows))]
+pub(crate) struct TestEnvironmentGuard(Vec<Environment>);
+#[cfg(all(test, windows))]
+impl TestEnvironmentGuard {
+    pub(crate) fn new(keys: &[&str]) -> Self {
+        Self(keys.iter().map(|key| capture_environment(key).expect("capture test environment")).collect())
+    }
+}
+#[cfg(all(test, windows))]
+impl Drop for TestEnvironmentGuard {
+    fn drop(&mut self) {
+        for before in &self.0 {
+            let current = capture_environment(&before.key).expect("read test environment");
+            restore_environment(&Some(EnvironmentRecord {
+                before: before.clone(),
+                expected: environment_signature(&current),
+            })).expect("restore test environment");
+        }
+    }
+}
+
 fn mode(file: &FileState) -> Option<u32> {
     #[cfg(unix)]
     {
@@ -583,8 +605,14 @@ fn restore_state(
     }
     Ok(())
 }
-fn validate_source(handle: &tauri::AppHandle, source: &Source) -> Result<(), String> {
+pub(crate) fn validate_source(handle: &tauri::AppHandle, source: &Source) -> Result<(), String> {
     let service = handle.state::<Arc<crate::tuzi_account::AccountService>>();
+    validate_account_source(&service, source)
+}
+pub(crate) fn validate_account_source(
+    service: &crate::tuzi_account::AccountService,
+    source: &Source,
+) -> Result<(), String> {
     let current = service.state();
     if source.site != "https://api.tu-zi.com"
         || current.status != "connected"
@@ -1335,11 +1363,11 @@ fn restore_backup(state: &AppState, backup_id: &str) -> Result<(), String> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderSource {
-    site: String,
-    user_id: String,
-    token_id: String,
-    app: String,
-    provider_id: String,
+    pub(crate) site: String,
+    pub(crate) user_id: String,
+    pub(crate) token_id: String,
+    pub(crate) app: String,
+    pub(crate) provider_id: String,
 }
 #[tauri::command]
 pub fn tuzi_provider_sources(
@@ -1731,6 +1759,8 @@ mod tests {
         );
     }
     struct Home {
+        #[cfg(windows)]
+        _environment: TestEnvironmentGuard,
         _temp: tempfile::TempDir,
         old: Option<std::ffi::OsString>,
     }
@@ -1740,7 +1770,14 @@ mod tests {
             let old = std::env::var_os("CC_SWITCH_TEST_HOME");
             std::env::set_var("CC_SWITCH_TEST_HOME", temp.path());
             crate::settings::reload_settings().unwrap();
-            Self { _temp: temp, old }
+            Self {
+                #[cfg(windows)]
+                _environment: TestEnvironmentGuard::new(&[
+                    "TUZI_SWITCH_SYNTHETIC_CODEX_API_KEY",
+                    "TUZI_SWITCH_SECOND_CODEX_API_KEY",
+                ]),
+                _temp: temp, old,
+            }
         }
     }
     impl Drop for Home {

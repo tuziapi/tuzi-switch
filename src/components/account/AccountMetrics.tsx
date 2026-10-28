@@ -4,6 +4,7 @@ import type { DesktopAccount, UsageValues } from "@/lib/api/desktop";
 import { useAccountRead, useDesktop } from "@/lib/query/desktop";
 import { displayAmount, useAccountCurrency } from "./AccountCurrency";
 import { QueryState } from "./BusinessShared";
+import { Wallet, ArrowUpRight, Activity, Layers3 } from "lucide-react";
 
 /** The first release needs only today's summary, not the hidden trend data. */
 export function AccountMetrics({
@@ -51,7 +52,12 @@ export function AccountMetrics({
     <>
       <dl className="account-metrics">
         <div className="account-card">
-          <dt>{t("account.business.balance")}</dt>
+          <dt>
+            <span className="account-metric-icon">
+              <Wallet size={15} aria-hidden="true" />
+            </span>
+            {t("account.business.balance")}
+          </dt>
           <dd>
             {account.data
               ? displayAmount(
@@ -63,7 +69,12 @@ export function AccountMetrics({
           </dd>
         </div>
         <div className="account-card">
-          <dt>{t("account.visual.todayCost")}</dt>
+          <dt>
+            <span className="account-metric-icon">
+              <ArrowUpRight size={15} aria-hidden="true" />
+            </span>
+            {t("account.visual.todayCost")}
+          </dt>
           <dd>
             {daily && account.data
               ? displayAmount(daily.quota, account.data.data.money, currency)
@@ -71,11 +82,21 @@ export function AccountMetrics({
           </dd>
         </div>
         <div className="account-card">
-          <dt>{t("account.visual.todayCalls")}</dt>
+          <dt>
+            <span className="account-metric-icon">
+              <Activity size={15} aria-hidden="true" />
+            </span>
+            {t("account.visual.todayCalls")}
+          </dt>
           <dd>{daily?.call_count ?? "—"}</dd>
         </div>
         <div className="account-card">
-          <dt>{t("account.visual.todayTokens")}</dt>
+          <dt>
+            <span className="account-metric-icon">
+              <Layers3 size={15} aria-hidden="true" />
+            </span>
+            {t("account.visual.todayTokens")}
+          </dt>
           <dd className="account-token-value">
             {daily
               ? `${daily.prompt_tokens} / ${daily.completion_tokens}`

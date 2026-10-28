@@ -20,7 +20,7 @@ interface FullScreenPanelProps {
 }
 
 const DRAG_BAR_HEIGHT = isWindows() || isLinux() ? 0 : 28; // px - match App.tsx
-const HEADER_HEIGHT = 64; // px - match App.tsx
+const HEADER_HEIGHT = 52; // px - match App.tsx
 
 /**
  * Reusable full-screen panel component
@@ -103,7 +103,7 @@ export const FullScreenPanel: React.FC<FullScreenPanelProps> = ({
 
           {/* Header - match App.tsx */}
           <div
-            className="flex-shrink-0 flex items-center"
+            className="flex-shrink-0 flex items-center border-b border-border"
             {...DRAG_REGION_ATTR}
             style={
               {

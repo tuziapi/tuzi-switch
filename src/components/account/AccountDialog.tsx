@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import "./account-polish.css";
 
 export function AccountDialog({
   title,

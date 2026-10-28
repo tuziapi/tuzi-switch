@@ -1,3 +1,4 @@
+import { UpdateProvider } from "@/contexts/UpdateContext";
 import { Suspense, type ComponentType } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
@@ -17,6 +18,10 @@ import { emitTauriEvent } from "../msw/tauriMocks";
 
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
+
+vi.mock("@/lib/updater", () => ({
+  checkForUpdate: vi.fn().mockResolvedValue({ status: "up-to-date" }),
+}));
 
 vi.mock("sonner", () => ({
   toast: {
@@ -141,24 +146,64 @@ vi.mock("@/components/ConfirmDialog", () => ({
     ) : null,
 }));
 
-vi.mock("@/components/AppSwitcher", () => ({
-  AppSwitcher: ({
-    activeApp,
-    onSwitch,
-    onSelectAccount,
-    accountSelected,
-  }: any) => (
+vi.mock("@/components/shell/TuziSidebar", () => ({
+  TuziSidebar: ({ activeApp, onSwitchApp, onNavigate, currentView }: any) => (
     <div data-testid="app-switcher">
+      <span>兔子助手</span>
       <button
-        onClick={onSelectAccount}
-        aria-current={accountSelected ? "page" : undefined}
+        onClick={() => onNavigate("account")}
+        aria-current={currentView === "account" ? "page" : undefined}
       >
         account.title
       </button>
       <span>{activeApp}</span>
-      <button onClick={() => onSwitch("claude")}>switch-claude</button>
-      <button onClick={() => onSwitch("codex")}>switch-codex</button>
-      <button onClick={() => onSwitch("openclaw")}>switch-openclaw</button>
+      {[
+        "prompts",
+        "skills",
+        "sessions",
+        "auth",
+        "usage",
+        "agents",
+        "grokbuild",
+        "pi",
+        "mcode",
+      ].map((view) => (
+        <button key={view} onClick={() => onNavigate(view)}>
+          nav-{view}
+        </button>
+      ))}
+      <button
+        onClick={() => {
+          onSwitchApp("claude-desktop");
+          onNavigate("providers");
+        }}
+      >
+        switch-desktop
+      </button>
+      <button
+        onClick={() => {
+          onSwitchApp("claude");
+          onNavigate("providers");
+        }}
+      >
+        switch-claude
+      </button>
+      <button
+        onClick={() => {
+          onSwitchApp("codex");
+          onNavigate("providers");
+        }}
+      >
+        switch-codex
+      </button>
+      <button
+        onClick={() => {
+          onSwitchApp("openclaw");
+          onNavigate("providers");
+        }}
+      >
+        switch-openclaw
+      </button>
     </div>
   ),
 }));
@@ -180,12 +225,34 @@ vi.mock("@/components/mcp/McpPanel", () => ({
     ),
 }));
 
+vi.mock("@/components/prompts/PromptPanel", () => ({
+  default: ({ appId }: any) => <div data-testid="prompt-target">{appId}</div>,
+}));
+vi.mock("@/components/skills/UnifiedSkillsPanel", () => ({
+  default: ({ currentApp }: any) => (
+    <div data-testid="skills-target">{currentApp}</div>
+  ),
+}));
+vi.mock("@/components/sessions/SessionManagerPage", () => ({
+  SessionManagerPage: ({ appId }: any) => (
+    <div data-testid="session-filter">{appId}</div>
+  ),
+}));
+vi.mock("@/components/settings/AuthCenterPanel", () => ({
+  AuthCenterPanel: () => <div data-testid="tool-auth-center" />,
+}));
+vi.mock("@/components/usage/UsageDashboard", () => ({
+  UsageDashboard: () => <div data-testid="local-usage-dashboard" />,
+}));
+
 const renderApp = (AppComponent: ComponentType) => {
   const client = new QueryClient();
   return render(
     <QueryClientProvider client={client}>
       <Suspense fallback={<div data-testid="loading">loading</div>}>
-        <AppComponent />
+        <UpdateProvider>
+          <AppComponent />
+        </UpdateProvider>
       </Suspense>
     </QueryClientProvider>,
   );
@@ -210,11 +277,23 @@ vi.mock("@/components/account/AccountPage", async (original) => {
 });
 vi.mock("@/components/account/ConfigureTool", () => ({
   ConfigureTool: ({ onReady, state }: any) => (
-    <button
-      onClick={() => onReady({ appId: "codex", generation: state.generation })}
-    >
-      prepare-synthetic-config
-    </button>
+    <>
+      <button
+        onClick={() =>
+          onReady({ appId: "codex", generation: state.generation })
+        }
+      >
+        prepare-synthetic-config
+      </button>
+      {["grokbuild", "pi", "mcode"].map((appId) => (
+        <button
+          key={appId}
+          onClick={() => onReady({ appId, generation: state.generation })}
+        >
+          prepare-{appId}
+        </button>
+      ))}
+    </>
   ),
 }));
 vi.mock("@/components/providers/TuziProviderDialog", async (original) => ({
@@ -226,10 +305,27 @@ vi.mock("@/components/providers/TuziProviderDialog", async (original) => ({
   ),
 }));
 
+vi.mock("@/components/providers/TuziNativeToolDialog", () => ({
+  TuziNativeToolDialog: ({ draft, onSaved }: any) => (
+    <button onClick={() => onSaved("native-synthetic")}>
+      save-{draft.appId}
+    </button>
+  ),
+}));
+vi.mock("@/components/providers/NativeToolPage", () => ({
+  NativeToolPage: ({ tool, focusRequest }: any) => (
+    <div data-testid="native-page">
+      {tool}
+      <span data-testid="native-focus">{focusRequest?.providerId}</span>
+    </div>
+  ),
+}));
+
 describe("App integration with MSW", () => {
   beforeEach(() => {
-    localStorage.removeItem("tuzi-switch-last-view");
     localStorage.removeItem("tuzi-switch-last-app");
+    localStorage.removeItem("tuzi-switch-last-view");
+    localStorage.removeItem("tuzi-sidebar-collapsed");
     server.use(
       http.post("http://tauri.local/account_get_state", () =>
         HttpResponse.json(disconnectedAccount),
@@ -246,7 +342,109 @@ describe("App integration with MSW", () => {
     toastErrorMock.mockReset();
   });
 
-  it.each([null, "providers", "settings"])(
+  it("requires an explicit target when entering a global editor from a native tool", async () => {
+    localStorage.setItem("tuzi-switch-last-view", "prompts");
+    localStorage.setItem("tuzi-switch-last-app", "codex");
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    fireEvent.click(await screen.findByText("nav-pi"));
+    fireEvent.click(screen.getByText("nav-prompts"));
+    expect(screen.queryByTestId("prompt-target")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("combobox", { name: "navigation.targetTool" }),
+    ).toHaveValue("");
+  });
+
+  it("routes the Agents entry through the real native file API after explicit target selection", async () => {
+    const reads: string[] = [];
+    server.use(
+      http.post("http://tauri.local/agents_read", async ({ request }) => {
+        const { tool } = (await request.json()) as { tool: string };
+        reads.push(tool);
+        return HttpResponse.json({
+          revision: "synthetic",
+          path: "/synthetic/agents",
+          files: [],
+          canRestore: false,
+        });
+      }),
+    );
+    localStorage.setItem("tuzi-switch-last-view", "agents");
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    const notice = await screen.findByRole("button", {
+      name: "firstRunNotice.confirm",
+    });
+    fireEvent.click(notice);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByText("nav-pi"));
+    fireEvent.click(screen.getByText("nav-agents"));
+    expect(reads).toEqual([]);
+    fireEvent.change(
+      await screen.findByRole("combobox", { name: "navigation.targetTool" }),
+      { target: { value: "opencode" } },
+    );
+    expect(await screen.findByText("agents.empty")).toBeInTheDocument();
+    expect(reads).toEqual(["opencode"]);
+    expect(screen.getByRole("button", { name: "agents.add" })).toBeEnabled();
+  });
+
+  it("exposes real global page containers and all-tool sessions", async () => {
+    localStorage.setItem("tuzi-switch-last-view", "auth");
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    fireEvent.click(await screen.findByText("nav-auth"));
+    expect(await screen.findByTestId("tool-auth-center")).toBeInTheDocument();
+    expect(screen.getByText("navigation.authScope")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("nav-usage"));
+    expect(
+      await screen.findByTestId("local-usage-dashboard"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("navigation.localUsageScope")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("nav-sessions"));
+    expect(await screen.findByTestId("session-filter")).toHaveTextContent(
+      "all",
+    );
+  });
+
+  it.each(["switch-desktop", "nav-grokbuild", "nav-pi", "nav-mcode"])(
+    "does not silently select Claude for %s workspace actions",
+    async (entry) => {
+      const { default: App } = await import("@/App");
+      renderApp(App);
+      await screen.findByTestId("app-switcher");
+      const notice = await screen.findByRole("button", {
+        name: "firstRunNotice.confirm",
+      });
+      if (notice) {
+        fireEvent.click(notice);
+        await waitFor(() =>
+          expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+        );
+      }
+      fireEvent.click(screen.getByText(entry));
+      fireEvent.click(screen.getByText("nav-skills"));
+      expect(
+        await screen.findByRole("combobox", { name: "navigation.targetTool" }),
+      ).toHaveValue("");
+      expect(screen.queryByTestId("skills-target")).not.toBeInTheDocument();
+      fireEvent.change(
+        screen.getByRole("combobox", { name: "navigation.targetTool" }),
+        { target: { value: "codex" } },
+      );
+      expect(await screen.findByTestId("skills-target")).toHaveTextContent(
+        "codex",
+      );
+      fireEvent.click(screen.getByText("nav-prompts"));
+      expect(await screen.findByTestId("prompt-target")).toHaveTextContent(
+        "codex",
+      );
+    },
+  );
+
+  it.each([null, "providers", "settings", "prompts", "agents", "pi"])(
     "starts on account despite saved view %s and keeps tools usable",
     async (savedView) => {
       if (savedView) localStorage.setItem("tuzi-switch-last-view", savedView);
@@ -327,6 +525,47 @@ describe("App integration with MSW", () => {
       await screen.findByText("configure-synthetic-key"),
     ).toBeInTheDocument();
   });
+
+  it.each(["grokbuild", "pi", "mcode"])(
+    "navigates an account draft to %s and locates the saved native provider",
+    async (tool) => {
+      server.use(
+        http.post("http://tauri.local/account_get_state", () =>
+          HttpResponse.json({
+            ...disconnectedAccount,
+            status: "connected",
+            generation: 10,
+            identity: {
+              userId: "synthetic-user",
+              username: "synthetic-b10",
+              displayName: "Synthetic",
+              connectionId: "synthetic",
+            },
+          }),
+        ),
+      );
+      const { default: App } = await import("@/App");
+      renderApp(App);
+      await screen.findByTestId("app-switcher");
+      fireEvent.click(
+        await screen.findByRole("button", { name: "firstRunNotice.confirm" }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "account.title" }));
+      fireEvent.click(await screen.findByText("configure-synthetic-key"));
+      fireEvent.click(await screen.findByText(`prepare-${tool}`));
+      expect(await screen.findByTestId("native-page")).toHaveTextContent(tool);
+      fireEvent.click(await screen.findByText(`save-${tool}`));
+      await waitFor(() =>
+        expect(screen.getByTestId("native-focus")).toHaveTextContent(
+          "native-synthetic",
+        ),
+      );
+      expect(screen.queryByTestId("focused-provider")).not.toBeInTheDocument();
+    },
+  );
 
   it("covers basic provider flows via real hooks", async () => {
     const { default: App } = await import("@/App");

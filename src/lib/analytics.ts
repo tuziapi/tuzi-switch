@@ -107,6 +107,9 @@ const tools = [
   "opencode",
   "openclaw",
   "hermes",
+  "grokbuild",
+  "pi",
+  "mcode",
 ];
 const pages = [
   "account",
@@ -124,6 +127,9 @@ const pages = [
   "openclawTools",
   "openclawAgents",
   "hermesMemory",
+  "grokbuild",
+  "pi",
+  "mcode",
   "general",
   "proxy",
   "auth",

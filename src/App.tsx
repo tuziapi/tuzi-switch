@@ -2,7 +2,7 @@ import { useAnalyticsView } from "@/hooks/useAnalyticsView";
 import { trackInteraction } from "@/lib/analytics";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -50,13 +50,11 @@ import {
 } from "@/hooks/useHermes";
 import { hermesApi } from "@/lib/api/hermes";
 import { useProxyStatus } from "@/hooks/useProxyStatus";
-import { useAutoCompact } from "@/hooks/useAutoCompact";
 import { useUsageCacheBridge } from "@/hooks/useUsageCacheBridge";
 import { useLastValidValue } from "@/hooks/useLastValidValue";
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { isTextEditableTarget } from "@/utils/domUtils";
 import { cn } from "@/lib/utils";
-import { REPOSITORY_URL } from "@/lib/releaseRepository";
 import {
   isWindows,
   isLinux,
@@ -65,19 +63,34 @@ import {
 } from "@/lib/platform";
 import { ConfigureTool } from "@/components/account/ConfigureTool";
 import { TuziProviderDialog } from "@/components/providers/TuziProviderDialog";
-import type { TuziProviderDraft } from "@/lib/tuziToolCompatibility";
+import { TuziNativeToolDialog } from "@/components/providers/TuziNativeToolDialog";
+import { isNativeTool, type NativeTool } from "@/lib/api/nativeTools";
+import type { TuziTool, TuziProviderDraft } from "@/lib/tuziToolCompatibility";
 import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 import { AccountPage } from "@/components/account/AccountPage";
 import { useAccount } from "@/lib/query/account";
-import { AppSwitcher } from "@/components/AppSwitcher";
+import { TuziSidebar } from "@/components/shell/TuziSidebar";
+import { WorkspaceScope } from "@/components/shell/WorkspaceScope";
+import {
+  WorkspaceAuthPage,
+  WorkspaceUsagePage,
+} from "@/components/shell/WorkspaceGlobalPages";
+import {
+  GLOBAL_WORKSPACE_VIEWS,
+  WORKSPACE_SUPPORT,
+  type WorkspaceTool,
+} from "@/config/workspace";
+import { ProviderIcon } from "@/components/ProviderIcon";
+import "@/components/shell/workspace-pages.css";
 import { ProviderList } from "@/components/providers/ProviderList";
 import { AddProviderDialog } from "@/components/providers/AddProviderDialog";
 import { EditProviderDialog } from "@/components/providers/EditProviderDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { UpdateBadge } from "@/components/UpdateBadge";
+import { VersionHistory } from "@/components/version-history/VersionHistory";
 import { EnvWarningBanner } from "@/components/env/EnvWarningBanner";
-import { ProxyToggle } from "@/components/proxy/ProxyToggle";
+import { ProviderConnectionControls } from "@/components/providers/ProviderConnectionControls";
 import { ClaudeDesktopRouteToggle } from "@/components/proxy/ClaudeDesktopRouteToggle";
 import { FailoverToggle } from "@/components/proxy/FailoverToggle";
 import UsageScriptModal from "@/components/UsageScriptModal";
@@ -101,6 +114,7 @@ import EnvPanel from "@/components/openclaw/EnvPanel";
 import ToolsPanel from "@/components/openclaw/ToolsPanel";
 import AgentsDefaultsPanel from "@/components/openclaw/AgentsDefaultsPanel";
 import OpenClawHealthBanner from "@/components/openclaw/OpenClawHealthBanner";
+import { NativeToolPage } from "@/components/providers/NativeToolPage";
 import HermesMemoryPanel from "@/components/hermes/HermesMemoryPanel";
 
 type View =
@@ -118,7 +132,12 @@ type View =
   | "openclawEnv"
   | "openclawTools"
   | "openclawAgents"
-  | "hermesMemory";
+  | "hermesMemory"
+  | "grokbuild"
+  | "pi"
+  | "mcode"
+  | "auth"
+  | "usage";
 
 interface WebDavSyncStatusUpdatedPayload {
   source?: string;
@@ -127,7 +146,7 @@ interface WebDavSyncStatusUpdatedPayload {
 }
 
 const DEFAULT_DRAG_BAR_HEIGHT = isWindows() || isLinux() ? 0 : 28; // px
-const HEADER_HEIGHT = 64; // px
+const HEADER_HEIGHT = 52; // px
 
 const STORAGE_KEY = "tuzi-switch-last-app";
 const VALID_APPS: AppId[] = [
@@ -150,6 +169,7 @@ const getInitialApp = (): AppId => {
 
 function App() {
   const { t } = useTranslation();
+  const reduceMotion = useReducedMotion();
   const queryClient = useQueryClient();
   const account = useAccount();
   const [configureKey, setConfigureKey] = useState<{
@@ -157,10 +177,11 @@ function App() {
     model?: DesktopPricing;
   } | null>(null);
   const [accountProviderFocus, setAccountProviderFocus] = useState<{
-    app: AppId;
+    app: TuziTool;
     providerId?: string;
   } | null>(null);
-  const [tuziDraft, setTuziDraft] = useState<TuziProviderDraft | null>(null);
+  const [tuziDraft, setTuziDraft] =
+    useState<TuziProviderDraft<TuziTool> | null>(null);
   const clearAccountProviderFocus = useCallback(
     () => setAccountProviderFocus(null),
     [],
@@ -180,16 +201,61 @@ function App() {
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
   const [accountReturnRequest, setAccountReturnRequest] = useState(0);
   const [currentView, setCurrentView] = useState<View>("account");
+  const [workspaceOrigin, setWorkspaceOrigin] = useState<WorkspaceTool>(() =>
+    ["grokbuild", "pi", "mcode"].includes(currentView)
+      ? (currentView as WorkspaceTool)
+      : activeApp,
+  );
+  const [workspaceTarget, setWorkspaceTarget] = useState<AppId | null>(() =>
+    (GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(currentView) ||
+    ["grokbuild", "pi", "mcode"].includes(currentView) ||
+    activeApp === "claude-desktop"
+      ? null
+      : activeApp,
+  );
+  const skillsTarget =
+    workspaceTarget && WORKSPACE_SUPPORT.skills.includes(workspaceTarget)
+      ? workspaceTarget
+      : null;
+  const promptTarget =
+    workspaceTarget && WORKSPACE_SUPPORT.prompts.includes(workspaceTarget)
+      ? workspaceTarget
+      : null;
+  useEffect(() => {
+    if (!(GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(currentView)) {
+      const origin = ["grokbuild", "pi", "mcode"].includes(currentView)
+        ? (currentView as WorkspaceTool)
+        : activeApp;
+      setWorkspaceOrigin(origin);
+      setWorkspaceTarget(
+        WORKSPACE_SUPPORT.prompts.includes(origin as AppId)
+          ? (origin as AppId)
+          : null,
+      );
+    }
+  }, [activeApp, currentView]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("tuzi-sidebar-collapsed") === "true",
+  );
+  useEffect(() => {
+    localStorage.setItem("tuzi-sidebar-collapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
   useAnalyticsView(
     currentView,
-    currentView === "account" || currentView === "settings"
-      ? undefined
-      : activeApp,
+    currentView === "providers"
+      ? activeApp
+      : ["grokbuild", "pi", "mcode"].includes(currentView)
+        ? currentView
+        : (GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(currentView)
+          ? (workspaceTarget ?? undefined)
+          : undefined,
   );
   useEffect(() => {
     if (
       accountProviderFocus &&
-      (currentView !== "providers" || activeApp !== accountProviderFocus.app)
+      (isNativeTool(accountProviderFocus.app)
+        ? currentView !== accountProviderFocus.app
+        : currentView !== "providers" || activeApp !== accountProviderFocus.app)
     )
       setAccountProviderFocus(null);
   }, [activeApp, currentView, accountProviderFocus]);
@@ -293,21 +359,6 @@ function App() {
       .catch(() => {});
   }, [activeApp]);
 
-  // Fallback from sessions view when switching to an app without session support
-  useEffect(() => {
-    if (
-      currentView === "sessions" &&
-      activeApp !== "claude" &&
-      activeApp !== "codex" &&
-      activeApp !== "opencode" &&
-      activeApp !== "openclaw" &&
-      activeApp !== "gemini" &&
-      activeApp !== "hermes"
-    ) {
-      setCurrentView("providers");
-    }
-  }, [activeApp, currentView]);
-
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [usageProvider, setUsageProvider] = useState<Provider | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
@@ -320,12 +371,6 @@ function App() {
 
   const effectiveEditingProvider = useLastValidValue(editingProvider);
   const effectiveUsageProvider = useLastValidValue(usageProvider);
-
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  const isToolbarCompact = useAutoCompact(
-    toolbarRef,
-    `${currentView}:${activeApp}`,
-  );
 
   useUsageCacheBridge();
 
@@ -1052,6 +1097,10 @@ function App() {
   const renderContent = () => {
     const content = (() => {
       switch (currentView) {
+        case "auth":
+          return <WorkspaceAuthPage />;
+        case "usage":
+          return <WorkspaceUsagePage />;
         case "account":
           return (
             <AccountPage
@@ -1068,6 +1117,21 @@ function App() {
               }}
             />
           );
+        case "grokbuild":
+        case "pi":
+        case "mcode":
+          return (
+            <NativeToolPage
+              key={currentView}
+              tool={currentView}
+              focusRequest={
+                accountProviderFocus?.app === currentView
+                  ? accountProviderFocus
+                  : undefined
+              }
+              onFocusComplete={clearAccountProviderFocus}
+            />
+          );
         case "settings":
           return (
             <SettingsPage
@@ -1079,40 +1143,92 @@ function App() {
           );
         case "prompts":
           return (
-            <PromptPanel
-              ref={promptPanelRef}
-              open={true}
-              onOpenChange={() => setCurrentView("providers")}
-              appId={activeApp}
-            />
+            <>
+              <WorkspaceScope
+                feature="prompts"
+                origin={workspaceOrigin}
+                target={promptTarget}
+                onTargetChange={setWorkspaceTarget}
+              />
+              {promptTarget ? (
+                <PromptPanel
+                  key={promptTarget}
+                  ref={promptPanelRef}
+                  open={true}
+                  onOpenChange={() => setCurrentView("providers")}
+                  appId={promptTarget}
+                />
+              ) : (
+                <p className="px-6 text-sm text-muted-foreground">
+                  {t("navigation.chooseTarget")}
+                </p>
+              )}
+            </>
           );
         case "hermesMemory":
           return <HermesMemoryPanel />;
         case "skills":
           return (
-            <UnifiedSkillsPanel
-              ref={unifiedSkillsPanelRef}
-              onOpenDiscovery={() => setCurrentView("skillsDiscovery")}
-              currentApp={activeApp === "openclaw" ? "claude" : activeApp}
-            />
+            <>
+              <WorkspaceScope
+                feature="skills"
+                origin={workspaceOrigin}
+                target={skillsTarget}
+                onTargetChange={setWorkspaceTarget}
+              />
+              {skillsTarget ? (
+                <UnifiedSkillsPanel
+                  key={skillsTarget}
+                  ref={unifiedSkillsPanelRef}
+                  onOpenDiscovery={() => setCurrentView("skillsDiscovery")}
+                  currentApp={skillsTarget}
+                />
+              ) : (
+                <p className="px-6 text-sm text-muted-foreground">
+                  {t("navigation.chooseTarget")}
+                </p>
+              )}
+            </>
           );
         case "skillsDiscovery":
           return (
-            <SkillsPage
-              ref={skillsPageRef}
-              initialApp={activeApp === "openclaw" ? "claude" : activeApp}
-            />
+            <>
+              <WorkspaceScope
+                feature="skills"
+                origin={workspaceOrigin}
+                target={skillsTarget}
+                onTargetChange={setWorkspaceTarget}
+              />
+              {skillsTarget ? (
+                <SkillsPage
+                  key={skillsTarget}
+                  ref={skillsPageRef}
+                  initialApp={skillsTarget}
+                />
+              ) : (
+                <p className="px-6 text-sm text-muted-foreground">
+                  {t("navigation.chooseTarget")}
+                </p>
+              )}
+            </>
           );
         case "mcp":
           return (
-            <UnifiedMcpPanel
-              ref={mcpPanelRef}
-              onOpenChange={() => setCurrentView("providers")}
-            />
+            <>
+              <WorkspaceScope feature="mcp" origin={workspaceOrigin} />
+              <UnifiedMcpPanel
+                ref={mcpPanelRef}
+                onOpenChange={() => setCurrentView("providers")}
+              />
+            </>
           );
         case "agents":
           return (
-            <AgentsPanel onOpenChange={() => setCurrentView("providers")} />
+            <AgentsPanel
+              origin={workspaceOrigin}
+              target={workspaceTarget}
+              onTargetChange={setWorkspaceTarget}
+            />
           );
         case "universal":
           return (
@@ -1122,7 +1238,12 @@ function App() {
           );
 
         case "sessions":
-          return <SessionManagerPage key={activeApp} appId={activeApp} />;
+          return (
+            <>
+              <WorkspaceScope feature="sessions" origin={workspaceOrigin} />
+              <SessionManagerPage appId="all" />
+            </>
+          );
         case "workspace":
           return <WorkspaceFilesPanel />;
         case "openclawEnv":
@@ -1134,6 +1255,19 @@ function App() {
         default:
           return (
             <div className="px-6 flex flex-col flex-1 min-h-0 overflow-hidden">
+              {["claude", "codex", "gemini"].includes(activeApp) && (
+                <ProviderConnectionControls
+                  key={activeApp}
+                  appId={activeApp}
+                  providers={providers}
+                  currentProviderId={currentProviderId}
+                  routeEnabled={!!settingsData?.enableLocalProxy}
+                  onOpenSettings={() => {
+                    setSettingsDefaultTab("proxy");
+                    setCurrentView("settings");
+                  }}
+                />
+              )}
               <div className="flex-1 overflow-y-auto overflow-x-hidden pb-12 px-1">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -1231,11 +1365,12 @@ function App() {
       <AnimatePresence mode="wait">
         <motion.div
           key={currentView}
-          className="flex-1 min-h-0"
-          initial={{ opacity: 0 }}
+          className="workspace-view flex flex-col flex-1 min-h-0 min-w-0"
+          data-view={currentView}
+          initial={{ opacity: reduceMotion ? 1 : 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          exit={{ opacity: reduceMotion ? 1 : 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.2 }}
         >
           {content}
         </motion.div>
@@ -1245,12 +1380,45 @@ function App() {
 
   return (
     <div
-      className="flex flex-col h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30 pb-4"
+      className="tuzi-shell flex flex-col h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30"
       style={{ overflowX: "hidden", paddingTop: contentTopOffset }}
     >
+      <TuziSidebar
+        activeApp={activeApp}
+        currentView={currentView}
+        visibleApps={visibleApps}
+        topOffset={dragBarHeight}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+        onSwitchApp={(app) => {
+          localStorage.setItem(STORAGE_KEY, app);
+          setActiveApp(app);
+        }}
+        onNavigate={(view) => {
+          if (
+            (GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(view) &&
+            !(GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(currentView)
+          ) {
+            const origin = ["grokbuild", "pi", "mcode"].includes(currentView)
+              ? (currentView as WorkspaceTool)
+              : activeApp;
+            setWorkspaceOrigin(origin);
+            setWorkspaceTarget(
+              WORKSPACE_SUPPORT.prompts.includes(origin as AppId)
+                ? (origin as AppId)
+                : null,
+            );
+          }
+          setCurrentView(view as View);
+        }}
+        onOpenSettings={() => {
+          setSettingsDefaultTab("general");
+          setCurrentView("settings");
+        }}
+      />
       {(dragBarHeight > 0 || useAppWindowControls) && (
         <div
-          className="fixed top-0 left-0 right-0 z-[70] flex items-center justify-end px-2"
+          className="fixed top-0 left-0 right-0 z-[35] flex items-center justify-end px-2"
           data-tauri-drag-region
           style={{ WebkitAppRegion: "drag", height: dragBarHeight } as any}
         >
@@ -1324,13 +1492,15 @@ function App() {
       )}
 
       <header
-        className="fixed z-50 w-full transition-all duration-300 bg-background/80 backdrop-blur-md"
+        className="workspace-header fixed z-30 transition-all duration-300 border-b border-border bg-background/90 backdrop-blur-md"
         {...DRAG_REGION_ATTR}
         style={
           {
             ...DRAG_REGION_STYLE,
             top: dragBarHeight,
             height: HEADER_HEIGHT,
+            left: sidebarCollapsed ? 68 : 228,
+            width: `calc(100% - ${sidebarCollapsed ? 68 : 228}px)`,
           } as any
         }
       >
@@ -1340,7 +1510,7 @@ function App() {
           style={{ ...DRAG_REGION_STYLE } as any}
         >
           <div
-            className="flex items-center gap-1"
+            className="workspace-header-title flex min-w-0 items-center gap-1"
             style={{ WebkitAppRegion: "no-drag" } as any}
           >
             {currentView !== "providers" && currentView !== "account" ? (
@@ -1361,8 +1531,12 @@ function App() {
                 </Button>
                 <h1 className="text-lg font-semibold">
                   {currentView === "settings" && t("settings.title")}
-                  {currentView === "prompts" &&
-                    t("prompts.title", { appName: t(`apps.${activeApp}`) })}
+                  {currentView === "auth" && t("navigation.auth")}
+                  {currentView === "usage" && t("navigation.localUsage")}
+                  {currentView === "grokbuild" && "Grok Build"}
+                  {currentView === "pi" && "Pi"}
+                  {currentView === "mcode" && "MiniMax Code"}
+                  {currentView === "prompts" && t("navigation.prompts")}
                   {currentView === "skills" && t("skills.title")}
                   {currentView === "skillsDiscovery" && t("skills.title")}
                   {currentView === "mcp" && t("mcp.unifiedPanel.title")}
@@ -1382,20 +1556,30 @@ function App() {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <div className="relative inline-flex items-center">
-                  <a
-                    href={REPOSITORY_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={cn(
-                      "text-xl font-semibold transition-colors",
-                      isProxyRunning && isCurrentAppTakeoverActive
-                        ? "text-emerald-500 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300"
-                        : "text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300",
-                    )}
-                  >
-                    兔子助手
-                  </a>
+                {currentView === "providers" && (
+                  <ProviderIcon
+                    icon={
+                      activeApp === "codex"
+                        ? "openai"
+                        : activeApp === "claude-desktop"
+                          ? "claude"
+                          : activeApp
+                    }
+                    name={t(`apps.${activeApp}`)}
+                    size={18}
+                  />
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-semibold">
+                    {currentView === "account"
+                      ? t("account.title")
+                      : t(`apps.${activeApp}`)}
+                  </span>
+                  {currentView === "providers" && (
+                    <span className="text-xs text-muted-foreground">
+                      {t("connectionMode.providers")}
+                    </span>
+                  )}
                 </div>
                 <Button
                   variant="ghost"
@@ -1409,6 +1593,7 @@ function App() {
                 >
                   <Settings className="w-4 h-4" />
                 </Button>
+                <VersionHistory />
                 <UpdateBadge
                   onOpenAbout={() => {
                     setSettingsDefaultTab("about");
@@ -1420,8 +1605,7 @@ function App() {
                     variant="ghost"
                     size="icon"
                     onClick={() => {
-                      setSettingsDefaultTab("usage");
-                      setCurrentView("settings");
+                      setCurrentView("usage");
                     }}
                     title={t("usage.title", {
                       defaultValue: "使用统计",
@@ -1446,26 +1630,19 @@ function App() {
                 >
                   {activeApp === "claude-desktop" ? (
                     <ClaudeDesktopRouteToggle />
-                  ) : (
-                    settingsData?.enableLocalProxy && (
-                      <ProxyToggle activeApp={activeApp} />
-                    )
-                  )}
+                  ) : null}
                   {activeApp !== "claude-desktop" &&
                     settingsData?.enableFailoverToggle && (
                       <FailoverToggle activeApp={activeApp} />
                     )}
                 </div>
               )}
-            <div
-              ref={toolbarRef}
-              className="flex flex-1 min-w-0 overflow-x-hidden items-center py-4 pr-2"
-            >
+            <div className="workspace-header-actions flex min-w-0 overflow-x-auto items-center py-1 pr-2">
               <div
                 className="flex shrink-0 items-center gap-1.5 ml-auto"
                 style={{ WebkitAppRegion: "no-drag" } as any}
               >
-                {currentView === "prompts" && (
+                {currentView === "prompts" && promptTarget && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1498,7 +1675,7 @@ function App() {
                     </Button>
                   </>
                 )}
-                {currentView === "skills" && (
+                {currentView === "skills" && skillsTarget && (
                   <>
                     <Button
                       variant="ghost"
@@ -1544,7 +1721,7 @@ function App() {
                     </Button>
                   </>
                 )}
-                {currentView === "skillsDiscovery" && (
+                {currentView === "skillsDiscovery" && skillsTarget && (
                   <>
                     <Button
                       variant="ghost"
@@ -1565,19 +1742,6 @@ function App() {
                       {t("skills.repoManager")}
                     </Button>
                   </>
-                )}
-                {(currentView === "providers" || currentView === "account") && (
-                  <AppSwitcher
-                    activeApp={activeApp}
-                    accountSelected={currentView === "account"}
-                    onSelectAccount={() => setCurrentView("account")}
-                    onSwitch={(app) => {
-                      setActiveApp(app);
-                      setCurrentView("providers");
-                    }}
-                    visibleApps={visibleApps}
-                    compact={isToolbarCompact}
-                  />
                 )}
                 {currentView === "providers" && (
                   <>
@@ -1759,7 +1923,10 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 flex flex-col overflow-y-auto animate-fade-in">
+      <main
+        className="flex-1 min-h-0 flex flex-col overflow-y-auto animate-fade-in transition-[margin] duration-200"
+        style={{ marginLeft: sidebarCollapsed ? 68 : 228 }}
+      >
         {isOpenClawView && openclawHealthWarnings.length > 0 && (
           <OpenClawHealthBanner warnings={openclawHealthWarnings} />
         )}
@@ -1775,29 +1942,46 @@ function App() {
           onClose={() => setConfigureKey(null)}
           onExisting={(app, providerId) => {
             setConfigureKey(null);
-            setActiveApp(app);
-            setCurrentView("providers");
+            if (isNativeTool(app)) setCurrentView(app);
+            else {
+              setActiveApp(app);
+              setCurrentView("providers");
+            }
             setAccountProviderFocus({ app, providerId });
           }}
           onReady={(draft) => {
             setConfigureKey(null);
-            setActiveApp(draft.appId);
-            setCurrentView("providers");
+            if (isNativeTool(draft.appId)) setCurrentView(draft.appId);
+            else {
+              setActiveApp(draft.appId);
+              setCurrentView("providers");
+            }
             setAccountProviderFocus({ app: draft.appId });
             setTuziDraft(draft);
           }}
         />
       )}
-      {tuziDraft && tuziDraft.generation === account.state.generation && (
-        <TuziProviderDialog
-          draft={tuziDraft}
-          onClose={() => setTuziDraft(null)}
-          onSaved={(providerId) => {
-            setAccountProviderFocus({ app: tuziDraft.appId, providerId });
-            setTuziDraft(null);
-          }}
-        />
-      )}
+      {tuziDraft &&
+        tuziDraft.generation === account.state.generation &&
+        (isNativeTool(tuziDraft.appId) ? (
+          <TuziNativeToolDialog
+            draft={tuziDraft as TuziProviderDraft<NativeTool>}
+            onClose={() => setTuziDraft(null)}
+            onSaved={(providerId) => {
+              setAccountProviderFocus({ app: tuziDraft.appId, providerId });
+              setTuziDraft(null);
+            }}
+          />
+        ) : (
+          <TuziProviderDialog
+            draft={tuziDraft as TuziProviderDraft<AppId>}
+            onClose={() => setTuziDraft(null)}
+            onSaved={(providerId) => {
+              setAccountProviderFocus({ app: tuziDraft.appId, providerId });
+              setTuziDraft(null);
+            }}
+          />
+        ))}
       <AddProviderDialog
         open={isAddOpen}
         onOpenChange={setIsAddOpen}

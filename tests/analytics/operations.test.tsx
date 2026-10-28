@@ -5,7 +5,11 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { useAccount } from "@/lib/query/account";
 import { disconnectedAccount } from "@/lib/api/account";
 import { useWrite } from "@/components/account/BusinessShared";
-import { useUpsertMcpServer, useAllMcpServers } from "@/hooks/useMcp";
+import {
+  useUpsertMcpServer,
+  useAllMcpServers,
+  useToggleMcpApp,
+} from "@/hooks/useMcp";
 import { useAddProviderMutation } from "@/lib/query/mutations";
 import { useImportExport } from "@/hooks/useImportExport";
 import { settingsApi } from "@/lib/api";
@@ -51,6 +55,42 @@ afterEach(() => {
 });
 
 describe("real operation hooks with synthetic native responses", () => {
+  it("refreshes MCP state after a failed native toggle and reports only its fixed tool", async () => {
+    let reads = 0;
+    invoke.mockImplementation(async (command: string) => {
+      if (command === "get_mcp_servers") {
+        reads++;
+        return {};
+      }
+      throw { code: "write_failed", message: "synthetic-private-path" };
+    });
+    const { wrapper } = setup();
+    const { result } = renderHook(
+      () => ({ read: useAllMcpServers(), toggle: useToggleMcpApp() }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.read.isSuccess).toBe(true));
+    const initialReads = reads;
+    await act(async () => {
+      await expect(
+        result.current.toggle.mutateAsync({
+          serverId: "synthetic-private-id",
+          app: "pi",
+          enabled: false,
+        }),
+      ).rejects.toMatchObject({ code: "write_failed" });
+    });
+    await waitFor(() => expect(reads).toBeGreaterThan(initialReads));
+    expect(track).toHaveBeenCalledTimes(2);
+    expect(track.mock.lastCall?.[1]).toMatchObject({
+      tool: "pi",
+      action: "disable",
+      outcome: "failure",
+      error_category: "local_write",
+    });
+    expect(JSON.stringify(track.mock.calls)).not.toContain("synthetic-private");
+  });
+
   it("does not count cancelling an export dialog as an attempted operation", async () => {
     vi.spyOn(settingsApi, "saveFileDialog").mockResolvedValue(null);
     const { result } = renderHook(() => useImportExport());

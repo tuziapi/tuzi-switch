@@ -197,7 +197,7 @@ fn serialize_yaml_section(key: &str, value: &serde_yaml::Value) -> Result<String
 }
 
 /// Replace a YAML section in raw text, or append it if not found.
-fn replace_yaml_section(
+pub(crate) fn replace_yaml_section(
     raw: &str,
     section_key: &str,
     value: &serde_yaml::Value,
@@ -319,7 +319,8 @@ fn write_yaml_section_to_config_locked(
         return Ok(HermesWriteOutcome::default());
     }
 
-    let backup_path = if !raw.is_empty() && !crate::services::tuzi_provider::account_backup_active() {
+    let backup_path = if !raw.is_empty() && !crate::services::tuzi_provider::account_backup_active()
+    {
         Some(create_hermes_backup(&raw)?)
     } else {
         None

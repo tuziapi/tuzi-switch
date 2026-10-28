@@ -87,7 +87,7 @@ mod tests {
     fn includes_config_sqlite_home() {
         let temp = tempdir().expect("tempdir");
         let sqlite_home = temp.path().join("sqlite-home");
-        let config_text = format!("sqlite_home = \"{}\"\n", sqlite_home.display());
+        let config_text = format!("sqlite_home = {}\n", toml_edit::value(sqlite_home.to_string_lossy().as_ref()));
 
         let paths = codex_state_db_paths(temp.path(), &config_text);
 

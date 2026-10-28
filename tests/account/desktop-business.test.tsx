@@ -10,7 +10,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import i18n from "i18next";
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => []) }));
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(async (command: string) =>
+    command === "tuzi_native_tool_sources"
+      ? { sources: [], unavailable: [] }
+      : [],
+  ),
+}));
 import { ConfigureTool } from "@/components/account/ConfigureTool";
 import { AccountMetrics } from "@/components/account/AccountMetrics";
 import zh from "@/i18n/locales/zh.json";
@@ -644,6 +650,9 @@ describe("business actions and secret lifetime", () => {
     ["OpenCode", "opencode", "anthropic", "claude code"],
     ["OpenClaw", "openclaw", "anthropic", "claude code"],
     ["Hermes", "hermes", "anthropic", "claude code"],
+    ["Grok Build", "grokbuild", "anthropic", "claude code"],
+    ["Pi", "pi", "anthropic", "claude code"],
+    ["MiniMax Code", "mcode", "anthropic", "claude code"],
   ])(
     "offers known catalog aliases without endpoint details for %s",
     async (label, app, protocol, alias) => {

@@ -17,6 +17,15 @@ pub struct McpApps {
     pub opencode: bool,
     #[serde(default)]
     pub hermes: bool,
+    #[serde(default)]
+    pub grokbuild: bool,
+    #[serde(default)]
+    pub pi: bool,
+    #[serde(default)]
+    pub mcode: bool,
+    #[serde(default)]
+    // Legacy portable intent only. Local Pi ownership is verified by a file receipt.
+    pub pi_managed: bool,
 }
 
 impl McpApps {
@@ -69,7 +78,14 @@ impl McpApps {
 
     /// 检查是否所有应用都未启用
     pub fn is_empty(&self) -> bool {
-        !self.claude && !self.codex && !self.gemini && !self.opencode && !self.hermes
+        !self.claude
+            && !self.codex
+            && !self.gemini
+            && !self.opencode
+            && !self.hermes
+            && !self.grokbuild
+            && !self.pi
+            && !self.mcode
     }
 }
 

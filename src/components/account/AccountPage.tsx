@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import "./account.css";
+import "./account-polish.css";
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -277,22 +278,31 @@ export function AccountPage({
       className="account-shell account-phase1"
       aria-label={t("account.title")}
     >
-      <div className="account-connection">
+      <div className="account-connection" data-status={state.status}>
         <div className="account-avatar">
           <TuziAccountIcon size={24} />
         </div>
-        <p role="status" aria-live="polite">
+        <p
+          className="account-connection-status"
+          role="status"
+          aria-live="polite"
+        >
           {t(`account.status.${isLoading ? "loading" : state.status}`)}
         </p>
         {state.identity && (
-          <p>
+          <p className="account-connection-identity">
             {state.identity.displayName || state.identity.username}{" "}
             <span className="text-muted-foreground">
               @{state.identity.username}
             </span>
           </p>
         )}
-        <p title={t("account.disconnectHint")}>{t("account.disconnectHint")}</p>
+        <p
+          className="account-connection-hint"
+          title={t("account.disconnectHint")}
+        >
+          {t("account.disconnectHint")}
+        </p>
         {state.status === "offline" && <p>{t("account.offlineHint")}</p>}
         {state.error && (
           <p role="alert">

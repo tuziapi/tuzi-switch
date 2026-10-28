@@ -95,7 +95,12 @@ beforeEach(() => {
   i18n.addResourceBundle("zh", "translation", zh, true, true);
   vi.clearAllMocks();
   localStorage.setItem("tuzi-account-display-currency", "CNY");
-  vi.mocked(invoke).mockResolvedValue([]);
+  vi.mocked(invoke).mockImplementation(
+    async (command) =>
+      (command === "tuzi_native_tool_sources"
+        ? { sources: [], unavailable: [] }
+        : []) as never,
+  );
   vi.mocked(desktopRequest).mockImplementation(async (req) => {
     if (req.path === "/account/account")
       return env({ quota: "1000000", money }) as never;
@@ -226,45 +231,103 @@ describe("B09 key workflow regressions", () => {
     expect(screen.queryByText(/不代表实际消费为零/)).toBeNull();
     expect(screen.getByText("还没有 API 密钥").closest("td")).not.toBeNull();
   });
-  it("routes an existing known configuration without revealing or duplicating its key", async () => {
-    vi.mocked(invoke).mockResolvedValue([
-      {
+  it.each(["codex", "grokbuild", "pi", "mcode"])(
+    "routes existing %s configuration without revealing or duplicating its key",
+    async (tool) => {
+      const record = {
         site: "https://api.tu-zi.com",
         userId: "42",
         tokenId: "101",
-        app: "codex",
+        app: tool,
         providerId: "provider-1",
-      },
-    ]);
-    const existing = vi.fn(),
-      ready = vi.fn();
-    setup(
-      <ConfigureTool
-        state={state}
-        keyDto={key}
-        onClose={vi.fn()}
-        onReady={ready}
-        onExisting={existing}
-      />,
-    );
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Codex/ })).toBeEnabled(),
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Codex/ }));
-    expect(existing).toHaveBeenCalledWith("codex", "provider-1");
-    expect(ready).not.toHaveBeenCalled();
-    expect(desktopRequest).not.toHaveBeenCalled();
-  });
+      };
+      vi.mocked(invoke).mockImplementation(
+        async (command) =>
+          (command === "tuzi_native_tool_sources"
+            ? { sources: tool === "codex" ? [] : [record], unavailable: [] }
+            : tool === "codex"
+              ? [record]
+              : []) as never,
+      );
+      const existing = vi.fn(),
+        ready = vi.fn();
+      setup(
+        <ConfigureTool
+          state={state}
+          keyDto={key}
+          onClose={vi.fn()}
+          onReady={ready}
+          onExisting={existing}
+        />,
+      );
+      const label = {
+        codex: /Codex/,
+        grokbuild: /Grok Build/,
+        pi: /^Pi /,
+        mcode: /MiniMax Code/,
+      }[tool]!;
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: label })).toBeEnabled(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      expect(existing).toHaveBeenCalledWith(tool, "provider-1");
+      expect(ready).not.toHaveBeenCalled();
+      expect(desktopRequest).not.toHaveBeenCalled();
+    },
+  );
+  it.each([false, true])(
+    "isolates native source failures from existing tools (IPC failure: %s)",
+    async (ipcFailure) => {
+      vi.mocked(invoke).mockImplementation(async (command) => {
+        if (command === "tuzi_native_tool_sources") {
+          if (ipcFailure) throw new Error("synthetic failure");
+          return { sources: [], unavailable: ["pi"] } as never;
+        }
+        return [] as never;
+      });
+      setup(
+        <ConfigureTool
+          state={state}
+          keyDto={key}
+          onClose={vi.fn()}
+          onReady={vi.fn()}
+        />,
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: /Pi 配置读取失败/ }),
+        ).toBeDisabled(),
+      );
+      expect(
+        screen.getByRole("button", { name: /Claude 选择并配置/ }),
+      ).toBeEnabled();
+      expect(
+        screen.getByRole("button", { name: /Codex 选择并配置/ }),
+      ).toBeEnabled();
+      if (!ipcFailure) {
+        expect(
+          screen.getByRole("button", { name: /Grok Build 选择并配置/ }),
+        ).toBeEnabled();
+        expect(
+          screen.getByRole("button", { name: /MiniMax Code 选择并配置/ }),
+        ).toBeEnabled();
+      }
+    },
+  );
   it("does not mistake another account source for configured; mirrors manual Codex models and forwards chosen tool", async () => {
-    vi.mocked(invoke).mockResolvedValue([
-      {
-        site: "https://api.tu-zi.com",
-        userId: "other",
-        tokenId: "101",
-        app: "codex",
-        providerId: "wrong",
-      },
-    ]);
+    vi.mocked(invoke).mockImplementation(async (command) =>
+      command === "tuzi_native_tool_sources"
+        ? ({ sources: [], unavailable: [] } as never)
+        : ([
+            {
+              site: "https://api.tu-zi.com",
+              userId: "other",
+              tokenId: "101",
+              app: "codex",
+              providerId: "wrong",
+            },
+          ] as never),
+    );
     const ready = vi.fn();
     vi.mocked(desktopRequest).mockImplementation(async (req) =>
       req.method === "POST"
@@ -360,7 +423,6 @@ describe("B09 key workflow regressions", () => {
     "selects catalog endpoint labels and preserves the Key/model for $appId",
     async ({ appId, label, protocol, endpoint, path }) => {
       const ready = vi.fn();
-      vi.mocked(invoke).mockResolvedValue([]);
       vi.mocked(desktopRequest).mockImplementation(async (req) =>
         req.method === "POST"
           ? (env({ key: "SYNTHETIC_MODEL_KEY" }) as never)

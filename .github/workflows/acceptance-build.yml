@@ -1,0 +1,134 @@
+name: Acceptance installers
+run-name: "Installers · ${{ github.ref_name }} · ${{ github.sha }}"
+
+on:
+  push:
+    branches: [gaizhao]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: acceptance-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TUZI_SWITCH_RELEASE_REPOSITORY: ${{ github.repository }}
+  VITE_RELEASE_REPOSITORY: ${{ github.repository }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
+      - run: python3 -m unittest discover -s src-tauri/resources/builtin-skills/codex-image-render-fallback/scripts -p 'test_*.py'
+
+  installers:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x64
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            name: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - name: Read repository Rust version
+        id: rust-version
+        shell: bash
+        run: |
+          node -e 'const fs = require("fs"); const text = fs.readFileSync("rust-toolchain.toml", "utf8"); const version = text.match(/^channel\s*=\s*"([^"]+)"/m)?.[1]; if (!version) throw new Error("Missing pinned Rust channel"); fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ steps.rust-version.outputs.version }}
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          cache-on-failure: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:renderer
+      - name: Native regression (host target)
+        shell: bash
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
+      - name: Isolated MCP service regression
+        if: runner.os == 'macOS'
+        shell: bash
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib native_mcp_service_ -- --ignored --test-threads=1
+      - name: Build installers
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: '-'
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            CONFIG="$(node scripts/tauri-release-config.cjs --unsigned)"
+          else
+            CONFIG="$(node scripts/tauri-release-config.cjs --unsigned --desktop-product-name)"
+          fi
+          pnpm tauri build --target "$BUILD_TARGET" --config "$CONFIG"
+      - name: Collect installers and source manifest
+        shell: bash
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+          BUILD_NAME: ${{ matrix.name }}
+        run: |
+          python3 <<'PY'
+          import hashlib, json, os, pathlib, shutil
+          source = pathlib.Path('src-tauri/target') / os.environ['BUILD_TARGET'] / 'release/bundle'
+          output = pathlib.Path('acceptance-artifacts')
+          output.mkdir()
+          files = []
+          for path in sorted(source.rglob('*')):
+              if path.is_file() and path.suffix in {'.dmg', '.msi', '.exe', '.AppImage', '.deb', '.rpm'}:
+                  target = output / path.name
+                  shutil.copy2(path, target)
+                  files.append({'file': target.name, 'sha256': hashlib.sha256(target.read_bytes()).hexdigest(), 'bytes': target.stat().st_size})
+          if not files:
+              raise SystemExit('No installers were produced')
+          (output / 'manifest.json').write_text(json.dumps({
+              'repository': os.environ['GITHUB_REPOSITORY'], 'commit': os.environ['GITHUB_SHA'],
+              'run': os.environ['GITHUB_RUN_ID'], 'target': os.environ['BUILD_TARGET'],
+              'version': json.loads(pathlib.Path('package.json').read_text(encoding='utf-8'))['version'],
+              'developerSigned': False, 'notarized': False, 'files': files
+          }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tuzi-assistant-${{ matrix.name }}-${{ github.sha }}
+          path: acceptance-artifacts/*
+          if-no-files-found: error
+          retention-days: 30

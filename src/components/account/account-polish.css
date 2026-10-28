@@ -1,0 +1,359 @@
+/* UI-09: public account workspace only; no shared provider or tool overrides. */
+.account-shell.account-phase1 {
+  flex: 1 0 auto;
+  container: account / inline-size;
+  --account-radius: 24px;
+}
+.account-phase1 > .account-connection {
+  width: calc(100% - 48px);
+  max-width: 1192px;
+  flex-shrink: 0;
+  margin: 18px auto 0;
+  padding: 14px 18px;
+  gap: 8px 12px;
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 20px;
+  background: hsl(var(--card));
+}
+.account-phase1 .account-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 13px;
+  background: hsl(var(--primary) / 0.06);
+}
+.account-connection .account-connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.account-connection-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+.account-connection[data-status="connected"] .account-connection-status {
+  color: #218369;
+}
+.account-connection[data-status="offline"] .account-connection-status {
+  color: #a87512;
+}
+.dark .account-connection[data-status="connected"] .account-connection-status {
+  color: #72cbb3;
+}
+.dark .account-connection[data-status="offline"] .account-connection-status {
+  color: #edc36b;
+}
+.account-connection-identity {
+  font-weight: 500;
+}
+.account-connection-identity > span {
+  font-weight: 400;
+  font-size: 11px;
+}
+.account-connection .account-connection-hint {
+  order: 1;
+  flex-basis: 100%;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+}
+.account-phase1 .account-content {
+  flex-shrink: 0;
+  width: min(100%, 1240px);
+  padding: 24px 24px 36px;
+  gap: 16px;
+}
+.account-phase1 .account-workspace-heading h2 {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+.account-phase1 .account-content > .account-metrics {
+  gap: 14px;
+}
+.account-phase1 .account-content > .account-metrics > div {
+  border-radius: var(--account-radius);
+  border-color: hsl(var(--border) / 0.7);
+  padding: 20px;
+  box-shadow: none;
+}
+.account-phase1 .account-content > .account-metrics dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.account-metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 29px;
+  height: 29px;
+  border-radius: 11px;
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.065);
+}
+.account-phase1 .account-content > .account-metrics dd {
+  margin-top: 12px;
+  font-size: 26px;
+  font-weight: 600;
+}
+.account-phase1 .account-content > .account-metrics .account-token-value {
+  font-size: 20px;
+  letter-spacing: -0.4px;
+}
+.account-phase1 .account-metrics-note {
+  margin-top: -7px;
+  padding-inline: 2px;
+}
+.account-phase1 .account-key-toolbar {
+  padding: 16px;
+  gap: 12px;
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: var(--account-radius);
+  background: hsl(var(--card));
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.account-phase1 .account-key-filters {
+  flex-basis: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.account-phase1 .account-key-filters input,
+.account-phase1 .account-key-filters select {
+  height: 36px;
+  padding-inline: 13px;
+  border-radius: 999px;
+  border-color: transparent;
+  background: hsl(var(--muted) / 0.45);
+  box-shadow: none;
+}
+.account-phase1 .account-key-filters :is(input, select):focus-visible {
+  background: hsl(var(--background));
+}
+.account-phase1 button,
+.account-modal button {
+  border-radius: 999px;
+  box-shadow: none;
+}
+.account-phase1 .account-key-create {
+  margin-left: 0;
+  padding-inline: 18px;
+}
+.account-phase1 .account-key-search-feedback {
+  margin-top: -8px;
+  margin-bottom: -8px;
+  padding-inline: 3px;
+}
+.account-phase1 .account-table-scroll {
+  border-radius: var(--account-radius);
+  border-color: hsl(var(--border) / 0.7);
+  background: hsl(var(--card));
+}
+.account-phase1 .account-key-table {
+  min-width: 870px;
+}
+.account-phase1 .account-key-table th {
+  background: hsl(var(--muted) / 0.35);
+  font-size: 11px;
+}
+.account-phase1 .account-key-table :is(th, td) {
+  padding: 15px 16px;
+  border-color: hsl(var(--border) / 0.6);
+}
+.account-phase1 .account-key-table tbody tr:hover {
+  background: hsl(var(--muted) / 0.2);
+}
+.account-phase1 .account-badge {
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.account-phase1 .account-row-actions {
+  gap: 3px 10px;
+}
+.account-phase1 .account-configure-primary {
+  padding-inline: 14px;
+}
+.account-phase1 .account-currency {
+  padding: 3px;
+  border-radius: 999px;
+  border-color: hsl(var(--border) / 0.6);
+  background: hsl(var(--muted) / 0.45);
+}
+.account-phase1 .account-currency button {
+  min-width: 58px;
+}
+.account-shell.account-disconnected {
+  background: hsl(var(--background));
+}
+.account-disconnected .account-connect-card {
+  border-radius: 28px;
+  border-color: hsl(var(--border) / 0.7);
+  padding: 36px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.035);
+}
+.account-disconnected .account-connect-emblem {
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  background: hsl(var(--primary) / 0.055);
+  margin-bottom: 24px;
+}
+.account-disconnected .account-connect-card h2 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+}
+.account-disconnected .account-connect-form input {
+  height: 44px;
+  border-radius: 14px;
+  padding-inline: 14px;
+  box-shadow: none;
+}
+.account-disconnected .account-connect-actions {
+  gap: 10px;
+}
+.account-disconnected .account-connect-actions button {
+  height: 42px;
+}
+.account-disconnected .account-connect-footnote {
+  margin-top: 22px;
+  border-color: hsl(var(--border) / 0.6);
+}
+.account-modal {
+  border-radius: 26px;
+  border-color: hsl(var(--border) / 0.8);
+}
+.account-modal > :first-child {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border) / 0.6);
+}
+.account-modal > :last-child:not(.account-modal-body) {
+  background: hsl(var(--muted) / 0.15);
+  border-color: hsl(var(--border) / 0.6);
+}
+.account-modal .account-modal-body {
+  padding: 24px;
+}
+.account-modal
+  :is(
+    .account-key-form input:not([type="checkbox"]),
+    .account-key-form select,
+    .account-secret-input,
+    .account-tool-select
+  ) {
+  border-radius: 13px;
+  padding-inline: 13px;
+  box-shadow: none;
+}
+.account-modal .account-group-chips > span {
+  border-radius: 999px;
+}
+.account-modal .account-advanced {
+  padding: 14px;
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 18px;
+  background: hsl(var(--muted) / 0.15);
+}
+.account-modal .account-advanced:not([open]) > summary {
+  margin-bottom: 0;
+}
+.account-modal .account-tool-grid {
+  gap: 12px;
+}
+.account-modal .account-tool-grid button {
+  border-radius: 18px;
+  min-height: 76px;
+  padding: 15px;
+  border: 1px solid hsl(var(--border) / 0.75);
+  background: hsl(var(--card));
+}
+.account-modal .account-tool-grid button[aria-pressed="true"] {
+  border-color: hsl(var(--primary) / 0.55);
+  background: hsl(var(--primary) / 0.055);
+  color: hsl(var(--primary));
+}
+.account-modal .account-tool-grid button:hover {
+  background: hsl(var(--muted) / 0.4);
+}
+.account-modal .account-tool-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: hsl(var(--muted) / 0.45);
+}
+.account-modal .account-tool-options [role="combobox"] {
+  border-radius: 13px;
+}
+.account-model-picker {
+  border-radius: 18px;
+}
+@container account (max-width: 920px) {
+  .account-phase1 .account-key-toolbar {
+    flex-wrap: wrap;
+  }
+  .account-phase1 .account-key-filters {
+    flex-basis: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .account-phase1 .account-key-create {
+    margin-left: auto;
+  }
+}
+@container account (max-width: 760px) {
+  .account-phase1 .account-content > .account-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container account (max-width: 500px) {
+  .account-disconnected .account-connect-card {
+    padding: 26px 22px;
+  }
+  .account-disconnected .account-connect-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .account-disconnected .account-connect-actions button {
+    white-space: normal;
+    padding-inline: 12px;
+  }
+  .account-phase1 > .account-connection {
+    width: calc(100% - 32px);
+    margin-inline: auto;
+    padding: 14px;
+  }
+  .account-phase1 .account-content {
+    padding: 20px 16px 28px;
+  }
+  .account-phase1 .account-content > .account-metrics {
+    gap: 10px;
+  }
+  .account-phase1 .account-content > .account-metrics > div {
+    padding: 14px;
+    border-radius: 20px;
+  }
+  .account-phase1 .account-content > .account-metrics dd {
+    font-size: 22px;
+  }
+  .account-phase1 .account-content > .account-metrics .account-token-value {
+    font-size: 16px;
+  }
+}
+@media (max-width: 500px) {
+  .account-disconnected .account-connect-card {
+    padding: 26px 22px;
+  }
+  .account-modal .account-modal-body {
+    padding: 20px;
+  }
+  .account-modal .account-tool-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .account-modal .account-key-details > div {
+    gap: 12px;
+    grid-template-columns: 85px minmax(0, 1fr);
+  }
+}

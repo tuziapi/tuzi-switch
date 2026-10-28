@@ -1,3 +1,4 @@
+import { isNativeTool } from '@/lib/api/nativeTools';
 import {describe,it,expect} from 'vitest';
 import {TUZI_TOOL_TARGETS,tuziToolCompatibility} from '@/lib/tuziToolCompatibility';
 import {tuziCreationPrefill} from '@/components/providers/TuziProviderDialog';
@@ -14,6 +15,7 @@ describe('account tool creation',()=>{
  });
  it('all seven creation payloads contain only a synthetic model key and independent Codex key',()=>{
   for(const appId of [...new Set(TUZI_TOOL_TARGETS.map(t=>t.appId))]) {
+   if (isNativeTool(appId)) continue;
    const target=TUZI_TOOL_TARGETS.find(t=>t.appId===appId)!;
    const data=tuziCreationPrefill({appId,protocol:target.protocol,key:'SYNTHETIC_MODEL_KEY',tokenId:'17',userId:'20',generation:1,model:'synthetic-model'});
    expect(JSON.stringify(data)).toContain('SYNTHETIC_MODEL_KEY');

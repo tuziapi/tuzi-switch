@@ -207,3 +207,195 @@ async fn codex_uses_key_membership_without_requiring_responses_metadata() {
         task.abort();
     }
 }
+
+fn native_selection(key: &str) -> crate::native_tools::AccountSelection {
+    serde_json::from_value(json!({"id":"tuzi-synthetic", "name":"兔子线路-合成", "model":"synthetic-model-0", "protocol":"responses", "key":key, "contextWindow":null})).unwrap()
+}
+fn native_source(generation: u64) -> crate::services::tuzi_provider::Source {
+    crate::services::tuzi_provider::Source {
+        site: "https://api.tu-zi.com".into(),
+        user_id: "7".into(),
+        token_id: "9".into(),
+        generation,
+    }
+}
+#[tokio::test]
+async fn native_account_save_uses_http_qualification_reveal_and_exact_native_transaction() {
+    use crate::native_tools::{save_account_to, NativeTool};
+    for tool in [NativeTool::Grokbuild, NativeTool::Pi, NativeTool::Mcode] {
+        let (service, _, task) = catalog_server("ok").await;
+        let generation = service.state().generation;
+        let revealed = service
+            .business_request(request(generation, "POST", "/account/keys/9/reveal"))
+            .await
+            .unwrap();
+        let key = revealed["data"]["key"].as_str().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config");
+        let backup = dir.path().join("backup");
+        let saved = save_account_to(
+            &service,
+            tool,
+            "missing".into(),
+            native_selection(key),
+            native_source(generation),
+            &path,
+            &backup,
+        )
+        .await
+        .unwrap();
+        assert!(saved.providers.contains_key("tuzi-synthetic"));
+        assert_eq!(saved.current, None);
+        assert!(std::fs::read_to_string(&path).unwrap().contains(key));
+        assert!(!std::fs::read_to_string(&path)
+            .unwrap()
+            .contains(SYNTHETIC_TOKEN));
+        let bytes = std::fs::read(&path).unwrap();
+        let before_backup = std::fs::read(&backup).unwrap();
+        assert!(save_account_to(
+            &service,
+            tool,
+            saved.revision.clone(),
+            native_selection(key),
+            native_source(generation),
+            &path,
+            &backup
+        )
+        .await
+        .is_err());
+        // Re-revealing cannot bypass the duplicate source check either.
+        service
+            .business_request(request(generation, "POST", "/account/keys/9/reveal"))
+            .await
+            .unwrap();
+        assert!(save_account_to(
+            &service,
+            tool,
+            saved.revision,
+            native_selection(key),
+            native_source(generation),
+            &path,
+            &backup
+        )
+        .await
+        .is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert_eq!(std::fs::read(&backup).unwrap(), before_backup);
+        task.abort();
+    }
+}
+#[tokio::test]
+async fn native_account_save_rejects_wrong_source_and_unrevealed_keys_without_files() {
+    use crate::native_tools::{save_account_to, NativeTool};
+    let (service, _, task) = catalog_server("ok").await;
+    let generation = service.state().generation;
+    service
+        .business_request(request(generation, "POST", "/account/keys/9/reveal"))
+        .await
+        .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("tool/config");
+    let backup = dir.path().join("backup");
+    for (case, key) in [
+        ("wrong-user", "sk-SYNTHETIC_MODEL_KEY"),
+        ("wrong-site", "sk-SYNTHETIC_MODEL_KEY"),
+        ("stale", "sk-SYNTHETIC_MODEL_KEY"),
+        ("wrong-key", "sk-other-synthetic"),
+        ("system-token", SYNTHETIC_TOKEN),
+    ] {
+        let mut source = native_source(generation);
+        match case {
+            "wrong-user" => source.user_id = "8".into(),
+            "wrong-site" => source.site = "https://example.invalid".into(),
+            "stale" => source.generation += 1,
+            _ => {}
+        }
+        assert!(
+            save_account_to(
+                &service,
+                NativeTool::Pi,
+                "missing".into(),
+                native_selection(key),
+                source,
+                &path,
+                &backup
+            )
+            .await
+            .is_err(),
+            "{case}"
+        );
+        assert!(!path.exists());
+        assert!(!backup.exists());
+        assert!(!path.parent().unwrap().exists());
+    }
+    task.abort();
+}
+#[tokio::test]
+async fn native_account_save_rejects_incompatible_or_missing_models_and_catalog_failure() {
+    use crate::native_tools::{save_account_to, NativeTool};
+    for mode in ["protocol", "missing", "error"] {
+        let (service, _, task) = catalog_server(mode).await;
+        let generation = service.state().generation;
+        service
+            .business_request(request(generation, "POST", "/account/keys/9/reveal"))
+            .await
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config");
+        let backup = dir.path().join("backup");
+        assert!(
+            save_account_to(
+                &service,
+                NativeTool::Mcode,
+                "missing".into(),
+                native_selection("sk-SYNTHETIC_MODEL_KEY"),
+                native_source(generation),
+                &path,
+                &backup
+            )
+            .await
+            .is_err(),
+            "{mode}"
+        );
+        assert!(!path.exists());
+        assert!(!backup.exists());
+        task.abort();
+    }
+}
+#[tokio::test]
+async fn native_account_save_rejects_logout_while_qualifying_before_file_side_effects() {
+    use crate::native_tools::{save_account_to, NativeTool};
+    let (service, fixture, task) = catalog_server("logout").await;
+    let generation = service.state().generation;
+    service
+        .business_request(request(generation, "POST", "/account/keys/9/reveal"))
+        .await
+        .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config");
+    let backup = dir.path().join("backup");
+    let work = {
+        let service = service.clone();
+        let path = path.clone();
+        let backup = backup.clone();
+        tokio::spawn(async move {
+            save_account_to(
+                &service,
+                NativeTool::Grokbuild,
+                "missing".into(),
+                native_selection("sk-SYNTHETIC_MODEL_KEY"),
+                native_source(generation),
+                &path,
+                &backup,
+            )
+            .await
+        })
+    };
+    fixture.entered.notified().await;
+    service.logout().await;
+    fixture.release.notify_one();
+    assert!(work.await.unwrap().is_err());
+    assert!(!path.exists());
+    assert!(!backup.exists());
+    task.abort();
+}

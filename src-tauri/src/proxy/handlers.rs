@@ -58,6 +58,26 @@ pub async fn get_status(State(state): State<ProxyState>) -> Result<Json<ProxySta
     Ok(Json(status))
 }
 
+pub async fn handle_aggregation_models(
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Value>, ProxyError> {
+    if headers.contains_key("anthropic-version") {
+        return crate::aggregation::discovery("claude")
+            .map(Json)
+            .map_err(ProxyError::ConfigError);
+    }
+    let state = crate::aggregation::load("codex").map_err(ProxyError::ConfigError)?;
+    if !state.enabled {
+        return Ok(Json(json!({"models":[]})));
+    }
+    let path = crate::config::get_app_config_dir().join("aggregation/codex-models.json");
+    let data = std::fs::read(path)
+        .map_err(|_| ProxyError::ConfigError("Aggregation catalog unavailable".into()))?;
+    serde_json::from_slice(&data)
+        .map(Json)
+        .map_err(|_| ProxyError::ConfigError("Invalid aggregation catalog".into()))
+}
+
 // ============================================================================
 // Claude API 处理器（包含格式转换逻辑）
 // ============================================================================

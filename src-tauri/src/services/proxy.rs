@@ -1103,6 +1103,7 @@ impl ProxyService {
     }
 
     async fn restore_live_config_for_app_inner(&self, app_type: &AppType) -> Result<(), String> {
+        crate::aggregation::restore_before_route_exit(app_type.as_str())?;
         match app_type {
             AppType::Claude => {
                 if let Ok(Some(backup)) = self.db.get_live_backup("claude").await {
@@ -1168,6 +1169,7 @@ impl ProxyService {
         &self,
         app_type: &AppType,
     ) -> Result<(), String> {
+        crate::aggregation::restore_before_route_exit(app_type.as_str())?;
         let app_type_str = app_type.as_str();
 
         // 1) 优先从 Live 备份恢复（这是"原始 Live"的唯一可靠来源）
@@ -1693,6 +1695,7 @@ impl ProxyService {
         app_type: &str,
         provider_id: &str,
     ) -> Result<HotSwitchOutcome, String> {
+        crate::aggregation::ensure_inactive(app_type)?;
         let app_type_enum =
             AppType::from_str(app_type).map_err(|_| format!("无效的应用类型: {app_type}"))?;
         let mut provider = self
