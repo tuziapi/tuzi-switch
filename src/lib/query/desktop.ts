@@ -27,7 +27,8 @@ export function useDesktop<T>(
         },
         signal,
       );
-      if (path === "/account/models") result.data = normalizeModels(result.data) as T;
+      if (path === "/account/models")
+        result.data = normalizeModels(result.data) as T;
       return result;
     },
     staleTime,

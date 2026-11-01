@@ -1224,15 +1224,17 @@ describe("business actions and secret lifetime", () => {
     };
     vi.mocked(desktopRequest).mockImplementation(async (req) =>
       req.path.includes("model-performance")
-        ? env({
-            model_name: model.model_name,
-            aggregate,
-            groups: [],
-            series_schema: "30m",
-          })
+        ? env([
+            {
+              model_name: model.model_name,
+              aggregate,
+              groups: [],
+              series_schema: "30m",
+            },
+          ])
         : env({
             items: [model],
-            pagination: { page: 1, has_more: false },
+            pagination: { page: 1, page_size: 6, total: "1", has_more: false },
             snapshot_id: "synthetic-snapshot",
             snapshot_refreshed: false,
             pricing_meta: { default_effective_group: "default" },

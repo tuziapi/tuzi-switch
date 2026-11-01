@@ -143,12 +143,12 @@ describe("account workspace navigation", () => {
         ),
     ).toHaveLength(0);
   });
-  it("queries log filters on submit, retains pagination and loads statistics only on demand", async () => {
+  it("queries log filters on submit, retains pagination and loads statistics immediately", async () => {
     const { client } = setup();
     await screen.findByText("合成开发密钥");
     await userEvent.click(tab("logs"));
     await waitFor(() => expect(paths()).toContain("/account/logs"));
-    expect(paths()).not.toContain("/account/logs/statistics");
+    await waitFor(() => expect(paths()).toContain("/account/logs/statistics"));
     fireEvent.change(
       screen.getByLabelText(zh.account.business.logFilter.model_name),
       { target: { value: "synthetic-filter" } },
@@ -195,7 +195,6 @@ describe("account workspace navigation", () => {
         ),
       ).toBe(true),
     );
-    await userEvent.click(screen.getByRole("button", { name: /消费统计/ }));
     await waitFor(() => expect(paths()).toContain("/account/logs/statistics"));
     await userEvent.click(tab("keys"));
     expect(
@@ -242,7 +241,7 @@ describe("account workspace navigation", () => {
           .getAll()
           .some(
             (q) =>
-              q.queryKey.includes("/account/model-performance") &&
+              q.queryKey.includes("/account/model-performance/batch") &&
               q.getObserversCount() > 0,
           ),
       ).toBe(true),
@@ -252,7 +251,7 @@ describe("account workspace navigation", () => {
       client
         .getQueryCache()
         .getAll()
-        .filter((q) => q.queryKey.includes("/account/model-performance"))
+        .filter((q) => q.queryKey.includes("/account/model-performance/batch"))
         .every((q) => q.getObserversCount() === 0),
     ).toBe(true);
     await userEvent.click(tab("modelsStatus"));
@@ -276,22 +275,116 @@ describe("account workspace navigation", () => {
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", {
-          name: zh.account.business.requestSummary,
+          name: "查看详情",
         }).length,
       ).toBeGreaterThan(0),
     );
     await userEvent.click(
       screen.getAllByRole("button", {
-        name: zh.account.business.requestSummary,
+        name: "查看详情",
       })[0],
     );
     expect(
-      screen.getByRole("dialog", { name: zh.account.business.requestSummary }),
+      screen.getByRole("dialog", { name: "请求详情" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("/v1/responses")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByText("同一请求的关联记录（扣费、错误、退款）"),
+    );
     await waitFor(() =>
       expect(paths().some((p) => p.startsWith("/account/logs/requests/"))).toBe(
         true,
       ),
     );
+  });
+  it("handles an empty Enter search and recovers to optional-field model details", async () => {
+    setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("models"));
+    await screen.findByText("gpt-5.6-sol");
+    await userEvent.type(
+      screen.getByLabelText(zh.account.business.modelFilter.search),
+      "11{Enter}",
+    );
+    await screen.findByText(zh.account.workspace.noModels);
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    await userEvent.click(screen.getByRole("button", { name: "清空筛选" }));
+    await screen.findByText("gpt-5.6-sol");
+    await userEvent.click(
+      screen.getAllByRole("button", { name: zh.account.business.details })[0],
+    );
+    expect(
+      screen.getByRole("dialog", { name: "gpt-5.6-sol" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("页面暂时无法显示，请重试或切换标签页。"),
+    ).toBeNull();
+  });
+  it("shows six status cards and requests only the next page's models", async () => {
+    setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("modelsStatus"));
+    await screen.findAllByText("99.8%");
+    expect(document.querySelectorAll(".account-status-card")).toHaveLength(6);
+    expect(
+      document.querySelectorAll(
+        ".account-status-card > .account-performance-metrics .account-timeline",
+      ),
+    ).toHaveLength(6);
+    await userEvent.click(
+      screen.getByRole("button", { name: zh.account.business.next }),
+    );
+    await screen.findByText("kimi-k2");
+    expect(document.querySelectorAll(".account-status-card")).toHaveLength(2);
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(invoke)
+          .mock.calls.some(
+            ([cmd, args]) =>
+              cmd === "account_request" &&
+              JSON.stringify(args).includes(
+                '"models":["kimi-k2","gemini-flash"]',
+              ),
+          ),
+      ).toBe(true),
+    );
+  });
+  it("shows ten logs and opens public error details without a request-summary fetch", async () => {
+    setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("logs"));
+    await screen.findAllByRole("button", { name: "查看详情" });
+    expect(
+      document.querySelectorAll(".account-log-table tbody tr"),
+    ).toHaveLength(10);
+    expect(screen.getByText("共 20 条 · 1–10 条")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "查看详情" })[2],
+    );
+    expect(screen.getByText("合成错误：请稍后重试")).toBeInTheDocument();
+    expect(screen.getByText("synthetic-upstream-2")).toBeInTheDocument();
+    expect(paths().some((path) => path.includes("/logs/requests/"))).toBe(
+      false,
+    );
+  });
+  it("renders malformed catalog responses as errors while keeping tabs usable", async () => {
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      const request = (args as { request?: { path: string } } | undefined)
+        ?.request;
+      if (command === "account_request" && request?.path === "/account/models")
+        return {
+          success: true,
+          data: { items: null, pagination: { total: "0" } },
+        };
+      return accountPreviewIPC(command, args);
+    });
+    setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("models"));
+    await screen.findByRole("alert");
+    expect(screen.queryByText(zh.account.workspace.noModels)).toBeNull();
+    await userEvent.click(tab("keys"));
+    await screen.findByText("合成开发密钥");
   });
 });
