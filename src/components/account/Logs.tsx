@@ -188,32 +188,6 @@ export function Logs({ state }: { state: AccountState }) {
           <p role="alert">{t("account.workspace.invalidRange")}</p>
         )}
       </form>
-      <div className="account-log-summary">
-        {summary.data && (
-          <dl className="account-consumption-values">
-            {[
-              ["记录消费", amount(summary.data.data.quota)],
-              ["记录数", summary.data.data.record_count],
-              [
-                "输入 / 输出 Token",
-                `${summary.data.data.prompt_tokens} / ${summary.data.data.completion_tokens}`,
-              ],
-              ["错误", summary.data.data.error_count],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </div>
-      <p
-        className="account-compact-notice"
-        title={t("account.business.logsNotice")}
-      >
-        {t("account.workspace.logNotice")}
-      </p>
       <QueryState
         query={{
           isLoading: list.isLoading || summary.isLoading || account.isLoading,
@@ -263,6 +237,32 @@ export function Logs({ state }: { state: AccountState }) {
       )}
       <section className="account-card account-log-statistics">
         <h3>{t("account.workspace.statistics")}</h3>
+        <div className="account-log-summary">
+          {summary.data && (
+            <dl className="account-consumption-values">
+              {[
+                ["记录消费", amount(summary.data.data.quota)],
+                ["记录数", summary.data.data.record_count],
+                [
+                  "输入 / 输出 Token",
+                  `${summary.data.data.prompt_tokens} / ${summary.data.data.completion_tokens}`,
+                ],
+                ["错误", summary.data.data.error_count],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+        <p
+          className="account-compact-notice"
+          title={t("account.business.logsNotice")}
+        >
+          {t("account.workspace.logNotice")}
+        </p>
         <QueryState query={statistics} />
         {statistics.data && (
           <>

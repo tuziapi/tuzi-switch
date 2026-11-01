@@ -6,7 +6,6 @@ import "./account-polish.css";
 import "./account-workspace.css";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AccountViewState } from "./AccountViewState";
-import { AccountSettings } from "./AccountSettings";
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,6 @@ function AccountPageContent({
 }) {
   const { t } = useTranslation();
   const [page, setPage] = useState<AccountPageId>("keys");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionFailed, setActionFailed] = useState(false);
   // This input exists only in this mounted form, never in query or persistent state.
@@ -330,9 +328,6 @@ function AccountPageContent({
           >
             {t(checking ? "account.checkingConnection" : "account.retry")}
           </Button>
-          <Button variant="outline" onClick={() => setSettingsOpen(true)}>
-            {t("account.workspace.settings")}
-          </Button>
           <Button
             variant="outline"
             disabled={busy}
@@ -387,9 +382,6 @@ function AccountPageContent({
           </TabsContent>
         ))}
       </Tabs>
-      {settingsOpen && (
-        <AccountSettings state={state} onClose={() => setSettingsOpen(false)} />
-      )}
     </section>
   );
 }

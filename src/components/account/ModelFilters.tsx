@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -43,18 +43,27 @@ function Choices({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
+          className="account-facet-select"
           variant="outline"
           role="combobox"
           aria-label={label}
           aria-expanded={open}
         >
-          {label}：
-          {chosen.length
-            ? chosen
-                .map((v) => options.find(([key]) => key === v)?.[1] ?? v)
-                .join("、")
-            : "全部"}{" "}
-          ▾
+          <span
+            className="account-facet-value"
+            title={chosen
+              .map((v) => options.find(([key]) => key === v)?.[1] ?? v)
+              .join("、")}
+          >
+            {label}：
+            {chosen.length
+              ? chosen
+                  .map((v) => options.find(([key]) => key === v)?.[1] ?? v)
+                  .join("、")
+              : "全部"}
+          </span>
+          <span aria-hidden="true">▾</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-0" align="start">
@@ -101,7 +110,9 @@ export function ModelFilters({
   values,
   status,
   onChange,
+  children,
 }: {
+  children?: ReactNode;
   meta: Record<string, unknown>;
   values: Record<string, string>;
   status: boolean;
@@ -140,16 +151,9 @@ export function ModelFilters({
   return (
     <div className="account-model-filter-options">
       {fields
-        .filter((f) =>
-          status ? ["endpoint_type", "group"].includes(f.key) : f.key !== "tag",
-        )
+        .filter((f) => !status || ["endpoint_type", "group"].includes(f.key))
         .map(field)}
-      {!status && (
-        <details>
-          <summary>更多筛选</summary>
-          {field(fields[4])}
-        </details>
-      )}
+      {children}
       {Object.entries(values)
         .filter(([k, v]) => k !== "search" && v)
         .map(([k, v]) => (

@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { ModelIcon } from "./ModelIcon";
 import { ModelFilters, billingLabels } from "./ModelFilters";
 import { AccountErrorBoundary } from "./AccountErrorBoundary";
@@ -14,7 +15,7 @@ import type {
   Performance,
 } from "@/lib/api/desktop";
 import { useAccountRead, useDesktop } from "@/lib/query/desktop";
-import { date, Field, Pager, QueryState } from "./BusinessShared";
+import { date, Pager, QueryState } from "./BusinessShared";
 import { PricingDetails } from "./PricingDetails";
 import { AccountDialog } from "./AccountDialog";
 import { useAccountViewState } from "./AccountViewState";
@@ -155,13 +156,23 @@ export function ModelsPage({
           query();
         }}
       >
-        <Field
-          label={t("account.business.modelFilter.search")}
-          value={draft.search ?? ""}
-          onChange={(value) =>
-            setDraft((previous) => ({ ...previous, search: value }))
-          }
-        />
+        <label className="account-model-search">
+          <Search size={16} aria-hidden="true" />
+          <span className="sr-only">
+            {t("account.business.modelFilter.search")}
+          </span>
+          <input
+            aria-label={t("account.business.modelFilter.search")}
+            placeholder={t("account.business.modelFilter.search")}
+            value={draft.search ?? ""}
+            onChange={(event) =>
+              setDraft((previous) => ({
+                ...previous,
+                search: event.target.value,
+              }))
+            }
+          />
+        </label>
         <ModelFilters
           meta={models.data?.data.pricing_meta ?? {}}
           values={filters}
@@ -177,29 +188,37 @@ export function ModelsPage({
             setSnapshot(undefined);
             setSelected(null);
           }}
-        />
-        {Object.values(draft).some(Boolean) && (
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => {
-              setDraft({});
-              setFilters({});
-              setPage(1);
-              setSnapshot(undefined);
-            }}
-          >
-            清空筛选
-          </Button>
-        )}
+        >
+          {performance && (
+            <label className="account-window-select">
+              <span>{t("account.business.window")}</span>
+              <select
+                value={hours}
+                onChange={(event) => setHours(Number(event.target.value))}
+              >
+                {[1, 6, 24].map((h) => (
+                  <option key={h} value={h}>
+                    {h} h
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </ModelFilters>
         <div className="account-inline-actions">
-          {!performance && (
-            <span
-              className="account-subtle"
-              title={t("account.business.accountPrices")}
+          {Object.values(draft).some(Boolean) && (
+            <Button
+              type="button"
+              variant="link"
+              onClick={() => {
+                setDraft({});
+                setFilters({});
+                setPage(1);
+                setSnapshot(undefined);
+              }}
             >
-              {t("account.business.accountPrices")}
-            </span>
+              清空筛选
+            </Button>
           )}
           <Button type="submit" disabled={models.isFetching}>
             {t("account.workspace.query")}
@@ -220,22 +239,6 @@ export function ModelsPage({
       <QueryState query={models} showUpdated={false} />
       {performance ? (
         <>
-          <div className="account-performance-toolbar">
-            <span className="account-subtle">热门优先 · 每页 6 个模型</span>
-            <label>
-              {t("account.business.window")}
-              <select
-                value={hours}
-                onChange={(e) => setHours(Number(e.target.value))}
-              >
-                {[1, 6, 24].map((h) => (
-                  <option key={h} value={h}>
-                    {h} h
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
           <QueryState query={quality} showUpdated={false} />
           <div className="account-status-grid">
             {models.data?.data.items.map((model) => {
@@ -385,30 +388,81 @@ export function ModelsPage({
         >
           <AccountErrorBoundary key={selected.model_name}>
             <div className="account-model-detail">
-              <p>{description(selected)}</p>
-              <p>{selected.tags}</p>
-              <p>
-                {selected.enable_groups.join(", ")} ·{" "}
-                {selected.supported_endpoint_types.join(", ")}
-              </p>
-              <p>
-                {t("account.business.billingMode")}:{" "}
-                {billingLabels[String(selected.quota_type)] ??
-                  selected.billing_mode ??
-                  "—"}{" "}
-                · {t("account.business.priceVersion")}:{" "}
-                {selected.pricing_version ?? "—"}
-              </p>
-              <p>{priceSummary(selected)}</p>
-              {selected.billing_expr && <code>{selected.billing_expr}</code>}
-              <details className="account-data-details" open>
-                <summary>{t("account.business.effectivePrice")}</summary>
+              <section className="account-model-intro">
+                <div className="account-model-identity">
+                  <span className="account-model-icon-tile">
+                    <ModelIcon name={selected.model_name} />
+                  </span>
+                  <div>
+                    <span className="account-badge">
+                      {billingLabels[String(selected.quota_type)] ??
+                        selected.billing_mode ??
+                        "—"}
+                    </span>
+                    {description(selected) && <p>{description(selected)}</p>}
+                  </div>
+                </div>
+                {selected.tags && (
+                  <div className="account-model-tags">
+                    {selected.tags
+                      .split(/[,，]/)
+                      .filter(Boolean)
+                      .map((tag) => (
+                        <span className="account-badge" key={tag}>
+                          {tag.trim()}
+                        </span>
+                      ))}
+                  </div>
+                )}
+              </section>
+              <section className="account-model-availability">
+                <div>
+                  <h4>{t("account.business.modelFilter.endpoint_type")}</h4>
+                  <div className="account-model-tags">
+                    {selected.supported_endpoint_types.length
+                      ? selected.supported_endpoint_types.map((value) => (
+                          <span className="account-badge" key={value}>
+                            {value}
+                          </span>
+                        ))
+                      : "—"}
+                  </div>
+                </div>
+                <div>
+                  <h4>{t("account.business.modelFilter.group")}</h4>
+                  <div className="account-model-tags">
+                    {selected.enable_groups.length
+                      ? selected.enable_groups.map((value) => (
+                          <span className="account-badge" key={value}>
+                            {value}
+                          </span>
+                        ))
+                      : "—"}
+                  </div>
+                </div>
+              </section>
+              <div className="account-model-price-section">
+                {selected.pricing_unavailable && (
+                  <p className="account-subtle">
+                    {t("account.business.priceUnavailable")}
+                  </p>
+                )}
                 <PricingDetails
                   model={selected}
                   meta={models.data?.data.pricing_meta ?? {}}
                   group={filters.group}
                 />
-              </details>
+              </div>
+              {(selected.billing_expr || selected.pricing_version) && (
+                <details className="account-model-technical">
+                  <summary>{t("account.visual.details")}</summary>
+                  <p>
+                    {t("account.business.priceVersion")}:{" "}
+                    {selected.pricing_version ?? "—"}
+                  </p>
+                  {selected.billing_expr && <pre>{selected.billing_expr}</pre>}
+                </details>
+              )}
             </div>
           </AccountErrorBoundary>
         </AccountDialog>

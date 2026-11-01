@@ -600,26 +600,6 @@
 .account-stat-breakdown {
   display: block;
 }
-.account-workspace .account-model-controls {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto;
-  align-items: end;
-  gap: 10px;
-}
-.account-model-controls > .account-field {
-  grid-column: 1;
-}
-.account-model-controls > .account-model-filter-options {
-  grid-column: 1 / -1;
-  grid-row: 2;
-}
-.account-model-controls > .account-inline-actions {
-  grid-column: 2;
-  grid-row: 1;
-}
-.account-model-controls > button {
-  justify-self: start;
-}
 .account-status-card .account-quality-values > div {
   border: 0;
   padding: 4px 0;
@@ -662,15 +642,6 @@
   border-radius: 6px;
   font-size: 11px;
 }
-@media (max-width: 760px) {
-  .account-workspace .account-model-controls {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .account-model-controls > .account-inline-actions {
-    grid-column: 1;
-    grid-row: 3;
-  }
-}
 .account-timeline .account-no-samples {
   flex: 1;
   min-width: 100%;
@@ -695,4 +666,260 @@
 .account-model-rank progress::-moz-progress-bar {
   background: #1688ed;
   border-radius: 3px;
+}
+
+/* ACCOUNT-OPEN-03: align model controls and keep the request list first. */
+.account-workspace .account-model-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.account-model-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--muted) / 0.3);
+  color: hsl(var(--muted-foreground));
+}
+.account-workspace .account-model-search input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: hsl(var(--foreground));
+  outline: none;
+}
+.account-model-search:focus-within {
+  border-color: #1688ed;
+  box-shadow: 0 0 0 2px #1688ed18;
+}
+.account-model-controls > .account-inline-actions {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  gap: 8px;
+}
+.account-model-controls .account-inline-actions button {
+  height: 38px;
+}
+.account-model-controls > .account-model-filter-options {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-workspace .account-facet-select,
+.account-window-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--card));
+  font-size: 12px;
+  font-weight: 400;
+  color: hsl(var(--foreground));
+}
+.account-workspace .account-facet-select {
+  flex: 1 1 135px;
+  justify-content: space-between;
+}
+.account-workspace .is-performance .account-facet-select {
+  flex: 0 1 auto;
+  min-width: 150px;
+}
+.account-workspace .account-window-select select {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  height: 30px;
+  width: auto;
+}
+.account-workspace .account-window-select span {
+  color: hsl(var(--muted-foreground));
+}
+.account-model-filter-options > .account-badge {
+  padding: 6px 10px;
+}
+.account-log-statistics .account-consumption-values {
+  margin: 8px 0 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: hsl(var(--muted) / 0.35);
+}
+.account-log-statistics .account-consumption-values dd {
+  font-size: 15px;
+  margin-top: 4px;
+}
+.account-log-statistics .account-compact-notice {
+  margin: 0 0 16px;
+}
+.account-model-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.account-model-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.account-model-identity > div {
+  min-width: 0;
+}
+.account-model-icon-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: hsl(var(--muted) / 0.6);
+}
+.account-model-identity p {
+  margin: 8px 0 0;
+  line-height: 1.7;
+  color: hsl(var(--muted-foreground));
+}
+.account-model-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.account-model-tags .account-badge {
+  padding: 4px 9px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.account-model-availability {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.account-model-availability h4 {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.account-model-price-section {
+  padding: 18px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+  background: hsl(var(--muted) / 0.15);
+}
+.account-model-price-section .account-pricing h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.account-model-price-section .account-pricing > p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: hsl(var(--muted-foreground));
+  margin: 0 0 14px;
+}
+.account-model-price-section .account-pricing > dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.account-model-price-section .account-pricing > dl:empty {
+  display: none;
+}
+.account-model-price-section .account-pricing > dl > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--card));
+}
+.account-model-price-section .account-pricing dt {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.account-model-price-section .account-pricing dd {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.account-model-technical {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.account-model-technical summary {
+  cursor: pointer;
+}
+.account-model-technical p,
+.account-model-technical pre {
+  margin-top: 10px;
+}
+.account-model-price-section pre,
+.account-model-technical pre {
+  padding: 12px;
+  border-radius: 8px;
+  background: hsl(var(--muted));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.account-drawer .account-model-configure {
+  gap: 10px;
+}
+@media (max-width: 600px) {
+  .account-workspace .account-model-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .account-model-controls > .account-inline-actions {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .account-workspace .account-facet-select {
+    flex: 1 1 140px;
+  }
+  .account-model-availability {
+    grid-template-columns: 1fr;
+  }
+}
+.account-facet-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .account-workspace
+    .account-models-page:not(.is-performance)
+    .account-model-filter-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .account-workspace
+    .account-models-page:not(.is-performance)
+    .account-model-filter-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

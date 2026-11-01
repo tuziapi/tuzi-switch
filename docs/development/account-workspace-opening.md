@@ -63,3 +63,17 @@
 - `pnpm tauri build --debug --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'`：成功，包含renderer构建与macOS debug app打包。产物 `src-tauri/target/debug/bundle/macos/兔子助手.app`。既有chunk体积/依赖数据库过期及Rust未使用项警告未阻断构建。
 - 浏览器合成验证：宽窗口、720px深色单列状态，11搜索回车空结果及恢复、计费选项、缺省字段模型详情、模型排行抽屉和常驻统计。截图 `account-opening-evidence/{logs-refinement,statistics-refinement,status-refinement,status-refinement-narrow-dark}.png`。预览 `http://127.0.0.1:5217/`，只使用合成IPC，不连接生产账户。
 - 日志 `/tmp/tuzi-account-refinement-final-{full,build}.log`、`/tmp/tuzi-account-refinement-native-all.log`。代码、单元测试及本地构建完成；真实账户联调、Windows/Linux WebView及用户验收未宣称完成，无远端发布。
+
+## ACCOUNT-OPEN-03 展示精简（2026-11-02）
+
+按用户五项反馈执行，仅React/CSS变动，API、原生、权限、凭证和工具事务不变。
+
+- 调用消费摘要和账务说明移到列表下方的常驻消费统计内，摘要使用紧凑底色区；列表前不再堆叠统计内容。
+- 模型广场标签直接列在筛选行，移除仅含一个字段的更多筛选，以及“当前桌面账户可见价格…”提示。搜索/查询/刷新同一行，选择项统一高度和样式；窄窗口用等宽网格，长值省略并保留完整提示。
+- 状态页使用相同筛选布局，时间窗口融入筛选行，保留6模型分页、接口筛选、全局排序及成功率色块。
+- 模型详情分为图标与说明、接口/可用组标签、价格卡片、折叠技术明细。价格和定价字段保留，不计算替代服务端价格；配置密钥及操作保持固定底部。
+- 账户设置按钮与挂载入口暂时隐藏；设置组件保留，独立未保存保护仍有回归覆盖，无资料请求或写入。
+
+验证：`pnpm typecheck`通过；账户导航/业务/AccountPage三文件68项测试通过；`git diff --check`通过。合成浏览器检查宽窗口日志首屏、模型筛选、详情及状态页，720px筛选等宽换行；证据 `account-opening-evidence/model-detail-polish.png`、`model-filters-polish-narrow.png`。构建结果见本节后续记录。未进行真实账户业务联调或跨平台验收。允许本地commit，不推送或发布；原未跟踪附件保留。
+
+最终 `pnpm tauri build --debug --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'` 成功，日志 `/tmp/tuzi-open03-final-build.log`；定向测试日志 `/tmp/tuzi-open03-tests.log`。已重启本地桌面构建并置前，确认四Tab存在、账户设置入口隐藏；没有开展真实账户写操作或完整业务联调。构建保留既有chunk体积及未使用项警告。

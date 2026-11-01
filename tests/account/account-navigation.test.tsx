@@ -1,3 +1,4 @@
+import { AccountSettings } from "@/components/account/AccountSettings";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -114,11 +115,17 @@ describe("account workspace navigation", () => {
     );
   });
 
-  it("loads settings on demand and asks before discarding edits", async () => {
-    setup();
+  it("hides the settings entry while retaining the standalone settings editor", async () => {
+    const { client } = setup();
     await screen.findByText("合成开发密钥");
-    await userEvent.click(
-      screen.getByRole("button", { name: zh.account.workspace.settings }),
+    expect(
+      screen.queryByRole("button", { name: zh.account.workspace.settings }),
+    ).toBeNull();
+    expect(paths()).not.toContain("/account/profile");
+    const settings = render(
+      <QueryClientProvider client={client}>
+        <AccountSettings state={state} onClose={() => settings.unmount()} />
+      </QueryClientProvider>,
     );
     const input = await screen.findByLabelText(zh.account.business.displayName);
     fireEvent.change(input, { target: { value: "修改后的合成名称" } });
