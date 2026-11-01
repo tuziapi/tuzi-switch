@@ -332,6 +332,18 @@ pub(crate) fn commit<T>(
         }
     }
     let legacy = crate::mcp::transaction::targets(previous, next);
+    // Codex MCP shares config.toml with the aggregation overlay journal.
+    // Hold the mode guard through the entire transaction so a mode transition
+    // cannot capture or restore a configuration while MCP is rewriting it.
+    let _mode_operation = crate::aggregation::read_operation().map_err(AppError::Message)?;
+    if legacy
+        .iter()
+        .any(|(app, _)| *app == crate::app_config::AppType::Codex)
+    {
+        crate::aggregation::ensure_inactive("codex").map_err(|_| {
+            AppError::Message("Exit aggregation before changing Codex MCP configuration".into())
+        })?;
+    }
     commit_all_at_paths(previous, next, targets, legacy, save)
 }
 
@@ -397,6 +409,11 @@ fn commit_all_at_paths<T>(
                 "{} 中的 Pi MCP 尚未在本机认领，请先导入后再管理",
                 path.display()
             )));
+        }
+        // A portable disabled Pi record does not imply a local file exists.
+        // Deleting it only removes database intent; there is nothing to rewrite.
+        if tool == NativeMcpTool::Pi && existing.is_none() && !was_enabled && next.is_none() {
+            continue;
         }
         let expected = if was_enabled || managed_pi {
             &previous.unwrap().server
@@ -805,6 +822,36 @@ mod tests {
         .unwrap();
         let value: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
         assert!(value["mcpServers"].get("fixture").is_none());
+    }
+
+    #[test]
+    fn deleting_portable_disabled_pi_without_local_entry_only_commits_database() {
+        for before in [
+            None,
+            Some(br#"{"mcpServers":{"other":{"command":"keep"}}}"#.as_slice()),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("pi.json");
+            if let Some(bytes) = before {
+                fs::write(&path, bytes).unwrap();
+            }
+            let mut server = fixture();
+            server.apps.pi = false;
+            let saved = std::cell::Cell::new(false);
+            commit_at_paths(
+                Some(&server),
+                None,
+                vec![(path.clone(), NativeMcpTool::Pi, false, false)],
+                || {
+                    saved.set(true);
+                    Ok(())
+                },
+            )
+            .unwrap();
+            assert!(saved.get());
+            assert_eq!(native_tools::read_bytes(&path).unwrap().as_deref(), before);
+            assert!(!path.with_file_name(".pi.json.tuzi-ownership.json").exists());
+        }
     }
 
     #[test]
