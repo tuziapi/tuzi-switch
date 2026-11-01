@@ -168,6 +168,13 @@
     "windowClose": "关闭窗口"
   },
   "versionHistory": {
+    "releaseNotes": "发布说明",
+    "sync": {
+      "local": "正在显示本地版本档案",
+      "syncing": "正在同步发布记录…",
+      "synced": "发布记录已同步",
+      "offline": "暂时无法同步，继续显示已有版本档案"
+    },
     "title": "版本历程",
     "open": "查看版本历程",
     "close": "关闭版本历程",

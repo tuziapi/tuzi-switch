@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { productReleases } from "./versionHistory";
+import releaseSources from "../../docs/development/version-history-sources.json";
 
 const SEMVER_TAG = /^v\d+\.\d+\.\d+$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 
 describe("productReleases", () => {
+  it("完整匹配已核验的公开正式 Release，日期与标签提交来源一致", () => {
+    expect(
+      productReleases.map(({ version, publishedAt, commit, releaseUrl }) => ({
+        version,
+        publishedAt,
+        commit,
+        releaseUrl,
+      })),
+    ).toEqual(releaseSources.releases);
+  });
+
   it("保持版本标识、来源与内容完整", () => {
     const versions = productReleases.map((release) => release.version);
 
