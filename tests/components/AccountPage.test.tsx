@@ -231,7 +231,9 @@ describe("system token connection and phase-one account workspace", () => {
       remoteRevoked: false,
     });
     expect(screen.getByText(zh.account.offlineHint)).toBeInTheDocument();
-    expect(screen.getByText(zh.account.disconnectHint)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: zh.account.disconnectHint }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: zh.account.retry }));
     await waitFor(() => expect(account.retry).toHaveBeenCalledTimes(1));

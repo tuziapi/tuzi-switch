@@ -17,10 +17,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { useUpdate } from "@/contexts/UpdateContext";
 import { settingsApi } from "@/lib/api";
-import {
-  productReleases,
-  type ReleaseChangeCategory,
-} from "@/data/versionHistory";
+import { type ReleaseChangeCategory } from "@/data/versionHistory";
+import { useReleaseHistory } from "@/hooks/useReleaseHistory";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -58,6 +56,7 @@ export function VersionHistory() {
   const { t } = useTranslation();
   const { hasUpdate, updateInfo } = useUpdate();
   const [open, setOpen] = useState(false);
+  const { releases, status: syncStatus } = useReleaseHistory(open);
   const [currentVersion, setCurrentVersion] = useState("");
   const [query, setQuery] = useState("");
   const [expandedVersions, setExpandedVersions] = useState<string[]>([]);
@@ -76,10 +75,10 @@ export function VersionHistory() {
     };
   }, [currentVersion, open]);
 
-  const latestVersion = normalizeVersion(productReleases[0]?.version);
+  const latestVersion = normalizeVersion(releases[0]?.version);
   const filteredReleases = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase();
-    return productReleases
+    return releases
       .map((release) => ({
         ...release,
         changes: release.changes.filter((change) => {
@@ -97,19 +96,20 @@ export function VersionHistory() {
         if (release.changes.length > 0) return true;
         return (
           category === "all" &&
-          release.version.toLocaleLowerCase().includes(keyword)
+          (release.version.toLocaleLowerCase().includes(keyword) ||
+            release.releaseNotes?.toLocaleLowerCase().includes(keyword))
         );
       });
-  }, [category, query]);
+  }, [category, query, releases]);
 
   const defaultExpanded = useMemo(() => {
-    const matched = productReleases.find(
+    const matched = releases.find(
       (release) => normalizeVersion(release.version) === currentVersion,
     );
-    return [matched?.version ?? productReleases[0]?.version].filter(
+    return [matched?.version ?? releases[0]?.version].filter(
       Boolean,
     ) as string[];
-  }, [currentVersion]);
+  }, [currentVersion, releases]);
 
   useEffect(() => {
     if (open && expandedVersions.length === 0) {
@@ -150,7 +150,7 @@ export function VersionHistory() {
             <div>
               <DialogTitle>{t("versionHistory.title")}</DialogTitle>
               <DialogDescription>
-                {t("versionHistory.summary", { count: productReleases.length })}
+                {t("versionHistory.summary", { count: releases.length })}
               </DialogDescription>
             </div>
             <DialogClose asChild>
@@ -182,6 +182,9 @@ export function VersionHistory() {
               </Badge>
             )}
           </div>
+          <p role="status" className="text-xs text-muted-foreground">
+            {t(`versionHistory.sync.${syncStatus}`)}
+          </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <label className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -267,9 +270,11 @@ export function VersionHistory() {
                           <Badge>{t("versionHistory.latest")}</Badge>
                         )}
                         <span className="ml-auto mr-3 text-xs font-normal text-muted-foreground">
-                          {t("versionHistory.changeCount", {
-                            count: release.changes.length,
-                          })}
+                          {release.changes.length
+                            ? t("versionHistory.changeCount", {
+                                count: release.changes.length,
+                              })
+                            : t("versionHistory.releaseNotes")}
                         </span>
                       </div>
                     </AccordionTrigger>
@@ -305,6 +310,16 @@ export function VersionHistory() {
                             </section>
                           );
                         })}
+                        {release.releaseNotes && (
+                          <details open={release.changes.length === 0}>
+                            <summary className="cursor-pointer text-sm font-medium">
+                              {t("versionHistory.releaseNotes")}
+                            </summary>
+                            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
+                              {release.releaseNotes}
+                            </p>
+                          </details>
+                        )}
                         {release.releaseUrl && (
                           <Button
                             type="button"

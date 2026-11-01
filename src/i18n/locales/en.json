@@ -168,6 +168,13 @@
     "windowClose": "Close window"
   },
   "versionHistory": {
+    "releaseNotes": "Release notes",
+    "sync": {
+      "local": "Showing bundled release history",
+      "syncing": "Syncing release history…",
+      "synced": "Release history synced",
+      "offline": "Sync unavailable; showing existing release history"
+    },
     "title": "Version History",
     "open": "View version history",
     "close": "Close version history",

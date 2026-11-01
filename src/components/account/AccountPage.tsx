@@ -7,6 +7,13 @@ import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { AccountBusiness } from "./BusinessPages";
 import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 import type { useAccount } from "@/lib/query/account";
@@ -297,12 +304,6 @@ export function AccountPage({
             </span>
           </p>
         )}
-        <p
-          className="account-connection-hint"
-          title={t("account.disconnectHint")}
-        >
-          {t("account.disconnectHint")}
-        </p>
         {state.status === "offline" && <p>{t("account.offlineHint")}</p>}
         {state.error && (
           <p role="alert">
@@ -335,6 +336,22 @@ export function AccountPage({
           >
             {t("account.disconnect")}
           </Button>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="account-disconnect-help"
+                  aria-label={t("account.disconnectHint")}
+                >
+                  <Info size={15} aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-72">
+                {t("account.disconnectHint")}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
       <section
