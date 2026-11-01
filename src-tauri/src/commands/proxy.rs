@@ -36,6 +36,7 @@ pub async fn stop_proxy_server(state: tauri::State<'_, AppState>) -> Result<(), 
 /// 停止代理服务器（恢复 Live 配置）
 #[tauri::command]
 pub async fn stop_proxy_with_restore(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let _mode_operation = crate::aggregation::read_operation()?;
     crate::services::codex_image_compat::stop_proxy_with_manual_suppression(state.inner()).await
 }
 
@@ -54,6 +55,8 @@ pub async fn set_proxy_takeover_for_app(
     app_type: String,
     enabled: bool,
 ) -> Result<(), String> {
+    let _mode_operation = crate::aggregation::read_operation()?;
+    crate::aggregation::ensure_inactive(&app_type)?;
     if app_type == crate::app_config::AppType::Codex.as_str() {
         crate::services::codex_image_compat::set_manual_takeover(state.inner(), enabled).await?;
     } else {
@@ -276,6 +279,8 @@ pub async fn switch_proxy_provider(
     app_type: String,
     provider_id: String,
 ) -> Result<(), String> {
+    let _mode_operation = crate::aggregation::read_operation()?;
+    crate::aggregation::ensure_inactive(&app_type)?;
     // Block official providers during proxy takeover
     let provider = state
         .db

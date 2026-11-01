@@ -71,6 +71,7 @@ pub struct ForwardError {
 }
 
 pub struct RequestForwarder {
+    aggregation_model: Option<String>,
     /// 共享的 ProviderRouter（持有熔断器状态）
     router: Arc<ProviderRouter>,
     status: Arc<RwLock<ProxyStatus>>,
@@ -118,6 +119,7 @@ impl RequestForwarder {
         copilot_optimizer_config: CopilotOptimizerConfig,
     ) -> Self {
         Self {
+            aggregation_model: None,
             router,
             status,
             current_providers,
@@ -135,6 +137,11 @@ impl RequestForwarder {
                 streaming_first_byte_timeout,
             ),
         }
+    }
+
+    pub(crate) fn with_aggregation_model(mut self, model: Option<String>) -> Self {
+        self.aggregation_model = model;
+        self
     }
 
     /// 转发请求（带故障转移）
@@ -163,6 +170,32 @@ impl RequestForwarder {
                 error: ProxyError::NoAvailableProvider,
                 provider: None,
             });
+        }
+        // Aggregation dispatch never changes failover queues, health, current provider or credentials.
+        if let Some(model) = &self.aggregation_model {
+            let provider = &providers[0];
+            let mut body = body;
+            body["model"] = serde_json::json!(model);
+            return self
+                .forward(
+                    app_type,
+                    provider,
+                    endpoint,
+                    &body,
+                    &headers,
+                    &extensions,
+                    adapter.as_ref(),
+                )
+                .await
+                .map(|(response, claude_api_format)| ForwardResult {
+                    response,
+                    provider: provider.clone(),
+                    claude_api_format,
+                })
+                .map_err(|error| ForwardError {
+                    error,
+                    provider: Some(provider.clone()),
+                });
         }
 
         let mut last_error = None;

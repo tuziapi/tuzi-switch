@@ -518,7 +518,7 @@ export const SkillsPage = forwardRef<SkillsPageHandle, SkillsPageProps>(
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="workspace-skill-grid grid gap-4">
                   {filteredSkills.map((skill) => (
                     <SkillCard
                       key={skill.key}
@@ -556,7 +556,7 @@ export const SkillsPage = forwardRef<SkillsPageHandle, SkillsPageProps>(
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="workspace-skill-grid grid gap-4">
                       {accumulatedResults.map((skill) => {
                         const installed = isSkillsShInstalled(skill);
                         return (

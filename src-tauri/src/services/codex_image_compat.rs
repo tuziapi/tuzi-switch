@@ -7,6 +7,10 @@ use std::{fs, path::Path, sync::Mutex};
 const SKILL_NAME: &str = "codex-image-render-fallback";
 const SKILL_OWNER_FILE: &str = ".tuzi-switch-managed";
 const SKILL_OWNER: &[u8] = b"tuzi-switch:codex-image-render-fallback:v1\n";
+// Older Windows builds embedded this same marker with checkout CRLF endings.
+fn is_skill_owner(bytes: &[u8]) -> bool {
+    bytes == SKILL_OWNER || bytes == b"tuzi-switch:codex-image-render-fallback:v1\r\n"
+}
 const TAKEOVER_OWNER_FILE: &str = "codex-image-compat-takeover-owner";
 const TAKEOVER_OWNED: &str = "owned";
 const TAKEOVER_ACTIVATING: &str = "activating";
@@ -22,9 +26,8 @@ struct EmbeddedSkillFile {
 const EMBEDDED_SKILL_FILES: &[EmbeddedSkillFile] = &[
     EmbeddedSkillFile {
         path: SKILL_OWNER_FILE,
-        content: include_bytes!(
-            "../../resources/builtin-skills/codex-image-render-fallback/.tuzi-switch-managed"
-        ),
+        // Ownership bytes must not depend on Git's platform line-ending conversion.
+        content: SKILL_OWNER,
     },
     EmbeddedSkillFile {
         path: "SKILL.md",
@@ -557,7 +560,7 @@ fn install_managed_skill_at_with_legacy_targets(
                     AppError::io(&owner_path, error)
                 }
             })?;
-            if owner != SKILL_OWNER {
+            if !is_skill_owner(&owner) {
                 return Err(skill_conflict());
             }
             true
@@ -708,7 +711,7 @@ fn uninstall_managed_skill_at(codex_home: &Path) -> Result<bool, AppError> {
         return Ok(false);
     }
     let owner_path = skill_dir.join(SKILL_OWNER_FILE);
-    if fs::read(&owner_path).ok().as_deref() != Some(SKILL_OWNER) {
+    if !fs::read(&owner_path).ok().is_some_and(|owner| is_skill_owner(&owner)) {
         return Ok(false);
     }
 
@@ -843,6 +846,21 @@ mod tests {
     }
 
     #[test]
+    fn windows_legacy_owner_marker_can_upgrade_and_uninstall() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        install_managed_skill_at(temp.path()).expect("install");
+        let marker = temp.path().join("skills").join(SKILL_NAME).join(SKILL_OWNER_FILE);
+        let legacy = b"tuzi-switch:codex-image-render-fallback:v1\r\n";
+        fs::write(&marker, legacy).expect("legacy marker");
+        assert!(install_managed_skill_at(temp.path()).expect("upgrade"));
+        assert_eq!(fs::read(&marker).unwrap(), SKILL_OWNER);
+        fs::write(&marker, legacy).expect("legacy uninstall marker");
+        assert!(uninstall_managed_skill_at(temp.path()).expect("uninstall"));
+        assert!(!marker.parent().unwrap().exists());
+        assert!(!is_skill_owner(b"tuzi-switch:codex-image-render-fallback:v2\r\n"));
+    }
+
+    #[test]
     fn unmanaged_skill_is_never_overwritten_or_removed() {
         let temp = tempfile::tempdir().expect("tempdir");
         let skill_dir = temp.path().join("skills").join(SKILL_NAME);
@@ -942,10 +960,11 @@ mod tests {
 
     #[test]
     fn legacy_targets_cover_custom_default_and_unified_skill_storage() {
-        let home = Path::new("/home/test-user");
-        let custom_app_dir = Path::new("/data/custom-tuzi");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let home = temp.path().join("home");
+        let custom_app_dir = temp.path().join("custom-tuzi");
         assert_eq!(
-            legacy_skill_dirs_for(home, custom_app_dir),
+            legacy_skill_dirs_for(&home, &custom_app_dir),
             vec![
                 custom_app_dir.join("skills").join(SKILL_NAME),
                 home.join(".tuzi-switch").join("skills").join(SKILL_NAME),
@@ -954,7 +973,7 @@ mod tests {
         );
 
         assert_eq!(
-            legacy_skill_dirs_for(home, &home.join(".tuzi-switch")),
+            legacy_skill_dirs_for(&home, &home.join(".tuzi-switch")),
             vec![
                 home.join(".tuzi-switch").join("skills").join(SKILL_NAME),
                 home.join(".agents").join("skills").join(SKILL_NAME),

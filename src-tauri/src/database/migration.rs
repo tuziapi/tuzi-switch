@@ -127,8 +127,8 @@ impl Database {
                 tx.execute(
                     "INSERT OR REPLACE INTO mcp_servers (
                         id, name, server_config, description, homepage, docs, tags,
-                        enabled_claude, enabled_codex, enabled_gemini
-                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                        enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                     params![
                         id,
                         server.name,
@@ -140,6 +140,12 @@ impl Database {
                         server.apps.claude,
                         server.apps.codex,
                         server.apps.gemini,
+                        server.apps.opencode,
+                        server.apps.hermes,
+                        server.apps.grokbuild,
+                        server.apps.pi,
+                        server.apps.mcode,
+                        server.apps.pi_managed,
                     ],
                 )
                 .map_err(|e| AppError::Database(format!("Migrate mcp server failed: {e}")))?;

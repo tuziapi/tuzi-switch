@@ -1,0 +1,86 @@
+/* Provider editors share a compact, solid card layout. */
+.provider-form-shell {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: 18px 20px 28px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 0.05));
+}
+.provider-form-section {
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 0.05));
+  padding: 18px;
+}
+.provider-form-basics {
+  display: grid;
+  gap: 18px;
+}
+.provider-form-fields {
+  display: grid;
+  gap: 20px;
+}
+.provider-form-shell label {
+  color: hsl(var(--foreground));
+  font-weight: 500;
+}
+.provider-form-shell input,
+.provider-form-shell textarea,
+.provider-form-shell [role="combobox"] {
+  border-radius: 8px;
+  border-color: hsl(var(--border));
+  background: hsl(var(--background));
+  box-shadow: none;
+}
+.provider-form-shell input:focus-visible,
+.provider-form-shell textarea:focus-visible,
+.provider-form-shell [role="combobox"]:focus-visible {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.12);
+}
+.provider-form-shell > .rounded-lg.border,
+.provider-form-shell > .rounded-xl.border {
+  border-color: hsl(var(--border));
+  background: hsl(var(--muted) / 0.28);
+  box-shadow: none;
+}
+.provider-form-shell .glass,
+.provider-form-shell .glass-card {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  box-shadow: none;
+}
+@media (max-width: 900px) {
+  .provider-form-shell {
+    width: 100%;
+    padding-inline: 16px;
+  }
+}
+/* Account-created providers follow the rounded account workspace. */
+.provider-form-shell[data-account-prefill="true"] {
+  border-radius: 24px;
+  border-color: hsl(var(--border) / 0.7);
+  padding: 24px;
+  box-shadow: none;
+}
+.provider-form-shell[data-account-prefill="true"]
+  :is(input, textarea, [role="combobox"]) {
+  border-radius: 13px;
+}
+.provider-form-shell[data-account-prefill="true"] .provider-form-section,
+.provider-form-shell[data-account-prefill="true"] > .rounded-lg.border,
+.provider-form-shell[data-account-prefill="true"] > .rounded-xl.border {
+  border-radius: 20px;
+  box-shadow: none;
+}
+.provider-form-shell[data-account-prefill="true"] button {
+  border-radius: 999px;
+}
+@media (max-width: 600px) {
+  .provider-form-shell[data-account-prefill="true"] {
+    padding: 18px 16px;
+  }
+}

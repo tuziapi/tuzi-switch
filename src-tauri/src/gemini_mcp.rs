@@ -77,12 +77,21 @@ pub fn set_mcp_servers_map(
     servers: &std::collections::HashMap<String, Value>,
 ) -> Result<(), AppError> {
     let path = user_config_path();
-    let mut root = if path.exists() {
+    let root = if path.exists() {
         read_json_value(&path)?
     } else {
         serde_json::json!({})
     };
 
+    let root = render_mcp_servers(&path, root, servers)?;
+    write_json_value(&path, &root)
+}
+
+pub(crate) fn render_mcp_servers(
+    _path: &Path,
+    mut root: Value,
+    servers: &std::collections::HashMap<String, Value>,
+) -> Result<Value, AppError> {
     // 构建 mcpServers 对象：移除 UI 辅助字段（enabled/source），仅保留实际 MCP 规范
     let mut out: Map<String, Value> = Map::new();
     for (id, spec) in servers.iter() {
@@ -162,6 +171,5 @@ pub fn set_mcp_servers_map(
         obj.insert("mcpServers".into(), Value::Object(out));
     }
 
-    write_json_value(&path, &root)?;
-    Ok(())
+    Ok(root)
 }

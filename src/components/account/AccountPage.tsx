@@ -2,10 +2,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import "./account.css";
+import "./account-polish.css";
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { AccountBusiness } from "./BusinessPages";
 import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 import type { useAccount } from "@/lib/query/account";
@@ -277,22 +285,25 @@ export function AccountPage({
       className="account-shell account-phase1"
       aria-label={t("account.title")}
     >
-      <div className="account-connection">
+      <div className="account-connection" data-status={state.status}>
         <div className="account-avatar">
           <TuziAccountIcon size={24} />
         </div>
-        <p role="status" aria-live="polite">
+        <p
+          className="account-connection-status"
+          role="status"
+          aria-live="polite"
+        >
           {t(`account.status.${isLoading ? "loading" : state.status}`)}
         </p>
         {state.identity && (
-          <p>
+          <p className="account-connection-identity">
             {state.identity.displayName || state.identity.username}{" "}
             <span className="text-muted-foreground">
               @{state.identity.username}
             </span>
           </p>
         )}
-        <p title={t("account.disconnectHint")}>{t("account.disconnectHint")}</p>
         {state.status === "offline" && <p>{t("account.offlineHint")}</p>}
         {state.error && (
           <p role="alert">
@@ -325,6 +336,22 @@ export function AccountPage({
           >
             {t("account.disconnect")}
           </Button>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="account-disconnect-help"
+                  aria-label={t("account.disconnectHint")}
+                >
+                  <Info size={15} aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-72">
+                {t("account.disconnectHint")}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
       <section

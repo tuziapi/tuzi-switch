@@ -1,5 +1,6 @@
 import React from "react";
 import type { AppId } from "@/lib/api/types";
+import type { NativeTool } from "@/lib/api/nativeTools";
 import {
   ClaudeIcon,
   CodexIcon,
@@ -35,9 +36,36 @@ export const SKILLS_APP_IDS: AppId[] = [
 ];
 
 /** App IDs shown in MCP panels (excludes OpenClaw) */
-export const MCP_APP_IDS: AppId[] = [...SKILLS_APP_IDS];
+export const MCP_APP_IDS: (AppId | NativeTool)[] = [
+  ...SKILLS_APP_IDS,
+  "grokbuild",
+  "pi",
+  "mcode",
+];
 
-export const APP_ICON_MAP: Record<AppId, AppConfig> = {
+export const APP_ICON_MAP: Record<AppId | NativeTool, AppConfig> = {
+  grokbuild: {
+    label: "Grok Build",
+    icon: <ProviderIcon icon="grok" name="Grok Build" size={14} />,
+    activeClass: "bg-neutral-500/10 ring-1 ring-neutral-500/20 text-foreground",
+    badgeClass: "bg-neutral-500/10 text-foreground border-0 gap-1.5",
+  },
+  pi: {
+    label: "Pi",
+    icon: <ProviderIcon icon="pi" name="Pi" size={14} />,
+    activeClass:
+      "bg-cyan-500/10 ring-1 ring-cyan-500/20 text-cyan-700 dark:text-cyan-300",
+    badgeClass:
+      "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-0 gap-1.5",
+  },
+  mcode: {
+    label: "MiniMax Code",
+    icon: <ProviderIcon icon="minimax" name="MiniMax Code" size={14} />,
+    activeClass:
+      "bg-rose-500/10 ring-1 ring-rose-500/20 text-rose-700 dark:text-rose-300",
+    badgeClass:
+      "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-0 gap-1.5",
+  },
   claude: {
     label: "Claude",
     icon: <ClaudeIcon size={14} />,

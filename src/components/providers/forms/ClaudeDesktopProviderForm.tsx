@@ -566,7 +566,7 @@ export function ClaudeDesktopProviderForm({
       <form
         id="provider-form"
         onSubmit={form.handleSubmit(handleSubmit)}
-        className="space-y-6"
+        className="provider-form-shell space-y-6"
       >
         {!editData && (
           <ProviderPresetSelector

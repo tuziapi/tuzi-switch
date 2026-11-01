@@ -10,7 +10,7 @@ import {
   useImportMcpFromApps,
 } from "@/hooks/useMcp";
 import type { McpServer } from "@/types";
-import type { AppId } from "@/lib/api/types";
+import type { WorkspaceTool } from "@/config/workspace";
 import McpFormModal from "./McpFormModal";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { Edit3, Trash2, ExternalLink } from "lucide-react";
@@ -21,6 +21,7 @@ import { MCP_APP_IDS } from "@/config/appConfig";
 import { AppCountBar } from "@/components/common/AppCountBar";
 import { AppToggleGroup } from "@/components/common/AppToggleGroup";
 import { ListItemRow } from "@/components/common/ListItemRow";
+import { WorkspaceQueryError } from "@/components/common/WorkspaceQueryError";
 
 interface UnifiedMcpPanelProps {
   onOpenChange: (open: boolean) => void;
@@ -37,6 +38,7 @@ const UnifiedMcpPanel = React.forwardRef<
 >(({ onOpenChange: _onOpenChange }, ref) => {
   const { t } = useTranslation();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -45,7 +47,7 @@ const UnifiedMcpPanel = React.forwardRef<
     onConfirm: () => void;
   } | null>(null);
 
-  const { data: serversMap, isLoading } = useAllMcpServers();
+  const { data: serversMap, isLoading, error, refetch } = useAllMcpServers();
   const toggleAppMutation = useToggleMcpApp();
   const deleteServerMutation = useDeleteMcpServer();
   const importMutation = useImportMcpFromApps();
@@ -64,6 +66,9 @@ const UnifiedMcpPanel = React.forwardRef<
       opencode: 0,
       openclaw: 0,
       hermes: 0,
+      grokbuild: 0,
+      pi: 0,
+      mcode: 0,
     };
     serverEntries.forEach(([_, server]) => {
       for (const app of MCP_APP_IDS) {
@@ -75,7 +80,7 @@ const UnifiedMcpPanel = React.forwardRef<
 
   const handleToggleApp = async (
     serverId: string,
-    app: AppId,
+    app: WorkspaceTool,
     enabled: boolean,
   ) => {
     try {
@@ -96,6 +101,8 @@ const UnifiedMcpPanel = React.forwardRef<
   };
 
   const handleImport = async () => {
+    if (importMutation.isPending) return;
+    setImportError(null);
     try {
       const count = await importMutation.mutateAsync();
       if (count === 0) {
@@ -108,7 +115,11 @@ const UnifiedMcpPanel = React.forwardRef<
         });
       }
     } catch (error) {
-      toast.error(t("common.error"), { description: String(error) });
+      setImportError(String(error));
+      toast.error(t("common.error"), {
+        description: String(error),
+        duration: 10000,
+      });
     }
   };
 
@@ -148,7 +159,26 @@ const UnifiedMcpPanel = React.forwardRef<
       />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24">
-        {isLoading ? (
+        {importError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm"
+          >
+            <p className="whitespace-pre-wrap break-words">{importError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              disabled={importMutation.isPending}
+              onClick={handleImport}
+            >
+              {t("common.retry", { defaultValue: "重试" })}
+            </Button>
+          </div>
+        )}
+        {error ? (
+          <WorkspaceQueryError onRetry={() => void refetch()} />
+        ) : isLoading ? (
           <div className="text-center py-12 text-muted-foreground">
             {t("mcp.loading")}
           </div>
@@ -217,7 +247,7 @@ UnifiedMcpPanel.displayName = "UnifiedMcpPanel";
 interface UnifiedMcpListItemProps {
   id: string;
   server: McpServer;
-  onToggleApp: (serverId: string, app: AppId, enabled: boolean) => void;
+  onToggleApp: (serverId: string, app: WorkspaceTool, enabled: boolean) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   isLast?: boolean;

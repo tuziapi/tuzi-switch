@@ -23,12 +23,13 @@ mod usage_semantics_migration_tests {
         conn.execute_batch(
             "CREATE TABLE proxy_request_logs (request_id TEXT PRIMARY KEY);
              CREATE TABLE usage_daily_rollups (date TEXT NOT NULL);
+             CREATE TABLE mcp_servers (id TEXT PRIMARY KEY);
              PRAGMA user_version = 10;",
         )?;
 
         Database::apply_schema_migrations_on_conn(&conn)?;
 
-        assert_eq!(Database::get_user_version(&conn)?, 11);
+        assert_eq!(Database::get_user_version(&conn)?, SCHEMA_VERSION);
         assert!(Database::has_column(
             &conn,
             "proxy_request_logs",
@@ -39,6 +40,25 @@ mod usage_semantics_migration_tests {
             "usage_daily_rollups",
             "input_token_semantics"
         )?);
+        Ok(())
+    }
+
+    #[test]
+    fn migrates_v11_mcp_flags_without_losing_rows() -> Result<(), AppError> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(
+            "CREATE TABLE mcp_servers (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+             INSERT INTO mcp_servers VALUES ('existing', 'Existing');
+             PRAGMA user_version = 11;",
+        )?;
+        Database::apply_schema_migrations_on_conn(&conn)?;
+        let row: (String, bool, bool, bool, bool) = conn.query_row(
+            "SELECT name, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed FROM mcp_servers WHERE id = 'existing'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        )?;
+        assert_eq!(row, ("Existing".into(), false, false, false, false));
+        assert_eq!(Database::get_user_version(&conn)?, SCHEMA_VERSION);
         Ok(())
     }
 }
@@ -75,11 +95,13 @@ impl Database {
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
 
-        conn.execute_batch("CREATE TABLE IF NOT EXISTS tuzi_provider_sources (
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS tuzi_provider_sources (
             site TEXT NOT NULL, user_id TEXT NOT NULL, token_id TEXT NOT NULL,
             app_type TEXT NOT NULL, provider_id TEXT NOT NULL,
             PRIMARY KEY(app_type, provider_id)
-        );")?;
+        );",
+        )?;
 
         // 2. Provider Endpoints 表
         conn.execute(
@@ -102,7 +124,11 @@ impl Database {
             description TEXT, homepage TEXT, docs TEXT, tags TEXT NOT NULL DEFAULT '[]',
             enabled_claude BOOLEAN NOT NULL DEFAULT 0, enabled_codex BOOLEAN NOT NULL DEFAULT 0,
             enabled_gemini BOOLEAN NOT NULL DEFAULT 0, enabled_opencode BOOLEAN NOT NULL DEFAULT 0,
-            enabled_hermes BOOLEAN NOT NULL DEFAULT 0
+            enabled_hermes BOOLEAN NOT NULL DEFAULT 0,
+            enabled_grokbuild BOOLEAN NOT NULL DEFAULT 0,
+            enabled_pi BOOLEAN NOT NULL DEFAULT 0,
+            enabled_mcode BOOLEAN NOT NULL DEFAULT 0,
+            pi_managed BOOLEAN NOT NULL DEFAULT 0
         )",
             [],
         )
@@ -473,6 +499,22 @@ impl Database {
                         log::info!("迁移数据库从 v10 到 v11（统一输入 Token 语义）");
                         Self::migrate_v10_to_v11(conn)?;
                         Self::set_user_version(conn, 11)?;
+                    }
+                    11 => {
+                        for column in [
+                            "enabled_grokbuild",
+                            "enabled_pi",
+                            "enabled_mcode",
+                            "pi_managed",
+                        ] {
+                            Self::add_column_if_missing(
+                                conn,
+                                "mcp_servers",
+                                column,
+                                "BOOLEAN NOT NULL DEFAULT 0",
+                            )?;
+                        }
+                        Self::set_user_version(conn, 12)?;
                     }
                     _ => {
                         return Err(AppError::Database(format!(

@@ -61,7 +61,7 @@ export function BasicFormFields({
   return (
     <>
       {/* 图标选择区域 - 顶部居中，可选 */}
-      <div className="flex justify-center mb-6">
+      <div className="provider-form-icon flex justify-center mb-6">
         <Dialog open={iconDialogOpen} onOpenChange={setIconDialogOpen}>
           <DialogTrigger asChild>
             <button

@@ -275,7 +275,7 @@ export function AddProviderDialog({
         <Button
           variant="outline"
           onClick={() => onOpenChange(false)}
-          className="border-border/20 hover:bg-accent hover:text-accent-foreground"
+          className={`border-border/20 hover:bg-accent hover:text-accent-foreground ${creationPrefill ? "rounded-full px-5" : ""}`}
         >
           {t("common.cancel")}
         </Button>
@@ -283,7 +283,7 @@ export function AddProviderDialog({
           type="submit"
           form="provider-form"
           disabled={isFormSubmitting}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
+          className={`bg-primary text-primary-foreground hover:bg-primary/90 ${creationPrefill ? "rounded-full px-5" : ""}`}
         >
           <Plus className="h-4 w-4 mr-2" />
           {t("common.add")}

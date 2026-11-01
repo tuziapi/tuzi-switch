@@ -6,6 +6,18 @@
 
 ## 目标与产品范围
 
+2026-10-27 UI-10：账户单条 Key 配置入口扩展至 Grok Build、Pi、MiniMax Code，按模型协议筛选并保存至各工具原生配置。真实工具验收待完成，见 [UI-10记录](ui10-native-account-tools.md)。
+
+2026-10-27 UI-09：用户授权将兔子账户连接页、四项概要、密钥筛选/表格和创建/配置弹窗统一为已确认的简洁圆角风格。仅展示适配；新增工具的账户一键配置不在本阶段，既有账户认证、业务与隐藏规则保留。见 [UI-09记录](ui09-account-polish.md)。
+
+2026-10-27 UI-07：Agents 入口接入 Claude Code 与 OpenCode 的用户级 Markdown Agent 文件管理。支持读取、搜索、新增、编辑、删除确认和单步恢复；严格按工具原生目录和格式保存，不执行 Agent、不跨工具转换。Claude Desktop、Codex、Gemini CLI、OpenClaw、Hermes 及 Grok Build/Pi/MiniMax Code 的 Agent 管理入口显示明确未支持状态或要求选择已支持工具。详见 [UI-07记录](ui07-agents-management.md)。
+
+2026-10-27 UI-06：按用户确认固定全局工作区导航：MCP、Skills、提示词、会话、授权、本机统计、Agents、统一供应商。授权及本机统计复用现有真实页面；未支持工具显示支持范围并显式选择写入目标，不回落 Claude，恢复全局编辑页也须重新选择目标。Agents 明示待实现；新工具扩展能力未因此增加。见 [UI-06记录](ui06-global-workspace.md)。
+
+2026-10-27 UI-05：用户授权进入新增工具与聚合阶段。新增Grok Build、Pi、MiniMax Code原生供应商配置入口；Claude Code/Codex增加第三方API按模型聚合、默认供应商、模型名单及退出恢复。原七工具和账户边界保留；真实工具验收与官方OAuth聚合、新工具扩展页等未完范围见 [UI-05记录](ui05-native-tools-aggregation.md)。
+
+2026-10-27 UI-04 用户补充：先对齐 CC Switch 截图中的供应商单列布局、蓝色选中态、模式入口和当前目标状态，再进入新增工具与聚合能力阶段。本阶段直连/路由复用既有接管恢复接口和设置门禁，聚合标记待开放并只展示说明；七工具能力及 Claude Desktop 独立路由语义保留。实施与验收限制见 [UI-04记录](ui04-provider-workspace.md)。
+
 用户从助手用系统默认浏览器前往 API 网站，复制自己的账户系统令牌，回跳后按 B11 条件预填（或手动粘贴），确认并连接。原生层验证身份、保存到独立本地账户配置文件并直接调用原站业务接口。B13按用户明确要求使用本地明文JSON及文件权限，不再访问系统钥匙串，也不调整授权弹窗流程。旧钥匙串用户首次更新后需重新粘贴一次；此后正常切页和重启不要求重新粘贴。文件读写失败明确报错。系统令牌不是模型 API Key，不自动配置到工具。
 
 保留现有七种工具 Claude、Claude Desktop、Codex、Gemini、OpenCode、OpenClaw、Hermes 的供应商、MCP、提示词、Skills、会话、工作区、设置和独立凭证。账户与工具同级、位于最左，沿用现有顶栏、自适应宽度和切回原工具行为，本轮仅优化账户连接页、密钥工作区及相关弹窗。

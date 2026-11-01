@@ -17,6 +17,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("analytics boundary", () => {
+  it.each(["grokbuild", "pi", "mcode"])(
+    "allows the fixed %s tool and page without accepting business fields",
+    (tool) => {
+      trackInteraction("navigation", "view", {
+        tool,
+        page: tool,
+        token: "synthetic-secret",
+      } as never);
+      expect(track.mock.lastCall?.[1]).toMatchObject({ tool, page: tool });
+      expect(JSON.stringify(track.mock.calls)).not.toContain(
+        "synthetic-secret",
+      );
+    },
+  );
+
   it("whitelists categories and never forwards business fields or raw errors", async () => {
     const synthetic = {
       tool: "codex",

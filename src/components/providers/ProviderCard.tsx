@@ -289,13 +289,8 @@ export function ProviderCard({
           ? activeProviderId === provider.id
           : isCurrent;
 
-  const shouldUseGreen = !isAnyOmo && isProxyTakeover && isActiveProvider;
   const hasPersistentConfigHighlight = isAdditiveMode && isInConfig;
-  const shouldUseBlue =
-    (isAnyOmo && isActiveProvider) ||
-    (!isAnyOmo &&
-      !isProxyTakeover &&
-      (isActiveProvider || hasPersistentConfigHighlight));
+  const shouldUseBlue = isActiveProvider || hasPersistentConfigHighlight;
 
   // 预设卡片未填 API key 时呈灰调（启用中的卡片不受影响）
   const PRESET_IDS: Partial<Record<string, string[]>> = {
@@ -324,38 +319,22 @@ export function ProviderCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border border-border p-4 transition-all duration-300",
+        "provider-row relative rounded-xl border p-3 transition-colors duration-150",
         "bg-card text-card-foreground group",
-        isAutoFailoverEnabled || isProxyTakeover
-          ? "hover:border-emerald-500/50"
-          : "hover:border-border-active",
-        shouldUseGreen &&
-          "border-emerald-500/60 shadow-sm shadow-emerald-500/10",
-        shouldUseBlue && "border-blue-500/60 shadow-sm shadow-blue-500/10",
-        !(isActiveProvider || hasPersistentConfigHighlight) &&
-          "hover:shadow-sm",
+        shouldUseBlue
+          ? "border-blue-500 bg-blue-50/80 dark:bg-blue-950/30"
+          : "border-border hover:bg-muted/30",
         dragHandleProps?.isDragging &&
           "cursor-grabbing border-primary shadow-lg scale-105 z-10",
         isPresetMissingKey && "opacity-50 grayscale",
       )}
     >
-      <div
-        className={cn(
-          "absolute inset-0 bg-gradient-to-r to-transparent transition-opacity duration-500 pointer-events-none",
-          shouldUseGreen && "from-emerald-500/10",
-          shouldUseBlue && "from-blue-500/10",
-          !shouldUseGreen && !shouldUseBlue && "from-primary/10",
-          isActiveProvider || hasPersistentConfigHighlight
-            ? "opacity-100"
-            : "opacity-0",
-        )}
-      />
-      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 items-center gap-2">
+      <div className="provider-row-content relative flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             type="button"
             className={cn(
-              "-ml-1.5 flex-shrink-0 cursor-grab active:cursor-grabbing p-1.5",
+              "provider-row-drag -ml-1.5 flex-shrink-0 cursor-grab active:cursor-grabbing p-1.5",
               "text-muted-foreground/50 hover:text-muted-foreground transition-colors",
               dragHandleProps?.isDragging && "cursor-grabbing",
             )}
@@ -366,7 +345,7 @@ export function ProviderCard({
             <GripVertical className="h-4 w-4" />
           </button>
 
-          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center border border-border group-hover:scale-105 transition-transform duration-300">
+          <div className="h-8 w-8 shrink-0 rounded-lg bg-background flex items-center justify-center border border-border">
             <ProviderIcon
               icon={provider.icon}
               name={provider.name}
@@ -375,9 +354,9 @@ export function ProviderCard({
             />
           </div>
 
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2 min-h-7">
-              <h3 className="provider-card-title text-base font-medium leading-6">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-h-5">
+              <h3 className="provider-card-title break-words text-sm font-medium leading-5">
                 {provider.name}
               </h3>
 
@@ -529,7 +508,7 @@ export function ProviderCard({
                   ? `${rawKey.slice(0, 8)}***${rawKey.slice(-4)}`
                   : null;
               return (
-                <div className="flex flex-wrap items-center gap-2 text-sm">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                   {links && (
                     <>
                       <button
@@ -572,7 +551,7 @@ export function ProviderCard({
                   )}
                   {maskedKey ? (
                     <span
-                      className="inline-flex max-w-[220px] items-center rounded-full border border-border/70 bg-muted/35 px-2.5 py-1 font-mono text-xs leading-none text-muted-foreground"
+                      className="inline-flex max-w-[180px] items-center font-mono text-[11px] leading-5 text-muted-foreground"
                       title={maskedKey}
                     >
                       {maskedKey}
@@ -583,9 +562,9 @@ export function ProviderCard({
                       type="button"
                       onClick={handleOpenWebsite}
                       className={cn(
-                        "inline-flex min-w-0 max-w-[340px] items-center rounded-full border border-border/50 bg-transparent px-2.5 py-0.5 text-xs leading-5 shadow-none",
+                        "inline-flex min-w-0 max-w-full items-center text-xs leading-5",
                         isClickableUrl
-                          ? "text-muted-foreground/80 transition-colors hover:border-blue-400/45 hover:bg-blue-50/40 hover:text-blue-600 dark:hover:bg-blue-950/20 dark:hover:text-blue-300 cursor-pointer"
+                          ? "text-muted-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-300 cursor-pointer"
                           : "text-muted-foreground cursor-default",
                       )}
                       title={displayUrl}
@@ -600,7 +579,7 @@ export function ProviderCard({
           </div>
         </div>
 
-        <div className="flex items-center ml-auto min-w-0 gap-3">
+        <div className="provider-row-tools flex flex-wrap items-center ml-auto min-w-0 gap-2">
           <div className="ml-auto">
             <div className="flex items-center gap-1">
               {isCopilot ? (

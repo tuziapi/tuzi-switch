@@ -148,6 +148,7 @@ import { HERMES_DEFAULT_CONFIG } from "./hooks/useHermesFormState";
 import { resolveManagedAccountId } from "@/lib/authBinding";
 import { useOpenClawLiveProviderIds } from "@/hooks/useOpenClaw";
 import { useHermesLiveProviderIds } from "@/hooks/useHermes";
+import "./provider-form.css";
 
 type PresetEntry = {
   id: string;
@@ -770,19 +771,6 @@ function ProviderFormFull({
     initialData,
     isCreationPrefill: appId === "codex" && !editData && !!creationPrefill,
   });
-  useEffect(() => {
-    onSubmittingChange?.(
-      isSubmitting ||
-        isConfirmSubmitting ||
-        (appId === "codex" && codexCredentialStatus === "loading"),
-    );
-  }, [
-    appId,
-    codexCredentialStatus,
-    isSubmitting,
-    isConfirmSubmitting,
-    onSubmittingChange,
-  ]);
   const [codexChatReasoning, setCodexChatReasoning] =
     useState<CodexChatReasoning>(
       () => initialData?.meta?.codexChatReasoning ?? {},
@@ -977,6 +965,15 @@ function ProviderFormFull({
       appId === "codex" ? initialData?.meta?.commonConfigEnabled : undefined,
     selectedPresetId: selectedPresetId ?? undefined,
   });
+
+  const isSubmitBlocked =
+    isSubmitting ||
+    isConfirmSubmitting ||
+    (appId === "codex" &&
+      (codexCredentialStatus === "loading" || isCodexCommonConfigLoading));
+  useEffect(() => {
+    onSubmittingChange?.(isSubmitBlocked);
+  }, [isSubmitBlocked, onSubmittingChange]);
 
   const {
     geminiEnv,
@@ -1249,6 +1246,8 @@ function ProviderFormFull({
   const [isCommonConfigModalOpen, setIsCommonConfigModalOpen] = useState(false);
 
   const handleSubmit = async (values: ProviderFormData) => {
+    // Also guard keyboard/programmatic submission while configuration loads.
+    if (appId === "codex" && isCodexCommonConfigLoading) return;
     if (appId === "codex" && codexCredentialStatus === "loading") {
       toast.info(
         t("providerForm.codexCredentialLoading", {
@@ -2327,7 +2326,8 @@ function ProviderFormFull({
         <form
           id="provider-form"
           onSubmit={form.handleSubmit(handleSubmit)}
-          className="space-y-6 glass rounded-xl p-6 border border-white/10"
+          className="provider-form-shell space-y-6"
+          data-account-prefill={creationPrefill ? "true" : undefined}
         >
           {!initialData && (
             <ProviderPresetSelector
@@ -3165,7 +3165,7 @@ function ProviderFormFull({
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || isConfirmSubmitting}
+                disabled={isSubmitBlocked}
               >
                 {submitLabel}
               </Button>

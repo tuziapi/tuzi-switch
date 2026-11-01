@@ -1,0 +1,101 @@
+/* Settings-specific navigation and grouped rows; shared tabs stay horizontal. */
+.settings-page-shell {
+  padding: 20px 24px 0;
+}
+.settings-page-shell .settings-directory {
+  display: flex;
+  width: 160px;
+  flex: 0 0 160px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--muted) / 0.45);
+}
+.settings-directory [role="tab"] {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  white-space: normal;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: left;
+}
+.settings-directory [role="tab"][data-state="active"] {
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+}
+.settings-detail-scroll {
+  padding: 1px 4px 28px 1px;
+  container-type: inline-size;
+}
+.settings-general-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+.settings-general-sections > section {
+  padding: 18px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+}
+.settings-general-sections > section > header,
+.settings-general-sections > section > div:first-child:has(> h3) {
+  margin-bottom: 14px;
+}
+.settings-general-sections > section > .inline-flex {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.settings-page-shell .glass-card,
+.settings-page-shell .glass {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.settings-page-shell .settings-toggle-row {
+  border: 0;
+  border-bottom: 1px solid hsl(var(--border) / 0.65);
+  border-radius: 0;
+  padding: 12px 0;
+  background: transparent;
+}
+.settings-page-shell .settings-toggle-row:last-child {
+  border-bottom: 0;
+}
+.settings-toggle-row > div:first-child,
+.settings-toggle-row > div:first-child > div:last-child {
+  min-width: 0;
+}
+.settings-toggle-row > [role="switch"] {
+  flex-shrink: 0;
+}
+@container (max-width: 520px) {
+  .settings-general-sections > section {
+    padding: 14px;
+  }
+  .settings-general-sections > section > .inline-flex {
+    display: flex;
+  }
+}
+@media (max-width: 1000px) {
+  .settings-page-shell {
+    padding-inline: 16px;
+  }
+  .settings-page-shell .settings-directory {
+    width: 120px;
+    flex-basis: 120px;
+  }
+  .settings-page-shell .settings-layout {
+    gap: 16px;
+  }
+}

@@ -7,6 +7,7 @@ import type {
   McpStatus,
 } from "@/types";
 import type { AppId } from "./types";
+import type { NativeTool } from "./nativeTools";
 
 export const mcpApi = {
   async getStatus(): Promise<McpStatus> {
@@ -114,7 +115,7 @@ export const mcpApi = {
    */
   async toggleApp(
     serverId: string,
-    app: AppId,
+    app: AppId | NativeTool,
     enabled: boolean,
   ): Promise<void> {
     return await invoke("toggle_mcp_app", { serverId, app, enabled });

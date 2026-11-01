@@ -42,6 +42,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { extractErrorMessage } from "@/utils/errorUtils";
+import { WorkspaceQueryError } from "@/components/common/WorkspaceQueryError";
 import { isMac } from "@/lib/platform";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { SessionItem } from "./SessionItem";
@@ -68,7 +69,7 @@ type ProviderFilter =
 export function SessionManagerPage({ appId }: { appId: string }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { data, isLoading, refetch } = useSessionsQuery();
+  const { data, isLoading, error, refetch } = useSessionsQuery();
   const sessions = data ?? [];
   const detailRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -127,11 +128,15 @@ export function SessionManagerPage({ appId }: { appId: string }) {
     );
   }, [filteredSessions, selectedKey]);
 
-  const { data: messages = [], isLoading: isLoadingMessages } =
-    useSessionMessagesQuery(
-      selectedSession?.providerId,
-      selectedSession?.sourcePath,
-    );
+  const {
+    data: messages = [],
+    isLoading: isLoadingMessages,
+    error: messagesError,
+    refetch: refetchMessages,
+  } = useSessionMessagesQuery(
+    selectedSession?.providerId,
+    selectedSession?.sourcePath,
+  );
   const deleteSessionMutation = useDeleteSessionMutation();
   const isDeleting = deleteSessionMutation.isPending || isBatchDeleting;
 
@@ -431,12 +436,12 @@ export function SessionManagerPage({ appId }: { appId: string }) {
   return (
     <TooltipProvider>
       <div
-        className="mx-auto px-4 sm:px-6 flex flex-col h-full min-h-0"
+        className="workspace-sessions mx-auto w-full px-4 sm:px-6 flex flex-col flex-1 min-h-0"
         onWheel={(e) => e.stopPropagation()}
       >
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
           {/* 主内容区域 - 左右分栏 */}
-          <div className="flex-1 overflow-hidden grid gap-4 md:grid-cols-[320px_1fr]">
+          <div className="workspace-session-columns flex-1 min-h-0 min-w-0 overflow-hidden grid gap-4">
             {/* 左侧会话列表 */}
             <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
               <CardHeader className="py-2 px-3 border-b">
@@ -759,7 +764,9 @@ export function SessionManagerPage({ appId }: { appId: string }) {
               <CardContent className="flex-1 min-h-0 p-0">
                 <ScrollArea className="h-full">
                   <div className="p-2">
-                    {isLoading ? (
+                    {error ? (
+                      <WorkspaceQueryError onRetry={() => void refetch()} />
+                    ) : isLoading ? (
                       <div className="flex items-center justify-center py-12">
                         <RefreshCw className="size-5 animate-spin text-muted-foreground" />
                       </div>
@@ -1005,7 +1012,11 @@ export function SessionManagerPage({ appId }: { appId: string }) {
                           ref={scrollContainerRef}
                           className="flex-1 overflow-y-auto px-4 pb-4 min-w-0"
                         >
-                          {isLoadingMessages ? (
+                          {messagesError ? (
+                            <WorkspaceQueryError
+                              onRetry={() => void refetchMessages()}
+                            />
+                          ) : isLoadingMessages ? (
                             <div className="flex items-center justify-center py-12">
                               <RefreshCw className="size-5 animate-spin text-muted-foreground" />
                             </div>

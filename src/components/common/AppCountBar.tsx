@@ -1,12 +1,13 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import type { AppId } from "@/lib/api/types";
+import type { NativeTool } from "@/lib/api/nativeTools";
 import { APP_IDS, APP_ICON_MAP } from "@/config/appConfig";
 
 interface AppCountBarProps {
   totalLabel: string;
-  counts: Partial<Record<AppId, number>>;
-  appIds?: AppId[];
+  counts: Partial<Record<AppId | NativeTool, number>>;
+  appIds?: (AppId | NativeTool)[];
 }
 
 export const AppCountBar: React.FC<AppCountBarProps> = ({
@@ -15,11 +16,11 @@ export const AppCountBar: React.FC<AppCountBarProps> = ({
   appIds = APP_IDS,
 }) => {
   return (
-    <div className="flex-shrink-0 py-4 glass rounded-xl border border-white/10 mb-4 px-6 flex items-center justify-between gap-4">
+    <div className="workspace-count-bar min-w-0 flex-shrink-0 py-3 rounded-xl border border-border bg-card mb-4 px-4 flex flex-wrap items-center justify-between gap-3">
       <Badge variant="outline" className="bg-background/50 h-7 px-3">
         {totalLabel}
       </Badge>
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         {appIds.map((app) => (
           <Badge
             key={app}

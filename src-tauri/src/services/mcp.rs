@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use crate::app_config::{AppType, McpServer};
 use crate::error::AppError;
@@ -8,61 +9,365 @@ use crate::store::AppState;
 
 /// MCP 相关业务逻辑（v3.7.0 统一结构）
 pub struct McpService;
+static MCP_MUTATION_LOCK: Mutex<()> = Mutex::new(());
+
+fn mutation_lock() -> Result<std::sync::MutexGuard<'static, ()>, AppError> {
+    MCP_MUTATION_LOCK
+        .lock()
+        .map_err(|_| AppError::Message("MCP 操作锁不可用".into()))
+}
+
+#[cfg(all(test, not(feature = "local-preview")))]
+mod native_integration_tests {
+    use super::*;
+    use crate::app_config::McpApps;
+    use serde_json::json;
+    use std::{fs, sync::Arc};
+
+    #[test]
+    #[ignore = "changes process environment; run alone with one test thread"]
+    fn native_mcp_service_mixed_tools_failure_and_restore() {
+        let dir = tempfile::tempdir().unwrap();
+        std::env::set_var("CC_SWITCH_TEST_HOME", dir.path());
+        std::env::set_var("PI_CODING_AGENT_DIR", dir.path().join("pi"));
+        std::env::set_var("MINIMAX_DATA_DIR", dir.path().join("mcode"));
+        fs::create_dir_all(dir.path().join(".codex")).unwrap();
+        fs::create_dir_all(dir.path().join(".claude")).unwrap();
+        let codex = crate::codex_config::get_codex_config_path();
+        fs::write(&codex, "[broken").unwrap();
+        let state = AppState::new(Arc::new(crate::database::Database::memory().unwrap()));
+        let server = McpServer {
+            id: "failure-fixture".into(),
+            name: "Fixture".into(),
+            server: json!({"command":"synthetic"}),
+            apps: McpApps {
+                claude: true,
+                codex: true,
+                pi: true,
+                mcode: true,
+                ..Default::default()
+            },
+            description: None,
+            homepage: None,
+            docs: None,
+            tags: vec![],
+        };
+        assert!(McpService::upsert_server(&state, server.clone()).is_err());
+        assert!(state.db.get_all_mcp_servers().unwrap().is_empty());
+        assert!(!dir.path().join("pi/mcp.json").exists());
+        assert!(!crate::config::get_claude_mcp_path().exists());
+        assert_eq!(fs::read_to_string(&codex).unwrap(), "[broken");
+        fs::write(&codex, b"# existing model\nmodel = \"synthetic\"\n").unwrap();
+        // A database failure after all file writes restores every original byte.
+        state.db.conn.lock().unwrap().execute_batch("CREATE TRIGGER fail_save BEFORE INSERT ON mcp_servers BEGIN SELECT RAISE(FAIL, 'synthetic failure'); END;").unwrap();
+        let before = fs::read(&codex).unwrap();
+        assert!(McpService::upsert_server(&state, server.clone()).is_err());
+        assert_eq!(fs::read(&codex).unwrap(), before);
+        assert!(!dir.path().join("pi/mcp.json").exists());
+        assert!(!crate::config::get_claude_mcp_path().exists());
+        state
+            .db
+            .conn
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_save;")
+            .unwrap();
+        McpService::upsert_server(&state, server.clone()).unwrap();
+        let snapshot = fs::read_to_string(&codex).unwrap();
+        let provider = crate::provider::Provider::with_id(
+            "codex-live-config".into(),
+            "Synthetic current config".into(),
+            json!({"auth":{}, "config":snapshot}),
+            None,
+        );
+        state.db.save_provider("codex", &provider).unwrap();
+        state
+            .db
+            .set_config_snippet("codex", Some(snapshot.clone()))
+            .unwrap();
+        let claude = crate::config::get_claude_mcp_path();
+        let claude_before = fs::read(&claude).unwrap();
+        let pi_path = dir.path().join("pi/mcp.json");
+        let pi_before = fs::read(&pi_path).unwrap();
+        let codex_before = fs::read(&codex).unwrap();
+        state.db.conn.lock().unwrap().execute_batch("CREATE TRIGGER fail_delete BEFORE DELETE ON mcp_servers BEGIN SELECT RAISE(FAIL, 'synthetic failure'); END;").unwrap();
+        assert!(McpService::delete_server(&state, &server.id).is_err());
+        assert_eq!(
+            state
+                .db
+                .get_provider_by_id("codex-live-config", "codex")
+                .unwrap()
+                .unwrap()
+                .settings_config["config"],
+            snapshot
+        );
+        assert_eq!(
+            state.db.get_config_snippet("codex").unwrap().unwrap(),
+            snapshot
+        );
+        assert_eq!(fs::read(&claude).unwrap(), claude_before);
+        assert_eq!(fs::read(&pi_path).unwrap(), pi_before);
+        assert_eq!(fs::read(&codex).unwrap(), codex_before);
+        state.db.conn.lock().unwrap().execute_batch("DROP TRIGGER fail_delete; CREATE TRIGGER fail_save BEFORE INSERT ON mcp_servers BEGIN SELECT RAISE(FAIL, 'synthetic failure'); END;").unwrap();
+        assert!(McpService::toggle_app(&state, &server.id, AppType::Codex, false).is_err());
+        assert_eq!(fs::read(&codex).unwrap(), codex_before);
+        assert!(
+            state.db.get_all_mcp_servers().unwrap()[&server.id]
+                .apps
+                .codex
+        );
+        state
+            .db
+            .conn
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_save;")
+            .unwrap();
+        // SQL/WebDAV restoration carries desired flags, but never Pi ownership.
+        McpService::toggle_native_app(&state, &server.id, "pi", false).unwrap();
+        let sql = state.db.export_sql_string().unwrap();
+        let sync_sql = state.db.export_sql_string_for_sync().unwrap();
+        assert!(!sql.contains("tuzi-ownership"));
+        let device_b = dir.path().join("device-b");
+        fs::create_dir_all(&device_b).unwrap();
+        fs::copy(&pi_path, device_b.join("mcp.json")).unwrap();
+        std::env::set_var("PI_CODING_AGENT_DIR", &device_b);
+        for sync in [false, true] {
+            if sync {
+                state.db.import_sql_string_for_sync(&sync_sql).unwrap();
+            } else {
+                state.db.import_sql_string(&sql).unwrap();
+            }
+            let before = fs::read(device_b.join("mcp.json")).unwrap();
+            assert!(McpService::delete_server(&state, &server.id)
+                .unwrap_err()
+                .to_string()
+                .contains("先导入"));
+            assert_eq!(fs::read(device_b.join("mcp.json")).unwrap(), before);
+            assert_eq!(fs::read(&claude).unwrap(), claude_before);
+        }
+        // Same-device restore retains the receipt; explicitly importing on B claims B only.
+        std::env::set_var("PI_CODING_AGENT_DIR", dir.path().join("pi"));
+        McpService::toggle_native_app(&state, &server.id, "pi", true).unwrap();
+        std::env::set_var("PI_CODING_AGENT_DIR", &device_b);
+        McpService::import_from_native_tools(&state).unwrap();
+        McpService::delete_server(&state, &server.id).unwrap();
+        assert!(!state
+            .db
+            .get_provider_by_id("codex-live-config", "codex")
+            .unwrap()
+            .unwrap()
+            .settings_config["config"]
+            .as_str()
+            .unwrap()
+            .contains("failure-fixture"));
+        assert!(!state
+            .db
+            .get_config_snippet("codex")
+            .unwrap()
+            .unwrap()
+            .contains("failure-fixture"));
+        assert!(state.db.get_all_mcp_servers().unwrap().is_empty());
+        assert!(serde_json::from_slice::<serde_json::Value>(
+            &fs::read(device_b.join("mcp.json")).unwrap()
+        )
+        .unwrap()["mcpServers"]
+            .get(&server.id)
+            .is_none());
+        assert!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&pi_path).unwrap()).unwrap()
+                ["mcpServers"]
+                .get(&server.id)
+                .is_some()
+        );
+        // Per-source partial import, conflict, failure injection, and repeat recovery.
+        fs::write(
+            &claude,
+            br#"{"mcpServers":{"first":{"command":"first"},"second":{"command":"second"}}}"#,
+        )
+        .unwrap();
+        state.db.conn.lock().unwrap().execute_batch("CREATE TRIGGER fail_second BEFORE INSERT ON mcp_servers WHEN NEW.id = 'second' BEGIN SELECT RAISE(FAIL, 'synthetic failure'); END;").unwrap();
+        assert!(McpService::import_from_claude(&state).is_err());
+        assert!(state.db.get_all_mcp_servers().unwrap().is_empty());
+        state
+            .db
+            .conn
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_second;")
+            .unwrap();
+        fs::write(&codex, "[invalid").unwrap();
+        let failure = McpService::import_all(&state).unwrap_err().to_string();
+        assert!(failure.contains("成功来源已保存 2 项"));
+        assert!(failure.contains("Codex"));
+        assert_eq!(state.db.get_all_mcp_servers().unwrap().len(), 2);
+        fs::write(&codex, "").unwrap();
+        assert_eq!(McpService::import_all(&state).unwrap(), 0);
+        fs::write(
+            &claude,
+            br#"{"mcpServers":{"first":{"command":"conflicting"},"third":{"command":"third"}}}"#,
+        )
+        .unwrap();
+        assert!(McpService::import_from_claude(&state).is_err());
+        assert!(!state
+            .db
+            .get_all_mcp_servers()
+            .unwrap()
+            .contains_key("third"));
+        std::env::remove_var("CC_SWITCH_TEST_HOME");
+        std::env::remove_var("PI_CODING_AGENT_DIR");
+        std::env::remove_var("MINIMAX_DATA_DIR");
+    }
+
+    #[test]
+    #[ignore = "changes process environment; run alone with one test thread"]
+    fn native_mcp_service_roundtrip_uses_isolated_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let pi_dir = home.join("pi");
+        let mcode_dir = home.join("mcode");
+        std::env::set_var("CC_SWITCH_TEST_HOME", home);
+        std::env::set_var("PI_CODING_AGENT_DIR", &pi_dir);
+        std::env::set_var("MINIMAX_DATA_DIR", &mcode_dir);
+        let state = AppState::new(Arc::new(crate::database::Database::memory().unwrap()));
+        let server = McpServer {
+            id: "fixture".into(),
+            name: "Fixture".into(),
+            server: json!({"type":"stdio", "command":"synthetic"}),
+            apps: McpApps {
+                grokbuild: true,
+                pi: true,
+                mcode: true,
+                ..Default::default()
+            },
+            description: None,
+            homepage: None,
+            docs: None,
+            tags: vec![],
+        };
+        McpService::upsert_server(&state, server).unwrap();
+        assert!(home.join(".grok/config.toml").exists());
+        assert!(mcode_dir.join("mcp.json").exists());
+        assert!(
+            state.db.get_all_mcp_servers().unwrap()["fixture"]
+                .apps
+                .pi_managed
+        );
+        McpService::toggle_native_app(&state, "fixture", "pi", false).unwrap();
+        let pi: serde_json::Value =
+            serde_json::from_slice(&fs::read(pi_dir.join("mcp.json")).unwrap()).unwrap();
+        assert_eq!(pi["mcpServers"]["fixture"]["enabled"], false);
+        assert!(McpService::delete_server(&state, "fixture").unwrap());
+        let pi: serde_json::Value =
+            serde_json::from_slice(&fs::read(pi_dir.join("mcp.json")).unwrap()).unwrap();
+        assert!(pi["mcpServers"].get("fixture").is_none());
+        assert!(state.db.get_all_mcp_servers().unwrap().is_empty());
+        std::env::remove_var("CC_SWITCH_TEST_HOME");
+        std::env::remove_var("PI_CODING_AGENT_DIR");
+        std::env::remove_var("MINIMAX_DATA_DIR");
+    }
+}
 
 impl McpService {
+    /// Each source commits atomically. Successful sources are retained and retries
+    /// are idempotent; the UI keeps this recovery message visible on failure.
+    pub fn import_all(state: &AppState) -> Result<usize, AppError> {
+        let mut total = 0;
+        let mut errors = Vec::new();
+        type Importer = fn(&AppState) -> Result<usize, AppError>;
+        let sources: [(&str, Importer); 6] = [
+            ("Claude", Self::import_from_claude),
+            ("Codex", Self::import_from_codex),
+            ("Gemini", Self::import_from_gemini),
+            ("OpenCode", Self::import_from_opencode),
+            ("Hermes", Self::import_from_hermes),
+            ("Grok / Pi / MiniMax", Self::import_from_native_tools),
+        ];
+        for (name, import) in sources {
+            match import(state) {
+                Ok(count) => total += count,
+                Err(error) => errors.push(format!("{name}: {error}")),
+            }
+        }
+        if errors.is_empty() {
+            Ok(total)
+        } else {
+            Err(AppError::Message(format!("导入未全部完成：成功来源已保存 {total} 项，失败来源未保存。已保存项会保留，修复以下问题后可再次导入，不会重复新增。{}", errors.join("; "))))
+        }
+    }
+
+    pub fn import_from_native_tools(state: &AppState) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
+        crate::native_mcp::import(state)
+    }
     /// 获取所有 MCP 服务器（统一结构）
     pub fn get_all_servers(state: &AppState) -> Result<IndexMap<String, McpServer>, AppError> {
         state.db.get_all_mcp_servers()
     }
 
     /// 添加或更新 MCP 服务器
-    pub fn upsert_server(state: &AppState, server: McpServer) -> Result<(), AppError> {
+    pub fn upsert_server(state: &AppState, mut server: McpServer) -> Result<(), AppError> {
+        let _provider_guard = crate::services::provider::OperationGuard::acquire()?;
+        let _guard = mutation_lock()?;
         // 读取旧状态：用于处理“编辑时取消勾选某个应用”的场景（需要从对应 live 配置中移除）
-        let prev_apps = state
-            .db
-            .get_all_mcp_servers()?
-            .get(&server.id)
+        let previous = state.db.get_all_mcp_servers()?.get(&server.id).cloned();
+        let prev_apps = previous
+            .as_ref()
             .map(|s| s.apps.clone())
             .unwrap_or_default();
+        server.apps.pi_managed = prev_apps.pi_managed || server.apps.pi;
 
-        state.db.save_mcp_server(&server)?;
-
-        // 处理禁用：若旧版本启用但新版本取消，则需要从该应用的 live 配置移除
-        if prev_apps.claude && !server.apps.claude {
-            Self::remove_server_from_app(state, &server.id, &AppType::Claude)?;
-        }
-        if prev_apps.codex && !server.apps.codex {
-            Self::remove_server_from_app(state, &server.id, &AppType::Codex)?;
-        }
-        if prev_apps.gemini && !server.apps.gemini {
-            Self::remove_server_from_app(state, &server.id, &AppType::Gemini)?;
-        }
-        if prev_apps.opencode && !server.apps.opencode {
-            Self::remove_server_from_app(state, &server.id, &AppType::OpenCode)?;
-        }
-        if prev_apps.hermes && !server.apps.hermes {
-            Self::remove_server_from_app(state, &server.id, &AppType::Hermes)?;
-        }
-
-        // 同步到各个启用的应用
-        Self::sync_server_to_apps(state, &server)?;
+        crate::native_mcp::commit(previous.as_ref(), Some(&server), || {
+            state.db.commit_mcp_change(previous.as_ref(), Some(&server))
+        })?;
 
         Ok(())
     }
 
     /// 删除 MCP 服务器
     pub fn delete_server(state: &AppState, id: &str) -> Result<bool, AppError> {
+        let _provider_guard = crate::services::provider::OperationGuard::acquire()?;
+        let _guard = mutation_lock()?;
         let server = state.db.get_all_mcp_servers()?.shift_remove(id);
 
         if let Some(server) = server {
-            state.db.delete_mcp_server(id)?;
+            crate::native_mcp::commit(Some(&server), None, || {
+                state.db.commit_mcp_change(Some(&server), None)
+            })?;
 
-            // 从所有应用的 live 配置中移除
-            Self::remove_server_from_all_apps(state, id, &server)?;
             Ok(true)
         } else {
             Ok(false)
         }
+    }
+
+    pub fn toggle_native_app(
+        state: &AppState,
+        server_id: &str,
+        app: &str,
+        enabled: bool,
+    ) -> Result<(), AppError> {
+        let _provider_guard = crate::services::provider::OperationGuard::acquire()?;
+        let _guard = mutation_lock()?;
+        let previous = state
+            .db
+            .get_all_mcp_servers()?
+            .shift_remove(server_id)
+            .ok_or_else(|| AppError::Message("MCP 服务器不存在".into()))?;
+        let mut next = previous.clone();
+        match app {
+            "grokbuild" => next.apps.grokbuild = enabled,
+            "pi" => next.apps.pi = enabled,
+            "mcode" => next.apps.mcode = enabled,
+            _ => return Err(AppError::Message("不支持的工具".into())),
+        }
+        next.apps.pi_managed = previous.apps.pi_managed || next.apps.pi;
+        if next.apps == previous.apps {
+            return Ok(());
+        }
+        crate::native_mcp::commit(Some(&previous), Some(&next), || {
+            state.db.commit_mcp_change(Some(&previous), Some(&next))
+        })
     }
 
     /// 切换指定应用的启用状态
@@ -72,30 +377,18 @@ impl McpService {
         app: AppType,
         enabled: bool,
     ) -> Result<(), AppError> {
-        let mut servers = state.db.get_all_mcp_servers()?;
-
-        if let Some(server) = servers.get_mut(server_id) {
-            server.apps.set_enabled_for(&app, enabled);
-            state.db.save_mcp_server(server)?;
-
-            // 同步到对应应用
-            if enabled {
-                Self::sync_server_to_app(state, server, &app)?;
-            } else {
-                Self::remove_server_from_app(state, server_id, &app)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// 将 MCP 服务器同步到所有启用的应用
-    fn sync_server_to_apps(_state: &AppState, server: &McpServer) -> Result<(), AppError> {
-        for app in server.apps.enabled_apps() {
-            Self::sync_server_to_app_no_config(server, &app)?;
-        }
-
-        Ok(())
+        let _provider_guard = crate::services::provider::OperationGuard::acquire()?;
+        let _guard = mutation_lock()?;
+        let previous = state
+            .db
+            .get_all_mcp_servers()?
+            .shift_remove(server_id)
+            .ok_or_else(|| AppError::Message("MCP 服务器不存在".into()))?;
+        let mut next = previous.clone();
+        next.apps.set_enabled_for(&app, enabled);
+        crate::native_mcp::commit(Some(&previous), Some(&next), || {
+            state.db.commit_mcp_change(Some(&previous), Some(&next))
+        })
     }
 
     /// 将 MCP 服务器同步到指定应用
@@ -137,19 +430,6 @@ impl McpService {
             AppType::Hermes => {
                 mcp::sync_single_server_to_hermes(&Default::default(), &server.id, &server.server)?;
             }
-        }
-        Ok(())
-    }
-
-    /// 从所有曾启用过该服务器的应用中移除
-    fn remove_server_from_all_apps(
-        state: &AppState,
-        id: &str,
-        server: &McpServer,
-    ) -> Result<(), AppError> {
-        // 从所有曾启用的应用中移除
-        for app in server.apps.enabled_apps() {
-            Self::remove_server_from_app(state, id, &app)?;
         }
         Ok(())
     }
@@ -262,193 +542,49 @@ impl McpService {
         Ok(())
     }
 
-    /// 从 Claude 导入 MCP（v3.7.0 已更新为统一结构）
+    fn import_legacy(
+        state: &AppState,
+        app: AppType,
+        importer: fn(&mut crate::app_config::MultiAppConfig) -> Result<usize, AppError>,
+    ) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
+        let mut config = crate::app_config::MultiAppConfig::default();
+        importer(&mut config)?;
+        let existing = state.db.get_all_mcp_servers()?;
+        let mut pending = Vec::new();
+        for server in config.mcp.servers.unwrap_or_default().into_values() {
+            if let Some(old) = existing.get(&server.id) {
+                if !crate::mcp::transaction::connections_match(&app, &server.server, &old.server)? {
+                    return Err(AppError::Message(format!(
+                        "{} 与已有服务器连接配置冲突；该来源未导入",
+                        server.id
+                    )));
+                }
+                if !old.apps.is_enabled_for(&app) {
+                    let mut merged = old.clone();
+                    merged.apps.set_enabled_for(&app, true);
+                    pending.push(merged);
+                }
+            } else {
+                pending.push(server);
+            }
+        }
+        state.db.save_mcp_servers_atomic(&pending)?;
+        Ok(pending.len())
+    }
     pub fn import_from_claude(state: &AppState) -> Result<usize, AppError> {
-        // 创建临时 MultiAppConfig 用于导入
-        let mut temp_config = crate::app_config::MultiAppConfig::default();
-
-        // 调用原有的导入逻辑（从 mcp.rs）
-        let count = crate::mcp::import_from_claude(&mut temp_config)?;
-
-        let mut new_count = 0;
-
-        // 如果有导入的服务器，保存到数据库
-        if count > 0 {
-            if let Some(servers) = &temp_config.mcp.servers {
-                let mut existing = state.db.get_all_mcp_servers()?;
-                for server in servers.values() {
-                    // 已存在：仅启用 Claude，不覆盖其他字段（与导入模块语义保持一致）
-                    let to_save = if let Some(existing_server) = existing.get(&server.id) {
-                        let mut merged = existing_server.clone();
-                        merged.apps.claude = true;
-                        merged
-                    } else {
-                        // 真正的新服务器
-                        new_count += 1;
-                        server.clone()
-                    };
-
-                    state.db.save_mcp_server(&to_save)?;
-                    existing.insert(to_save.id.clone(), to_save.clone());
-
-                    // 导入是读取已有配置，不应反向写回任何应用的 live 配置。
-                    // 显式编辑、启用/禁用或手动同步时再执行写回。
-                }
-            }
-        }
-
-        Ok(new_count)
+        Self::import_legacy(state, AppType::Claude, crate::mcp::import_from_claude)
     }
-
-    /// 从 Codex 导入 MCP（v3.7.0 已更新为统一结构）
     pub fn import_from_codex(state: &AppState) -> Result<usize, AppError> {
-        // 创建临时 MultiAppConfig 用于导入
-        let mut temp_config = crate::app_config::MultiAppConfig::default();
-
-        // 调用原有的导入逻辑（从 mcp.rs）
-        let count = crate::mcp::import_from_codex(&mut temp_config)?;
-
-        let mut new_count = 0;
-
-        // 如果有导入的服务器，保存到数据库
-        if count > 0 {
-            if let Some(servers) = &temp_config.mcp.servers {
-                let mut existing = state.db.get_all_mcp_servers()?;
-                for server in servers.values() {
-                    // 已存在：仅启用 Codex，不覆盖其他字段（与导入模块语义保持一致）
-                    let to_save = if let Some(existing_server) = existing.get(&server.id) {
-                        let mut merged = existing_server.clone();
-                        merged.apps.codex = true;
-                        merged
-                    } else {
-                        // 真正的新服务器
-                        new_count += 1;
-                        server.clone()
-                    };
-
-                    state.db.save_mcp_server(&to_save)?;
-                    existing.insert(to_save.id.clone(), to_save.clone());
-
-                    // 导入是读取已有配置，不应反向写回任何应用的 live 配置。
-                    // 显式编辑、启用/禁用或手动同步时再执行写回。
-                }
-            }
-        }
-
-        Ok(new_count)
+        Self::import_legacy(state, AppType::Codex, crate::mcp::import_from_codex)
     }
-
-    /// 从 Gemini 导入 MCP（v3.7.0 已更新为统一结构）
     pub fn import_from_gemini(state: &AppState) -> Result<usize, AppError> {
-        // 创建临时 MultiAppConfig 用于导入
-        let mut temp_config = crate::app_config::MultiAppConfig::default();
-
-        // 调用原有的导入逻辑（从 mcp.rs）
-        let count = crate::mcp::import_from_gemini(&mut temp_config)?;
-
-        let mut new_count = 0;
-
-        // 如果有导入的服务器，保存到数据库
-        if count > 0 {
-            if let Some(servers) = &temp_config.mcp.servers {
-                let mut existing = state.db.get_all_mcp_servers()?;
-                for server in servers.values() {
-                    // 已存在：仅启用 Gemini，不覆盖其他字段（与导入模块语义保持一致）
-                    let to_save = if let Some(existing_server) = existing.get(&server.id) {
-                        let mut merged = existing_server.clone();
-                        merged.apps.gemini = true;
-                        merged
-                    } else {
-                        // 真正的新服务器
-                        new_count += 1;
-                        server.clone()
-                    };
-
-                    state.db.save_mcp_server(&to_save)?;
-                    existing.insert(to_save.id.clone(), to_save.clone());
-
-                    // 导入是读取已有配置，不应反向写回任何应用的 live 配置。
-                    // 显式编辑、启用/禁用或手动同步时再执行写回。
-                }
-            }
-        }
-
-        Ok(new_count)
+        Self::import_legacy(state, AppType::Gemini, crate::mcp::import_from_gemini)
     }
-
-    /// 从 OpenCode 导入 MCP（v3.9.2+ 新增）
     pub fn import_from_opencode(state: &AppState) -> Result<usize, AppError> {
-        // 创建临时 MultiAppConfig 用于导入
-        let mut temp_config = crate::app_config::MultiAppConfig::default();
-
-        // 调用原有的导入逻辑（从 mcp/opencode.rs）
-        let count = crate::mcp::import_from_opencode(&mut temp_config)?;
-
-        let mut new_count = 0;
-
-        // 如果有导入的服务器，保存到数据库
-        if count > 0 {
-            if let Some(servers) = &temp_config.mcp.servers {
-                let mut existing = state.db.get_all_mcp_servers()?;
-                for server in servers.values() {
-                    // 已存在：仅启用 OpenCode，不覆盖其他字段（与导入模块语义保持一致）
-                    let to_save = if let Some(existing_server) = existing.get(&server.id) {
-                        let mut merged = existing_server.clone();
-                        merged.apps.opencode = true;
-                        merged
-                    } else {
-                        // 真正的新服务器
-                        new_count += 1;
-                        server.clone()
-                    };
-
-                    state.db.save_mcp_server(&to_save)?;
-                    existing.insert(to_save.id.clone(), to_save.clone());
-
-                    // 导入是读取已有配置，不应反向写回任何应用的 live 配置。
-                    // 显式编辑、启用/禁用或手动同步时再执行写回。
-                }
-            }
-        }
-
-        Ok(new_count)
+        Self::import_legacy(state, AppType::OpenCode, crate::mcp::import_from_opencode)
     }
-
-    /// 从 Hermes 导入 MCP
     pub fn import_from_hermes(state: &AppState) -> Result<usize, AppError> {
-        // 创建临时 MultiAppConfig 用于导入
-        let mut temp_config = crate::app_config::MultiAppConfig::default();
-
-        // 调用导入逻辑（从 mcp/hermes.rs）
-        let count = crate::mcp::import_from_hermes(&mut temp_config)?;
-
-        let mut new_count = 0;
-
-        // 如果有导入的服务器，保存到数据库
-        if count > 0 {
-            if let Some(servers) = &temp_config.mcp.servers {
-                let mut existing = state.db.get_all_mcp_servers()?;
-                for server in servers.values() {
-                    // 已存在：仅启用 Hermes，不覆盖其他字段（与导入模块语义保持一致）
-                    let to_save = if let Some(existing_server) = existing.get(&server.id) {
-                        let mut merged = existing_server.clone();
-                        merged.apps.hermes = true;
-                        merged
-                    } else {
-                        // 真正的新服务器
-                        new_count += 1;
-                        server.clone()
-                    };
-
-                    state.db.save_mcp_server(&to_save)?;
-                    existing.insert(to_save.id.clone(), to_save.clone());
-
-                    // 导入是读取已有配置，不应反向写回任何应用的 live 配置。
-                    // 显式编辑、启用/禁用或手动同步时再执行写回。
-                }
-            }
-        }
-
-        Ok(new_count)
+        Self::import_legacy(state, AppType::Hermes, crate::mcp::import_from_hermes)
     }
 }

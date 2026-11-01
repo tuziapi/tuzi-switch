@@ -33,6 +33,7 @@ import { settingsApi, skillsApi } from "@/lib/api";
 import { toast } from "sonner";
 import { SKILLS_APP_IDS } from "@/config/appConfig";
 import { AppCountBar } from "@/components/common/AppCountBar";
+import { WorkspaceQueryError } from "@/components/common/WorkspaceQueryError";
 import { AppToggleGroup } from "@/components/common/AppToggleGroup";
 import { ListItemRow } from "@/components/common/ListItemRow";
 import {
@@ -80,7 +81,7 @@ const UnifiedSkillsPanel = React.forwardRef<
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
 
-  const { data: skills, isLoading } = useInstalledSkills();
+  const { data: skills, isLoading, error, refetch } = useInstalledSkills();
   const {
     data: skillBackups = [],
     refetch: refetchSkillBackups,
@@ -346,7 +347,7 @@ const UnifiedSkillsPanel = React.forwardRef<
 
   return (
     <div className="px-6 flex flex-col flex-1 min-h-0 overflow-hidden">
-      <div className="flex items-center justify-between">
+      <div className="workspace-skills-summary flex flex-wrap items-start justify-between gap-3">
         <AppCountBar
           totalLabel={t("skills.installed", { count: skills?.length || 0 })}
           counts={enabledCounts}
@@ -400,7 +401,9 @@ const UnifiedSkillsPanel = React.forwardRef<
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24">
-        {isLoading ? (
+        {error ? (
+          <WorkspaceQueryError onRetry={() => void refetch()} />
+        ) : isLoading ? (
           <div className="text-center py-12 text-muted-foreground">
             {t("skills.loading")}
           </div>
