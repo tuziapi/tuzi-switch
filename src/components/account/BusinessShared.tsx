@@ -107,14 +107,29 @@ export function Pager({
   page,
   more,
   onChange,
+  total,
+  pageSize = 10,
 }: {
   page: number;
   more: boolean;
   onChange: (p: number) => void;
+  total?: string;
+  pageSize?: number;
 }) {
   const { t } = useTranslation();
+  const pages =
+    total === undefined
+      ? undefined
+      : Math.max(1, Math.ceil(Number(total) / pageSize));
+  const [jump, setJump] = useState("");
   return (
-    <div className="account-pager">
+    <nav className="account-pager" aria-label="分页">
+      {total !== undefined && (
+        <span>
+          共 {total} 条 · {Number(total) === 0 ? 0 : (page - 1) * pageSize + 1}–
+          {Math.min(page * pageSize, Number(total))} 条
+        </span>
+      )}
       <Button
         variant="outline"
         disabled={page === 1}
@@ -122,7 +137,31 @@ export function Pager({
       >
         {t("account.business.previous")}
       </Button>
-      <span>{page}</span>
+      {pages ? (
+        Array.from(
+          new Set([
+            1,
+            ...Array.from({ length: 3 }, (_, i) => page + i - 1),
+            pages,
+          ]),
+        )
+          .filter((p) => p > 0 && p <= pages)
+          .sort((a, b) => a - b)
+          .map((p, index, all) => (
+            <span key={p}>
+              {index > 0 && p - all[index - 1] > 1 && <span> … </span>}
+              <Button
+                variant={p === page ? "default" : "outline"}
+                aria-current={p === page ? "page" : undefined}
+                onClick={() => onChange(p)}
+              >
+                {p}
+              </Button>
+            </span>
+          ))
+      ) : (
+        <span>第 {page} 页</span>
+      )}
       <Button
         variant="outline"
         disabled={!more}
@@ -130,7 +169,29 @@ export function Pager({
       >
         {t("account.business.next")}
       </Button>
-    </div>
+      {pages && pages > 1 && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const p = Number(jump);
+            if (Number.isInteger(p) && p >= 1 && p <= pages) onChange(p);
+          }}
+        >
+          <input
+            aria-label="跳转页码"
+            type="number"
+            min={1}
+            max={pages}
+            value={jump}
+            onChange={(e) => setJump(e.target.value)}
+            placeholder="页码"
+          />
+          <Button variant="outline" type="submit">
+            跳转
+          </Button>
+        </form>
+      )}
+    </nav>
   );
 }
 export function useWrite(state: AccountState, trackKeys = false) {

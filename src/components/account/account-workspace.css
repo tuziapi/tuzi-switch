@@ -421,3 +421,278 @@
 .account-drawer .account-model-configure > button {
   align-self: flex-end;
 }
+
+/* Account workspace refinement: page scroll owns the ten-row request table. */
+.account-table-scroll.account-log-table {
+  max-height: none;
+  overflow-y: visible;
+}
+.account-stat-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.account-model-rank {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+.account-model-rank > div {
+  min-width: 0;
+  flex: 1;
+}
+.account-model-rank > div > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.account-model-rank strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.account-model-rank span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.account-model-rank progress {
+  width: 100%;
+  height: 5px;
+  accent-color: hsl(var(--primary));
+}
+.account-model-rank small {
+  color: hsl(var(--muted-foreground));
+}
+.account-error-breakdown {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.account-log-detail > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.account-log-detail dt {
+  color: hsl(var(--muted-foreground));
+}
+.account-log-detail dd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.account-pager {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.account-pager form {
+  display: flex;
+  gap: 6px;
+}
+.account-pager input {
+  width: 65px;
+  background: transparent;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 4px;
+}
+.account-rank-table {
+  width: 100%;
+  text-align: left;
+}
+.account-rank-table td,
+.account-rank-table th {
+  padding: 10px 6px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.account-log-list-anchor {
+  scroll-margin-top: 16px;
+}
+@media (max-width: 760px) {
+  .account-stat-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.account-model-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.account-model-filter-options button {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+.account-model-filter-options details {
+  position: relative;
+}
+.account-model-filter-options summary {
+  cursor: pointer;
+  padding: 8px;
+}
+.account-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.account-status-card {
+  min-width: 0;
+  padding: 16px;
+}
+.account-status-card .account-quality-values {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.account-status-card .account-quality-values dd {
+  font-size: 15px;
+}
+.account-status-card .account-performance-metrics > p {
+  font-size: 11px;
+}
+.account-status-card .account-timeline {
+  margin: 12px 0;
+}
+.account-model-heading h3 {
+  overflow-wrap: anywhere;
+  flex: 1;
+  min-width: 0;
+}
+.account-timeline span:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+@media (max-width: 760px) {
+  .account-status-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.account-consumption-values {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 8px 0;
+}
+.account-consumption-values dt {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.account-consumption-values dd {
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .account-consumption-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.account-workspace .account-log-statistics {
+  order: 0;
+}
+.account-stat-breakdown {
+  display: block;
+}
+.account-workspace .account-model-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+.account-model-controls > .account-field {
+  grid-column: 1;
+}
+.account-model-controls > .account-model-filter-options {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.account-model-controls > .account-inline-actions {
+  grid-column: 2;
+  grid-row: 1;
+}
+.account-model-controls > button {
+  justify-self: start;
+}
+.account-status-card .account-quality-values > div {
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+.account-workspace .account-status-card .account-performance-metrics {
+  gap: 8px;
+}
+.account-workspace .account-status-card .account-performance-metrics > p {
+  margin: 0;
+}
+.account-status-card .account-quality-values {
+  margin: 0;
+}
+.account-status-card .account-timeline {
+  margin: 2px 0 4px;
+}
+.account-status-card .account-timeline span {
+  height: 22px;
+}
+.account-status-card .account-timeline p {
+  display: none;
+}
+.account-timeline span {
+  position: relative;
+}
+.account-timeline span:focus-visible::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 2;
+  bottom: 100%;
+  left: 0;
+  white-space: nowrap;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  padding: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .account-workspace .account-model-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .account-model-controls > .account-inline-actions {
+    grid-column: 1;
+    grid-row: 3;
+  }
+}
+.account-timeline .account-no-samples {
+  flex: 1;
+  min-width: 100%;
+}
+.account-model-rank progress {
+  appearance: none;
+  display: block;
+  border: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  background: hsl(var(--muted));
+  margin: 5px 0;
+}
+.account-model-rank progress::-webkit-progress-bar {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+.account-model-rank progress::-webkit-progress-value {
+  background: #1688ed;
+  border-radius: 3px;
+}
+.account-model-rank progress::-moz-progress-bar {
+  background: #1688ed;
+  border-radius: 3px;
+}

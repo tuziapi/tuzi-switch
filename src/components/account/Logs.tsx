@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { ModelIcon } from "./ModelIcon";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import type { AccountState } from "@/lib/api/account";
@@ -59,7 +60,9 @@ export function Logs({ state }: { state: AccountState }) {
     filters,
   );
   const [request, setRequest] = useState("");
-  const [statisticsOpen, setStatisticsOpen] = useState(false);
+  const [selected, setSelected] = useState<Log | null>(null);
+  const [allModels, setAllModels] = useState(false);
+  const listTop = useRef<HTMLDivElement>(null);
   const currency = useAccountCurrency();
   const account = useDesktop<DesktopAccount>(
     state,
@@ -71,10 +74,11 @@ export function Logs({ state }: { state: AccountState }) {
   const list = useDesktop<Page<Log>>(state, "/account/logs", {
     ...filters,
     page,
+    page_size: 10,
   });
   const summary = useDesktop<Summary>(state, "/account/logs/summary", filters);
   const statistics = useDesktop<LogStatistics>(
-    statisticsOpen ? state : { ...state, identity: null },
+    state,
     "/account/logs/statistics",
     filters,
   );
@@ -103,7 +107,7 @@ export function Logs({ state }: { state: AccountState }) {
       void list.refetch();
       void summary.refetch();
       void account.refetch();
-      if (statisticsOpen) void statistics.refetch();
+      void statistics.refetch();
     }
   };
   return (
@@ -186,20 +190,23 @@ export function Logs({ state }: { state: AccountState }) {
       </form>
       <div className="account-log-summary">
         {summary.data && (
-          <span>
-            {t("account.business.records")}: {summary.data.data.record_count} ·{" "}
-            {t("account.business.errorRecords")}:{" "}
-            {summary.data.data.error_count} · {t("account.workspace.cost")}:{" "}
-            {amount(summary.data.data.quota)}
-          </span>
+          <dl className="account-consumption-values">
+            {[
+              ["记录消费", amount(summary.data.data.quota)],
+              ["记录数", summary.data.data.record_count],
+              [
+                "输入 / 输出 Token",
+                `${summary.data.data.prompt_tokens} / ${summary.data.data.completion_tokens}`,
+              ],
+              ["错误", summary.data.data.error_count],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
         )}
-        <button
-          type="button"
-          aria-expanded={statisticsOpen}
-          onClick={() => setStatisticsOpen(!statisticsOpen)}
-        >
-          {t("account.workspace.statistics")} {statisticsOpen ? "▴" : "▾"}
-        </button>
       </div>
       <p
         className="account-compact-notice"
@@ -215,41 +222,22 @@ export function Logs({ state }: { state: AccountState }) {
         }}
         showUpdated={false}
       />
-      {statisticsOpen && (
-        <section className="account-card account-log-statistics">
-          <QueryState query={statistics} />
-          {statistics.data && (
-            <>
-              <UsageChart
-                label={t("account.workspace.consumptionTrend")}
-                money={money ? { ...money, display_type: currency } : undefined}
-                points={statistics.data.data.trend.map((point) => ({
-                  ...point,
-                  call_count: point.record_count,
-                  bucket_start: point.start_timestamp,
-                  bucket_end: point.end_timestamp,
-                }))}
-              />
-              <div className="account-stat-breakdown">
-                {statistics.data.data.by_model.map((point) => (
-                  <p key={point.model_name}>
-                    {point.model_name}: {point.record_count} ·{" "}
-                    {amount(point.quota)}
-                  </p>
-                ))}
-                {statistics.data.data.by_error.map((point) => (
-                  <p key={point.error_code}>
-                    {point.error_code}: {point.record_count}
-                  </p>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
+      <div ref={listTop} className="account-log-list-anchor" />
+      {list.data && (
+        <div className="account-model-heading">
+          <h3>请求明细</h3>
+          <span className="account-subtle">
+            共 {list.data.data.total} 条 · 第 {page} /{" "}
+            {Math.max(1, Math.ceil(Number(list.data.data.total) / 10))} 页
+          </span>
+        </div>
       )}
       <LogRows
         items={list.data?.data.items ?? []}
-        select={setRequest}
+        select={(log) => {
+          setSelected(log);
+          setRequest("");
+        }}
         selectedRequest={request}
         money={money}
         currency={currency}
@@ -260,28 +248,201 @@ export function Logs({ state }: { state: AccountState }) {
       {list.data && (
         <Pager
           page={page}
+          total={list.data.data.total}
+          pageSize={10}
           more={list.data.data.has_more}
           onChange={(value) => {
             setPage(value);
             setRequest("");
+            listTop.current?.scrollIntoView?.({
+              block: "start",
+              behavior: "smooth",
+            });
           }}
         />
       )}
-      {request && (
+      <section className="account-card account-log-statistics">
+        <h3>{t("account.workspace.statistics")}</h3>
+        <QueryState query={statistics} />
+        {statistics.data && (
+          <>
+            <div className="account-stat-columns">
+              <div>
+                <h4>{t("account.workspace.consumptionTrend")}</h4>
+                <UsageChart
+                  label={t("account.workspace.consumptionTrend")}
+                  money={
+                    money ? { ...money, display_type: currency } : undefined
+                  }
+                  points={statistics.data.data.trend.map((point) => ({
+                    ...point,
+                    call_count: point.record_count,
+                    bucket_start: point.start_timestamp,
+                    bucket_end: point.end_timestamp,
+                  }))}
+                />
+              </div>
+              <div className="account-stat-breakdown">
+                <div className="account-model-heading">
+                  <h4>模型消费排行</h4>
+                  <Button variant="link" onClick={() => setAllModels(true)}>
+                    查看全部
+                  </Button>
+                </div>
+                {[...statistics.data.data.by_model]
+                  .sort((a, b) => Number(b.quota) - Number(a.quota))
+                  .slice(0, 5)
+                  .map((point) => {
+                    const total = statistics.data.data.by_model.reduce(
+                      (sum, row) => sum + Number(row.quota),
+                      0,
+                    );
+                    const percent =
+                      total > 0 ? (Number(point.quota) / total) * 100 : 0;
+                    return (
+                      <div
+                        className="account-model-rank"
+                        key={point.model_name}
+                      >
+                        <ModelIcon name={point.model_name} />
+                        <div>
+                          <div>
+                            <strong title={point.model_name}>
+                              {point.model_name}
+                            </strong>
+                            <span>{amount(point.quota)}</span>
+                          </div>
+                          <progress value={percent} max={100} />
+                          <small>
+                            {point.record_count} 条 · {percent.toFixed(1)}%
+                          </small>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {statistics.data.data.by_model.length === 0 && (
+                  <p className="account-subtle">暂无消费记录</p>
+                )}
+              </div>
+            </div>
+            {statistics.data.data.by_error.length > 0 && (
+              <div className="account-error-breakdown">
+                <span>错误分布</span>
+                {statistics.data.data.by_error.map((point) => (
+                  <span className="account-badge" key={point.error_code}>
+                    {point.error_code} · {point.record_count}
+                  </span>
+                ))}
+              </div>
+            )}
+            {statistics.data.data.summary.refund_quota && (
+              <p className="account-subtle">
+                退款：{amount(statistics.data.data.summary.refund_quota)}
+                （单独统计）
+              </p>
+            )}
+          </>
+        )}
+      </section>
+      {allModels && (
         <AccountDialog
           drawer
-          title={t("account.business.requestSummary")}
-          description={request}
-          onClose={() => setRequest("")}
+          title="模型消费排行"
+          onClose={() => setAllModels(false)}
         >
-          <QueryState query={detail} />
-          <LogRows
-            items={detail.data?.data.items ?? []}
-            money={money}
-            currency={currency}
-          />
-          {detail.data?.data.has_more && (
-            <p>{t("account.business.summaryLimit")}</p>
+          <table className="account-rank-table">
+            <thead>
+              <tr>
+                <th>模型</th>
+                <th>消费</th>
+                <th>记录</th>
+                <th>错误</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...(statistics.data?.data.by_model ?? [])]
+                .sort((a, b) => Number(b.quota) - Number(a.quota))
+                .map((row) => (
+                  <tr key={row.model_name}>
+                    <td>
+                      <ModelIcon name={row.model_name} /> {row.model_name}
+                    </td>
+                    <td>{amount(row.quota)}</td>
+                    <td>{row.record_count}</td>
+                    <td>{row.error_count}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </AccountDialog>
+      )}
+      {selected && (
+        <AccountDialog
+          drawer
+          title="请求详情"
+          description={selected.model_name}
+          onClose={() => {
+            setSelected(null);
+            setRequest("");
+          }}
+        >
+          <dl className="account-log-detail">
+            {[
+              ["日志 ID", selected.id],
+              ["时间", date(selected.created_at)],
+              ["模型", selected.model_name],
+              ["密钥", selected.token_name],
+              ["分组", selected.group],
+              ["请求 ID", selected.request_id],
+              ["上游请求 ID", selected.upstream_request_id],
+              ["请求路径", selected.request_path],
+              [
+                "请求结果",
+                t(`account.business.resultStatus.${selected.result}`),
+              ],
+              ["耗时", `${selected.duration_ms} ms`],
+              ["流式", selected.is_stream ? "是" : "否"],
+              [
+                "输入 / 输出 Token",
+                `${selected.prompt_tokens} / ${selected.completion_tokens}`,
+              ],
+              [
+                "计费状态",
+                t(`account.business.billingStatus.${selected.billing_status}`),
+              ],
+              ["消费", amount(selected.quota)],
+              ["错误代码", selected.public_error_code ?? selected.error_code],
+              ["HTTP 状态", selected.status_code],
+              ["错误详情", selected.error_message],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value || "—"}</dd>
+              </div>
+            ))}
+          </dl>
+          {selected.request_id && (
+            <details
+              onToggle={(e) =>
+                setRequest(e.currentTarget.open ? selected.request_id : "")
+              }
+            >
+              <summary>同一请求的关联记录（扣费、错误、退款）</summary>
+              <QueryState query={detail} />
+              <LogRows
+                items={(detail.data?.data.items ?? []).filter(
+                  (log) => log.id !== selected.id,
+                )}
+                money={money}
+                currency={currency}
+              />
+              {detail.data &&
+                detail.data.data.items.filter((log) => log.id !== selected.id)
+                  .length === 0 && <p>暂无其他关联记录</p>}
+              {detail.data?.data.has_more && (
+                <p>{t("account.business.summaryLimit")}</p>
+              )}
+            </details>
           )}
         </AccountDialog>
       )}
@@ -296,7 +457,7 @@ function LogRows({
   currency,
 }: {
   items: Log[];
-  select?: (id: string) => void;
+  select?: (log: Log) => void;
   selectedRequest?: string;
   money?: Money;
   currency: AccountCurrency;
@@ -364,9 +525,9 @@ function LogRows({
                 {l.error_code && (
                   <p>{t(`account.business.callError.${l.error_code}`)}</p>
                 )}
-                {select && l.request_id && (
-                  <Button variant="link" onClick={() => select(l.request_id)}>
-                    {t("account.business.requestSummary")}
+                {select && (
+                  <Button variant="link" onClick={() => select(l)}>
+                    查看详情
                   </Button>
                 )}
               </td>

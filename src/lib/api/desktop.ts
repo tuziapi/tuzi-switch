@@ -99,6 +99,7 @@ export interface Log {
   is_stream: boolean;
   error_code: string | null;
   error_message: string | null;
+  public_error_code?: string | null;
   request_path?: string | null;
   upstream_request_id?: string | null;
   status_code?: number | string | null;
