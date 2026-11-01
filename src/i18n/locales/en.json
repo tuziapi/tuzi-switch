@@ -3134,6 +3134,13 @@
     "tokenPlaceholder": "Paste account system token",
     "tokenInvalid": "Paste a complete account system token without whitespace.",
     "verifyingToken": "Verifying…",
-    "disconnectHint": "Disconnecting clears credentials on this device only. The website system token stays valid."
+    "disconnectHint": "Disconnecting clears credentials on this device only. The website system token stays valid.",
+    "workspace": {
+      "settings": "Account settings",
+      "wallet": "Top up / Redeem",
+      "unsaved": "There are unsaved changes or an unverified save result. Close anyway?",
+      "keepEditing": "Keep editing",
+      "discard": "Close and discard draft"
+    }
   }
 }

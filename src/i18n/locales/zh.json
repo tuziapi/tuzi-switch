@@ -3134,6 +3134,13 @@
     "tokenPlaceholder": "粘贴账户系统令牌",
     "tokenInvalid": "请输入完整的系统令牌，不要包含空白。",
     "verifyingToken": "验证中…",
-    "disconnectHint": "断开仅清除此设备的凭证，不会使网站系统令牌失效。"
+    "disconnectHint": "断开仅清除此设备的凭证，不会使网站系统令牌失效。",
+    "workspace": {
+      "settings": "账户设置",
+      "wallet": "充值 / 兑换",
+      "unsaved": "有未保存的修改或待核实的保存结果，确认关闭？",
+      "keepEditing": "继续编辑",
+      "discard": "关闭并丢弃草稿"
+    }
   }
 }

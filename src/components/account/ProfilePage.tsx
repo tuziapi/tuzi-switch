@@ -16,10 +16,12 @@ export function ProfilePage({
   state,
   canWrite,
   personalAllowed = true,
+  onEditState,
 }: {
   state: AccountState;
   canWrite: boolean;
   personalAllowed?: boolean;
+  onEditState?: (dirty: boolean, busy: boolean) => void;
 }) {
   const { t } = useTranslation();
   const query = useDesktop<Profile>(state, "/account/profile", {}, 60000);
@@ -35,6 +37,15 @@ export function ProfilePage({
   useEffect(() => {
     if (query.data && !form) setForm(readForm(query.data.data));
   }, [query.data, form]);
+  const dirty =
+    !!form &&
+    !!query.data &&
+    Object.entries(form).some(
+      ([key, value]) => value !== query.data!.data[key as keyof ProfileWrite],
+    );
+  useEffect(() => {
+    onEditState?.(dirty || !!error?.outcomeUnknown, busy);
+  }, [dirty, busy, error?.outcomeUnknown, onEditState]);
   const verify = async () => {
     const result = await query.refetch();
     if (!result.error && result.data) {
@@ -123,6 +134,7 @@ export function ProfilePage({
             <Button
               variant="outline"
               type="button"
+              disabled={busy}
               onClick={() => void verify()}
             >
               {t("account.business.verify")}

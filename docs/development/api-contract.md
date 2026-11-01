@@ -1,5 +1,7 @@
 # 接口与权限契约
 
+2026-11-01 ACCOUNT-OPEN-01：客户端开放已有 logs/models/performance/profile 能力，业务路由和 DTO 不变。原生 release.profile=phase1 为历史标记，不再表示完整 UI 可见性。保留 keys 发布开关及逐页 native/web 能力检查，实际权限仍由服务端校验。
+
 有效基线 `TA-AC-1.5-B4`；契约 `system-token-v1`（2026-10-18）。适用于本轮配对本地版本；不证明生产已支持。原站接口返回继续兼容网站及其他接入方；Rust 适配为现有页面 DTO，不能将旧 `/api/desktop` 改名后重建网络 facade。历史 A 契约见 [归档](history/b3-oauth-a/api-contract.md)。
 
 ## 凭证、身份及兼容
