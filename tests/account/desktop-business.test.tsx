@@ -1174,6 +1174,9 @@ describe("business actions and secret lifetime", () => {
       screen.getByLabelText(zh.account.business.logFilter.model_name),
       { target: { value: "synthetic-model" } },
     );
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.account.workspace.query }),
+    );
     await waitFor(() =>
       expect(
         vi
@@ -1236,17 +1239,14 @@ describe("business actions and secret lifetime", () => {
           }),
     );
     const { wrapper } = setup();
-    render(<ModelsPage state={state} />, { wrapper });
+    render(<ModelsPage state={state} performance />, { wrapper });
     await screen.findByText("synthetic-model");
-    fireEvent.click(
-      screen.getByRole("button", { name: zh.account.business.details }),
-    );
     await screen.findByText(/75%/);
     expect(screen.queryByText(/7500%/)).toBeNull();
     expect(screen.getByText(/2000 ms/)).toBeInTheDocument();
     expect(
       screen.getByText(zh.account.business.noSamples, { exact: false }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("SYNTHETIC_PRICE_EXPR")).toHaveLength(1);
+    expect(screen.queryByText("SYNTHETIC_PRICE_EXPR")).not.toBeInTheDocument();
   });
 });

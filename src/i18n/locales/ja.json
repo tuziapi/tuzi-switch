@@ -3043,8 +3043,8 @@
         "token": "キー末尾4文字"
       },
       "logFilter": {
-        "start_timestamp": "開始 Unix 秒",
-        "end_timestamp": "終了 Unix 秒",
+        "start_timestamp": "開始日時",
+        "end_timestamp": "終了日時",
         "token_name": "Key 名",
         "model_name": "モデル名",
         "group": "グループ",
@@ -3133,7 +3133,16 @@
       "wallet": "チャージ / 引換",
       "unsaved": "未保存の変更または未確認の保存結果があります。閉じますか？",
       "keepEditing": "編集を続ける",
-      "discard": "下書きを破棄して閉じる"
+      "discard": "下書きを破棄して閉じる",
+      "query": "検索",
+      "cost": "消費額",
+      "statistics": "利用統計",
+      "consumptionTrend": "消費の推移",
+      "invalidRange": "終了時刻が開始時刻より後になる期間を選択してください。",
+      "filtersPending": "検索を押すと条件が適用されます",
+      "groupPerformance": "グループ別の稼働状況",
+      "logNotice": "消費・エラー・返金は別の記録です。ログ集計は完全な会計記録ではありません。",
+      "noModels": "条件に一致するモデルがありません。検索条件を変更してください。"
     }
   }
 }

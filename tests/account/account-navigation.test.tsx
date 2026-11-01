@@ -143,4 +143,155 @@ describe("account workspace navigation", () => {
         ),
     ).toHaveLength(0);
   });
+  it("queries log filters on submit, retains pagination and loads statistics only on demand", async () => {
+    const { client } = setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("logs"));
+    await waitFor(() => expect(paths()).toContain("/account/logs"));
+    expect(paths()).not.toContain("/account/logs/statistics");
+    fireEvent.change(
+      screen.getByLabelText(zh.account.business.logFilter.model_name),
+      { target: { value: "synthetic-filter" } },
+    );
+    const queries = () =>
+      vi
+        .mocked(invoke)
+        .mock.calls.filter(([cmd]) => cmd === "account_request")
+        .map(
+          ([, args]) =>
+            (args as { request: { path: string; query?: [string, string][] } })
+              .request,
+        );
+    expect(
+      queries().some((r) =>
+        r.query?.some(
+          ([k, v]) => k === "model_name" && v === "synthetic-filter",
+        ),
+      ),
+    ).toBe(false);
+    await userEvent.click(
+      screen.getByRole("button", { name: zh.account.workspace.query }),
+    );
+    await waitFor(() =>
+      expect(
+        queries().some(
+          (r) =>
+            r.path === "/account/logs" &&
+            r.query?.some(
+              ([k, v]) => k === "model_name" && v === "synthetic-filter",
+            ),
+        ),
+      ).toBe(true),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: zh.account.business.next }),
+    );
+    await waitFor(() =>
+      expect(
+        queries().some(
+          (r) =>
+            r.path === "/account/logs" &&
+            r.query?.some(([k, v]) => k === "page" && v === "2"),
+        ),
+      ).toBe(true),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /消费统计/ }));
+    await waitFor(() => expect(paths()).toContain("/account/logs/statistics"));
+    await userEvent.click(tab("keys"));
+    expect(
+      client
+        .getQueryCache()
+        .getAll()
+        .filter((q) => q.queryKey.includes("/account/logs/statistics"))
+        .every((q) => q.getObserversCount() === 0),
+    ).toBe(true);
+    await userEvent.click(tab("logs"));
+    expect(
+      screen.getByLabelText(zh.account.business.logFilter.model_name),
+    ).toHaveValue("synthetic-filter");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: zh.account.business.previous }),
+      ).toBeEnabled(),
+    );
+    fireEvent.change(
+      screen.getByLabelText(zh.account.business.logFilter.end_timestamp),
+      { target: { value: "2000-01-01T00:00" } },
+    );
+    expect(
+      screen.getByRole("button", { name: zh.account.workspace.query }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(zh.account.workspace.invalidRange),
+    ).toBeInTheDocument();
+  });
+
+  it("stops observing performance after leaving the page and restores its window", async () => {
+    const { client } = setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("modelsStatus"));
+    await screen.findAllByText("99.8%");
+    await userEvent.selectOptions(
+      screen.getByLabelText(zh.account.business.window),
+      "6",
+    );
+    await waitFor(() =>
+      expect(
+        client
+          .getQueryCache()
+          .getAll()
+          .some(
+            (q) =>
+              q.queryKey.includes("/account/model-performance") &&
+              q.getObserversCount() > 0,
+          ),
+      ).toBe(true),
+    );
+    await userEvent.click(tab("keys"));
+    expect(
+      client
+        .getQueryCache()
+        .getAll()
+        .filter((q) => q.queryKey.includes("/account/model-performance"))
+        .every((q) => q.getObserversCount() === 0),
+    ).toBe(true);
+    await userEvent.click(tab("modelsStatus"));
+    expect(screen.getByLabelText(zh.account.business.window)).toHaveValue("6");
+  });
+
+  it("opens model details without performance requests and request details in a drawer", async () => {
+    setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("models"));
+    await screen.findByText("gpt-5.6-sol");
+    await userEvent.click(
+      screen.getAllByRole("button", { name: zh.account.business.details })[0],
+    );
+    expect(
+      screen.getByRole("dialog", { name: "gpt-5.6-sol" }),
+    ).toBeInTheDocument();
+    expect(paths()).not.toContain("/account/model-performance");
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(tab("logs"));
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", {
+          name: zh.account.business.requestSummary,
+        }).length,
+      ).toBeGreaterThan(0),
+    );
+    await userEvent.click(
+      screen.getAllByRole("button", {
+        name: zh.account.business.requestSummary,
+      })[0],
+    );
+    expect(
+      screen.getByRole("dialog", { name: zh.account.business.requestSummary }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(paths().some((p) => p.startsWith("/account/logs/requests/"))).toBe(
+        true,
+      ),
+    );
+  });
 });

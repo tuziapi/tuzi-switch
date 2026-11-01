@@ -30,10 +30,10 @@ export function useAccountViewState<T>(
   const [local, setLocal] = useState(initial);
   if (!context) return [local, setLocal];
   return [
-    (context.values[name] as T | undefined) ?? initial,
+    (context.values[name] as T | undefined) ?? local,
     (action) => {
       context.setValues((previous) => {
-        const value = (previous[name] as T | undefined) ?? initial;
+        const value = (previous[name] as T | undefined) ?? local;
         return {
           ...previous,
           [name]:

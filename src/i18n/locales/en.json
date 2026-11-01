@@ -3050,8 +3050,8 @@
         "token": "Last 4 key characters"
       },
       "logFilter": {
-        "start_timestamp": "Start Unix seconds",
-        "end_timestamp": "End Unix seconds",
+        "start_timestamp": "Start time",
+        "end_timestamp": "End time",
         "token_name": "Key name",
         "model_name": "Model name",
         "group": "Group",
@@ -3140,7 +3140,16 @@
       "wallet": "Top up / Redeem",
       "unsaved": "There are unsaved changes or an unverified save result. Close anyway?",
       "keepEditing": "Keep editing",
-      "discard": "Close and discard draft"
+      "discard": "Close and discard draft",
+      "query": "Search",
+      "cost": "Cost",
+      "statistics": "Consumption statistics",
+      "consumptionTrend": "Consumption trend",
+      "invalidRange": "Choose a valid time range with the end after the start.",
+      "filtersPending": "Filters changed. Search to apply.",
+      "groupPerformance": "Performance by group",
+      "logNotice": "Charges, errors and refunds are separate records; logs are not a complete ledger.",
+      "noModels": "No models match these filters. Try adjusting your search."
     }
   }
 }

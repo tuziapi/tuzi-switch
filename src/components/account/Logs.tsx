@@ -1,32 +1,83 @@
-import { FilterBar } from "./BusinessShared";
-import { Button } from "@/components/ui/button";
-import { type AccountState } from "@/lib/api/account";
-import type { Log, Page, Summary } from "@/lib/api/desktop";
-import { useDesktop } from "@/lib/query/desktop";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { date, Field, Pager, QueryState } from "./BusinessShared";
+import { Button } from "@/components/ui/button";
+import type { AccountState } from "@/lib/api/account";
+import type {
+  DesktopAccount,
+  Log,
+  Money,
+  Page,
+  Summary,
+} from "@/lib/api/desktop";
+import { useDesktop } from "@/lib/query/desktop";
+import { date, Field, FilterBar, Pager, QueryState } from "./BusinessShared";
+import { AccountDialog } from "./AccountDialog";
+import {
+  CurrencySwitcher,
+  displayAmount,
+  useAccountCurrency,
+  type AccountCurrency,
+} from "./AccountCurrency";
+import { useAccountViewState } from "./AccountViewState";
+import { UsageChart } from "./UsageChart";
+
+function initialWindow() {
+  const end = new Date();
+  const start = new Date(end);
+  start.setHours(0, 0, 0, 0);
+  return {
+    start_timestamp: String(Math.floor(start.getTime() / 1000)),
+    end_timestamp: String(Math.floor(end.getTime() / 1000)),
+  };
+}
+function localDate(value: string) {
+  if (!value) return "";
+  const d = new Date(Number(value) * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+interface LogStatistics {
+  summary: Summary;
+  trend: Summary[];
+  by_model: {
+    model_name: string;
+    quota: string;
+    record_count: string;
+    error_count: string;
+  }[];
+  by_error: { error_code: string; record_count: string }[];
+}
 export function Logs({ state }: { state: AccountState }) {
   const { t } = useTranslation();
-  const [page, setPage] = useState(1),
-    [filters, setFilters] = useState<Record<string, string>>({}),
-    [request, setRequest] = useState("");
+  const [page, setPage] = useAccountViewState("logs.page", 1);
+  const [filters, setFilters] = useAccountViewState<Record<string, string>>(
+    "logs.filters",
+    initialWindow(),
+  );
+  const [draft, setDraft] = useAccountViewState<Record<string, string>>(
+    "logs.draft",
+    filters,
+  );
+  const [request, setRequest] = useState("");
+  const [statisticsOpen, setStatisticsOpen] = useState(false);
+  const currency = useAccountCurrency();
+  const account = useDesktop<DesktopAccount>(
+    state,
+    "/account/account",
+    {},
+    60000,
+  );
+  const money = account.data?.data.money;
   const list = useDesktop<Page<Log>>(state, "/account/logs", {
     ...filters,
     page,
   });
   const summary = useDesktop<Summary>(state, "/account/logs/summary", filters);
-  const statistics = useDesktop<{
-    summary: Summary;
-    trend: Summary[];
-    by_model: {
-      model_name: string;
-      quota: string;
-      record_count: string;
-      error_count: string;
-    }[];
-    by_error: { error_code: string; record_count: string }[];
-  }>(state, "/account/logs/statistics", filters);
+  const statistics = useDesktop<LogStatistics>(
+    statisticsOpen ? state : { ...state, identity: null },
+    "/account/logs/statistics",
+    filters,
+  );
   const detail = useDesktop<{
     request_id: string;
     items: Log[];
@@ -35,129 +86,204 @@ export function Logs({ state }: { state: AccountState }) {
     request ? state : { ...state, identity: null },
     `/account/logs/requests/${encodeURIComponent(request)}`,
   );
+  const invalidRange =
+    !draft.start_timestamp ||
+    !draft.end_timestamp ||
+    Number(draft.start_timestamp) >= Number(draft.end_timestamp);
+  const changed = JSON.stringify(filters) !== JSON.stringify(draft);
+  const amount = (quota: string) =>
+    money ? displayAmount(quota, money, currency) : `${quota} quota`;
+  const submit = () => {
+    if (invalidRange) return;
+    if (changed) {
+      setFilters({ ...draft });
+      setPage(1);
+      setRequest("");
+    } else {
+      void list.refetch();
+      void summary.refetch();
+      void account.refetch();
+      if (statisticsOpen) void statistics.refetch();
+    }
+  };
   return (
     <>
-      <p>{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
-      <FilterBar visible={4}>
-        {[
-          "start_timestamp",
-          "end_timestamp",
-          "token_name",
-          "model_name",
-          "group",
-          "request_id",
-          "upstream_request_id",
-          "request_path",
-          "error_keyword",
-        ].map((k) => (
-          <Field
-            key={k}
-            label={t(`account.business.logFilter.${k}`)}
-            value={filters[k] ?? ""}
-            onChange={(v) => {
-              setFilters((f) => ({ ...f, [k]: v }));
-              setPage(1);
-              setRequest("");
-            }}
-          />
-        ))}
-        <label>
-          {t("account.business.type")}
-          <select
-            aria-label={t("account.business.type")}
-            value={filters.type ?? "0"}
-            onChange={(e) => {
-              setFilters((f) => ({ ...f, type: e.target.value }));
-              setPage(1);
-              setRequest("");
-            }}
-          >
-            {[0, 1, 2, 3, 4, 6, 7].map((n) => (
-              <option key={n} value={n}>
-                {t(`account.business.logType.${n}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </FilterBar>
-      <Button
-        className="account-page-action"
-        variant="outline"
-        onClick={() => {
-          void list.refetch();
-          void summary.refetch();
-          void statistics.refetch();
+      <form
+        className="account-log-controls"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
         }}
       >
-        {t("account.business.refresh")}
-      </Button>
-      <p className="account-notice">{t("account.business.logsNotice")}</p>
-      <QueryState query={list} />
-      {list.data?.data.items.length === 0 && (
-        <p className="account-empty">{t("account.business.empty")}</p>
-      )}
-      <QueryState query={summary} />
-      {summary.data && (
-        <p>
-          {t("account.business.records")}: {summary.data.data.record_count} ·{" "}
-          {t("account.business.errorRecords")}: {summary.data.data.error_count}{" "}
-          · quota {summary.data.data.quota} · [
-          {date(summary.data.data.start_timestamp)},{" "}
-          {date(summary.data.data.end_timestamp)})
-        </p>
+        <FilterBar visible={4}>
+          {[
+            "start_timestamp",
+            "end_timestamp",
+            "token_name",
+            "model_name",
+            "group",
+            "request_id",
+            "upstream_request_id",
+            "request_path",
+            "error_keyword",
+          ].map((key) => (
+            <Field
+              key={key}
+              label={t(`account.business.logFilter.${key}`)}
+              type={key.endsWith("timestamp") ? "datetime-local" : "text"}
+              value={
+                key.endsWith("timestamp")
+                  ? localDate(draft[key] ?? "")
+                  : (draft[key] ?? "")
+              }
+              onChange={(value) =>
+                setDraft((previous) => ({
+                  ...previous,
+                  [key]: key.endsWith("timestamp")
+                    ? value
+                      ? String(Math.floor(new Date(value).getTime() / 1000))
+                      : ""
+                    : value,
+                }))
+              }
+            />
+          ))}
+          <label>
+            {t("account.business.type")}
+            <select
+              value={draft.type ?? "0"}
+              onChange={(e) =>
+                setDraft((previous) => ({ ...previous, type: e.target.value }))
+              }
+            >
+              {[0, 1, 2, 3, 4, 6, 7].map((n) => (
+                <option key={n} value={n}>
+                  {t(`account.business.logType.${n}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </FilterBar>
+        <div className="account-inline-actions">
+          <span className="account-subtle">
+            {Intl.DateTimeFormat().resolvedOptions().timeZone}
+          </span>
+          {changed && (
+            <span className="account-subtle">
+              {t("account.workspace.filtersPending")}
+            </span>
+          )}
+          <CurrencySwitcher />
+          <Button type="submit" disabled={invalidRange || list.isFetching}>
+            {t(
+              changed ? "account.workspace.query" : "account.business.refresh",
+            )}
+          </Button>
+        </div>
+        {invalidRange && (
+          <p role="alert">{t("account.workspace.invalidRange")}</p>
+        )}
+      </form>
+      <div className="account-log-summary">
+        {summary.data && (
+          <span>
+            {t("account.business.records")}: {summary.data.data.record_count} ·{" "}
+            {t("account.business.errorRecords")}:{" "}
+            {summary.data.data.error_count} · {t("account.workspace.cost")}:{" "}
+            {amount(summary.data.data.quota)}
+          </span>
+        )}
+        <button
+          type="button"
+          aria-expanded={statisticsOpen}
+          onClick={() => setStatisticsOpen(!statisticsOpen)}
+        >
+          {t("account.workspace.statistics")} {statisticsOpen ? "▴" : "▾"}
+        </button>
+      </div>
+      <p
+        className="account-compact-notice"
+        title={t("account.business.logsNotice")}
+      >
+        {t("account.workspace.logNotice")}
+      </p>
+      <QueryState
+        query={{
+          isLoading: list.isLoading || summary.isLoading || account.isLoading,
+          error: list.error || summary.error || account.error,
+          dataUpdatedAt: 0,
+        }}
+        showUpdated={false}
+      />
+      {statisticsOpen && (
+        <section className="account-card account-log-statistics">
+          <QueryState query={statistics} />
+          {statistics.data && (
+            <>
+              <UsageChart
+                label={t("account.workspace.consumptionTrend")}
+                money={money ? { ...money, display_type: currency } : undefined}
+                points={statistics.data.data.trend.map((point) => ({
+                  ...point,
+                  call_count: point.record_count,
+                  bucket_start: point.start_timestamp,
+                  bucket_end: point.end_timestamp,
+                }))}
+              />
+              <div className="account-stat-breakdown">
+                {statistics.data.data.by_model.map((point) => (
+                  <p key={point.model_name}>
+                    {point.model_name}: {point.record_count} ·{" "}
+                    {amount(point.quota)}
+                  </p>
+                ))}
+                {statistics.data.data.by_error.map((point) => (
+                  <p key={point.error_code}>
+                    {point.error_code}: {point.record_count}
+                  </p>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
       )}
       <LogRows
         items={list.data?.data.items ?? []}
         select={setRequest}
         selectedRequest={request}
+        money={money}
+        currency={currency}
       />
+      {list.data?.data.items.length === 0 && (
+        <p className="account-empty">{t("account.business.empty")}</p>
+      )}
       {list.data && (
         <Pager
           page={page}
           more={list.data.data.has_more}
-          onChange={(p) => {
-            setPage(p);
+          onChange={(value) => {
+            setPage(value);
             setRequest("");
           }}
         />
       )}
-      <QueryState query={statistics} />
-      {statistics.data && (
-        <>
-          <section className="account-card account-log-statistics">
-            <h3>{t("account.business.trend")}</h3>
-            {statistics.data.data.trend.map((b) => (
-              <p key={b.start_timestamp}>
-                {date(b.start_timestamp)}: {b.record_count} · quota {b.quota}
-              </p>
-            ))}
-            {statistics.data.data.by_model.map((b) => (
-              <p key={b.model_name}>
-                {b.model_name}: {b.record_count} · quota {b.quota}
-              </p>
-            ))}
-            {statistics.data.data.by_error.map((b) => (
-              <p key={b.error_code}>
-                {b.error_code}: {b.record_count}
-              </p>
-            ))}
-          </section>
-        </>
-      )}
       {request && (
-        <section className="account-card account-detail">
-          <h3>
-            {t("account.business.requestSummary")} {request}
-          </h3>
+        <AccountDialog
+          drawer
+          title={t("account.business.requestSummary")}
+          description={request}
+          onClose={() => setRequest("")}
+        >
           <QueryState query={detail} />
-          <LogRows items={detail.data?.data.items ?? []} />
+          <LogRows
+            items={detail.data?.data.items ?? []}
+            money={money}
+            currency={currency}
+          />
           {detail.data?.data.has_more && (
             <p>{t("account.business.summaryLimit")}</p>
           )}
-          <Button onClick={() => setRequest("")}>
-            {t("account.business.close")}
-          </Button>
-        </section>
+        </AccountDialog>
       )}
     </>
   );
@@ -166,10 +292,14 @@ function LogRows({
   items,
   select,
   selectedRequest,
+  money,
+  currency,
 }: {
   items: Log[];
   select?: (id: string) => void;
   selectedRequest?: string;
+  money?: Money;
+  currency: AccountCurrency;
 }) {
   const { t } = useTranslation();
   return (
@@ -186,7 +316,13 @@ function LogRows({
               "tokens",
               "duration",
             ].map((k) => (
-              <th key={k}>{t(`account.business.${k}`)}</th>
+              <th key={k}>
+                {t(
+                  k === "quota"
+                    ? "account.workspace.cost"
+                    : `account.business.${k}`,
+                )}
+              </th>
             ))}
           </tr>
         </thead>
@@ -215,7 +351,11 @@ function LogRows({
                 </span>
               </td>
               <td>{t(`account.business.billingStatus.${l.billing_status}`)}</td>
-              <td>{l.quota}</td>
+              <td>
+                {money
+                  ? displayAmount(l.quota, money, currency)
+                  : `${l.quota} quota`}
+              </td>
               <td>
                 {l.prompt_tokens} / {l.completion_tokens}
               </td>

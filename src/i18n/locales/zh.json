@@ -3050,8 +3050,8 @@
         "token": "密钥后4位"
       },
       "logFilter": {
-        "start_timestamp": "开始 Unix 秒",
-        "end_timestamp": "结束 Unix 秒",
+        "start_timestamp": "开始时间",
+        "end_timestamp": "结束时间",
         "token_name": "Key 名称",
         "model_name": "模型名称",
         "group": "分组",
@@ -3140,7 +3140,16 @@
       "wallet": "充值 / 兑换",
       "unsaved": "有未保存的修改或待核实的保存结果，确认关闭？",
       "keepEditing": "继续编辑",
-      "discard": "关闭并丢弃草稿"
+      "discard": "关闭并丢弃草稿",
+      "query": "查询",
+      "cost": "消耗",
+      "statistics": "消费统计",
+      "consumptionTrend": "消费趋势",
+      "invalidRange": "请选择有效的开始和结束时间，结束时间须晚于开始时间。",
+      "filtersPending": "筛选已修改，点击查询后生效",
+      "groupPerformance": "按分组查看服务状态",
+      "logNotice": "消费、错误与退款分别记录；日志汇总不代表完整账务。",
+      "noModels": "当前筛选下没有可用模型，请调整筛选条件。"
     }
   }
 }
