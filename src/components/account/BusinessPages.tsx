@@ -1,3 +1,4 @@
+import { AccountErrorBoundary } from "./AccountErrorBoundary";
 import { type AccountState } from "@/lib/api/account";
 import type {
   Capabilities,
@@ -51,7 +52,7 @@ export function AccountBusiness({
         <p role="alert">{t("account.business.unavailable")}</p>
       )}
       {enabled && (
-        <>
+        <AccountErrorBoundary key={page}>
           {page === "keys" && (
             <>
               <AccountMetrics
@@ -71,7 +72,7 @@ export function AccountBusiness({
               onConfigure={page === "models" ? onConfigure : undefined}
             />
           )}
-        </>
+        </AccountErrorBoundary>
       )}
     </>
   );
