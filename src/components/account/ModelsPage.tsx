@@ -1,7 +1,10 @@
+import { ModelIcon } from "./ModelIcon";
+import { ModelFilters, billingLabels } from "./ModelFilters";
+import { AccountErrorBoundary } from "./AccountErrorBoundary";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import type { AccountState } from "@/lib/api/account";
+import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type {
   DesktopError,
   DesktopKey,
@@ -10,8 +13,8 @@ import type {
   Page,
   Performance,
 } from "@/lib/api/desktop";
-import { useDesktop } from "@/lib/query/desktop";
-import { date, Field, FilterBar, Pager, QueryState } from "./BusinessShared";
+import { useAccountRead, useDesktop } from "@/lib/query/desktop";
+import { date, Field, Pager, QueryState } from "./BusinessShared";
 import { PricingDetails } from "./PricingDetails";
 import { AccountDialog } from "./AccountDialog";
 import { useAccountViewState } from "./AccountViewState";
@@ -41,48 +44,65 @@ export function ModelsPage({
     undefined,
   );
   const [selected, setSelected] = useState<DesktopPricing | null>(null);
-  const [selectedName, setSelectedName] = useAccountViewState(
-    `${prefix}.selection`,
-    "",
-  );
   const [hours, setHours] = useAccountViewState(`${prefix}.hours`, 24);
   const [keyId, setKeyId] = useState("");
   const [keyPage, setKeyPage] = useState(1);
   const models = useDesktop<Models>(
     state,
     "/account/models",
-    { ...filters, page, snapshot_id: page > 1 ? snapshot : undefined },
+    {
+      ...filters,
+      page,
+      page_size: performance ? 6 : 12,
+      snapshot_id: page > 1 ? snapshot : undefined,
+    },
     300000,
   );
-  const currentModel = performance
-    ? (models.data?.data.items.find(
-        (model) => model.model_name === selectedName,
-      ) ?? models.data?.data.items[0])
-    : selected;
   const keys = useDesktop<Page<DesktopKey>>(
     selected && onConfigure ? state : { ...state, identity: null },
     "/account/keys",
     { page: keyPage, page_size: 100, status: 1 },
   );
-  const quality = useDesktop<Performance>(
-    performance && currentModel ? state : { ...state, identity: null },
-    "/account/model-performance",
-    {
-      model: currentModel?.model_name,
-      hours,
-      resolution: "30m",
-      group: filters.group,
-    },
+  const modelNames =
+    models.data?.data.items.map((model) => model.model_name) ?? [];
+  const quality = useAccountRead(
+    performance && modelNames.length ? state : { ...state, identity: null },
+    "/account/model-performance/batch",
+    { models: JSON.stringify(modelNames), hours, group: filters.group },
+    (signal) =>
+      desktopRequest<Performance[]>(
+        {
+          method: "POST",
+          path: "/account/model-performance/batch",
+          generation: state.generation,
+          body: {
+            models: modelNames,
+            groups: filters.group ? [filters.group] : [],
+            hours,
+            resolution: "30m",
+          },
+        },
+        signal,
+      ),
     60000,
     performance,
   );
+  useEffect(() => {
+    if ((draft.search ?? "") === (filters.search ?? "")) return;
+    const timer = setTimeout(() => {
+      setFilters((previous) => ({ ...previous, search: draft.search ?? "" }));
+      setPage(1);
+      setSnapshot(undefined);
+      setSelected(null);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [draft.search, filters.search]);
   useEffect(() => {
     const data = models.data?.data;
     if (data) {
       if (data.snapshot_refreshed && page > 1) {
         setPage(1);
         setSelected(null);
-        setSelectedName("");
       }
       setSnapshot(data.snapshot_id);
     }
@@ -94,7 +114,6 @@ export function ModelsPage({
       setSnapshot(undefined);
       setPage(1);
       setSelected(null);
-      setSelectedName("");
     }
   }, [models.error]);
   const description = (model: DesktopPricing) => {
@@ -124,7 +143,6 @@ export function ModelsPage({
     setSnapshot(undefined);
     setPage(1);
     setSelected(null);
-    setSelectedName("");
   };
   return (
     <div
@@ -137,26 +155,43 @@ export function ModelsPage({
           query();
         }}
       >
-        <FilterBar visible={performance ? 2 : 3}>
-          {[
-            "search",
-            "group",
-            "endpoint_type",
-            "quota_type",
-            "vendor",
-            "tag",
-            "models",
-          ].map((key) => (
-            <Field
-              key={key}
-              label={t(`account.business.modelFilter.${key}`)}
-              value={draft[key] ?? ""}
-              onChange={(value) =>
-                setDraft((previous) => ({ ...previous, [key]: value }))
-              }
-            />
-          ))}
-        </FilterBar>
+        <Field
+          label={t("account.business.modelFilter.search")}
+          value={draft.search ?? ""}
+          onChange={(value) =>
+            setDraft((previous) => ({ ...previous, search: value }))
+          }
+        />
+        <ModelFilters
+          meta={models.data?.data.pricing_meta ?? {}}
+          values={filters}
+          status={performance}
+          onChange={(key, value) => {
+            setDraft((previous) => ({ ...previous, [key]: value }));
+            setFilters((previous) => ({
+              ...previous,
+              [key]: value,
+              search: draft.search ?? "",
+            }));
+            setPage(1);
+            setSnapshot(undefined);
+            setSelected(null);
+          }}
+        />
+        {Object.values(draft).some(Boolean) && (
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => {
+              setDraft({});
+              setFilters({});
+              setPage(1);
+              setSnapshot(undefined);
+            }}
+          >
+            清空筛选
+          </Button>
+        )}
         <div className="account-inline-actions">
           {!performance && (
             <span
@@ -175,7 +210,7 @@ export function ModelsPage({
             disabled={models.isFetching || quality.isFetching}
             onClick={() => {
               void models.refetch();
-              if (performance && currentModel) void quality.refetch();
+              if (performance && modelNames.length) void quality.refetch();
             }}
           >
             {t("account.business.refresh")}
@@ -186,21 +221,7 @@ export function ModelsPage({
       {performance ? (
         <>
           <div className="account-performance-toolbar">
-            <label className="account-model-select">
-              {t("account.business.model")}
-              <select
-                value={currentModel?.model_name ?? ""}
-                disabled={!models.data?.data.items.length}
-                onChange={(e) => setSelectedName(e.target.value)}
-              >
-                {!models.data?.data.items.length && <option value="">—</option>}
-                {models.data?.data.items.map((model) => (
-                  <option key={model.model_name} value={model.model_name}>
-                    {model.model_name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <span className="account-subtle">热门优先 · 每页 6 个模型</span>
             <label>
               {t("account.business.window")}
               <select
@@ -215,26 +236,53 @@ export function ModelsPage({
               </select>
             </label>
           </div>
-          <QueryState query={quality} />
-          {quality.data && (
-            <>
-              <Metrics metric={quality.data.data.aggregate} />
-              {quality.data.data.groups.length > 0 && (
-                <details className="account-card account-data-details">
-                  <summary>{t("account.workspace.groupPerformance")}</summary>
-                  {quality.data.data.groups.map((group) => (
-                    <div
-                      className="account-performance-group"
-                      key={group.group}
-                    >
-                      <h4>{group.group}</h4>
-                      <Metrics metric={group} />
-                    </div>
-                  ))}
-                </details>
-              )}
-            </>
-          )}
+          <QueryState query={quality} showUpdated={false} />
+          <div className="account-status-grid">
+            {models.data?.data.items.map((model) => {
+              const result = quality.data?.data.find(
+                (item) => item.model_name === model.model_name,
+              );
+              return (
+                <article
+                  className="account-card account-status-card"
+                  key={model.model_name}
+                >
+                  <div className="account-model-heading">
+                    <ModelIcon name={model.model_name} />
+                    <h3>{model.model_name}</h3>
+                    {typeof model.hot_rank === "number" &&
+                      model.hot_rank > 0 && (
+                        <span className="account-badge">
+                          热门 #{model.hot_rank}
+                        </span>
+                      )}
+                  </div>
+                  {result ? (
+                    <>
+                      <Metrics metric={result.aggregate} />
+                      <details className="account-data-details">
+                        <summary>
+                          {t("account.workspace.groupPerformance")}
+                        </summary>
+                        {result.groups.map((group) => (
+                          <div key={group.group}>
+                            <h4>{group.group}</h4>
+                            <Metrics metric={group} />
+                          </div>
+                        ))}
+                      </details>
+                    </>
+                  ) : (
+                    <p className="account-subtle">
+                      {quality.isLoading
+                        ? t("account.business.loading")
+                        : "暂无状态数据"}
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
         </>
       ) : (
         <div className="account-model-grid">
@@ -244,8 +292,11 @@ export function ModelsPage({
               className="account-card account-model-card"
             >
               <div className="account-model-heading">
+                <ModelIcon name={model.model_name} />
                 <h3>{model.model_name}</h3>
-                <span className="account-badge">{model.vendor_id || "—"}</span>
+                <span className="account-badge">
+                  {billingLabels[String(model.quota_type)] ?? "—"}
+                </span>
               </div>
               <p className="account-model-description">{description(model)}</p>
               <p className="account-model-endpoints">
@@ -272,11 +323,12 @@ export function ModelsPage({
       {models.data && (
         <Pager
           page={page}
+          total={models.data.data.pagination.total}
+          pageSize={models.data.data.pagination.page_size}
           more={models.data.data.pagination.has_more}
           onChange={(value) => {
             setPage(value);
             setSelected(null);
-            setSelectedName("");
           }}
         />
       )}
@@ -331,30 +383,34 @@ export function ModelsPage({
           }
           onClose={() => setSelected(null)}
         >
-          <div className="account-model-detail">
-            <p>{description(selected)}</p>
-            <p>{selected.tags}</p>
-            <p>
-              {selected.enable_groups.join(", ")} ·{" "}
-              {selected.supported_endpoint_types.join(", ")}
-            </p>
-            <p>
-              {t("account.business.billingMode")}:{" "}
-              {selected.billing_mode ?? selected.quota_type} ·{" "}
-              {t("account.business.priceVersion")}:{" "}
-              {selected.pricing_version ?? "—"}
-            </p>
-            <p>{priceSummary(selected)}</p>
-            {selected.billing_expr && <code>{selected.billing_expr}</code>}
-            <details className="account-data-details" open>
-              <summary>{t("account.business.effectivePrice")}</summary>
-              <PricingDetails
-                model={selected}
-                meta={models.data?.data.pricing_meta ?? {}}
-                group={filters.group}
-              />
-            </details>
-          </div>
+          <AccountErrorBoundary key={selected.model_name}>
+            <div className="account-model-detail">
+              <p>{description(selected)}</p>
+              <p>{selected.tags}</p>
+              <p>
+                {selected.enable_groups.join(", ")} ·{" "}
+                {selected.supported_endpoint_types.join(", ")}
+              </p>
+              <p>
+                {t("account.business.billingMode")}:{" "}
+                {billingLabels[String(selected.quota_type)] ??
+                  selected.billing_mode ??
+                  "—"}{" "}
+                · {t("account.business.priceVersion")}:{" "}
+                {selected.pricing_version ?? "—"}
+              </p>
+              <p>{priceSummary(selected)}</p>
+              {selected.billing_expr && <code>{selected.billing_expr}</code>}
+              <details className="account-data-details" open>
+                <summary>{t("account.business.effectivePrice")}</summary>
+                <PricingDetails
+                  model={selected}
+                  meta={models.data?.data.pricing_meta ?? {}}
+                  group={filters.group}
+                />
+              </details>
+            </div>
+          </AccountErrorBoundary>
         </AccountDialog>
       )}
     </div>
@@ -388,9 +444,19 @@ function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
       <figure className="account-timeline">
         <figcaption>{t("account.visual.series")}</figcaption>
         <div>
+          {m.half_hour_series.length === 0 && (
+            <span
+              className="account-no-samples"
+              title={t("account.business.noSamples")}
+              aria-label={t("account.business.noSamples")}
+            />
+          )}
           {m.half_hour_series.map((point) => (
             <span
               key={point.ts}
+              tabIndex={0}
+              role="img"
+              aria-label={`${date(point.ts)} · ${point.has_samples ? `${point.success_rate ?? "—"}%` : t("account.business.noSamples")}`}
               className={
                 point.has_samples && point.success_rate != null
                   ? "has-samples"
@@ -406,6 +472,7 @@ function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
                     }
                   : undefined
               }
+              data-tooltip={`${date(point.ts)} · ${point.has_samples ? `${point.success_rate ?? "—"}%` : t("account.business.noSamples")}`}
               title={`${date(point.ts)} · ${point.has_samples ? `${point.success_rate ?? "—"}%` : t("account.business.noSamples")}`}
             />
           ))}

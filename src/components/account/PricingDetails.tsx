@@ -60,7 +60,9 @@ export function PricingDetails({
           .filter((f) => f in model || f in override)
           .map((f) => (
             <div key={f}>
-              <dt>{f}</dt>
+              <dt title={f}>
+                {t(`account.priceLabels.${f}`, { defaultValue: f })}
+              </dt>
               <dd>{String((f in override ? override[f] : model[f]) ?? "—")}</dd>
             </div>
           ))}
@@ -71,14 +73,18 @@ export function PricingDetails({
           "user_group_multiplier",
           "group_discount_ratio",
           "group_discount_source",
-        ].map((f) => (
-          <div key={f}>
-            <dt>{f}</dt>
-            <dd>{String(object(meta[f])[effective] ?? "—")}</dd>
-          </div>
-        ))}
+        ]
+          .filter((f) => object(meta[f])[effective] != null)
+          .map((f) => (
+            <div key={f}>
+              <dt title={f}>
+                {t(`account.priceLabels.${f}`, { defaultValue: f })}
+              </dt>
+              <dd>{String(object(meta[f])[effective] ?? "—")}</dd>
+            </div>
+          ))}
         <div>
-          <dt>user_model_discount_ratio</dt>
+          <dt>{t("account.priceLabels.user_model_discount_ratio")}</dt>
           <dd>
             {String(
               object(object(meta.user_model_discount_ratio)[effective])[
@@ -89,7 +95,9 @@ export function PricingDetails({
         </div>
         {Object.entries(groups).map(([f, map]) => (
           <div key={f}>
-            <dt>{f}</dt>
+            <dt title={f}>
+              {t(`account.priceLabels.${f}`, { defaultValue: f })}
+            </dt>
             <dd>{String(object(map)[model.model_name] ?? "—")}</dd>
           </div>
         ))}
