@@ -37,7 +37,7 @@ impl NativeTool {
             Self::Pi => home.join(".pi/agent/models.json"),
             Self::Mcode => home.join(".minimax/config.yaml"),
         };
-        #[cfg(not(feature = "local-preview"))]
+        #[cfg(not(feature = "isolated-profile"))]
         {
             let vars: &[&str] = match self {
                 Self::Grokbuild => &[],

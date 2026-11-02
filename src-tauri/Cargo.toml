@@ -18,7 +18,9 @@ doctest = false
 [features]
 default = []
 test-hooks = []
-local-preview = []
+# Isolate user data without enabling debug-only loopback fixtures.
+isolated-profile = []
+local-preview = ["isolated-profile"]
 
 [build-dependencies]
 tauri-build = { version = "2.4.0", features = [] }

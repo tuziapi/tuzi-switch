@@ -87,6 +87,9 @@ jobs:
       - name: Native regression (host target)
         shell: bash
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
+      - name: Acceptance profile regression
+        shell: bash
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --features isolated-profile acceptance_profile_ -- --test-threads=1
       - name: Isolated MCP service regression
         if: runner.os == 'macOS'
         shell: bash
@@ -98,7 +101,7 @@ jobs:
           BUILD_TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          pnpm tauri build --target "$BUILD_TARGET" --features local-preview --config src-tauri/tauri.acceptance.conf.json
+          pnpm tauri build --target "$BUILD_TARGET" --features isolated-profile --config src-tauri/tauri.acceptance.conf.json
       - name: Collect installers and source manifest
         shell: bash
         env:

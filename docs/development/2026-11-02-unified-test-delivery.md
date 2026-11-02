@@ -11,7 +11,7 @@ opentu 来源固定为 7d05f299fec40599221294a34c9b26f888177c9e，1359 原始文
 ## 交付
 
 - `acceptance-build.yml` 仅在测试 fork 的 main/gaizhao 或手动触发；不会创建 Release、发布标签或部署网站。
-- 测试应用名 `Tuzi Assistant Test`，应用标识 `com.tuziswitch.desktop.acceptance`，独立 Windows upgradeCode 和 `tuziswitch-test` 协议，不提供自动更新。编译启用 `local-preview`，默认工具配置与账户记录使用既有隔离预览目录（不是正式目录）；与旧本地预览共用该预览配置，用户设置的目录覆盖仍有效。
+- 测试应用名 `Tuzi Assistant Test`，应用标识 `com.tuziswitch.desktop.acceptance`，独立 Windows upgradeCode 和 `tuziswitch-test` 协议，不提供自动更新。编译启用 `isolated-profile`，默认工具配置与账户记录使用独立 acceptance 数据目录；不启用仅限 debug 的 `local-preview`，账户仍使用正式协议/地址，不带本机模拟账户。用户显式设置的目录覆盖仍有效。
 - CI 分别构建 macOS ARM/x64、Windows x64、Linux x64，上传安装包、精确 commit、SHA-256；未签名/未公证，保留 30 天。构建成功不等于安装、升级、回退验收完成。
 - `packages/download-page` 是独立 AGPL-3.0-or-later 网站包，保留 new-api / QuantumNous 来源；桌面许可不变。构建时验证正式仓库公开 Release 资产，提供版本快照和发布记录入口；另提供当前 Actions 的测试包入口。站点 artifact 包含完整源码归档与校验清单，不自动部署。
 - 主按钮“下载兔子助手”，品牌复用 `src-tauri/icons/icon.png` 蓝兔原始字节。Umami 仅统计实际下载点击和 platform/version，不能用于证明下载完成或独立人数。网站共享组件同改于独立 API worktree，未推送 API。
@@ -36,3 +36,6 @@ opentu 来源固定为 7d05f299fec40599221294a34c9b26f888177c9e，1359 原始文
 
 
 云端首轮 41401808218：verify 与下载页成功；两个 macOS 在创作包构建触发约 2 GiB 的 V8 默认堆上限（SIGABRT/134）。为构建任务明确设置 4 GiB Node 堆，测试与正式构建配置同步修复；未修改业务源码或开启正式发布。后续构建结果以新提交 Actions 为准。
+
+
+第二轮 41402848454：四平台前端及原生常规检查通过后，安装包 release 编译触发原有 local-preview 仅限 debug 的编译保护。保留保护，拆分 isolated-profile 功能；它只负责独立数据目录及工具路径隔离，local-preview 依赖该功能并继续独占本机模拟账户。新增特征回归校验正式账户协议、独立目录和拒绝模拟令牌，CI 在构建前执行。

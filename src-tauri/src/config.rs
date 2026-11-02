@@ -28,12 +28,13 @@ pub fn get_home_dir() -> PathBuf {
         }
     }
     // A preview bundle must never import or write the user's real tool settings.
-    #[cfg(feature = "local-preview")]
+    #[cfg(feature = "isolated-profile")]
     return dirs::data_local_dir()
-        .expect("local preview requires a local data directory")
-        .join("com.tuziswitch.desktop.preview/home");
+        .expect("isolated profile requires a local data directory")
+        .join(ISOLATED_PROFILE_ID)
+        .join("home");
 
-    #[cfg(not(feature = "local-preview"))]
+    #[cfg(not(feature = "isolated-profile"))]
     {
         dirs::home_dir().unwrap_or_else(|| {
             log::warn!("无法获取用户主目录，回退到当前目录");
@@ -41,6 +42,14 @@ pub fn get_home_dir() -> PathBuf {
         })
     }
 }
+
+/// User-independent profile identity for explicit test/preview builds.
+#[cfg(feature = "isolated-profile")]
+pub(crate) const ISOLATED_PROFILE_ID: &str = if cfg!(feature = "local-preview") {
+    "com.tuziswitch.desktop.preview"
+} else {
+    "com.tuziswitch.desktop.acceptance"
+};
 
 /// 获取 Claude Code 配置目录路径
 pub fn get_claude_config_dir() -> PathBuf {
