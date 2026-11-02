@@ -3050,8 +3050,8 @@
         "token": "密钥后4位"
       },
       "logFilter": {
-        "start_timestamp": "开始 Unix 秒",
-        "end_timestamp": "结束 Unix 秒",
+        "start_timestamp": "开始时间",
+        "end_timestamp": "结束时间",
         "token_name": "Key 名称",
         "model_name": "模型名称",
         "group": "分组",
@@ -3086,7 +3086,8 @@
         "token": "密钥后4位",
         "group": "分组",
         "status": "全部状态"
-      }
+      },
+      "catalogPrices": "模型价格"
     },
     "visual": {
       "actions": "操作",
@@ -3134,6 +3135,60 @@
     "tokenPlaceholder": "粘贴账户系统令牌",
     "tokenInvalid": "请输入完整的系统令牌，不要包含空白。",
     "verifyingToken": "验证中…",
-    "disconnectHint": "断开仅清除此设备的凭证，不会使网站系统令牌失效。"
+    "disconnectHint": "断开仅清除此设备的凭证，不会使网站系统令牌失效。",
+    "workspace": {
+      "settings": "账户设置",
+      "wallet": "充值 / 兑换",
+      "unsaved": "有未保存的修改或待核实的保存结果，确认关闭？",
+      "keepEditing": "继续编辑",
+      "discard": "关闭并丢弃草稿",
+      "query": "查询",
+      "cost": "消耗",
+      "statistics": "消费统计",
+      "consumptionTrend": "消费趋势",
+      "invalidRange": "请选择有效的开始和结束时间，结束时间须晚于开始时间。",
+      "filtersPending": "筛选已修改，点击查询后生效",
+      "groupPerformance": "按分组查看服务状态",
+      "logNotice": "消费、错误与退款分别记录；日志汇总不代表完整账务。",
+      "noModels": "当前筛选下没有可用模型，请调整筛选条件。"
+    },
+    "priceLabels": {
+      "model_price": "模型价格",
+      "completion_price": "输出价格",
+      "second_price": "每秒价格",
+      "multiplier": "倍率",
+      "cache_price": "缓存读取价格",
+      "create_cache_price": "缓存写入价格",
+      "create_cache_price_5m": "缓存写入价格（5 分钟）",
+      "create_cache_price_1h": "缓存写入价格（1 小时）",
+      "image_price": "图像输入价格",
+      "image_cache_price": "图像缓存价格",
+      "image_output_price": "图像输出价格",
+      "audio_price": "音频输入价格",
+      "audio_cache_price": "音频缓存价格",
+      "audio_completion_price": "音频输出价格",
+      "web_search_price": "联网搜索价格",
+      "model_ratio": "模型倍率",
+      "completion_ratio": "输出倍率",
+      "group_ratio": "有效分组倍率",
+      "base_group_ratio": "基础分组倍率",
+      "system_group_ratio": "系统分组倍率",
+      "user_group_multiplier": "账户分组倍率",
+      "group_discount_ratio": "分组折扣",
+      "group_discount_source": "折扣来源",
+      "user_model_discount_ratio": "账户模型折扣",
+      "second_ratio": "每秒倍率",
+      "cache_ratio": "缓存读取倍率",
+      "create_cache_ratio": "缓存写入倍率",
+      "create_cache_ratio_5m": "缓存写入倍率（5 分钟）",
+      "create_cache_ratio_1h": "缓存写入倍率（1 小时）",
+      "image_ratio": "图像输入倍率",
+      "image_cache_ratio": "图像缓存倍率",
+      "image_output_ratio": "图像输出倍率",
+      "audio_ratio": "音频输入倍率",
+      "audio_cache_ratio": "音频缓存倍率",
+      "audio_completion_ratio": "音频输出倍率",
+      "web_search_ratio": "联网搜索倍率"
+    }
   }
 }

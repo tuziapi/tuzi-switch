@@ -1,3 +1,4 @@
+import { AccountErrorBoundary } from "./AccountErrorBoundary";
 import { type AccountState } from "@/lib/api/account";
 import type {
   Capabilities,
@@ -7,7 +8,6 @@ import type {
 import { useDesktop } from "@/lib/query/desktop";
 import { useTranslation } from "react-i18next";
 import { QueryState, WebEntry } from "./BusinessShared";
-import { CurrencySwitcher } from "./AccountCurrency";
 import { Keys } from "./Keys";
 import { Logs } from "./Logs";
 import { ModelsPage } from "./ModelsPage";
@@ -32,9 +32,17 @@ export function AccountBusiness({
     {},
     60000,
   );
+  const native = caps.data?.data.native;
   const enabled =
-    page === "keys" &&
-    (caps.data?.data.release?.keys ?? caps.data?.data.native.keys);
+    page === "keys"
+      ? (caps.data?.data.release?.keys ?? native?.keys)
+      : page === "logs"
+        ? native?.logs
+        : page === "models"
+          ? native?.models
+          : page === "modelsStatus"
+            ? native?.models && native?.performance
+            : false;
   return (
     <>
       <div className="account-capabilities">
@@ -44,18 +52,27 @@ export function AccountBusiness({
         <p role="alert">{t("account.business.unavailable")}</p>
       )}
       {enabled && (
-        <>
-          <div className="account-workspace-heading">
-            <h2>{t("account.pages.keys")}</h2>
-            <CurrencySwitcher />
-          </div>
-          <AccountMetrics
-            state={state}
-            accountEnabled={!!caps.data?.data.native.account}
-            usageEnabled={!!caps.data?.data.native.usage}
-          />
-          <Keys state={state} onConfigure={onConfigure} />
-        </>
+        <AccountErrorBoundary key={page}>
+          {page === "keys" && (
+            <>
+              <AccountMetrics
+                state={state}
+                accountEnabled={!!native?.account}
+                usageEnabled={!!native?.usage}
+                web={caps.data?.data.web}
+              />
+              <Keys state={state} onConfigure={onConfigure} />
+            </>
+          )}
+          {page === "logs" && <Logs state={state} />}
+          {(page === "models" || page === "modelsStatus") && (
+            <ModelsPage
+              state={state}
+              performance={page === "modelsStatus"}
+              onConfigure={page === "models" ? onConfigure : undefined}
+            />
+          )}
+        </AccountErrorBoundary>
       )}
     </>
   );

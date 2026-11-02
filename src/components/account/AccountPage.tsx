@@ -3,6 +3,9 @@ import { toast } from "sonner";
 import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import "./account.css";
 import "./account-polish.css";
+import "./account-workspace.css";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { AccountViewState } from "./AccountViewState";
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -19,20 +22,16 @@ import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 import type { useAccount } from "@/lib/query/account";
 
 export const ACCOUNT_PAGES = [
-  "overview",
   "keys",
   "logs",
-  "modelsStatus",
-  "topup",
-  "redeem",
-  "profile",
   "models",
+  "modelsStatus",
 ] as const;
 export type AccountPageId = (typeof ACCOUNT_PAGES)[number];
 type AccountController = ReturnType<typeof useAccount>;
 
 /** Only sanitized native account state crosses this boundary. Never persist it. */
-export function AccountPage({
+function AccountPageContent({
   account,
   tokenReturnRequest = 0,
   onConfigureKey,
@@ -43,7 +42,7 @@ export function AccountPage({
   onConfigureKey?: (key: DesktopKey, model?: DesktopPricing) => void;
 }) {
   const { t } = useTranslation();
-  const page = "keys";
+  const [page, setPage] = useState<AccountPageId>("keys");
   const [busy, setBusy] = useState(false);
   const [actionFailed, setActionFailed] = useState(false);
   // This input exists only in this mounted form, never in query or persistent state.
@@ -282,7 +281,7 @@ export function AccountPage({
     );
   return (
     <section
-      className="account-shell account-phase1"
+      className="account-shell account-phase1 account-workspace"
       aria-label={t("account.title")}
     >
       <div className="account-connection" data-status={state.status}>
@@ -354,20 +353,47 @@ export function AccountPage({
           </TooltipProvider>
         </div>
       </div>
-      <section
-        className="account-content"
-        data-account-page={page}
-        aria-label={t(`account.pages.${page}`)}
+      <Tabs
+        value={page}
+        onValueChange={(value) => setPage(value as AccountPageId)}
+        className="account-tabs"
       >
-        {state.identity && (
-          <AccountBusiness
-            key={`${state.identity.connectionId}:${state.generation}:${page}`}
-            state={state}
-            page={page}
-            onConfigure={onConfigureKey}
-          />
-        )}
-      </section>
+        <TabsList className="account-tab-list" aria-label={t("account.title")}>
+          {ACCOUNT_PAGES.map((id) => (
+            <TabsTrigger key={id} value={id}>
+              {t(`account.pages.${id}`)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {ACCOUNT_PAGES.map((id) => (
+          <TabsContent
+            key={id}
+            value={id}
+            className="account-content"
+            data-account-page={id}
+          >
+            {state.identity && (
+              <AccountBusiness
+                state={state}
+                page={id}
+                onConfigure={onConfigureKey}
+              />
+            )}
+          </TabsContent>
+        ))}
+      </Tabs>
     </section>
+  );
+}
+
+// Remount on account replacement so drafts and navigation never cross identities.
+export function AccountPage(props: Parameters<typeof AccountPageContent>[0]) {
+  const { state } = props.account;
+  return (
+    <AccountViewState
+      key={`${state.identity?.connectionId ?? "disconnected"}:${state.generation}`}
+    >
+      <AccountPageContent {...props} />
+    </AccountViewState>
   );
 }

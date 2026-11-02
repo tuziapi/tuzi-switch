@@ -1,5 +1,7 @@
 # 账户中心与工具管理开发基线
 
+2026-11-02 UC-SYNC-54：合入 PR #54 最终账户四页工作区及价格修订，保留 opentu 集成；625 项前端及 58 项账户原生回归通过，重建使用线上账户地址的隔离测试包。见 [同步记录](2026-11-02-pr54-integration.md)。
+
 2026-11-02 UC-TEST-01：用户已批准测试 main、未签名测试构建及正式仓库 Draft PR；主按钮与蓝兔图标同步调整。验证和剩余发布门禁见 [测试交付记录](2026-11-02-unified-test-delivery.md)。
 
 2026-11-02 UC-DL-01：下载页已在独立网站 worktree 完成重设计与本地预览，18 个浏览器场景通过；客户端现有发布门禁仍未关闭。见 [进度记录](progress.md#2026-11-02-uc-dl-01统一客户端下载页)。
@@ -17,6 +19,11 @@
 2026-11-01 UC-P01.1：用户确认创作自动向上收起助手导航；核对 opentu 版本并补齐暖白点阵显示适配，验证见 [实施记录](opentu-unified-client-implementation.md)。
 
 2026-11-01 UC-P01：用户批准基于 [统一客户端设计 v0.2](opentu-unified-client-design.md) 开始本地预览，并指定 AiW520/tuzi-switch 的 codex/assistant-main-sync 分支。实施基线、可验收范围和限制见 [UC-P01 记录](opentu-unified-client-implementation.md)。
+2026-11-02 ACCOUNT-OPEN-03：用户要求暂时隐藏账户设置入口（保留实现且不挂载）；调用摘要及账务说明移入列表下方消费统计；模型标签直接展示、移除模型页账户价格提示、统一筛选布局并美化模型详情。仅本地前端调整，契约不变。见 [开放记录](account-workspace-opening.md)。
+
+
+2026-11-01 ACCOUNT-OPEN-01：用户批准四个账户内 Tab，默认密钥；四项概要仅在密钥页，不设独立总览；资料放账户设置抽屉。替代历史 Phase 1 隐藏规则，允许本地分阶段提交，未授权推送或发布。见 [账户页面开放记录](account-workspace-opening.md)。
+
 
 2026-10-29 UI-15：用户授权版本历程按需自动同步公开Release，本地档案与缓存兜底；边界与回退见 [ADR-017](decisions/0017-release-history-sync.md)，验证见progress.md。
 

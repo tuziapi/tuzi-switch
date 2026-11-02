@@ -1,3 +1,4 @@
+import { normalizeModels } from "../api/modelNormalization";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { accountQueryKey } from "./account";
@@ -14,8 +15,8 @@ export function useDesktop<T>(
     state,
     path,
     query,
-    (signal) =>
-      desktopRequest<T>(
+    async (signal) => {
+      const result = await desktopRequest<T>(
         {
           method: "GET",
           path,
@@ -25,7 +26,11 @@ export function useDesktop<T>(
           generation: state.generation,
         },
         signal,
-      ),
+      );
+      if (path === "/account/models")
+        result.data = normalizeModels(result.data) as T;
+      return result;
+    },
     staleTime,
     poll,
     keepPrevious,
