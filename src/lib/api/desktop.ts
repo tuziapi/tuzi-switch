@@ -99,8 +99,13 @@ export interface Log {
   is_stream: boolean;
   error_code: string | null;
   error_message: string | null;
+  public_error_code?: string | null;
+  request_path?: string | null;
+  upstream_request_id?: string | null;
+  status_code?: number | string | null;
 }
 export interface Summary {
+  refund_quota?: string;
   record_count: string;
   error_count: string;
   quota: string;
@@ -131,7 +136,7 @@ export interface DesktopPricing {
   description: string;
   description_i18n: string;
   tags: string;
-  vendor_id: string;
+  vendor_id: string | number;
   quota_type: number;
   model_ratio: number | null;
   model_price: number | null;

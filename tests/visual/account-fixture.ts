@@ -53,19 +53,24 @@ const models: DesktopPricing[] = [
   ["claude-sonnet-5-5", "Anthropic", "anthropic_messages"],
   ["gemini-3.1-pro-preview", "Google", "gemini_native,openai"],
   ["gpt-image-2", "OpenAI", "Images"],
-].map(([name, vendor, protocol]) => ({
+  ["deepseek-v3", "DeepSeek", "openai"],
+  ["qwen3", "Alibaba", "openai"],
+  ["kimi-k2", "Moonshot", "openai"],
+  ["gemini-flash", "Google", "gemini_native"],
+].map(([name, vendor, protocol], index) => ({
+  hot_rank: index + 1,
   model_name: name,
   aliases: [],
   description: "合成模型 · 仅供本地视觉验证",
   description_i18n: "{}",
   tags: "文本 / 推理",
   vendor_id: vendor,
-  quota_type: 0,
+  quota_type: 1,
   model_ratio: 1,
   model_price: null,
   pricing_unavailable: false,
   completion_ratio: 3,
-  enable_groups: ["default"],
+  enable_groups: index === 0 ? ["default", "Codex"] : ["default"],
   supported_endpoint_types: protocol.split(","),
   endpoints: {},
   billing_mode: "按量计费",
@@ -126,7 +131,11 @@ const logs = Array.from({ length: 20 }, (_, i) => ({
   duration_ms: 12300,
   is_stream: true,
   error_code: null,
-  error_message: null,
+  error_message: i === 2 ? "合成错误：请稍后重试" : null,
+  public_error_code: i === 2 ? "rate_limit_exceeded" : null,
+  status_code: i === 2 ? 429 : null,
+  request_path: "/v1/responses",
+  upstream_request_id: `synthetic-upstream-${i}`,
 }));
 const summary = {
   record_count: "128",
@@ -174,7 +183,14 @@ export async function accountPreviewIPC(command: string, args?: unknown) {
     keys.some((k) => request.path === `/account/keys/${k.id}/reveal`)
   )
     return envelope({ key: "sk-SYNTHETIC_PREVIEW_ONLY" });
-  if (request.method !== "GET") throw { code: "synthetic_preview_read_only" };
+  if (
+    request.method !== "GET" &&
+    !(
+      request.method === "POST" &&
+      request.path === "/account/model-performance/batch"
+    )
+  )
+    throw { code: "synthetic_preview_read_only" };
   switch (request.path) {
     case "/account/capabilities":
       return envelope({
@@ -242,19 +258,89 @@ export async function accountPreviewIPC(command: string, args?: unknown) {
         { id: "default", label: "默认分组" },
         { id: "claude", label: "Claude" },
       ]);
-    case "/account/models":
+    case "/account/models": {
+      const filtered = empty
+        ? []
+        : models.filter(
+            (m) =>
+              (!q.search || m.model_name.includes(q.search)) &&
+              (!q.vendor || m.vendor_id === q.vendor) &&
+              (!q.quota_type || String(m.quota_type) === q.quota_type) &&
+              (!q.group || m.enable_groups.includes(q.group)) &&
+              (!q.endpoint_type ||
+                m.supported_endpoint_types.includes(q.endpoint_type)),
+          );
+      const size = Number(q.page_size || 12),
+        page = Number(q.page || 1);
       return envelope({
-        items: empty
-          ? []
-          : models.filter((m) => !q.search || m.model_name.includes(q.search)),
-        pagination: { page: 1, page_size: 20, total: "4", has_more: false },
+        items: filtered
+          .slice((page - 1) * size, page * size)
+          .map(
+            ({ related_pricing, aliases, description_i18n, ...wire }) => wire,
+          ),
+        pagination: {
+          page,
+          page_size: size,
+          total: String(filtered.length),
+          has_more: page * size < filtered.length,
+        },
         snapshot_id: "synthetic-snapshot",
         snapshot_refreshed: false,
         api_version: 1,
         schema_version: "v1",
         algorithm_version: "v1",
-        pricing_meta: { default_effective_group: "default" },
+        pricing_meta: {
+          usable_group: { default: "默认分组", Codex: "Codex" },
+          base_group_ratio: { default: 1, Codex: 0.8 },
+          default_effective_group: "default",
+          filter_facets: {
+            vendors: {
+              OpenAI: 2,
+              Anthropic: 1,
+              Google: 2,
+              DeepSeek: 1,
+              Alibaba: 1,
+              Moonshot: 1,
+            },
+            groups: { default: 8 },
+            endpoint_types: {
+              openai: 6,
+              responses: 1,
+              anthropic_messages: 1,
+              gemini_native: 2,
+              Images: 1,
+            },
+            tags: { 文本: 7, 推理: 5 },
+            quota_types: { "1": 8 },
+          },
+        },
       });
+    }
+    case "/account/model-performance/batch": {
+      const requestedGroups = (request.body as { groups?: string[] }).groups;
+      // The API distinguishes omitted (all visible) from [] (no groups).
+      const hasGroups =
+        requestedGroups === undefined || requestedGroups.includes("default");
+      const sample = hasGroups
+        ? metric
+        : {
+            ...metric,
+            has_samples: false,
+            success_rate: null,
+            avg_latency_ms: null,
+            avg_ttft_ms: null,
+            avg_tps: null,
+            half_hour_series: [],
+          };
+      return envelope(
+        ((request.body as { models: string[] }).models ?? []).map((name) => ({
+          model_name: name,
+          aggregate: sample,
+          groups: hasGroups ? [{ ...sample, group: "default" }] : [],
+          series_schema: "v1",
+        })),
+      );
+    }
     case "/account/model-performance":
       return envelope({
         model_name: q.model,
@@ -264,16 +350,42 @@ export async function accountPreviewIPC(command: string, args?: unknown) {
       });
     case "/account/logs":
       return envelope({
-        page: 1,
-        page_size: 20,
-        total: empty ? "0" : "128",
-        has_more: !empty,
-        items: empty ? [] : logs,
+        page: Number(q.page || 1),
+        page_size: Number(q.page_size || 10),
+        total: empty ? "0" : "20",
+        has_more: !empty && Number(q.page || 1) === 1,
+        items: empty
+          ? []
+          : logs.slice(
+              (Number(q.page || 1) - 1) * 10,
+              Number(q.page || 1) * 10,
+            ),
       });
     case "/account/logs/summary":
       return envelope(summary);
     case "/account/logs/statistics":
-      return envelope({ summary, trend: [], by_model: [], by_error: [] });
+      return envelope({
+        summary,
+        trend: empty
+          ? []
+          : points.map((p) => ({
+              ...summary,
+              quota: p.quota,
+              start_timestamp: p.bucket_start,
+              end_timestamp: p.bucket_end,
+            })),
+        by_model: empty
+          ? []
+          : models.map((m, i) => ({
+              model_name: m.model_name,
+              quota: String(21000 * (8 - i)),
+              record_count: String(12 - i),
+              error_count: i === 2 ? "2" : "0",
+            })),
+        by_error: empty
+          ? []
+          : [{ error_code: "rate_limit_exceeded", record_count: "2" }],
+      });
     case "/account/profile":
       return envelope({
         user_id: "synthetic-user",
