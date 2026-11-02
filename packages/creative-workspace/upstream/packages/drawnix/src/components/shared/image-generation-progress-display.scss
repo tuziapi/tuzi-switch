@@ -1,0 +1,124 @@
+.image-generation-progress-display {
+  --image-generation-progress-accent: #f39c12;
+  --image-generation-progress-accent-soft: rgba(243, 156, 18, 0.18);
+  --image-generation-progress-ring-bg: rgba(100, 116, 139, 0.38);
+  --image-generation-progress-text: rgba(31, 41, 55, 0.96);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.image-generation-progress-display__ring {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-generation-progress-display__ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.image-generation-progress-display__ring-bg {
+  stroke: var(--image-generation-progress-ring-bg);
+}
+
+.image-generation-progress-display__ring-progress {
+  stroke: var(--image-generation-progress-accent);
+  transition: stroke-dashoffset 0.3s ease;
+  filter: drop-shadow(0 0 4px var(--image-generation-progress-accent-soft));
+}
+
+.image-generation-progress-display__percentage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--image-generation-progress-text);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.25);
+}
+
+.image-generation-progress-display__pulse {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.24);
+  border-top-color: var(--image-generation-progress-accent);
+  box-shadow: 0 0 0 5px var(--image-generation-progress-accent-soft);
+}
+
+.image-generation-progress-display__status {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(31, 41, 55, 0.92);
+  text-align: center;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.image-generation-progress-display--compact {
+  gap: 4px;
+}
+
+.image-generation-progress-display--compact
+  .image-generation-progress-display__ring {
+  width: 48px;
+  height: 48px;
+}
+
+.image-generation-progress-display--compact
+  .image-generation-progress-display__percentage {
+  font-size: 12px;
+}
+
+.image-generation-progress-display--compact
+  .image-generation-progress-display__status {
+  font-size: 11px;
+}
+
+.image-generation-progress-display--loading {
+  --image-generation-progress-accent: #00a870;
+  --image-generation-progress-accent-soft: rgba(0, 168, 112, 0.16);
+}
+
+.image-generation-progress-display--danger {
+  --image-generation-progress-accent: #dc2626;
+  --image-generation-progress-accent-soft: rgba(220, 38, 38, 0.12);
+}
+
+.image-generation-progress-display--success {
+  --image-generation-progress-accent: #16a34a;
+  --image-generation-progress-accent-soft: rgba(22, 163, 74, 0.16);
+}
+
+.image-generation-progress-display--indeterminate
+  .image-generation-progress-display__pulse {
+  animation: image-generation-progress-display-spin 0.95s linear infinite;
+}
+
+.image-generation-progress-display--no-ring {
+  gap: 0;
+}
+
+@keyframes image-generation-progress-display-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-generation-progress-display__ring-progress,
+  .image-generation-progress-display__pulse {
+    animation: none !important;
+    transition: none !important;
+  }
+}

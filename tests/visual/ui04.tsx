@@ -1,3 +1,6 @@
+import { creativeManualPreviewIPC } from "./creative-request-fixture";
+import { CreativeWorkspace } from "@/features/creative/CreativeWorkspace";
+import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 import { nativePreviewIPC } from "./native-tool-fixture";
 // Synthetic provider workspace. No real IPC, filesystem or external requests.
 import { useState } from "react";
@@ -7,7 +10,8 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { Toaster, toast } from "sonner";
 import { Plus } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
-import { TuziSidebar } from "@/components/shell/TuziSidebar";
+import { TuziNavigation } from "@/components/shell/TuziNavigation";
+import { TuziSidebarTransition } from "@/components/shell/TuziSidebarTransition";
 import { ProviderCard } from "@/components/providers/ProviderCard";
 import { ProviderConnectionControls } from "@/components/providers/ProviderConnectionControls";
 import { NativeToolPage } from "@/components/providers/NativeToolPage";
@@ -53,7 +57,16 @@ const mcpFixture = {
     id: "fixture",
     name: "合成 MCP 服务",
     server: { type: "stdio", command: "fixture" },
-    apps: { claude: true, codex: false, gemini: false, opencode: false, hermes: false, grokbuild: true, pi: true, mcode: true },
+    apps: {
+      claude: true,
+      codex: false,
+      gemini: false,
+      opencode: false,
+      hermes: false,
+      grokbuild: true,
+      pi: true,
+      mcode: true,
+    },
     tags: [],
   },
 };
@@ -105,9 +118,18 @@ mockWindows("main");
 mockIPC(
   async (command, args) => {
     if (command === "set_window_theme") return;
+    if (command === "open_external") {
+      const state = window as unknown as { __creativeOpenedTools?: string[] };
+      (state.__creativeOpenedTools ??= []).push((args as {url: string}).url);
+      return;
+    }
+    if (command === "creative_manual_request" || command === "creative_manual_cancel") return creativeManualPreviewIPC(command, args);
     if (
       [
         "account_request",
+        "creative_account_bindings",
+        "creative_account_bind",
+        "creative_account_request",
         "account_cancel_request",
         "tuzi_provider_sources",
         "tuzi_native_tool_sources",
@@ -153,14 +175,17 @@ mockIPC(
       return next;
     }
     if (command === "get_settings") return { commonConfigConfirmed: true };
-    if (command === "get_mcp_servers") return params.get("scenario") === "mcp" ? mcpFixture : {};
+    if (command === "get_mcp_servers")
+      return params.get("scenario") === "mcp" ? mcpFixture : {};
     if (command === "toggle_mcp_app" && params.get("scenario") === "mcp") {
-      const { app, enabled } = args as { app: keyof typeof mcpFixture.fixture.apps; enabled: boolean };
+      const { app, enabled } = args as {
+        app: keyof typeof mcpFixture.fixture.apps;
+        enabled: boolean;
+      };
       mcpFixture.fixture.apps[app] = enabled;
       return;
     }
-    if (["get_prompts", "get_universal_providers"].includes(command))
-      return {};
+    if (["get_prompts", "get_universal_providers"].includes(command)) return {};
     if (
       [
         "get_installed_skills",
@@ -262,6 +287,11 @@ function Canvas() {
   const [collapsed, setCollapsed] = useState(false);
   const [selected, setSelected] = useState(currentId);
   const [page, setPage] = useState(params.get("page") ?? "providers");
+  const [creativeKeyId,setCreativeKeyId] = useState<string>();
+  const [creativeAccountState,setCreativeAccountState] = useState<AccountState>({
+    ...disconnectedAccount,status:params.get("account")==="disconnected" ? "disconnected":"connected",generation:1,
+    identity:params.get("account")==="disconnected" ? null : {userId:"synthetic-user",username:"preview_synthetic",displayName:"本地合成账户",connectionId:"synthetic-connection"},
+  });
   const [nativeFocus, setNativeFocus] = useState<
     { providerId: string } | undefined
   >();
@@ -270,6 +300,7 @@ function Canvas() {
   const [target, setTarget] = useState<AppId | null>("codex");
   const native = ["grokbuild", "pi", "mcode"].includes(page);
   const titles: Record<string, string> = {
+    creative: "opentu 创作",
     account: "兔子账户",
     providers: WORKSPACE_TOOL_NAMES[app],
     mcp: "MCP 管理",
@@ -291,9 +322,13 @@ function Canvas() {
       : null;
   const globalContent = () => {
     switch (page) {
+      case "creative":
+        return null;
       case "account":
         return (
           <AccountWorkspacePreview
+            onStateChange={setCreativeAccountState}
+            onCreativeConfigure={key=>{setCreativeKeyId(key.id);setPage("creative");}}
             onNativeSaved={(tool, providerId) => {
               setNativeFocus({ providerId });
               setOrigin(tool);
@@ -373,47 +408,53 @@ function Canvas() {
         );
     }
   };
-  const left = collapsed ? 68 : 228;
+  const left = page === "creative" ? 0 : collapsed ? 68 : 228;
+  const assistantNavigation = (
+    <TuziNavigation
+      activeApp={app}
+      currentView={page}
+      visibleApps={{
+        claude: true,
+        "claude-desktop": true,
+        codex: true,
+        gemini: true,
+        opencode: true,
+        openclaw: true,
+        hermes: true,
+      }}
+      topOffset={0}
+      collapsed={collapsed}
+      onToggleCollapsed={() => setCollapsed(!collapsed)}
+      onSwitchApp={(next) => {
+        setApp(next);
+        setOrigin(next);
+        setTarget(WORKSPACE_SUPPORT.prompts.includes(next) ? next : null);
+      }}
+      onNavigate={(view) => {
+        if (["grokbuild", "pi", "mcode"].includes(view)) {
+          setOrigin(view as NativeTool);
+          setTarget(null);
+        }
+        setPage(view);
+      }}
+      onOpenSettings={notice}
+    />
+  );
   return (
     <div
       className="tuzi-shell h-screen flex flex-col bg-background text-foreground"
       style={{ paddingTop: 52 }}
     >
       <Toaster />
-      <TuziSidebar
-        activeApp={app}
-        currentView={page}
-        visibleApps={{
-          claude: true,
-          "claude-desktop": true,
-          codex: true,
-          gemini: true,
-          opencode: true,
-          openclaw: true,
-          hermes: true,
-        }}
-        topOffset={0}
-        collapsed={collapsed}
-        onToggleCollapsed={() => setCollapsed(!collapsed)}
-        onSwitchApp={(next) => {
-          setApp(next);
-          setOrigin(next);
-          setTarget(WORKSPACE_SUPPORT.prompts.includes(next) ? next : null);
-        }}
-        onNavigate={(view) => {
-          if (["grokbuild", "pi", "mcode"].includes(view)) {
-            setOrigin(view as NativeTool);
-            setTarget(null);
-          }
-          setPage(view);
-        }}
-        onOpenSettings={notice}
-      />
+      <TuziSidebarTransition visible={page !== "creative"}>
+        {assistantNavigation}
+      </TuziSidebarTransition>
       <header
-        className="workspace-header fixed top-0 h-[52px] border-b border-border bg-background flex items-center justify-between px-6"
+        className="workspace-header tuzi-workspace-layout fixed top-0 z-30 h-[52px] border-b border-border bg-background flex items-center justify-between px-6"
         style={{ left, width: `calc(100% - ${left}px)` }}
       >
         <div className="flex items-center gap-3">
+          {page === "creative" && assistantNavigation}
           {page === "providers" && app === "codex" && (
             <ProviderIcon icon="openai" name="Codex" size={20} />
           )}
@@ -422,7 +463,9 @@ function Canvas() {
               ? nativeToolNames[page as NativeTool]
               : (titles[page] ?? page)}
           </strong>
-          <span className="text-xs text-muted-foreground">合成预览</span>
+          <span className="text-xs text-muted-foreground">
+            {page === "creative" ? "本地预览 · 项目真实保存" : "合成预览"}
+          </span>
         </div>
         {page === "providers" && (
           <Button
@@ -436,10 +479,11 @@ function Canvas() {
         )}
       </header>
       <main
-        className="workspace-view flex flex-1 flex-col min-h-0"
+        className="workspace-view tuzi-workspace-layout flex flex-1 flex-col min-h-0"
         data-view={page}
         style={{ marginLeft: left }}
       >
+        <CreativeWorkspace active={page === "creative"} accountState={creativeAccountState} selectedKeyId={creativeKeyId} onManageAccount={()=>setPage("account")}/>
         {native ? (
           <NativeToolPage
             key={page}

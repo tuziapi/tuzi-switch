@@ -3,7 +3,7 @@ run-name: "Installers · ${{ github.ref_name }} · ${{ github.sha }}"
 
 on:
   push:
-    branches: [gaizhao]
+    branches: [gaizhao, main]
   workflow_dispatch:
 
 permissions:
@@ -19,6 +19,7 @@ env:
 
 jobs:
   verify:
+    if: github.repository == 'AiW520/tuzi-switch'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +30,7 @@ jobs:
         with:
           version: '9'
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build:creative
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
       - run: python3 -m unittest discover -s src-tauri/resources/builtin-skills/codex-image-render-fallback/scripts -p 'test_*.py'
@@ -94,12 +96,7 @@ jobs:
           BUILD_TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            CONFIG="$(node scripts/tauri-release-config.cjs --unsigned)"
-          else
-            CONFIG="$(node scripts/tauri-release-config.cjs --unsigned --desktop-product-name)"
-          fi
-          pnpm tauri build --target "$BUILD_TARGET" --config "$CONFIG"
+          pnpm tauri build --target "$BUILD_TARGET" --features local-preview --config src-tauri/tauri.acceptance.conf.json
       - name: Collect installers and source manifest
         shell: bash
         env:
@@ -123,12 +120,43 @@ jobs:
               'repository': os.environ['GITHUB_REPOSITORY'], 'commit': os.environ['GITHUB_SHA'],
               'run': os.environ['GITHUB_RUN_ID'], 'target': os.environ['BUILD_TARGET'],
               'version': json.loads(pathlib.Path('package.json').read_text(encoding='utf-8'))['version'],
-              'developerSigned': False, 'notarized': False, 'files': files
+              'developerSigned': False, 'notarized': False, 'channel': 'acceptance',
+              'applicationId': 'com.tuziswitch.desktop.acceptance', 'isolatedLocalProfile': True, 'files': files
           }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
       - uses: actions/upload-artifact@v4
         with:
           name: tuzi-assistant-${{ matrix.name }}-${{ github.sha }}
           path: acceptance-artifacts/*
+          if-no-files-found: error
+          retention-days: 30
+
+  download-page:
+    needs: verify
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:download
+        env:
+          VITE_ACCEPTANCE_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
+      - name: Include source and checksums
+        shell: bash
+        run: |
+          cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/dist/
+          git archive --format=tar.gz --output=packages/download-page/dist/source.tar.gz HEAD
+          cd packages/download-page/dist
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tuzi-download-page-${{ github.sha }}
+          path: packages/download-page/dist/
           if-no-files-found: error
           retention-days: 30

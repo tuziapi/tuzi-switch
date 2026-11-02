@@ -1,0 +1,142 @@
+@import "./variables.module.scss";
+
+.drawnix {
+  --focus-highlight-color: #{$oc-blue-2};
+  --icon-fill-color: var(--color-on-surface);
+  --island-bg-color: #ffffff;
+  --island-border-color: #eeeeee;
+  --keybinding-color: var(--color-gray-40);
+  --shadow-island: 0 0 16px #00000014;
+  --dialog-border-color: var(--color-gray-20);
+  --button-hover-bg: var(--color-surface-high);
+  --button-active-border: var(--color-brand-active);
+  --link-color: var(--color-primary);
+  --default-button-size: 2rem;
+  --default-icon-size: 1rem;
+  --lg-button-size: 2.25rem;
+  --lg-icon-size: 1.125rem;
+  --xlg-icon-size: 1.25rem;
+  --popup-label-size: 1.25rem;
+  --editor-container-padding: 1rem;
+
+  @media screen and (min-device-width: 1921px) {
+    --lg-button-size: 2.5rem;
+    --lg-icon-size: 1.25rem;
+    --default-button-size: 2.25rem;
+    --default-icon-size: 1.25rem;
+  }
+
+  --space-factor: 0.25rem;
+  --text-primary-color: var(--color-on-surface);
+
+  --color-icon-white: #{$oc-white};
+
+  /* Opentu 品牌色彩系统 - 与 TDesign 主题同步 */
+  --brand-primary: #F39C12;
+  --brand-primary-dark: #E67E22;
+  --brand-primary-darker: #D35400;
+  --brand-primary-light: #FEF5E7;
+  --brand-primary-light-darker: #FDE68A;
+  
+  /* 辅助品牌色 - 蓝紫色系 */
+  --brand-secondary: #5A4FCF;
+  --brand-secondary-light: #7B68EE;
+  --brand-secondary-lighter: #9966CC;
+  
+  /* 创作激活色 - 玫红色系 */
+  --accent-create: #E91E63;
+  --accent-create-light: #F06292;
+  
+  /* 渐变色定义 */
+  --brand-gradient: linear-gradient(135deg, #F39C12 0%, #E67E22 30%, #5A4FCF 70%, #E91E63 100%);
+  --brush-gradient: linear-gradient(135deg, #5A4FCF 0%, #7B68EE 50%, #E91E63 100%);
+  
+  /* 主色彩映射 */
+  --color-primary: var(--brand-primary);
+  --color-primary-darker: var(--brand-primary-dark);
+  --color-primary-darkest: var(--brand-primary-darker);
+  --color-primary-light: var(--brand-primary-light);
+  --color-primary-light-darker: var(--brand-primary-light-darker);
+  --color-primary-hover: var(--brand-primary-dark);
+
+  /* 统一 UI token 映射：新组件优先使用 --aitu-ui-*，旧组件可继续读 --color-* */
+  --aitu-ui-brand: var(--td-brand-color, var(--brand-primary));
+  --aitu-ui-brand-hover: var(--td-brand-color-hover, var(--brand-primary-dark));
+  --aitu-ui-brand-active: var(--td-brand-color-active, var(--brand-primary-darker));
+  --aitu-ui-brand-text: #b45309;
+  --aitu-ui-brand-soft: rgba(243, 156, 18, 0.12);
+  --aitu-ui-brand-softer: rgba(243, 156, 18, 0.06);
+  --aitu-ui-brand-border: rgba(243, 156, 18, 0.52);
+  --aitu-ui-brand-border-soft: rgba(243, 156, 18, 0.28);
+  --aitu-ui-focus-ring: 0 0 0 3px rgba(243, 156, 18, 0.18);
+  --aitu-ui-selected-bg: rgba(243, 156, 18, 0.08);
+  --aitu-ui-hover-bg: #fffaf0;
+
+  --aitu-ui-surface: #ffffff;
+  --aitu-ui-surface-subtle: #f8fafc;
+  --aitu-ui-surface-muted: #f1f5f9;
+  --aitu-ui-surface-elevated: rgba(255, 255, 255, 0.92);
+  --aitu-ui-border-subtle: rgba(15, 23, 42, 0.06);
+  --aitu-ui-border: rgba(15, 23, 42, 0.1);
+  --aitu-ui-border-hover: rgba(15, 23, 42, 0.18);
+  --aitu-ui-text-primary: #1e293b;
+  --aitu-ui-text-secondary: #64748b;
+  --aitu-ui-text-tertiary: #94a3b8;
+  --aitu-ui-text-inverse: #ffffff;
+
+  --aitu-ui-success: #15803d;
+  --aitu-ui-success-soft: rgba(34, 197, 94, 0.12);
+  --aitu-ui-success-border: rgba(34, 197, 94, 0.28);
+  --aitu-ui-warning: #b45309;
+  --aitu-ui-warning-soft: rgba(245, 158, 11, 0.14);
+  --aitu-ui-warning-border: rgba(245, 158, 11, 0.32);
+  --aitu-ui-danger: var(--td-error-color, #E91E63);
+  --aitu-ui-danger-soft: rgba(233, 30, 99, 0.08);
+  --aitu-ui-danger-border: rgba(233, 30, 99, 0.24);
+
+  --aitu-ui-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --aitu-ui-shadow-hover: 0 8px 20px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(243, 156, 18, 0.18);
+  --aitu-ui-shadow-selected: 0 10px 24px rgba(243, 156, 18, 0.14), 0 0 0 1px rgba(243, 156, 18, 0.36);
+  --aitu-ui-shadow-popover: 0 16px 40px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --aitu-ui-shadow-soft: 0 2px 10px rgba(15, 23, 42, 0.06);
+
+  --button-hover-bg: var(--color-surface-high);
+  --button-active-bg: var(--color-surface-high);
+  --button-active-border: var(--color-brand-active);
+  --default-border-color: var(--color-surface-high);
+
+  --color-gray-10: #f5f5f5;
+  --color-gray-20: #ebebeb;
+  --color-gray-30: #d6d6d6;
+  --color-gray-40: #b8b8b8;
+  --color-gray-50: #999999;
+  --color-gray-60: #7a7a7a;
+  --color-gray-70: #5c5c5c;
+  --color-gray-80: #3d3d3d;
+  --color-gray-85: #242424;
+  --color-gray-90: #1e1e1e;
+  --color-gray-100: #121212;
+
+  --color-disabled: var(--color-gray-40);
+
+  --color-promo: var(--color-primary);
+  --color-success: #268029;
+  --color-success-lighter: #cafccc;
+
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.375rem;
+  --border-radius-lg: 0.5rem;
+  --color-surface-high: hsl(220, 100%, 97%);
+  --color-surface-mid: hsl(220 25% 96%);
+  --color-surface-low: hsl(220 25% 94%);
+  --color-surface-lowest: #ffffff;
+  --color-on-surface: #666666;
+  --color-brand-hover: var(--brand-primary-dark);
+  --color-on-primary-container: var(--brand-primary);
+  --color-surface-primary-container: rgba(243, 156, 18, .1);
+  --color-brand-active: var(--brand-primary);
+  --color-border-outline: #767680;
+  --color-border-outline-variant: #c5c5d0;
+
+  --default-border-color: var(--color-surface-high);
+}

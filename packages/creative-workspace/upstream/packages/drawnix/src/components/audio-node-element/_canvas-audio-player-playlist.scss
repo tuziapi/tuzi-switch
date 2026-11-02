@@ -1,0 +1,64 @@
+// Playlist styles for CanvasAudioPlayer
+
+.canvas-audio-player__playlist {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  width: auto;
+  max-width: 100%;
+  max-height: min(360px, calc(100vh - 160px));
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(18px);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.canvas-audio-player__playlist-tabs {
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  .audio-playlist-tabs__chip {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .audio-playlist-tabs__create {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+}
+
+.canvas-audio-player__playlist-list {
+  min-width: 0;
+}
+
+.canvas-audio-player__playlist-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 80px;
+  color: #64748b;
+  font-size: 12px;
+}

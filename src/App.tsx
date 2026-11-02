@@ -1,3 +1,4 @@
+import { CreativeWorkspace } from "@/features/creative/CreativeWorkspace";
 import { useAnalyticsView } from "@/hooks/useAnalyticsView";
 import { trackInteraction } from "@/lib/analytics";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
@@ -69,7 +70,8 @@ import type { TuziTool, TuziProviderDraft } from "@/lib/tuziToolCompatibility";
 import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 import { AccountPage } from "@/components/account/AccountPage";
 import { useAccount } from "@/lib/query/account";
-import { TuziSidebar } from "@/components/shell/TuziSidebar";
+import { TuziNavigation } from "@/components/shell/TuziNavigation";
+import { TuziSidebarTransition } from "@/components/shell/TuziSidebarTransition";
 import { WorkspaceScope } from "@/components/shell/WorkspaceScope";
 import {
   WorkspaceAuthPage,
@@ -119,6 +121,7 @@ import HermesMemoryPanel from "@/components/hermes/HermesMemoryPanel";
 
 type View =
   | "account"
+  | "creative"
   | "providers"
   | "settings"
   | "prompts"
@@ -172,6 +175,7 @@ function App() {
   const reduceMotion = useReducedMotion();
   const queryClient = useQueryClient();
   const account = useAccount();
+  const [creativeKeyId, setCreativeKeyId] = useState<string>();
   const [configureKey, setConfigureKey] = useState<{
     key: DesktopKey;
     model?: DesktopPricing;
@@ -188,6 +192,7 @@ function App() {
   );
   useEffect(() => {
     setConfigureKey(null);
+    setCreativeKeyId(undefined);
     setTuziDraft(null);
     setAccountProviderFocus(null);
   }, [account.state.generation, account.state.identity?.connectionId]);
@@ -1101,6 +1106,8 @@ function App() {
           return <WorkspaceAuthPage />;
         case "usage":
           return <WorkspaceUsagePage />;
+        case "creative":
+          return null;
         case "account":
           return (
             <AccountPage
@@ -1378,44 +1385,52 @@ function App() {
     );
   };
 
+  const sidebarWidth =
+    currentView === "creative" ? 0 : sidebarCollapsed ? 68 : 228;
+  const assistantNavigation = (
+    <TuziNavigation
+      activeApp={activeApp}
+      currentView={currentView}
+      visibleApps={visibleApps}
+      topOffset={dragBarHeight}
+      collapsed={sidebarCollapsed}
+      onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+      onSwitchApp={(app) => {
+        localStorage.setItem(STORAGE_KEY, app);
+        setActiveApp(app);
+      }}
+      onNavigate={(view) => {
+        if (
+          (GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(view) &&
+          !(GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(currentView)
+        ) {
+          const origin = ["grokbuild", "pi", "mcode"].includes(currentView)
+            ? (currentView as WorkspaceTool)
+            : activeApp;
+          setWorkspaceOrigin(origin);
+          setWorkspaceTarget(
+            WORKSPACE_SUPPORT.prompts.includes(origin as AppId)
+              ? (origin as AppId)
+              : null,
+          );
+        }
+        setCurrentView(view as View);
+      }}
+      onOpenSettings={() => {
+        setSettingsDefaultTab("general");
+        setCurrentView("settings");
+      }}
+    />
+  );
+
   return (
     <div
       className="tuzi-shell flex flex-col h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30"
       style={{ overflowX: "hidden", paddingTop: contentTopOffset }}
     >
-      <TuziSidebar
-        activeApp={activeApp}
-        currentView={currentView}
-        visibleApps={visibleApps}
-        topOffset={dragBarHeight}
-        collapsed={sidebarCollapsed}
-        onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
-        onSwitchApp={(app) => {
-          localStorage.setItem(STORAGE_KEY, app);
-          setActiveApp(app);
-        }}
-        onNavigate={(view) => {
-          if (
-            (GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(view) &&
-            !(GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(currentView)
-          ) {
-            const origin = ["grokbuild", "pi", "mcode"].includes(currentView)
-              ? (currentView as WorkspaceTool)
-              : activeApp;
-            setWorkspaceOrigin(origin);
-            setWorkspaceTarget(
-              WORKSPACE_SUPPORT.prompts.includes(origin as AppId)
-                ? (origin as AppId)
-                : null,
-            );
-          }
-          setCurrentView(view as View);
-        }}
-        onOpenSettings={() => {
-          setSettingsDefaultTab("general");
-          setCurrentView("settings");
-        }}
-      />
+      <TuziSidebarTransition visible={currentView !== "creative"}>
+        {assistantNavigation}
+      </TuziSidebarTransition>
       {(dragBarHeight > 0 || useAppWindowControls) && (
         <div
           className="fixed top-0 left-0 right-0 z-[35] flex items-center justify-end px-2"
@@ -1492,15 +1507,15 @@ function App() {
       )}
 
       <header
-        className="workspace-header fixed z-30 transition-all duration-300 border-b border-border bg-background/90 backdrop-blur-md"
+        className="workspace-header tuzi-workspace-layout fixed z-30 border-b border-border bg-background/90 backdrop-blur-md"
         {...DRAG_REGION_ATTR}
         style={
           {
             ...DRAG_REGION_STYLE,
             top: dragBarHeight,
             height: HEADER_HEIGHT,
-            left: sidebarCollapsed ? 68 : 228,
-            width: `calc(100% - ${sidebarCollapsed ? 68 : 228}px)`,
+            left: sidebarWidth,
+            width: `calc(100% - ${sidebarWidth}px)`,
           } as any
         }
       >
@@ -1515,21 +1530,26 @@ function App() {
           >
             {currentView !== "providers" && currentView !== "account" ? (
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() =>
-                    setCurrentView(
-                      currentView === "skillsDiscovery"
-                        ? "skills"
-                        : "providers",
-                    )
-                  }
-                  className="mr-2 rounded-lg"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
+                {currentView === "creative" ? (
+                  assistantNavigation
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() =>
+                      setCurrentView(
+                        currentView === "skillsDiscovery"
+                          ? "skills"
+                          : "providers",
+                      )
+                    }
+                    className="mr-2 rounded-lg"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                )}
                 <h1 className="text-lg font-semibold">
+                  {currentView === "creative" && "opentu 创作"}
                   {currentView === "settings" && t("settings.title")}
                   {currentView === "auth" && t("navigation.auth")}
                   {currentView === "usage" && t("navigation.localUsage")}
@@ -1924,13 +1944,19 @@ function App() {
       </header>
 
       <main
-        className="flex-1 min-h-0 flex flex-col overflow-y-auto animate-fade-in transition-[margin] duration-200"
-        style={{ marginLeft: sidebarCollapsed ? 68 : 228 }}
+        className="tuzi-workspace-layout flex-1 min-h-0 flex flex-col overflow-y-auto"
+        style={{ marginLeft: sidebarWidth }}
       >
         {isOpenClawView && openclawHealthWarnings.length > 0 && (
           <OpenClawHealthBanner warnings={openclawHealthWarnings} />
         )}
-        {renderContent()}
+        <CreativeWorkspace
+          active={currentView === "creative"}
+          accountState={account.state}
+          selectedKeyId={creativeKeyId}
+          onManageAccount={() => setCurrentView("account")}
+        />
+        {currentView !== "creative" && renderContent()}
       </main>
 
       {configureKey && account.state.identity && (
@@ -1938,6 +1964,11 @@ function App() {
           key={`${account.state.generation}:${configureKey.key.id}`}
           state={account.state}
           keyDto={configureKey.key}
+          onCreative={(key) => {
+            setCreativeKeyId(key.id);
+            setConfigureKey(null);
+            setCurrentView("creative");
+          }}
           model={configureKey.model}
           onClose={() => setConfigureKey(null)}
           onExisting={(app, providerId) => {

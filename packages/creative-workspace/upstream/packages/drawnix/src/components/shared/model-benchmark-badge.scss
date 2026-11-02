@@ -1,0 +1,15 @@
+.model-benchmark-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+
+  &__star {
+    color: #F39C12;
+    fill: #F39C12;
+  }
+
+  &__reject {
+    color: #E53935;
+  }
+}

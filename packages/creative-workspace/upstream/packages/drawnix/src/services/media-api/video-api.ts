@@ -1,0 +1,575 @@
+/**
+ * 视频生成 API
+ *
+ * 统一的视频生成接口，SW 和主线程共用
+ */
+
+import type {
+  VideoApiConfig,
+  VideoGenerationParams,
+  VideoGenerationResult,
+  VideoStatusResponse,
+  PollingOptions,
+} from './types';
+import {
+  buildProviderContextFromApiConfig,
+  normalizeApiBase,
+  parseErrorMessage,
+  sleep,
+} from './utils';
+import { providerTransport } from '../provider-routing/provider-transport';
+import {
+  appendVideoOutputParams,
+  downloadVideoContentToLocalUrl,
+  extractInlineVideoUrl,
+  isMiniMaxH3Model,
+  normalizeMiniMaxH3VideoResponse,
+  resolveVideoPollPathForModel,
+  resolveVideoSubmission,
+  shouldDownloadVideoContent,
+} from '../video-binding-utils';
+import { prepareVideoReferenceImageBlob } from '../video-reference-image-utils';
+import { prepareReferenceImageForMultipart } from '../reference-image-form-data';
+import { mapWithConcurrency } from '../../utils/map-with-concurrency';
+import { appendVeoAdvancedMetadata } from '../../utils/veo-parameters';
+import { prepareMiniMaxH3Submission } from '../minimax-h3-video-workflow';
+
+const DURATION_IN_MODEL_PREFIX = 'sora-2-';
+const PROVIDER_ERROR_PREVIEW_LIMIT = 1000;
+const REFERENCE_IMAGE_PREPARE_CONCURRENCY = 3;
+const durationEncodedInModel = (model?: string | null) =>
+  Boolean(model && model.startsWith(DURATION_IN_MODEL_PREFIX));
+
+/**
+ * 视频生成业务失败错误
+ * 区分业务失败（不应重试）和网络错误（可重试）
+ */
+export class VideoGenerationFailedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VideoGenerationFailedError';
+  }
+}
+
+export class ProviderHttpError extends Error {
+  public readonly status: number;
+  public readonly rawResponse: string;
+  public readonly code: string;
+
+  constructor(params: {
+    status: number;
+    message: string;
+    rawResponse: string;
+    code?: string;
+  }) {
+    super(params.message);
+    this.name = 'ProviderHttpError';
+    this.status = params.status;
+    this.rawResponse = params.rawResponse;
+    this.code = params.code || `HTTP_${params.status}`;
+  }
+}
+
+function extractProviderErrorMessage(rawText: string): string {
+  const trimmed = rawText.trim();
+  if (!trimmed) return '';
+
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      message?: string;
+      detail?: string;
+      error?:
+        | string
+        | {
+            code?: unknown;
+            message?: unknown;
+            status?: unknown;
+            details?: Array<{
+              reason?: unknown;
+              metadata?: {
+                reason?: unknown;
+              };
+            }>;
+          };
+    };
+    if (typeof parsed.error === 'string') return parsed.error;
+
+    const error = parsed.error;
+    const reason =
+      error?.details?.find(
+        (item) =>
+          typeof item.reason === 'string' ||
+          typeof item.metadata?.reason === 'string'
+      )?.reason ||
+      error?.details?.find((item) => typeof item.metadata?.reason === 'string')
+        ?.metadata?.reason;
+    const message =
+      (typeof error?.message === 'string' ? error.message : '') ||
+      (typeof parsed.message === 'string' ? parsed.message : '') ||
+      (typeof parsed.detail === 'string' ? parsed.detail : '');
+    return [message, reason].filter(Boolean).join(' ').trim();
+  } catch {
+    return trimmed.replace(/\s+/g, ' ');
+  }
+}
+
+async function readResponseTextPreview(
+  response: Response,
+  limit = PROVIDER_ERROR_PREVIEW_LIMIT
+): Promise<string> {
+  if (!response.body) {
+    try {
+      return (await response.clone().text()).slice(0, limit);
+    } catch {
+      return '';
+    }
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+
+  try {
+    while (text.length < limit) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    if (text.length >= limit) {
+      await reader.cancel().catch(() => undefined);
+    }
+  } catch {
+    await reader.cancel().catch(() => undefined);
+  }
+
+  return text.slice(0, limit);
+}
+
+function buildVideoSubmissionHttpError(
+  status: number,
+  rawResponse: string
+): ProviderHttpError {
+  const providerMessage = extractProviderErrorMessage(rawResponse);
+  const combined = `${providerMessage} ${rawResponse}`;
+  const isRecaptchaBlocked =
+    status === 403 &&
+    /recaptcha|PUBLIC_ERROR_UNUSUAL_ACTIVITY|unusual activity/i.test(combined);
+
+  if (isRecaptchaBlocked) {
+    return new ProviderHttpError({
+      status,
+      code: 'PROVIDER_RECAPTCHA_BLOCKED',
+      message:
+        '供应商风控拦截：当前视频模型触发 reCAPTCHA/异常流量校验，请换用 Seedance/Veo 其他模型或稍后重试。',
+      rawResponse,
+    });
+  }
+
+  return new ProviderHttpError({
+    status,
+    message: providerMessage || `视频提交失败：HTTP ${status}`,
+    rawResponse,
+  });
+}
+
+/**
+ * 提交视频生成任务
+ *
+ * @param params 视频生成参数
+ * @param config API 配置
+ * @param signal 取消信号
+ * @returns 远程任务 ID
+ */
+export async function submitVideoGeneration(
+  params: VideoGenerationParams,
+  config: VideoApiConfig,
+  signal?: AbortSignal
+): Promise<string> {
+  const fetchFn = config.fetchImpl || fetch;
+  const baseUrl = normalizeApiBase(config.baseUrl);
+  const providerContext = buildProviderContextFromApiConfig(config, baseUrl);
+  const model = params.model || config.defaultModel || 'veo3';
+  // seconds can come from duration (number/string) or explicit seconds
+  const secondsParam = params.duration ?? (params as any).seconds;
+  const submission = resolveVideoSubmission(
+    model,
+    secondsParam,
+    config.binding,
+    params.params as Record<string, string> | undefined
+  );
+  const isMiniMaxH3 = isMiniMaxH3Model(model);
+
+  // 构建 FormData
+  const formData = new FormData();
+  formData.append('model', submission.model);
+  formData.append('prompt', params.prompt);
+
+  if (submission.duration && !durationEncodedInModel(submission.model)) {
+    formData.append(submission.durationField, String(submission.duration));
+  }
+
+  appendVideoOutputParams(formData, model, params.size, params.params);
+  appendVeoAdvancedMetadata(formData, model, params.params, config.binding?.metadata?.video);
+
+  // 处理参考图片（体积控制在 1MB 内，与图片生成一致）
+  if (!isMiniMaxH3 && params.referenceImages && params.referenceImages.length > 0) {
+    const references = params.referenceImages
+      .map((value, index) => ({ value, index }))
+      .filter((item): item is { value: string; index: number } => Boolean(item.value));
+    const preparedReferences = await mapWithConcurrency(
+      references,
+      REFERENCE_IMAGE_PREPARE_CONCURRENCY,
+      async ({ value, index }) => {
+        const prepared = await prepareReferenceImageForMultipart(value, {
+          filename: `reference-${index + 1}.png`,
+          fetcher: fetchFn,
+          signal,
+        });
+        return {
+          ...prepared,
+          blob: await prepareVideoReferenceImageBlob(prepared.blob, params.size),
+        };
+      }
+    );
+    for (const prepared of preparedReferences) {
+      const blob = prepared.blob;
+      formData.append('input_reference', blob, prepared.filename);
+    }
+  }
+
+  const miniMaxSubmission = isMiniMaxH3
+    ? await prepareMiniMaxH3Submission(
+        {
+          prompt: params.prompt,
+          duration: submission.duration,
+          size: params.size,
+          ratio: params.params?.ratio,
+          referenceImages: params.referenceImages,
+          params: params.params,
+        },
+        {
+          provider: providerContext,
+          fetcher: fetchFn,
+          signal,
+        }
+      )
+    : null;
+  const submitPath =
+    miniMaxSubmission?.path || config.binding?.submitPath || '/v1/videos';
+
+  const response = await providerTransport.send(providerContext, {
+    path: submitPath,
+    baseUrlStrategy: isMiniMaxH3
+      ? 'trim-v1'
+      : config.binding?.baseUrlStrategy,
+    method: 'POST',
+    headers: isMiniMaxH3 ? { 'Content-Type': 'application/json' } : undefined,
+    body: isMiniMaxH3
+      ? JSON.stringify(miniMaxSubmission!.body)
+      : formData,
+    signal,
+    fetcher: fetchFn,
+  });
+
+  if (!response.ok) {
+    const errorText = await readResponseTextPreview(response);
+    throw buildVideoSubmissionHttpError(response.status, errorText);
+  }
+
+  const rawData = await response.json();
+  const data = isMiniMaxH3 ? normalizeMiniMaxH3VideoResponse(rawData) : rawData;
+
+  if (data.status === 'failed') {
+    throw new VideoGenerationFailedError(
+      parseErrorMessage(data.error) || '视频生成失败'
+    );
+  }
+
+  if (!data.id) {
+    throw new Error('No task ID returned from API');
+  }
+
+  return data.id;
+}
+
+/**
+ * 查询视频状态（单次）
+ *
+ * @param videoId 视频 ID
+ * @param config API 配置
+ * @param signal 取消信号
+ * @returns 视频状态响应
+ */
+export async function queryVideoStatus(
+  videoId: string,
+  config: VideoApiConfig,
+  signal?: AbortSignal
+): Promise<VideoStatusResponse> {
+  const fetchFn = config.fetchImpl || fetch;
+  const baseUrl = normalizeApiBase(config.baseUrl);
+  const providerContext = buildProviderContextFromApiConfig(config, baseUrl);
+  const isMiniMaxH3 = isMiniMaxH3Model(config.defaultModel);
+
+  const response = await providerTransport.send(providerContext, {
+    path: resolveVideoPollPathForModel(
+      videoId,
+      config.defaultModel,
+      config.binding,
+      config.params
+    ),
+    baseUrlStrategy: isMiniMaxH3 ? 'trim-v1' : config.binding?.baseUrlStrategy,
+    method: 'GET',
+    signal,
+    fetcher: fetchFn,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Video status query failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return isMiniMaxH3
+    ? (normalizeMiniMaxH3VideoResponse(data, videoId) as VideoStatusResponse)
+    : data;
+}
+
+/**
+ * 轮询视频生成状态直到完成
+ *
+ * @param videoId 视频 ID
+ * @param config API 配置
+ * @param options 轮询配置
+ * @returns 完成的视频状态响应
+ */
+export async function pollVideoUntilComplete(
+  videoId: string,
+  config: VideoApiConfig,
+  options: PollingOptions = {}
+): Promise<VideoStatusResponse> {
+  const { onProgress, signal, interval = 5000 } = options;
+  const fetchFn = config.fetchImpl || fetch;
+  const baseUrl = normalizeApiBase(config.baseUrl);
+  const providerContext = buildProviderContextFromApiConfig(config, baseUrl);
+  const isMiniMaxH3 = isMiniMaxH3Model(config.defaultModel);
+
+  let attempts = 0;
+  let consecutiveErrors = 0;
+  const maxConsecutiveErrors = 10;
+
+  for (;;) {
+    if (signal?.aborted) {
+      throw new Error('Video generation cancelled');
+    }
+
+    try {
+      const response = await providerTransport.send(providerContext, {
+        path: resolveVideoPollPathForModel(
+          videoId,
+          config.defaultModel,
+          config.binding,
+          config.params
+        ),
+        baseUrlStrategy: isMiniMaxH3
+          ? 'trim-v1'
+          : config.binding?.baseUrlStrategy,
+        signal,
+        fetcher: fetchFn,
+      });
+
+      if (!response.ok) {
+        // 轮询接口临时错误，增加间隔继续重试
+        consecutiveErrors++;
+        console.warn(
+          `[VideoAPI] Status query failed (${response.status}), attempt ${consecutiveErrors}/${maxConsecutiveErrors}`
+        );
+
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          throw new Error(
+            `Failed to get video status after ${maxConsecutiveErrors} consecutive errors: ${response.status}`
+          );
+        }
+
+        // 指数退避
+        const backoffInterval = Math.min(
+          interval * Math.pow(1.5, consecutiveErrors),
+          60000
+        );
+        await sleep(backoffInterval, signal);
+        attempts++;
+        continue;
+      }
+
+      // 请求成功，重置连续错误计数
+      consecutiveErrors = 0;
+
+      const rawData = await response.json();
+      const data: VideoStatusResponse = isMiniMaxH3
+        ? (normalizeMiniMaxH3VideoResponse(
+            rawData,
+            videoId
+          ) as VideoStatusResponse)
+        : rawData;
+      const status =
+        data.status?.toLowerCase() as VideoStatusResponse['status'];
+
+      // 更新进度
+      const progress = data.progress ?? Math.min(10 + attempts * 2, 90);
+      onProgress?.(progress);
+
+      // 检查完成状态
+      if (status === 'completed' || status === 'succeeded') {
+        onProgress?.(100);
+        return data;
+      }
+
+      // 检查失败状态 - 业务失败不应重试
+      if (status === 'failed' || status === 'error') {
+        throw new VideoGenerationFailedError(
+          parseErrorMessage(data.error) || '视频生成失败'
+        );
+      }
+
+      // 等待下一次轮询
+      await sleep(interval, signal);
+      attempts++;
+    } catch (err) {
+      // 业务失败错误直接抛出
+      if (err instanceof VideoGenerationFailedError) {
+        throw err;
+      }
+
+      // 取消信号
+      if (signal?.aborted) {
+        throw new Error('Video generation cancelled');
+      }
+
+      // 网络错误等可重试
+      consecutiveErrors++;
+      console.warn(
+        `[VideoAPI] Network error during status query, attempt ${consecutiveErrors}/${maxConsecutiveErrors}:`,
+        err
+      );
+
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        throw err;
+      }
+
+      const backoffInterval = Math.min(
+        interval * Math.pow(1.5, consecutiveErrors),
+        60000
+      );
+      await sleep(backoffInterval, signal);
+      attempts++;
+    }
+  }
+}
+
+/**
+ * 完整的视频生成流程：提交 + 轮询
+ *
+ * @param params 视频生成参数
+ * @param config API 配置
+ * @param options 轮询选项
+ * @param onRemoteId 提交成功后的回调，返回远程任务 ID
+ * @returns 视频生成结果
+ */
+export async function generateVideo(
+  params: VideoGenerationParams,
+  config: VideoApiConfig,
+  options: PollingOptions = {},
+  onRemoteId?: (remoteId: string) => void
+): Promise<VideoGenerationResult> {
+  const { signal } = options;
+
+  // 提交任务
+  options.onProgress?.(5);
+  const remoteId = await submitVideoGeneration(params, config, signal);
+  onRemoteId?.(remoteId);
+
+  // 轮询等待完成
+  const result = await pollVideoUntilComplete(
+    remoteId,
+    {
+      ...config,
+      defaultModel: params.model || config.defaultModel,
+      params: { ...config.params, ...params.params },
+    },
+    options
+  );
+  const videoUrl =
+    extractInlineVideoUrl(result as Record<string, any>) ||
+    (shouldDownloadVideoContent(
+      result.model || params.model,
+      config.binding,
+      result as Record<string, any>
+    )
+      ? await downloadVideoContentToLocalUrl({
+          videoId: remoteId,
+          provider: buildProviderContextFromApiConfig(
+            config,
+            normalizeApiBase(config.baseUrl)
+          ),
+          binding: config.binding,
+          modelId: result.model || params.model,
+          cacheKey: remoteId,
+        })
+      : undefined);
+  if (!videoUrl) {
+    throw new Error('No video URL in completed response');
+  }
+
+  return {
+    url: videoUrl,
+    format: 'mp4',
+    width: result.width,
+    height: result.height,
+    duration: result.seconds ? parseInt(result.seconds, 10) : undefined,
+  };
+}
+
+/**
+ * 恢复视频轮询
+ * 用于页面刷新后继续轮询已提交的任务
+ *
+ * @param remoteId 远程任务 ID
+ * @param config API 配置
+ * @param options 轮询选项
+ * @returns 视频生成结果
+ */
+export async function resumeVideoPolling(
+  remoteId: string,
+  config: VideoApiConfig,
+  options: PollingOptions = {}
+): Promise<VideoGenerationResult> {
+  const result = await pollVideoUntilComplete(remoteId, config, options);
+  const videoUrl =
+    extractInlineVideoUrl(result as Record<string, any>) ||
+    (shouldDownloadVideoContent(
+      result.model || config.defaultModel,
+      config.binding,
+      result as Record<string, any>
+    )
+      ? await downloadVideoContentToLocalUrl({
+          videoId: remoteId,
+          provider: buildProviderContextFromApiConfig(
+            config,
+            normalizeApiBase(config.baseUrl)
+          ),
+          binding: config.binding,
+          modelId: result.model || config.defaultModel,
+          cacheKey: remoteId,
+        })
+      : undefined);
+  if (!videoUrl) {
+    throw new Error('No video URL in completed response');
+  }
+
+  return {
+    url: videoUrl,
+    format: 'mp4',
+    width: result.width,
+    height: result.height,
+    duration: result.seconds ? parseInt(result.seconds, 10) : undefined,
+  };
+}

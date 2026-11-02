@@ -1,0 +1,220 @@
+.desktop-cleanup {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border, #ddd);
+  font-size: 13px;
+  min-width: 0;
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    accent-color: #167865;
+  }
+  &__heading,
+  &__actions,
+  &__toolbar,
+  &__footer,
+  &__pagination {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  &__heading,
+  &__footer {
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  &__summary {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin: 18px 0;
+  }
+  &__summary > div {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  &__summary strong {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  &__summary span {
+    opacity: 0.7;
+    font-size: 12px;
+  }
+  &__error {
+    color: #bb3737;
+    overflow-wrap: anywhere;
+    margin: 12px 0;
+  }
+  &__error p {
+    margin: 5px 0;
+  }
+  &__result {
+    color: #14805c;
+    margin: 12px 0;
+  }
+  &__progress,
+  &__notice {
+    margin: 10px 0;
+    color: #856404;
+    overflow-wrap: anywhere;
+  }
+  &__filters {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0;
+  }
+  &__filters select,
+  &__filters label {
+    border: 1px solid var(--color-border, #ccc);
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    min-height: 34px;
+  }
+  &__filters select {
+    padding: 0 8px;
+  }
+  &__filters label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 9px;
+    flex: 1;
+    min-width: 0;
+  }
+  &__filters input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+  }
+  &__toolbar {
+    flex-wrap: wrap;
+    padding: 8px 0;
+  }
+  &__toolbar label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  &__toolbar > button {
+    margin-left: auto;
+    color: #bb3737;
+  }
+  &__files {
+    border-top: 1px solid var(--color-border, #ddd);
+    border-bottom: 1px solid var(--color-border, #ddd);
+    min-height: 100px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  &__file {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-border, #eee);
+  }
+  &__file:last-child {
+    border-bottom: 0;
+  }
+  &__file-copy {
+    flex: 1;
+    min-width: 0;
+  }
+  &__file-copy strong {
+    font-size: 13px;
+    font-weight: 500;
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  &__file-copy span,
+  &__file-copy summary {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 4px;
+    display: block;
+  }
+  &__file-copy summary {
+    cursor: pointer;
+  }
+  &__file-copy p {
+    font-size: 12px;
+    margin: 4px 0;
+    overflow-wrap: anywhere;
+  }
+  &__icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    background: transparent;
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 4px;
+    color: inherit;
+    cursor: pointer;
+  }
+  &__empty {
+    padding: 22px 0;
+    text-align: center;
+    opacity: 0.7;
+  }
+  &__footer {
+    padding-top: 12px;
+  }
+  &__pagination span {
+    min-width: 50px;
+    text-align: center;
+  }
+  &__busy {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    background: rgba(255, 255, 255, 0.94);
+    color: #222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    pointer-events: all;
+  }
+  @media (max-width: 600px) {
+    &__summary {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    &__summary > div:first-child {
+      grid-column: 1 / -1;
+    }
+    &__heading {
+      align-items: flex-start;
+    }
+    &__actions {
+      width: 100%;
+      flex-wrap: wrap;
+    }
+    .desktop-cleanup__actions > .settings-dialog__button {
+      width: auto;
+      white-space: nowrap;
+    }
+    &__toolbar span {
+      font-size: 12px;
+    }
+  }
+}

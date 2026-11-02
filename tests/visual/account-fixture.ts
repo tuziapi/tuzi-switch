@@ -138,6 +138,25 @@ const summary = {
   end_timestamp: now,
 };
 export async function accountPreviewIPC(command: string, args?: unknown) {
+  const creativeBindings = keys.map(key=>({schemaVersion:1,id:'tuzi-account-'+key.id,accountOrigin:'https://api.tu-zi.com',userId:'synthetic-user',tokenId:key.id,name:key.name,keyMask:key.masked_key,group:key.group,updatedAt:now}));
+  if(command === "creative_account_bindings") return creativeBindings;
+  if(command === "creative_account_bind") {
+    const request=(args as {request:{generation:number;tokenId:string}}).request;
+    const binding=creativeBindings.find(item=>item.tokenId===request.tokenId);
+    if(request.generation!==1 || !binding) throw new Error("synthetic binding rejected");
+    return binding;
+  }
+  if(command === "creative_account_request") {
+    const {request,onChunk}=args as {request:{action:string;bindingId:string};onChunk:{onmessage:(value:unknown)=>void}};
+    if(request.action!=="models" || !creativeBindings.some(item=>item.id===request.bindingId)) throw "creative_action_unsupported";
+    onChunk.onmessage({type:"start",status:200,content_type:"application/json"});
+    onChunk.onmessage({type:"data",data:btoa(JSON.stringify({data:[
+      {id:"gpt-image-2",supported_endpoint_types:["image-generation"],endpoints:{"image-generation":{path:"/v1/images/generations",method:"POST"}}},
+      {id:"synthetic-chat",supported_endpoint_types:["openai"],endpoints:{"openai":{path:"/v1/chat/completions",method:"POST"}}},
+    ]}))});
+    onChunk.onmessage({type:"end"});
+    return;
+  }
   if (
     command === "account_cancel_request" ||
     command === "account_cancel_token_prefill"

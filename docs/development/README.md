@@ -1,5 +1,23 @@
 # 账户中心与工具管理开发基线
 
+2026-11-02 UC-TEST-01：用户已批准测试 main、未签名测试构建及正式仓库 Draft PR；主按钮与蓝兔图标同步调整。验证和剩余发布门禁见 [测试交付记录](2026-11-02-unified-test-delivery.md)。
+
+2026-11-02 UC-DL-01：下载页已在独立网站 worktree 完成重设计与本地预览，18 个浏览器场景通过；客户端现有发布门禁仍未关闭。见 [进度记录](progress.md#2026-11-02-uc-dl-01统一客户端下载页)。
+
+2026-11-02 UC-AC-R1：逐项上线验收已发现并修复后台图片交付、工具主题、外站浏览器入口和备份预检问题；598项前端及1480项原生单元通过，但原生退出保护、完整迁移/扩展隔离、真实业务与三平台发布仍有门禁，**不能上线**。见 [验收报告](opentu-release-acceptance-2026-11-02.md)。
+
+2026-11-02 UC-P03：用户批准正式实现后补齐手动原生请求、取消竞争与媒体 CSP，核实 PR #7 已包含且源码完整保留。实现与分层验证见 [原生接入记录](opentu-native-runtime-implementation.md)。
+
+2026-11-01 UC-P01.3：按用户反馈补齐进入创作时的向上收起、布局展开和内容淡入；宿主和本地预览共用过渡组件，支持减少动态效果。验证见 [实施记录](opentu-unified-client-implementation.md)。
+
+2026-11-01 UC-P02：用户已选择 B，并要求复用现有设置、保留手动配置。统一账户来源、顶部/画布双入口和原生受限请求已本地实现；设计修订见 [关联设计](opentu-account-binding-design.md)，分层验证及真实联调限制见 [实施记录](opentu-account-binding-implementation.md)。账户契约不变，未发布。
+
+2026-11-01 UC-P01.2：按用户要求移除独立工作流应用、入口、资源和专属依赖，保留自由画布内部任务与旧用户数据；569 项前端测试、类型、renderer 与浏览器回归通过，见 [实施记录](opentu-unified-client-implementation.md)。
+
+2026-11-01 UC-P01.1：用户确认创作自动向上收起助手导航；核对 opentu 版本并补齐暖白点阵显示适配，验证见 [实施记录](opentu-unified-client-implementation.md)。
+
+2026-11-01 UC-P01：用户批准基于 [统一客户端设计 v0.2](opentu-unified-client-design.md) 开始本地预览，并指定 AiW520/tuzi-switch 的 codex/assistant-main-sync 分支。实施基线、可验收范围和限制见 [UC-P01 记录](opentu-unified-client-implementation.md)。
+
 2026-10-29 UI-15：用户授权版本历程按需自动同步公开Release，本地档案与缓存兜底；边界与回退见 [ADR-017](decisions/0017-release-history-sync.md)，验证见progress.md。
 
 2026-10-28 MAIN-SYNC-01：将上游 main `0b5ff2bd`（中文操作统计、默认账户启动）合入已验收改造分支，保留新版工作区与失败恢复；77 文件543项前端回归、类型及 renderer 构建通过。用户授权推送 fork 并创建目标 main 的 PR，不含合并或发布，见 [同步记录](2026-10-28-main-sync-pr.md)。

@@ -1,0 +1,367 @@
+.knowledge-note-context-selector {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  font-size: 13px;
+}
+
+.knowledge-note-context-selector__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 20px;
+}
+
+.knowledge-note-context-selector__label {
+  font-weight: 600;
+  color: var(--color-text-secondary, #666);
+}
+
+.knowledge-note-context-selector__clear {
+  border: none;
+  background: transparent;
+  color: #f39c12;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.knowledge-note-context-selector__clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.knowledge-note-context-selector__trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border, #d9d9d9);
+  border-radius: 8px;
+  background: var(--color-bg-container, #fff);
+  color: var(--color-text-primary, #333);
+  cursor: pointer;
+}
+
+.knowledge-note-context-selector__trigger span {
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-note-context-selector__trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.knowledge-note-context-selector__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.knowledge-note-context-selector__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 6px;
+  border: 1px solid rgba(243, 156, 18, 0.35);
+  border-radius: 6px;
+  background: rgba(243, 156, 18, 0.08);
+  color: #8a5a00;
+}
+
+.knowledge-note-context-selector__chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-note-context-selector__chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.knowledge-note-context-selector__dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  width: min(420px, 100%);
+  border: 1px solid var(--color-border, #d9d9d9);
+  border-radius: 8px;
+  background: var(--color-bg-container, #fff);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.knowledge-note-context-selector--placement-up
+  .knowledge-note-context-selector__dropdown {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.knowledge-note-context-selector__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border-light, #eee);
+  color: var(--color-text-placeholder, #999);
+}
+
+.knowledge-note-context-selector__search input {
+  width: 100%;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary, #333);
+  font-size: 13px;
+}
+
+.knowledge-note-context-selector__list {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.knowledge-note-context-selector__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  background: transparent;
+  color: var(--color-text-primary, #333);
+  cursor: pointer;
+  text-align: left;
+}
+
+.knowledge-note-context-selector__item:hover:not(:disabled),
+.knowledge-note-context-selector__item--selected {
+  background: rgba(243, 156, 18, 0.08);
+}
+
+.knowledge-note-context-selector__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.knowledge-note-context-selector__item-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.knowledge-note-context-selector__item-title,
+.knowledge-note-context-selector__item-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-note-context-selector__item-title {
+  font-weight: 500;
+}
+
+.knowledge-note-context-selector__item-meta {
+  color: var(--color-text-placeholder, #999);
+  font-size: 12px;
+}
+
+.knowledge-note-context-selector__empty,
+.knowledge-note-context-selector__footer {
+  padding: 10px;
+  color: var(--color-text-placeholder, #999);
+  font-size: 12px;
+}
+
+.knowledge-note-context-selector__empty {
+  text-align: center;
+}
+
+.knowledge-note-context-selector__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--color-border-light, #eee);
+}
+
+.knowledge-note-context-selector__footer-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-note-context-selector__footer-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.knowledge-note-context-selector__footer-add,
+.knowledge-note-context-selector__footer-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.knowledge-note-context-selector__footer-add {
+  color: #d97706;
+}
+
+.knowledge-note-context-selector__footer-clear {
+  color: var(--color-text-secondary, #666);
+}
+
+.knowledge-note-context-selector__footer-add:hover:not(:disabled),
+.knowledge-note-context-selector__footer-add:focus-visible,
+.knowledge-note-context-selector__footer-clear:hover:not(:disabled),
+.knowledge-note-context-selector__footer-clear:focus-visible {
+  background: rgba(245, 158, 11, 0.12);
+  outline: none;
+}
+
+.knowledge-note-context-selector__footer-add:disabled,
+.knowledge-note-context-selector__footer-clear:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.knowledge-note-context-selector--compact {
+  width: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+
+.knowledge-note-context-selector--compact
+  .knowledge-note-context-selector__trigger {
+  position: relative;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #6b7280;
+}
+
+.knowledge-note-context-selector--compact
+  .knowledge-note-context-selector__trigger:hover,
+.knowledge-note-context-selector--compact
+  .knowledge-note-context-selector__trigger:focus-visible,
+.knowledge-note-context-selector--compact.knowledge-note-context-selector--selected
+  .knowledge-note-context-selector__trigger {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.knowledge-note-context-selector__badge {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.knowledge-note-context-selector__hover-summary {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 51;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-light, #eee);
+  border-radius: 8px;
+  background: var(--color-bg-container, #fff);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  color: var(--color-text-primary, #333);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  visibility: hidden;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    visibility 0.15s ease;
+}
+
+.knowledge-note-context-selector--compact:hover
+  .knowledge-note-context-selector__hover-summary,
+.knowledge-note-context-selector--compact:focus-within
+  .knowledge-note-context-selector__hover-summary {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.knowledge-note-context-selector--compact.knowledge-note-context-selector--open
+  .knowledge-note-context-selector__hover-summary {
+  display: none;
+}
+
+.knowledge-note-context-selector__hover-title {
+  margin-bottom: 6px;
+  color: var(--color-text-secondary, #666);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.knowledge-note-context-selector__hover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.knowledge-note-context-selector__hover-item {
+  overflow: hidden;
+  color: var(--color-text-primary, #333);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

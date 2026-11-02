@@ -15,7 +15,7 @@ import {
   CommandList,
   CommandItem,
 } from "@/components/ui/command";
-import { ChevronsUpDown, Check } from "lucide-react";
+import { ChevronsUpDown, Check, Palette } from "lucide-react";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { isNativeTool } from "@/lib/api/nativeTools";
 
@@ -72,6 +72,7 @@ function ConfigureToolSession({
   onClose,
   onReady,
   onExisting,
+  onCreative,
 }: {
   state: AccountState;
   keyDto: DesktopKey;
@@ -79,6 +80,7 @@ function ConfigureToolSession({
   onClose: () => void;
   onReady: (draft: TuziProviderDraft<TuziTool>) => void;
   onExisting?: (app: TuziTool, providerId: string) => void;
+  onCreative?: (key: DesktopKey) => void;
 }) {
   const [app, setApp] = useState<TuziTool | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -264,6 +266,20 @@ function ConfigureToolSession({
         </p>
       )}
       <div className="account-tool-grid">
+        {onCreative && (
+          <Button
+            variant="outline"
+            disabled={busy || !!unavailable}
+            onClick={() => onCreative(keyDto)}
+          >
+            <span>
+              opentu 创作<small>关联账户 · 配置供应商与模型</small>
+            </span>
+            <span className="account-tool-icon" aria-hidden="true">
+              <Palette size={18} />
+            </span>
+          </Button>
+        )}
         {(Object.keys(labels) as TuziTool[])
           .filter(
             (id) =>

@@ -12,6 +12,7 @@ mod codex_history_migration;
 mod codex_state_db;
 mod commands;
 mod config;
+mod creative_http;
 mod database;
 mod deeplink;
 mod error;
@@ -1262,6 +1263,11 @@ pub fn run() {
             native_tools::native_tool_restore,
             commands::get_providers,
             tuzi_account::account_get_state,
+            creative_http::creative_manual_request,
+            creative_http::creative_manual_cancel,
+            tuzi_account::creative::creative_account_bindings,
+            tuzi_account::creative::creative_account_bind,
+            tuzi_account::creative::creative_account_request,
             tuzi_account::account_take_open_request,
             tuzi_account::business::account_request,
             tuzi_account::business::account_cancel_request,

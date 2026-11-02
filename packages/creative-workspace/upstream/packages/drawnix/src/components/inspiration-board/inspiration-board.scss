@@ -1,0 +1,556 @@
+/**
+ * Inspiration Board Styles
+ *
+ * 灵感创意板块样式
+ */
+
+@import '../../styles/common-variables';
+
+// ============================================================================
+// Variables
+// ============================================================================
+
+$card-border-radius: 12px;
+$card-gap: 12px;
+$animation-duration: 0.3s;
+
+// ============================================================================
+// Inspiration Board Container
+// ============================================================================
+
+.inspiration-board {
+  padding: $spacing-md;
+  padding-bottom: $spacing-md; // 底部内边距
+  background: var(--island-bg-color, #fff);
+  border: none;
+  border-radius: 24px 24px 0 0; // 上圆角，下直角与输入框连接
+  backdrop-filter: blur(10px);
+  box-shadow: none; // 移除阴影，由父容器统一处理
+  animation: slideUp $animation-duration ease-out;
+  pointer-events: auto; // 覆盖父容器 ai-input-bar 的 pointer-events: none
+  width: 100%;
+  box-sizing: border-box;
+
+  &--guide {
+    .inspiration-board__header {
+      align-items: flex-start;
+    }
+
+    .inspiration-board__hide-btn {
+      margin-left: auto;
+      margin-right: 0;
+    }
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: $spacing-sm;
+    gap: 8px;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--td-text-color-primary);
+    flex: 1; // 占据剩余空间，把右侧按钮推到最右边
+  }
+
+  &__guide-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__back-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--td-bg-color-container-hover);
+    color: var(--td-text-color-secondary);
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      color: var(--td-text-color-primary);
+      background: var(--td-bg-color-container-active);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
+  // 不再提示按钮
+  &__hide-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    color: var(--td-text-color-placeholder);
+    transition: all 0.2s ease;
+    margin-right: 8px;
+
+    &:hover {
+      background: var(--td-bg-color-container-hover);
+      color: var(--td-text-color-secondary);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
+  // 提示词工具按钮
+  &__prompt-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin-right: 8px;
+
+    &:active {
+      transform: scale(0.97);
+    }
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+
+  &__pagination {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+  }
+
+  &__page-indicator {
+    font-size: 11px;
+    color: var(--td-text-color-placeholder);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__nav-buttons {
+    display: flex;
+    gap: 2px;
+  }
+
+  &__nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: #fff;
+    border: 1px solid var(--td-component-border);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--td-text-color-secondary);
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: var(--td-bg-color-container-hover);
+      color: var(--td-text-color-primary);
+      border-color: var(--td-brand-color-light);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: $card-gap;
+  }
+
+  &__guide {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    animation: fadeIn $animation-duration ease-out;
+    justify-items: stretch;
+  }
+
+  &__guide-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.78fr);
+    gap: 18px;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+
+  &__guide-summary {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  &__guide-image {
+    width: 84px;
+    height: 84px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--td-component-border);
+    background: var(--td-bg-color-container);
+    flex-shrink: 0;
+  }
+
+  &__guide-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  &__guide-badge {
+    width: fit-content;
+    margin-bottom: 6px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 4px;
+  }
+
+  &__guide-name {
+    margin: 0 0 4px;
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 600;
+    color: var(--td-text-color-primary);
+  }
+
+  &__guide-description {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--td-text-color-secondary);
+  }
+
+  &__guide-action {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  &__guide-cue {
+    position: relative;
+    min-height: 92px;
+    overflow: hidden;
+    border-radius: 12px;
+    background:
+      linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(255, 255, 255, 0)),
+      repeating-linear-gradient(
+        135deg,
+        rgba(245, 158, 11, 0.08) 0,
+        rgba(245, 158, 11, 0.08) 1px,
+        transparent 1px,
+        transparent 12px
+      );
+  }
+
+  &__guide-pointer {
+    position: absolute;
+    left: 28px;
+    top: 18px;
+    z-index: 3;
+    color: #b45309;
+    pointer-events: none;
+    filter: drop-shadow(0 4px 8px rgba(245, 158, 11, 0.18));
+    transform-origin: 70% 70%;
+    animation: pointerTap 1.8s ease-in-out infinite;
+  }
+
+  &__guide-send-preview {
+    position: absolute;
+    right: 32px;
+    bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(245, 158, 11, 0.88);
+    color: #fff;
+    cursor: pointer;
+    z-index: 2;
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 255, 255, 0.58),
+      0 8px 18px rgba(245, 158, 11, 0.2);
+
+    &:hover {
+      background: rgba(245, 158, 11, 0.95);
+    }
+  }
+
+  &__guide-tip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(245, 158, 11, 0.1);
+    color: #b45309;
+    font-size: 12px;
+    line-height: 1.45;
+    font-weight: 500;
+
+    svg {
+      flex-shrink: 0;
+    }
+  }
+}
+
+// ============================================================================
+// Inspiration Card
+// ============================================================================
+
+.inspiration-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--td-component-border);
+  border-radius: $card-border-radius;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: var(--td-brand-color-light);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+
+    .inspiration-card__image {
+      transform: scale(1.05);
+    }
+
+    .inspiration-card__hover-overlay {
+      opacity: 1;
+    }
+
+    .inspiration-card__arrow {
+      transform: translateY(0);
+    }
+
+    .inspiration-card__title {
+      color: var(--td-brand-color);
+    }
+  }
+
+  &--placeholder {
+    visibility: hidden;
+  }
+
+  // 图片区域
+  &__image-wrapper {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--td-bg-color-container);
+  }
+
+  &__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+  }
+
+  // 分类标签
+  &__badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+    background-color: rgba(255, 255, 255, 0.95);
+  }
+
+  // 悬停遮罩
+  &__hover-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  &__arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    color: var(--td-text-color-primary);
+    transform: translateY(8px);
+    transition: transform 0.2s ease;
+  }
+
+  // 文本内容
+  &__content {
+    padding: $spacing-sm;
+  }
+
+  &__title {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--td-text-color-primary);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+  }
+
+  &__description {
+    margin: 0;
+    font-size: 11px;
+    color: var(--td-text-color-secondary);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    height: 32px;
+  }
+}
+
+// ============================================================================
+// Animations
+// ============================================================================
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pointerTap {
+  0%,
+  18%,
+  100% {
+    left: 28px;
+    top: 18px;
+    transform: rotate(-10deg) scale(1);
+  }
+  58%,
+  70% {
+    left: calc(100% - 62px);
+    top: 30px;
+    transform: rotate(-10deg) scale(1);
+  }
+  78% {
+    left: calc(100% - 62px);
+    top: 30px;
+    transform: rotate(-10deg) scale(0.82);
+  }
+  88% {
+    left: calc(100% - 62px);
+    top: 30px;
+    transform: rotate(-10deg) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .inspiration-board {
+    &__guide-main {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    &__guide-summary {
+      gap: 10px;
+    }
+
+    &__guide-image {
+      width: 68px;
+      height: 68px;
+    }
+
+    &__guide-summary {
+      grid-template-columns: 68px minmax(0, 1fr);
+    }
+
+    &__guide-cue {
+      min-height: 70px;
+    }
+
+    &__hide-btn,
+    &__prompt-btn,
+    &__back-btn {
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+  }
+}

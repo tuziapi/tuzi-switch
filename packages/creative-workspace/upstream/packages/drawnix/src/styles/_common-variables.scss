@@ -1,0 +1,34 @@
+/**
+ * Common Variables
+ *
+ * 公共变量定义，供各组件样式文件引用
+ */
+
+// Layout
+$drawer-width: 300px;
+$toolbar-safe-area-left: 48px; // 侧边标签冲突时，拖入画布内侧的建议避让距离
+$toolbar-edge-gap: 0px; // 默认贴屏幕左边缘
+$toolbar-left: $toolbar-edge-gap;
+$toolbar-content-width: 58px;
+$toolbar-width: $toolbar-left + $toolbar-content-width; // 工具栏右边界，用于抽屉/提示避让
+
+// Animation
+$animation-duration: 300ms;
+
+// Spacing
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 12px;
+$spacing-lg: 16px;
+$spacing-xl: 24px;
+
+// Border Radius
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+$border-radius-xl: 16px;
+
+// Colors
+$primary-color: #ff6b35;
+$primary-color-light: #ff8c5a;
+$primary-color-dark: #e55a2b;

@@ -1,0 +1,336 @@
+/* AI Video Generation Container - aligned with AI Image Generation */
+@keyframes ai-generation-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-video-generation-container {
+  display: flex;
+  flex-direction: column;
+  height: 80vh;
+  overflow: hidden;
+  position: relative;
+}
+
+.seedance-reference-audio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: min(100%, 420px);
+  max-width: calc(100vw - 32px);
+  min-height: 32px;
+  padding-left: 10px;
+  border: 1px solid var(--td-border-level-2-color, #dcdcdc);
+  border-radius: 6px;
+
+  &:focus-within {
+    border-color: var(--td-brand-color, #0052d9);
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+
+  &__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 30px;
+    border: 0;
+    border-left: 1px solid var(--td-border-level-2-color, #dcdcdc);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+}
+
+.ai-generation-mobile-switcher {
+  display: none;
+}
+
+.main-content {
+  display: flex;
+  gap: 0;
+  min-height: 400px;
+  height: 100%;
+  align-items: stretch;
+  flex: 1;
+  overflow: hidden;
+}
+
+.ai-image-generation-section {
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  // 右侧内边距，避免滚动条遮挡内容
+  padding-right: 8px;
+
+  /* 隐藏滚动条但保持滚动功能 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 2px;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.25);
+    }
+  }
+
+  // AI 视频生成表单 - 自适应布局
+  .ai-image-generation-form {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .form-header-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .model-selector-wrapper {
+        flex: 1;
+        width: 100%;
+        max-width: none;
+      }
+    }
+
+    .model-params-row {
+      margin-bottom: 0;
+    }
+
+    // 描述输入区域 - 自适应填充剩余空间，但保持最小高度
+    .form-field--prompt {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 150px; // 保证最小高度
+
+      .form-textarea {
+        flex: 1 1 auto;
+        min-height: 100px !important; // textarea 最小高度，确保不被压缩
+        height: auto;
+      }
+    }
+  }
+}
+
+.task-sidebar {
+  min-width: 240px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--color-bg-container, #fff);
+  border: 1px solid var(--color-border-light, #e8e8e8);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* 优化滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 2px;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.25);
+    }
+  }
+}
+
+/* Canvas video component styles */
+.video-origin {
+  border-radius: 6px;
+
+  &--focus {
+    outline: 2px solid var(--td-brand-color, #0052d9);
+    outline-offset: 2px;
+  }
+
+  &--selected {
+    box-shadow: 0 0 0 2px var(--td-brand-color, #0052d9);
+  }
+
+  &::-webkit-media-controls {
+    border-radius: 6px;
+  }
+}
+
+/* Responsive adjustments - 移动端统一使用垂直布局，单一滚动条 */
+
+@media (max-width: 768px) {
+  /* 移动端容器布局 - 不滚动，由 wb-body 处理滚动 */
+  .ai-video-generation-container {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .ai-generation-mobile-switcher {
+    display: inline-grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 4px;
+    padding: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    background: #f5f7fb;
+    border: 1px solid #e8edf3;
+    border-radius: 16px;
+    margin: 4px 0 12px;
+
+    &__tab {
+      min-height: 42px;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.18s ease, color 0.18s ease,
+        box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    &__tab--active {
+      background: #ffffff;
+      color: #111827;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+      transform: translateY(-1px);
+    }
+  }
+
+  /* 主内容区域 - 使用后代选择器确保匹配 */
+  .ai-video-generation-container .main-content {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
+    flex: none !important;
+    overflow: visible !important;
+  }
+
+  /* 表单区域 - 确保显示 */
+  .ai-video-generation-container .ai-image-generation-section {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    flex: none !important;
+    overflow: visible !important;
+    order: 1 !important;
+  }
+
+  /* 任务侧栏 - 全宽显示 */
+  .ai-video-generation-container .task-sidebar {
+    display: block !important;
+    flex: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 8px !important;
+    order: 2 !important;
+    margin-top: 0 !important;
+  }
+
+  .ai-video-generation-container .task-sidebar--mobile-panel {
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .ai-video-generation-container
+    .main-content--mobile-panels
+    > *:not(.ai-generation-mobile-panel--hidden) {
+    animation: ai-generation-panel-enter 0.2s ease;
+  }
+
+  /* 操作按钮区域 */
+  .ai-video-generation-container .section-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    background: #fff;
+  }
+
+  .task-list {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .ai-video-generation-container
+    .ai-image-generation-section.ai-generation-mobile-panel--hidden,
+  .ai-video-generation-container
+    .task-sidebar.ai-generation-mobile-panel--hidden {
+    display: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .ai-video-generation-container {
+    max-height: calc(100vh - 50px);
+
+    .task-sidebar {
+      padding: 6px;
+    }
+
+    .section-actions {
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 0;
+      flex-wrap: wrap;
+    }
+  }
+}

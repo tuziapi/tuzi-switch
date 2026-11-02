@@ -1,0 +1,866 @@
+@import '../../../../../node_modules/@plait/draw/styles/styles.scss';
+@import '../../../../../node_modules/@plait/mind/styles/styles.scss';
+@import 'tailwindcss';
+@import './tdesign-theme.scss';
+@import './theme.scss';
+@import './z-index.scss'; // Z-Index层级管理变量
+@import './responsive'; // 响应式设计变量和混合宏
+@import './common-variables';
+@import './toolbox-theme.scss'; // 工具箱主题变量
+@import '../components/tool-element/tool.component.scss';
+@import '../components/minimap/minimap.scss';
+@import '../components/toolbar/pencil-settings-toolbar/pencil-settings-toolbar.scss'; // 画笔设置工具栏
+@import '../components/toolbar/pen-settings-toolbar/pen-settings-toolbar.scss'; // 钢笔设置工具栏
+
+:root {
+  --aitu-toolbar-safe-area-left: #{$toolbar-safe-area-left};
+  --aitu-toolbar-left: #{$toolbar-left};
+  --aitu-toolbar-content-width: #{$toolbar-content-width};
+  --aitu-toolbar-right-edge: #{$toolbar-width};
+  --aitu-toolbar-right-dock-width: 0px;
+  --aitu-toolbar-right-avoidance: 0px;
+  --aitu-toolbar-side-panel-max-width: calc(100vw - #{$toolbar-width});
+}
+
+.t-dialog__ctx.t-dialog__ctx--fixed {
+  z-index: $z-dialog !important;
+}
+
+.t-tooltip,
+.t-tooltip .t-popup__content {
+  pointer-events: none;
+}
+
+.drawnix {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'PingFang SC', 'Noto Sans', 'Noto Sans CJK SC', 'Microsoft Yahei',
+    'Hiragino Sans GB', Arial, sans-serif;
+
+  // Desktop default/light canvas only; preserve explicitly selected color themes.
+  .desktop-warm-canvas:is(.theme-default, .theme-colorful) {
+    background-color: #fcfaf6;
+    background-image: radial-gradient(circle, #d8cebf var(--desktop-dot-size, .7px), transparent calc(var(--desktop-dot-size, .7px) + .15px));
+    background-size: var(--desktop-dot-gap, 24px) var(--desktop-dot-gap, 24px);
+    background-position: var(--desktop-dot-position, -12px -12px);
+
+    .board-host-svg { background-color: transparent; }
+  }
+
+  // Sidebar layout mode
+  &--with-sidebar {
+    display: flex;
+    flex-direction: row;
+  }
+
+  // Main canvas area
+  &__main {
+    flex: 1;
+    position: relative;
+    height: 100%;
+    min-width: 0; // Prevent flex item from overflowing
+  }
+  .pencil-mode-toolbar {
+    position: absolute;
+    top: 82px;
+    left: 0;
+    .tool-icon__icon {
+      width: auto;
+      padding: 0 8px;
+      background-color: var(--color-surface-mid);
+    }
+  }
+  .pencil-settings-toolbar {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: $z-unified-toolbar;
+    background: var(--color-surface-high);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    // 移动端调整定位，位于工具栏右侧避免重叠
+    @media (max-width: 768px) {
+      left: 70px; // 工具栏宽度(~50px) + 间距
+      transform: none;
+      top: calc(env(safe-area-inset-top, 0px) + 8px);
+    }
+  }
+  .pen-settings-toolbar {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: $z-unified-toolbar;
+    background: var(--color-surface-high);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    // 移动端调整定位，位于工具栏右侧避免重叠
+    @media (max-width: 768px) {
+      left: 70px; // 工具栏宽度(~50px) + 间距
+      transform: none;
+      top: calc(env(safe-area-inset-top, 0px) + 8px);
+    }
+  }
+  .draw-toolbar {
+    cursor: default;
+    position: absolute;
+    top: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    // zoom 内联样式（在 creation-toolbar 中）
+    .creation-toolbar__zoom-inline {
+      display: inline-flex;
+      align-items: center;
+
+      .stack {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center;
+        gap: 0;
+      }
+
+      .zoom-out-button {
+        border-top-right-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+      }
+
+      .zoom-menu-trigger {
+        min-width: 40px;
+        padding: 0 2px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-on-surface);
+        border-radius: 0;
+        cursor: pointer;
+        font-size: 12px;
+
+        &:hover,
+        &.active {
+          background-color: var(--color-surface-primary-container);
+        }
+      }
+
+      .zoom-in-button {
+        color: var(--color-on-surface);
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+      }
+
+      // 纵向模式（embedded工具栏）
+      &--vertical {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        .stack {
+          flex-direction: column !important;
+        }
+
+        .zoom-out-button {
+          border-radius: var(--border-radius-sm) !important;
+          border-bottom-left-radius: 0 !important;
+          border-bottom-right-radius: 0 !important;
+        }
+
+        .zoom-menu-trigger {
+          width: 100%;
+          border-radius: 0;
+        }
+
+        .zoom-in-button {
+          border-radius: var(--border-radius-sm) !important;
+          border-top-left-radius: 0 !important;
+          border-top-right-radius: 0 !important;
+        }
+      }
+    }
+  }
+  .app-toolbar {
+    position: absolute;
+    top: 36px;
+    left: 36px;
+  }
+
+  // Unified Toolbar Container (统一左侧工具栏 - 桌面端和移动端通用)
+  .unified-toolbar {
+    position: fixed;
+    left: var(--aitu-toolbar-left, #{$toolbar-left});
+    top: 12px;
+    z-index: $z-side-drawer + 1; // 覆盖抽屉左侧同色延展背景
+    bottom: 12px; // 保持底部间距
+    height: calc(100vh - 24px); // 减去上下间距
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: fit-content;
+    max-width: 80px;
+    overflow: visible; // 允许 Badge 角标溢出显示，滚动由 __scrollable 处理
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08); // 更加柔和的阴影
+    background: rgba(
+      var(--island-bg-color-rgb, 255, 255, 255),
+      0.95
+    ); // 稍微透明感
+    backdrop-filter: blur(10px); // 毛玻璃效果
+    border: 1px solid var(--color-border-light, rgba(0, 0, 0, 0.05));
+
+    // 可滚动内容区域
+    &__scrollable {
+      flex: 1;
+      min-height: 0; // 关键：允许 flex 子元素收缩以启用滚动
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch; // iOS 惯性滚动
+      touch-action: pan-y; // 允许垂直滚动触摸
+      display: flex;
+      flex-direction: column;
+      gap: 4px; // 增加间距
+      padding: 8px 0;
+      scrollbar-width: none;
+      &::-webkit-scrollbar {
+        display: none;
+      }
+
+      // 滚动区域内第一个section不需要顶部边框
+      .unified-toolbar__section:first-child {
+        border-top: none;
+        padding-top: 0;
+      }
+    }
+
+    &__drag-handle {
+      position: relative;
+      flex-shrink: 0;
+      width: 100%;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 0;
+      border-radius: 20px 20px 8px 8px;
+      background: transparent;
+      color: var(--color-on-surface-variant, rgba(0, 0, 0, 0.28));
+      cursor: grab;
+      opacity: 0.72;
+      transition:
+        background-color 0.18s ease,
+        color 0.18s ease,
+        opacity 0.18s ease;
+      touch-action: none;
+      z-index: 1;
+
+      &::before {
+        content: '';
+        width: 20px;
+        height: 3px;
+        border-radius: 999px;
+        background: currentColor;
+        opacity: 0.34;
+      }
+
+      &:hover,
+      &:focus-visible {
+        background: rgba(0, 0, 0, 0.035);
+        color: var(--color-on-surface, rgba(0, 0, 0, 0.72));
+        opacity: 1;
+      }
+
+      &:active {
+        cursor: grabbing;
+      }
+    }
+
+    &--dragging .unified-toolbar__drag-handle {
+      background: rgba(243, 156, 18, 0.08);
+      color: var(--brand-primary, #f39c12);
+      opacity: 1;
+    }
+
+    &--dragging {
+      user-select: none;
+    }
+
+    &__section {
+      padding: 0 8px;
+
+      // 分区之间添加更加微妙的分割线
+      &:not(:first-child):not(&--fixed-top):not(&--fixed-bottom) {
+        margin-top: 8px;
+        padding-top: 8px;
+        position: relative;
+
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 12px;
+          right: 12px;
+          height: 1px;
+          background: var(--color-border-light, rgba(0, 0, 0, 0.05));
+        }
+      }
+
+      // 固定在底部的section (任务按钮)
+      &--fixed-bottom {
+        flex-shrink: 0;
+        padding: 12px 8px;
+        border-top: 1px solid var(--color-border-light, rgba(0, 0, 0, 0.05));
+        border-radius: 0 0 20px 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: inherit;
+        overflow: visible; // 允许 Badge 角标溢出显示
+      }
+
+      // 固定在顶部的section (菜单)
+      &--fixed-top {
+        flex-shrink: 0;
+        padding: 4px 8px 10px;
+        border-bottom: 1px solid var(--color-border-light, rgba(0, 0, 0, 0.05));
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: inherit;
+      }
+    }
+
+    // 图标模式修饰符 (窗口高度不足时自动切换)
+    &--icon-only {
+      // 隐藏工具按钮标签,仅显示图标
+      .tool-icon__label {
+        display: none;
+      }
+    }
+
+    // ============================================================================
+    // 移动端响应式样式 (Mobile Responsive Styles)
+    // ============================================================================
+
+    // Match useDeviceType's compact toolbar breakpoint (1024px).
+    @include tablet-landscape-and-below {
+      left: $mobile-spacing;
+      top: auto;
+      bottom: calc(#{$safe-area-bottom} + 70px); // 给 AI 输入栏留出空间
+      height: auto;
+      max-height: calc(100vh - 160px); // 限制最大高度
+      width: 38px; // 固定宽度，确保收起和展开状态一致（以收起状态为准）
+      max-width: 38px;
+      border-radius: 16px;
+
+      .unified-toolbar__drag-handle {
+        display: none;
+      }
+
+      // 移动端强制使用图标模式
+      .tool-icon__label {
+        display: none;
+      }
+
+      // 调整 section padding
+      .unified-toolbar__section {
+        padding: 0 4px;
+
+        &--fixed-top,
+        &--fixed-bottom {
+          padding: 8px 4px;
+        }
+      }
+
+      // 调整按钮尺寸确保触控友好
+      .tool-button,
+      .tool-icon {
+        @include touch-target($mobile-button-min-size);
+      }
+    }
+
+    // 移动端竖屏 (max-width: 640px) - 最小化工具栏
+    @include mobile {
+      left: $mobile-spacing;
+      bottom: calc(#{$safe-area-bottom} + 80px); // 更多空间给 AI 输入栏
+      max-height: calc(100vh - 180px);
+
+      // 更紧凑的布局
+      &__scrollable {
+        padding: 2px 0;
+        gap: 1px;
+      }
+
+      // 更紧凑的 section
+      .unified-toolbar__section {
+        padding: 0 1px;
+
+        &:not(:first-child):not(.unified-toolbar__section--fixed-top):not(
+            .unified-toolbar__section--fixed-bottom
+          ) {
+          margin-top: 2px;
+          padding-top: 2px;
+        }
+
+        &--fixed-top,
+        &--fixed-bottom {
+          padding: 4px 1px;
+        }
+      }
+    }
+
+    // 移动端收起状态修饰符
+    &--mobile-collapsed {
+      @include tablet-landscape-and-below {
+        // 保持底部悬浮位置，只调整高度为自适应
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+
+        // 隐藏所有常规内容
+        .unified-toolbar__scrollable,
+        .unified-toolbar__section,
+        .unified-toolbar__mobile-toggle {
+          display: none !important;
+        }
+      }
+    }
+
+    // 移动端收起状态快捷按钮区域
+    &__collapsed-shortcuts {
+      display: none; // 默认隐藏
+
+      @include tablet-landscape-and-below {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+        padding: 4px 4px 8px; // 紧凑 padding 以适应窄宽度
+        width: 100%; // 填满容器宽度
+      }
+    }
+
+    // 收起状态快捷按钮
+    &__collapsed-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%; // 填满容器宽度
+      height: 40px;
+      min-height: 40px;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      color: var(--color-on-surface);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      outline: none; // 移除焦点边框
+
+      &:hover,
+      &:active {
+        background: var(--color-surface-high, rgba(0, 0, 0, 0.05));
+      }
+
+      &:focus {
+        outline: none; // 移除焦点边框
+      }
+
+      svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      // 展开/收起箭头按钮 - 统一样式
+      &--toggle {
+        height: 32px;
+        min-height: 32px;
+        margin-bottom: 4px;
+
+        svg {
+          width: 18px;
+          height: 18px;
+          color: var(--color-text-secondary, #999);
+        }
+      }
+    }
+
+    // 移动端展开按钮（展开状态时显示）- 与收起状态箭头保持一致
+    &__mobile-toggle {
+      display: none;
+
+      @include tablet-landscape-and-below {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px; // 固定宽度，与下方工具按钮一致
+        height: 32px; // 与收起状态一致
+        margin: 4px auto 0; // 水平居中
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        color: var(--color-text-secondary, #999); // 与收起状态颜色一致
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        flex-shrink: 0;
+
+        &:hover,
+        &:active {
+          background: var(--color-surface-high);
+        }
+
+        svg {
+          width: 18px; // 与收起状态一致
+          height: 18px;
+        }
+      }
+    }
+  }
+
+  // Embedded mode for individual toolbars (适配80px垂直布局)
+  .app-toolbar--embedded,
+  .draw-toolbar--embedded {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    transform: none;
+    width: 100%; // 填充容器宽度
+    display: flex;
+    flex-direction: column;
+    align-items: center; // 让所有直接子元素（包括 GitHub 按钮）居中
+
+    // 调整 Island 容器
+    .island {
+      width: 100%;
+      padding: 4px; // 减小padding以适应窄宽度
+    }
+
+    // Stack 改为垂直布局以适应80px宽度
+    .stack {
+      display: flex !important; // Override Grid
+      flex-direction: column !important;
+      align-items: center;
+      gap: 4px;
+      width: 100%;
+    }
+
+    // 调整工具按钮尺寸以适应窄宽度
+    .tool-button,
+    .tool-icon {
+      min-width: 40px;
+      max-width: 100%;
+      width: auto;
+    }
+
+    // 隐藏文本标签，节省空间
+    .tool-icon__label {
+      display: none;
+    }
+  }
+
+  // More tools panel styles
+  .more-tools-panel {
+    min-width: 200px;
+    max-width: 280px;
+    padding: 8px;
+    background: var(--island-bg-color);
+    border-radius: 8px;
+
+    &__header {
+      padding: 4px 8px 8px;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: 8px;
+    }
+
+    &__title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary-color);
+    }
+
+    &__content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    &__item {
+      border-radius: 6px;
+      transition: background-color 0.15s ease;
+
+      &:hover {
+        background-color: var(--color-surface-high);
+      }
+    }
+
+    &__footer {
+      padding: 8px 8px 4px;
+      border-top: 1px solid var(--color-border);
+      margin-top: 8px;
+    }
+
+    &__hint {
+      font-size: 11px;
+      color: var(--text-secondary-color);
+    }
+
+    &__empty {
+      padding: 16px 8px;
+      text-align: center;
+    }
+
+    &__empty-text {
+      font-size: 12px;
+      color: var(--text-secondary-color);
+    }
+
+    // Zoom 工具栏横向展示（内联在icon流中）
+    &__zoom-row {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 6px;
+      transition: background-color 0.15s ease;
+
+      &:hover {
+        background-color: var(--color-surface-high);
+      }
+
+      .stack {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center;
+        gap: 0;
+      }
+
+      .zoom-out-button {
+        border-top-right-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+      }
+
+      .zoom-menu-trigger {
+        min-width: 40px;
+        padding: 0 2px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-on-surface);
+        border-radius: 0;
+        cursor: pointer;
+        font-size: 12px;
+
+        &:hover,
+        &.active {
+          background-color: var(--color-surface-primary-container);
+        }
+      }
+
+      .zoom-in-button {
+        color: var(--color-on-surface);
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+      }
+    }
+  }
+
+  // Toolbar button drag styles
+  .toolbar-button-wrapper {
+    position: relative;
+    cursor: grab;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+
+    &:active {
+      cursor: grabbing;
+    }
+
+    &--dragging {
+      opacity: 0.5;
+      transform: scale(0.95);
+    }
+
+    &--drag-over {
+      &::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        height: 2px;
+        background-color: var(--color-primary);
+        border-radius: 1px;
+      }
+    }
+
+    &--drag-before::before {
+      top: -2px;
+    }
+
+    &--drag-after::before {
+      bottom: -2px;
+    }
+  }
+
+  .drawnix-link,
+  a {
+    text-decoration: none;
+    color: var(--link-color);
+    user-select: none;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+    &:active {
+      text-decoration: none;
+    }
+  }
+  .a {
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--link-color);
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: pointer;
+  }
+  textarea {
+    outline: none;
+  }
+  .drawnix-button {
+    @include outlineButtonStyles;
+  }
+
+  [plait-mindmap='true'] {
+    img.image-origin--focus:hover {
+      cursor: zoom-in;
+    }
+  }
+
+}
+
+.plait-board-container {
+  // 橡皮擦光标由 JavaScript 动态设置（usePencilCursor hook）
+  // 不再使用固定大小的 CSS 光标
+  .slate-editable-container {
+    cursor: inherit !important;
+  }
+}
+
+// Toolbar context menu styles - 通过 portal 渲染到 body，需要在全局作用域
+.toolbar-context-menu {
+  animation: toolbarContextMenuFadeIn 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'PingFang SC', 'Noto Sans', 'Noto Sans CJK SC', 'Microsoft Yahei',
+    'Hiragino Sans GB', Arial, sans-serif;
+
+  .menu {
+    min-width: 120px;
+    padding: 4px;
+    background: var(--island-bg-color, #fff);
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .menu-container {
+    background-color: var(--island-bg-color, #fff);
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    height: 32px;
+    font-size: 14px;
+    color: var(--color-gray-90, #333);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 2px;
+
+    &:first-child {
+      margin-top: 0;
+    }
+
+    &:hover {
+      background-color: var(--color-surface-primary-container, #f5f5f5);
+    }
+
+    &[disabled] {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+  }
+
+  .menu-separator {
+    height: 1px;
+    background-color: var(--color-border, #e0e0e0);
+    margin: 4px 0;
+  }
+}
+
+// Freehand panel divider
+.freehand-panel-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--color-border, #e0e0e0);
+  margin: 0 4px;
+}
+
+@keyframes toolbarContextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// ============================================================================
+// Slideshow Mode: 隐藏所有 UI 覆盖层，只保留画布内容
+// ============================================================================
+.slideshow-active {
+  .frame-element__outline {
+    stroke: transparent !important;
+    stroke-dasharray: none !important;
+  }
+
+  // 工具栏
+  .unified-toolbar,
+    .popup-toolbar,
+    .pencil-mode-toolbar,
+    .pencil-settings-toolbar,
+    .pen-settings-toolbar,
+    .eraser-settings-toolbar,
+    .quick-creation-toolbar,
+    .app-toolbar,
+    // 抽屉和面板
+    .project-drawer,
+    .chat-drawer,
+    .chat-drawer-trigger,
+    .toolbox-drawer,
+    .performance-panel,
+    // 输入栏和导航
+    .ai-input-bar,
+    .view-navigation,
+    .version-update-prompt,
+    // 弹出层
+    .command-palette,
+    .canvas-search,
+    .multi-selection-handles,
+    .auto-complete-shape-picker,
+    .link-popup,
+    .tool-winbox-manager {
+    display: none !important;
+  }
+}

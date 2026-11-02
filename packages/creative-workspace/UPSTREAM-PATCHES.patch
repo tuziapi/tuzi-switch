@@ -1,0 +1,5203 @@
+--- a/apps/desktop/src/utils/desktop-model-setup.ts
++++ b/apps/desktop/src/utils/desktop-model-setup.ts
+@@ -1,8 +1,8 @@
+ import { isTauriEnvironment } from './tauri-api';
+ 
+-/** Only the free canvas uses global credentials; workflow guides its own channels. */
++/** Initialize the standalone desktop canvas credentials when needed. */
+ export async function initializeDesktopModelSetup(): Promise<void> {
+-  if (!isTauriEnvironment() || window.location.pathname.startsWith('/workflow')) return;
++  if (!isTauriEnvironment()) return;
+   const { settingsManager, providerProfilesSettings } = await import('../../../../packages/drawnix/src/utils/settings-manager');
+   await settingsManager.waitForInitialization();
+   if (providerProfilesSettings.get().some(profile => profile.enabled && profile.apiKey.trim())) return;
+--- a/apps/web/src/app/app.tsx
++++ b/apps/web/src/app/app.tsx
+@@ -35,7 +35,7 @@
+ import { ErrorFallbackUI, safeModeReload, goToDebug } from './ErrorBoundary';
+ import { collectAndDownloadErrorLog } from '../utils/error-log-exporter';
+ 
+-importLocalTuziCredentials();
++// Account credentials belong exclusively to the assistant host.
+ 
+ const Drawnix = lazy(() =>
+   // eslint-disable-next-line @nx/enforce-module-boundaries -- 同上，仅放行 Drawnix 正式入口。
+@@ -134,49 +134,10 @@
+ /**
+  * 从 URL 获取画布 ID 参数
+  */
+-function getBoardIdFromUrl(): string | null {
+-  const params = new URLSearchParams(window.location.search);
+-  const boardId = params.get(BOARD_URL_PARAM);
+-  if (boardId || import.meta.env.VITE_OPENTU_DESKTOP !== 'true') return boardId;
+-  try {
+-    return localStorage.getItem(DESKTOP_LAST_BOARD_KEY);
+-  } catch {
+-    return null;
+-  }
+-}
+-
+-/**
+- * 更新 URL 中的画布 ID 参数（不刷新页面）
+- * @param boardId 画布 ID
+- * @param replace 是否使用 replaceState（默认 false，使用 pushState）
+- */
+-function updateBoardIdInUrl(
+-  boardId: string | null,
+-  replace = false
+-): void {
+-  const url = new URL(window.location.href);
+-  if (url.pathname === '/workflow' || url.pathname.startsWith('/workflow/')) return;
+-  if (boardId) {
+-    url.searchParams.set(BOARD_URL_PARAM, boardId);
+-    if (import.meta.env.VITE_OPENTU_DESKTOP === 'true') {
+-      try {
+-        localStorage.setItem(DESKTOP_LAST_BOARD_KEY, boardId);
+-      } catch {
+-        // The current board remains available for this session.
+-      }
+-    }
+-  } else {
+-    url.searchParams.delete(BOARD_URL_PARAM);
+-  }
+-
+-  // 使用 pushState 产生历史记录，支持浏览器前进后退
+-  // 初始加载时使用 replaceState 避免重复记录
+-  if (replace) {
+-    window.history.replaceState({ boardId }, '', url.toString());
+-  } else {
+-    window.history.pushState({ boardId }, '', url.toString());
+-  }
+-}
++function getBoardIdFromUrl(): string | null { return null; }
++
++// Host navigation owns the URL; the workspace service persists currentBoardId.
++function updateBoardIdInUrl(_boardId: string | null, _replace = false): void {}
+ 
+ function saveBoardCloseSnapshot(snapshot: BoardCloseSnapshot): void {
+   try {
+@@ -257,7 +218,7 @@
+   const hasPendingPersistenceRef = useRef<boolean>(false);
+ 
+   // 使用 useDocumentTitle hook 管理页面标题
+-  useDocumentTitle(currentBoardId);
++  // The assistant owns the window title.
+ 
+   useEffect(() => {
+     currentBoardIdRef.current = currentBoardId;
+@@ -312,6 +273,8 @@
+     []
+   );
+ 
++  useEffect(() => () => persistCloseSnapshot('pagehide'), [persistCloseSnapshot]);
++
+   useEffect(() => {
+     const bootController = getBootController();
+     if (!bootController) {
+@@ -333,7 +296,7 @@
+ 
+   // Initialize workspace and handle migration
+   useEffect(() => {
+-    importLocalTuziCredentials();
++    // Account credentials belong exclusively to the assistant host.
+     const initialize = async () => {
+       // 检查是否需要显示崩溃恢复对话框
+       if (
+@@ -382,6 +345,9 @@
+           );
+           hasPendingPersistenceRef.current = false;
+           setValue(nextData);
++          setCurrentBoardId(currentBoard.id);
++          isDataReadyRef.current = true;
++          setIsDataReady(true);
+         }
+         setIsLoading(false);
+         // 标记加载完成
+@@ -1001,7 +967,7 @@
+           display: 'flex',
+           alignItems: 'center',
+           justifyContent: 'center',
+-          height: '100vh',
++          height: '100%',
+         }}
+       >
+         加载中...
+@@ -1010,7 +976,7 @@
+   }
+ 
+   return (
+-    <div style={{ height: '100vh' }}>
++    <div style={{ height: '100%' }}>
+       <Suspense fallback={null}>
+         <Drawnix
+           value={value.children}
+--- a/packages/drawnix/src/components/ai-input-bar/CountDropdown.tsx
++++ b/packages/drawnix/src/components/ai-input-bar/CountDropdown.tsx
+@@ -151,7 +151,7 @@
+                 })}
+               </div>
+             </div>,
+-            document.body
++            (document.getElementById('creative-portals') || document.body)
+           )}
+         </div>
+       )}
+--- a/packages/drawnix/src/components/ai-input-bar/GenerationTypeDropdown.tsx
++++ b/packages/drawnix/src/components/ai-input-bar/GenerationTypeDropdown.tsx
+@@ -151,7 +151,7 @@
+                 })}
+               </div>
+             </div>,
+-            document.body
++            (document.getElementById('creative-portals') || document.body)
+           )}
+         </div>
+       )}
+--- a/packages/drawnix/src/components/ai-input-bar/KeyboardDropdown.tsx
++++ b/packages/drawnix/src/components/ai-input-bar/KeyboardDropdown.tsx
+@@ -153,7 +153,20 @@
+     if (!trackPosition || !isOpen) return;
+     const updatePosition = () => {
+       if (!containerRef.current) return;
+-      const rect = containerRef.current.getBoundingClientRect();
++      const triggerRect = containerRef.current.getBoundingClientRect();
++      const host = import.meta.env.VITE_TUZI_ASSISTANT === 'true'
++        ? document.getElementById('creative-portals')?.closest('.creative-root') : null;
++      const hostRect = host?.getBoundingClientRect();
++      const viewportHeight = hostRect?.height ?? window.innerHeight;
++      const viewportWidth = hostRect?.width ?? window.innerWidth;
++      const rect = {
++        top: triggerRect.top - (hostRect?.top ?? 0),
++        bottom: triggerRect.bottom - (hostRect?.top ?? 0),
++        left: triggerRect.left - (hostRect?.left ?? 0),
++        width: triggerRect.width,
++      };
++      const menuWidth = menuRef.current?.getBoundingClientRect().width || rect.width;
++      const menuLeft = Math.max(viewportPadding, Math.min(rect.left, viewportWidth - menuWidth - viewportPadding));
+       const nextPortalPosition = {
+         top: rect.top,
+         left: rect.left,
+@@ -163,7 +176,7 @@
+       const spaceAbove = Math.max(0, rect.top - viewportPadding - offset);
+       const spaceBelow = Math.max(
+         0,
+-        window.innerHeight - rect.bottom - viewportPadding - offset
++        viewportHeight - rect.bottom - viewportPadding - offset
+       );
+       const resolvedPlacement =
+         placement === 'auto'
+@@ -181,15 +194,17 @@
+         resolvedPlacement === 'down'
+           ? {
+               position: 'fixed',
+-              left: rect.left,
++              left: menuLeft,
+               top: rect.bottom + offset,
++              maxWidth: viewportWidth - viewportPadding * 2,
+               maxHeight: boundedMaxHeight,
+               overflowY: 'auto',
+             }
+           : {
+               position: 'fixed',
+-              left: rect.left,
+-              bottom: window.innerHeight - rect.top + offset,
++              left: menuLeft,
++              bottom: viewportHeight - rect.top + offset,
++              maxWidth: viewportWidth - viewportPadding * 2,
+               maxHeight: boundedMaxHeight,
+               overflowY: 'auto',
+             };
+@@ -226,10 +241,14 @@
+     };
+ 
+     updatePosition();
++    const observer = new ResizeObserver(updatePosition);
++    if (menuRef.current) observer.observe(menuRef.current);
++    if (containerRef.current) observer.observe(containerRef.current);
+     window.addEventListener('resize', updatePosition);
+     window.addEventListener('scroll', updatePosition, true);
+ 
+     return () => {
++      observer.disconnect();
+       window.removeEventListener('resize', updatePosition);
+       window.removeEventListener('scroll', updatePosition, true);
+     };
+--- a/packages/drawnix/src/components/ai-input-bar/ModelDropdown.tsx
++++ b/packages/drawnix/src/components/ai-input-bar/ModelDropdown.tsx
+@@ -1502,7 +1502,7 @@
+             data-testid="model-selector"
+           >
+             {renderTrigger(handleTriggerKeyDown)}
+-            {isOpen && (isPortalled ? createPortal(menu, document.body) : menu)}
++            {isOpen && (isPortalled ? createPortal(menu, (document.getElementById('creative-portals') || document.body)) : menu)}
+             {isOpen ? (
+               <ContextMenu
+                 state={contextMenu}
+--- a/packages/drawnix/src/components/ai-input-bar/ParametersDropdown.tsx
++++ b/packages/drawnix/src/components/ai-input-bar/ParametersDropdown.tsx
+@@ -563,7 +563,7 @@
+                     {hasAdvancedParams && !advancedOpen && advancedToggle}
+                   </div>
+                 </div>,
+-                document.body
++                (document.getElementById('creative-portals') || document.body)
+               )}
+           </div>
+         );
+--- a/packages/drawnix/src/components/ai-input-bar/SizeDropdown.tsx
++++ b/packages/drawnix/src/components/ai-input-bar/SizeDropdown.tsx
+@@ -188,7 +188,7 @@
+                 })}
+               </div>
+             </div>,
+-            document.body
++            (document.getElementById('creative-portals') || document.body)
+           )}
+         </div>
+       )}
+--- a/packages/drawnix/src/components/ai-input-bar/SkillDropdown.tsx
++++ b/packages/drawnix/src/components/ai-input-bar/SkillDropdown.tsx
+@@ -299,7 +299,7 @@
+                   <span>添加 Skill</span>
+                 </div>
+               </div>,
+-              document.body
++              (document.getElementById('creative-portals') || document.body)
+             )}
+         </div>
+       )}
+--- a/packages/drawnix/src/components/backup-restore/backup-restore-dialog.tsx
++++ b/packages/drawnix/src/components/backup-restore/backup-restore-dialog.tsx
+@@ -140,7 +140,9 @@
+   );
+ 
+   const handleClose = useCallback(async () => {
+-    if (!isProcessing) {
++    // A click inside the nested confirmation is outside this dialog's portal.
++    // Keep the backup dialog mounted until that confirmation resolves.
++    if (!isProcessing && !confirmDialog) {
+       // 如果有待恢复的工作区状态，处理画布切换（需要等待完成）
+       if (pendingWorkspaceState) {
+         await handleWorkspaceRestore(pendingWorkspaceState);
+@@ -166,6 +168,7 @@
+     }
+   }, [
+     isProcessing,
++    confirmDialog,
+     onOpenChange,
+     importResult,
+     pendingWorkspaceState,
+--- a/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx
++++ b/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx
+@@ -434,7 +434,7 @@
+         </div>
+       );
+ 
+-      return createPortal(menu, document.body);
++      return createPortal(menu, (document.getElementById('creative-portals') || document.body));
+     };
+ 
+     return (
+--- a/packages/drawnix/src/components/comic-creator/ComicCreator.scss
++++ b/packages/drawnix/src/components/comic-creator/ComicCreator.scss
+@@ -46,7 +46,7 @@
+     align-items: center;
+     padding: 10px;
+     border-radius: 8px;
+-    background: #fafafa;
++    background: var(--creative-tool-surface, #fafafa);
+     border: 1px solid rgba(0, 0, 0, 0.05);
+   }
+ 
+@@ -59,7 +59,7 @@
+     > span {
+       font-size: 12px;
+       font-weight: 600;
+-      color: #666;
++      color: var(--creative-tool-muted, #666);
+     }
+   }
+ 
+@@ -160,8 +160,8 @@
+     max-width: 100%;
+     padding: 6px 8px;
+     border-radius: 8px;
+-    background: #f7f7f7;
+-    color: #555;
++    background: var(--creative-tool-soft, #f7f7f7);
++    color: var(--creative-tool-text, #555);
+     font-size: 12px;
+ 
+     span {
+@@ -173,7 +173,7 @@
+   }
+ 
+   .comic-pdf-hint {
+-    color: #999;
++    color: var(--creative-tool-muted, #999);
+     font-size: 12px;
+   }
+ 
+@@ -184,7 +184,7 @@
+     border: none;
+     border-radius: 6px;
+     background: transparent;
+-    color: #888;
++    color: var(--creative-tool-muted, #888);
+     cursor: pointer;
+ 
+     &:hover {
+@@ -223,7 +223,7 @@
+     strong {
+       display: block;
+       margin-bottom: 6px;
+-      color: #333;
++      color: var(--creative-tool-text, #333);
+       font-size: 14px;
+       line-height: 1.45;
+     }
+@@ -234,7 +234,7 @@
+     padding: 10px 12px;
+     border: 1px solid rgba(0, 0, 0, 0.06);
+     border-radius: 8px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+   }
+ 
+   .comic-outline-preview__item--common {
+@@ -246,7 +246,7 @@
+     margin: 0;
+     max-width: 100%;
+     overflow: auto;
+-    color: #666;
++    color: var(--creative-tool-muted, #666);
+     font-family: inherit;
+     font-size: 13px;
+     line-height: 1.62;
+@@ -257,8 +257,8 @@
+   .comic-outline-preview__content--json {
+     padding: 10px;
+     border-radius: 7px;
+-    background: #f8f8f8;
+-    color: #3f3f3f;
++    background: var(--creative-tool-soft, #f8f8f8);
++    color: var(--creative-tool-text, #3f3f3f);
+     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+     font-size: 12px;
+     line-height: 1.55;
+@@ -269,7 +269,7 @@
+     display: inline-flex;
+     padding: 3px;
+     border-radius: 8px;
+-    background: #f0f0f0;
++    background: var(--creative-tool-soft, #f0f0f0);
+ 
+     button {
+       min-width: 52px;
+@@ -277,11 +277,11 @@
+       border-radius: 6px;
+       padding: 6px 10px;
+       background: transparent;
+-      color: #666;
++      color: var(--creative-tool-muted, #666);
+       cursor: pointer;
+ 
+       &.active {
+-        background: #fff;
++        background: var(--creative-tool-surface, #fff);
+         color: #c97d0a;
+         font-weight: 600;
+         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+@@ -295,7 +295,7 @@
+   }
+ 
+   .comic-segmented--mode {
+-    background: #f5f1eb;
++    background: var(--creative-tool-soft, #f5f1eb);
+ 
+     button {
+       min-width: 108px;
+@@ -312,7 +312,7 @@
+     min-height: 38px;
+     padding: 8px 10px;
+     border-radius: 8px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+     border: 1px solid rgba(0, 0, 0, 0.06);
+   }
+ 
+@@ -326,7 +326,7 @@
+       flex: 0 0 auto;
+       font-size: 12px;
+       font-weight: 600;
+-      color: #555;
++      color: var(--creative-tool-text, #555);
+     }
+   }
+ 
+@@ -359,15 +359,15 @@
+     flex-wrap: wrap;
+     padding: 10px;
+     border-radius: 8px;
+-    background: #fafafa;
++    background: var(--creative-tool-surface, #fafafa);
+     border: 1px solid rgba(0, 0, 0, 0.05);
+ 
+     button {
+       border: none;
+       border-radius: 8px;
+       padding: 8px 12px;
+-      background: #f4f4f4;
+-      color: #555;
++      background: var(--creative-tool-soft, #f4f4f4);
++      color: var(--creative-tool-text, #555);
+       cursor: pointer;
+ 
+       &:hover {
+@@ -420,7 +420,7 @@
+       min-height: 36px;
+       padding: 6px 10px;
+       border-radius: 8px;
+-      background: #f4f4f4;
++      background: var(--creative-tool-soft, #f4f4f4);
+ 
+       &:hover {
+         background: rgba(243, 156, 18, 0.1);
+@@ -443,8 +443,8 @@
+     gap: 6px;
+     padding: 0 10px;
+     border-radius: 8px;
+-    background: #f4f4f4;
+-    color: #555;
++    background: var(--creative-tool-soft, #f4f4f4);
++    color: var(--creative-tool-text, #555);
+     font-size: 12px;
+     font-weight: 600;
+     white-space: nowrap;
+@@ -476,8 +476,8 @@
+     gap: 6px;
+     padding: 0 8px;
+     border-radius: 8px;
+-    background: #f4f4f4;
+-    color: #666;
++    background: var(--creative-tool-soft, #f4f4f4);
++    color: var(--creative-tool-muted, #666);
+     font-size: 12px;
+     white-space: nowrap;
+ 
+@@ -490,7 +490,7 @@
+     min-width: 58px;
+     border: none;
+     background: transparent;
+-    color: #333;
++    color: var(--creative-tool-text, #333);
+     font: inherit;
+     font-weight: 600;
+     outline: none;
+@@ -507,7 +507,7 @@
+     align-items: center;
+     gap: 6px;
+     font-size: 12px;
+-    color: #666;
++    color: var(--creative-tool-muted, #666);
+     white-space: nowrap;
+   }
+ 
+@@ -523,7 +523,7 @@
+       appearance: none;
+       border: 1.5px solid rgba(15, 23, 42, 0.24);
+       border-radius: 4px;
+-      background: #fff;
++      background: var(--creative-tool-surface, #fff);
+       cursor: pointer;
+       transition:
+         background 0.15s ease,
+@@ -537,7 +537,7 @@
+         top: 2px;
+         width: 4px;
+         height: 8px;
+-        border: solid #fff;
++        border: solid var(--creative-tool-border, #fff);
+         border-width: 0 2px 2px 0;
+         opacity: 0;
+         transform: rotate(45deg);
+@@ -574,7 +574,7 @@
+ 
+   .comic-page-card {
+     border-radius: 8px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+     border: 1px solid rgba(0, 0, 0, 0.07);
+     overflow: hidden;
+   }
+@@ -584,7 +584,7 @@
+     align-items: center;
+     gap: 6px;
+     padding: 8px 10px;
+-    background: #fafafa;
++    background: var(--creative-tool-surface, #fafafa);
+     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+   }
+ 
+@@ -598,14 +598,14 @@
+     .comic-check {
+       flex: 0 0 auto;
+       font-weight: 600;
+-      color: #333;
++      color: var(--creative-tool-text, #333);
+     }
+   }
+ 
+   .comic-page-title-label {
+     min-width: 0;
+     overflow: hidden;
+-    color: #555;
++    color: var(--creative-tool-text, #555);
+     font-size: 12px;
+     font-weight: 600;
+     text-overflow: ellipsis;
+@@ -639,7 +639,7 @@
+     min-height: 240px;
+     border-radius: 8px;
+     overflow: hidden;
+-    background: #f4f4f4;
++    background: var(--creative-tool-soft, #f4f4f4);
+ 
+     img {
+       width: 100%;
+@@ -690,7 +690,7 @@
+     }
+ 
+     &:hover:not(:disabled) {
+-      background: #fff7ec;
++      background: var(--creative-tool-soft, #fff7ec);
+       color: #b56f05;
+     }
+ 
+@@ -736,7 +736,7 @@
+     padding: 0;
+     border: 1px solid rgba(243, 156, 18, 0.22);
+     border-radius: 8px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+     color: #c97d0a;
+     cursor: pointer;
+     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+@@ -747,7 +747,7 @@
+ 
+     &:hover {
+       border-color: rgba(243, 156, 18, 0.46);
+-      background: #fff7ec;
++      background: var(--creative-tool-soft, #fff7ec);
+       color: #b56f05;
+     }
+ 
+@@ -766,7 +766,7 @@
+     padding: 0;
+     border: 2px solid transparent;
+     border-radius: 6px;
+-    background: #eee;
++    background: var(--creative-tool-soft, #eee);
+     cursor: pointer;
+ 
+     img {
+@@ -810,7 +810,7 @@
+     display: flex;
+     align-items: center;
+     justify-content: center;
+-    color: #aaa;
++    color: var(--creative-tool-muted, #aaa);
+     background: repeating-linear-gradient(
+       45deg,
+       #f6f6f6,
+@@ -838,8 +838,8 @@
+     padding: 3px 7px;
+     border-radius: 999px;
+     font-size: 11px;
+-    color: #777;
+-    background: #eee;
++    color: var(--creative-tool-muted, #777);
++    background: var(--creative-tool-soft, #eee);
+   }
+ 
+   .comic-status--running,
+@@ -874,8 +874,8 @@
+     gap: 8px;
+     border: 1px solid rgba(0, 0, 0, 0.06);
+     border-radius: 8px;
+-    background: #fff;
+-    color: #555;
++    background: var(--creative-tool-surface, #fff);
++    color: var(--creative-tool-text, #555);
+     cursor: pointer;
+ 
+     &:hover:not(:disabled) {
+@@ -905,7 +905,7 @@
+     gap: 8px;
+     padding: 10px;
+     border-radius: 8px;
+-    background: #fafafa;
++    background: var(--creative-tool-surface, #fafafa);
+     border: 1px solid rgba(0, 0, 0, 0.05);
+   }
+ 
+@@ -923,19 +923,19 @@
+     }
+ 
+     strong {
+-      color: #333;
++      color: var(--creative-tool-text, #333);
+       margin-bottom: 4px;
+     }
+ 
+     span {
+-      color: #999;
++      color: var(--creative-tool-muted, #999);
+       font-size: 12px;
+       margin-bottom: 4px;
+     }
+ 
+     p {
+       margin: 0;
+-      color: #666;
++      color: var(--creative-tool-muted, #666);
+       font-size: 12px;
+       overflow: hidden;
+       text-overflow: ellipsis;
+@@ -955,8 +955,8 @@
+       justify-content: center;
+       border: 1px solid rgba(0, 0, 0, 0.06);
+       border-radius: 6px;
+-      background: #fff;
+-      color: #888;
++      background: var(--creative-tool-surface, #fff);
++      color: var(--creative-tool-muted, #888);
+       cursor: pointer;
+       transition:
+         background 0.15s ease,
+--- a/packages/drawnix/src/components/image-editor/ImageEditor.tsx
++++ b/packages/drawnix/src/components/image-editor/ImageEditor.tsx
+@@ -47,7 +47,7 @@
+     </div>
+   );
+ 
+-  return createPortal(content, document.body);
++  return createPortal(content, (document.getElementById('creative-portals') || document.body));
+ };
+ 
+ export default ImageEditor;
+--- a/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx
++++ b/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx
+@@ -4,7 +4,6 @@
+ import { providerProfilesSettings } from '../../utils/settings-manager';
+ import { CryptoUtils } from '../../utils/crypto-utils';
+ import { isTuziRequestRecoveryBaseUrl } from '../../services/provider-routing/tuzi-api-endpoints';
+-import { RecoveredImageSaveError } from './recovery-events';
+ import './manual-image-recovery.scss';
+ 
+ export function ManualImageRecovery({ onInsert, onClose }: { onInsert: (url: string) => Promise<void | { remoteOnly?: boolean }>; onClose: () => void }) {
+@@ -38,8 +37,8 @@
+     queriedProfile.current = null;
+     setBusy(true); setUrls([]); setInserted([]); setMessage('');
+     try {
+-      const { queryWorkflowImageResult } = await import('../../workflow-mode/web/src/services/api/image-recovery');
+-      const result = await queryWorkflowImageResult(originalBaseUrl, originalApiKey, id);
++      const { queryImageResult } = await import('../../services/query-image-result');
++      const result = await queryImageResult(originalBaseUrl, originalApiKey, id);
+       const current = providerProfilesSettings.get().find(item => item.id === profile.id);
+       if (run !== sequence.current) return;
+       if (!current || current.baseUrl !== originalBaseUrl || current.apiKey !== originalApiKey) {
+@@ -78,10 +77,7 @@
+       if (run === sequence.current) { setInserted(previous => [...previous, url]); setMessage(result?.remoteOnly ? '图片已插入，但未能缓存到本地；远程链接可能过期，请及时下载备份。' : '图片已插入当前画布'); }
+     } catch (error) {
+       if (run === sequence.current) {
+-        if (error instanceof RecoveredImageSaveError) {
+-          setInserted(previous => [...previous, url]);
+-          setMessage('图片已插入画布，但保存失败。请检查存储空间并手动保存，避免重复插入。');
+-        } else setMessage('插入失败，请确认当前画布已打开；图片仍可在此预览');
++        setMessage('插入失败，请确认当前画布已打开；图片仍可在此预览');
+       }
+     } finally {
+       if (run === sequence.current) setBusy(false);
+--- a/packages/drawnix/src/components/image-recovery/recovery-events.ts
++++ b/packages/drawnix/src/components/image-recovery/recovery-events.ts
+@@ -1,20 +1 @@
+ export const OPEN_IMAGE_RECOVERY = 'opentu:open-image-recovery';
+-export const INSERT_WORKFLOW_RECOVERED_IMAGE = 'opentu:insert-recovered-image';
+-
+-export class RecoveredImageSaveError extends Error {}
+-
+-export interface WorkflowRecoveredImageRequest {
+-  url: string;
+-  path: string;
+-  handled: boolean;
+-  resolve: (result?: { remoteOnly?: boolean }) => void;
+-  reject: (error: Error) => void;
+-}
+-
+-export function insertWorkflowRecoveredImage(url: string): Promise<{ remoteOnly?: boolean } | undefined> {
+-  return new Promise((resolve, reject) => {
+-    const request: WorkflowRecoveredImageRequest = { url, path: window.location.pathname, handled: false, resolve, reject };
+-    window.dispatchEvent(new CustomEvent(INSERT_WORKFLOW_RECOVERED_IMAGE, { detail: request }));
+-    if (!request.handled) reject(new Error('请先打开无限画布项目'));
+-  });
+-}
+--- a/packages/drawnix/src/components/knowledge-base/KBUnifiedTree.tsx
++++ b/packages/drawnix/src/components/knowledge-base/KBUnifiedTree.tsx
+@@ -329,7 +329,7 @@
+               </>
+             )}
+           </div>,
+-          document.body
++          (document.getElementById('creative-portals') || document.body)
+         )}
+     </div>
+   );
+--- a/packages/drawnix/src/components/knowledge-base/KnowledgeBaseDrawer.tsx
++++ b/packages/drawnix/src/components/knowledge-base/KnowledgeBaseDrawer.tsx
+@@ -57,6 +57,6 @@
+         </div>
+       </div>
+     </div>,
+-    document.body
++    (document.getElementById('creative-portals') || document.body)
+   );
+ };
+--- a/packages/drawnix/src/components/model-benchmark/image-inspection-report.scss
++++ b/packages/drawnix/src/components/model-benchmark/image-inspection-report.scss
+@@ -4,15 +4,15 @@
+   min-height: 0;
+   display: flex;
+   flex-direction: column;
+-  background: #f5f7fa;
+-  color: #1d2939;
++  background: var(--creative-tool-soft, #f5f7fa);
++  color: var(--creative-tool-text, #1d2939);
+ 
+   button {
+-    border: 1px solid #d0d5dd;
++    border: 1px solid var(--creative-tool-border, #d0d5dd);
+     border-radius: 8px;
+     padding: 8px 12px;
+-    background: #fff;
+-    color: #344054;
++    background: var(--creative-tool-surface, #fff);
++    color: var(--creative-tool-text, #344054);
+     cursor: pointer;
+ 
+     &:disabled {
+@@ -36,14 +36,14 @@
+   &__header,
+   &__setup,
+   &__summary {
+-    background: #fff;
+-    border-bottom: 1px solid #eaecf0;
++    background: var(--creative-tool-surface, #fff);
++    border-bottom: 1px solid var(--creative-tool-border, #eaecf0);
+   }
+ 
+   &__connection-warning {
+     padding: 10px 22px;
+     border-bottom: 1px solid #fedf89;
+-    background: #fffaeb;
++    background: var(--creative-tool-soft, #fffaeb);
+     color: #b54708;
+     font-size: 13px;
+   }
+@@ -62,7 +62,7 @@
+ 
+     p {
+       margin: 0;
+-      color: #667085;
++      color: var(--creative-tool-muted, #667085);
+     }
+   }
+ 
+@@ -90,7 +90,7 @@
+     display: flex;
+     align-items: center;
+     gap: 7px;
+-    color: #667085;
++    color: var(--creative-tool-muted, #667085);
+ 
+     strong {
+       color: #175cd3;
+@@ -103,7 +103,7 @@
+ 
+   &__model-scope {
+     margin-top: 7px;
+-    color: #667085;
++    color: var(--creative-tool-muted, #667085);
+     font-size: 12px;
+ 
+     summary {
+@@ -121,8 +121,8 @@
+       max-width: 100%;
+       padding: 3px 6px;
+       border-radius: 5px;
+-      background: #f2f4f7;
+-      color: #344054;
++      background: var(--creative-tool-soft, #f2f4f7);
++      color: var(--creative-tool-text, #344054);
+       overflow-wrap: anywhere;
+     }
+   }
+@@ -136,8 +136,8 @@
+ 
+   &__history {
+     padding: 16px;
+-    border-right: 1px solid #eaecf0;
+-    background: #fff;
++    border-right: 1px solid var(--creative-tool-border, #eaecf0);
++    background: var(--creative-tool-surface, #fff);
+     overflow: auto;
+ 
+     h2 {
+@@ -161,7 +161,7 @@
+ 
+       &.active {
+         border-color: #84adff;
+-        background: #eff4ff;
++        background: var(--creative-tool-soft, #eff4ff);
+       }
+     }
+ 
+@@ -175,7 +175,7 @@
+ 
+     small {
+       margin-top: 4px;
+-      color: #667085;
++      color: var(--creative-tool-muted, #667085);
+     }
+ 
+     .delete {
+@@ -186,7 +186,7 @@
+ 
+   &__empty-history,
+   &__empty-results {
+-    color: #667085;
++    color: var(--creative-tool-muted, #667085);
+     text-align: center;
+     padding: 48px 20px !important;
+   }
+@@ -217,7 +217,7 @@
+     align-items: center;
+     gap: 8px;
+     margin-top: 10px;
+-    color: #667085;
++    color: var(--creative-tool-muted, #667085);
+     font-size: 12px;
+ 
+     button {
+@@ -236,8 +236,8 @@
+     width: 100%;
+     min-width: 1320px;
+     border-collapse: collapse;
+-    background: #fff;
+-    border: 1px solid #eaecf0;
++    background: var(--creative-tool-surface, #fff);
++    border: 1px solid var(--creative-tool-border, #eaecf0);
+     border-radius: 10px;
+     overflow: hidden;
+   }
+@@ -245,7 +245,7 @@
+   th,
+   td {
+     padding: 11px;
+-    border-bottom: 1px solid #eaecf0;
++    border-bottom: 1px solid var(--creative-tool-border, #eaecf0);
+     text-align: left;
+     vertical-align: top;
+     font-size: 13px;
+@@ -255,7 +255,7 @@
+     position: sticky;
+     top: 0;
+     z-index: 1;
+-    background: #f9fafb;
++    background: var(--creative-tool-soft, #f9fafb);
+   }
+ 
+   &__pill,
+@@ -272,12 +272,12 @@
+   }
+ 
+   &__pill--model {
+-    background: #fee4e2;
++    background: var(--creative-tool-soft, #fee4e2);
+     color: #b42318;
+   }
+ 
+   &__status--passed {
+-    background: #dcfae6;
++    background: var(--creative-tool-soft, #dcfae6);
+     color: #067647;
+   }
+ 
+@@ -288,7 +288,7 @@
+ 
+   &__status--failed,
+   &__status--cancelled {
+-    background: #fee4e2;
++    background: var(--creative-tool-soft, #fee4e2);
+     color: #b42318;
+   }
+ 
+@@ -325,7 +325,7 @@
+       padding: 10px;
+       white-space: pre-wrap;
+       border-radius: 8px;
+-      background: #f9fafb;
++      background: var(--creative-tool-soft, #f9fafb);
+     }
+   }
+ 
+@@ -357,7 +357,7 @@
+     &__history {
+       max-height: 220px;
+       border-right: 0;
+-      border-bottom: 1px solid #eaecf0;
++      border-bottom: 1px solid var(--creative-tool-border, #eaecf0);
+     }
+   }
+ }
+--- a/packages/drawnix/src/components/model-benchmark/model-benchmark-workbench.scss
++++ b/packages/drawnix/src/components/model-benchmark/model-benchmark-workbench.scss
+@@ -17,7 +17,7 @@
+   min-height: 0;
+   display: grid;
+   grid-template-columns: 280px minmax(0, 1fr);
+-  background: #f1f5f9;
++  background: var(--creative-tool-soft, #f1f5f9);
+   color: var(--mb-ink);
+   font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+ 
+@@ -33,7 +33,7 @@
+     gap: 16px;
+     padding: 16px;
+     border-right: 1px solid var(--mb-line);
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+     overflow: hidden;
+   }
+ 
+@@ -81,7 +81,7 @@
+     padding: 0;
+     border: 1px solid var(--mb-line);
+     border-radius: 999px;
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+     color: var(--mb-muted);
+     cursor: pointer;
+     transition: all 0.2s ease;
+@@ -120,7 +120,7 @@
+     gap: 16px;
+     padding: 20px;
+     border-radius: 16px;
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+     border: 1px solid var(--mb-line);
+     box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+   }
+@@ -168,7 +168,7 @@
+ 
+   &__modality-tabs {
+     display: flex;
+-    background: #f8fafc;
++    background: var(--creative-tool-soft, #f8fafc);
+     padding: 4px;
+     border-radius: 8px;
+     border: 1px solid var(--mb-line);
+@@ -190,7 +190,7 @@
+       }
+ 
+       &.active {
+-        background: #ffffff;
++        background: var(--creative-tool-surface, #ffffff);
+         color: var(--mb-accent-deep);
+         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+       }
+@@ -204,7 +204,7 @@
+     button {
+       padding: 6px 12px;
+       border: 1px solid var(--mb-line);
+-      background: #ffffff;
++      background: var(--creative-tool-surface, #ffffff);
+       border-radius: 8px;
+       font-size: 13px;
+       font-weight: 600;
+@@ -349,7 +349,7 @@
+   &__main-shell {
+     border-radius: 16px;
+     padding: 16px;
+-    background: rgba(255, 255, 255, 0.65);
++    background: var(--creative-tool-surface, rgba(255, 255, 255, 0.65));
+   }
+ 
+   &__hero {
+@@ -433,7 +433,7 @@
+     padding: 10px 12px;
+     border: 1px solid rgba(15, 23, 42, 0.05);
+     border-radius: 10px;
+-    background: rgba(255, 255, 255, 0.5);
++    background: var(--creative-tool-surface, rgba(255, 255, 255, 0.5));
+   }
+ 
+   &__hero-stat strong,
+@@ -458,7 +458,7 @@
+   }
+ 
+   &__panel--accent {
+-    background: linear-gradient(135deg, rgba(243, 156, 18, 0.04), #ffffff);
++    background: linear-gradient(135deg, rgba(243, 156, 18, 0.04), var(--creative-tool-surface, #ffffff));
+   }
+ 
+   &__config-dash {
+@@ -531,7 +531,7 @@
+       border: 1px solid var(--mb-line);
+       border-radius: 8px;
+       box-sizing: border-box;
+-      background: #ffffff;
++      background: var(--creative-tool-surface, #ffffff);
+       color: var(--mb-ink);
+       font-size: 13px;
+       font-weight: 600;
+@@ -645,12 +645,12 @@
+     }
+ 
+     &--active {
+-      background: #ffffff;
++      background: var(--creative-tool-surface, #ffffff);
+       color: var(--mb-accent-deep);
+       box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+ 
+       &:hover {
+-        background: #ffffff;
++        background: var(--creative-tool-surface, #ffffff);
+       }
+     }
+   }
+@@ -660,7 +660,7 @@
+     text-align: left;
+     padding: 10px 12px;
+     border: 1px solid var(--mb-line);
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+     border-radius: 10px;
+ 
+     &--active {
+@@ -679,7 +679,7 @@
+   &__session-item {
+     appearance: none;
+     border: 1px solid var(--mb-line);
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+     color: var(--mb-ink);
+     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+   }
+@@ -712,7 +712,7 @@
+     width: 100%;
+     box-sizing: border-box;
+     color: var(--mb-ink);
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+     font-size: 13px;
+   }
+ 
+@@ -790,7 +790,7 @@
+       border: 1px solid var(--mb-line);
+       border-radius: 8px;
+       box-sizing: border-box;
+-      background: #ffffff;
++      background: var(--creative-tool-surface, #ffffff);
+       color: var(--mb-ink);
+       font-size: 13px;
+       transition: all 0.2s ease;
+@@ -839,7 +839,7 @@
+   &__preset-chip,
+   &__score-chip,
+   &__ghost-button {
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+     border: 1px solid var(--mb-line-strong);
+     color: var(--mb-ink);
+ 
+@@ -911,7 +911,7 @@
+       padding: 2px 10px;
+       border: 1px solid var(--mb-line);
+       border-radius: 6px;
+-      background: #ffffff;
++      background: var(--creative-tool-surface, #ffffff);
+       font-size: 12px;
+       color: var(--mb-muted);
+       cursor: pointer;
+@@ -986,7 +986,7 @@
+     border: 1px dashed var(--mb-line-strong);
+     border-radius: 8px;
+     color: var(--mb-muted);
+-    background: rgba(255, 255, 255, 0.4);
++    background: var(--creative-tool-surface, rgba(255, 255, 255, 0.4));
+     font-size: 12px;
+   }
+ 
+@@ -1062,7 +1062,7 @@
+     min-width: 0;
+     min-height: 44px;
+     border: 1px solid var(--mb-accent-soft-strong);
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+     box-shadow: 0 2px 8px rgba(243, 156, 18, 0.04);
+ 
+     &--more {
+@@ -1258,7 +1258,7 @@
+     justify-content: space-between;
+     gap: 16px;
+     padding: 16px;
+-    background: linear-gradient(135deg, rgba(243, 156, 18, 0.05), #ffffff);
++    background: linear-gradient(135deg, rgba(243, 156, 18, 0.05), var(--creative-tool-surface, #ffffff));
+   }
+ 
+   &__spotlight-copy {
+@@ -1283,7 +1283,7 @@
+       padding: 0 10px;
+       border-radius: 999px;
+       border: 1px solid var(--mb-accent-soft-strong);
+-      background: #ffffff;
++      background: var(--creative-tool-surface, #ffffff);
+       color: var(--mb-accent-deep);
+       font-size: 11px;
+       font-weight: 600;
+@@ -1303,7 +1303,7 @@
+ 
+     &--failed {
+       border-color: rgba(225, 112, 85, 0.15);
+-      background: rgba(255, 255, 255, 0.8);
++      background: var(--creative-tool-surface, rgba(255, 255, 255, 0.8));
+     }
+   }
+ 
+@@ -1347,8 +1347,8 @@
+   &__status {
+     display: inline-flex;
+     align-items: center;
+-    background: #f1f5f9;
+-    color: #64748b;
++    background: var(--creative-tool-soft, #f1f5f9);
++    color: var(--creative-tool-muted, #64748b);
+ 
+     &--completed {
+       background: rgba(0, 184, 148, 0.06);
+@@ -1468,7 +1468,7 @@
+       }
+ 
+       &::-webkit-scrollbar-thumb {
+-        background: rgba(255, 255, 255, 0.15);
++        background: var(--creative-tool-surface, rgba(255, 255, 255, 0.15));
+         border-radius: 3px;
+       }
+     }
+@@ -1486,7 +1486,7 @@
+     border: 1px dashed var(--mb-line-strong);
+     color: var(--mb-muted);
+     text-align: center;
+-    background: rgba(255, 255, 255, 0.4);
++    background: var(--creative-tool-surface, rgba(255, 255, 255, 0.4));
+     font-size: 12px;
+ 
+     .model-benchmark__raw-data {
+@@ -1503,7 +1503,7 @@
+     padding: 0 10px;
+     border-radius: 999px;
+     border: 1px solid var(--mb-accent-soft-strong);
+-    background: #ffffff;
++    background: var(--creative-tool-surface, #ffffff);
+ 
+     strong {
+       font-size: 14px;
+--- a/packages/drawnix/src/components/music-analyzer/MusicAnalyzer.scss
++++ b/packages/drawnix/src/components/music-analyzer/MusicAnalyzer.scss
+@@ -5,7 +5,7 @@
+     gap: 10px;
+     padding: 12px;
+     border-radius: 10px;
+-    background: #fafafa;
++    background: var(--creative-tool-surface, #fafafa);
+     border: 1px solid rgba(0, 0, 0, 0.05);
+   }
+ 
+@@ -20,7 +20,7 @@
+     justify-content: space-between;
+     gap: 8px;
+     font-weight: 600;
+-    color: #333;
++    color: var(--creative-tool-text, #333);
+   }
+ 
+   .ma-icon-btn {
+@@ -33,7 +33,7 @@
+     border: none;
+     border-radius: 6px;
+     background: transparent;
+-    color: #888;
++    color: var(--creative-tool-muted, #888);
+     cursor: pointer;
+     transition: background 0.16s ease, color 0.16s ease;
+ 
+@@ -44,7 +44,7 @@
+   }
+ 
+   .ma-muted {
+-    color: #999;
++    color: var(--creative-tool-muted, #999);
+     font-weight: 400;
+     font-size: 12px;
+   }
+@@ -59,7 +59,7 @@
+     flex-direction: column;
+     gap: 6px;
+     align-items: center;
+-    color: #666;
++    color: var(--creative-tool-muted, #666);
+   }
+ 
+   .ma-audio-preview {
+@@ -83,8 +83,8 @@
+     box-sizing: border-box;
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     border-radius: 8px;
+-    background: #fff;
+-    color: #333;
++    background: var(--creative-tool-surface, #fff);
++    color: var(--creative-tool-text, #333);
+     padding: 10px 12px;
+     font-size: 13px;
+     line-height: 1.5;
+@@ -112,7 +112,7 @@
+       box-sizing: border-box;
+       border: 1px solid rgba(0, 0, 0, 0.08);
+       border-radius: 8px;
+-      background: #fff;
++      background: var(--creative-tool-surface, #fff);
+ 
+       &:focus-within {
+         border-color: rgba(243, 156, 18, 0.45);
+@@ -161,7 +161,7 @@
+     padding: 0 10px;
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     border-radius: 8px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+ 
+     .model-dropdown {
+       min-width: 0;
+@@ -183,7 +183,7 @@
+ 
+   .ma-inline-label {
+     flex: 0 0 auto;
+-    color: #555;
++    color: var(--creative-tool-text, #555);
+     font-size: 12px;
+     font-weight: 600;
+     white-space: nowrap;
+@@ -250,7 +250,7 @@
+     p {
+       margin: 0;
+       line-height: 1.6;
+-      color: #444;
++      color: var(--creative-tool-text, #444);
+     }
+   }
+ 
+@@ -266,8 +266,8 @@
+     align-items: center;
+     padding: 4px 8px;
+     border-radius: 999px;
+-    background: #f0f0f0;
+-    color: #666;
++    background: var(--creative-tool-soft, #f0f0f0);
++    color: var(--creative-tool-muted, #666);
+     font-size: 12px;
+   }
+ 
+@@ -279,7 +279,7 @@
+   .ma-tag-row code {
+     padding: 4px 8px;
+     border-radius: 6px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+     border: 1px solid rgba(0, 0, 0, 0.06);
+   }
+ 
+@@ -292,12 +292,12 @@
+     padding: 0;
+     cursor: pointer;
+     font-weight: 600;
+-    color: #333;
++    color: var(--creative-tool-text, #333);
+   }
+ 
+   .ma-suggestions,
+   .ma-history-summary {
+-    color: #666;
++    color: var(--creative-tool-muted, #666);
+     line-height: 1.5;
+   }
+ 
+@@ -326,7 +326,7 @@
+     display: flex;
+     flex-direction: column;
+     gap: 6px;
+-    color: #555;
++    color: var(--creative-tool-text, #555);
+ 
+     > span {
+       font-size: 12px;
+@@ -357,7 +357,7 @@
+ 
+   .ma-history-title {
+     font-weight: 600;
+-    color: #333;
++    color: var(--creative-tool-text, #333);
+   }
+ 
+   .ma-history-clips-count {
+@@ -394,8 +394,8 @@
+     flex: 1;
+     padding: 8px 12px;
+     border: none;
+-    background: #fafafa;
+-    color: #666;
++    background: var(--creative-tool-surface, #fafafa);
++    color: var(--creative-tool-muted, #666);
+     cursor: pointer;
+     font-size: 13px;
+     transition: background 0.15s, color 0.15s;
+@@ -419,8 +419,8 @@
+     padding: 4px 8px;
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     border-radius: 6px;
+-    background: #fff;
+-    color: #666;
++    background: var(--creative-tool-surface, #fff);
++    color: var(--creative-tool-muted, #666);
+     font-size: 12px;
+     cursor: pointer;
+   }
+@@ -436,7 +436,7 @@
+     z-index: 10;
+     margin-top: 4px;
+     min-width: 140px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     border-radius: 8px;
+     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+@@ -451,11 +451,11 @@
+     background: transparent;
+     text-align: left;
+     font-size: 12px;
+-    color: #333;
++    color: var(--creative-tool-text, #333);
+     cursor: pointer;
+ 
+     &:hover {
+-      background: #f5f5f5;
++      background: var(--creative-tool-soft, #f5f5f5);
+     }
+ 
+     &.active {
+@@ -480,8 +480,8 @@
+     padding: 8px 12px;
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     border-radius: 8px;
+-    background: #fff;
+-    color: #666;
++    background: var(--creative-tool-surface, #fff);
++    color: var(--creative-tool-muted, #666);
+     cursor: pointer;
+     font-size: 13px;
+     transition: background 0.15s, color 0.15s, border-color 0.15s;
+@@ -512,7 +512,7 @@
+     > span {
+       font-size: 12px;
+       font-weight: 600;
+-      color: #555;
++      color: var(--creative-tool-text, #555);
+     }
+   }
+ 
+@@ -530,8 +530,8 @@
+     padding: 8px;
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     border-radius: 8px;
+-    background: #fff;
+-    color: #666;
++    background: var(--creative-tool-surface, #fff);
++    color: var(--creative-tool-muted, #666);
+     cursor: pointer;
+     font-size: 13px;
+     transition: background 0.15s, color 0.15s;
+@@ -558,7 +558,7 @@
+     gap: 10px;
+     padding: 6px 8px;
+     border-radius: 8px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+     border: 1px solid rgba(0, 0, 0, 0.06);
+ 
+     &.is-selected {
+@@ -595,7 +595,7 @@
+   .ma-clip-title {
+     font-size: 12px;
+     font-weight: 500;
+-    color: #333;
++    color: var(--creative-tool-text, #333);
+     max-width: 80px;
+     overflow: hidden;
+     text-overflow: ellipsis;
+@@ -604,7 +604,7 @@
+ 
+   .ma-clip-duration {
+     font-size: 11px;
+-    color: #999;
++    color: var(--creative-tool-muted, #999);
+   }
+ 
+   .ma-clip-player {
+@@ -650,7 +650,7 @@
+ 
+     label {
+       font-size: 12px;
+-      color: #666;
++      color: var(--creative-tool-muted, #666);
+       white-space: nowrap;
+     }
+ 
+--- a/packages/drawnix/src/components/mv-creator/MVCreator.scss
++++ b/packages/drawnix/src/components/mv-creator/MVCreator.scss
+@@ -7,7 +7,7 @@
+   gap: 4px;
+   padding: 6px 12px;
+   font-size: 12px;
+-  color: #888;
++  color: var(--creative-tool-muted, #888);
+   background: rgba(0, 0, 0, 0.03);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+   border-radius: 8px;
+@@ -16,7 +16,7 @@
+ 
+   &:hover {
+     background: rgba(243, 156, 18, 0.08);
+-    color: #666;
++    color: var(--creative-tool-muted, #666);
+   }
+ }
+ 
+@@ -27,7 +27,7 @@
+   gap: 10px;
+   padding: 12px;
+   border-radius: 10px;
+-  background: #fafafa;
++  background: var(--creative-tool-surface, #fafafa);
+   border: 1px solid rgba(0, 0, 0, 0.05);
+   box-sizing: border-box;
+ }
+@@ -104,7 +104,7 @@
+   justify-content: space-between;
+   gap: 8px;
+   font-weight: 600;
+-  color: #333;
++  color: var(--creative-tool-text, #333);
+ }
+ 
+ .mv-creator .ma-chip {
+@@ -112,8 +112,8 @@
+   align-items: center;
+   padding: 4px 8px;
+   border-radius: 999px;
+-  background: #f0f0f0;
+-  color: #666;
++  background: var(--creative-tool-soft, #f0f0f0);
++  color: var(--creative-tool-muted, #666);
+   font-size: 12px;
+ }
+ 
+@@ -146,7 +146,7 @@
+ 
+ .mv-creator .va-edit-field-label {
+   font-size: 11px;
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+ }
+ 
+ /* 音频选择列表限高可滚动 */
+@@ -165,7 +165,7 @@
+   gap: 10px;
+   padding: 6px 8px;
+   border-radius: 8px;
+-  background: #fff;
++  background: var(--creative-tool-surface, #fff);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+   box-sizing: border-box;
+ 
+@@ -203,7 +203,7 @@
+ .mv-creator .ma-clip-title {
+   font-size: 12px;
+   font-weight: 500;
+-  color: #333;
++  color: var(--creative-tool-text, #333);
+   max-width: 160px;
+   overflow: hidden;
+   text-overflow: ellipsis;
+@@ -212,7 +212,7 @@
+ 
+ .mv-creator .ma-clip-duration {
+   font-size: 11px;
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+ }
+ 
+ .mv-creator .ma-clip-player {
+@@ -237,8 +237,8 @@
+   font-size: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 6px;
+-  background: #fff;
+-  color: #333;
++  background: var(--creative-tool-surface, #fff);
++  color: var(--creative-tool-text, #333);
+   resize: vertical;
+   font-family: inherit;
+   box-sizing: border-box;
+@@ -272,13 +272,13 @@
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   border-radius: 6px;
+   background: rgba(243, 156, 18, 0.08);
+-  color: #888;
++  color: var(--creative-tool-muted, #888);
+   cursor: pointer;
+   transition: background 0.15s ease-out, color 0.15s ease-out;
+ 
+   &:hover {
+     background: rgba(243, 156, 18, 0.2);
+-    color: #333;
++    color: var(--creative-tool-text, #333);
+   }
+ }
+ 
+@@ -291,7 +291,7 @@
+   margin-top: 8px;
+   text-align: center;
+   font-size: 12px;
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+ }
+ 
+ /* hover 大图/大视频预览（portal 到 body） */
+--- a/packages/drawnix/src/components/mv-creator/pages/GeneratePage.tsx
++++ b/packages/drawnix/src/components/mv-creator/pages/GeneratePage.tsx
+@@ -2172,7 +2172,7 @@
+             <video src={hoverPreview.url} controls muted preload="metadata" />
+           )}
+         </div>,
+-        document.body
++        (document.getElementById('creative-portals') || document.body)
+       )}
+     </div>
+   );
+--- a/packages/drawnix/src/components/project-drawer/FrameSlideshow.tsx
++++ b/packages/drawnix/src/components/project-drawer/FrameSlideshow.tsx
+@@ -939,6 +939,6 @@
+         </HoverTip>
+       )}
+     </div>,
+-    document.body
++    (document.getElementById('creative-portals') || document.body)
+   );
+ };
+--- a/packages/drawnix/src/components/settings-dialog/DesktopStorageCleanup.tsx
++++ b/packages/drawnix/src/components/settings-dialog/DesktopStorageCleanup.tsx
+@@ -498,7 +498,7 @@
+             <Loader2 size={22} />
+             <span>正在清理本地存储...</span>
+           </div>,
+-          document.body
++          (document.getElementById('creative-portals') || document.body)
+         )}
+     </section>
+   );
+--- a/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx
++++ b/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx
+@@ -1,7 +1,10 @@
++import { resolveBuiltinAssetUrl } from '../../utils/bundled-assets';
+ import { promptForApiKey } from '../../utils/gemini-api/auth';
+ import { useDrawnix } from '../../hooks/use-drawnix';
+ import { useDeviceType } from '../../hooks/useDeviceType';
+ import './settings-dialog.scss';
++import { AssistantAccountBinding } from './AssistantAccountBinding';
++import { isAccountReference } from '../../services/assistant-account';
+ import {
+   memo,
+   useCallback,
+@@ -191,11 +194,11 @@
+ }
+ 
+ const isDesktopTauri =
+-  typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++  typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+ 
+ // Tauri 桌面端命令调用（不依赖 @tauri-apps/api 包）
+ function tauriInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+-  const internals = (window as any).__TAURI_INTERNALS__;
++  const internals = (window as any).__TUZI_CREATIVE_NATIVE__;
+   if (!internals) {
+     return Promise.reject(new Error('Not in Tauri environment'));
+   }
+@@ -830,7 +833,8 @@
+     return 0;
+   }
+ 
+-  return (['image', 'video', 'audio', 'text'] as ModelType[]).filter(
++  // Match the three route editors shown in the preset panel; retain saved audio routes.
++  return (['image', 'video', 'text'] as ModelType[]).filter(
+     (routeType) => Boolean(getRouteModelId(preset[routeType]))
+   ).length;
+ }
+@@ -867,7 +871,7 @@
+   }
+ 
+   const trimmed = profile.iconUrl.trim();
+-  return trimmed || null;
++  return trimmed ? resolveBuiltinAssetUrl(trimmed) : null;
+ }
+ 
+ function getProviderHomepageUrl(
+@@ -1157,14 +1161,15 @@
+   const dialogRef = useRef<HTMLDivElement | null>(null);
+   const [dialogWidth, setDialogWidth] = useState(0);
+   const [tuziMode, setTuziMode] = useState(
+-    () =>
++    () => import.meta.env.VITE_TUZI_ASSISTANT !== 'true' && (
+       isTuziEmbeddedMode() ||
+       isLocalTuziSession() ||
+-      (tuziEmbeddedConfig.enabled && window.parent !== window)
++      (tuziEmbeddedConfig.enabled && window.parent !== window))
+   );
+   const [accountBoundary, setAccountBoundary] = useState('');
+   useEffect(() => {
+     const syncBridgeMode = () => {
++      if (import.meta.env.VITE_TUZI_ASSISTANT === 'true') { setTuziMode(false); return; }
+       setTuziMode(
+         isTuziEmbeddedMode() ||
+           isLocalTuziSession() ||
+@@ -1178,7 +1183,7 @@
+     };
+     window.addEventListener(TUZI_BRIDGE_EVENT, syncBridgeMode);
+ 
+-    if (appState.openSettings || window.parent !== window) {
++    if (import.meta.env.VITE_TUZI_ASSISTANT !== 'true' && (appState.openSettings || window.parent !== window)) {
+       void requestTuziParentContext({ refresh: appState.openSettings }).finally(
+         syncBridgeMode
+       );
+@@ -3086,7 +3091,8 @@
+     if (discoveryDialogOpen || isPersisting) {
+       return;
+     }
+-    handleCancel();
++    if(import.meta.env.VITE_TUZI_ASSISTANT === 'true') closeSettingsDialog();
++    else handleCancel();
+   };
+ 
+   const renderProviderRow = (profile: ProviderProfile) => {
+@@ -3400,6 +3406,7 @@
+           </div>
+         </div>
+ 
++        {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <AssistantAccountBinding key={selectedProfile.id} profile={selectedProfile} onChange={patch=>updateProfile(selectedProfile.id,profile=>({...profile,...patch}))}/>}
+         <div className="settings-dialog__section">
+           <div className="settings-dialog__section-header">
+             <div>
+@@ -3425,13 +3432,14 @@
+               />
+             </div>
+ 
+-            <div className="settings-dialog__field settings-dialog__field--column">
++            <div className="settings-dialog__field settings-dialog__field--column" hidden={isAccountReference(selectedProfile.apiKey)}>
+               <label className="settings-dialog__label settings-dialog__label--stacked">
+                 接口类型
+               </label>
+               <select
+                 className="settings-dialog__select"
+                 value={selectedProfile.providerType}
++                disabled={isAccountReference(selectedProfile.apiKey)}
+                 onChange={(event) =>
+                   updateProfile(selectedProfile.id, (profile) => {
+                     const providerType = event.target
+@@ -3461,6 +3469,9 @@
+               </select>
+             </div>
+ 
++            <details className="settings-dialog__advanced settings-dialog__field--full" open={import.meta.env.VITE_TUZI_ASSISTANT !== 'true' ? true : undefined}>
++              <summary>高级选项</summary>
++              <div className="settings-dialog__grid">
+             <div className="settings-dialog__field settings-dialog__field--column settings-dialog__field--full">
+               <label className="settings-dialog__label settings-dialog__label--stacked">
+                 图片接口格式
+@@ -3542,7 +3553,10 @@
+               </span>
+             </div>
+ 
+-            <div className="settings-dialog__field settings-dialog__field--column settings-dialog__field--full">
++              </div>
++            </details>
++
++            <div className="settings-dialog__field settings-dialog__field--column settings-dialog__field--full" hidden={isAccountReference(selectedProfile.apiKey)}>
+               <label className="settings-dialog__label settings-dialog__label--stacked">
+                 API 地址
+               </label>
+@@ -3550,6 +3564,7 @@
+                 type="text"
+                 className="settings-dialog__input"
+                 value={selectedProfile.baseUrl}
++                readOnly={isAccountReference(selectedProfile.apiKey)}
+                 onChange={(event) =>
+                   updateProfile(selectedProfile.id, (profile) => ({
+                     ...profile,
+@@ -3558,7 +3573,7 @@
+                 }
+                 placeholder={TUZI_PROVIDER_DEFAULT_BASE_URL}
+               />
+-              {isSelectedTuziProfile ? (
++              {isSelectedTuziProfile && !isAccountReference(selectedProfile.apiKey) ? (
+                 <div className="settings-dialog__endpoint-panel">
+                   <div className="settings-dialog__endpoint-toolbar">
+                     <div className="settings-dialog__endpoint-title">
+@@ -3777,7 +3792,7 @@
+                       >
+                         <iframe
+                           title="Bilibili tutorial video"
+-                          src="//player.bilibili.com/player.html?isOutside=true&aid=116171584049629&bvid=BV1k4PqzPEKz&cid=36455319822&p=1"
++                          src="https://player.bilibili.com/player.html?isOutside=true&aid=116171584049629&bvid=BV1k4PqzPEKz&cid=36455319822&p=1"
+                           allowFullScreen={true}
+                           style={{
+                             position: 'absolute',
+@@ -3813,9 +3828,10 @@
+                   style={{ flex: isCompactLayout ? 'none' : 1 }}
+                 >
+                   <input
+-                    type={isApiKeyVisible ? 'text' : 'password'}
++                    type={isAccountReference(selectedProfile.apiKey) || isApiKeyVisible ? 'text' : 'password'}
+                     className="settings-dialog__input settings-dialog__secret-input"
+-                    value={selectedProfile.apiKey}
++                    value={isAccountReference(selectedProfile.apiKey) ? '由兔子账户管理，无需填写' : selectedProfile.apiKey}
++                    readOnly={isAccountReference(selectedProfile.apiKey)}
+                     onChange={(event) =>
+                       updateProfile(selectedProfile.id, (profile) => ({
+                         ...profile,
+@@ -3831,6 +3847,7 @@
+                     <button
+                       type="button"
+                       className="settings-dialog__secret-toggle"
++                      hidden={isAccountReference(selectedProfile.apiKey)}
+                       aria-label={
+                         isApiKeyVisible ? '隐藏 API Key' : '查看 API Key'
+                       }
+@@ -3867,7 +3884,7 @@
+                       同步中
+                     </>
+                   ) : (
+-                    '获取模型'
++                    import.meta.env.VITE_TUZI_ASSISTANT === 'true' && hasPendingChanges ? '保存并获取模型' : '获取模型'
+                   )}
+                 </button>
+               </div>
+@@ -3875,12 +3892,10 @@
+           </div>
+         </div>
+ 
+-        <PricingFieldGroup
+-          profile={selectedProfile}
+-          onUpdateProfile={(updater) =>
+-            updateProfile(selectedProfile.id, updater)
+-          }
+-        />
++        <details className="settings-dialog__advanced" open={import.meta.env.VITE_TUZI_ASSISTANT !== 'true' ? true : undefined}>
++          <summary>价格与分组</summary>
++          <PricingFieldGroup profile={selectedProfile} onUpdateProfile={(updater) => updateProfile(selectedProfile.id, updater)} />
++        </details>
+ 
+         {selectedProfile.id === LEGACY_DEFAULT_PROVIDER_PROFILE_ID ? (
+           <div className="settings-dialog__section settings-dialog__section--compact">
+@@ -4032,7 +4047,8 @@
+         ) : null}
+ 
+         {canManageModels ? (
+-          <div className="settings-dialog__custom-model-panel">
++          <details className="settings-dialog__custom-model-panel settings-dialog__advanced" open={import.meta.env.VITE_TUZI_ASSISTANT !== 'true' ? true : undefined}>
++            <summary>手动添加模型</summary>
+             <div className="settings-dialog__custom-model-grid">
+               <label className="settings-dialog__field settings-dialog__field--column">
+                 <span className="settings-dialog__label settings-dialog__label--stacked">
+@@ -4389,7 +4405,7 @@
+                 {customModelError}
+               </div>
+             ) : null}
+-          </div>
++          </details>
+         ) : null}
+ 
+         {modelGroups.length > 0 ? (
+@@ -5090,23 +5106,23 @@
+       <WinBoxWindow
+         id="settings-dialog"
+         visible={appState.openSettings}
+-        title="设置"
++        title={import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? '创作配置' : '设置'}
+         onClose={handleWindowClose}
+         width={isCompactLayout ? '100%' : '88%'}
+-        height={isCompactLayout ? '100%' : '88%'}
++        height={import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? Math.max(300, viewportHeight - 160) : isCompactLayout ? '100%' : '88%'}
+         minWidth={
+           isCompactLayout
+             ? Math.max(320, Math.min(viewportWidth - 16, 640))
+             : 1080
+         }
+         minHeight={
+-          isCompactLayout
++          import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? Math.min(480, Math.max(300, viewportHeight - 160)) : isCompactLayout
+             ? Math.max(520, Math.min(viewportHeight - 16, 820))
+             : 680
+         }
+         x="center"
+-        y="center"
+-        maximizable={true}
++        y={import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? 16 : "center"}
++        maximizable={import.meta.env.VITE_TUZI_ASSISTANT !== 'true'}
+         minimizable={false}
+         resizable={!isCompactLayout}
+         movable={!isCompactLayout}
+@@ -5117,7 +5133,7 @@
+       >
+         <div
+           ref={dialogRef}
+-          className={`settings-dialog ${
++          className={`settings-dialog ${import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? 'settings-dialog--assistant' : ''} ${
+             isCompactLayout ? 'settings-dialog--compact' : ''
+           }`}
+           data-testid="settings-dialog"
+@@ -5126,6 +5142,11 @@
+             {renderSettingsNav()}
+             <div className="settings-dialog__main">{renderActiveView()}</div>
+           </div>
++          {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <div className="settings-dialog__assistant-footer">
++            <span>{activeView === 'providers' ? hasPendingChanges ? '供应商配置有未保存的更改' : '供应商配置已保存' : '更改即时生效'}</span>
++            <button type="button" className="settings-dialog__button" disabled={isPersisting} onClick={closeSettingsDialog}>{activeView === 'providers' && hasPendingChanges ? '取消' : '关闭'}</button>
++            {activeView === 'providers' && <button type="button" className="settings-dialog__button settings-dialog__button--primary" disabled={isPersisting} onClick={()=>void persistDrafts(true)}>{isPersisting ? '保存中…' : '保存'}</button>}
++          </div>}
+         </div>
+       </WinBoxWindow>
+       <ModelDiscoveryDialog
+--- a/packages/drawnix/src/components/shared/ContextMenu.tsx
++++ b/packages/drawnix/src/components/shared/ContextMenu.tsx
+@@ -407,6 +407,6 @@
+         className={className}
+       />
+     </div>,
+-    document.body
+-  );
+-}
++    (document.getElementById('creative-portals') || document.body)
++  );
++}
+--- a/packages/drawnix/src/components/shared/KnowledgeNoteContextSelector.tsx
++++ b/packages/drawnix/src/components/shared/KnowledgeNoteContextSelector.tsx
+@@ -501,7 +501,7 @@
+       ) : null}
+ 
+       {isCompact && dropdown
+-        ? createPortal(dropdown, document.body)
++        ? createPortal(dropdown, (document.getElementById('creative-portals') || document.body))
+         : dropdown}
+     </div>
+   );
+--- a/packages/drawnix/src/components/shared/ModelSourceIcon.tsx
++++ b/packages/drawnix/src/components/shared/ModelSourceIcon.tsx
+@@ -1,3 +1,4 @@
++import { resolveBuiltinAssetUrl } from '../../utils/bundled-assets';
+ import React, { useEffect, useMemo, useState, type CSSProperties } from 'react';
+ import { type ModelVendor } from '../../constants/model-config';
+ import {
+@@ -14,7 +15,7 @@
+   }
+ 
+   const trimmed = iconUrl.trim();
+-  return trimmed || null;
++  return trimmed ? resolveBuiltinAssetUrl(trimmed) : null;
+ }
+ 
+ function getAvatarLabel(name?: string | null): string {
+--- a/packages/drawnix/src/components/shared/SelectedContentPreview.tsx
++++ b/packages/drawnix/src/components/shared/SelectedContentPreview.tsx
+@@ -186,7 +186,7 @@
+               </div>
+             )}
+           </div>,
+-          document.body
++          (document.getElementById('creative-portals') || document.body)
+         )}
+ 
+       {/* Content preview grid */}
+--- a/packages/drawnix/src/components/shared/media-preview/UnifiedMediaViewer.tsx
++++ b/packages/drawnix/src/components/shared/media-preview/UnifiedMediaViewer.tsx
+@@ -420,7 +420,7 @@
+         : currentItem.url;
+     const isDesktopDownload =
+       typeof window !== 'undefined' &&
+-      Boolean((window as any).__TAURI_INTERNALS__);
++      Boolean((window as any).__TUZI_CREATIVE_NATIVE__);
+ 
+     if (isDesktopDownload) {
+       const { smartDownload, buildDownloadFilename } = await import(
+@@ -845,7 +845,7 @@
+   );
+ 
+   // 使用 Portal 渲染到 body
+-  return createPortal(viewerContent, document.body);
++  return createPortal(viewerContent, (document.getElementById('creative-portals') || document.body));
+ };
+ 
+ export default UnifiedMediaViewer;
+--- a/packages/drawnix/src/components/shared/workflow/ComboInput.tsx
++++ b/packages/drawnix/src/components/shared/workflow/ComboInput.tsx
+@@ -216,7 +216,7 @@
+             </div>
+           ))}
+         </div>,
+-        document.body
++        (document.getElementById('creative-portals') || document.body)
+       )}
+     </div>
+   );
+--- a/packages/drawnix/src/components/startup/DrawnixDeferredRuntime.tsx
++++ b/packages/drawnix/src/components/startup/DrawnixDeferredRuntime.tsx
+@@ -579,7 +579,9 @@
+     };
+   }, [board, isTaskStorageReady]);
+ 
+-  useTaskExecutor(isTaskStorageReady);
++  // The assistant owns the executor across view switches. Standalone keeps its
++  // original lifecycle; never mount two executors over the same task queue.
++  useTaskExecutor(isTaskStorageReady && import.meta.env.VITE_TUZI_ASSISTANT !== 'true');
+   useAutoInsertToCanvas({
+     enabled: true,
+     insertPrompt: false,
+--- a/packages/drawnix/src/components/tool-element/tool.generator.ts
++++ b/packages/drawnix/src/components/tool-element/tool.generator.ts
+@@ -14,6 +14,7 @@
+ import { ToolTransforms } from './tool.transforms';
+ import { toolWindowService } from '../../services/tool-window-service';
+ import { processToolUrl, hasTemplateVariables } from '../../utils/url-template';
++import { isAssistantExternalTool, openAssistantExternalTool } from '../../services/assistant-account';
+ import { toolRegistry } from '../../tools/registry';
+ 
+ /**
+@@ -247,6 +248,16 @@
+       
+       // 延迟渲染以确保 DOM 已挂载
+       setTimeout(() => this.renderReactContent(element, reactContentArea as HTMLElement), 0);
++    } else if (isAssistantExternalTool(element.toolId)) {
++      const notice = document.createElement('div');
++      notice.className = 'creative-external-tool-notice';
++      const text = document.createElement('p');
++      text.textContent = '此工具在系统浏览器中使用，不自动传递账户或 API Key。';
++      const button = document.createElement('button');
++      button.textContent = '在系统浏览器打开';
++      button.onclick = () => { void openAssistantExternalTool(element.toolId).catch(() => { button.textContent = '打开失败，点击重试'; }); };
++      notice.append(text, button);
++      container.appendChild(notice);
+     } else {
+       // 创建 iframe 内容区域
+       const contentArea = document.createElement('div');
+--- a/packages/drawnix/src/components/toolbar/app-toolbar/app-menu-items.tsx
++++ b/packages/drawnix/src/components/toolbar/app-toolbar/app-menu-items.tsx
+@@ -36,7 +36,7 @@
+ import { useLatestRelease } from '../../../hooks/useLatestRelease';
+ import Menu from '../../menu/menu';
+ import { useContext, useState, useCallback, useEffect } from 'react';
+-import { Workflow as WorkflowIcon, RefreshCw } from 'lucide-react';
++import { RefreshCw } from 'lucide-react';
+ import { DESKTOP_DOWNLOAD_PAGE, publishDesktopUpdate, type DesktopUpdateCheckState, type DesktopUpdateState } from '../../../utils/desktop-update-state';
+ import { MenuContentPropsContext } from '../../menu/common';
+ import { EVENT } from '../../../constants';
+@@ -219,28 +219,6 @@
+ };
+ CloudSync.displayName = 'CloudSync';
+ 
+-export const WorkflowModeMenuItem = ({
+-  onOpenWorkflowMode,
+-  label,
+-}: {
+-  onOpenWorkflowMode: () => void;
+-  label?: string;
+-}) => {
+-  const { t } = useI18n();
+-  return (
+-    <MenuItem
+-      icon={<WorkflowIcon size={18} />}
+-      data-testid="workflow-mode-button"
+-      data-track="toolbar_click_menu_workflow_mode"
+-      onSelect={onOpenWorkflowMode}
+-      aria-label={label || t('menu.workflowMode')}
+-    >
+-      {label || t('menu.workflowMode')}
+-    </MenuItem>
+-  );
+-};
+-WorkflowModeMenuItem.displayName = 'WorkflowModeMenuItem';
+-
+ export const DebugPanel = () => {
+   const { t } = useI18n();
+   return (
+@@ -287,9 +265,9 @@
+       icon={<GithubIcon />}
+       data-track="toolbar_click_menu_github"
+       onSelect={() => {
+-        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++        const isTauri = typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+         if (isTauri) {
+-          (window as any).__TAURI_INTERNALS__.invoke('plugin:opener|open_url', { url: 'https://github.com/AiW520/opentu' });
++          (window as any).__TUZI_CREATIVE_NATIVE__.invoke('plugin:opener|open_url', { url: 'https://github.com/AiW520/opentu' });
+         } else {
+           window.open('https://github.com/ljquan/aitu', '_blank');
+         }
+@@ -331,9 +309,9 @@
+       icon={<BookOpenIcon />}
+       data-track="toolbar_click_menu_manual"
+       onSelect={() => {
+-        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++        const isTauri = typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+         if (isTauri) {
+-          (window as any).__TAURI_INTERNALS__.invoke('plugin:opener|open_url', { url: 'https://opentu.ai/user-manual/index.html' });
++          (window as any).__TUZI_CREATIVE_NATIVE__.invoke('plugin:opener|open_url', { url: 'https://opentu.ai/user-manual/index.html' });
+         } else {
+           window.open('./user-manual/index.html', '_blank');
+         }
+@@ -348,9 +326,9 @@
+ 
+ export const VersionInfo = () => {
+   const { t } = useI18n();
+-  // 从 HTML meta 标签获取版本号
+-  const version = document.querySelector('meta[name="app-version"]')?.getAttribute('content') || '0.0.0';
+-  const isDesktop = !!(window as any).__TAURI_INTERNALS__;
++  // The integrated host has its own HTML, so use the injected build version.
++  const version = import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? __APP_VERSION__ : document.querySelector('meta[name="app-version"]')?.getAttribute('content') || '0.0.0';
++  const isDesktop = !!(window as any).__TUZI_CREATIVE_NATIVE__;
+   const webLatest = useLatestRelease(version, !isDesktop);
+   const [desktopUpdate, setDesktopUpdate] = useState<DesktopUpdateState | undefined>(window.__OPENTU_DESKTOP_UPDATE_EVENT__);
+   const [checkState, setCheckState] = useState<DesktopUpdateCheckState | undefined>(window.__OPENTU_DESKTOP_UPDATE_CHECK__);
+@@ -371,9 +349,9 @@
+   const latest = isDesktop ? desktopUpdate && { tag: `v${desktopUpdate.version}`, url: DESKTOP_DOWNLOAD_PAGE } : webLatest;
+ 
+   const openExternalUrl = (url: string) => {
+-    const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++    const isTauri = typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+     if (isTauri) {
+-      (window as any).__TAURI_INTERNALS__.invoke('plugin:opener|open_url', { url });
++      (window as any).__TUZI_CREATIVE_NATIVE__.invoke('plugin:opener|open_url', { url });
+     } else {
+       window.open(url, '_blank');
+     }
+--- a/packages/drawnix/src/components/toolbar/app-toolbar/app-toolbar.tsx
++++ b/packages/drawnix/src/components/toolbar/app-toolbar/app-toolbar.tsx
+@@ -20,7 +20,6 @@
+   UserManual,
+   VersionInfo,
+   CleanInvalidLinks,
+-  WorkflowModeMenuItem,
+ } from './app-menu-items';
+ import { GithubIcon } from '../../icons';
+ import { LanguageSwitcherMenu } from './language-switcher-menu';
+@@ -38,7 +37,6 @@
+ export interface AppToolbarProps extends ToolbarSectionProps {
+   onOpenBackupRestore?: () => void;
+   onOpenCloudSync?: () => void;
+-  onOpenWorkflowMode?: () => void;
+ }
+ 
+ export const AppToolbar: React.FC<AppToolbarProps> = ({
+@@ -46,7 +44,6 @@
+   iconMode = false,
+   onOpenBackupRestore,
+   onOpenCloudSync,
+-  onOpenWorkflowMode,
+ }) => {
+   const board = useBoard();
+   const { t } = useI18n();
+@@ -123,7 +120,6 @@
+               }}
+             />
+             <Settings />
+-            {import.meta.env.VITE_OPENTU_DESKTOP === 'true' && onOpenWorkflowMode && <WorkflowModeMenuItem label={t('menu.infiniteCanvas')} onOpenWorkflowMode={onOpenWorkflowMode} />}
+             {import.meta.env.VITE_OPENTU_DESKTOP === 'true' && <MenuItem icon={<ImageDown size={18} />} onSelect={() => window.dispatchEvent(new Event(OPEN_IMAGE_RECOVERY))}>找回图片</MenuItem>}
+             <MenuSeparator />
+             <QuickCommands />
+--- a/packages/drawnix/src/components/toolbar/canvas-resources-button.tsx
++++ b/packages/drawnix/src/components/toolbar/canvas-resources-button.tsx
+@@ -34,7 +34,7 @@
+   const board = useBoard();
+   const { t } = useI18n();
+   const titleId = useId();
+-  const desktop = isTauriEnvironment();
++  const desktop = isTauriEnvironment() || import.meta.env.VITE_TUZI_ASSISTANT === 'true';
+   const [needsAcknowledgement, setNeedsAcknowledgement] = useState(
+     () => !desktop && !isAcknowledged()
+   );
+--- a/packages/drawnix/src/components/toolbar/more-tools-button.tsx
++++ b/packages/drawnix/src/components/toolbar/more-tools-button.tsx
+@@ -792,7 +792,7 @@
+             </MenuItem>
+           </Menu>
+         </div>,
+-        document.body
++        (document.getElementById('creative-portals') || document.body)
+       )}
+     </>
+   );
+--- a/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
++++ b/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
+@@ -2066,7 +2066,7 @@
+                     const processedItems: BatchDownloadItem[] = [];
+                     const isDesktopDownload =
+                       typeof window !== 'undefined' &&
+-                      Boolean((window as any).__TAURI_INTERNALS__);
++                      Boolean((window as any).__TUZI_CREATIVE_NATIVE__);
+ 
+                     for (const item of downloadItems) {
+                       if (isDesktopDownload) {
+--- a/packages/drawnix/src/components/toolbar/toolbar-context-menu.tsx
++++ b/packages/drawnix/src/components/toolbar/toolbar-context-menu.tsx
+@@ -229,7 +229,7 @@
+               </MenuItem>
+             </Menu>
+           </div>,
+-          document.body
++          (document.getElementById('creative-portals') || document.body)
+         )}
+     </>
+   );
+--- a/packages/drawnix/src/components/toolbar/toolbar.types.ts
++++ b/packages/drawnix/src/components/toolbar/toolbar.types.ts
+@@ -46,7 +46,6 @@
+    */
+   onOpenCloudSync?: () => void;
+   /** 工作流模式打开回调 */
+-  onOpenWorkflowMode?: () => void;
+   /**
+    * (可选) 知识库开关回调
+    */
+--- a/packages/drawnix/src/components/toolbar/unified-toolbar.tsx
++++ b/packages/drawnix/src/components/toolbar/unified-toolbar.tsx
+@@ -156,7 +156,6 @@
+     onTaskPanelToggle,
+     onOpenBackupRestore,
+     onOpenCloudSync,
+-    onOpenWorkflowMode,
+     onOpenMediaLibrary,
+     deferredFeaturesEnabled = false,
+     minimizedToolsBarEnabled = false,
+@@ -543,7 +542,6 @@
+               iconMode={isIconMode || isMobileOrTablet}
+               onOpenBackupRestore={onOpenBackupRestore}
+               onOpenCloudSync={onOpenCloudSync}
+-              onOpenWorkflowMode={onOpenWorkflowMode}
+             />
+           </div>
+ 
+--- a/packages/drawnix/src/components/toolbox-drawer/ToolItem.tsx
++++ b/packages/drawnix/src/components/toolbox-drawer/ToolItem.tsx
+@@ -10,6 +10,7 @@
+ import { InsertToCanvasIcon } from '../icons';
+ import { ToolDefinition } from '../../types/toolbox.types';
+ import { toolRegistry } from '../../tools/registry';
++import { isAssistantExternalTool } from '../../services/assistant-account';
+ import { HoverTip } from '../shared';
+ 
+ export interface ToolItemProps {
+@@ -166,7 +167,7 @@
+             />
+           </HoverTip>
+         )}
+-        <HoverTip content="插入到画布" placement="left">
++        {!isAssistantExternalTool(tool.id) && <HoverTip content="插入到画布" placement="left">
+           <Button
+             variant="text"
+             size="small"
+@@ -177,8 +178,8 @@
+             data-track="toolbox_click_insert_tool"
+             data-track-params={insertTrackParams}
+           />
+-        </HoverTip>
+-        <HoverTip content="在窗口中打开" placement="left">
++        </HoverTip>}
++        <HoverTip content={isAssistantExternalTool(tool.id) ? "在系统浏览器打开" : "在窗口中打开"} placement="left">
+           <Button
+             variant="outline"
+             size="small"
+@@ -186,6 +187,7 @@
+             icon={<JumpIcon />}
+             onClick={handleOpenWindow}
+             className="tool-item__action-btn tool-item__action-btn--open-window"
++            aria-label={isAssistantExternalTool(tool.id) ? `在系统浏览器打开${tool.name}` : `在窗口中打开${tool.name}`}
+             data-track="toolbox_click_open_window_tool"
+             data-track-params={openWindowTrackParams}
+           />
+--- a/packages/drawnix/src/components/toolbox-drawer/ToolWinBoxManager.tsx
++++ b/packages/drawnix/src/components/toolbox-drawer/ToolWinBoxManager.tsx
+@@ -5,6 +5,7 @@
+  * 支持最小化、常驻工具栏等功能
+  */
+ 
++import { isAssistantExternalTool, openAssistantExternalTool } from '../../services/assistant-account';
+ import React, {
+   useEffect,
+   useState,
+@@ -335,9 +336,9 @@
+   }, [stackedStates]);
+ 
+   const openExternalToolUrl = useCallback((url: string) => {
+-    const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++    const isTauri = typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+     if (isTauri) {
+-      (window as any).__TAURI_INTERNALS__.invoke('plugin:opener|open_url', { url });
++      (window as any).__TUZI_CREATIVE_NATIVE__.invoke('plugin:opener|open_url', { url });
+     } else {
+       window.open(url, '_blank', 'noopener,noreferrer');
+     }
+@@ -441,6 +442,14 @@
+                 >
+                   <InternalComponent {...componentProps} />
+                 </Suspense>
++              ) : isAssistantExternalTool(tool.id) ? (
++                <div className="creative-external-tool-notice">
++                  <p>此工具在系统浏览器中使用，不自动传递账户或 API Key。</p>
++                  <button onClick={event => {
++                    const button = event.currentTarget;
++                    void openAssistantExternalTool(tool.id).catch(() => { button.textContent = '打开失败，点击重试'; });
++                  }}>在系统浏览器打开</button>
++                </div>
+               ) : tool.url ? (
+                 <div
+                   style={{
+--- a/packages/drawnix/src/components/toolbox-drawer/ToolboxDrawer.tsx
++++ b/packages/drawnix/src/components/toolbox-drawer/ToolboxDrawer.tsx
+@@ -31,6 +31,7 @@
+ import { CustomToolDialog } from '../custom-tool-dialog/CustomToolDialog';
+ import { BaseDrawer } from '../side-drawer';
+ import { useConfirmDialog } from '../dialog/ConfirmDialog';
++import { isAssistantExternalTool, openAssistantExternalTool } from '../../services/assistant-account';
+ import { needsApiKeyConfiguration } from '../../utils/url-template';
+ import { geminiSettings } from '../../utils/settings-manager';
+ import { DRAWER_PIN_KEYS } from '../../utils/drawer-pin';
+@@ -189,6 +190,13 @@
+    */
+   const handleToolInsert = useCallback(
+     (tool: ToolDefinition) => {
++      if (isAssistantExternalTool(tool.id)) {
++        void openAssistantExternalTool(tool.id).then(() => {
++          MessagePlugin.info('已在系统浏览器打开，不自动传递账户或 API Key');
++        }).catch(() => MessagePlugin.error('系统浏览器打开失败，请重试'));
++        handleClose();
++        return;
++      }
+       // 检查 URL 是否需要 API Key 配置
+       const toolUrl = (tool as any).url;
+       if (toolUrl && needsApiKeyConfiguration(toolUrl)) {
+@@ -216,7 +224,7 @@
+       // 直接执行插入
+       executeToolInsert(tool);
+     },
+-    [executeToolInsert, setAppState]
++    [executeToolInsert, setAppState, handleClose]
+   );
+ 
+   /**
+@@ -268,6 +276,13 @@
+    */
+   const handleToolOpenWindow = useCallback(
+     (tool: ToolDefinition) => {
++      if (isAssistantExternalTool(tool.id)) {
++        void openAssistantExternalTool(tool.id).then(() => {
++          MessagePlugin.info('已在系统浏览器打开，不自动传递账户或 API Key');
++        }).catch(() => MessagePlugin.error('系统浏览器打开失败，请重试'));
++        handleClose();
++        return;
++      }
+       // 检查 URL 是否需要 API Key 配置
+       const toolUrl = (tool as any).url;
+       if (toolUrl && needsApiKeyConfiguration(toolUrl)) {
+@@ -295,7 +310,7 @@
+       // 直接执行打开窗口
+       executeToolOpenWindow(tool);
+     },
+-    [executeToolOpenWindow, setAppState]
++    [executeToolOpenWindow, setAppState, handleClose]
+   );
+ 
+   /**
+--- a/packages/drawnix/src/components/ttd-dialog/batch-image-generation.scss
++++ b/packages/drawnix/src/components/ttd-dialog/batch-image-generation.scss
+@@ -44,7 +44,7 @@
+   height: 100%;
+   gap: 16px;
+   padding: 16px;
+-  background: #f5f5f5;
++  background: var(--creative-tool-soft, #f5f5f5);
+   overflow: visible; // 允许下拉菜单溢出
+ 
+   .batch-main-content {
+@@ -52,12 +52,12 @@
+     display: flex;
+     flex-direction: column;
+     min-width: 0;
+-    background: white;
++    background: var(--creative-tool-surface, white);
+     border-radius: 8px;
+     min-height: 0;
+     padding: 16px;
+     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+-    border: 1px solid #eee;
++    border: 1px solid var(--creative-tool-border, #eee);
+     overflow: visible; // 关键：允许内部下拉菜单溢出显示
+   }
+ 
+@@ -72,7 +72,7 @@
+     align-items: flex-start;
+     margin-bottom: 12px;
+     padding-bottom: 12px;
+-    border-bottom: 1px solid #f0f0f0;
++    border-bottom: 1px solid var(--creative-tool-border, #f0f0f0);
+     flex-wrap: wrap; // 允许换行，但在大多数情况下通过 gap 和 min-width 控制
+     gap: 12px;
+     position: relative;
+@@ -109,7 +109,7 @@
+     .toolbar-divider {
+       width: 1px;
+       height: 20px;
+-      background: #eee;
++      background: var(--creative-tool-soft, #eee);
+       margin: 0 4px;
+       flex-shrink: 0; // 防止分割线被压缩成 0
+     }
+@@ -144,7 +144,7 @@
+     padding: 8px 0 12px;
+     font-size: 12px;
+     line-height: 20px;
+-    color: #666;
++    color: var(--creative-tool-muted, #666);
+   }
+ 
+   .batch-selection-summary {
+@@ -154,7 +154,7 @@
+     gap: 6px;
+ 
+     strong {
+-      color: #222;
++      color: var(--creative-tool-text, #222);
+       font-variant-numeric: tabular-nums;
+     }
+   }
+@@ -178,12 +178,12 @@
+   }
+ 
+   .batch-delete-btn {
+-    color: #888 !important;
++    color: var(--creative-tool-muted, #888) !important;
+     font-weight: 400 !important;
+ 
+     &:hover {
+       color: #ff4d4f !important;
+-      background: #f5f5f5 !important;
++      background: var(--creative-tool-soft, #f5f5f5) !important;
+     }
+   }
+ 
+@@ -196,9 +196,9 @@
+     flex: 1;
+     min-height: 0;
+     overflow: auto;
+-    border: 1px solid #eee;
++    border: 1px solid var(--creative-tool-border, #eee);
+     border-radius: 8px;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+ 
+     &.is-filling {
+       cursor: crosshair;
+@@ -219,17 +219,17 @@
+ 
+     th,
+     td {
+-      border: 1px solid #f0f0f0;
++      border: 1px solid var(--creative-tool-border, #f0f0f0);
+       padding: 0;
+       vertical-align: top;
+       height: 1px;
+     }
+ 
+     th {
+-      background: #fafafa;
++      background: var(--creative-tool-surface, #fafafa);
+       font-weight: 600;
+       font-size: 12px;
+-      color: #888;
++      color: var(--creative-tool-muted, #888);
+       text-transform: uppercase;
+       letter-spacing: 0;
+       text-align: center;
+@@ -243,9 +243,9 @@
+       width: 40px;
+       min-width: 40px;
+       text-align: center;
+-      background: #fafafa;
++      background: var(--creative-tool-surface, #fafafa);
+       font-weight: 500;
+-      color: #999;
++      color: var(--creative-tool-muted, #999);
+       padding: 8px;
+       position: sticky;
+       left: 40px;
+@@ -265,7 +265,7 @@
+       position: sticky;
+       left: 0;
+       z-index: 5;
+-      background: #fff;
++      background: var(--creative-tool-surface, #fff);
+ 
+       .checkbox-wrapper {
+         display: inline-flex;
+@@ -298,7 +298,7 @@
+ 
+     th.col-checkbox {
+       z-index: 15;
+-      background: #fafafa;
++      background: var(--creative-tool-surface, #fafafa);
+     }
+ 
+     td.row-number {
+@@ -326,13 +326,13 @@
+     }
+ 
+     tr.row-selected td {
+-      background: #fff9f0 !important;
++      background: var(--creative-tool-soft, #fff9f0) !important;
+     }
+ 
+     tr {
+       transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+       &:hover td {
+-        background: #fafafa;
++        background: var(--creative-tool-surface, #fafafa);
+       }
+ 
+       &.row-drag-over td {
+@@ -367,9 +367,9 @@
+       margin-left: 6px; // 稍微减小间距，因为有了 Tooltip 包装
+       opacity: 0.6;
+       transition: all 0.2s;
+-      color: #999 !important;
+-      background: #f5f5f5 !important;
+-      border: 1px solid #e0e0e0 !important;
++      color: var(--creative-tool-muted, #999) !important;
++      background: var(--creative-tool-soft, #f5f5f5) !important;
++      border: 1px solid var(--creative-tool-border, #e0e0e0) !important;
+       width: 18px !important;
+       height: 18px !important;
+       min-height: 18px !important;
+@@ -411,7 +411,7 @@
+     user-select: none;
+     box-sizing: border-box;
+     font-size: 13px;
+-    color: #444;
++    color: var(--creative-tool-text, #444);
+ 
+     // 针对提示词列进行特殊对齐处理，防止编辑态跳动
+     &.cell-prompt {
+@@ -431,7 +431,7 @@
+     }
+ 
+     &.selected:not(.active) {
+-      background: #fff9f0 !important;
++      background: var(--creative-tool-soft, #fff9f0) !important;
+       box-shadow: inset 0 0 0 1px #f39c12;
+       z-index: 1;
+ 
+@@ -497,7 +497,7 @@
+       width: 100%;
+       height: 32px;
+       border: none !important;
+-      background: #f5f5f5 !important;
++      background: var(--creative-tool-soft, #f5f5f5) !important;
+       border-radius: 6px;
+       text-align: center;
+       font-weight: 600;
+@@ -508,12 +508,12 @@
+       transition: all 0.2s;
+ 
+       &:hover {
+-        background: #fff !important;
++        background: var(--creative-tool-surface, #fff) !important;
+         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+       }
+ 
+       &:focus {
+-        background: #fff !important;
++        background: var(--creative-tool-surface, #fff) !important;
+         box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.2);
+       }
+ 
+@@ -546,26 +546,26 @@
+         justify-content: space-between;
+         gap: 8px;
+         padding: 0 10px;
+-        background: #f5f5f5;
++        background: var(--creative-tool-soft, #f5f5f5);
+         border: 1px solid transparent;
+         border-radius: 6px;
+-        color: #444;
++        color: var(--creative-tool-text, #444);
+ 
+         &:hover:not(:disabled) {
+-          background: #fff;
++          background: var(--creative-tool-surface, #fff);
+           border-color: rgba(243, 156, 18, 0.35);
+           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+         }
+ 
+         &--open {
+-          background: #fff8f0;
++          background: var(--creative-tool-soft, #fff8f0);
+           border-color: #f39c12;
+         }
+       }
+ 
+       .parameters-dropdown__label {
+         min-width: 0;
+-        color: #444;
++        color: var(--creative-tool-text, #444);
+       }
+     }
+ 
+@@ -612,7 +612,7 @@
+     border-radius: 6px;
+     overflow: hidden;
+     position: relative;
+-    border: 1px solid #eee;
++    border: 1px solid var(--creative-tool-border, #eee);
+     flex-shrink: 0;
+     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+     img {
+@@ -649,12 +649,12 @@
+   .add-image-btn {
+     width: 36px !important;
+     height: 36px !important;
+-    background: #f5f5f5 !important;
+-    color: #999 !important;
++    background: var(--creative-tool-soft, #f5f5f5) !important;
++    color: var(--creative-tool-muted, #999) !important;
+     border-radius: 6px !important;
+     padding: 0 !important;
+     &:hover {
+-      background: #fff !important;
++      background: var(--creative-tool-surface, #fff) !important;
+       color: #f39c12 !important;
+       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+     }
+@@ -662,7 +662,7 @@
+ 
+   .hint-text {
+     font-size: 11px;
+-    color: #bbb;
++    color: var(--creative-tool-muted, #bbb);
+     margin-top: 12px;
+     text-align: center;
+   }
+@@ -670,9 +670,9 @@
+   // 图片库侧栏
+   .image-library-sidebar {
+     width: 280px;
+-    background: white;
++    background: var(--creative-tool-surface, white);
+     border-radius: 12px;
+-    border: 1px solid #eee;
++    border: 1px solid var(--creative-tool-border, #eee);
+     display: flex;
+     flex-direction: column;
+     overflow: hidden;
+@@ -685,8 +685,8 @@
+ 
+     .library-header {
+       padding: 12px 16px;
+-      background: #fff;
+-      border-bottom: 1px solid #f0f0f0;
++      background: var(--creative-tool-surface, #fff);
++      border-bottom: 1px solid var(--creative-tool-border, #f0f0f0);
+       display: flex;
+       align-items: center;
+       justify-content: space-between;
+@@ -694,13 +694,13 @@
+         font-size: 14px;
+         font-weight: 600;
+         margin: 0;
+-        color: #333;
++        color: var(--creative-tool-text, #333);
+       }
+       .close-btn {
+-        color: #999 !important;
++        color: var(--creative-tool-muted, #999) !important;
+         &:hover {
+           color: #f39c12 !important;
+-          background: #f5f5f5 !important;
++          background: var(--creative-tool-soft, #f5f5f5) !important;
+         }
+       }
+     }
+@@ -728,12 +728,12 @@
+       justify-content: center;
+       padding: 32px 16px;
+       text-align: center;
+-      color: #999;
++      color: var(--creative-tool-muted, #999);
+       font-size: 13px;
+       line-height: 1.5;
+-      background: #fafafa;
++      background: var(--creative-tool-surface, #fafafa);
+       border-radius: 8px;
+-      border: 1px dashed #e0e0e0;
++      border: 1px dashed var(--creative-tool-border, #e0e0e0);
+       white-space: nowrap;
+     }
+ 
+@@ -742,9 +742,9 @@
+       border-radius: 8px;
+       overflow: hidden;
+       cursor: grab;
+-      border: 1px solid #eee;
++      border: 1px solid var(--creative-tool-border, #eee);
+       transition: all 0.2s;
+-      background: #f9f9f9;
++      background: var(--creative-tool-soft, #f9f9f9);
+       &:hover {
+         border-color: #f39c12;
+         transform: translateY(-2px);
+@@ -767,7 +767,7 @@
+       font-size: 14px;
+     }
+     &.preview-generating {
+-      background: #fff9f0;
++      background: var(--creative-tool-soft, #fff9f0);
+       .preview-generating {
+         display: flex;
+         align-items: center;
+@@ -778,13 +778,13 @@
+       }
+     }
+     &.preview-completed {
+-      background: #f6ffed;
++      background: var(--creative-tool-soft, #f6ffed);
+     }
+     &.preview-failed {
+-      background: #fff1f0;
++      background: var(--creative-tool-soft, #fff1f0);
+     }
+     &.preview-partial {
+-      background: #fffbe6;
++      background: var(--creative-tool-soft, #fffbe6);
+     }
+   }
+ 
+@@ -800,9 +800,9 @@
+     height: 36px;
+     border-radius: 6px;
+     overflow: hidden;
+-    border: 1px solid #eee;
++    border: 1px solid var(--creative-tool-border, #eee);
+     flex-shrink: 0;
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+     img {
+       width: 100%;
+@@ -834,9 +834,9 @@
+ 
+   .preview-more {
+     font-size: 11px;
+-    color: #888;
++    color: var(--creative-tool-muted, #888);
+     padding: 2px 6px;
+-    background: #f0f0f0;
++    background: var(--creative-tool-soft, #f0f0f0);
+     border-radius: 4px;
+     font-weight: 600;
+     &.clickable:hover {
+@@ -852,7 +852,7 @@
+     font-size: 11px;
+     color: #f39c12;
+     padding: 2px 6px;
+-    background: #fff9f0;
++    background: var(--creative-tool-soft, #fff9f0);
+     border-radius: 4px;
+     white-space: nowrap;
+     font-weight: 600;
+@@ -897,7 +897,7 @@
+   .loading-spinner {
+     width: 14px;
+     height: 14px;
+-    border: 2px solid #eee;
++    border: 2px solid var(--creative-tool-border, #eee);
+     border-top: 2px solid #f39c12;
+     border-radius: 50%;
+     animation: spin 1s linear infinite;
+@@ -934,7 +934,7 @@
+   align-items: center;
+   gap: 16px;
+   padding: 12px 0;
+-  border-top: 1px dashed #e0e0e0;
++  border-top: 1px dashed var(--creative-tool-border, #e0e0e0);
+   margin-top: 4px;
+ }
+ 
+@@ -974,7 +974,7 @@
+   display: flex;
+   flex-direction: column;
+   overflow: hidden;
+-  background: #fff;
++  background: var(--creative-tool-surface, #fff);
+   border-radius: 10px;
+   border: 1px solid rgba(0, 0, 0, 0.06);
+   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+@@ -985,7 +985,7 @@
+     justify-content: space-between;
+     gap: 12px;
+     padding: 16px 20px;
+-    border-bottom: 1px solid #f0f0f0;
++    border-bottom: 1px solid var(--creative-tool-border, #f0f0f0);
+     flex-shrink: 0;
+ 
+     h3 {
+@@ -993,7 +993,7 @@
+       font-size: 16px;
+       line-height: 24px;
+       font-weight: 600;
+-      color: #222;
++      color: var(--creative-tool-text, #222);
+     }
+ 
+     .close-btn {
+@@ -1007,15 +1007,15 @@
+       border: none;
+       border-radius: 6px;
+       background: transparent;
+-      color: #888;
++      color: var(--creative-tool-muted, #888);
+       font-size: 22px;
+       line-height: 1;
+       cursor: pointer;
+       transition: background 0.2s, color 0.2s;
+ 
+       &:hover {
+-        background: #f5f5f5;
+-        color: #333;
++        background: var(--creative-tool-soft, #f5f5f5);
++        color: var(--creative-tool-text, #333);
+       }
+     }
+   }
+@@ -1029,7 +1029,7 @@
+ 
+   .import-info {
+     margin: 0 0 16px;
+-    color: #555;
++    color: var(--creative-tool-text, #555);
+     font-size: 14px;
+     line-height: 22px;
+   }
+@@ -1048,7 +1048,7 @@
+     label {
+       display: block;
+       margin-bottom: 8px;
+-      color: #444;
++      color: var(--creative-tool-text, #444);
+       font-size: 13px;
+       line-height: 20px;
+       font-weight: 500;
+@@ -1060,10 +1060,10 @@
+     height: 36px;
+     box-sizing: border-box;
+     padding: 0 10px;
+-    border: 1px solid #dcdcdc;
++    border: 1px solid var(--creative-tool-border, #dcdcdc);
+     border-radius: 6px;
+-    background: #fff;
+-    color: #222;
++    background: var(--creative-tool-surface, #fff);
++    color: var(--creative-tool-text, #222);
+     font-size: 14px;
+     line-height: 20px;
+     outline: none;
+@@ -1088,10 +1088,10 @@
+     align-items: center;
+     justify-content: center;
+     padding: 0;
+-    border: 1px solid #dcdcdc;
++    border: 1px solid var(--creative-tool-border, #dcdcdc);
+     border-radius: 6px;
+-    background: #fff;
+-    color: #444;
++    background: var(--creative-tool-surface, #fff);
++    color: var(--creative-tool-text, #444);
+     font: inherit;
+     font-size: 14px;
+     font-weight: 500;
+@@ -1102,7 +1102,7 @@
+     &:hover {
+       border-color: #f39c12;
+       color: #d98200;
+-      background: #fff9f0;
++      background: var(--creative-tool-soft, #fff9f0);
+     }
+ 
+     &:focus-visible {
+@@ -1122,7 +1122,7 @@
+     margin: 0 0 14px;
+     padding: 10px 12px;
+     border-radius: 6px;
+-    background: #fff9f0;
++    background: var(--creative-tool-soft, #fff9f0);
+     color: #9a5b00;
+     font-size: 13px;
+     line-height: 20px;
+@@ -1140,8 +1140,8 @@
+     aspect-ratio: 1;
+     min-width: 0;
+     border-radius: 8px;
+-    border: 1px solid #eee;
+-    background: #fafafa;
++    border: 1px solid var(--creative-tool-border, #eee);
++    background: var(--creative-tool-surface, #fafafa);
+   }
+ 
+   .preview-item {
+@@ -1159,7 +1159,7 @@
+     display: flex;
+     align-items: center;
+     justify-content: center;
+-    color: #666;
++    color: var(--creative-tool-muted, #666);
+     font-size: 14px;
+     font-weight: 600;
+   }
+@@ -1169,8 +1169,8 @@
+     justify-content: flex-end;
+     gap: 10px;
+     padding: 14px 20px;
+-    border-top: 1px solid #f0f0f0;
+-    background: #fff;
++    border-top: 1px solid var(--creative-tool-border, #f0f0f0);
++    background: var(--creative-tool-surface, #fff);
+     flex-shrink: 0;
+   }
+ }
+--- a/packages/drawnix/src/components/ttd-dialog/shared/MultiImageUpload.tsx
++++ b/packages/drawnix/src/components/ttd-dialog/shared/MultiImageUpload.tsx
+@@ -455,7 +455,7 @@
+           >
+             <img src={hoveredImage.url} alt="Preview" />
+           </div>,
+-          document.body
++          (document.getElementById('creative-portals') || document.body)
+         )}
+ 
+       <div className="multi-image-upload">
+--- a/packages/drawnix/src/components/ttd-dialog/shared/PromptInput.tsx
++++ b/packages/drawnix/src/components/ttd-dialog/shared/PromptInput.tsx
+@@ -269,7 +269,7 @@
+       </div>
+     );
+ 
+-    return createPortal(tooltipContent, document.body);
++    return createPortal(tooltipContent, (document.getElementById('creative-portals') || document.body));
+   };
+ 
+   return (
+--- a/packages/drawnix/src/components/ttd-dialog/shared/ReferenceImageUpload.tsx
++++ b/packages/drawnix/src/components/ttd-dialog/shared/ReferenceImageUpload.tsx
+@@ -1008,7 +1008,7 @@
+           >
+             <img src={hoveredImage.url} alt="Preview" />
+           </div>,
+-          document.body
++          (document.getElementById('creative-portals') || document.body)
+         )}
+ 
+       <div
+--- a/packages/drawnix/src/components/version-update/version-update-prompt.scss
++++ b/packages/drawnix/src/components/version-update/version-update-prompt.scss
+@@ -39,12 +39,6 @@
+   }
+ }
+ 
+-.version-update-prompt--workflow {
+-  z-index: 10001;
+-  left: 12px;
+-  top: 52px;
+-  max-width: calc(100vw - 24px);
+-}
+ 
+ .aitu-toolbar-dock-right .version-update-prompt {
+   left: auto;
+--- a/packages/drawnix/src/components/version-update/version-update-prompt.tsx
++++ b/packages/drawnix/src/components/version-update/version-update-prompt.tsx
+@@ -8,9 +8,8 @@
+ import './version-update-prompt.scss';
+ 
+ export const VersionUpdatePrompt: React.FC<{
+-  workflow?: boolean;
+   prepareDesktopUpdate?: () => Promise<void>;
+-}> = ({ workflow = false, prepareDesktopUpdate }) => {
++}> = ({ prepareDesktopUpdate }) => {
+   const [updateAvailable, setUpdateAvailable] = useState<{
+     version: string;
+     changelog?: string[];
+@@ -130,7 +129,7 @@
+ 
+   return (
+     <>
+-      <div className={`version-update-prompt${workflow ? ' version-update-prompt--workflow' : ''}`}>
++      <div className="version-update-prompt">
+         <div className="version-update-prompt__content">
+           <span className="version-update-prompt__text">
+             {desktopUpdate?.status === 'downloading'
+--- a/packages/drawnix/src/components/video-analyzer/VideoAnalyzer.scss
++++ b/packages/drawnix/src/components/video-analyzer/VideoAnalyzer.scss
+@@ -4,7 +4,7 @@
+   height: 100%;
+   font-size: 13px;
+   color: var(--td-text-color-primary, #333);
+-  background: #fff;
++  background: var(--creative-tool-surface, #fff);
+ }
+ 
+ // Nav bar
+@@ -165,12 +165,12 @@
+     padding: 8px 6px;
+     border: none;
+     border-radius: 8px;
+-    background: #f5f5f5;
++    background: var(--creative-tool-soft, #f5f5f5);
+     font-size: 11px;
+     line-height: 1.2;
+     white-space: nowrap;
+     cursor: pointer;
+-    color: #555;
++    color: var(--creative-tool-text, #555);
+     transition: all 0.15s;
+ 
+     &:hover {
+@@ -197,7 +197,7 @@
+   min-width: fit-content;
+   padding: 0 4px;
+   font-size: 12px;
+-  color: #666;
++  color: var(--creative-tool-muted, #666);
+   white-space: nowrap;
+ 
+   input {
+@@ -214,7 +214,7 @@
+   margin-top: 8px;
+   text-align: center;
+   font-size: 12px;
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+ }
+ 
+ .mv-hover-preview {
+@@ -247,7 +247,7 @@
+ .va-tabs {
+   display: flex;
+   gap: 0;
+-  background: #f7f7f7;
++  background: var(--creative-tool-soft, #f7f7f7);
+   border-radius: 8px;
+   padding: 3px;
+ }
+@@ -260,11 +260,11 @@
+   background: transparent;
+   cursor: pointer;
+   font-size: 13px;
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+   transition: all 0.15s ease-out;
+ 
+   &.active {
+-    background: #fff;
++    background: var(--creative-tool-surface, #fff);
+     color: #E67E22;
+     font-weight: 500;
+     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+@@ -278,7 +278,7 @@
+   min-height: 72px;
+   border: none;
+   border-radius: 8px;
+-  background: #f9f9f9;
++  background: var(--creative-tool-soft, #f9f9f9);
+   cursor: pointer;
+   transition: background 0.15s;
+ 
+@@ -329,12 +329,12 @@
+   justify-content: space-between;
+   gap: 8px;
+   padding: 6px 10px;
+-  background: #f9f9f9;
++  background: var(--creative-tool-soft, #f9f9f9);
+   font-size: 12px;
+ }
+ 
+ .va-video-preview-name {
+-  color: #333;
++  color: var(--creative-tool-text, #333);
+   font-weight: 500;
+   overflow: hidden;
+   text-overflow: ellipsis;
+@@ -343,7 +343,7 @@
+ }
+ 
+ .va-video-preview-size {
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+   flex-shrink: 0;
+ }
+ 
+@@ -358,7 +358,7 @@
+ }
+ 
+ .va-placeholder {
+-  color: #bbb;
++  color: var(--creative-tool-muted, #bbb);
+   text-align: center;
+   line-height: 1.6;
+ }
+@@ -371,7 +371,7 @@
+ }
+ 
+ .va-filename {
+-  color: #333;
++  color: var(--creative-tool-text, #333);
+   font-weight: 500;
+ }
+ 
+@@ -379,12 +379,12 @@
+   width: 100%;
+   padding: 10px 0;
+   border: none;
+-  border-bottom: 1.5px solid #eee;
++  border-bottom: 1.5px solid var(--creative-tool-border, #eee);
+   border-radius: 0;
+   font-size: 13px;
+   outline: none;
+   background: transparent;
+-  color: #333;
++  color: var(--creative-tool-text, #333);
+   box-sizing: border-box;
+ 
+   &:focus {
+@@ -577,7 +577,7 @@
+ 
+ .va-model-label {
+   font-size: 12px;
+-  color: #666;
++  color: var(--creative-tool-muted, #666);
+   white-space: nowrap;
+ }
+ 
+@@ -1310,9 +1310,9 @@
+ .va-combo-trigger {
+   display: flex;
+   align-items: center;
+-  border: 1px solid #eee;
++  border: 1px solid var(--creative-tool-border, #eee);
+   border-radius: 4px;
+-  background: #fafafa;
++  background: var(--creative-tool-surface, #fafafa);
+   cursor: text;
+ 
+   &:focus-within { border-color: rgba(243, 156, 18, 0.4); }
+@@ -1325,7 +1325,7 @@
+   padding: 5px 8px;
+   font-size: 12px;
+   outline: none;
+-  color: #333;
++  color: var(--creative-tool-text, #333);
+   font-family: inherit;
+   min-width: 0;
+ }
+@@ -1333,7 +1333,7 @@
+ .va-combo-arrow {
+   padding: 0 8px;
+   font-size: 12px;
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+   cursor: pointer;
+   user-select: none;
+ }
+@@ -1351,8 +1351,8 @@
+ 
+ .va-combo-menu {
+   margin-top: 2px;
+-  background: #fff;
+-  border: 1px solid #eee;
++  background: var(--creative-tool-surface, #fff);
++  border: 1px solid var(--creative-tool-border, #eee);
+   border-radius: 6px;
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+   max-height: 240px;
+@@ -1369,7 +1369,7 @@
+   padding: 8px 10px 4px;
+   font-size: 11px;
+   font-weight: 600;
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+   letter-spacing: 0.02em;
+ }
+ 
+@@ -1377,7 +1377,7 @@
+   padding: 6px 10px;
+   font-size: 12px;
+   cursor: pointer;
+-  color: #555;
++  color: var(--creative-tool-text, #555);
+ 
+   &:hover { background: rgba(243, 156, 18, 0.06); color: #E67E22; }
+   &.selected { color: #F39C12; font-weight: 500; }
+@@ -1513,7 +1513,7 @@
+ .va-history-related {
+   margin-top: 8px;
+   padding-top: 8px;
+-  border-top: 1px solid #f0f0f0;
++  border-top: 1px solid var(--creative-tool-border, #f0f0f0);
+   display: flex;
+   flex-direction: column;
+   gap: 8px;
+@@ -1521,7 +1521,7 @@
+ 
+ .va-history-related-group-title {
+   font-size: 11px;
+-  color: #999;
++  color: var(--creative-tool-muted, #999);
+   font-weight: 500;
+   margin-bottom: 2px;
+ }
+@@ -1557,12 +1557,12 @@
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+-  color: #555;
++  color: var(--creative-tool-text, #555);
+ }
+ 
+ .va-history-related-task-time {
+   font-size: 11px;
+-  color: #bbb;
++  color: var(--creative-tool-muted, #bbb);
+   flex-shrink: 0;
+ }
+ 
+@@ -1573,7 +1573,7 @@
+   overflow: hidden;
+   flex-shrink: 0;
+   position: relative;
+-  background: #f3f4f6;
++  background: var(--creative-tool-soft, #f3f4f6);
+ 
+   img,
+   video,
+@@ -1606,11 +1606,11 @@
+   width: 32px;
+   height: 32px;
+   border: 1px solid rgba(15, 23, 42, 0.08);
+-  background: #f3f4f6;
++  background: var(--creative-tool-soft, #f3f4f6);
+   border-radius: 12px;
+   padding: 0;
+   cursor: pointer;
+-  color: #4b5563;
++  color: var(--creative-tool-text, #4b5563);
+   flex-shrink: 0;
+   display: flex;
+   align-items: center;
+@@ -1618,8 +1618,8 @@
+   transition: background 0.15s, color 0.15s, transform 0.15s;
+ 
+   &:hover {
+-    background: #e5e7eb;
+-    color: #111827;
++    background: var(--creative-tool-soft, #e5e7eb);
++    color: var(--creative-tool-text, #111827);
+     transform: translateY(-1px);
+   }
+ }
+@@ -1703,8 +1703,8 @@
+   right: 0;
+   margin-top: 4px;
+   min-width: 180px;
+-  background: #fff;
+-  border: 1px solid #eee;
++  background: var(--creative-tool-surface, #fff);
++  border: 1px solid var(--creative-tool-border, #eee);
+   border-radius: 8px;
+   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+   max-height: 240px;
+@@ -1720,7 +1720,7 @@
+   display: flex;
+   flex-direction: column;
+   gap: 2px;
+-  border-bottom: 1px solid #f5f5f5;
++  border-bottom: 1px solid var(--creative-tool-border, #f5f5f5);
+ 
+   &:last-child { border-bottom: none; }
+   &:hover { background: rgba(243, 156, 18, 0.06); }
+--- a/packages/drawnix/src/components/video-analyzer/pages/GeneratePage.tsx
++++ b/packages/drawnix/src/components/video-analyzer/pages/GeneratePage.tsx
+@@ -2201,7 +2201,7 @@
+             <video src={hoverPreview.url} controls muted preload="metadata" />
+           )}
+         </div>,
+-        document.body
++        (document.getElementById('creative-portals') || document.body)
+       )}
+     </div>
+   );
+--- a/packages/drawnix/src/components/winbox/WinBoxWindow.tsx
++++ b/packages/drawnix/src/components/winbox/WinBoxWindow.tsx
+@@ -6,6 +6,13 @@
+ import { useViewportScale } from '../../hooks/useViewportScale';
+ import { winboxManagerService } from '../../services/winbox-manager-service';
+ 
++// Embedded windows use the creative viewport, below the assistant navigation.
++function getWindowViewport() {
++  const host = import.meta.env.VITE_TUZI_ASSISTANT === 'true'
++    ? document.getElementById('creative-portals')?.closest<HTMLElement>('.creative-root') : null;
++  return { host, width: host?.clientWidth || window.innerWidth, height: host?.clientHeight || window.innerHeight };
++}
++
+ // 全局存储 WinBox 构造函数
+ let WinBoxConstructor: any = null;
+ let loadingPromise: Promise<any> | null = null;
+@@ -13,6 +20,19 @@
+ // 动态加载 WinBox - 使用 Vite 动态导入
+ const loadWinBox = async (): Promise<any> => {
+   if (WinBoxConstructor) return WinBoxConstructor;
++
++  // The pre-minified bundle renames constraint fields (minwidth/right/etc.).
++  // Use the ESM source in the host so runtime resize/split constraints remain writable.
++  if (import.meta.env.VITE_TUZI_ASSISTANT === 'true') {
++    if (!loadingPromise) {
++      // @ts-ignore WinBox does not ship declarations for its ESM entry.
++      loadingPromise = import('winbox/src/js/winbox.js').then(({ default: Constructor }) => {
++        WinBoxConstructor = Constructor;
++        return Constructor;
++      });
++    }
++    return loadingPromise;
++  }
+ 
+   if (typeof window !== 'undefined' && (window as any).WinBox) {
+     WinBoxConstructor = (window as any).WinBox;
+@@ -326,7 +346,7 @@
+     // 直接从 WinBox 栈中获取实例，避免受 CSS transform 影响
+     const WinBox = (window as any).WinBox;
+     const allBoxes = WinBox.stack();
+-    const viewportWidth = window.innerWidth;
++    const viewportWidth = getWindowViewport().width;
+ 
+     allBoxes.forEach((wb: any) => {
+       // 忽略当前正在操作的窗口
+@@ -346,8 +366,8 @@
+     (wb: any) => {
+       if (!wb || !wb.window) return;
+ 
+-      const viewportWidth = window.innerWidth;
+-      const viewportHeight = window.innerHeight;
++      const viewportWidth = getWindowViewport().width;
++      const viewportHeight = getWindowViewport().height;
+ 
+       // 恢复原始 minWidth
+       if (originalMinWidthRef.current !== null) {
+@@ -357,9 +377,9 @@
+ 
+       // 重置边界
+       wb.left = 0;
+-      wb.right = 0;
++      wb.right = window.innerWidth - getWindowViewport().width;
+       wb.top = 0;
+-      wb.bottom = 0;
++      wb.bottom = window.innerHeight - getWindowViewport().height;
+ 
+       // 计算居中位置和尺寸（使用初始设置的 80% 或更合理的尺寸）
+       let targetWidth: number;
+@@ -382,8 +402,8 @@
+       }
+ 
+       // 确保尺寸不超过最小宽高
+-      targetWidth = Math.max(targetWidth, minWidth);
+-      targetHeight = Math.max(targetHeight, minHeight);
++      targetWidth = Math.min(viewportWidth, Math.max(targetWidth, minWidth));
++      targetHeight = Math.min(viewportHeight, Math.max(targetHeight, minHeight));
+ 
+       const centerX = Math.floor((viewportWidth - targetWidth) / 2);
+       const centerY = Math.floor((viewportHeight - targetHeight) / 2);
+@@ -407,10 +427,11 @@
+ 
+       // 关键：分屏前必须重置边界，否则 resize 会加上负边界的宽度
+       wb.left = 0;
+-      wb.right = 0;
++      wb.right = window.innerWidth - getWindowViewport().width;
+       wb.top = 0;
+-      wb.bottom = 0;
+-
++      wb.bottom = window.innerHeight - getWindowViewport().height;
++
++      setSplitSide(targetSide);
+       if (targetSide === 'left') {
+         wb.resize(halfWidth, viewportHeight).move(0, 0);
+         setSplitSide('left');
+@@ -433,8 +454,8 @@
+       return;
+     }
+ 
+-    const viewportWidth = window.innerWidth;
+-    const viewportHeight = window.innerHeight;
++    const viewportWidth = getWindowViewport().width;
++    const viewportHeight = getWindowViewport().height;
+     const occupied = getOccupiedSides();
+     const halfWidth = Math.floor(viewportWidth / 2);
+ 
+@@ -604,15 +625,25 @@
+       classList.push('no-full');
+       if (className) classList.push(className);
+ 
++      const viewport = getWindowViewport();
++      const fitDimension = (value: number | string, minimum: number, limit: number) => {
++        const pixels = typeof value === 'number' ? value
++          : value.endsWith('%') ? parseFloat(value) * limit / 100 : parseFloat(value);
++        return Math.min(limit, Math.max(minimum, Number.isFinite(pixels) ? pixels : limit));
++      };
+       // 创建 WinBox 实例 - 不使用 mount 选项，改用 Portal
+       const wb = new WinBoxConstructor({
+         id,
+         title,
+         // 不使用 mount，改用 React Portal 渲染内容
+-        width,
+-        height,
+-        minwidth: minWidth,
+-        minheight: minHeight,
++        width: viewport.host ? fitDimension(width, minWidth, viewport.width) : width,
++        height: viewport.host ? fitDimension(height, minHeight, viewport.height) : height,
++        minwidth: Math.min(minWidth, viewport.width),
++        minheight: Math.min(minHeight, viewport.height),
++        maxwidth: viewport.width,
++        maxheight: viewport.height,
++        right: window.innerWidth - viewport.width,
++        bottom: window.innerHeight - viewport.height,
+         x,
+         y,
+         modal,
+@@ -620,7 +651,7 @@
+         border,
+         overflow: true, // 允许内容移出视口
+         class: classList,
+-        root: container || document.body,
++        root: container || document.getElementById('creative-portals') || document.body,
+         onclose: handleClose,
+         onmaximize: onMaximize,
+         onminimize: function (this: any) {
+@@ -740,8 +771,8 @@
+         onmove: function (this: any, x: number, y: number) {
+           if (this.max || this.min || isMovingRef.current) return;
+ 
+-          const viewportWidth = window.innerWidth;
+-          const viewportHeight = window.innerHeight;
++          const viewportWidth = getWindowViewport().width;
++          const viewportHeight = getWindowViewport().height;
+           const wbWidth = this.width;
+           const wbHeight = this.height;
+           const minVisible = minVisiblePixels;
+@@ -1214,9 +1245,9 @@
+     }
+ 
+     const nextWidth =
+-      typeof width === 'number' ? width : winboxRef.current.width;
++      Math.min(getWindowViewport().width, typeof width === 'number' ? width : winboxRef.current.width);
+     const nextHeight =
+-      typeof height === 'number' ? height : winboxRef.current.height;
++      Math.min(getWindowViewport().height, typeof height === 'number' ? height : winboxRef.current.height);
+ 
+     if (
+       typeof nextWidth !== 'number' ||
+@@ -1229,10 +1260,33 @@
+       return;
+     }
+ 
+-    winboxRef.current.minwidth = minWidth;
+-    winboxRef.current.minheight = minHeight;
++    winboxRef.current.minwidth = Math.min(minWidth, getWindowViewport().width);
++    winboxRef.current.minheight = Math.min(minHeight, getWindowViewport().height);
+     winboxRef.current.resize(nextWidth, nextHeight);
+   }, [height, minHeight, minWidth, visible, width]);
++
++  // Refit live windows when the host is resized; keep maximized/split windows inside it.
++  useEffect(() => {
++    const { host } = getWindowViewport();
++    if (!host || !isReady || !visible) return;
++    const fit = () => {
++      const wb = winboxRef.current;
++      if (!wb || wb.min) return;
++      const { width: w, height: h } = getWindowViewport();
++      wb.maxwidth = w; wb.maxheight = h;
++      wb.minwidth = Math.min(minWidth, splitSideRef.current ? w / 2 : w);
++      wb.minheight = Math.min(minHeight, h);
++      wb.right = window.innerWidth - w; wb.bottom = window.innerHeight - h;
++      const nextW = wb.max ? w : splitSideRef.current ? Math.floor(w / 2) : Math.min(Math.max(wb.width, wb.minwidth), w);
++      const nextH = wb.max || splitSideRef.current ? h : Math.min(Math.max(wb.height, wb.minheight), h);
++      const nextX = wb.max ? 0 : splitSideRef.current === 'right' ? w - nextW : Math.max(0, Math.min(wb.x, w - nextW));
++      const nextY = wb.max || splitSideRef.current ? 0 : Math.max(0, Math.min(wb.y, h - nextH));
++      wb.resize(nextW, nextH).move(nextX, nextY);
++    };
++    const observer = new ResizeObserver(fit);
++    observer.observe(host);
++    return () => observer.disconnect();
++  }, [isReady, visible, minWidth, minHeight]);
+ 
+   // 使用 Portal 渲染内容到 WinBox 的 .wb-body 中
+   // 这样可以保持 React 事件系统正常工作
+--- a/packages/drawnix/src/data/filesystem.ts
++++ b/packages/drawnix/src/data/filesystem.ts
+@@ -60,14 +60,14 @@
+ }
+ 
+ function isTauriEnvironment(): boolean {
+-  return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++  return typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+ }
+ 
+ function tauriInvoke<T>(
+   command: string,
+   args?: Record<string, unknown>
+ ): Promise<T> {
+-  return (window as any).__TAURI_INTERNALS__.invoke(command, args);
++  return (window as any).__TUZI_CREATIVE_NATIVE__.invoke(command, args);
+ }
+ 
+ async function pickDesktopSavePath(fileName: string): Promise<string | null> {
+--- a/packages/drawnix/src/data/image.ts
++++ b/packages/drawnix/src/data/image.ts
+@@ -473,7 +473,7 @@
+   let imageLoadObjectUrl: string | undefined;
+   if (
+     typeof window !== 'undefined' &&
+-    (window as any).__TAURI_INTERNALS__ &&
++    (window as any).__TUZI_CREATIVE_NATIVE__ &&
+     isVirtualMediaUrl(resolvedUrl)
+   ) {
+     const cachedBlob = await unifiedCacheService.getCachedBlob(resolvedUrl);
+--- a/packages/drawnix/src/drawnix.tsx
++++ b/packages/drawnix/src/drawnix.tsx
+@@ -136,10 +136,7 @@
+ import { syncEditedPPTSlideImage } from './utils/frame-insertion-utils';
+ import type { MediaLibraryModalProps } from './types/asset.types';
+ import { SelectionMode } from './types/asset.types';
+-import { WorkflowModeHost } from './workflow-mode/host/WorkflowModeHost';
+-import { queueProviderSettingsNavigation } from './components/settings-dialog/provider-settings-navigation';
+-import { useWorkflowRoute } from './workflow-mode/host/use-workflow-route';
+-import { OPEN_IMAGE_RECOVERY, insertWorkflowRecoveredImage } from './components/image-recovery/recovery-events';
++import { OPEN_IMAGE_RECOVERY } from './components/image-recovery/recovery-events';
+ const PopupToolbar = lazy(() =>
+   import('./components/toolbar/popup-toolbar/popup-toolbar').then((module) => ({
+     default: module.PopupToolbar,
+@@ -335,9 +332,6 @@
+   isDataReady = false,
+   currentBoardId,
+ }) => {
+-  const workflowRoute = useWorkflowRoute(currentBoardId);
+-  const workflowVisited = useRef(workflowRoute.open);
+-  if (workflowRoute.open) workflowVisited.current = true;
+   const options: PlaitBoardOptions = {
+     readonly: false,
+     hideScrollbar: false,
+@@ -359,6 +353,12 @@
+     };
+   });
+ 
++  useEffect(() => {
++    if (import.meta.env.VITE_TUZI_ASSISTANT === 'true' && appState.openSettings) {
++      window.dispatchEvent(new Event('tuzi-assistant-open-creative-settings'));
++      setAppState(previous => ({...previous, openSettings:false}));
++    }
++  }, [appState.openSettings]);
+   const [board, setBoard] = useState<DrawnixBoard | null>(null);
+   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
+   const [toolboxDrawerOpen, setToolboxDrawerOpen] = useState(false);
+@@ -370,7 +370,9 @@
+     });
+   const [backupRestoreOpen, setBackupRestoreOpen] = useState(false);
+   const [cloudSyncOpen, setCloudSyncOpen] = useState(false);
+-  const [deferredRuntimeEnabled, setDeferredRuntimeEnabled] = useState(false);
++  // Remounting an assistant canvas must resume result delivery without requiring
++  // another generate/click event. Execution itself belongs to the host runtime.
++  const [deferredRuntimeEnabled, setDeferredRuntimeEnabled] = useState(import.meta.env.VITE_TUZI_ASSISTANT === 'true');
+   const [versionUpdateEnabled, setVersionUpdateEnabled] = useState(false);
+   const [imageRecoveryOpen, setImageRecoveryOpen] = useState(false);
+   useEffect(() => {
+@@ -386,26 +388,6 @@
+ 
+   // 使用 ref 来保存 board 的最新引用,避免 useCallback 依赖问题
+   const boardRef = useRef<DrawnixBoard | null>(null);
+-  const resumeCanvas = useRef<{ boardId?: string | null; source: string; value: PlaitElement[]; viewport: Viewport; theme: PlaitTheme } | null>(null);
+-  const enterWorkflowRoute = workflowRoute.enter;
+-  const enterWorkflow = useCallback(() => {
+-    const current = boardRef.current;
+-    if (current) {
+-      resumeCanvas.current = {
+-        boardId: currentBoardId,
+-        source: JSON.stringify(value),
+-        value: current.children,
+-        viewport: current.viewport,
+-        theme: current.theme,
+-      };
+-    }
+-    enterWorkflowRoute();
+-  }, [currentBoardId, value, enterWorkflowRoute]);
+-  const resume = useMemo(() => {
+-    const snapshot = resumeCanvas.current;
+-    return snapshot?.boardId === currentBoardId && snapshot?.source === JSON.stringify(value) ? snapshot : null;
+-  }, [currentBoardId, value, workflowRoute.open]);
+-
+   // 关闭所有抄屉
+   const closeAllDrawers = useCallback(() => {
+     if (shouldAutoCloseProjectDrawer()) {
+@@ -868,23 +850,12 @@
+   }, [onChange, saveBoard]);
+ 
+   const prepareDesktopUpdate = useCallback(async () => {
+-    const [{ hasActiveLLMTasks }, native, local] = await Promise.all([
+-      import('./utils/active-tasks'),
+-      import('./workflow-mode/host/native-task-recovery'),
+-      import('./workflow-mode/web/src/services/workflow-local-task'),
+-    ]);
+-    const hasActiveTasks = async () => native.hasActiveNativeWorkflowTasks() ||
+-      local.hasActiveLocalWorkflowTasks() || await hasActiveLLMTasks();
++    const { hasActiveLLMTasks: hasActiveTasks } = await import('./utils/active-tasks');
+     if (await hasActiveTasks()) throw new Error('请等待正在进行的生成任务完成后再更新');
+     if (boardRef.current) {
+       const current = boardRef.current;
+       const saved = await saveBoard({ children: current.children || [], viewport: current.viewport, theme: current.theme });
+       if (!saved) throw new Error('画布保存失败，请重试');
+-    }
+-    if (workflowVisited.current) {
+-      const { flushCanvasStorage, useCanvasStore } = await import('./workflow-mode/web/src/stores/canvas/use-canvas-store');
+-      if (!useCanvasStore.getState().hydrated) throw new Error('画布仍在加载，请稍后重试更新');
+-      await flushCanvasStorage();
+     }
+     if (await hasActiveTasks()) throw new Error('请等待正在进行的生成任务完成后再更新');
+   }, [saveBoard]);
+@@ -897,22 +868,19 @@
+   }, [prepareDesktopUpdate]);
+ 
+   const insertRecoveredImage = useCallback(async (url: string) => {
+-    if (workflowRoute.open) {
+-      return await insertWorkflowRecoveredImage(url);
+-    }
+     const target = boardRef.current;
+     const targetId = currentBoardId;
+     if (!target || !targetId) throw new Error('画布尚未加载');
+     const [{ insertImageFromUrl }, { workspaceService }] = await Promise.all([
+       import('./data/image'), import('./services/workspace-service'),
+     ]);
+-    const guard = () => boardRef.current === target && workspaceService.getCurrentBoard()?.id === targetId && !window.location.pathname.startsWith('/workflow');
++    const guard = () => boardRef.current === target && workspaceService.getCurrentBoard()?.id === targetId;
+     if (!guard()) throw new Error('画布已切换');
+     let remoteOnly = false;
+     const inserted = await insertImageFromUrl(target, url, undefined, undefined, undefined, undefined, undefined, undefined, undefined, guard, undefined, () => { remoteOnly = true; });
+     if (!inserted) throw new Error('图片未插入');
+     return { remoteOnly };
+-  }, [currentBoardId, workflowRoute.open]);
++  }, [currentBoardId]);
+ 
+   // 创建新项目并刷新页面（用于释放内存）
+   const handleCreateProjectForMemory = useCallback(async () => {
+@@ -998,22 +966,13 @@
+                     {imageRecoveryOpen && <Suspense fallback={null}><ManualImageRecovery onInsert={insertRecoveredImage} onClose={() => setImageRecoveryOpen(false)} /></Suspense>}
+                     {versionUpdateEnabled && (
+                       <Suspense fallback={null}>
+-                        <VersionUpdatePrompt workflow={workflowRoute.open} prepareDesktopUpdate={prepareDesktopUpdate} />
++                        <VersionUpdatePrompt prepareDesktopUpdate={prepareDesktopUpdate} />
+                       </Suspense>
+                     )}
+-                    {workflowRoute.open ? (
+-                      <>
+-                        <WorkflowModeHost open={!appState.openSettings} onExit={workflowRoute.exit} onOpenProviderSettings={(profileId) => {
+-                          queueProviderSettingsNavigation(profileId === undefined ? { action: 'create' } : { action: 'select', profileId: profileId || 'legacy-default' });
+-                          setAppState(prev => ({ ...prev, openSettings: true }));
+-                        }} />
+-                        {appState.openSettings && <div className="drawnix"><Suspense fallback={null}><SettingsDialog container={null} /></Suspense></div>}
+-                      </>
+-                    ) : <DrawnixContent
+-                      value={resume?.value ?? value}
+-                      viewport={resume?.viewport ?? viewport}
+-                      theme={resume?.theme ?? theme}
+-                      onOpenWorkflowMode={enterWorkflow}
++                    <DrawnixContent
++                      value={value}
++                      viewport={viewport}
++                      theme={theme}
+                       options={options}
+                       plugins={plugins}
+                       containerRef={containerRef}
+@@ -1031,10 +990,7 @@
+                       onViewportChange={onViewportChange}
+                       onThemeChange={onThemeChange}
+                       onValueChange={onValueChange}
+-                      afterInit={(initializedBoard) => {
+-                        resumeCanvas.current = null;
+-                        afterInit?.(initializedBoard);
+-                      }}
++                      afterInit={afterInit}
+                       onBoardSwitch={onBoardSwitch}
+                       onTabSyncNeeded={onTabSyncNeeded}
+                       handleProjectDrawerToggle={handleProjectDrawerToggle}
+@@ -1064,7 +1020,7 @@
+                       minimizedToolsBarEnabled={minimizedToolsBarEnabled}
+                       enableToolWindows={enableToolWindows}
+                       enableGenerationRuntime={enableGenerationRuntime}
+-                    />}
++                    />
+                   </DrawnixContext.Provider>
+                 </ChatDrawerProvider>
+               </CacheQuotaProvider>
+@@ -1078,7 +1034,6 @@
+ 
+ // Internal component that uses ChatDrawer context
+ interface DrawnixContentProps {
+-  onOpenWorkflowMode: () => void;
+   value: PlaitElement[];
+   viewport?: Viewport;
+   theme?: PlaitTheme;
+@@ -1130,7 +1085,6 @@
+ }
+ 
+ const DrawnixContent: React.FC<DrawnixContentProps> = ({
+-  onOpenWorkflowMode,
+   value,
+   viewport,
+   theme,
+@@ -1837,7 +1791,7 @@
+           onValueChange={onValueChange}
+         >
+           <Board
+-            className={isTauriEnvironment() ? 'desktop-warm-canvas' : undefined}
++            className={isTauriEnvironment() || import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? 'desktop-warm-canvas' : undefined}
+             afterInit={(board) => {
+               setBoard(board as DrawnixBoard);
+               // 挂载 board 实例到 window，供知识库等外部模块访问
+@@ -1869,7 +1823,6 @@
+             onTaskPanelToggle={handleTaskPanelToggle}
+             onOpenBackupRestore={handleOpenBackupRestore}
+             onOpenCloudSync={handleOpenCloudSync}
+-            onOpenWorkflowMode={onOpenWorkflowMode}
+             onKnowledgeBaseToggle={handleKnowledgeBaseToggle}
+             onOpenMediaLibrary={handleOpenMediaLibrary}
+             deferredFeaturesEnabled={toolWindowManagerEnabled}
+@@ -1904,7 +1857,7 @@
+               <TTDDialog container={containerRef.current}></TTDDialog>
+             </Suspense>
+           )}
+-          {appState.openSettings && (
++          {appState.openSettings && import.meta.env.VITE_TUZI_ASSISTANT !== 'true' && (
+             <Suspense fallback={null}>
+               <SettingsDialog container={containerRef.current}></SettingsDialog>
+             </Suspense>
+--- a/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts
++++ b/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts
+@@ -378,6 +378,12 @@
+     pptExplainerSourceBoardId &&
+     (!binding || binding.boardId !== pptExplainerSourceBoardId)
+   ) {
++    return false;
++  }
++  // An anchor belongs to its original board. Finishing while another project
++  // is visible must not insert the result into that unrelated project.
++  if (import.meta.env.VITE_TUZI_ASSISTANT === 'true' && task.params?.anchorId &&
++      (!binding || !findImageGenerationAnchorForTaskOnBoard(binding.board, task))) {
+     return false;
+   }
+   if (associations.length === 0) return true;
+@@ -2817,6 +2823,7 @@
+     };
+ 
+     const handleTaskCompleted = (task: Task) => {
++
+       if (!isUserVisibleTaskResult(task.result)) {
+         return;
+       }
+@@ -3030,6 +3037,7 @@
+     };
+ 
+     const recoverCompletedAutoInsertTasks = () => {
++
+       if (!getCurrentCanvasBoardBinding()) {
+         scheduleBoardRecovery();
+         return;
+--- a/packages/drawnix/src/hooks/useBeforeUnload.ts
++++ b/packages/drawnix/src/hooks/useBeforeUnload.ts
+@@ -24,10 +24,10 @@
+       return undefined;
+     };
+ 
+-    window.onbeforeunload = handleBeforeUnload;
++    window.addEventListener('beforeunload', handleBeforeUnload);
+ 
+     return () => {
+-      window.onbeforeunload = null;
++      window.removeEventListener('beforeunload', handleBeforeUnload);
+     };
+   }, []);
+ }
+--- a/packages/drawnix/src/hooks/useDesktopCanvasBackground.ts
++++ b/packages/drawnix/src/hooks/useDesktopCanvasBackground.ts
+@@ -5,7 +5,7 @@
+ /** Paint only the HTML viewport, so dots never become document/export content. */
+ export function useDesktopCanvasBackground(board: PlaitBoard | null) {
+   useEffect(() => {
+-    if (!board || !isTauriEnvironment()) return;
++    if (!board || (!isTauriEnvironment() && import.meta.env.VITE_TUZI_ASSISTANT !== 'true')) return;
+     const container = PlaitBoard.getBoardContainer(board);
+     const host = PlaitBoard.getHost(board);
+     const viewport = PlaitBoard.getViewportContainer(board);
+--- a/packages/drawnix/src/i18n.tsx
++++ b/packages/drawnix/src/i18n.tsx
+@@ -94,8 +94,6 @@
+   'menu.settings': string;
+   'menu.backupRestore': string;
+   'menu.cloudSync': string;
+-  'menu.workflowMode': string;
+-  'menu.infiniteCanvas': string;
+   'menu.debugPanel': string;
+   'menu.version': string;
+   'menu.more': string;
+@@ -297,8 +295,6 @@
+     'menu.settings': '设置',
+     'menu.backupRestore': '备份 / 恢复',
+     'menu.cloudSync': '云端同步',
+-    'menu.workflowMode': '工作流模式',
+-    'menu.infiniteCanvas': '无限画布',
+     'menu.debugPanel': '日志 / 调试',
+     'menu.version': '版本',
+     'menu.more': '更多',
+@@ -497,8 +493,6 @@
+     'menu.settings': 'Settings',
+     'menu.backupRestore': 'Backup / Restore',
+     'menu.cloudSync': 'Cloud Sync',
+-    'menu.workflowMode': 'Workflow Mode',
+-    'menu.infiniteCanvas': 'Infinite Canvas',
+     'menu.debugPanel': 'Log / Debug',
+     'menu.version': 'Version',
+     'menu.more': 'More',
+--- a/packages/drawnix/src/services/asset-storage-service.ts
++++ b/packages/drawnix/src/services/asset-storage-service.ts
+@@ -245,7 +245,7 @@
+     command: string,
+     args?: Record<string, unknown>
+   ): Promise<T> {
+-    const internals = (window as any).__TAURI_INTERNALS__;
++    const internals = (window as any).__TUZI_CREATIVE_NATIVE__;
+     if (!internals?.invoke) {
+       throw new Error('Not running in Tauri environment');
+     }
+--- a/packages/drawnix/src/services/backup-restore/backup-import-service.ts
++++ b/packages/drawnix/src/services/backup-restore/backup-import-service.ts
+@@ -1,3 +1,4 @@
++import { validateBackupPayload } from './backup-preflight';
+ /**
+  * Backup Import Service
+  * 从 ZIP 文件导入数据，兼容 v2/v3/v4 manifest
+@@ -87,7 +88,7 @@
+     try {
+       onProgress?.(5, '正在读取文件...');
+       const { default: JSZip } = await import('jszip');
+-      const zip = await JSZip.loadAsync(file);
++      const zip = await JSZip.loadAsync(file, { checkCRC32: true });
+ 
+       onProgress?.(10, '正在验证文件格式...');
+       const manifestFile = zip.file('manifest.json');
+@@ -99,6 +100,8 @@
+       const manifest = validateBackupManifest(
+         JSON.parse(manifestContent)
+       ) as BackupManifest;
++
++      await validateBackupPayload(zip, manifest, importMode);
+ 
+       const shouldImport = (domain: string) =>
+         !options.selectedDomains?.length || options.selectedDomains.includes(domain);
+@@ -472,7 +475,8 @@
+           boardsImported++;
+         }
+       } catch (error) {
+-        console.warn(`[BackupRestore] Failed to import board ${filePath}:`, error);
++        // A partially written import must never be reported as successful.
++        throw new Error(`画板导入失败：${filePath}`);
+       }
+ 
+       if (onProgress && drawnixFiles.length > 0) {
+--- a/packages/drawnix/src/services/backup-restore/environment-backup-service.ts
++++ b/packages/drawnix/src/services/backup-restore/environment-backup-service.ts
+@@ -1,3 +1,4 @@
++import { isAccountReference } from '../assistant-account';
+ import localforage from 'localforage';
+ import { LS_KEYS, LS_KEYS_TO_MIGRATE } from '../../constants/storage-keys';
+ import {
+@@ -440,6 +441,8 @@
+     );
+   }
+ 
++  if(nextSettings.gemini && isAccountReference(nextSettings.gemini.apiKey)) nextSettings.gemini.apiKey = '';
++  nextSettings.providerProfiles?.forEach(profile => { if(isAccountReference(profile.apiKey)) profile.apiKey = ''; });
+   await settingsManager.updateSettings(nextSettings);
+   return 1;
+ }
+@@ -585,10 +588,10 @@
+ 
+ function extractSettingsSecrets(settings: AppSettings): SettingsSecrets {
+   return {
+-    geminiApiKey: settings.gemini?.apiKey || '',
++    geminiApiKey: isAccountReference(settings.gemini?.apiKey) ? '' : settings.gemini?.apiKey || '',
+     providerProfiles: (settings.providerProfiles || []).map(profile => ({
+       id: profile.id,
+-      apiKey: profile.apiKey || '',
++      apiKey: isAccountReference(profile.apiKey) ? '' : profile.apiKey || '',
+       extraHeaders: profile.extraHeaders,
+     })),
+   };
+@@ -599,7 +602,7 @@
+   secrets: SettingsSecrets
+ ): void {
+   if (settings.gemini && typeof secrets.geminiApiKey === 'string') {
+-    settings.gemini.apiKey = secrets.geminiApiKey;
++    settings.gemini.apiKey = isAccountReference(secrets.geminiApiKey) ? '' : secrets.geminiApiKey;
+   }
+ 
+   if (!Array.isArray(settings.providerProfiles)) {
+@@ -613,7 +616,7 @@
+     return secret
+       ? {
+           ...profile,
+-          apiKey: secret.apiKey || '',
++          apiKey: isAccountReference(secret.apiKey) ? '' : secret.apiKey || '',
+           extraHeaders: secret.extraHeaders,
+         }
+       : profile;
+--- a/packages/drawnix/src/services/desktop-storage-cleanup-service.ts
++++ b/packages/drawnix/src/services/desktop-storage-cleanup-service.ts
+@@ -81,7 +81,7 @@
+   command: string,
+   args?: Record<string, unknown>
+ ): Promise<T> {
+-  const internals = (window as any).__TAURI_INTERNALS__;
++  const internals = (window as any).__TUZI_CREATIVE_NATIVE__;
+   if (!internals?.invoke) throw new Error('此功能仅在桌面应用中可用');
+   return internals.invoke(command, args);
+ }
+--- a/packages/drawnix/src/services/image-inspection-api.ts
++++ b/packages/drawnix/src/services/image-inspection-api.ts
+@@ -1,3 +1,4 @@
++import { accountReferenceFromHeaders, requestAssistantAccount, hasAssistantTransport, fetchAssistantManual } from './assistant-account';
+ import type { ProviderProfile } from '../utils/settings-manager';
+ 
+ const API_PATH = '/api/image-inspection';
+@@ -177,6 +178,9 @@
+     controller.abort();
+   }, timeoutMs);
+   try {
++    const reference = accountReferenceFromHeaders(init.headers);
++    if(reference) return await requestAssistantAccount(reference, String(input), {...init, signal: controller.signal});
++    if (hasAssistantTransport()) return await fetchAssistantManual(String(input), { ...init, signal: controller.signal });
+     return await fetch(input, { ...init, signal: controller.signal });
+   } catch (error) {
+     if (timedOut && !externalSignal?.aborted) {
+--- a/packages/drawnix/src/services/image-recovery-fetch.ts
++++ b/packages/drawnix/src/services/image-recovery-fetch.ts
+@@ -1,13 +1,17 @@
+ import { isTauriEnvironment } from '../utils/tauri-env';
++import { accountReferenceFromHeaders, requestAssistantAccount, hasAssistantTransport, fetchAssistantManual } from './assistant-account';
+ 
+ /** The desktop command is restricted to trusted Tuzi recovery GETs. */
+ export async function fetchImageRecovery(url: string, init: RequestInit = {}): Promise<Response> {
++  const reference = accountReferenceFromHeaders(init.headers);
++  if (reference) return requestAssistantAccount(reference, url, init);
++  if (hasAssistantTransport()) return fetchAssistantManual(url, init);
+   if (!isTauriEnvironment()) return globalThis.fetch.call(globalThis, url, init);
+   if (init.signal?.aborted) throw init.signal.reason;
+   const authorization = new Headers(init.headers).get('authorization') || '';
+   const internals = (window as unknown as {
+-    __TAURI_INTERNALS__: { invoke: (command: string, args: object) => Promise<{ status: number; body: string }> };
+-  }).__TAURI_INTERNALS__;
++    __TUZI_CREATIVE_NATIVE__: { invoke: (command: string, args: object) => Promise<{ status: number; body: string }> };
++  }).__TUZI_CREATIVE_NATIVE__;
+   const result = await internals.invoke('query_image_recovery', { url, authorization });
+   if (init.signal?.aborted) throw init.signal.reason;
+   return new Response([204, 205, 304].includes(result.status) ? null : result.body, { status: result.status });
+--- a/packages/drawnix/src/services/media-executor/fallback-utils.ts
++++ b/packages/drawnix/src/services/media-executor/fallback-utils.ts
+@@ -554,7 +554,7 @@
+   command: string,
+   args?: Record<string, unknown>
+ ): Promise<T> {
+-  return (window as any).__TAURI_INTERNALS__.invoke(command, args);
++  return (window as any).__TUZI_CREATIVE_NATIVE__.invoke(command, args);
+ }
+ 
+ async function cacheRemoteUrlToDesktopMedia(
+--- a/packages/drawnix/src/services/media-executor/text-response.ts
++++ b/packages/drawnix/src/services/media-executor/text-response.ts
+@@ -1,3 +1,4 @@
++import { accountReferenceFromHeaders, requestAssistantAccount } from '../assistant-account';
+ import { isTauriEnvironment } from '../../utils/tauri-env';
+ import type { GeminiMessage } from '../../utils/gemini-api/types';
+ import { fetchWithTuziClientChannel, withTuziClientChannel } from '../tuzi-client-attribution';
+@@ -32,6 +33,8 @@
+ 
+ // Only the local OpenTu host is known to provide this same-origin proxy.
+ export const fetchTextCompletion: typeof fetch = (input, init) => {
++  const reference = accountReferenceFromHeaders(init?.headers);
++  if(reference) return requestAssistantAccount(reference, String(input), init || {});
+   if (typeof input === 'string') input = withTuziClientChannel(input);
+   if (typeof input === 'string' && typeof window !== 'undefined' && !isTauriEnvironment() &&
+       ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) {
+--- a/packages/drawnix/src/services/model-discovery-fetch.ts
++++ b/packages/drawnix/src/services/model-discovery-fetch.ts
+@@ -1,13 +1,17 @@
+ import { isTauriEnvironment } from '../utils/tauri-env';
++import { accountReferenceFromHeaders, requestAssistantAccount, hasAssistantTransport, fetchAssistantManual } from './assistant-account';
+ 
+ /** Desktop metadata reads bypass WebView CORS; web keeps its existing proxy. */
+ export async function fetchModelDiscovery(url: string, init: RequestInit = {}, timeoutMs?: number): Promise<Response> {
++  const reference = accountReferenceFromHeaders(init.headers);
++  if (reference) return requestAssistantAccount(reference, url, init);
++  if (hasAssistantTransport()) return fetchAssistantManual(url, init);
+   if (!isTauriEnvironment()) return globalThis.fetch.call(globalThis, url, init);
+   init.signal?.throwIfAborted();
+   const headers = new Headers(init.headers);
+   const internals = (window as unknown as {
+-    __TAURI_INTERNALS__: { invoke: (command: string, args: object) => Promise<{ status: number; body: string; content_type: string }> };
+-  }).__TAURI_INTERNALS__;
++    __TUZI_CREATIVE_NATIVE__: { invoke: (command: string, args: object) => Promise<{ status: number; body: string; content_type: string }> };
++  }).__TUZI_CREATIVE_NATIVE__;
+   let abort: (() => void) | undefined;
+   const cancelled = new Promise<never>((_, reject) => {
+     abort = () => reject(init.signal?.reason || new DOMException('Aborted', 'AbortError'));
+--- a/packages/drawnix/src/services/provider-routing/provider-transport.ts
++++ b/packages/drawnix/src/services/provider-routing/provider-transport.ts
+@@ -1,4 +1,5 @@
+ import { withTuziClientChannel } from '../tuzi-client-attribution';
++import { isAccountReference, requestAssistantAccount, fetchAssistantManual } from '../assistant-account';
+ import type {
+   PreparedProviderTransportRequest,
+   ProviderBaseUrlStrategy,
+@@ -720,7 +721,10 @@
+       context,
+       request
+     );
+-    const fetcher = request.fetcher || fetch;
++    const managed = isAccountReference(context.apiKey);
++    const fetcher = managed
++      ? (url: string, init: RequestInit) => requestAssistantAccount(context.apiKey, url, init)
++      : request.fetcher || fetchAssistantManual;
+     let responseCleanupDeferred = false;
+     const returnResponse = async (
+       response: Response,
+@@ -749,6 +753,7 @@
+     const sendFallbackRequests = async (
+       initialResponse?: Response
+     ): Promise<Response | null> => {
++      if (managed) return initialResponse || null;
+       const fallbackBaseUrls = await getTuziFallbackBaseUrls(context.baseUrl);
+       let retryResponse = initialResponse;
+       for (const fallbackBaseUrl of fallbackBaseUrls) {
+--- a/packages/drawnix/src/services/tuzi-client-attribution.ts
++++ b/packages/drawnix/src/services/tuzi-client-attribution.ts
+@@ -1,3 +1,4 @@
++import { accountReferenceFromHeaders, requestAssistantAccount, hasAssistantTransport, fetchAssistantManual } from './assistant-account';
+ import { isTuziRequestRecoveryBaseUrl } from './provider-routing/tuzi-api-endpoints';
+ 
+ declare const __OPENTU_DESKTOP_CHANNEL_PROOF__: string;
+@@ -116,6 +117,23 @@
+       : input instanceof URL
+       ? input.href
+       : input.url;
++  const reference = accountReferenceFromHeaders(init?.headers || (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined));
++  if(reference) {
++    if(typeof Request !== 'undefined' && input instanceof Request) {
++      const request = new Request(input, init);
++      const body = !request.body ? undefined : request.headers.get("content-type")?.startsWith("multipart/form-data") ? await request.formData() : await request.text();
++      return requestAssistantAccount(reference, url, {method:request.method,headers:request.headers,signal:request.signal,body});
++    }
++    return requestAssistantAccount(reference, url, init || {});
++  }
++  if (hasAssistantTransport() && /^https?:/i.test(url)) {
++    if (typeof Request !== 'undefined' && input instanceof Request) {
++      const request = new Request(input, init);
++      const body = await readRequestBody(request);
++      return fetchAssistantManual(url, {method:request.method, headers:request.headers, signal:request.signal, body});
++    }
++    return fetchAssistantManual(url, init);
++  }
+   if (url === original) return fetch(input, init);
+   if (!(typeof Request !== 'undefined' && input instanceof Request)) {
+     return fetch(url, init);
+--- a/packages/drawnix/src/services/tuzi-token-auth.ts
++++ b/packages/drawnix/src/services/tuzi-token-auth.ts
+@@ -29,49 +29,8 @@
+ }
+ 
+ export function importLocalTuziCredentials(): boolean {
+-  if (!isLocalStandalonePage()) return false;
+-  const url = new URL(window.location.href);
+-  if (!url.searchParams.has('token')) return isLocalTuziSession();
+-  const token = normalizeToken(url.searchParams.get('token'));
+-  const userId = normalizeUserId(url.searchParams.get('id'));
+-  // Keep credentials out of subsequent navigation and request referrers.
+-  url.searchParams.delete('token');
+-  url.searchParams.delete('id');
+-  window.history.replaceState(window.history.state, '', url);
+-  if (!token || !userId) return false;
+-  try {
+-    const previousToken = window.localStorage.getItem(STORAGE_KEY);
+-    const previousId = window.localStorage.getItem(USER_ID_STORAGE_KEY);
+-    const previousSession = window.sessionStorage.getItem(LOCAL_SESSION_KEY);
+-    const previousSessionToken = window.sessionStorage.getItem(LOCAL_SESSION_TOKEN_KEY);
+-    const previousSessionUser = window.sessionStorage.getItem(LOCAL_SESSION_USER_KEY);
+-    try {
+-      window.localStorage.setItem(STORAGE_KEY, token);
+-      window.localStorage.setItem(USER_ID_STORAGE_KEY, userId);
+-      window.sessionStorage.setItem(LOCAL_SESSION_KEY, userId);
+-      window.sessionStorage.setItem(LOCAL_SESSION_TOKEN_KEY, token);
+-      window.sessionStorage.setItem(LOCAL_SESSION_USER_KEY, userId);
+-    } catch {
+-      const previous: Array<[string, string | null]> = [
+-        [STORAGE_KEY, previousToken],
+-        [USER_ID_STORAGE_KEY, previousId],
+-      ];
+-      for (const [key, value] of previous) {
+-        if (value === null) window.localStorage.removeItem(key);
+-        else window.localStorage.setItem(key, value);
+-      }
+-      if (previousSession === null) window.sessionStorage.removeItem(LOCAL_SESSION_KEY);
+-      else window.sessionStorage.setItem(LOCAL_SESSION_KEY, previousSession);
+-      for (const [key, value] of [[LOCAL_SESSION_TOKEN_KEY, previousSessionToken], [LOCAL_SESSION_USER_KEY, previousSessionUser]]) {
+-        if (value === null) window.sessionStorage.removeItem(key!);
+-        else window.sessionStorage.setItem(key!, value!);
+-      }
+-      return false;
+-    }
+-    return true;
+-  } catch {
+-    return false;
+-  }
++  // The assistant owns account credentials. Never import URL credentials.
++  return false;
+ }
+ 
+ function normalizeToken(value: unknown): string {
+--- a/packages/drawnix/src/services/unified-cache-service.ts
++++ b/packages/drawnix/src/services/unified-cache-service.ts
+@@ -142,7 +142,7 @@
+ function isTauriRuntime(): boolean {
+   return (
+     typeof window !== 'undefined' &&
+-    Boolean((window as any).__TAURI_INTERNALS__)
++    Boolean((window as any).__TUZI_CREATIVE_NATIVE__)
+   );
+ }
+ 
+@@ -1195,7 +1195,7 @@
+         // file:// 协议：通过 Tauri invoke 命令读取本地文件
+         const filePath = url.replace('file://', '');
+         try {
+-          const internals = (window as any).__TAURI_INTERNALS__;
++          const internals = (window as any).__TUZI_CREATIVE_NATIVE__;
+           if (internals) {
+             const base64Data = await internals.invoke('read_local_file', { base64_path: filePath });
+             const mimeType = this.getMimeTypeFromUrl(filePath);
+@@ -1495,7 +1495,7 @@
+         const fileName = this.getFileNameFromUrl(cacheUrl);
+         const fileType = this.getMediaTypeFromUrl(cacheUrl);
+         try {
+-          await (window as any).__TAURI_INTERNALS__.invoke('delete_file', {
++          await (window as any).__TUZI_CREATIVE_NATIVE__.invoke('delete_file', {
+             fileName,
+             fileType,
+           });
+@@ -2031,7 +2031,7 @@
+       // 从 URL 提取文件名
+       const fileName = this.getFileNameFromUrl(url);
+ 
+-      const result = await (window as any).__TAURI_INTERNALS__.invoke(
++      const result = await (window as any).__TUZI_CREATIVE_NATIVE__.invoke(
+         'get_default_save_path',
+         {
+           fileName,
+@@ -2128,7 +2128,7 @@
+ 
+       try {
+         const filePath = decodeURIComponent(new URL(url).pathname.slice(1));
+-        const base64Data = await (window as any).__TAURI_INTERNALS__.invoke(
++        const base64Data = await (window as any).__TUZI_CREATIVE_NATIVE__.invoke(
+           'read_local_file',
+           { base64_path: filePath }
+         );
+@@ -2187,7 +2187,7 @@
+       if (
+         isVirtualUrl &&
+         typeof window !== 'undefined' &&
+-        (window as any).__TAURI_INTERNALS__
++        (window as any).__TUZI_CREATIVE_NATIVE__
+       ) {
+         const fileName = this.getFileNameFromUrl(cacheUrl);
+         const fileType = this.getMediaTypeFromUrl(cacheUrl);
+@@ -2199,7 +2199,7 @@
+           return assetBlob;
+         }
+ 
+-        const base64Data = await (window as any).__TAURI_INTERNALS__.invoke(
++        const base64Data = await (window as any).__TUZI_CREATIVE_NATIVE__.invoke(
+           'get_cached_media_file',
+           {
+             fileName,
+@@ -2244,7 +2244,7 @@
+     fileType: CacheMediaType
+   ): Promise<Blob | null> {
+     try {
+-      const filePath = await (window as any).__TAURI_INTERNALS__.invoke(
++      const filePath = await (window as any).__TUZI_CREATIVE_NATIVE__.invoke(
+         'get_file_path',
+         {
+           fileName,
+--- a/packages/drawnix/src/styles/index.scss
++++ b/packages/drawnix/src/styles/index.scss
+@@ -1,5 +1,5 @@
+-@import './../../../../node_modules/@plait/draw/styles/styles.scss';
+-@import './../../../../node_modules/@plait/mind/styles/styles.scss';
++@import '../../../../../node_modules/@plait/draw/styles/styles.scss';
++@import '../../../../../node_modules/@plait/mind/styles/styles.scss';
+ @import 'tailwindcss';
+ @import './tdesign-theme.scss';
+ @import './theme.scss';
+--- a/packages/drawnix/src/tools/tools/music-player/music-player-tool.scss
++++ b/packages/drawnix/src/tools/tools/music-player/music-player-tool.scss
+@@ -4,8 +4,8 @@
+   gap: 12px;
+   height: 100%;
+   padding: 12px;
+-  background: linear-gradient(180deg, #fcfdff 0%, #f3f7fc 100%);
+-  color: #18212f;
++  background: linear-gradient(180deg, var(--creative-tool-surface, #fcfdff) 0%, var(--creative-tool-soft, #f3f7fc) 100%);
++  color: var(--creative-tool-text, #18212f);
+   box-sizing: border-box;
+ }
+ 
+@@ -37,7 +37,7 @@
+   align-items: center;
+   padding: 12px;
+   border-radius: 14px;
+-  background: rgba(255, 255, 255, 0.92);
++  background: var(--creative-tool-surface, rgba(255, 255, 255, 0.92));
+   border: 1px solid rgba(148, 163, 184, 0.2);
+ }
+ 
+@@ -47,7 +47,7 @@
+   border-radius: 14px;
+   overflow: hidden;
+   flex-shrink: 0;
+-  background: linear-gradient(135deg, #dbeafe, #e2e8f0);
++  background: linear-gradient(135deg, #dbeafe, var(--creative-tool-soft, #e2e8f0));
+ }
+ 
+ .music-player-tool__now-playing-cover--fallback {
+@@ -63,7 +63,7 @@
+ 
+ .music-player-tool__eyebrow {
+   font-size: 12px;
+-  color: #64748b;
++  color: var(--creative-tool-muted, #64748b);
+ }
+ 
+ .music-player-tool__title,
+@@ -82,7 +82,7 @@
+ .music-player-tool__item-subtitle,
+ .music-player-tool__list-header {
+   font-size: 12px;
+-  color: #64748b;
++  color: var(--creative-tool-muted, #64748b);
+ }
+ 
+ .music-player-tool__now-playing-actions,
+@@ -111,8 +111,8 @@
+   height: 36px;
+   padding: 0;
+   border-radius: 999px;
+-  background: #eef2f7;
+-  color: #334155;
++  background: var(--creative-tool-soft, #eef2f7);
++  color: var(--creative-tool-text, #334155);
+   transition:
+     transform 0.16s ease,
+     background-color 0.16s ease,
+@@ -142,7 +142,7 @@
+ 
+ .music-player-tool__action-btn--ghost {
+   background: rgba(226, 232, 240, 0.55);
+-  color: #475569;
++  color: var(--creative-tool-muted, #475569);
+ }
+ 
+ .music-player-tool__search {
+@@ -179,7 +179,7 @@
+   min-height: 0;
+   padding: 12px;
+   border-radius: 14px;
+-  background: rgba(255, 255, 255, 0.9);
++  background: var(--creative-tool-surface, rgba(255, 255, 255, 0.9));
+   border: 1px solid rgba(148, 163, 184, 0.2);
+ }
+ 
+@@ -190,7 +190,7 @@
+   gap: 8px;
+   margin-bottom: 10px;
+   font-size: 12px;
+-  color: #64748b;
++  color: var(--creative-tool-muted, #64748b);
+ }
+ 
+ .music-player-tool__subtitle-panel {
+@@ -210,7 +210,7 @@
+ .music-player-tool__subtitle-line {
+   border: none;
+   background: transparent;
+-  color: #64748b;
++  color: var(--creative-tool-muted, #64748b);
+   text-align: left;
+   padding: 6px 8px;
+   border-radius: 10px;
+@@ -222,7 +222,7 @@
+ 
+ .music-player-tool__subtitle-line:hover {
+   background: rgba(37, 99, 235, 0.08);
+-  color: #1e293b;
++  color: var(--creative-tool-text, #1e293b);
+ }
+ 
+ .music-player-tool__subtitle-line--active {
+@@ -253,15 +253,15 @@
+   justify-content: center;
+   gap: 8px;
+   min-height: 160px;
+-  color: #64748b;
+-  background: rgba(255, 255, 255, 0.88);
++  color: var(--creative-tool-muted, #64748b);
++  background: var(--creative-tool-surface, rgba(255, 255, 255, 0.88));
+   border-radius: 14px;
+ }
+ 
+ .music-player-tool__context-menu {
+   position: fixed;
+   min-width: 220px;
+-  background: #fff;
++  background: var(--creative-tool-surface, #fff);
+   border: 1px solid rgba(15, 23, 42, 0.08);
+   border-radius: 12px;
+   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+@@ -277,7 +277,7 @@
+   border: none;
+   border-radius: 8px;
+   background: transparent;
+-  color: #334155;
++  color: var(--creative-tool-text, #334155);
+   display: flex;
+   align-items: center;
+   gap: 8px;
+@@ -286,7 +286,7 @@
+   text-align: left;
+ 
+   &:hover:not(:disabled) {
+-    background: #f8fafc;
++    background: var(--creative-tool-soft, #f8fafc);
+   }
+ 
+   &:disabled {
+--- a/packages/drawnix/src/utils/desktop-asset-url.ts
++++ b/packages/drawnix/src/utils/desktop-asset-url.ts
+@@ -3,7 +3,7 @@
+ export const OPENTU_ASSET_PROTOCOL = 'opentu-asset';
+ 
+ export function isTauriEnvironment(): boolean {
+-  return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++  return typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+ }
+ 
+ function shouldUseHttpAssetProtocol(): boolean {
+--- a/packages/drawnix/src/utils/download-utils.ts
++++ b/packages/drawnix/src/utils/download-utils.ts
+@@ -199,14 +199,14 @@
+ };
+ 
+ function isTauriEnvironment(): boolean {
+-  return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++  return typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+ }
+ 
+ function tauriInvoke<T>(
+   command: string,
+   args?: Record<string, unknown>
+ ): Promise<T> {
+-  return (window as any).__TAURI_INTERNALS__.invoke(command, args);
++  return (window as any).__TUZI_CREATIVE_NATIVE__.invoke(command, args);
+ }
+ 
+ async function pickDesktopSavePath(filename: string): Promise<string | null> {
+--- a/packages/drawnix/src/utils/gemini-api/auth.ts
++++ b/packages/drawnix/src/utils/gemini-api/auth.ts
+@@ -1,3 +1,5 @@
++import communityQrUrl from '../../../../../apps/web/public/logo/opentu-community-qr.png';
++import supportQrUrl from '../../../../../apps/web/public/logo/opentu-support-qr.png';
+ /**
+  * Gemini API 认证和配置管理
+  */
+@@ -49,13 +51,13 @@
+       <div class="api-key-dialog__support">
+         <figure>
+           <div class="api-key-dialog__qr">
+-            <img src="${import.meta.env.BASE_URL}logo/opentu-community-qr.png" alt="OpenTu 交流群二维码" />
++            <img src="${communityQrUrl}" alt="OpenTu 交流群二维码" />
+           </div>
+           <figcaption>OpenTu 交流群</figcaption>
+         </figure>
+         <figure>
+           <div class="api-key-dialog__qr">
+-            <img src="${import.meta.env.BASE_URL}logo/opentu-support-qr.png" alt="微信客服二维码" />
++            <img src="${supportQrUrl}" alt="微信客服二维码" />
+           </div>
+           <figcaption>微信客服</figcaption>
+         </figure>
+@@ -80,7 +82,8 @@
+     overlay.appendChild(dialog);
+     // Keep nested prompts inside the active UI focus scope (for example, an
+     // Ant Design model modal) so its focus trap does not steal input focus.
+-    (options?.container || document.body).appendChild(overlay);
++    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
++    (options?.container || document.getElementById('creative-portals') || document.body).appendChild(overlay);
+ 
+     // 获取元素
+     const input = dialog.querySelector('#apiKeyInput') as HTMLInputElement;
+@@ -90,21 +93,32 @@
+     // 阻止所有键盘事件冒泡到页面其他元素（防止输入被捕获到表格等）
+     const stopKeyboardPropagation = (e: KeyboardEvent) => {
+       e.stopPropagation();
++      if (e.type !== 'keydown') return;
++      if (e.key === 'Escape') {
++        e.preventDefault();
++        dismiss();
++      } else if (e.key === 'Tab') {
++        const controls = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], input, button'))
++          .filter(element => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
++        const index = controls.indexOf(document.activeElement as HTMLElement);
++        e.preventDefault();
++        controls[(index + (e.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
++      }
+     };
+     overlay.addEventListener('keydown', stopKeyboardPropagation);
+     overlay.addEventListener('keyup', stopKeyboardPropagation);
+     overlay.addEventListener('keypress', stopKeyboardPropagation);
+ 
+     // 自动聚焦到输入框
+-    const focusTimer = setTimeout(() => input.focus(), 100);
++    input.focus();
+ 
+     // 清理函数
+     const cleanup = () => {
+-      clearTimeout(focusTimer);
+       overlay.removeEventListener('keydown', stopKeyboardPropagation);
+       overlay.removeEventListener('keyup', stopKeyboardPropagation);
+       overlay.removeEventListener('keypress', stopKeyboardPropagation);
+       overlay.remove();
++      if (previousFocus?.isConnected) previousFocus.focus();
+     };
+ 
+     let saving = false;
+--- a/packages/drawnix/src/utils/model-pricing-service.ts
++++ b/packages/drawnix/src/utils/model-pricing-service.ts
+@@ -1,3 +1,4 @@
++import { isAccountReference } from '../services/assistant-account';
+ import {
+   providerPricingCacheSettings,
+   type ProviderProfile,
+@@ -664,7 +665,7 @@
+ 
+     const promise = (async () => {
+       const headers: Record<string, string> = { Accept: 'application/json' };
+-      if (apiKey) {
++      if (apiKey && !isAccountReference(apiKey)) {
+         headers['Authorization'] = `Bearer ${apiKey}`;
+       }
+       const response = await fetch(normalizedPricingUrl, { headers });
+--- a/packages/drawnix/src/utils/runtime-model-discovery.ts
++++ b/packages/drawnix/src/utils/runtime-model-discovery.ts
+@@ -1,3 +1,4 @@
++import { isAccountReference, hasAssistantTransport } from '../services/assistant-account';
+ import {
+   isCurrentTuziEndpoint,
+   isVerifiedTuziProvider,
+@@ -195,7 +196,7 @@
+   if (signal?.aborted) abortFromCaller();
+   signal?.addEventListener('abort', abortFromCaller, { once: true });
+   try {
+-    const requestUrl = getModelListRequestUrl(baseUrl, accountManaged);
++    const requestUrl = isAccountReference(apiKey) ? `${baseUrl}/models` : getModelListRequestUrl(baseUrl, accountManaged);
+     const response = await fetchModelDiscovery(requestUrl, {
+       headers: {
+         Authorization: `Bearer ${apiKey}`,
+@@ -231,7 +232,7 @@
+   baseUrl: string,
+   accountManaged: boolean
+ ): string {
+-  if (typeof window === 'undefined' || isTauriEnvironment()) {
++  if (typeof window === 'undefined' || isTauriEnvironment() || hasAssistantTransport()) {
+     return `${baseUrl}/models`;
+   }
+ 
+@@ -283,7 +284,7 @@
+ ): Promise<string> {
+   const baseUrls = buildModelDiscoveryBaseUrls(
+     primaryBaseUrl,
+-    fallbackBaseUrls
++    isAccountReference(apiKey) ? [] : fallbackBaseUrls
+   );
+   let lastFetchError: unknown = null;
+ 
+--- a/packages/drawnix/src/utils/tauri-env.ts
++++ b/packages/drawnix/src/utils/tauri-env.ts
+@@ -6,5 +6,5 @@
+  * 检测是否在 Tauri 桌面环境中运行
+  */
+ export function isTauriEnvironment(): boolean {
+-  return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
++  return typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
+ }
+--- a/packages/drawnix/src/utils/url-template.ts
++++ b/packages/drawnix/src/utils/url-template.ts
+@@ -16,7 +16,7 @@
+  * 模板变量映射表
+  */
+ const VARIABLE_GETTERS: Record<TemplateVariable, () => string> = {
+-  apiKey: () => geminiSettings.get().apiKey || '',
++  apiKey: () => import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? '' : geminiSettings.get().apiKey || '',
+   baseUrl: () => geminiSettings.get().baseUrl || '',
+ };
+ 
+--- /dev/null
++++ b/packages/drawnix/src/services/query-image-result.ts
+@@ -0,0 +1,62 @@
++import axios from 'axios';
++import { isAccountReference, requestAssistantAccount } from './assistant-account';
++import { providerTransport } from './provider-routing/provider-transport';
++import { isTrustedTuziApiBaseUrl, isTuziRequestRecoveryBaseUrl, loadTuziApiEndpointBaseUrls, normalizeTuziApiEndpointUrl } from './provider-routing/tuzi-api-endpoints';
++import { withTuziClientChannel } from './tuzi-client-attribution';
++import { buildImageRecoveryUrl } from './image-generation-recovery-metadata';
++import { fetchImageRecovery } from './image-recovery-fetch';
++import { isTauriEnvironment } from '../utils/tauri-env';
++
++/** Match canvas recovery: query the original provider, then trusted shared nodes on transport failure. */
++export async function queryImageResult(baseUrl: string, apiKey: string, requestId: string) {
++    if (isAccountReference(apiKey)) {
++        const url = buildImageRecoveryUrl(baseUrl, requestId);
++        if (!url) throw new Error('无效的图片结果查询地址');
++        const response = await requestAssistantAccount(apiKey, url, {method:'GET'});
++        const payload = await response.json();
++        const echoedId = payload?.request_id ?? payload?.requestId;
++        if (echoedId != null && echoedId !== requestId) return {status:'processing_or_not_found'};
++        return payload;
++    }
++    if (!isTuziRequestRecoveryBaseUrl(baseUrl)) throw new Error('当前渠道不支持按请求 ID 恢复图片');
++    const targets = [baseUrl];
++    let fallbacksLoaded = false;
++    let lastError: unknown;
++    for (const target of targets) {
++        try {
++            const url = buildImageRecoveryUrl(target, requestId);
++            if (!url) throw new Error('无效的图片结果查询地址');
++            const prepared = providerTransport.prepareRequest({ profileId: 'canvas-recovery', profileName: 'Canvas recovery', providerType: 'custom', baseUrl: target, apiKey, authType: 'bearer' }, {
++                path: '/log/get-request', method: 'GET',
++            });
++            const headers: Record<string, string> = {};
++            new Headers(prepared.init.headers).forEach((value, name) => { headers[name] = value; });
++            let payload: any;
++            if (isTauriEnvironment()) {
++                const response = await fetchImageRecovery(url, { headers, signal: AbortSignal.timeout(20_000) });
++                if (!response.ok) throw Object.assign(new Error('Recovery request failed'), { response: { status: response.status } });
++                payload = await response.json();
++            } else {
++                const response = await axios.get(withTuziClientChannel(url), { headers, timeout: 20_000 });
++                payload = response.data;
++            }
++            const echoedId = payload?.request_id ?? payload?.requestId;
++            if (echoedId != null && (typeof echoedId !== 'string' || echoedId.trim() !== requestId.trim())) {
++                return { status: 'processing_or_not_found' };
++            }
++            if (payload && ['succeeded', 'failed', 'processing_or_not_found'].includes(payload.status)) return payload;
++            lastError = new Error('结果查询返回无效响应，结果待确认');
++        } catch (error) {
++            const status = (error as { response?: { status?: number } })?.response?.status;
++            // Authentication and other explicit query errors must not be hidden by fallback.
++            if (status && status !== 404 && status !== 429 && status < 500) throw error;
++            lastError = error;
++        }
++        if (!fallbacksLoaded) {
++            fallbacksLoaded = true;
++            const original = normalizeTuziApiEndpointUrl(baseUrl);
++            targets.push(...[...new Set(await loadTuziApiEndpointBaseUrls())].filter(url => isTrustedTuziApiBaseUrl(url) && normalizeTuziApiEndpointUrl(url) !== original));
++        }
++    }
++    throw lastError || new Error('暂时无法查询生成结果');
++}
+--- /dev/null
++++ b/packages/drawnix/src/components/settings-dialog/AssistantAccountBinding.tsx
+@@ -0,0 +1,253 @@
++import { useEffect, useRef, useState } from "react";
++import { KeyRound, UserRound, ChevronDown } from "lucide-react";
++import type { ProviderProfile } from "../../utils/settings-types";
++import type {
++  CreativeAccountBinding,
++  CreativeAccountKey,
++} from "../../../../../../src/bridge-types";
++import {
++  ACCOUNT_REFERENCE_PREFIX,
++  ASSISTANT_ACCOUNT_CHANGED,
++  getAssistantAccount,
++  isAccountReference,
++} from "../../services/assistant-account";
++import "./assistant-account-binding.scss";
++
++export function AssistantAccountBinding({
++  profile,
++  onChange,
++}: {
++  profile: ProviderProfile;
++  onChange: (patch: Partial<ProviderProfile>) => void;
++}) {
++  const [bridge, setBridge] = useState(getAssistantAccount);
++  const [mode, setMode] = useState<"account" | "manual">(() =>
++    !profile.apiKey ||
++    isAccountReference(profile.apiKey) ||
++    getAssistantAccount()?.selectedKeyId
++      ? "account"
++      : "manual",
++  );
++  const [keys, setKeys] = useState<CreativeAccountKey[]>([]);
++  const [bindings, setBindings] = useState<CreativeAccountBinding[]>([]);
++  const [page, setPage] = useState(1);
++  const [search, setSearch] = useState("");
++  const [more, setMore] = useState(false);
++  const [picker, setPicker] = useState(Boolean(bridge?.selectedKeyId));
++  const [loading, setLoading] = useState(false);
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState("");
++  const revision = useRef(0);
++  const linked = isAccountReference(profile.apiKey);
++  const binding = bindings.find(
++    (item) => ACCOUNT_REFERENCE_PREFIX + item.id === profile.apiKey,
++  );
++  useEffect(() => {
++    const update = () => setBridge(getAssistantAccount());
++    window.addEventListener(ASSISTANT_ACCOUNT_CHANGED, update);
++    return () => window.removeEventListener(ASSISTANT_ACCOUNT_CHANGED, update);
++  }, []);
++  useEffect(() => {
++    const generation = ++revision.current;
++    setKeys([]);
++    setBindings([]);
++    setError("");
++    if (!bridge || bridge.state.status !== "connected" || mode !== "account") {
++      setLoading(false);
++      return;
++    }
++    setLoading(true);
++    const timer = setTimeout(() => {
++      Promise.all([bridge.listKeys(page, search), bridge.listBindings()])
++        .then(([data, saved]) => {
++          if (generation !== revision.current) return;
++          setKeys(data.items);
++          setMore(data.has_more);
++          setBindings(saved);
++        })
++        .catch(() => {
++          if (generation === revision.current)
++            setError("无法读取账户密钥，请稍后重试。");
++        })
++        .finally(() => {
++          if (generation === revision.current) setLoading(false);
++        });
++    }, 180);
++    return () => {
++      clearTimeout(timer);
++      revision.current++;
++    };
++  }, [bridge, mode, page, search]);
++  const choose = async (key: CreativeAccountKey) => {
++    if (!bridge || busy) return;
++    const generation = revision.current;
++    setBusy(true);
++    setError("");
++    try {
++      const saved = await bridge.bindKey(key.id);
++      if (generation !== revision.current) return;
++      setBindings((previous) => [
++        ...previous.filter((item) => item.id !== saved.id),
++        saved,
++      ]);
++      onChange({
++        apiKey: ACCOUNT_REFERENCE_PREFIX + saved.id,
++        baseUrl: saved.accountOrigin + "/v1",
++        authType: "bearer",
++        providerType: "openai-compatible",
++        pricingGroup: saved.group,
++        name: saved.name || profile.name,
++        extraHeaders: undefined,
++      });
++      setPicker(false);
++    } catch (e) {
++      if (generation === revision.current)
++        setError(e instanceof Error ? e.message : "关联失败，请重试。");
++    } finally {
++      setBusy(false);
++    }
++  };
++  return (
++    <section className="assistant-account-binding" aria-label="配置来源">
++      <div className="assistant-account-binding__modes">
++        <button
++          type="button"
++          aria-pressed={mode === "account"}
++          disabled={busy}
++          onClick={() => {
++            setMode("account");
++            setPicker(true);
++          }}
++        >
++          <UserRound size={16} />
++          兔子账户
++        </button>
++        <button
++          type="button"
++          aria-pressed={mode === "manual"}
++          disabled={busy}
++          onClick={() => {
++            setMode("manual");
++            setError("");
++            if (linked) onChange({ apiKey: "" });
++          }}
++        >
++          <KeyRound size={16} />
++          手动配置
++        </button>
++      </div>
++      {mode === "manual" ? (
++        <p>使用下方的 API 地址和密钥，原有配置可以继续使用。</p>
++      ) : bridge?.state.status !== "connected" ? (
++        <div className="assistant-account-binding__status">
++          <span>连接兔子助手账户后，可直接选择已有 Key。</span>
++          <button type="button" onClick={() => bridge?.manageAccount()}>
++            连接兔子账户
++          </button>
++        </div>
++      ) : (
++        <>
++          <div className="assistant-account-binding__status">
++            <span>
++              {bridge.state.identity?.displayName ||
++                bridge.state.identity?.username}{" "}
++              · 已连接
++            </span>
++            <button type="button" onClick={bridge.manageAccount}>
++              管理账户
++            </button>
++          </div>
++          <button
++            type="button"
++            className="assistant-account-binding__selected"
++            onClick={() => setPicker(!picker)}
++            disabled={busy}
++          >
++            <span>
++              <strong>
++                {binding?.name ||
++                  (linked ? "已关联的账户 Key" : "选择用于创作的 API Key")}
++              </strong>
++              <small>
++                {binding
++                  ? binding.keyMask + " · " + (binding.group || "未指定分组")
++                  : linked
++                    ? "重新校验后使用；切换账户不会复用此密钥"
++                    : "无需复制或再次粘贴密钥"}
++              </small>
++            </span>
++            <ChevronDown size={16} />
++          </button>
++          {picker && (
++            <div className="assistant-account-binding__picker">
++              <input
++                aria-label="搜索账户 Key"
++                placeholder="搜索密钥名称"
++                value={search}
++                disabled={busy}
++                onChange={(e) => {
++                  setSearch(e.target.value);
++                  setPage(1);
++                }}
++              />
++              {loading ? (
++                <p role="status">正在读取密钥…</p>
++              ) : keys.length === 0 ? (
++                <p>没有匹配的 Key，可前往账户创建。</p>
++              ) : (
++                keys.map((key) => {
++                  const unavailable =
++                    key.status !== 1 ||
++                    key.is_expired ||
++                    (key.expired_time !== -1 &&
++                      key.expired_time * 1000 <= Date.now());
++                  return (
++                    <button
++                      type="button"
++                      key={key.id}
++                      className="assistant-account-binding__key"
++                      disabled={busy || unavailable}
++                      onClick={() => void choose(key)}
++                    >
++                      <span>
++                        <strong>
++                          {key.name || "未命名 Key"}
++                          {bridge.selectedKeyId === key.id ? " · 当前选择" : ""}
++                        </strong>
++                        <small>
++                          {key.masked_key} · {key.group || "未指定分组"}
++                        </small>
++                      </span>
++                      <span>
++                        {unavailable ? "不可用" : busy ? "关联中…" : "选择"}
++                      </span>
++                    </button>
++                  );
++                })
++              )}
++              <div className="assistant-account-binding__pages">
++                <button
++                  type="button"
++                  disabled={page === 1 || busy || loading}
++                  onClick={() => setPage(page - 1)}
++                >
++                  上一页
++                </button>
++                <span>{page}</span>
++                <button
++                  type="button"
++                  disabled={!more || busy || loading}
++                  onClick={() => setPage(page + 1)}
++                >
++                  下一页
++                </button>
++              </div>
++            </div>
++          )}
++          <p>选择后沿用下方模型配置。点击“保存”后应用到创作。</p>
++        </>
++      )}
++      {error && <p role="alert">{error}</p>}
++    </section>
++  );
++}
+--- /dev/null
++++ b/packages/drawnix/src/components/settings-dialog/assistant-account-binding.scss
+@@ -0,0 +1,244 @@
++.assistant-account-binding {
++  margin: 0 0 22px;
++  padding: 16px;
++  border: 1px solid var(--td-component-border, #e7e4df);
++  border-radius: 14px;
++  background: var(--td-bg-color-container, #fff);
++  color: var(--td-text-color-primary, #25241f);
++  p {
++    margin: 10px 0 0;
++    font-size: 12px;
++    color: var(--td-text-color-secondary, #777);
++    line-height: 1.6;
++  }
++  button {
++    border: 0;
++    background: transparent;
++    color: inherit;
++    font: inherit;
++    cursor: pointer;
++    border-radius: 8px;
++    padding: 8px 10px;
++  }
++  button:disabled {
++    opacity: 0.45;
++    cursor: not-allowed;
++  }
++  &__modes {
++    display: flex;
++    gap: 6px;
++    padding: 4px;
++    background: var(--td-bg-color-secondarycontainer, #f5f3ef);
++    border-radius: 10px;
++    button {
++      display: flex;
++      gap: 7px;
++      align-items: center;
++      justify-content: center;
++      flex: 1;
++      font-size: 13px;
++    }
++    button[aria-pressed="true"] {
++      background: var(--td-bg-color-container, #fff);
++      box-shadow: 0 1px 4px #0000000d;
++      font-weight: 600;
++    }
++  }
++  &__status {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    gap: 12px;
++    margin: 12px 0;
++    font-size: 12px;
++    flex-wrap: wrap;
++    button {
++      color: var(--td-brand-color, #a36627);
++    }
++  }
++  &__selected,
++  &__key {
++    width: 100%;
++    display: flex;
++    justify-content: space-between;
++    align-items: center;
++    text-align: left;
++    gap: 12px;
++    span:first-child {
++      min-width: 0;
++    }
++    strong,
++    small {
++      display: block;
++      overflow-wrap: anywhere;
++    }
++    strong {
++      font-size: 13px;
++      font-weight: 500;
++    }
++    small {
++      font-size: 12px;
++      opacity: 0.65;
++      margin-top: 3px;
++    }
++  }
++  &__selected {
++    border: 1px solid var(--td-component-border, #e7e4df) !important;
++    padding: 12px !important;
++  }
++  &__picker {
++    margin-top: 10px;
++    input {
++      width: 100%;
++      box-sizing: border-box;
++      border: 1px solid var(--td-component-border, #e7e4df);
++      background: transparent;
++      color: inherit;
++      border-radius: 8px;
++      padding: 9px;
++      font: inherit;
++    }
++  }
++  &__key:hover:not(:disabled) {
++    background: var(--td-bg-color-secondarycontainer, #f5f3ef);
++  }
++  &__pages {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    font-size: 12px;
++    margin-top: 8px;
++  }
++  [role="alert"] {
++    color: var(--td-error-color, #c43c39);
++  }
++}
++.settings-dialog--assistant {
++  .settings-dialog__layout {
++    display: flex;
++    flex-direction: column;
++  }
++  .settings-dialog__nav {
++    width: 100%;
++    flex: none;
++    border-right: 0;
++    border-bottom: 1px solid var(--td-component-border, #e7e4df);
++    padding: 8px 16px;
++  }
++  .settings-dialog__nav-shell {
++    padding: 0;
++  }
++  .settings-dialog__nav-list {
++    display: flex;
++    flex-direction: row;
++    gap: 6px;
++    flex-wrap: wrap;
++  }
++  .settings-dialog__nav-item {
++    width: auto;
++    padding: 8px 14px;
++    border-radius: 9px;
++  }
++  .settings-dialog__main {
++    flex: 1;
++    min-height: 0;
++    overflow: hidden;
++  }
++  .settings-dialog__content-panel {
++    padding: 22px;
++  }
++  .settings-dialog__sidebar {
++    width: 240px;
++    flex-basis: 240px;
++  }
++  .settings-dialog__provider-hero {
++    padding-bottom: 16px;
++  }
++}
++
++.settings-dialog__advanced > summary {
++  cursor: pointer;
++  font-size: 12px;
++  color: var(--td-text-color-secondary, #777);
++  padding: 9px 0;
++}
++.settings-dialog__advanced[open] > summary {
++  margin-bottom: 12px;
++}
++.settings-dialog--assistant .settings-dialog__advanced {
++  border: 1px solid var(--td-component-border, #e7e4df);
++  border-radius: 10px;
++  padding: 3px 12px;
++}
++.settings-dialog--assistant .settings-dialog__provider-tag {
++  white-space: nowrap;
++}
++.settings-dialog--assistant
++  .settings-dialog__grid
++  > .settings-dialog__advanced {
++  order: 5;
++}
++
++.settings-dialog--assistant .settings-dialog__layout {flex:1;min-height:0;}
++.settings-dialog__assistant-footer {flex:none;display:flex;align-items:center;gap:10px;padding:12px 22px;border-top:1px solid var(--sd-border);background:var(--sd-surface);font-size:12px;}
++.settings-dialog__assistant-footer > span {flex:1;color:var(--sd-muted);}
++.settings-dialog__assistant-footer .settings-dialog__button--primary {background:var(--sd-text);color:var(--sd-surface);border-color:transparent;}
++
++.settings-dialog--assistant [hidden] { display:none !important; }
++.creative-root[data-theme=dark] .winbox-settings-window {
++  --td-bg-color-container:#292925;
++  --td-bg-color-secondarycontainer:#34342f;
++  --td-text-color-primary:#e6e4df;
++  --td-text-color-secondary:#aaa89e;
++  --td-component-border:#48473f;
++  --td-brand-color:#d6a65d;
++}
++.creative-root[data-theme=dark] .winbox-settings-window :is(.wb-header,.wb-body,.winbox-content-wrapper,.settings-dialog) {
++  background:#292925 !important;color:#e6e4df;
++}
++.creative-root[data-theme=dark] .winbox-settings-window .wb-title {color:#e6e4df;}
++.creative-root[data-theme=dark] .winbox-settings-window .wb-icon {filter:none;}
++.creative-root[data-theme=dark] .settings-dialog--assistant {
++  --sd-text:#e6e4df;--sd-muted:#aaa89e;--sd-border:#48473f;--sd-border-strong:#5b594f;--sd-surface:#292925;--sd-surface-soft:#34342f;
++}
++.creative-root[data-theme=dark] .settings-dialog--assistant :is(.settings-dialog__workspace,.settings-dialog__content-panel,.settings-dialog__sidebar,.settings-dialog__input,.settings-dialog__select,.settings-dialog__model-type-group,.settings-dialog__custom-model-panel,.settings-dialog__preference,.settings-dialog__compat-card) {
++  background:var(--sd-surface);color:var(--sd-text);border-color:var(--sd-border);
++}
++.creative-root[data-theme=dark] .settings-dialog--assistant :is(.settings-dialog__nav-item--active,.settings-dialog__provider-row--active,.settings-dialog__model-type-header,.settings-dialog__model-row,.settings-dialog__button) {
++  background:var(--sd-surface-soft);color:var(--sd-text);border-color:var(--sd-border);
++}
++.creative-root[data-theme=dark] .settings-dialog--assistant .settings-dialog__button--primary {background:#e6e4df;color:#292925;}
++.creative-root[data-theme=dark] .settings-dialog--assistant :is(.settings-dialog__label,.settings-dialog__field-hint,.settings-dialog__custom-model-error) {color:var(--sd-text);}
++.creative-root[data-theme=dark] .settings-dialog--assistant :is(.settings-dialog__main,.settings-dialog__workspace,.settings-dialog__content-panel,.settings-dialog__sidebar,.settings-dialog__assistant-footer) {border-color:var(--sd-border) !important;}
++.creative-root[data-theme=dark] .winbox-settings-window :is(.wb-close,.wb-full,.wb-max,.wb-split) {filter:none !important;}
++.creative-root[data-theme=dark] .winbox-settings-window .wb-header {background-image:none !important;}
++.settings-dialog--assistant .assistant-account-binding {margin-bottom:12px;padding:12px;}
++.settings-dialog--assistant .assistant-account-binding__status {margin:8px 0;}
++.settings-dialog--assistant .assistant-account-binding__selected {padding:9px !important;}
++
++// Keep the shared footer independent of the original compact form's full-width buttons.
++.settings-dialog--assistant .settings-dialog__assistant-footer {
++  flex-wrap: wrap;
++  > span { flex: 1 1 180px; min-width: 0; }
++  > .settings-dialog__button { flex: 0 0 auto; width: auto; min-width: 64px; }
++}
++
++.creative-root[data-theme=dark] .settings-dialog--assistant {
++  color-scheme: dark;
++  :is(.settings-dialog__route-card, .settings-dialog__endpoint-panel, .settings-dialog__endpoint-row,
++      .settings-dialog__sidebar-item, .settings-dialog__ghost-button, .settings-dialog__sidebar-add,
++      .settings-dialog__endpoint-test-btn, .settings-dialog__endpoint-add-btn, .settings-dialog__endpoint-remove) {
++    background: var(--sd-surface-soft); color: var(--sd-text); border-color: var(--sd-border);
++  }
++  .settings-dialog__sidebar-item--active { background: #454137; }
++  .settings-dialog__endpoint-add input { background: var(--sd-surface); color: var(--sd-text); }
++  .project-drawer-tts { background: var(--sd-surface); }
++  .project-drawer-tts__slider-value { color: #e8b959; }
++  :is(.project-drawer-tts__hint, .project-drawer-tts__empty) { color: var(--sd-muted); }
++}
++.creative-root[data-theme=dark] .settings-dialog--assistant {
++  :is(.settings-dialog__endpoint-row-url, .settings-dialog__endpoint-row-name) { color: var(--sd-text); }
++  :is(.settings-dialog__route-clear, .settings-dialog__compat-card, .settings-dialog__compat-card strong,
++      .settings-dialog__compat-card span, .settings-dialog__sidebar-badge--accent) { color: #e8b959; }
++  :is(.settings-dialog__endpoint-error, .settings-dialog__danger-button) { color: #f59d92; }
++}
+--- /dev/null
++++ b/packages/drawnix/src/services/assistant-account.ts
+@@ -0,0 +1,51 @@
++import type { CreativeAccountBridge } from "../../../../../src/bridge-types";
++export const ACCOUNT_REFERENCE_PREFIX = "tuzi-account:";
++export const ASSISTANT_ACCOUNT_CHANGED = "tuzi-assistant-account-changed";
++export const ASSISTANT_OPEN_SETTINGS = "tuzi-assistant-open-creative-settings";
++let current: CreativeAccountBridge | undefined;
++export const getAssistantAccount = () => current;
++export function setAssistantAccount(bridge: CreativeAccountBridge | undefined) {
++  current = bridge;
++  window.dispatchEvent(new Event(ASSISTANT_ACCOUNT_CHANGED));
++}
++export const isAccountReference = (value?: string | null) =>
++  Boolean(value?.startsWith(ACCOUNT_REFERENCE_PREFIX));
++export function accountReferenceFromHeaders(
++  headers?: HeadersInit,
++): string | null {
++  const values = new Headers(headers);
++  for (const value of [
++    values.get("authorization")?.replace(/^Bearer\s+/i, ""),
++    values.get("x-goog-api-key"),
++  ]) {
++    if (value && isAccountReference(value)) return value;
++  }
++  return null;
++}
++export async function requestAssistantAccount(
++  reference: string,
++  url: string,
++  init: RequestInit,
++): Promise<Response> {
++  if (!current || current.state.status !== "connected")
++    throw new Error("兔子账户未连接，请在兔子助手中重新连接。");
++  return current.request(reference, url, init);
++}
++
++export const hasAssistantTransport = () => Boolean(current?.requestManual);
++/** Explicit host capability: does not enable the old desktop filesystem IPC. */
++export function fetchAssistantManual(url: string, init: RequestInit = {}): Promise<Response> {
++  return current?.requestManual ? current.requestManual(url, init) : fetch(url, init);
++}
++
++/** External sites stay outside the host WebView and receive no model Key. */
++export function isAssistantExternalTool(toolId: string): boolean {
++  return import.meta.env.VITE_TUZI_ASSISTANT === 'true' &&
++    ['chat-mj', 'banana-prompt', 'pose-library'].includes(toolId);
++}
++export async function openAssistantExternalTool(toolId: string): Promise<void> {
++  if (!isAssistantExternalTool(toolId) || !current?.openExternalTool) {
++    throw new Error('无法打开系统浏览器，请重试');
++  }
++  await current.openExternalTool(toolId);
++}
+--- /dev/null
++++ b/packages/drawnix/src/utils/bundled-assets.ts
+@@ -0,0 +1,6 @@
++import tuziLogoUrl from '../../../../apps/web/public/logo-tuzi.png';
++
++/** Resolve legacy built-in asset paths at display time without rewriting saved profiles. */
++export function resolveBuiltinAssetUrl(url: string): string {
++  return url === '/logo-tuzi.png' || url === './logo-tuzi.png' ? tuziLogoUrl : url;
++}
+--- /dev/null
++++ b/packages/drawnix/src/services/backup-restore/backup-preflight.ts
+@@ -0,0 +1,57 @@
++import type JSZip from 'jszip';
++import type { BackupManifest } from './types';
++import { checksumJson } from './backup-checksum';
++
++/** Validate the whole archive before any store is cleared or changed.
++ * This is not a cross-database transaction: write/quota failures remain separate.
++ */
++export async function validateBackupPayload(
++  zip: JSZip,
++  manifest: BackupManifest,
++  mode: 'merge' | 'replace',
++): Promise<void> {
++  if (mode === 'replace' && (Number(manifest.totalParts || 1) > 1 || Number(manifest.partIndex || 1) > 1)) {
++    throw new Error('分片备份不能逐片覆盖恢复，请使用合并恢复，原数据未修改');
++  }
++  const parsed = new Map<string, any>();
++  for (const [name, entry] of Object.entries(zip.files)) {
++    const original = (entry as typeof entry & { unsafeOriginalName?: string }).unsafeOriginalName || name;
++    if (original.startsWith('/') || original.includes('\\') || original.split('/').includes('..') || /^[A-Za-z]:/.test(original)) {
++      throw new Error('备份含不安全路径，原数据未修改');
++    }
++    if (entry.dir || !/\.(json|drawnix)$/.test(name)) continue;
++    let value: any;
++    try { value = JSON.parse(await entry.async('string')); }
++    catch { throw new Error(`备份文件损坏：${name}，原数据未修改`); }
++    if (!value || typeof value !== 'object') throw new Error(`备份数据格式无效：${name}`);
++    if (name.endsWith('.drawnix') && !Array.isArray(value.elements)) throw new Error(`画板数据格式无效：${name}`);
++    if (name === 'tasks.json' && !Array.isArray(value)) throw new Error('任务数据格式无效');
++    parsed.set(name, value);
++  }
++  const domains = {
++    prompts: 'prompts.json', environment: 'environment/data.json',
++    knowledgeBase: 'knowledge-base.json', tasks: 'tasks.json',
++  } as const;
++  for (const [domain, name] of Object.entries(domains)) {
++    const stats = manifest.domainStats?.[domain];
++    const value = parsed.get(name);
++    const firstPart = Number(manifest.partIndex || 1) === 1;
++    if (firstPart && stats && !value) throw new Error(`备份缺少数据：${name}，原数据未修改`);
++    if (value && stats?.checksum) {
++      let checksum: string;
++      if (stats.checksum.startsWith('fnv1a-')) {
++        let hash = 2166136261;
++        const text = JSON.stringify(value);
++        for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
++        checksum = `fnv1a-${(hash >>> 0).toString(16)}`;
++      } else checksum = await checksumJson(value);
++      if (checksum !== stats.checksum) throw new Error(`备份校验不匹配：${name}，原数据未修改`);
++    }
++  }
++  if (Number(manifest.totalParts || 1) === 1 && manifest.includes.projects) {
++    const count = [...parsed.keys()].filter(name => name.startsWith('projects/') && name.endsWith('.drawnix')).length;
++    if (typeof manifest.stats?.boardCount === 'number' && count !== manifest.stats.boardCount) {
++      throw new Error('备份画板数量不完整，原数据未修改');
++    }
++  }
++}

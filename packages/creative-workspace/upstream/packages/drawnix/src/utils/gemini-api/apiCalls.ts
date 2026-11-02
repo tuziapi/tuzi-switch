@@ -1,0 +1,1306 @@
+/**
+ * Gemini API 调用函数
+ *
+ * 所有 API 请求在主线程直接发起。
+ */
+
+import type { ResolvedProviderContext } from '../../services/provider-routing';
+import {
+  providerTransport,
+  readProviderResponseJson,
+  readProviderResponseText,
+} from '../../services/provider-routing';
+import {
+  GeminiConfig,
+  GeminiMessage,
+  GeminiResponse,
+  VideoGenerationOptions,
+} from './types';
+import { VIDEO_DEFAULT_CONFIG } from './config';
+import { analytics, getProviderEndpointAnalytics } from '../umami-analytics';
+import { IMAGE_GENERATION_TIMEOUT_MS } from '../../constants/TASK_CONSTANTS';
+import {
+  buildManualHttpRequestPayload,
+  buildManualHttpVariables,
+  getManualHttpTemplate,
+  normalizeManualTextResponse,
+  renderTemplate,
+} from '../../services/provider-routing/manual-http-template';
+import { unifiedCacheService } from '../../services/unified-cache-service';
+import { isVirtualMediaUrl } from '../virtual-media-url';
+
+type GoogleInlineData = {
+  mime_type?: string;
+  mimeType?: string;
+  data?: string;
+};
+
+const MIN_GENERATE_CONTENT_TIMEOUT_MS = IMAGE_GENERATION_TIMEOUT_MS;
+
+function isGoogleGenerateContentProtocol(config: GeminiConfig): boolean {
+  return config.protocol === 'google.generateContent';
+}
+
+function isManualHttpConfig(config: GeminiConfig): boolean {
+  return Boolean(getManualHttpTemplate(config.binding?.metadata));
+}
+
+function buildProviderContext(config: GeminiConfig): ResolvedProviderContext {
+  return (
+    config.provider || {
+      profileId: 'runtime',
+      profileName: 'Runtime',
+      providerType: config.providerType || 'custom',
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      authType: config.authType || 'bearer',
+      extraHeaders: config.extraHeaders,
+    }
+  );
+}
+
+function buildAPIAnalyticsContext(
+  config: GeminiConfig
+): Record<string, unknown> {
+  const endpoint = getProviderEndpointAnalytics(
+    config.provider?.baseUrl || config.baseUrl
+  );
+  return {
+    providerType:
+      config.provider?.providerType || config.providerType || 'custom',
+    profileId: config.provider?.profileId,
+    profileName: config.provider?.profileName,
+    providerOrigin: endpoint?.origin,
+    providerHost: endpoint?.host,
+    providerProtocol: endpoint?.protocol,
+    baseUrlStrategy: config.binding?.baseUrlStrategy,
+  };
+}
+
+type APIAnalyticsTrackedError = {
+  __aituApiFailureTracked?: boolean;
+};
+
+function markAPIFailureTracked(error: unknown): void {
+  if (error && typeof error === 'object') {
+    (error as APIAnalyticsTrackedError).__aituApiFailureTracked = true;
+  }
+}
+
+function hasAPIFailureTracked(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === 'object' &&
+      (error as APIAnalyticsTrackedError).__aituApiFailureTracked
+  );
+}
+
+function resolveBindingPath(
+  pathTemplate: string | null | undefined,
+  model: string
+): string {
+  const template = pathTemplate?.trim();
+  if (!template) {
+    return `/v1/models/${model}:generateContent`;
+  }
+
+  const resolvedPath = template.replace(/\{model(?:_name)?\}/g, model);
+
+  // 兼容历史错误模板：/v1beta/{model}:generateContent -> /v1beta/models/{model}:generateContent
+  return resolvedPath.replace(
+    /^(\/v\d+(?:alpha|beta)?\/)([^/]+:(?:generateContent|streamGenerateContent))$/i,
+    '$1models/$2'
+  );
+}
+
+function buildGoogleEndpoint(
+  config: GeminiConfig,
+  model: string,
+  stream: boolean
+): string {
+  const submitPath = resolveBindingPath(config.binding?.submitPath, model);
+  if (!stream) {
+    return submitPath;
+  }
+
+  if (submitPath.endsWith(':streamGenerateContent')) {
+    return submitPath;
+  }
+
+  if (submitPath.endsWith(':generateContent')) {
+    return `${submitPath.slice(
+      0,
+      -':generateContent'.length
+    )}:streamGenerateContent`;
+  }
+
+  return `/v1beta/models/${model}:streamGenerateContent`;
+}
+
+function createTimeoutSignal(
+  upstreamSignal: AbortSignal | undefined,
+  timeoutMs: number
+): {
+  signal: AbortSignal;
+  didTimeout: () => boolean;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  let didTimeout = false;
+
+  const abortFromUpstream = () => {
+    controller.abort();
+  };
+
+  if (upstreamSignal?.aborted) {
+    controller.abort();
+  } else if (upstreamSignal) {
+    upstreamSignal.addEventListener('abort', abortFromUpstream, { once: true });
+  }
+
+  const timeoutId = setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, timeoutMs);
+
+  return {
+    signal: controller.signal,
+    didTimeout: () => didTimeout,
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      upstreamSignal?.removeEventListener('abort', abortFromUpstream);
+    },
+  };
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('图片读取失败'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function parseDataUrl(dataUrl: string): { mimeType: string; data: string } {
+  const match = dataUrl.match(/^data:([^;,]*);base64,([\s\S]+)$/i);
+  if (!match) {
+    throw new Error('Invalid data URL');
+  }
+
+  return {
+    mimeType: match[1],
+    data: match[2] || '',
+  };
+}
+
+function normalizeGoogleImageData(parsed: {
+  mimeType: string;
+  data: string;
+}): GoogleInlineData {
+  let mimeType = parsed.mimeType.trim().toLowerCase();
+  if (
+    !mimeType ||
+    mimeType === 'application/octet-stream' ||
+    mimeType === 'binary/octet-stream'
+  ) {
+    // Decode only a short prefix; never relabel an unknown response as PNG.
+    const prefix = parsed.data.slice(0, 128).replace(/\s/g, '').slice(0, 64);
+    let header: string;
+    try {
+      header = atob(prefix);
+    } catch {
+      throw new Error('参考图片 Base64 数据无效');
+    }
+    if (header.startsWith('\x89PNG\r\n\x1a\n')) {
+      mimeType = 'image/png';
+    } else if (header.startsWith('\xff\xd8\xff')) {
+      mimeType = 'image/jpeg';
+    } else if (header.startsWith('GIF87a') || header.startsWith('GIF89a')) {
+      mimeType = 'image/gif';
+    } else if (header.startsWith('RIFF') && header.slice(8, 12) === 'WEBP') {
+      mimeType = 'image/webp';
+    } else if (header.slice(4, 8) === 'ftyp') {
+      const brands = [header.slice(8, 12)];
+      for (let offset = 16; offset + 4 <= header.length; offset += 4) {
+        brands.push(header.slice(offset, offset + 4));
+      }
+      if (brands.some((brand) => brand === 'avif' || brand === 'avis')) {
+        mimeType = 'image/avif';
+      }
+    }
+  }
+  if (!mimeType.startsWith('image/')) {
+    throw new Error(
+      `无法识别参考图片格式（MIME: ${parsed.mimeType || '未知'}），请转换为 PNG、JPEG、WebP、GIF 或 AVIF 后重试`
+    );
+  }
+  return { mime_type: mimeType, data: parsed.data };
+}
+
+async function toGoogleInlineData(url: string): Promise<GoogleInlineData> {
+  if (url.startsWith('data:')) {
+    return normalizeGoogleImageData(parseDataUrl(url));
+  }
+
+  let blob: Blob;
+  if (isVirtualMediaUrl(url)) {
+    const cachedBlob = await unifiedCacheService.getCachedBlob(url);
+    if (!cachedBlob) {
+      throw new Error(`Cached image input not found: ${url}`);
+    }
+    blob = cachedBlob;
+  } else {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load image input: ${response.status}`);
+    }
+    blob = await response.blob();
+  }
+
+  const dataUrl = await blobToDataUrl(blob);
+  return normalizeGoogleImageData(parseDataUrl(dataUrl));
+}
+
+async function buildGoogleParts(messages: GeminiMessage[]): Promise<{
+  contents: Array<{
+    role: 'user' | 'model';
+    parts: Array<Record<string, unknown>>;
+  }>;
+  systemInstruction?: { parts: Array<{ text: string }> };
+}> {
+  const contents: Array<{
+    role: 'user' | 'model';
+    parts: Array<Record<string, unknown>>;
+  }> = [];
+  const systemTexts: string[] = [];
+  let imageIndex = 0;
+
+  for (const message of messages) {
+    const parts: Array<Record<string, unknown>> = [];
+
+    for (const part of message.content) {
+      if (part.type === 'text' && part.text) {
+        parts.push({ text: part.text });
+      } else if (part.type === 'image_url' && part.image_url?.url) {
+        imageIndex += 1;
+        try {
+          parts.push({
+            inline_data: await toGoogleInlineData(part.image_url.url),
+          });
+        } catch (error) {
+          throw new Error(
+            `第 ${imageIndex} 张参考图处理失败：${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      } else if (part.type === 'inline_data' && part.data) {
+        parts.push({
+          inline_data: { mime_type: part.mimeType, data: part.data },
+        });
+      } else if (part.type === 'file_uri' && part.fileUri) {
+        parts.push({
+          fileData: { fileUri: part.fileUri },
+        });
+      }
+    }
+
+    if (message.role === 'system') {
+      parts.forEach((part) => {
+        if (typeof part.text === 'string' && part.text.trim()) {
+          systemTexts.push(part.text);
+        }
+      });
+      continue;
+    }
+
+    if (parts.length === 0) {
+      continue;
+    }
+
+    contents.push({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts,
+    });
+  }
+
+  return {
+    contents,
+    systemInstruction:
+      systemTexts.length > 0
+        ? {
+            parts: systemTexts.map((text) => ({ text })),
+          }
+        : undefined,
+  };
+}
+
+function extractGooglePartContent(part: Record<string, any>): string {
+  if (typeof part.text === 'string') {
+    return part.text;
+  }
+
+  const inlineData: GoogleInlineData | undefined =
+    part.inline_data || part.inlineData;
+  if (inlineData?.data) {
+    const mimeType = inlineData.mime_type || inlineData.mimeType || 'image/png';
+    return `data:${mimeType};base64,${inlineData.data}`;
+  }
+
+  const fileData = part.file_data || part.fileData;
+  const fileUri = fileData?.file_uri || fileData?.fileUri;
+  if (typeof fileUri === 'string') {
+    return fileUri;
+  }
+
+  return '';
+}
+
+function normalizeGoogleResponseContent(
+  response: Record<string, any>,
+  excludeThoughts = false
+): string {
+  const candidates = Array.isArray(response.candidates)
+    ? response.candidates
+    : [];
+  const parts = candidates.flatMap((candidate) =>
+    Array.isArray(candidate?.content?.parts) ? candidate.content.parts : []
+  );
+
+  return parts
+    .filter((part) => !excludeThoughts || part?.thought !== true)
+    .map((part) => extractGooglePartContent(part || {}))
+    .filter(Boolean)
+    .join('\n');
+}
+
+function normalizeGoogleResponse(
+  response: Record<string, any>,
+  excludeThoughts = false
+): GeminiResponse {
+  return {
+    choices: [
+      {
+        message: {
+          role: 'assistant',
+          content: normalizeGoogleResponseContent(response, excludeThoughts),
+        },
+      },
+    ],
+  };
+}
+
+export function normalizeGoogleImageResponse(response: Record<string, any>): {
+  data: Array<{ b64_json?: string; url?: string; mime_type?: string }>;
+  raw: Record<string, any>;
+} {
+  const candidates = Array.isArray(response.candidates)
+    ? response.candidates
+    : [];
+  const data = candidates.flatMap((candidate) => {
+    const parts = Array.isArray(candidate?.content?.parts)
+      ? candidate.content.parts
+      : [];
+
+    return parts
+      .map((part: Record<string, any>) => {
+        if (part.thought === true) {
+          return null;
+        }
+        const inlineData: GoogleInlineData | undefined =
+          part.inline_data || part.inlineData;
+        if (inlineData?.data) {
+          return {
+            b64_json: inlineData.data,
+            mime_type:
+              inlineData.mime_type || inlineData.mimeType || 'image/png',
+          };
+        }
+
+        const fileData = part.file_data || part.fileData;
+        const fileUri = fileData?.file_uri || fileData?.fileUri;
+        if (typeof fileUri === 'string') {
+          return { url: fileUri };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+  });
+
+  return {
+    data,
+    raw: response,
+  };
+}
+
+async function readGoogleError(response: Response): Promise<string> {
+  const text = await readProviderResponseText(response);
+  try {
+    const payload = JSON.parse(text);
+    return (
+      payload?.error?.message ||
+      payload?.error?.status ||
+      payload?.message ||
+      response.statusText
+    );
+  } catch {
+    return text || response.statusText;
+  }
+}
+
+async function callManualHttpTextRaw(
+  config: GeminiConfig,
+  messages: GeminiMessage[],
+  options: {
+    stream?: boolean;
+    onChunk?: (content: string) => void;
+    signal?: AbortSignal;
+  } = {}
+): Promise<GeminiResponse> {
+  const template = getManualHttpTemplate(config.binding?.metadata);
+  if (!template) {
+    throw new Error('自定义文本模型缺少调用方法配置');
+  }
+
+  const model = config.modelName || 'custom';
+  const templateModelRef = config.binding?.modelId
+    ? {
+        profileId: config.binding.profileId,
+        modelId: config.binding.modelId,
+      }
+    : null;
+  const endpoint = config.binding?.submitPath || '/chat/completions';
+  const variables = buildManualHttpVariables({
+    model,
+    modelRef: templateModelRef,
+    prompt: messages
+      .flatMap((message) =>
+        message.content
+          .map((part) => (part.type === 'text' ? part.text : ''))
+          .filter(Boolean)
+      )
+      .join('\n'),
+    messages,
+    images: messages.flatMap((message) =>
+      message.content
+        .map((part) =>
+          part.type === 'image_url' ? part.image_url?.url : undefined
+        )
+        .filter((url): url is string => Boolean(url))
+    ),
+    params: {
+      stream: Boolean(options.stream),
+    },
+  });
+  const requestPayload = await buildManualHttpRequestPayload(
+    template,
+    variables,
+    undefined,
+    options.signal
+  );
+  const headers = renderTemplate(template.headers || {}, variables) as
+    | Record<string, string>
+    | undefined;
+
+  const response = await providerTransport.send(buildProviderContext(config), {
+    path: renderTemplate(endpoint, variables) as string,
+    baseUrlStrategy: config.binding?.baseUrlStrategy,
+    method:
+      template.method || (requestPayload.body === undefined ? 'GET' : 'POST'),
+    headers: {
+      ...(requestPayload.contentType
+        ? { 'Content-Type': requestPayload.contentType }
+        : {}),
+      ...(!requestPayload.contentType &&
+      requestPayload.body !== undefined &&
+      !(requestPayload.body instanceof FormData)
+        ? { 'Content-Type': 'application/json' }
+        : {}),
+      ...(headers || {}),
+    },
+    body: requestPayload.body,
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => response.statusText);
+    const error = new Error(`HTTP ${response.status}: ${errorText}`);
+    (error as any).apiErrorBody = errorText;
+    (error as any).httpStatus = response.status;
+    throw error;
+  }
+
+  const text = await response.text();
+  let responsePayload: unknown = text;
+  if (text.trim()) {
+    try {
+      responsePayload = JSON.parse(text);
+    } catch {
+      responsePayload = text;
+    }
+  }
+
+  const normalized = normalizeManualTextResponse(
+    responsePayload,
+    template.responsePaths
+  );
+  options.onChunk?.(normalized.choices[0]?.message?.content || '');
+  return normalized;
+}
+
+export async function callGoogleGenerateContentRaw(
+  config: GeminiConfig,
+  messages: GeminiMessage[],
+  options: {
+    fetcher?: typeof fetch;
+    stream: boolean;
+    onChunk?: (content: string) => void;
+    signal?: AbortSignal;
+    generationConfig?: Record<string, unknown>;
+    requestId?: string;
+    onSubmissionAttempt?: () => void | Promise<void>;
+    onResponse?: (response: Response) => void | Promise<void>;
+  } = { stream: false }
+): Promise<GeminiResponse> {
+  const startTime = Date.now();
+  const model = config.modelName || 'gemini-2.0-flash';
+  const endpoint = buildGoogleEndpoint(config, model, options.stream);
+  const payload = await buildGoogleParts(messages);
+  const requestBody: Record<string, unknown> = {
+    contents: payload.contents,
+  };
+
+  if (payload.systemInstruction) {
+    requestBody.systemInstruction = payload.systemInstruction;
+  }
+
+  if (options.generationConfig) {
+    requestBody.generationConfig = options.generationConfig;
+  }
+
+  analytics.trackAPICallStart({
+    endpoint,
+    model,
+    messageCount: messages.length,
+    stream: options.stream,
+    ...buildAPIAnalyticsContext(config),
+  });
+
+  const providerContext = buildProviderContext(config);
+  const timeoutMs = Math.max(
+    config.timeout || 0,
+    MIN_GENERATE_CONTENT_TIMEOUT_MS
+  );
+  const timeoutControl = createTimeoutSignal(options.signal, timeoutMs);
+
+  try {
+    await options.onSubmissionAttempt?.();
+    const response = await providerTransport.send(providerContext, {
+      path: endpoint,
+      baseUrlStrategy: config.binding?.baseUrlStrategy,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      requestId: options.requestId,
+      query: options.stream ? { alt: 'sse' } : undefined,
+      body: JSON.stringify(requestBody),
+      signal: timeoutControl.signal,
+      fetcher: options.fetcher,
+      controlledResponseBody: true,
+      onResponse: options.onResponse,
+    });
+
+    if (!response.ok) {
+      const duration = Date.now() - startTime;
+      const errorMessage = await readGoogleError(response);
+      analytics.trackAPICallFailure({
+        endpoint,
+        model,
+        duration,
+        error: errorMessage,
+        httpStatus: response.status,
+        stream: options.stream,
+        ...buildAPIAnalyticsContext(config),
+      });
+      const error = new Error(`HTTP ${response.status}: ${errorMessage}`);
+      (error as any).httpStatus = response.status;
+      markAPIFailureTracked(error);
+      throw error;
+    }
+
+    if (!options.stream) {
+      const result = await readProviderResponseJson<Record<string, any>>(
+        response
+      );
+      const modalities = options.generationConfig?.responseModalities;
+      const normalized = normalizeGoogleResponse(
+        result,
+        Array.isArray(modalities) && modalities.includes('IMAGE')
+      );
+      const duration = Date.now() - startTime;
+      analytics.trackAPICallSuccess({
+        endpoint,
+        model,
+        duration,
+        responseLength: normalized.choices[0]?.message?.content?.length || 0,
+        stream: false,
+        ...buildAPIAnalyticsContext(config),
+      });
+      return normalized;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法获取响应流');
+    }
+
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let lineBuffer = '';
+
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        const chunk = decoder.decode(value, { stream: true });
+        const combined = lineBuffer + chunk;
+        const lines = combined.split('\n');
+        lineBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) {
+            continue;
+          }
+
+          const rawData = trimmed.slice(6).trim();
+          if (!rawData || rawData === '[DONE]') {
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(rawData) as Record<string, any>;
+            const chunkContent = normalizeGoogleResponseContent(parsed);
+            if (!chunkContent) {
+              continue;
+            }
+
+            fullContent += chunkContent;
+            options.onChunk?.(fullContent);
+          } catch {
+            // Ignore malformed SSE chunks.
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const duration = Date.now() - startTime;
+    analytics.trackAPICallSuccess({
+      endpoint,
+      model,
+      duration,
+      responseLength: fullContent.length,
+      stream: true,
+      ...buildAPIAnalyticsContext(config),
+    });
+
+    return {
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: fullContent,
+          },
+        },
+      ],
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const normalizedError =
+      timeoutControl.didTimeout() &&
+      error instanceof Error &&
+      error.name === 'AbortError'
+        ? new Error(
+            `generateContent 请求超时（>${Math.floor(timeoutMs / 60000)} 分钟）`
+          )
+        : error;
+    const errorMessage =
+      normalizedError instanceof Error
+        ? normalizedError.message
+        : String(normalizedError);
+    if (
+      !hasAPIFailureTracked(error) &&
+      !hasAPIFailureTracked(normalizedError)
+    ) {
+      analytics.trackAPICallFailure({
+        endpoint,
+        model,
+        duration,
+        error: errorMessage,
+        stream: options.stream,
+        ...buildAPIAnalyticsContext(config),
+      });
+      markAPIFailureTracked(normalizedError);
+    }
+    throw normalizedError;
+  } finally {
+    timeoutControl.cleanup();
+  }
+}
+
+/**
+ * 使用原始 fetch 调用聊天 API
+ */
+export async function callApiRaw(
+  config: GeminiConfig,
+  messages: GeminiMessage[],
+  signal?: AbortSignal
+): Promise<GeminiResponse> {
+  if (isManualHttpConfig(config)) {
+    return callManualHttpTextRaw(config, messages, {
+      stream: false,
+      signal,
+    });
+  }
+
+  if (isGoogleGenerateContentProtocol(config)) {
+    return callGoogleGenerateContentRaw(config, messages, {
+      stream: false,
+      signal,
+    });
+  }
+
+  const startTime = Date.now();
+  const model = config.modelName || 'gemini-3-pro-image-preview-vip';
+  const endpoint = config.binding?.submitPath || '/chat/completions';
+
+  // Track API call start
+  analytics.trackAPICallStart({
+    endpoint,
+    model,
+    messageCount: messages.length,
+    stream: false,
+    ...buildAPIAnalyticsContext(config),
+  });
+
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  const data = {
+    model,
+    messages,
+    stream: false,
+  };
+
+  try {
+    const response = await providerTransport.send(
+      buildProviderContext(config),
+      {
+        path: endpoint,
+        baseUrlStrategy: config.binding?.baseUrlStrategy,
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+        signal,
+      }
+    );
+
+    if (!response.ok) {
+      const duration = Date.now() - startTime;
+      // 尝试读取响应体中的错误信息
+      let errorBody = '';
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = await response.json();
+        if (errorJson.error) {
+          errorMessage =
+            errorJson.error.message ||
+            errorJson.error.code ||
+            response.statusText;
+          errorBody = JSON.stringify(errorJson.error);
+        }
+      } catch (e) {
+        // 如果无法解析 JSON，尝试读取文本
+        try {
+          errorBody = await response.text();
+        } catch (e2) {
+          // 忽略读取错误
+        }
+      }
+      analytics.trackAPICallFailure({
+        endpoint,
+        model,
+        duration,
+        error: errorMessage,
+        httpStatus: response.status,
+        stream: false,
+        ...buildAPIAnalyticsContext(config),
+      });
+      const error = new Error(`HTTP ${response.status}: ${errorMessage}`);
+      (error as any).apiErrorBody = errorBody;
+      (error as any).httpStatus = response.status;
+      markAPIFailureTracked(error);
+      throw error;
+    }
+
+    // 处理非流式响应
+    const result = await response.json();
+    const duration = Date.now() - startTime;
+
+    analytics.trackAPICallSuccess({
+      endpoint,
+      model,
+      duration,
+      responseLength: result.choices?.[0]?.message?.content?.length,
+      stream: false,
+      ...buildAPIAnalyticsContext(config),
+    });
+
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (!hasAPIFailureTracked(error)) {
+      analytics.trackAPICallFailure({
+        endpoint,
+        model,
+        duration,
+        error: errorMessage,
+        stream: false,
+        ...buildAPIAnalyticsContext(config),
+      });
+      markAPIFailureTracked(error);
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * 流式 API 调用函数
+ *
+ * 在主线程直接使用 fetch 发起流式请求。
+ */
+export async function callApiStreamRaw(
+  config: GeminiConfig,
+  messages: GeminiMessage[],
+  onChunk?: (content: string) => void,
+  signal?: AbortSignal
+): Promise<GeminiResponse> {
+  if (isManualHttpConfig(config)) {
+    return callManualHttpTextRaw(config, messages, {
+      stream: true,
+      onChunk,
+      signal,
+    });
+  }
+
+  if (isGoogleGenerateContentProtocol(config)) {
+    return callGoogleGenerateContentRaw(config, messages, {
+      stream: true,
+      onChunk,
+      signal,
+    });
+  }
+
+  return callApiStreamDirect(config, messages, onChunk, signal);
+}
+
+// callApiStreamViaSW 已移除
+
+/**
+ * 使用 fetch 发送流式 API 请求
+ */
+async function callApiStreamDirect(
+  config: GeminiConfig,
+  messages: GeminiMessage[],
+  onChunk?: (content: string) => void,
+  signal?: AbortSignal
+): Promise<GeminiResponse> {
+  const startTime = Date.now();
+  const model = config.modelName || 'gemini-3-pro-image-preview-vip';
+  const endpoint = config.binding?.submitPath || '/chat/completions';
+  // Track API call start
+  analytics.trackAPICallStart({
+    endpoint,
+    model,
+    messageCount: messages.length,
+    stream: true,
+    ...buildAPIAnalyticsContext(config),
+  });
+
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  const data = {
+    model,
+    messages,
+    presence_penalty: 0,
+    temperature: 0.5,
+    top_p: 1,
+    stream: true,
+  };
+
+  try {
+    const response = await providerTransport.send(
+      buildProviderContext(config),
+      {
+        path: endpoint,
+        baseUrlStrategy: config.binding?.baseUrlStrategy,
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+        signal,
+      }
+    );
+
+    if (!response.ok) {
+      const duration = Date.now() - startTime;
+      // 尝试读取响应体中的错误信息
+      let errorBody = '';
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = await response.json();
+        if (errorJson.error) {
+          errorMessage =
+            errorJson.error.message ||
+            errorJson.error.code ||
+            response.statusText;
+          errorBody = JSON.stringify(errorJson.error);
+        }
+      } catch (e) {
+        // 如果无法解析 JSON，尝试读取文本
+        try {
+          errorBody = await response.text();
+        } catch (e2) {
+          // 忽略读取错误
+        }
+      }
+      analytics.trackAPICallFailure({
+        endpoint,
+        model,
+        duration,
+        error: errorMessage,
+        httpStatus: response.status,
+        stream: true,
+        ...buildAPIAnalyticsContext(config),
+      });
+      const error = new Error(`HTTP ${response.status}: ${errorMessage}`);
+      (error as any).apiErrorBody = errorBody;
+      (error as any).httpStatus = response.status;
+      markAPIFailureTracked(error);
+      throw error;
+    }
+
+    // 处理流式响应
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法获取响应流');
+    }
+
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let streamDone = false;
+    let lineBuffer = ''; // 缓冲跨 chunk 的不完整行
+
+    try {
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) {
+          // console.log('[StreamAPI] Stream ended (done=true)');
+          streamDone = true;
+          continue;
+        }
+
+        const chunk = decoder.decode(value, { stream: true });
+        // 将缓冲区内容与新 chunk 拼接后再按行分割
+        const combined = lineBuffer + chunk;
+        const lines = combined.split('\n');
+        // 最后一行可能不完整，暂存到 buffer
+        lineBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (trimmedLine.startsWith('data: ')) {
+            const data = trimmedLine.slice(6).trim();
+            if (data === '[DONE]') {
+              // console.log('[StreamAPI] Received [DONE] signal');
+              break;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                fullContent += content;
+                if (onChunk) {
+                  // 返回累积的所有数据，而不是只返回新增的 chunk
+                  onChunk(fullContent);
+                }
+              }
+            } catch (e) {
+              // 忽略解析错误的数据块（极端情况下单行内的 JSON 仍可能不完整）
+              // console.warn('解析流式数据块失败:', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const duration = Date.now() - startTime;
+
+    // Log full content for debugging incomplete responses
+    // console.log('[StreamAPI] Stream completed, full content length:', fullContent.length);
+    // console.log('[StreamAPI] Full response content:', fullContent);
+
+    // Check for incomplete response patterns
+    const hasGeneratingText =
+      fullContent.includes('正在生成') || fullContent.includes('generating');
+    const hasImageUrl =
+      fullContent.includes('![') && fullContent.includes('](http');
+
+    if (hasGeneratingText && !hasImageUrl) {
+      console.warn(
+        '[StreamAPI] Warning: Response contains "generating" text but no image URL - response may be incomplete'
+      );
+    }
+
+    analytics.trackAPICallSuccess({
+      endpoint,
+      model,
+      duration,
+      responseLength: fullContent.length,
+      stream: true,
+      ...buildAPIAnalyticsContext(config),
+    });
+
+    // 返回标准格式的响应
+    return {
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: fullContent,
+          },
+        },
+      ],
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (!hasAPIFailureTracked(error)) {
+      analytics.trackAPICallFailure({
+        endpoint,
+        model,
+        duration,
+        error: errorMessage,
+        stream: true,
+        ...buildAPIAnalyticsContext(config),
+      });
+      markAPIFailureTracked(error);
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * 视频生成专用的流式API调用函数
+ */
+export async function callVideoApiStreamRaw(
+  config: GeminiConfig,
+  messages: GeminiMessage[],
+  options: VideoGenerationOptions = {}
+): Promise<GeminiResponse> {
+  const startTime = Date.now();
+  const model = config.modelName || VIDEO_DEFAULT_CONFIG.modelName || 'veo3';
+  const endpoint = '/chat/completions';
+
+  // Track API call start
+  analytics.trackAPICallStart({
+    endpoint,
+    model,
+    messageCount: messages.length + 1, // +1 for system message
+    stream: true,
+    ...buildAPIAnalyticsContext(config),
+  });
+
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  // 添加系统消息，参考你提供的接口参数
+  const systemMessage: GeminiMessage = {
+    role: 'user',
+    content: [
+      {
+        type: 'text',
+        text: `You are Video Creator.\nCurrent model: ${model}\nCurrent time: ${new Date().toLocaleString()}\nLatex inline: $x^2$\nLatex block: $e=mc^2$`,
+      },
+    ],
+  };
+
+  const data = {
+    max_tokens: options.max_tokens || 1024,
+    model,
+    temperature: options.temperature || 0.5,
+    top_p: options.top_p || 1,
+    presence_penalty: options.presence_penalty || 0,
+    frequency_penalty: options.frequency_penalty || 0,
+    messages: [systemMessage, ...messages],
+    stream: true,
+  };
+
+  try {
+    const response = await providerTransport.send(
+      buildProviderContext(config),
+      {
+        path: endpoint,
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const duration = Date.now() - startTime;
+      // 尝试读取响应体中的错误信息
+      let errorBody = '';
+      let errorMessage = response.statusText;
+      try {
+        const errorJson = await response.json();
+        if (errorJson.error) {
+          errorMessage =
+            errorJson.error.message ||
+            errorJson.error.code ||
+            response.statusText;
+          errorBody = JSON.stringify(errorJson.error);
+        }
+      } catch (e) {
+        // 如果无法解析 JSON，尝试读取文本
+        try {
+          errorBody = await response.text();
+        } catch (e2) {
+          // 忽略读取错误
+        }
+      }
+      analytics.trackAPICallFailure({
+        endpoint,
+        model,
+        duration,
+        error: errorMessage,
+        httpStatus: response.status,
+        stream: true,
+        ...buildAPIAnalyticsContext(config),
+      });
+      const error = new Error(`HTTP ${response.status}: ${errorMessage}`);
+      (error as any).apiErrorBody = errorBody;
+      (error as any).httpStatus = response.status;
+      markAPIFailureTracked(error);
+      throw error;
+    }
+
+    // 处理流式响应
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法获取响应流');
+    }
+
+    const decoder = new TextDecoder();
+    let fullContent = '';
+
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') {
+              break;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                fullContent += content;
+              }
+            } catch (e) {
+              // 忽略解析错误的数据块
+              console.warn('解析流式数据块失败:', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const duration = Date.now() - startTime;
+    analytics.trackAPICallSuccess({
+      endpoint,
+      model,
+      duration,
+      responseLength: fullContent.length,
+      stream: true,
+      ...buildAPIAnalyticsContext(config),
+    });
+
+    // 返回标准格式的响应
+    return {
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: fullContent,
+          },
+        },
+      ],
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (!hasAPIFailureTracked(error)) {
+      analytics.trackAPICallFailure({
+        endpoint,
+        model,
+        duration,
+        error: errorMessage,
+        stream: true,
+        ...buildAPIAnalyticsContext(config),
+      });
+      markAPIFailureTracked(error);
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * API 调用（不再重试）
+ */
+export async function callApiWithRetry(
+  config: GeminiConfig,
+  messages: GeminiMessage[],
+  signal?: AbortSignal
+): Promise<GeminiResponse> {
+  // 直接调用，不再重试
+  return callApiRaw(config, messages, signal);
+}

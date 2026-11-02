@@ -790,11 +790,18 @@ impl AccountService {
 
     // Fixed origin, owned Key only. Listing does not reveal the secret to the
     // renderer or create/consume the one-use proof used by provider_save.
-    async fn key_model_catalog(
+    pub(super) async fn key_model_catalog(
         &self,
         generation: u64,
         token_id: &str,
     ) -> Result<Value, BusinessError> {
+        self.qualified_creative_key(generation, token_id).await.map(|(catalog, _)| catalog)
+    }
+
+    // Shared native qualification; no renderer reveal and no tool-save proof mutation.
+    pub(super) async fn qualified_creative_key(
+        &self, generation: u64, token_id: &str,
+    ) -> Result<(Value, zeroize::Zeroizing<String>), BusinessError> {
         let token = self.business_tokens(generation)?;
         let request = |method, suffix: &str| {
             self.http
@@ -843,10 +850,10 @@ impl AccountService {
         let items: Vec<_> = models.into_iter()
             .filter(|m| current_key["model_limits_enabled"] != true || limits.is_empty() || limits.contains(&m.id.as_str()))
             .map(|m| serde_json::json!({"model_name":m.id,"supported_endpoint_types":m.supported_endpoint_types,"endpoints":m.endpoints})).collect();
-        Ok(serde_json::json!({"items":items,"key":current_key}))
+        Ok((serde_json::json!({"items":items,"key":current_key}), secret))
     }
 
-    fn business_tokens(&self, generation: u64) -> Result<Tokens, BusinessError> {
+    pub(super) fn business_tokens(&self, generation: u64) -> Result<Tokens, BusinessError> {
         self.load();
         let i = self.inner.lock().unwrap();
         if i.record.generation != generation {

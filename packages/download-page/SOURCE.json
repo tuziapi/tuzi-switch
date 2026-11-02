@@ -1,0 +1,58 @@
+{
+  "repository": "tuziapi/tuzi-api",
+  "base": "5599625542131f42177596d1a74903f59f581710",
+  "sourceStatus": "local download redesign UC-DL-01/02, not yet deployed",
+  "files": [
+    {
+      "source": "web/src/components/tool-pages/TuziDownloadPage.jsx",
+      "path": "src/TuziDownloadPage.jsx",
+      "sha256": "1ec9615c287a7e3c7472d94d93172b464e2a5aa76eb0fb10d63cc0675d248f56"
+    },
+    {
+      "source": "web/src/components/tool-pages/tuzi-download.css",
+      "path": "src/tuzi-download.css",
+      "sha256": "db4340047e5ac113a682a83fcaf50457657b4c37fef3aefa32229b978bf5659e"
+    },
+    {
+      "source": "web/src/helpers/tuziSwitchRelease.js",
+      "path": "src/tuziSwitchRelease.js",
+      "sha256": "7c8454dff292ab6b327a5770945bf0a1b3d7993f7289afc0b0a719aeabe837bf"
+    },
+    {
+      "source": "web/public/tuzi-download-analytics.html",
+      "path": "public/tuzi-download-analytics.html",
+      "sha256": "26bca0b2d1649e15c3476f3c34d52baf7ba784eecfabf41c4a1c3603de422981"
+    },
+    {
+      "source": "LICENSE",
+      "path": "LICENSE",
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+    },
+    {
+      "source": "web/public/tuzi-assistant-assets/tools.png",
+      "path": "public/tuzi-assistant-assets/tools.png",
+      "sha256": "5bde352fcb30dac958ba4f130d2511d533bb5c53d01548db5cdea985e2e1feb9"
+    },
+    {
+      "source": "web/public/tuzi-assistant-assets/projects.png",
+      "path": "public/tuzi-assistant-assets/projects.png",
+      "sha256": "e2de881f14cd73fe8d7066a3ff84744d697a5e3c5fc2d4efb9353451959c4caa"
+    },
+    {
+      "source": "web/public/tuzi-assistant-assets/configuration.png",
+      "path": "public/tuzi-assistant-assets/configuration.png",
+      "sha256": "57f28915982f499f9e089ada427c76bedb5eeda97eedcee5e70648a1a0b0b2b1"
+    }
+  ],
+  "adaptations": [
+    "Standalone Vite entry and static verified public-release snapshot",
+    "Relative asset URLs for subdirectory hosting",
+    "Optional Actions test-artifact link and exact-commit source link",
+    "Original blue desktop icon and 下载兔子助手 CTA"
+  ],
+  "brandIcon": {
+    "repository": "tuziapi/tuzi-switch",
+    "path": "src-tauri/icons/icon.png",
+    "sha256": "0ac46b55e71b60d46874ca24ded5a98228967753e9dc9333d52f4faa157cf9bc"
+  }
+}

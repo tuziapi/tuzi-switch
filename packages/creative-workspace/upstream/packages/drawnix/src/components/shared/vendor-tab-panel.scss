@@ -1,0 +1,223 @@
+/**
+ * VendorTabPanel 厂商标签面板样式
+ * 支持两列（标签 | 内容）和三列（标签 | 分类 | 内容）布局
+ */
+
+$orange-primary: #f59e0b;
+$orange-light: rgba(243, 156, 18, 0.12);
+$orange-border: rgba(243, 156, 18, 0.6);
+$gray-light: #f3f4f6;
+$gray-medium: #9ca3af;
+$gray-dark: #6b7280;
+$text-dark: #1f2937;
+
+.vendor-tab-panel {
+  display: flex;
+  min-height: 280px;
+  flex: 1;
+
+  // 左侧厂商标签栏
+  &__tabs {
+    width: 116px;
+    flex-shrink: 0;
+    border-right: 1px solid #e5e7eb;
+    overflow-y: auto;
+    padding: 4px 0;
+    display: flex;
+    flex-direction: column;
+
+    &::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #e5e7eb;
+      border-radius: 2px;
+    }
+  }
+
+  &__tabs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: min-content;
+  }
+
+  &__tabs-footer {
+    margin-top: auto;
+    padding: 8px;
+    border-top: 1px solid #eef1f5;
+    background: #fff;
+  }
+
+  // 中间分类栏（三列模式）
+  &__middle-tabs {
+    width: 116px;
+    flex-shrink: 0;
+    border-right: 1px solid #e5e7eb;
+    overflow-y: auto;
+    padding: 4px 0;
+    background: #fcfcfd;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    &::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #e5e7eb;
+      border-radius: 2px;
+    }
+  }
+
+  &__tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: $gray-dark;
+    background: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &:hover {
+      background: $gray-light;
+      color: $text-dark;
+    }
+
+    &--active {
+      border-left-color: $orange-border;
+      background: $orange-light;
+      color: $text-dark;
+      font-weight: 600;
+    }
+  }
+
+  &__tab-icon {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: inherit;
+  }
+
+  &__tab-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__tab-count {
+    font-size: 11px;
+    font-weight: 400;
+    color: $gray-medium;
+    flex-shrink: 0;
+  }
+
+  // 右侧内容区
+  &__content {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #e5e7eb;
+      border-radius: 2px;
+    }
+  }
+
+  // compact 模式
+  &--compact &__tabs {
+    width: 148px;
+  }
+
+  &--compact &__tab {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  &--compact &__middle-tabs {
+    width: 132px;
+  }
+}
+
+// 暗色模式
+:root[data-theme='dark'] {
+  .vendor-tab-panel {
+    &__tabs {
+      border-right-color: var(--color-border, #444);
+
+      &::-webkit-scrollbar-thumb {
+        background: var(--color-border, #444);
+      }
+    }
+
+    &__middle-tabs {
+      background: var(--color-surface, #262626);
+      border-right-color: var(--color-border, #444);
+
+      &::-webkit-scrollbar-thumb {
+        background: var(--color-border, #444);
+      }
+    }
+
+    &__tabs-footer {
+      border-top-color: var(--color-border, #444);
+      background: var(--color-surface, #262626);
+    }
+
+    &__tab {
+      color: var(--color-gray-50, #999);
+
+      &:hover {
+        background: var(--color-surface-mid, #333);
+        color: var(--color-gray-20, #ccc);
+      }
+
+      &--active {
+        background: rgba(243, 156, 18, 0.15);
+        color: var(--color-gray-20, #ccc);
+      }
+    }
+
+    &__tab-count {
+      color: var(--color-gray-60, #666);
+    }
+
+    &__content {
+      &::-webkit-scrollbar-thumb {
+        background: var(--color-border, #444);
+      }
+    }
+  }
+}

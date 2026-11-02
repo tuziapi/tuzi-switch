@@ -20,6 +20,13 @@ use crate::error::AppError;
 /// 为了让 Windows CI/本地测试能稳定隔离真实用户数据，可通过 `CC_SWITCH_TEST_HOME`
 /// 显式覆盖 home dir（仅用于测试/调试场景）。
 pub fn get_home_dir() -> PathBuf {
+    // Keep isolated test launches consistent with LocalFileStore. This also
+    // separates creative preview runs from an already installed preview app.
+    if let Ok(home) = std::env::var("CC_SWITCH_TEST_HOME") {
+        if !home.trim().is_empty() {
+            return PathBuf::from(home.trim());
+        }
+    }
     // A preview bundle must never import or write the user's real tool settings.
     #[cfg(feature = "local-preview")]
     return dirs::data_local_dir()
@@ -28,13 +35,6 @@ pub fn get_home_dir() -> PathBuf {
 
     #[cfg(not(feature = "local-preview"))]
     {
-        if let Ok(home) = std::env::var("CC_SWITCH_TEST_HOME") {
-            let trimmed = home.trim();
-            if !trimmed.is_empty() {
-                return PathBuf::from(trimmed);
-            }
-        }
-
         dirs::home_dir().unwrap_or_else(|| {
             log::warn!("无法获取用户主目录，回退到当前目录");
             PathBuf::from(".")
