@@ -820,69 +820,7 @@
   margin-bottom: 8px;
 }
 .account-model-price-section {
-  padding: 18px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 16px;
-  background: hsl(var(--muted) / 0.15);
-}
-.account-model-price-section .account-pricing h4 {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 8px;
-}
-.account-model-price-section .account-pricing > p {
-  font-size: 11px;
-  line-height: 1.7;
-  color: hsl(var(--muted-foreground));
-  margin: 0 0 14px;
-}
-.account-model-price-section .account-pricing > dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-}
-.account-model-price-section .account-pricing > dl:empty {
-  display: none;
-}
-.account-model-price-section .account-pricing > dl > div {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 10px;
-  background: hsl(var(--card));
-}
-.account-model-price-section .account-pricing dt {
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-}
-.account-model-price-section .account-pricing dd {
-  font-size: 14px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-.account-model-technical {
-  color: hsl(var(--muted-foreground));
-  font-size: 12px;
-}
-.account-model-technical summary {
-  cursor: pointer;
-}
-.account-model-technical p,
-.account-model-technical pre {
-  margin-top: 10px;
-}
-.account-model-price-section pre,
-.account-model-technical pre {
-  padding: 12px;
-  border-radius: 8px;
-  background: hsl(var(--muted));
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 .account-drawer .account-model-configure {
   gap: 10px;
@@ -1021,4 +959,85 @@
 .account-pager > span:first-child {
   color: hsl(var(--muted-foreground));
   margin-right: 5px;
+}
+
+.account-workspace .account-log-table th.account-log-action {
+  text-align: left;
+}
+.account-workspace .account-status-card .account-quality-values {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.account-price-tab {
+  padding: 0 0 12px;
+  border-bottom: 2px solid hsl(var(--primary));
+  width: fit-content;
+  font-weight: 600;
+}
+.account-price-panel {
+  margin-top: 16px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  padding: 18px;
+}
+.account-price-panel h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.account-price-panel > p {
+  margin: 0 0 16px;
+}
+.account-price-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.account-price-table th,
+.account-price-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: left;
+}
+.account-price-table thead {
+  background: hsl(var(--muted) / 0.5);
+  color: hsl(var(--muted-foreground));
+}
+.account-price-table tbody th {
+  font-weight: 400;
+}
+.account-price-table td,
+.account-price-table thead th:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.account-price-table small {
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+.account-price-groups {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 16px 0;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.account-price-site {
+  display: inline-block;
+  margin-top: 12px;
+  color: hsl(var(--primary));
+  font-size: 12px;
+}
+.account-price-tier {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+.account-price-tier select {
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--muted));
+  padding: 5px 10px;
+  max-width: 100%;
 }

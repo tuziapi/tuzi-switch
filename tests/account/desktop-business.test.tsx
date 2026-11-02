@@ -1243,9 +1243,9 @@ describe("business actions and secret lifetime", () => {
     const { wrapper } = setup();
     render(<ModelsPage state={state} performance />, { wrapper });
     await screen.findByText("synthetic-model");
-    await screen.findByText(/75%/);
+    await screen.findByText(/75.00%/);
     expect(screen.queryByText(/7500%/)).toBeNull();
-    expect(screen.getByText(/2000 ms/)).toBeInTheDocument();
+    expect(screen.getByText(/2000.00 ms/)).toBeInTheDocument();
     expect(
       screen.getByText(zh.account.business.noSamples, { exact: false }),
     ).toBeInTheDocument();

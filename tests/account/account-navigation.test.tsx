@@ -237,7 +237,7 @@ describe("account workspace navigation", () => {
     const { client } = setup();
     await screen.findByText("合成开发密钥");
     await userEvent.click(tab("modelsStatus"));
-    await screen.findAllByText("99.8%");
+    await screen.findAllByText("99.80%");
     await userEvent.selectOptions(
       screen.getByLabelText(zh.account.business.window),
       "6",
@@ -332,7 +332,7 @@ describe("account workspace navigation", () => {
     setup();
     await screen.findByText("合成开发密钥");
     await userEvent.click(tab("modelsStatus"));
-    await screen.findAllByText("99.8%");
+    await screen.findAllByText("99.80%");
     expect(document.querySelectorAll(".account-status-card")).toHaveLength(6);
     expect(
       document.querySelectorAll(
@@ -399,7 +399,7 @@ describe("account workspace navigation", () => {
     setup();
     await screen.findByText("合成开发密钥");
     await userEvent.click(tab("modelsStatus"));
-    await screen.findAllByText("99.8%");
+    await screen.findAllByText("99.80%");
     const batches = () =>
       vi.mocked(invoke).mock.calls.flatMap(([cmd, args]) => {
         const request = (
@@ -411,9 +411,13 @@ describe("account workspace navigation", () => {
           : [];
       });
     expect(batches()[0]).not.toHaveProperty("groups");
-    await userEvent.click(
-      screen.getByRole("combobox", { name: "可用分组" }),
-    );
+    expect(
+      screen.getAllByText("最近 24 小时成功率 · 每格 30 分钟"),
+    ).toHaveLength(6);
+    expect(screen.queryByText("吞吐")).toBeNull();
+    expect(screen.queryByText("数据明细")).toBeNull();
+    expect(screen.queryByText("按分组查看服务状态")).toBeNull();
+    await userEvent.click(screen.getByRole("combobox", { name: "可用分组" }));
     await userEvent.click(
       await screen.findByRole("option", { name: "default" }),
     );
@@ -421,7 +425,7 @@ describe("account workspace navigation", () => {
       expect(batches()[batches().length - 1]?.groups).toEqual(["default"]),
     );
     await userEvent.click(screen.getByRole("button", { name: "清空筛选" }));
-    await screen.findAllByText("99.8%");
+    await screen.findAllByText("99.80%");
   });
   it("shows catalog pricing without applying account override metadata", async () => {
     vi.mocked(invoke).mockImplementation(async (command, args) => {
@@ -438,6 +442,7 @@ describe("account workspace navigation", () => {
           };
         };
         envelope.data.items[0].model_price = 0.125;
+        envelope.data.items[0].quota_type = 0;
         envelope.data.pricing_meta.user_model_pricing = {
           default: { "gpt-5.6-sol": { model_price: 98765 } },
         };
@@ -451,7 +456,7 @@ describe("account workspace navigation", () => {
     await userEvent.click(
       screen.getAllByRole("button", { name: zh.account.business.details })[0],
     );
-    expect(screen.getByText("0.125", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("$0.125", { exact: true })).toBeInTheDocument();
     expect(screen.queryByText("98765")).toBeNull();
     expect(
       screen.queryByText(zh.account.business.effectivePrice, { exact: false }),

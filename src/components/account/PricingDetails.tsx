@@ -1,94 +1,91 @@
-import { useTranslation } from "react-i18next";
+import { settingsApi } from "@/lib/api";
+import { toast } from "sonner";
+import { useState } from "react";
+import { priceTiers } from "@/lib/accountPricing/tiers";
 import type { DesktopPricing } from "@/lib/api/desktop";
-const fields = [
-  "model_price",
-  "completion_price",
-  "second_price",
-  "multiplier",
-  "cache_price",
-  "create_cache_price",
-  "create_cache_price_5m",
-  "create_cache_price_1h",
-  "image_price",
-  "image_cache_price",
-  "image_output_price",
-  "audio_price",
-  "audio_cache_price",
-  "audio_completion_price",
-  "web_search_price",
-  "model_ratio",
-  "completion_ratio",
-  "cache_ratio",
-  "create_cache_ratio",
-  "create_cache_ratio_5m",
-  "create_cache_ratio_1h",
-  "image_ratio",
-  "image_cache_ratio",
-  "image_output_ratio",
-  "audio_ratio",
-  "audio_cache_ratio",
-  "audio_completion_ratio",
-];
-const object = (v: unknown): Record<string, unknown> =>
-  v && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : {};
-/** Display catalog prices verbatim; do not merge account/group overrides here. */
+import { catalogPrices } from "@/lib/accountPricing/catalog";
+
+/** Catalog prices, without personalized account discounts. */
 export function PricingDetails({ model }: { model: DesktopPricing }) {
-  const { t } = useTranslation();
+  const tiers = model.billing_expr ? priceTiers(model.billing_expr) : [];
+  const [tier, setTier] = useState(0);
+  const prices = tiers[tier]?.prices ?? catalogPrices(model);
   return (
-    <section className="account-pricing">
-      <h4>{t("account.business.catalogPrices")}</h4>
-      <p>{t("account.business.priceUnits")}</p>
-      <dl>
-        {fields
-          .filter((f) => model[f] != null)
-          .map((f) => (
-            <div key={f}>
-              <dt title={f}>
-                {t(`account.priceLabels.${f}`, { defaultValue: f })}
-              </dt>
-              <dd>{String(model[f])}</dd>
+    <section className="account-catalog-pricing">
+      <div className="account-price-tab">价格与说明</div>
+      <div className="account-price-panel">
+        <h4>模型定价</h4>
+        <p className="account-subtle">美元计价 · 目录标准价格</p>
+        {tiers.length > 0 && (
+          <label className="account-price-tier">
+            价格档位{" "}
+            <select
+              value={tier}
+              onChange={(e) => setTier(Number(e.target.value))}
+            >
+              {tiers.map((item, index) => (
+                <option key={index} value={index}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {prices.length > 0 ? (
+          <table className="account-price-table">
+            <thead>
+              <tr>
+                <th>计费项目</th>
+                <th>价格</th>
+              </tr>
+            </thead>
+            <tbody>
+              {prices.map(({ label, amount, unit }) => (
+                <tr key={label}>
+                  <th scope="row">{label}</th>
+                  <td>
+                    <strong>
+                      $
+                      {amount.toLocaleString("en-US", {
+                        maximumFractionDigits: 12,
+                      })}
+                    </strong>{" "}
+                    <small>{unit}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="account-subtle">
+            {model.billing_expr
+              ? "此模型采用动态计费，具体价格以网站展示的价格档位为准。"
+              : "暂无可用价格"}
+          </p>
+        )}
+        {model.enable_groups.length > 0 && (
+          <div className="account-price-groups">
+            <span>可用分组</span>
+            <div className="account-model-tags">
+              {model.enable_groups.map((group) => (
+                <span className="account-badge" key={group}>
+                  {group}
+                </span>
+              ))}
             </div>
-          ))}
-      </dl>
-      {[
-        "conditional_task_pricing",
-        "conditional_task_pricing_details",
-        "task_per_second_pricing",
-        "per_call_variants",
-      ].map((f) =>
-        model[f] ? (
-          <div key={f}>
-            <h5>{f}</h5>
-            <pre className="whitespace-pre-wrap break-all">
-              {JSON.stringify(model[f], null, 2)}
-            </pre>
           </div>
-        ) : null,
-      )}
-      <dl>
-        {Object.entries(model.endpoints ?? {}).map(([name, v]) => {
-          const endpoint = object(v);
-          return (
-            <div key={name}>
-              <dt>{name}</dt>
-              <dd>
-                {String(endpoint.method ?? "")} {String(endpoint.path ?? "")} ·{" "}
-                {String(endpoint.label ?? "")} ·{" "}
-                {String(endpoint.description ?? "")}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
-      {model.related_pricing.map((m) => (
-        <p key={m.model_name}>
-          {t("account.business.relatedPrice")} {m.model_name} ·{" "}
-          {m.billing_mode ?? "—"} · {m.model_price ?? "—"} ·{" "}
-          {m.billing_expr ?? ""}
-        </p>
-      ))}
+        )}
+        <button
+          className="account-price-site"
+          onClick={() =>
+            void settingsApi
+              .openExternal("https://api.tu-zi.com/pricing")
+              .catch(() => toast.error("无法打开浏览器，请稍后重试"))
+          }
+        >
+          在网站查看分组价格与完整说明 ↗
+        </button>
+      </div>
     </section>
   );
 }

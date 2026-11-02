@@ -261,20 +261,7 @@ export function ModelsPage({
                       )}
                   </div>
                   {result ? (
-                    <>
-                      <Metrics metric={result.aggregate} />
-                      <details className="account-data-details">
-                        <summary>
-                          {t("account.workspace.groupPerformance")}
-                        </summary>
-                        {result.groups.map((group) => (
-                          <div key={group.group}>
-                            <h4>{group.group}</h4>
-                            <Metrics metric={group} />
-                          </div>
-                        ))}
-                      </details>
-                    </>
+                    <Metrics metric={result.aggregate} hours={hours} />
                   ) : (
                     <p className="account-subtle">
                       {quality.isLoading
@@ -415,32 +402,6 @@ export function ModelsPage({
                   </div>
                 )}
               </section>
-              <section className="account-model-availability">
-                <div>
-                  <h4>{t("account.business.modelFilter.endpoint_type")}</h4>
-                  <div className="account-model-tags">
-                    {selected.supported_endpoint_types.length
-                      ? selected.supported_endpoint_types.map((value) => (
-                          <span className="account-badge" key={value}>
-                            {value}
-                          </span>
-                        ))
-                      : "—"}
-                  </div>
-                </div>
-                <div>
-                  <h4>{t("account.business.modelFilter.group")}</h4>
-                  <div className="account-model-tags">
-                    {selected.enable_groups.length
-                      ? selected.enable_groups.map((value) => (
-                          <span className="account-badge" key={value}>
-                            {value}
-                          </span>
-                        ))
-                      : "—"}
-                  </div>
-                </div>
-              </section>
               <div className="account-model-price-section">
                 {selected.pricing_unavailable && (
                   <p className="account-subtle">
@@ -449,16 +410,6 @@ export function ModelsPage({
                 )}
                 <PricingDetails model={selected} />
               </div>
-              {(selected.billing_expr || selected.pricing_version) && (
-                <details className="account-model-technical">
-                  <summary>{t("account.visual.details")}</summary>
-                  <p>
-                    {t("account.business.priceVersion")}:{" "}
-                    {selected.pricing_version ?? "—"}
-                  </p>
-                  {selected.billing_expr && <pre>{selected.billing_expr}</pre>}
-                </details>
-              )}
             </div>
           </AccountErrorBoundary>
         </AccountDialog>
@@ -466,7 +417,15 @@ export function ModelsPage({
     </div>
   );
 }
-function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
+function Metrics({
+  metric: m,
+  hours,
+}: {
+  metric: Performance["aggregate"];
+  hours: number | string;
+}) {
+  const value = (n: number | null, unit: string) =>
+    n != null && Number.isFinite(n) ? `${n.toFixed(2)}${unit}` : "—";
   const { t } = useTranslation();
   return (
     <div className="account-performance-metrics">
@@ -480,10 +439,9 @@ function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
       </p>
       <dl className="account-quality-values">
         {[
-          [t("account.business.latency"), `${m.avg_latency_ms ?? "—"} ms`],
-          ["TTFT", `${m.avg_ttft_ms ?? "—"} ms`],
-          [t("account.visual.throughput"), `${m.avg_tps ?? "—"} token/s`],
-          [t("account.business.successRate"), `${m.success_rate ?? "—"}%`],
+          [t("account.business.latency"), value(m.avg_latency_ms, " ms")],
+          ["TTFT", value(m.avg_ttft_ms, " ms")],
+          [t("account.business.successRate"), value(m.success_rate, "%")],
         ].map(([label, value]) => (
           <div key={label}>
             <dt>{label}</dt>
@@ -492,7 +450,7 @@ function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
         ))}
       </dl>
       <figure className="account-timeline">
-        <figcaption>{t("account.visual.series")}</figcaption>
+        <figcaption>最近 {hours} 小时成功率 · 每格 30 分钟</figcaption>
         <div>
           {m.half_hour_series.length === 0 && (
             <span
@@ -506,7 +464,7 @@ function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
               key={point.ts}
               tabIndex={0}
               role="img"
-              aria-label={`${date(point.ts)} · ${point.has_samples ? `${point.success_rate ?? "—"}%` : t("account.business.noSamples")}`}
+              aria-label={`${date(point.ts)} · ${point.has_samples ? value(point.success_rate, "%") : t("account.business.noSamples")}`}
               className={
                 point.has_samples && point.success_rate != null
                   ? "has-samples"
@@ -522,56 +480,13 @@ function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
                     }
                   : undefined
               }
-              data-tooltip={`${date(point.ts)} · ${point.has_samples ? `${point.success_rate ?? "—"}%` : t("account.business.noSamples")}`}
-              title={`${date(point.ts)} · ${point.has_samples ? `${point.success_rate ?? "—"}%` : t("account.business.noSamples")}`}
+              data-tooltip={`${date(point.ts)} · ${point.has_samples ? value(point.success_rate, "%") : t("account.business.noSamples")}`}
+              title={`${date(point.ts)} · ${point.has_samples ? value(point.success_rate, "%") : t("account.business.noSamples")}`}
             />
           ))}
         </div>
         <p>{t("account.visual.seriesHint")}</p>
       </figure>
-      <details className="account-data-details">
-        <summary>{t("account.visual.details")}</summary>
-        <h4>{t("account.business.historical")}</h4>
-        <dl>
-          {Object.entries(m.historical_values ?? {}).map(([key, value]) => (
-            <div key={key}>
-              <dt>{key}</dt>
-              <dd>
-                {typeof value === "number" && key.includes("timestamp")
-                  ? date(value)
-                  : typeof value === "object" && value
-                    ? `${value.value} (${date(value.ts)})`
-                    : String(value ?? "—")}
-              </dd>
-            </div>
-          ))}
-        </dl>
-        <h4>{t("account.visual.series")}</h4>
-        <div className="account-table-scroll">
-          <table>
-            <thead>
-              <tr>
-                {["time", "latency", "ttft", "throughput", "successRate"].map(
-                  (key) => (
-                    <th key={key}>{t(`account.visual.${key}`)}</th>
-                  ),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {m.half_hour_series.map((p) => (
-                <tr key={p.ts}>
-                  <td>{date(p.ts)}</td>
-                  <td>{p.avg_latency_ms ?? "—"} ms</td>
-                  <td>{p.avg_ttft_ms ?? "—"} ms</td>
-                  <td>{p.avg_tps ?? "—"} token/s</td>
-                  <td>{p.success_rate ?? "—"}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
     </div>
   );
 }
