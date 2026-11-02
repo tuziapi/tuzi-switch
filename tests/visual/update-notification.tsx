@@ -20,7 +20,9 @@ mockIPC((command, args) => {
       platform,
     };
   if (command === "open_external") {
-    document.querySelector("output")!.textContent = String(args?.url);
+    document.querySelector("output")!.textContent = String(
+      (args as { url?: string } | undefined)?.url,
+    );
     return true;
   }
   throw new Error(`Unexpected IPC: ${command}`);
