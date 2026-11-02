@@ -412,10 +412,10 @@ describe("account workspace navigation", () => {
       });
     expect(batches()[0]).not.toHaveProperty("groups");
     await userEvent.click(
-      screen.getByRole("combobox", { name: "可用分组", exact: true }),
+      screen.getByRole("combobox", { name: "可用分组" }),
     );
     await userEvent.click(
-      await screen.findByRole("option", { name: "default", exact: true }),
+      await screen.findByRole("option", { name: "default" }),
     );
     await waitFor(() =>
       expect(batches()[batches().length - 1]?.groups).toEqual(["default"]),
