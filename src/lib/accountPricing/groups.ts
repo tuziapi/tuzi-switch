@@ -64,6 +64,15 @@ export function groupPrices(
       record.pricing_unavailable = false;
       record.billing_expr = null;
       record.billing_mode = null;
+      const source = get("pricing_source") ?? "group_override";
+      // A complete group plan replaces public task variants; fallback and
+      // multiplier plans inherit them and must not become a flat price.
+      if (source === "group_override") {
+        record.conditional_task_pricing = undefined;
+        record.conditional_task_pricing_details = undefined;
+        record.task_per_second_pricing = undefined;
+        record.per_call_variants = undefined;
+      }
       if (typeof expression === "string" && expression.length > 0) {
         record.billing_expr = expression;
         record.billing_mode = "tiered_expr";
@@ -99,7 +108,6 @@ export function groupPrices(
             record[field] = get(`model_${field}`);
         }
       }
-      const source = get("pricing_source") ?? "group_override";
       if (
         (get("pricing_semantics") === "final_v1" &&
           source !== "global_fallback") ||

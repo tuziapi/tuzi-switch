@@ -7,7 +7,12 @@ export function catalogPrices(model: DesktopPricing): Price[] {
   if (
     model.pricing_unavailable ||
     model.billing_mode === "tiered_expr" ||
-    model.billing_expr
+    model.billing_expr ||
+    model.conditional_task_pricing ||
+    model.conditional_task_pricing_details ||
+    model.task_per_second_pricing ||
+    (Array.isArray(model.per_call_variants) &&
+      model.per_call_variants.length > 0)
   )
     return [];
   const rows: Price[] = [];
