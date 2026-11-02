@@ -910,7 +910,7 @@
   white-space: nowrap;
 }
 .account-workspace .account-log-table .account-log-action {
-  text-align: right;
+  text-align: left;
   white-space: nowrap;
 }
 .account-workspace .account-log-table .account-log-action button {
@@ -1040,4 +1040,33 @@
   background: hsl(var(--muted));
   padding: 5px 10px;
   max-width: 100%;
+}
+
+.account-workspace .account-log-table th.account-log-action {
+  padding-left: 12px;
+}
+.account-group-price {
+  display: grid;
+  grid-template-columns: 125px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px 0;
+  border-top: 1px solid hsl(var(--border));
+}
+.account-group-price-heading {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.account-group-price-heading small {
+  display: block;
+  color: hsl(var(--muted-foreground));
+  margin-top: 4px;
+}
+.account-group-price .account-price-table {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .account-group-price {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
 }

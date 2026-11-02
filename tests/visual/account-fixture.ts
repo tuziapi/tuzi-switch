@@ -70,7 +70,7 @@ const models: DesktopPricing[] = [
   model_price: null,
   pricing_unavailable: false,
   completion_ratio: 3,
-  enable_groups: ["default"],
+  enable_groups: index === 0 ? ["default", "Codex"] : ["default"],
   supported_endpoint_types: protocol.split(","),
   endpoints: {},
   billing_mode: "按量计费",
@@ -290,6 +290,8 @@ export async function accountPreviewIPC(command: string, args?: unknown) {
         schema_version: "v1",
         algorithm_version: "v1",
         pricing_meta: {
+          usable_group: { default: "默认分组", Codex: "Codex" },
+          base_group_ratio: { default: 1, Codex: 0.8 },
           default_effective_group: "default",
           filter_facets: {
             vendors: {

@@ -1,24 +1,63 @@
 import { settingsApi } from "@/lib/api";
 import { toast } from "sonner";
 import { useState } from "react";
-import { priceTiers } from "@/lib/accountPricing/tiers";
+import { groupPrices, type GroupPrices } from "@/lib/accountPricing/groups";
 import type { DesktopPricing } from "@/lib/api/desktop";
-import { catalogPrices } from "@/lib/accountPricing/catalog";
 
-/** Catalog prices, without personalized account discounts. */
-export function PricingDetails({ model }: { model: DesktopPricing }) {
-  const tiers = model.billing_expr ? priceTiers(model.billing_expr) : [];
-  const [tier, setTier] = useState(0);
-  const prices = tiers[tier]?.prices ?? catalogPrices(model);
+/** The same visible groups as the website, using group catalog plans. */
+export function PricingDetails({
+  model,
+  meta = {},
+}: {
+  model: DesktopPricing;
+  meta?: Record<string, unknown>;
+}) {
+  const groups = groupPrices(model, meta);
   return (
     <section className="account-catalog-pricing">
       <div className="account-price-tab">价格与说明</div>
       <div className="account-price-panel">
-        <h4>模型定价</h4>
-        <p className="account-subtle">美元计价 · 目录标准价格</p>
-        {tiers.length > 0 && (
+        <h4>分组价格</h4>
+        <p className="account-subtle">
+          美元计价 · 分组目录价格，不含个人专属折扣
+        </p>
+        {groups.map((group) => (
+          <GroupPrice key={group.group} group={group} />
+        ))}
+        {!groups.length && (
+          <p className="account-subtle">暂无可展示的分组价格</p>
+        )}
+        <button
+          className="account-price-site"
+          onClick={() =>
+            void settingsApi
+              .openExternal("https://api.tu-zi.com/pricing")
+              .catch(() => toast.error("无法打开浏览器，请稍后重试"))
+          }
+        >
+          在网站查看完整定价说明 ↗
+        </button>
+      </div>
+    </section>
+  );
+}
+function GroupPrice({ group }: { group: GroupPrices }) {
+  const [tier, setTier] = useState(0);
+  const tiers = group.tiers;
+  const prices = tiers[tier]?.prices ?? tiers[0]?.prices ?? [];
+  return (
+    <section
+      className="account-group-price"
+      aria-label={`${group.label} 分组价格`}
+    >
+      <div className="account-group-price-heading">
+        <strong>{group.label}</strong>
+        {group.label !== group.group && <small>{group.group}</small>}
+      </div>
+      <div>
+        {tiers.length > 1 && (
           <label className="account-price-tier">
-            价格档位{" "}
+            {group.label} · 价格档位{" "}
             <select
               value={tier}
               onChange={(e) => setTier(Number(e.target.value))}
@@ -58,33 +97,9 @@ export function PricingDetails({ model }: { model: DesktopPricing }) {
           </table>
         ) : (
           <p className="account-subtle">
-            {model.billing_expr
-              ? "此模型采用动态计费，具体价格以网站展示的价格档位为准。"
-              : "暂无可用价格"}
+            暂无可直接展示的价格，请在网站查看完整定价说明。
           </p>
         )}
-        {model.enable_groups.length > 0 && (
-          <div className="account-price-groups">
-            <span>可用分组</span>
-            <div className="account-model-tags">
-              {model.enable_groups.map((group) => (
-                <span className="account-badge" key={group}>
-                  {group}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        <button
-          className="account-price-site"
-          onClick={() =>
-            void settingsApi
-              .openExternal("https://api.tu-zi.com/pricing")
-              .catch(() => toast.error("无法打开浏览器，请稍后重试"))
-          }
-        >
-          在网站查看分组价格与完整说明 ↗
-        </button>
       </div>
     </section>
   );

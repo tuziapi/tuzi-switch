@@ -408,7 +408,10 @@ export function ModelsPage({
                     {t("account.business.priceUnavailable")}
                   </p>
                 )}
-                <PricingDetails model={selected} />
+                <PricingDetails
+                  model={selected}
+                  meta={models.data?.data.pricing_meta ?? {}}
+                />
               </div>
             </div>
           </AccountErrorBoundary>

@@ -1,3 +1,4 @@
+import { groupPrices } from "@/lib/accountPricing/groups";
 import { describe, expect, it } from "vitest";
 import { catalogPrices } from "@/lib/accountPricing/catalog";
 import { priceTiers } from "@/lib/accountPricing/tiers";
@@ -36,5 +37,81 @@ describe("public catalog display", () => {
       'tier("x", p',
     ])
       expect(priceTiers(expr)).toEqual([]);
+  });
+});
+
+describe("group catalog pricing", () => {
+  const model = {
+    model_name: "synthetic",
+    quota_type: 1,
+    model_ratio: 1,
+    completion_ratio: 3,
+    enable_groups: ["all"],
+    pricing_unavailable: false,
+  } as DesktopPricing;
+  it("shows visible supported groups and applies distinct base ratios, ignoring personal discounts", () => {
+    const rows = groupPrices(model, {
+      usable_group: { default: "默认", Codex: "Codex", auto: "自动" },
+      base_group_ratio: { default: 1, Codex: 0.8 },
+      group_ratio: { default: 0.5, Codex: 0.4 },
+      user_group_multiplier: { Codex: 0.1 },
+    });
+    expect(rows.map((r) => [r.group, r.tiers[0].prices[0].amount])).toEqual([
+      ["default", 2],
+      ["Codex", 1.6],
+    ]);
+    expect(
+      groupPrices(
+        { ...model, enable_groups: ["Codex"] },
+        { usable_group: { default: "默认", Codex: "Codex" } },
+      ).map((r) => r.group),
+    ).toEqual(["Codex"]);
+  });
+  it("applies final group plans once and replaces rather than multiplies group ratios", () => {
+    const rows = groupPrices(model, {
+      usable_group: { final: "最终价格", multiple: "倍率" },
+      base_group_ratio: { final: 7, multiple: 7 },
+      group_model_pricing: {
+        final: {
+          quota_type: { synthetic: 1 },
+          model_ratio: { synthetic: 0.25 },
+          model_completion_ratio: { synthetic: 2 },
+          pricing_semantics: { synthetic: "final_v1" },
+        },
+        multiple: { model_multiplier: { synthetic: 0.8 } },
+      },
+    });
+    expect(rows[0].tiers[0].prices.map((p) => p.amount)).toEqual([0.5, 1]);
+    expect(rows[1].tiers[0].prices[0].amount).toBe(1.6);
+  });
+  it("resolves virtual default and supports group expressions and free per-call prices", () => {
+    const rows = groupPrices(model, {
+      usable_group: { default: "默认", free: "免费" },
+      default_resolution: { synthetic: { effective_group: "actual" } },
+      group_model_pricing: {
+        actual: {
+          billing_expr: { synthetic: 'v2:tier("基础", (p + c * 5) / 1000000)' },
+        },
+        free: {
+          quota_type: { synthetic: 0 },
+          model_price: { synthetic: 0 },
+          pricing_semantics: { synthetic: "final_v1" },
+        },
+      },
+    });
+    expect(rows[0].tiers[0].prices.map((p) => p.amount)).toEqual([1, 5]);
+    expect(rows[1].tiers[0].prices[0].amount).toBe(0);
+  });
+  it("does not merge incomplete overrides or fabricate invalid multiplier prices", () => {
+    const rows = groupPrices(model, {
+      usable_group: { partial: "Partial", bad: "Bad" },
+      base_group_ratio: { partial: 1 },
+      group_model_pricing: {
+        partial: { model_completion_ratio: { synthetic: 99 } },
+        bad: { model_multiplier: { synthetic: null } },
+      },
+    });
+    expect(rows[0].tiers[0].prices.map((p) => p.amount)).toEqual([2, 6]);
+    expect(rows[1].tiers).toEqual([]);
   });
 });
