@@ -3086,7 +3086,8 @@
         "token": "Last 4 key characters",
         "group": "Group",
         "status": "All statuses"
-      }
+      },
+      "catalogPrices": "Model pricing"
     },
     "visual": {
       "actions": "Actions",

@@ -314,15 +314,31 @@ export async function accountPreviewIPC(command: string, args?: unknown) {
         },
       });
     }
-    case "/account/model-performance/batch":
+    case "/account/model-performance/batch": {
+      const requestedGroups = (request.body as { groups?: string[] }).groups;
+      // The API distinguishes omitted (all visible) from [] (no groups).
+      const hasGroups =
+        requestedGroups === undefined || requestedGroups.includes("default");
+      const sample = hasGroups
+        ? metric
+        : {
+            ...metric,
+            has_samples: false,
+            success_rate: null,
+            avg_latency_ms: null,
+            avg_ttft_ms: null,
+            avg_tps: null,
+            half_hour_series: [],
+          };
       return envelope(
         ((request.body as { models: string[] }).models ?? []).map((name) => ({
           model_name: name,
-          aggregate: metric,
-          groups: [{ ...metric, group: "default" }],
+          aggregate: sample,
+          groups: hasGroups ? [{ ...sample, group: "default" }] : [],
           series_schema: "v1",
         })),
       );
+    }
     case "/account/model-performance":
       return envelope({
         model_name: q.model,

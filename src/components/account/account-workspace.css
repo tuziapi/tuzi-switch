@@ -923,3 +923,102 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ACCOUNT-OPEN-04: fixed log slots and quiet, shared pagination. */
+.account-workspace .account-log-table table {
+  table-layout: fixed;
+  min-width: 880px;
+  width: 100%;
+}
+.account-workspace .account-log-table th:nth-child(1) {
+  width: 152px;
+}
+.account-workspace .account-log-table th:nth-child(2) {
+  width: 21%;
+}
+.account-workspace .account-log-table th:nth-child(3) {
+  width: 76px;
+}
+.account-workspace .account-log-table th:nth-child(4) {
+  width: 90px;
+}
+.account-workspace .account-log-table th:nth-child(5) {
+  width: 76px;
+}
+.account-workspace .account-log-table th:nth-child(6) {
+  width: 128px;
+}
+.account-workspace .account-log-table th:nth-child(7) {
+  width: 88px;
+}
+.account-workspace .account-log-table th.account-log-action {
+  width: 84px;
+}
+.account-workspace .account-log-table td {
+  height: 64px;
+  padding: 10px 12px;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.account-workspace .account-log-table td strong,
+.account-workspace .account-log-table td small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-workspace .account-log-table .account-log-duration span {
+  display: block;
+  white-space: nowrap;
+}
+.account-workspace .account-log-table .account-log-action {
+  text-align: right;
+  white-space: nowrap;
+}
+.account-workspace .account-log-table .account-log-action button {
+  height: 28px;
+  padding: 0;
+  font-size: 12px;
+}
+.account-shell .account-pager,
+.account-drawer .account-pager {
+  gap: 5px;
+  font-size: 12px;
+  padding: 8px 0;
+}
+.account-shell .account-pager button,
+.account-drawer .account-pager button {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 6px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
+}
+.account-shell .account-pager button:hover:not(:disabled),
+.account-drawer .account-pager button:hover:not(:disabled) {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.account-shell .account-pager button[aria-current="page"],
+.account-drawer .account-pager button[aria-current="page"] {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+.account-shell .account-pager input,
+.account-drawer .account-pager input {
+  width: 48px;
+  height: 26px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.account-pager > span:first-child {
+  color: hsl(var(--muted-foreground));
+  margin-right: 5px;
+}

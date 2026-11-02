@@ -3086,7 +3086,8 @@
         "token": "密钥后4位",
         "group": "分组",
         "status": "全部状态"
-      }
+      },
+      "catalogPrices": "模型价格"
     },
     "visual": {
       "actions": "操作",

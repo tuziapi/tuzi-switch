@@ -3079,7 +3079,8 @@
         "token": "キー末尾4文字",
         "group": "グループ",
         "status": "すべての状態"
-      }
+      },
+      "catalogPrices": "モデル料金"
     },
     "visual": {
       "actions": "操作",

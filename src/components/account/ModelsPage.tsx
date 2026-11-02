@@ -78,7 +78,7 @@ export function ModelsPage({
           generation: state.generation,
           body: {
             models: modelNames,
-            groups: filters.group ? [filters.group] : [],
+            ...(filters.group ? { groups: [filters.group] } : {}),
             hours,
             resolution: "30m",
           },
@@ -447,11 +447,7 @@ export function ModelsPage({
                     {t("account.business.priceUnavailable")}
                   </p>
                 )}
-                <PricingDetails
-                  model={selected}
-                  meta={models.data?.data.pricing_meta ?? {}}
-                  group={filters.group}
-                />
+                <PricingDetails model={selected} />
               </div>
               {(selected.billing_expr || selected.pricing_version) && (
                 <details className="account-model-technical">

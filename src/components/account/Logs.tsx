@@ -485,6 +485,7 @@ function LogRows({
                 )}
               </th>
             ))}
+            {select && <th className="account-log-action">操作</th>}
           </tr>
         </thead>
         <tbody>
@@ -497,14 +498,21 @@ function LogRows({
                   : undefined
               }
             >
-              <td>{date(l.created_at)}</td>
+              <td className="account-log-time">{date(l.created_at)}</td>
               <td>
-                <strong>{l.model_name}</strong>
+                <strong title={l.model_name}>{l.model_name}</strong>
                 <small>
                   {l.token_name} · {l.group}
                 </small>
               </td>
-              <td>
+              <td
+                title={
+                  l.error_message ||
+                  l.public_error_code ||
+                  l.error_code ||
+                  undefined
+                }
+              >
                 <span
                   className={`account-badge ${l.result === "success" ? "is-success" : l.result === "error" ? "is-error" : ""}`}
                 >
@@ -520,17 +528,17 @@ function LogRows({
               <td>
                 {l.prompt_tokens} / {l.completion_tokens}
               </td>
-              <td>
-                {l.duration_ms} ms {l.is_stream ? "stream" : ""}
-                {l.error_code && (
-                  <p>{t(`account.business.callError.${l.error_code}`)}</p>
-                )}
-                {select && (
+              <td className="account-log-duration">
+                <span>{l.duration_ms} ms</span>
+                <small>{l.is_stream ? "流式" : "非流式"}</small>
+              </td>
+              {select && (
+                <td className="account-log-action">
                   <Button variant="link" onClick={() => select(l)}>
                     查看详情
                   </Button>
-                )}
-              </td>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

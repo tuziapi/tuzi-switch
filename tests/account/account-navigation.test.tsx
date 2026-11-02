@@ -54,6 +54,7 @@ const tab = (page: "keys" | "logs" | "models" | "modelsStatus") =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  HTMLElement.prototype.scrollIntoView = vi.fn();
   i18n.addResourceBundle("zh", "translation", zh, true, true);
   setAccountPreviewMode("normal");
   vi.mocked(invoke).mockImplementation(accountPreviewIPC as typeof invoke);
@@ -393,5 +394,67 @@ describe("account workspace navigation", () => {
     expect(screen.queryByText(zh.account.workspace.noModels)).toBeNull();
     await userEvent.click(tab("keys"));
     await screen.findByText("合成开发密钥");
+  });
+  it("omits the all-groups filter and sends only an explicitly selected group", async () => {
+    setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("modelsStatus"));
+    await screen.findAllByText("99.8%");
+    const batches = () =>
+      vi.mocked(invoke).mock.calls.flatMap(([cmd, args]) => {
+        const request = (
+          args as { request?: { path: string; body: Record<string, unknown> } }
+        )?.request;
+        return cmd === "account_request" &&
+          request?.path === "/account/model-performance/batch"
+          ? [request.body]
+          : [];
+      });
+    expect(batches()[0]).not.toHaveProperty("groups");
+    await userEvent.click(
+      screen.getByRole("combobox", { name: "可用分组", exact: true }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "default", exact: true }),
+    );
+    await waitFor(() =>
+      expect(batches()[batches().length - 1]?.groups).toEqual(["default"]),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "清空筛选" }));
+    await screen.findAllByText("99.8%");
+  });
+  it("shows catalog pricing without applying account override metadata", async () => {
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      const result = await accountPreviewIPC(command, args);
+      if (
+        command === "account_request" &&
+        (args as { request: { path: string } }).request.path ===
+          "/account/models"
+      ) {
+        const envelope = result as {
+          data: {
+            items: Record<string, unknown>[];
+            pricing_meta: Record<string, unknown>;
+          };
+        };
+        envelope.data.items[0].model_price = 0.125;
+        envelope.data.pricing_meta.user_model_pricing = {
+          default: { "gpt-5.6-sol": { model_price: 98765 } },
+        };
+      }
+      return result;
+    });
+    setup();
+    await screen.findByText("合成开发密钥");
+    await userEvent.click(tab("models"));
+    await screen.findByText("gpt-5.6-sol");
+    await userEvent.click(
+      screen.getAllByRole("button", { name: zh.account.business.details })[0],
+    );
+    expect(screen.getByText("0.125", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText("98765")).toBeNull();
+    expect(
+      screen.queryByText(zh.account.business.effectivePrice, { exact: false }),
+    ).toBeNull();
   });
 });

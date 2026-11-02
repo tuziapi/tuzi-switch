@@ -33,81 +33,25 @@ const object = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v)
     ? (v as Record<string, unknown>)
     : {};
-export function PricingDetails({
-  model,
-  meta,
-  group,
-}: {
-  model: DesktopPricing;
-  meta: Record<string, unknown>;
-  group?: string;
-}) {
+/** Display catalog prices verbatim; do not merge account/group overrides here. */
+export function PricingDetails({ model }: { model: DesktopPricing }) {
   const { t } = useTranslation();
-  const effective =
-    group ||
-    String(meta.default_effective_group ?? meta.pricing_reference_group ?? "");
-  const personal = object(object(meta.user_model_pricing)[effective]);
-  const override = object(personal[model.model_name]);
-  const groups = object(object(meta.group_model_pricing)[effective]);
   return (
     <section className="account-pricing">
-      <h4>
-        {t("account.business.effectivePrice")} · {effective || "—"}
-      </h4>
+      <h4>{t("account.business.catalogPrices")}</h4>
       <p>{t("account.business.priceUnits")}</p>
       <dl>
         {fields
-          .filter((f) => f in model || f in override)
+          .filter((f) => model[f] != null)
           .map((f) => (
             <div key={f}>
               <dt title={f}>
                 {t(`account.priceLabels.${f}`, { defaultValue: f })}
               </dt>
-              <dd>{String((f in override ? override[f] : model[f]) ?? "—")}</dd>
+              <dd>{String(model[f])}</dd>
             </div>
           ))}
-        {[
-          "group_ratio",
-          "base_group_ratio",
-          "system_group_ratio",
-          "user_group_multiplier",
-          "group_discount_ratio",
-          "group_discount_source",
-        ]
-          .filter((f) => object(meta[f])[effective] != null)
-          .map((f) => (
-            <div key={f}>
-              <dt title={f}>
-                {t(`account.priceLabels.${f}`, { defaultValue: f })}
-              </dt>
-              <dd>{String(object(meta[f])[effective] ?? "—")}</dd>
-            </div>
-          ))}
-        <div>
-          <dt>{t("account.priceLabels.user_model_discount_ratio")}</dt>
-          <dd>
-            {String(
-              object(object(meta.user_model_discount_ratio)[effective])[
-                model.model_name
-              ] ?? "—",
-            )}
-          </dd>
-        </div>
-        {Object.entries(groups).map(([f, map]) => (
-          <div key={f}>
-            <dt title={f}>
-              {t(`account.priceLabels.${f}`, { defaultValue: f })}
-            </dt>
-            <dd>{String(object(map)[model.model_name] ?? "—")}</dd>
-          </div>
-        ))}
       </dl>
-      {typeof override.billing_expr === "string" && (
-        <p>
-          {t("account.business.complexPrice")}{" "}
-          <code>{override.billing_expr}</code>
-        </p>
-      )}
       {[
         "conditional_task_pricing",
         "conditional_task_pricing_details",

@@ -77,3 +77,16 @@
 验证：`pnpm typecheck`通过；账户导航/业务/AccountPage三文件68项测试通过；`git diff --check`通过。合成浏览器检查宽窗口日志首屏、模型筛选、详情及状态页，720px筛选等宽换行；证据 `account-opening-evidence/model-detail-polish.png`、`model-filters-polish-narrow.png`。构建结果见本节后续记录。未进行真实账户业务联调或跨平台验收。允许本地commit，不推送或发布；原未跟踪附件保留。
 
 最终 `pnpm tauri build --debug --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'` 成功，日志 `/tmp/tuzi-open03-final-build.log`；定向测试日志 `/tmp/tuzi-open03-tests.log`。已重启本地桌面构建并置前，确认四Tab存在、账户设置入口隐藏；没有开展真实账户写操作或完整业务联调。构建保留既有chunk体积及未使用项警告。
+
+## ACCOUNT-OPEN-04 日志对齐、轻量分页与状态空数据修复（2026-11-02）
+
+用户授权四项反馈本地实施，基于 `244aa63`，分支 `codex/enable-hidden-features`。保留账户设置隐藏、统计位于列表下方及四Tab。
+
+- 日志增加独立操作列，耗时/流式状态固定两行；错误详情保留抽屉及结果悬停提示，避免失败记录额外撑高。固定列布局与64px行高，长模型名省略并提供完整悬停标题，窄屏保留横向滚动。
+- 共用分页器采用26px轻量按钮与输入框，弱化边框和背景、强调当前页；总数/范围、上一页/下一页、页码及跳转不变，覆盖日志、广场、状态页。
+- 模型详情直接展示目录返回的非空价格/倍率及复杂定价字段，不合并 user_model_pricing/group_model_pricing 或账户折扣，不在客户端推算“当前账户有效价”。不声称目录原始价是个性化最终扣费价；配置工具入口保留。
+- 状态空数据根因：无筛选时发送 `groups: []`。API `parsePerfMetricGroupValues` 保留显式空数组，`resolvePerfMetricGroups` 取交集为空；省略 groups 才表示全部可见分组。客户端现在未筛选时省略 groups，仅选中时传单项数组，与网站默认batch请求一致。保留真实无样本语义，不填造指标。
+
+API仅只读参考，HEAD `e24dec43f00722733db7264eda32afcef60fc55e`、工作区干净；契约 `system-token-v1`，无原生/服务端修改、无凭证或数据迁移。状态来源：controller/perf_metrics.go、网站 MarketplaceModelStatus.jsx；价格来源：ModelDetailSideSheet.jsx/目录接口，本次按用户要求取消客户端账户特价覆盖。
+
+验证：类型检查通过；账户导航/业务2文件53项通过。新增用例校验默认省略groups、选择分组后发送准确数组，并在注入账户价格覆盖元数据时仍显示目录原始值。合成fixture模拟API省略/空数组差异，防止旧mock掩盖问题。浏览器验证日志成功/失败十行均64px、分页26px及下一页、价格抽屉。macOS debug app构建成功（renderer与原生打包，既有依赖/包体/Rust未使用项警告）。日志 `/tmp/tuzi-open04-{final-tests,build}.log`。真实账户/线上部署未验证；不将合成数据显示当作线上联调成功。仅本地提交，无push/PR/发布。
