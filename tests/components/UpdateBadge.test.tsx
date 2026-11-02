@@ -90,10 +90,16 @@ describe("UpdateBadge", () => {
   it("opens an update dialog from the top badge", () => {
     render(<UpdateBadge />);
 
-    fireEvent.click(screen.getByRole("button", { name: "检测到新版本：1.1.30" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "检测到新版本：1.1.30" }),
+    );
 
-    expect(screen.getByText("当前版本 1.1.29，可升级到 1.1.30。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "更新到 1.1.30" })).toBeInTheDocument();
+    expect(
+      screen.getByText("当前版本 1.1.29，可升级到 1.1.30。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "更新到 1.1.30" }),
+    ).toBeInTheDocument();
   });
 
   it("shows progress and restart action after native update installs", async () => {
@@ -105,11 +111,15 @@ describe("UpdateBadge", () => {
 
     render(<UpdateBadge />);
 
-    fireEvent.click(screen.getByRole("button", { name: "检测到新版本：1.1.30" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "检测到新版本：1.1.30" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "更新到 1.1.30" }));
 
     await waitFor(() => {
-      expect(screen.getByText("settings.updateRestartTitle")).toBeInTheDocument();
+      expect(
+        screen.getByText("settings.updateRestartTitle"),
+      ).toBeInTheDocument();
     });
 
     expect(resetDismissMock).toHaveBeenCalledTimes(1);
@@ -118,7 +128,34 @@ describe("UpdateBadge", () => {
       { closeButton: true },
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /settings.restartNow/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /settings.restartNow/ }),
+    );
     expect(relaunchMock).toHaveBeenCalledTimes(1);
+  });
+  it("manual test updates open the download without showing installed or restart", async () => {
+    updateState.updateHandle!.manual = true;
+    updateState.updateInfo!.channel = "acceptance";
+    downloadAndInstallMock.mockResolvedValue(undefined);
+    render(<UpdateBadge />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "检测到新版本：1.1.30" }),
+    );
+    expect(
+      screen.getByText("settings.acceptanceUpdateHint"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "settings.downloadUpdate" }),
+    );
+    await waitFor(() =>
+      expect(toastSuccessMock).toHaveBeenCalledWith(
+        "settings.updatePageOpened",
+        { closeButton: true },
+      ),
+    );
+    expect(relaunchMock).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText("settings.updateRestartTitle"),
+    ).not.toBeInTheDocument();
   });
 });

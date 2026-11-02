@@ -24,6 +24,11 @@ import { settingsApi } from "@/lib/api";
 import type { WebHotUpdateStatus } from "@/lib/api/settings";
 import { useUpdate } from "@/contexts/UpdateContext";
 import { relaunchApp } from "@/lib/updater";
+import {
+  getUpdateBuildInfo,
+  ACCEPTANCE_DOWNLOAD_PAGE,
+  type UpdateBuildInfo,
+} from "@/lib/acceptanceUpdater";
 import { RELEASES_URL } from "@/lib/releaseRepository";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
@@ -94,7 +99,16 @@ curl -fsSL https://opencode.ai/install | bash`;
 export function AboutSection({ isPortable }: AboutSectionProps) {
   // ... (use hooks as before) ...
   const { t } = useTranslation();
-  const version = __APP_VERSION__;
+  const [build, setBuild] = useState<UpdateBuildInfo | null>(null);
+  useEffect(() => {
+    void getUpdateBuildInfo()
+      .then(setBuild)
+      .catch(() => {});
+  }, []);
+  const version =
+    build?.channel === "acceptance"
+      ? `test-${build.commit.slice(0, 8) || "local"} (#${build.runNumber})`
+      : `v${__APP_VERSION__}`;
   const [isDownloading, setIsDownloading] = useState(false);
   const [webUpdateStatus, setWebUpdateStatus] =
     useState<WebHotUpdateStatus | null>(null);
@@ -248,6 +262,14 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
 
   const handleOpenReleaseNotes = useCallback(async () => {
     try {
+      if (updateInfo?.channel === "acceptance" && updateInfo.releaseUrl) {
+        await settingsApi.openExternal(updateInfo.releaseUrl);
+        return;
+      }
+      if (build?.channel === "acceptance") {
+        await settingsApi.openExternal(ACCEPTANCE_DOWNLOAD_PAGE);
+        return;
+      }
       const targetVersion = updateInfo?.availableVersion ?? version ?? "";
       const displayVersion = targetVersion.startsWith("v")
         ? targetVersion
@@ -265,11 +287,11 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
       console.error("[AboutSection] Failed to open release notes", error);
       toast.error(t("settings.openReleaseNotesFailed"));
     }
-  }, [t, updateInfo?.availableVersion, version]);
+  }, [t, updateInfo, version, build]);
 
   const handleCheckUpdate = useCallback(async () => {
     if (hasUpdate && updateHandle) {
-      if (isPortable) {
+      if (isPortable && !updateHandle.manual) {
         try {
           await settingsApi.checkUpdates();
         } catch (error) {
@@ -397,7 +419,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
                 <span className="text-muted-foreground">
                   {t("common.version")}
                 </span>
-                <span className="font-medium">{`v${version}`}</span>
+                <span className="font-medium">{version}</span>
               </Badge>
               {isPortable && (
                 <Badge variant="secondary" className="gap-1.5">
@@ -444,9 +466,14 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
               ) : hasUpdate ? (
                 <>
                   <Download className="h-3.5 w-3.5" />
-                  {t("settings.updateTo", {
-                    version: updateInfo?.availableVersion ?? "",
-                  })}
+                  {t(
+                    updateHandle?.manual
+                      ? "settings.downloadUpdate"
+                      : "settings.updateTo",
+                    {
+                      version: updateInfo?.availableVersion ?? "",
+                    },
+                  )}
                 </>
               ) : isChecking ? (
                 <>

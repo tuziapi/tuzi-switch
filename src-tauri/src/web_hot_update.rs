@@ -64,6 +64,9 @@ pub fn register_protocol<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
 }
 
 pub fn navigate_main_window_if_available(app: &AppHandle) {
+    if cfg!(feature = "isolated-profile") {
+        return;
+    }
     if active_web_root().is_none() {
         return;
     }
@@ -87,6 +90,13 @@ pub async fn get_web_hot_update_status() -> Result<WebHotUpdateStatus, String> {
 
 #[tauri::command]
 pub async fn check_web_hot_update() -> Result<WebHotUpdateResult, String> {
+    if cfg!(feature = "isolated-profile") {
+        return Ok(WebHotUpdateResult {
+            updated: false,
+            version: None,
+            message: "集成测试版通过完整安装包更新".to_string(),
+        });
+    }
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(20))
         .build()
@@ -133,11 +143,15 @@ pub async fn check_web_hot_update() -> Result<WebHotUpdateResult, String> {
 }
 
 fn build_status() -> WebHotUpdateStatus {
-    let active = active_version();
+    let active = if cfg!(feature = "isolated-profile") {
+        None
+    } else {
+        active_version()
+    };
     WebHotUpdateStatus {
         bundled_version: env!("CARGO_PKG_VERSION").to_string(),
         pending_version: active.clone(),
-        using_hot_assets: active_web_root().is_some(),
+        using_hot_assets: !cfg!(feature = "isolated-profile") && active_web_root().is_some(),
         active_version: active,
         manifest_url: crate::release_repository::web_manifest_urls()[0].clone(),
     }
@@ -573,5 +587,18 @@ mod tests {
             signature_payload(&manifest),
             "abcdef\n1.1.4-web.1\n>=1.1.4 <1.2.0\n"
         );
+    }
+}
+
+#[cfg(all(test, feature = "isolated-profile"))]
+mod acceptance_update_tests {
+    #[tokio::test]
+    async fn acceptance_updates_never_download_stable_web_assets() {
+        let result = super::check_web_hot_update().await.unwrap();
+        assert!(!result.updated);
+        assert!(result.version.is_none());
+        let status = super::build_status();
+        assert!(!status.using_hot_assets);
+        assert!(status.active_version.is_none());
     }
 }

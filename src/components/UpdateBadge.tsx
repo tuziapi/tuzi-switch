@@ -161,15 +161,25 @@ export function UpdateBadge({ className = "", onOpenAbout }: UpdateBadgeProps) {
             <DialogDescription className="text-sm leading-relaxed">
               {isInstalled
                 ? t("settings.updateRestartMessage")
-                : t("settings.updateDialogDescription", {
-                    current: updateInfo.currentVersion || "-",
-                    version: updateInfo.availableVersion,
-                  })}
+                : t(
+                    updateHandle?.manual
+                      ? "settings.manualUpdateDescription"
+                      : "settings.updateDialogDescription",
+                    {
+                      current: updateInfo.currentVersion || "-",
+                      version: updateInfo.availableVersion,
+                    },
+                  )}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 px-6 py-4">
-            {isDownloading && (
+            {!isInstalled && updateInfo.channel === "acceptance" && (
+              <p className="text-sm text-muted-foreground">
+                {t("settings.acceptanceUpdateHint")}
+              </p>
+            )}
+            {isDownloading && !updateHandle?.manual && (
               <div className="space-y-2" role="status" aria-live="polite">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{progressLabel}</span>
@@ -235,9 +245,11 @@ export function UpdateBadge({ className = "", onOpenAbout }: UpdateBadgeProps) {
                   )}
                   {isDownloading
                     ? t("settings.updating")
-                    : t("settings.updateTo", {
-                        version: updateInfo.availableVersion,
-                      })}
+                    : updateHandle?.manual
+                      ? t("settings.downloadUpdate")
+                      : t("settings.updateTo", {
+                          version: updateInfo.availableVersion,
+                        })}
                 </Button>
               </>
             )}

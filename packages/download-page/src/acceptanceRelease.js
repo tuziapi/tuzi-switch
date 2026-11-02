@@ -35,6 +35,11 @@ export function isAcceptanceRelease(value, now = Date.now()) {
   if (
     !value?.success ||
     value.channel !== "acceptance" ||
+    value.schemaVersion !== 1 ||
+    value.repository !== ACCEPTANCE_REPOSITORY ||
+    !Number.isSafeInteger(value.runNumber) ||
+    value.runNumber <= 0 ||
+    !Number.isFinite(Date.parse(value.publishedAt)) ||
     !/^\d+$/.test(value.runId || "") ||
     !/^[a-f0-9]{40}$/.test(value.commit || "") ||
     value.tag !== `test-${value.commit.slice(0, 8)}` ||
@@ -72,6 +77,10 @@ export function createAcceptanceRelease(pin, run, artifacts, now = Date.now()) {
     run.head_sha !== pin.commit ||
     run.repository?.full_name !== ACCEPTANCE_REPOSITORY ||
     run.path !== ".github/workflows/acceptance-build.yml" ||
+    !Number.isSafeInteger(run.run_number) ||
+    run.run_number <= 0 ||
+    run.head_branch !== "main" ||
+    !Number.isFinite(Date.parse(run.updated_at)) ||
     run.status !== "completed" ||
     run.conclusion !== "success"
   )
@@ -103,6 +112,10 @@ export function createAcceptanceRelease(pin, run, artifacts, now = Date.now()) {
     };
   });
   const metadata = {
+    schemaVersion: 1,
+    repository: ACCEPTANCE_REPOSITORY,
+    runNumber: run.run_number,
+    publishedAt: run.updated_at,
     success: true,
     channel: "acceptance",
     runId: pin.runId,

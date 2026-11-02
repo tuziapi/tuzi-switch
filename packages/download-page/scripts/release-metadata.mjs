@@ -4,7 +4,13 @@ import {
   ACCEPTANCE_REPOSITORY,
   createAcceptanceRelease,
 } from "../src/acceptanceRelease.js";
-const pin = JSON.parse(await readFile("acceptance-build.json", "utf8"));
+const pin =
+  process.env.ACCEPTANCE_RUN_ID || process.env.ACCEPTANCE_COMMIT
+    ? {
+        runId: process.env.ACCEPTANCE_RUN_ID,
+        commit: process.env.ACCEPTANCE_COMMIT,
+      }
+    : JSON.parse(await readFile("acceptance-build.json", "utf8"));
 async function github(path) {
   const response = await fetch(
     `https://api.github.com/repos/${ACCEPTANCE_REPOSITORY}/${path}`,
@@ -12,6 +18,9 @@ async function github(path) {
       headers: {
         Accept: "application/vnd.github+json",
         "User-Agent": "tuzi-download-build",
+        ...(process.env.GH_TOKEN
+          ? { Authorization: `Bearer ${process.env.GH_TOKEN}` }
+          : {}),
       },
       signal: AbortSignal.timeout(30000),
     },

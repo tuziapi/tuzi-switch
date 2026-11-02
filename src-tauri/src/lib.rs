@@ -1336,6 +1336,7 @@ pub fn run() {
             commands::set_log_config,
             commands::restart_app,
             commands::check_for_updates,
+            commands::get_update_build_info,
             capabilities::get_capability_manifest,
             capabilities::invoke_capability,
             web_hot_update::get_web_hot_update_status,

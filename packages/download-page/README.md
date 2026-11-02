@@ -13,3 +13,7 @@ macOS 支持 Apple Silicon / Intel；Windows ZIP 内含 EXE / MSI，Linux ZIP �
 Umami `switch_download_click` 仅包含 platform/version，支持测试构建版本和 macOS Intel；统计点击不代表下载完成。本地 QA 不点击真实下载链接，不发送生产事件。
 
 蓝色兔子沿用 `src-tauri/icons/icon.png`；展示截图使用合成数据。未完成的安装、迁移和真实业务验收见客户端开发记录。
+
+## 自动发布与客户端更新
+
+`Publish acceptance downloads` 在测试 main 的 `Acceptance installers` 全部成功后生成带 schemaVersion/repository/runNumber/publishedAt 的 release.json，先部署 Pages，再发布相同的客户端清单。Pages 配置需为 GitHub Actions，github-pages 环境需允许 main；工作流仅在 AiW520/tuzi-switch 执行。失败构建和旧构建不推进下载目标。旧客户端需手动安装一次带提醒的新包。Actions artifact 保留 30 天并需要 GitHub 登录。详情见仓库 docs/development/2026-11-02-update-notifications.md。

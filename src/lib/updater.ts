@@ -1,3 +1,4 @@
+import { checkAcceptanceUpdate, getUpdateBuildInfo } from "./acceptanceUpdater";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -27,6 +28,8 @@ export interface UpdateInfo {
   availableVersion: string;
   notes?: string;
   pubDate?: string;
+  channel?: "stable" | "acceptance";
+  releaseUrl?: string;
 }
 
 export interface UpdateProgressEvent {
@@ -125,7 +128,7 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-async function openReleasePage(version?: string): Promise<void> {
+export async function openReleasePage(version?: string): Promise<void> {
   const tag = version
     ? version.startsWith("v")
       ? version
@@ -209,6 +212,14 @@ export async function checkForUpdate(
   | { status: "available"; info: UpdateInfo; update: UpdateHandle }
 > {
   const timeout = opts.timeout ?? 30000;
+  const build = await withTimeout(
+    getUpdateBuildInfo(),
+    timeout,
+    "Get update build identity timed out",
+  );
+  if (build.channel === "acceptance")
+    return checkAcceptanceUpdate(build, timeout);
+  if (build.channel !== "stable") throw new Error("Unknown update channel");
   const currentVersion = await withTimeout(
     getCurrentVersion(),
     timeout,

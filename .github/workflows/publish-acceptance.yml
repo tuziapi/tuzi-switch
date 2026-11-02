@@ -1,0 +1,95 @@
+name: Publish acceptance downloads
+on:
+  workflow_run:
+    workflows: [Acceptance installers]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed acceptance installer run ID
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: acceptance-download-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'AiW520/tuzi-switch' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Verify completed installer run and prevent publication rollback
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > /tmp/installer-run.json
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const run = JSON.parse(fs.readFileSync('/tmp/installer-run.json', 'utf8'));
+          if (run.repository.full_name !== process.env.GITHUB_REPOSITORY || run.head_branch !== 'main' || run.path !== '.github/workflows/acceptance-build.yml' || run.status !== 'completed' || run.conclusion !== 'success' || !/^[a-f0-9]{40}$/.test(run.head_sha) || !Number.isSafeInteger(run.run_number)) throw Error('Not a successful main installer run');
+          execFileSync('git', ['merge-base', '--is-ancestor', run.head_sha, 'HEAD']);
+          execFileSync('git', ['fetch', 'origin', 'codex/download-pages']);
+          const old = JSON.parse(execFileSync('git', ['show', 'FETCH_HEAD:release.json'], { encoding: 'utf8' }));
+          if ((old.runNumber || 0) > run.run_number) throw Error('Refusing older installer publication');
+          fs.appendFileSync(process.env.GITHUB_ENV, `ACCEPTANCE_RUN_ID=${run.id}\nACCEPTANCE_COMMIT=${run.head_sha}\n`);
+          JS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
+      - name: Include public source and verify delivery contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp packages/download-page/dist/tuzi-switch.html packages/download-page/dist/index.html
+          cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/dist/
+          git archive --format=tar.gz --output=packages/download-page/dist/source.tar.gz HEAD
+          touch packages/download-page/dist/.nojekyll
+          cd packages/download-page/dist
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/download-page/dist
+      - uses: actions/deploy-pages@v4
+        id: deployment
+      - name: Publish the identical update manifest only after the download page deploys
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add /tmp/tuzi-download-publication origin/codex/download-pages
+          cp -a packages/download-page/dist/. /tmp/tuzi-download-publication/
+          cd /tmp/tuzi-download-publication
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish acceptance build $ACCEPTANCE_RUN_ID"
+            git push origin HEAD:codex/download-pages
+          fi

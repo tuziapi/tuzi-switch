@@ -22,6 +22,7 @@ describe("checkForUpdate", () => {
     checkMock.mockReset();
     getVersionMock.mockReset();
     invokeMock.mockReset();
+    invokeMock.mockResolvedValue({ channel: "stable" });
     getVersionMock.mockResolvedValue("1.1.26");
   });
 

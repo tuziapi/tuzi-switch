@@ -12,6 +12,9 @@ function fixture() {
   const pin = { runId: "123", commit: "ab".repeat(20) };
   const run = {
     id: 123,
+    run_number: 12,
+    head_branch: "main",
+    updated_at: "2026-11-02T00:00:00Z",
     head_sha: pin.commit,
     repository: { full_name: "AiW520/tuzi-switch" },
     path: ".github/workflows/acceptance-build.yml",
@@ -46,6 +49,9 @@ test("each architecture resolves to its exact successful build artifact", () => 
 test("running, failed, unrelated repository, wrong workflow or wrong commit is rejected", () => {
   for (const update of [
     { status: "in_progress" },
+    { run_number: 0 },
+    { head_branch: "other-branch" },
+    { updated_at: "invalid" },
     { conclusion: "failure" },
     { repository: { full_name: "untrusted/repo" } },
     { path: "other.yml" },

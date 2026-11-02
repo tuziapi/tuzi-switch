@@ -25,6 +25,8 @@ vi.mock("@/lib/updater", () => ({
 
 vi.mock("sonner", () => ({
   toast: {
+    dismiss: vi.fn(),
+    info: vi.fn(),
     success: (...args: unknown[]) => toastSuccessMock(...args),
     error: (...args: unknown[]) => toastErrorMock(...args),
   },
