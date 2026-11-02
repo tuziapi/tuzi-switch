@@ -10,7 +10,7 @@
     ></script>
     <script>
       const pending = [];
-      const platforms = new Set(['macos', 'windows', 'rpm', 'deb', 'appimage']);
+      const platforms = new Set(['macos', 'macos-intel', 'windows', 'linux', 'rpm', 'deb', 'appimage']);
       function flush() {
         if (typeof window.umami?.track !== 'function') return;
         while (pending.length) {
@@ -29,7 +29,7 @@
           event.source !== window.parent ||
           data?.type !== 'tuzi-download-click' ||
           !platforms.has(data.platform) ||
-          !/^v\d+\.\d+\.\d+$/.test(data.version || '')
+          !/^(?:v\d+\.\d+\.\d+|test-[a-f0-9]{8})$/.test(data.version || '')
         )
           return;
         if (pending.length < 20)

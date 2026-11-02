@@ -5,8 +5,9 @@
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "scripts": {
-    "build": "node scripts/release-metadata.mjs && vite build",
-    "dev": "vite --host 127.0.0.1"
+    "build": "node --test scripts/verify-acceptance.mjs && node scripts/release-metadata.mjs && vite build",
+    "dev": "vite --host 127.0.0.1",
+    "test": "node --test scripts/verify-acceptance.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
