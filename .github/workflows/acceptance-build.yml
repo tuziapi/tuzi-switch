@@ -14,6 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # Creative workspace exceeds the 2 GiB heap default on macOS runners.
+  NODE_OPTIONS: --max-old-space-size=4096
   TUZI_SWITCH_RELEASE_REPOSITORY: ${{ github.repository }}
   VITE_RELEASE_REPOSITORY: ${{ github.repository }}
 
