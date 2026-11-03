@@ -410,7 +410,7 @@ export function TuziDownloadView({
                   <PanelLeftClose size={23} />
                 </span>
                 <span className='td-feature-index'>
-                  02 / CREATE · {t('预览')}
+                  02 / CREATE
                 </span>
                 <h3>{t('进入创作，画布展开')}</h3>
                 <p>
@@ -429,7 +429,7 @@ export function TuziDownloadView({
                   <Unplug size={23} />
                 </span>
                 <span className='td-feature-index'>
-                  03 / CONNECT · {t('预览')}
+                  03 / CONNECT
                 </span>
                 <h3>{t('账户关联，手动也可以')}</h3>
                 <p>

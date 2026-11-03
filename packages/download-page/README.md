@@ -13,3 +13,5 @@ macOS 提供 ARM64 / Intel DMG，Windows 提供 EXE / MSI，Linux 提供 DEB / R
 `pnpm --filter @tuzi/download-page test` 检查来源、缺包、摘要和统计桥。历史 acceptance 模块保留用于旧元数据回归，不再用于公开下载入口。`VITE_DOWNLOAD_SOURCE_URL` 指向此页面对应的精确源码；Pages 和 Release 同时提供源码归档。
 
 Umami `switch_download_click` 仅记录 platform/version，包含 MSI、Mac Intel、Linux 格式选择。点击数不代表安装完成，本地 QA 阻断生产统计。蓝兔图标沿用原图标；截图使用合成示例数据。
+
+独立修订网页或重试部署：从 main 手动运行 `Publish download page`。只使用当前 latest 的已公开正式安装包，不重建、不替换 Release 附件。

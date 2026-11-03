@@ -1,0 +1,43 @@
+name: Publish download page
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: unified-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'AiW520/tuzi-switch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
+      - name: Package site and corresponding source
+        run: |
+          cp packages/download-page/dist/tuzi-switch.html packages/download-page/dist/index.html
+          cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/dist/
+          git archive --format=tar.gz --output=packages/download-page/dist/source.tar.gz HEAD
+          touch packages/download-page/dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/download-page/dist
+      - uses: actions/deploy-pages@v4
+        id: deployment
