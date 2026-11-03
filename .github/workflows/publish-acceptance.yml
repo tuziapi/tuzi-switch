@@ -1,9 +1,5 @@
 name: Publish acceptance downloads
 on:
-  workflow_run:
-    workflows: [Acceptance installers]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       run_id:
@@ -17,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.repository == 'AiW520/tuzi-switch' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    if: false # Retired: public downloads are published by unified-release.yml
     runs-on: ubuntu-22.04
     permissions:
       contents: write

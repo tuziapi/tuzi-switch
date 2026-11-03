@@ -19,11 +19,11 @@ import {
   Unplug,
 } from 'lucide-react';
 import { FaApple, FaLinux, FaWindows } from 'react-icons/fa6';
-import { isAcceptanceRelease } from './acceptanceRelease';
+import { isStableRelease } from './stableRelease';
 import './tuzi-download.css';
 
 const pageSource = import.meta.env.VITE_DOWNLOAD_SOURCE_URL || 'https://github.com/AiW520/tuzi-switch/tree/main/packages/download-page';
-const SOURCE = 'https://github.com/tuziapi/tuzi-switch';
+const SOURCE = 'https://github.com/AiW520/tuzi-switch';
 const screens = [
   {
     id: 'tools',
@@ -58,15 +58,15 @@ const platforms = [
 const faqs = [
   [
     '现在下载的版本包含 opentu 吗？',
-    '包含。主下载按钮提供集成 opentu 的兔子助手测试包，可使用账户四页、项目和自由画布。应用名为 Tuzi Assistant Test；页面底部另有不含 opentu 的历史正式版入口。',
+    '包含。下载兔子助手即可使用工具管理、兔子账户、opentu 项目与自由画布，无需再安装另一款创作客户端。',
   ],
   [
     '已有兔子账户，还需要重复填写 Key 吗？',
-    '集成测试版使用独立配置目录，首次使用需连接兔子账户。之后可选择账户中的模型 Key，或使用手动配置。账户管理令牌与模型 Key 用途不同，不应混用。',
+    '已连接的兔子账户可继续使用，创作时选择账户中的模型 Key，或使用手动配置。首次使用请先连接账户；账户管理令牌与模型 Key 用途不同。',
   ],
   [
     '如何选择适合自己电脑的安装包？',
-    'macOS 请在“关于本机”中确认 Apple Silicon 或 Intel。Windows 提供 x86_64 的 EXE 和 MSI，Linux 提供 DEB、RPM 和 AppImage。需登录 GitHub 下载 ZIP，解压后选择安装文件。',
+    'macOS 请在“关于本机”中确认 Apple Silicon 或 Intel。Windows 提供 x86_64 的 EXE 和 MSI，Linux 提供 DEB、RPM 和 AppImage。点击直接下载安装文件，无需登录 GitHub 或解压 ZIP。',
   ],
   [
     '旧版 opentu 的作品可以直接迁移吗？',
@@ -103,7 +103,7 @@ function useRelease() {
       .then(async (response) => {
         if (!response.ok) throw new Error('Release unavailable');
         const release = await response.json();
-        if (!isAcceptanceRelease(release)) throw new Error('Invalid release');
+        if (!isStableRelease(release)) throw new Error('Invalid release');
         if (!disposed) setState({ loading: false, release, error: false });
       })
       .catch(() => {
@@ -161,7 +161,7 @@ export function TuziDownloadView({
   const choices = downloads.filter((item) =>
     platform === 'macos'
       ? ['macos', 'macos-intel'].includes(item.id)
-      : item.id === platform,
+      : platform === 'windows' ? ['windows', 'msi'].includes(item.id) : ['deb', 'rpm', 'appimage'].includes(item.id),
   );
   const selected = choices.find((item) => item.id === packageId) || choices[0];
   const current = screens[screen];
@@ -281,7 +281,7 @@ export function TuziDownloadView({
               </div>
               <p className='td-hero-note'>
                 macOS · Windows · Linux<span> / </span>
-                {t('已包含 opentu · 集成测试版')}
+                {t('已包含 opentu 创作')}
               </p>
             </div>
             <div className='td-hero-art' aria-hidden='true'>
@@ -347,7 +347,7 @@ export function TuziDownloadView({
               </div>
               <span className='td-preview-badge'>
                 <span />
-                {t('统一客户端 · 集成测试版')}
+                {t('统一客户端')}
               </span>
             </div>
             <div
@@ -377,7 +377,7 @@ export function TuziDownloadView({
             </div>
             <p className='td-preview-note'>
               {t(
-                '画面使用合成示例数据。主下载提供包含 opentu 的集成测试版，正式上线验收仍在进行。',
+                '画面使用示例数据，下载兔子助手即可体验工具管理与 opentu 创作。',
               )}
             </p>
           </section>
@@ -464,12 +464,12 @@ export function TuziDownloadView({
                 {loading
                   ? t('正在获取版本…')
                   : release
-                    ? `${t('集成测试版')} · ${release.commit.slice(0, 8)}`
+                    ? `兔子助手 ${release.tag}`
                     : t('版本暂时无法获取')}
               </div>
               <p className='td-release-boundary'>
                 {t(
-                  '已包含 opentu 创作与账户四页。测试包未正式签名，使用独立配置目录，首次打开需重新连接账户。',
+                  '工具管理、兔子账户与 opentu 创作，一个客户端即可使用。',
                 )}
               </p>
             </div>
@@ -504,20 +504,20 @@ export function TuziDownloadView({
                 </div>
                 {selected && (
                   <span className='td-format'>
-                    ZIP
+                    {selected.format}
                   </span>
                 )}
               </div>
-              {platform === 'macos' && choices.length > 1 && (
+              {choices.length > 1 && (
                 <label className='td-package-select'>
-                  {t('芯片类型')}
+                  {t(platform === 'macos' ? '芯片类型' : '安装格式')}
                   <select
                     value={selected.id}
                     onChange={(event) => setPackageId(event.target.value)}
                   >
                     {choices.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.subtitle}
+                        {platform === 'macos' ? item.subtitle : `${item.format} · ${item.subtitle}`}
                       </option>
                     ))}
                   </select>
@@ -525,7 +525,7 @@ export function TuziDownloadView({
               )}
               {error ? (
                 <div className='td-download-error' role='alert'>
-                  <p>{t('测试安装包暂不可用或已过期，请重试或查看构建记录。')}</p>
+                  <p>{t('安装包暂时无法获取，请重试或查看版本发布页。')}</p>
                   <button onClick={retry}>{t('重新获取')}</button>
                 </div>
               ) : selected ? (
@@ -549,12 +549,12 @@ export function TuziDownloadView({
               )}
               <p className='td-package-note'>
                 {platform === 'macos'
-                  ? t('请在“关于本机”中确认芯片类型，解压 ZIP 后打开 DMG 安装。')
+                  ? t('请在“关于本机”中确认芯片类型，下载后打开 DMG，将兔子助手拖入“应用程序”。')
                   : platform === 'windows'
-                    ? t('解压 ZIP 后选择 EXE 或 MSI 安装，适用于 Intel / AMD 64 位电脑。')
-                    : t('解压 ZIP 后选择 DEB、RPM 或 AppImage；DEB 适合 Debian / Ubuntu。')}
+                    ? t('下载后双击 EXE 或 MSI，按提示安装。适用于 Intel / AMD 64 位电脑。')
+                    : t('选择 DEB、RPM 或 AppImage；DEB 适合 Debian / Ubuntu。')}
               </p>
-              <p className='td-cache-notice'>{t('需要登录 GitHub。下载 ZIP 后解压，安装并打开 Tuzi Assistant Test。')}</p>
+              <p className='td-cache-notice'>{t('安装包尚未进行开发者签名或 Apple 公证，系统可能提示无法验证发布者。')}</p>
               {release?.stale && (
                 <p className='td-cache-notice' role='status'>
                   {t('版本同步暂不可用，当前为上次确认的版本。')}
@@ -562,10 +562,10 @@ export function TuziDownloadView({
               )}
               <a
                 className='td-release-link'
-                href={release?.sourceUrl || 'https://github.com/AiW520/tuzi-switch/actions/workflows/acceptance-build.yml'}
+                href={release?.sourceUrl || `${SOURCE}/releases`}
                 {...external}
               >
-                {t('查看构建记录与全部测试安装包')}
+                {t('查看更新说明与全部安装包')}
                 <ArrowUpRight size={14} />
               </a>
             </div>
@@ -616,7 +616,6 @@ export function TuziDownloadView({
             </div>
           </section>
         </main>
-        <p className='td-test-build'><a href={`${SOURCE}/releases/latest`} {...external}>历史正式版（不含 opentu） ↗</a></p>
         <footer className='td-footer'>
           <span>
             <img className='td-brand-icon' src={`${import.meta.env.BASE_URL}tuzi-assistant-assets/icon.png`} alt='' />

@@ -1,3 +1,4 @@
+import { checkInstallerUpdate } from "./installerUpdater";
 import { checkAcceptanceUpdate, getUpdateBuildInfo } from "./acceptanceUpdater";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
@@ -225,6 +226,10 @@ export async function checkForUpdate(
     timeout,
     "Get current app version timed out",
   ).catch(() => "");
+
+  if (build.repository === "AiW520/tuzi-switch") {
+    return checkInstallerUpdate(build, currentVersion, timeout);
+  }
 
   let update: Update | null;
   try {

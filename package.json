@@ -1,6 +1,6 @@
 {
   "name": "tu-zi-switch",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI - 兔子助手",
   "type": "module",
   "scripts": {

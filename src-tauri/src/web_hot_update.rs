@@ -54,6 +54,13 @@ struct WebArchive {
     signature: String,
 }
 
+// This distribution ships the creative workspace and native bridge together.
+// Never load cached standalone renderer assets from an older installation.
+fn full_installer_updates_only() -> bool {
+    cfg!(feature = "isolated-profile")
+        || crate::release_repository::RELEASE_REPOSITORY == "AiW520/tuzi-switch"
+}
+
 pub fn register_protocol<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder.register_uri_scheme_protocol("tuziweb", |_ctx, request| {
         match serve_hot_asset(request.uri().path()) {
@@ -64,7 +71,7 @@ pub fn register_protocol<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
 }
 
 pub fn navigate_main_window_if_available(app: &AppHandle) {
-    if cfg!(feature = "isolated-profile") {
+    if full_installer_updates_only() {
         return;
     }
     if active_web_root().is_none() {
@@ -90,11 +97,11 @@ pub async fn get_web_hot_update_status() -> Result<WebHotUpdateStatus, String> {
 
 #[tauri::command]
 pub async fn check_web_hot_update() -> Result<WebHotUpdateResult, String> {
-    if cfg!(feature = "isolated-profile") {
+    if full_installer_updates_only() {
         return Ok(WebHotUpdateResult {
             updated: false,
             version: None,
-            message: "集成测试版通过完整安装包更新".to_string(),
+            message: "请通过完整安装包更新".to_string(),
         });
     }
     let client = reqwest::Client::builder()
@@ -143,7 +150,7 @@ pub async fn check_web_hot_update() -> Result<WebHotUpdateResult, String> {
 }
 
 fn build_status() -> WebHotUpdateStatus {
-    let active = if cfg!(feature = "isolated-profile") {
+    let active = if full_installer_updates_only() {
         None
     } else {
         active_version()
@@ -151,7 +158,7 @@ fn build_status() -> WebHotUpdateStatus {
     WebHotUpdateStatus {
         bundled_version: env!("CARGO_PKG_VERSION").to_string(),
         pending_version: active.clone(),
-        using_hot_assets: !cfg!(feature = "isolated-profile") && active_web_root().is_some(),
+        using_hot_assets: !full_installer_updates_only() && active_web_root().is_some(),
         active_version: active,
         manifest_url: crate::release_repository::web_manifest_urls()[0].clone(),
     }
@@ -590,10 +597,13 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "isolated-profile"))]
+#[cfg(test)]
 mod acceptance_update_tests {
     #[tokio::test]
     async fn acceptance_updates_never_download_stable_web_assets() {
+        if !super::full_installer_updates_only() {
+            return;
+        }
         let result = super::check_web_hot_update().await.unwrap();
         assert!(!result.updated);
         assert!(result.version.is_none());

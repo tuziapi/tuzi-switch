@@ -25,6 +25,7 @@ env:
 
 jobs:
   create-release:
+    if: github.repository != 'AiW520/tuzi-switch'
     runs-on: ubuntu-latest
     permissions:
       contents: write

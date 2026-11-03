@@ -10,7 +10,7 @@
     ></script>
     <script>
       const pending = [];
-      const platforms = new Set(['macos', 'macos-intel', 'windows', 'linux', 'rpm', 'deb', 'appimage']);
+      const platforms = new Set(['macos', 'macos-intel', 'windows', 'msi', 'linux', 'rpm', 'deb', 'appimage']);
       function flush() {
         if (typeof window.umami?.track !== 'function') return;
         while (pending.length) {

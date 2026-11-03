@@ -1,0 +1,227 @@
+name: Unified desktop release
+run-name: "兔子助手 · ${{ github.ref_name }}"
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unified-release
+  cancel-in-progress: false
+
+env:
+  # Creative workspace exceeds the 2 GiB heap default on macOS runners.
+  NODE_OPTIONS: --max-old-space-size=4096
+  TUZI_SWITCH_RELEASE_REPOSITORY: ${{ github.repository }}
+  VITE_RELEASE_REPOSITORY: ${{ github.repository }}
+
+jobs:
+  verify:
+    if: github.repository == 'AiW520/tuzi-switch' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify version identity
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const version = JSON.parse(fs.readFileSync('package.json')).version;
+          if (!/^\d+\.\d+\.\d+$/.test(version) || process.env.GITHUB_REF_NAME !== `v${version}`) throw Error('Invalid release version');
+          if (JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).version !== version || !fs.readFileSync('src-tauri/Cargo.toml','utf8').includes(`version = "${version}"`)) throw Error('Version mismatch');
+          JS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:creative
+      - run: pnpm --filter @tuzi/download-page test
+      - run: python3 scripts/test_release_assets.py
+      - run: pnpm typecheck
+      - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
+      - run: python3 -m unittest discover -s src-tauri/resources/builtin-skills/codex-image-render-fallback/scripts -p 'test_*.py'
+
+  installers:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x64
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            name: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - name: Read repository Rust version
+        id: rust-version
+        shell: bash
+        run: |
+          node -e 'const fs = require("fs"); const text = fs.readFileSync("rust-toolchain.toml", "utf8"); const version = text.match(/^channel\s*=\s*"([^"]+)"/m)?.[1]; if (!version) throw new Error("Missing pinned Rust channel"); fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ steps.rust-version.outputs.version }}
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          cache-on-failure: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:renderer
+      - name: Native regression (host target)
+        shell: bash
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
+      - name: Acceptance profile regression
+        shell: bash
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --features isolated-profile acceptance_profile_ -- --test-threads=1
+      - name: Isolated MCP service regression
+        if: runner.os == 'macOS'
+        shell: bash
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib native_mcp_service_ -- --ignored --test-threads=1
+      - name: Build installers
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: '-'
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --unsigned)"
+          else
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --unsigned --desktop-product-name)"
+          fi
+          pnpm tauri build --target "$BUILD_TARGET" --config "$RELEASE_CONFIG"
+      - name: Collect installers and source manifest
+        shell: bash
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+          BUILD_NAME: ${{ matrix.name }}
+        run: |
+          python3 <<'PY'
+          import hashlib, json, os, pathlib, shutil
+          source = pathlib.Path('src-tauri/target') / os.environ['BUILD_TARGET'] / 'release/bundle'
+          output = pathlib.Path('release-assets')
+          output.mkdir()
+          files = []
+          for path in sorted(source.rglob('*')):
+              if path.is_file() and path.suffix in {'.dmg', '.msi', '.exe', '.AppImage', '.deb', '.rpm'}:
+                  target = output / ('tuzi-assistant-' + os.environ['BUILD_NAME'] + path.suffix)
+                  if target.exists(): raise SystemExit('Duplicate installer format')
+                  shutil.copy2(path, target)
+                  files.append({'file': target.name, 'sha256': hashlib.sha256(target.read_bytes()).hexdigest(), 'bytes': target.stat().st_size})
+          if not files:
+              raise SystemExit('No installers were produced')
+          (output / ('manifest-' + os.environ['BUILD_NAME'] + '.json')).write_text(json.dumps({
+              'repository': os.environ['GITHUB_REPOSITORY'], 'commit': os.environ['GITHUB_SHA'],
+              'run': os.environ['GITHUB_RUN_ID'], 'target': os.environ['BUILD_TARGET'],
+              'version': json.loads(pathlib.Path('package.json').read_text(encoding='utf-8'))['version'],
+              'developerSigned': False, 'notarized': False, 'channel': 'stable',
+              'applicationId': 'com.tuziswitch.desktop', 'isolatedLocalProfile': False, 'files': files
+          }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [verify, installers]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify every package against its build manifest
+        run: python3 scripts/verify-release-assets.py release-assets
+      - name: Prepare release notes and source
+        shell: bash
+        run: |
+          git archive --format=tar.gz --output=release-assets/tuzi-assistant-source.tar.gz HEAD
+          cp "docs/releases/${GITHUB_REF_NAME}.md" /tmp/release-notes.md
+          cd release-assets
+          sha256sum tuzi-assistant-* > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Publish complete installation files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/latest-release.json
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const latest = JSON.parse(fs.readFileSync('/tmp/latest-release.json')).tag_name;
+          const parts = s => s.replace(/^v/, '').split('.').map(Number);
+          const a = parts(process.env.RELEASE_TAG), b = parts(latest);
+          for (let i=0;i<3;i++) { if (a[i] < b[i]) throw Error('Refusing release rollback'); if(a[i] > b[i]) break; }
+          JS
+          if gh release view "$RELEASE_TAG" --json isDraft >/tmp/existing-release.json 2>/dev/null; then
+            node -e 'if(!require("/tmp/existing-release.json").isDraft) throw Error("Published releases are immutable; rerun page publication separately")'
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --title "兔子助手 $RELEASE_TAG" --notes-file /tmp/release-notes.md --draft --latest=false
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest --notes-file /tmp/release-notes.md
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
+      - name: Include source and checksums on public download page
+        run: |
+          cp packages/download-page/dist/tuzi-switch.html packages/download-page/dist/index.html
+          cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/dist/
+          cp release-assets/tuzi-assistant-source.tar.gz packages/download-page/dist/source.tar.gz
+          touch packages/download-page/dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/download-page/dist
+      - uses: actions/deploy-pages@v4
+        id: deployment
