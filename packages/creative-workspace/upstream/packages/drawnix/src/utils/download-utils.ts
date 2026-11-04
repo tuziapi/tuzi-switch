@@ -26,6 +26,8 @@ import {
 import { isDesktopAssetUrl } from './desktop-asset-url';
 import { isVirtualMediaUrl } from './virtual-media-url';
 import { writeDesktopBinaryFile } from './desktop-binary-writer';
+import { getAssistantAccount } from '../services/assistant-account';
+import { runCanvasImageAction } from './canvas-image-actions';
 import { unifiedCacheService } from '../services/unified-cache-service';
 
 export interface SmartDownloadResult {
@@ -115,6 +117,10 @@ export async function downloadMediaFile(
   saveLocation?: string
 ): Promise<SmartDownloadResult> {
   const normalizedUrl = normalizeImageDataUrl(url);
+  if (getAssistantAccount()?.imageAction && /^(png|jpe?g|webp|gif)$/i.test(format)) {
+    const result = await runCanvasImageAction('save', normalizedUrl, `${sanitizeFilename(prompt) || fallbackName}.${format}`);
+    return createDownloadResult({ downloadedCount: result === 'saved' ? 1 : 0 });
+  }
 
   if (isTauriEnvironment()) {
     const type =
@@ -487,7 +493,7 @@ async function readDownloadBlob(item: BatchDownloadItem): Promise<Blob> {
   if (isVirtualMediaUrl(item.url)) {
     const cachedBlob = await unifiedCacheService.getCachedBlob(item.url);
     if (!cachedBlob?.size) {
-      throw new Error('本地媒体缓存不可用，请重新生成');
+      throw new Error('原图缓存暂不可用，请从任务列表找回已有结果后重试');
     }
     return cachedBlob;
   }
@@ -774,6 +780,12 @@ export async function smartDownload(
     const item = items[0];
     const assetUrl =
       item.type === 'image' ? normalizeImageDataUrl(item.url) : item.url;
+
+    if (item.type === 'image' && getAssistantAccount()?.imageAction) {
+      const result = await runCanvasImageAction('save', assetUrl, item.filename);
+      reportProgress(onProgress, 100);
+      return createDownloadResult({ downloadedCount: result === 'saved' ? 1 : 0 });
+    }
 
     // 如果有自定义保存路径，使用该路径
     if (item.saveLocation) {

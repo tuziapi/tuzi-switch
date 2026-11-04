@@ -117,6 +117,18 @@ const agentBackups: Partial<Record<AgentTool, AgentSnapshot>> = {};
 mockWindows("main");
 mockIPC(
   async (command, args) => {
+    if (command === "creative_image_action" || command === "copy_text_to_clipboard") {
+      const state = window as unknown as { __creativeImageFixture?: {
+        calls: unknown[]; next?: string; error?: string;
+      } };
+      const fixture = state.__creativeImageFixture ??= { calls: [] };
+      fixture.calls.push({ command, args });
+      if (fixture.error) { const error = fixture.error; delete fixture.error; throw error; }
+      if (fixture.next) { const result = fixture.next; delete fixture.next; return result; }
+      if (command === "copy_text_to_clipboard") return;
+      const action = (args as { request: { action: "copy" | "save" | "reveal" } }).request.action;
+      return { copy: "copied", save: "saved", reveal: "revealed" }[action];
+    }
     if (command === "set_window_theme") return;
     if (command === "open_external") {
       const state = window as unknown as { __creativeOpenedTools?: string[] };

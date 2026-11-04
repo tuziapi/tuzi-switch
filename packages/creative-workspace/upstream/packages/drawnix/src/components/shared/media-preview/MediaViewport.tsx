@@ -1144,6 +1144,7 @@ export const MediaViewport = forwardRef<MediaViewportRef, MediaViewportProps>(
               >
                 <button
                   type="button"
+                  aria-label="下载图片或媒体"
                   onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();

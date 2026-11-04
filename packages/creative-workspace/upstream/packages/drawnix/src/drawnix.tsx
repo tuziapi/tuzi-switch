@@ -114,6 +114,7 @@ import {
   classifyApiCredentialError,
 } from './utils/api-auth-error-event';
 import { MessagePlugin } from './utils/message-plugin';
+import { CanvasImageContextMenu } from './components/CanvasImageContextMenu';
 import { calculateEditedImagePoints } from './utils/image';
 import { isCardElement } from './types/card.types';
 import { isFrameElement } from './types/frame.types';
@@ -1813,6 +1814,7 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
           ></Board>
           {/* 多选时的缩放控制点 */}
           <MultiSelectionHandles />
+          <CanvasImageContextMenu board={board} onPreview={openMediaPreview} />
           {/* 统一左侧工具栏 (桌面端和移动端一致) */}
           <UnifiedToolbar
             projectDrawerOpen={projectDrawerOpen}

@@ -12,6 +12,7 @@ import {
   nativeCreativeResponse,
 } from "./nativeStream";
 import { requestCreativeManual } from "./manualTransport";
+import { nativeImageAction } from "./imageActions";
 
 const PREFIX = "tuzi-account:";
 const messages: Record<string, string> = {
@@ -128,6 +129,16 @@ export function createCreativeAccountBridge(
     state,
     manageAccount,
     selectedKeyId,
+    imageAction:
+      typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+        ? nativeImageAction
+        : undefined,
+    copyText:
+      typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+        ? async (text) => {
+            await invoke("copy_text_to_clipboard", { text });
+          }
+        : undefined,
     async openExternalTool(toolId) {
       const urls: Record<string, string> = {
         "chat-mj": "https://vercel.ddaiai.com/",

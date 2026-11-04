@@ -2541,6 +2541,7 @@ const BatchImageGeneration: React.FC<BatchImageGenerationProps> = ({
 
       const result = await smartDownload(downloadItems, zipFilename);
 
+      if (result.openedCount === 0 && result.downloadedCount === 0 && result.failedCount === 0) return;
       if (result.openedCount > 0 && result.downloadedCount === 0) {
         MessagePlugin.success(
           language === 'zh'

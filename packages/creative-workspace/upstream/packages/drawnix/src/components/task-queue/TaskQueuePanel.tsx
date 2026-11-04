@@ -515,6 +515,7 @@ export const TaskQueuePanel: React.FC<TaskQueuePanelProps> = ({
 
     try {
       const result = await smartDownload(downloadItems);
+      if (result.openedCount === 0 && result.downloadedCount === 0 && result.failedCount === 0) return;
       if (result.openedCount > 0 && result.downloadedCount === 0) {
         MessagePlugin.success(
           result.openedCount > 1

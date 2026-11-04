@@ -5483,6 +5483,36 @@
       "path": "packages/drawnix/src/services/backup-restore/backup-preflight.ts",
       "origin": "assistant-integration",
       "reason": "Read-only archive preflight before import mutations; validates JSON, declared checksums and unsafe paths"
+    },
+    {
+      "path": "packages/drawnix/src/components/CanvasImageContextMenu.tsx",
+      "origin": "assistant-integration",
+      "reason": "Approved canvas image context menu and original-image copy/save/reveal (UC-IMG-MENU-01)"
+    },
+    {
+      "path": "packages/drawnix/src/components/canvas-image-context-menu.scss",
+      "origin": "assistant-integration",
+      "reason": "Approved canvas image context menu and original-image copy/save/reveal (UC-IMG-MENU-01)"
+    },
+    {
+      "path": "packages/drawnix/src/utils/canvas-image-actions.ts",
+      "origin": "assistant-integration",
+      "reason": "Approved canvas image context menu and original-image copy/save/reveal (UC-IMG-MENU-01)"
+    },
+    {
+      "path": "openspec/changes/add-canvas-image-menu/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "Approved canvas image context menu and original-image copy/save/reveal (UC-IMG-MENU-01)"
+    },
+    {
+      "path": "openspec/changes/add-canvas-image-menu/specs/canvas-image-actions/spec.md",
+      "origin": "assistant-integration",
+      "reason": "Approved canvas image context menu and original-image copy/save/reveal (UC-IMG-MENU-01)"
+    },
+    {
+      "path": "openspec/changes/add-canvas-image-menu/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "Approved canvas image context menu and original-image copy/save/reveal (UC-IMG-MENU-01)"
     }
   ]
 }

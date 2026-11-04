@@ -1,3 +1,4 @@
+import { getAssistantAccount } from '../../../services/assistant-account';
 import Stack from '../../stack';
 import { FontColorIcon, PropertySettingsIcon } from '../../icons';
 import {
@@ -2069,7 +2070,7 @@ export const PopupToolbar = () => {
                       Boolean((window as any).__TUZI_CREATIVE_NATIVE__);
 
                     for (const item of downloadItems) {
-                      if (isDesktopDownload) {
+                      if (isDesktopDownload || (item.type === 'image' && getAssistantAccount()?.imageAction)) {
                         processedItems.push(item);
                         continue;
                       }
@@ -2157,7 +2158,7 @@ export const PopupToolbar = () => {
                           ? `Opened ${downloadResult.openedCount} links for download`
                           : 'Opened link for download'
                       );
-                    } else {
+                    } else if (!downloadResult || downloadResult.downloadedCount > 0) {
                       MessagePlugin.success(
                         downloadItems.length > 1
                           ? language === 'zh'

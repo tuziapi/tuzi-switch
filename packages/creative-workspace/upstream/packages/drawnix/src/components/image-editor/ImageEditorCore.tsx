@@ -730,14 +730,21 @@ export const ImageEditorCore = forwardRef<
             onInsert?.(pendingImageUrl);
             break;
           case 'download': {
-            await smartDownload([
-              {
-                url: pendingImageUrl,
-                type: 'image',
-                filename: `edited-image-${Date.now()}.png`,
-              },
-            ]);
-            MessagePlugin.success('图片已下载');
+            let result;
+            try {
+              result = await smartDownload([
+                {
+                  url: pendingImageUrl,
+                  type: 'image',
+                  filename: `edited-image-${Date.now()}.png`,
+                },
+              ]);
+            } catch (error) {
+              MessagePlugin.error(error instanceof Error ? error.message : '图片保存失败');
+              return;
+            }
+            if (result.downloadedCount === 0 && result.openedCount === 0) return;
+            MessagePlugin.success('图片已保存');
             break;
           }
         }

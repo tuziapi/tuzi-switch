@@ -686,6 +686,38 @@
  };
  
  export default ImageEditor;
+--- a/packages/drawnix/src/components/image-editor/ImageEditorCore.tsx
++++ b/packages/drawnix/src/components/image-editor/ImageEditorCore.tsx
+@@ -730,14 +730,21 @@
+             onInsert?.(pendingImageUrl);
+             break;
+           case 'download': {
+-            await smartDownload([
+-              {
+-                url: pendingImageUrl,
+-                type: 'image',
+-                filename: `edited-image-${Date.now()}.png`,
+-              },
+-            ]);
+-            MessagePlugin.success('图片已下载');
++            let result;
++            try {
++              result = await smartDownload([
++                {
++                  url: pendingImageUrl,
++                  type: 'image',
++                  filename: `edited-image-${Date.now()}.png`,
++                },
++              ]);
++            } catch (error) {
++              MessagePlugin.error(error instanceof Error ? error.message : '图片保存失败');
++              return;
++            }
++            if (result.downloadedCount === 0 && result.openedCount === 0) return;
++            MessagePlugin.success('图片已保存');
+             break;
+           }
+         }
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 +++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 @@ -6,7 +6,7 @@
@@ -1918,7 +1950,44 @@
        <ModelDiscoveryDialog
 --- a/packages/drawnix/src/components/shared/ContextMenu.tsx
 +++ b/packages/drawnix/src/components/shared/ContextMenu.tsx
-@@ -407,6 +407,6 @@
+@@ -89,15 +89,17 @@
+   x: number,
+   y: number,
+   width: number,
+-  height: number
++  height: number,
++  viewportWidth = window.innerWidth,
++  viewportHeight = window.innerHeight
+ ): { x: number; y: number } {
+   const maxX = Math.max(
+     CONTEXT_MENU_VIEWPORT_PADDING,
+-    window.innerWidth - width - CONTEXT_MENU_VIEWPORT_PADDING
++    viewportWidth - width - CONTEXT_MENU_VIEWPORT_PADDING
+   );
+   const maxY = Math.max(
+     CONTEXT_MENU_VIEWPORT_PADDING,
+-    window.innerHeight - height - CONTEXT_MENU_VIEWPORT_PADDING
++    viewportHeight - height - CONTEXT_MENU_VIEWPORT_PADDING
+   );
+ 
+   return {
+@@ -131,7 +133,14 @@
+     if (!element) return;
+ 
+     const rect = element.getBoundingClientRect();
+-    const next = clampPosition(x, y, rect.width, rect.height);
++    // The unified host contains layout/paint, so fixed coordinates are relative
++    // to its creative root, while MouseEvent coordinates are viewport-relative.
++    const root = element.closest('.creative-root')?.getBoundingClientRect();
++    const next = clampPosition(
++      x - (root?.left || 0), y - (root?.top || 0), rect.width, rect.height,
++      root ? Math.min(root.width, window.innerWidth - root.left) : window.innerWidth,
++      root ? Math.min(root.height, window.innerHeight - root.top) : window.innerHeight,
++    );
+     if (next.x !== position.x || next.y !== position.y) {
+       setPosition(next);
+     }
+@@ -407,6 +416,6 @@
          className={className}
        />
      </div>,
@@ -1966,10 +2035,38 @@
          )}
  
        {/* Content preview grid */}
+--- a/packages/drawnix/src/components/shared/media-preview/MediaViewport.tsx
++++ b/packages/drawnix/src/components/shared/media-preview/MediaViewport.tsx
+@@ -1144,6 +1144,7 @@
+               >
+                 <button
+                   type="button"
++                  aria-label="下载图片或媒体"
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     e.preventDefault();
 --- a/packages/drawnix/src/components/shared/media-preview/UnifiedMediaViewer.tsx
 +++ b/packages/drawnix/src/components/shared/media-preview/UnifiedMediaViewer.tsx
-@@ -420,7 +420,7 @@
+@@ -1,3 +1,6 @@
++import { getAssistantAccount } from '../../../services/assistant-account';
++import { runCanvasImageAction } from '../../../utils/canvas-image-actions';
++import { MessagePlugin } from '../../../utils/message-plugin';
+ /**
+  * 统一媒体预览系统 - 主组件
+  * 支持单图预览、对比预览和编辑模式，可相互切换
+@@ -418,9 +421,18 @@
+       currentItem.type === 'image'
+         ? normalizeImageDataUrl(currentItem.url)
          : currentItem.url;
++    if (currentItem.type === 'image' && getAssistantAccount()?.imageAction) {
++      try {
++        const result = await runCanvasImageAction('save', url, currentItem.title);
++        if (result === 'saved') MessagePlugin.success('图片已保存');
++      } catch (error) {
++        MessagePlugin.error(error instanceof Error ? error.message : '图片保存失败');
++      }
++      return;
++    }
      const isDesktopDownload =
        typeof window !== 'undefined' &&
 -      Boolean((window as any).__TAURI_INTERNALS__);
@@ -1977,7 +2074,7 @@
  
      if (isDesktopDownload) {
        const { smartDownload, buildDownloadFilename } = await import(
-@@ -845,7 +845,7 @@
+@@ -845,7 +857,7 @@
    );
  
    // 使用 Portal 渲染到 body
@@ -2010,6 +2107,26 @@
    useAutoInsertToCanvas({
      enabled: true,
      insertPrompt: false,
+--- a/packages/drawnix/src/components/task-queue/DialogTaskList.tsx
++++ b/packages/drawnix/src/components/task-queue/DialogTaskList.tsx
+@@ -194,6 +194,7 @@
+ 
+     try {
+       const result = await smartDownload(downloadItems);
++      if (result.openedCount === 0 && result.downloadedCount === 0 && result.failedCount === 0) return;
+       if (result.openedCount > 0 && result.downloadedCount === 0) {
+         MessagePlugin.success(
+           result.openedCount > 1
+--- a/packages/drawnix/src/components/task-queue/TaskQueuePanel.tsx
++++ b/packages/drawnix/src/components/task-queue/TaskQueuePanel.tsx
+@@ -515,6 +515,7 @@
+ 
+     try {
+       const result = await smartDownload(downloadItems);
++      if (result.openedCount === 0 && result.downloadedCount === 0 && result.failedCount === 0) return;
+       if (result.openedCount > 0 && result.downloadedCount === 0) {
+         MessagePlugin.success(
+           result.openedCount > 1
 --- a/packages/drawnix/src/components/tool-element/tool.generator.ts
 +++ b/packages/drawnix/src/components/tool-element/tool.generator.ts
 @@ -14,6 +14,7 @@
@@ -2184,7 +2301,12 @@
    );
 --- a/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
 +++ b/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
-@@ -2066,7 +2066,7 @@
+@@ -1,3 +1,4 @@
++import { getAssistantAccount } from '../../../services/assistant-account';
+ import Stack from '../../stack';
+ import { FontColorIcon, PropertySettingsIcon } from '../../icons';
+ import {
+@@ -2066,10 +2067,10 @@
                      const processedItems: BatchDownloadItem[] = [];
                      const isDesktopDownload =
                        typeof window !== 'undefined' &&
@@ -2192,7 +2314,20 @@
 +                      Boolean((window as any).__TUZI_CREATIVE_NATIVE__);
  
                      for (const item of downloadItems) {
-                       if (isDesktopDownload) {
+-                      if (isDesktopDownload) {
++                      if (isDesktopDownload || (item.type === 'image' && getAssistantAccount()?.imageAction)) {
+                         processedItems.push(item);
+                         continue;
+                       }
+@@ -2157,7 +2158,7 @@
+                           ? `Opened ${downloadResult.openedCount} links for download`
+                           : 'Opened link for download'
+                       );
+-                    } else {
++                    } else if (!downloadResult || downloadResult.downloadedCount > 0) {
+                       MessagePlugin.success(
+                         downloadItems.length > 1
+                           ? language === 'zh'
 --- a/packages/drawnix/src/components/toolbar/toolbar-context-menu.tsx
 +++ b/packages/drawnix/src/components/toolbar/toolbar-context-menu.tsx
 @@ -229,7 +229,7 @@
@@ -2926,6 +3061,16 @@
      flex-shrink: 0;
    }
  }
+--- a/packages/drawnix/src/components/ttd-dialog/batch-image-generation.tsx
++++ b/packages/drawnix/src/components/ttd-dialog/batch-image-generation.tsx
+@@ -2541,6 +2541,7 @@
+ 
+       const result = await smartDownload(downloadItems, zipFilename);
+ 
++      if (result.openedCount === 0 && result.downloadedCount === 0 && result.failedCount === 0) return;
+       if (result.openedCount > 0 && result.downloadedCount === 0) {
+         MessagePlugin.success(
+           language === 'zh'
 --- a/packages/drawnix/src/components/ttd-dialog/shared/MultiImageUpload.tsx
 +++ b/packages/drawnix/src/components/ttd-dialog/shared/MultiImageUpload.tsx
 @@ -455,7 +455,7 @@
@@ -3530,7 +3675,15 @@
      const cachedBlob = await unifiedCacheService.getCachedBlob(resolvedUrl);
 --- a/packages/drawnix/src/drawnix.tsx
 +++ b/packages/drawnix/src/drawnix.tsx
-@@ -136,10 +136,7 @@
+@@ -114,6 +114,7 @@
+   classifyApiCredentialError,
+ } from './utils/api-auth-error-event';
+ import { MessagePlugin } from './utils/message-plugin';
++import { CanvasImageContextMenu } from './components/CanvasImageContextMenu';
+ import { calculateEditedImagePoints } from './utils/image';
+ import { isCardElement } from './types/card.types';
+ import { isFrameElement } from './types/frame.types';
+@@ -136,10 +137,7 @@
  import { syncEditedPPTSlideImage } from './utils/frame-insertion-utils';
  import type { MediaLibraryModalProps } from './types/asset.types';
  import { SelectionMode } from './types/asset.types';
@@ -3542,7 +3695,7 @@
  const PopupToolbar = lazy(() =>
    import('./components/toolbar/popup-toolbar/popup-toolbar').then((module) => ({
      default: module.PopupToolbar,
-@@ -335,9 +332,6 @@
+@@ -335,9 +333,6 @@
    isDataReady = false,
    currentBoardId,
  }) => {
@@ -3552,7 +3705,7 @@
    const options: PlaitBoardOptions = {
      readonly: false,
      hideScrollbar: false,
-@@ -359,6 +353,12 @@
+@@ -359,6 +354,12 @@
      };
    });
  
@@ -3565,7 +3718,7 @@
    const [board, setBoard] = useState<DrawnixBoard | null>(null);
    const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
    const [toolboxDrawerOpen, setToolboxDrawerOpen] = useState(false);
-@@ -370,7 +370,9 @@
+@@ -370,7 +371,9 @@
      });
    const [backupRestoreOpen, setBackupRestoreOpen] = useState(false);
    const [cloudSyncOpen, setCloudSyncOpen] = useState(false);
@@ -3576,7 +3729,7 @@
    const [versionUpdateEnabled, setVersionUpdateEnabled] = useState(false);
    const [imageRecoveryOpen, setImageRecoveryOpen] = useState(false);
    useEffect(() => {
-@@ -386,26 +388,6 @@
+@@ -386,26 +389,6 @@
  
    // 使用 ref 来保存 board 的最新引用,避免 useCallback 依赖问题
    const boardRef = useRef<DrawnixBoard | null>(null);
@@ -3603,7 +3756,7 @@
    // 关闭所有抄屉
    const closeAllDrawers = useCallback(() => {
      if (shouldAutoCloseProjectDrawer()) {
-@@ -868,23 +850,12 @@
+@@ -868,23 +851,12 @@
    }, [onChange, saveBoard]);
  
    const prepareDesktopUpdate = useCallback(async () => {
@@ -3628,7 +3781,7 @@
      }
      if (await hasActiveTasks()) throw new Error('请等待正在进行的生成任务完成后再更新');
    }, [saveBoard]);
-@@ -897,22 +868,19 @@
+@@ -897,22 +869,19 @@
    }, [prepareDesktopUpdate]);
  
    const insertRecoveredImage = useCallback(async (url: string) => {
@@ -3653,7 +3806,7 @@
  
    // 创建新项目并刷新页面（用于释放内存）
    const handleCreateProjectForMemory = useCallback(async () => {
-@@ -998,22 +966,13 @@
+@@ -998,22 +967,13 @@
                      {imageRecoveryOpen && <Suspense fallback={null}><ManualImageRecovery onInsert={insertRecoveredImage} onClose={() => setImageRecoveryOpen(false)} /></Suspense>}
                      {versionUpdateEnabled && (
                        <Suspense fallback={null}>
@@ -3681,7 +3834,7 @@
                        options={options}
                        plugins={plugins}
                        containerRef={containerRef}
-@@ -1031,10 +990,7 @@
+@@ -1031,10 +991,7 @@
                        onViewportChange={onViewportChange}
                        onThemeChange={onThemeChange}
                        onValueChange={onValueChange}
@@ -3693,7 +3846,7 @@
                        onBoardSwitch={onBoardSwitch}
                        onTabSyncNeeded={onTabSyncNeeded}
                        handleProjectDrawerToggle={handleProjectDrawerToggle}
-@@ -1064,7 +1020,7 @@
+@@ -1064,7 +1021,7 @@
                        minimizedToolsBarEnabled={minimizedToolsBarEnabled}
                        enableToolWindows={enableToolWindows}
                        enableGenerationRuntime={enableGenerationRuntime}
@@ -3702,7 +3855,7 @@
                    </DrawnixContext.Provider>
                  </ChatDrawerProvider>
                </CacheQuotaProvider>
-@@ -1078,7 +1034,6 @@
+@@ -1078,7 +1035,6 @@
  
  // Internal component that uses ChatDrawer context
  interface DrawnixContentProps {
@@ -3710,7 +3863,7 @@
    value: PlaitElement[];
    viewport?: Viewport;
    theme?: PlaitTheme;
-@@ -1130,7 +1085,6 @@
+@@ -1130,7 +1086,6 @@
  }
  
  const DrawnixContent: React.FC<DrawnixContentProps> = ({
@@ -3718,7 +3871,7 @@
    value,
    viewport,
    theme,
-@@ -1837,7 +1791,7 @@
+@@ -1837,7 +1792,7 @@
            onValueChange={onValueChange}
          >
            <Board
@@ -3727,7 +3880,15 @@
              afterInit={(board) => {
                setBoard(board as DrawnixBoard);
                // 挂载 board 实例到 window，供知识库等外部模块访问
-@@ -1869,7 +1823,6 @@
+@@ -1859,6 +1814,7 @@
+           ></Board>
+           {/* 多选时的缩放控制点 */}
+           <MultiSelectionHandles />
++          <CanvasImageContextMenu board={board} onPreview={openMediaPreview} />
+           {/* 统一左侧工具栏 (桌面端和移动端一致) */}
+           <UnifiedToolbar
+             projectDrawerOpen={projectDrawerOpen}
+@@ -1869,7 +1825,6 @@
              onTaskPanelToggle={handleTaskPanelToggle}
              onOpenBackupRestore={handleOpenBackupRestore}
              onOpenCloudSync={handleOpenCloudSync}
@@ -3735,7 +3896,7 @@
              onKnowledgeBaseToggle={handleKnowledgeBaseToggle}
              onOpenMediaLibrary={handleOpenMediaLibrary}
              deferredFeaturesEnabled={toolWindowManagerEnabled}
-@@ -1904,7 +1857,7 @@
+@@ -1904,7 +1859,7 @@
                <TTDDialog container={containerRef.current}></TTDDialog>
              </Suspense>
            )}
@@ -4441,7 +4602,27 @@
  function shouldUseHttpAssetProtocol(): boolean {
 --- a/packages/drawnix/src/utils/download-utils.ts
 +++ b/packages/drawnix/src/utils/download-utils.ts
-@@ -199,14 +199,14 @@
+@@ -26,6 +26,8 @@
+ import { isDesktopAssetUrl } from './desktop-asset-url';
+ import { isVirtualMediaUrl } from './virtual-media-url';
+ import { writeDesktopBinaryFile } from './desktop-binary-writer';
++import { getAssistantAccount } from '../services/assistant-account';
++import { runCanvasImageAction } from './canvas-image-actions';
+ import { unifiedCacheService } from '../services/unified-cache-service';
+ 
+ export interface SmartDownloadResult {
+@@ -115,6 +117,10 @@
+   saveLocation?: string
+ ): Promise<SmartDownloadResult> {
+   const normalizedUrl = normalizeImageDataUrl(url);
++  if (getAssistantAccount()?.imageAction && /^(png|jpe?g|webp|gif)$/i.test(format)) {
++    const result = await runCanvasImageAction('save', normalizedUrl, `${sanitizeFilename(prompt) || fallbackName}.${format}`);
++    return createDownloadResult({ downloadedCount: result === 'saved' ? 1 : 0 });
++  }
+ 
+   if (isTauriEnvironment()) {
+     const type =
+@@ -199,14 +205,14 @@
  };
  
  function isTauriEnvironment(): boolean {
@@ -4458,6 +4639,28 @@
  }
  
  async function pickDesktopSavePath(filename: string): Promise<string | null> {
+@@ -487,7 +493,7 @@
+   if (isVirtualMediaUrl(item.url)) {
+     const cachedBlob = await unifiedCacheService.getCachedBlob(item.url);
+     if (!cachedBlob?.size) {
+-      throw new Error('本地媒体缓存不可用，请重新生成');
++      throw new Error('原图缓存暂不可用，请从任务列表找回已有结果后重试');
+     }
+     return cachedBlob;
+   }
+@@ -775,6 +781,12 @@
+     const assetUrl =
+       item.type === 'image' ? normalizeImageDataUrl(item.url) : item.url;
+ 
++    if (item.type === 'image' && getAssistantAccount()?.imageAction) {
++      const result = await runCanvasImageAction('save', assetUrl, item.filename);
++      reportProgress(onProgress, 100);
++      return createDownloadResult({ downloadedCount: result === 'saved' ? 1 : 0 });
++    }
++
+     // 如果有自定义保存路径，使用该路径
+     if (item.saveLocation) {
+       const saveLocation = item.saveLocation;
 --- a/packages/drawnix/src/utils/gemini-api/auth.ts
 +++ b/packages/drawnix/src/utils/gemini-api/auth.ts
 @@ -1,3 +1,5 @@
@@ -5296,3 +5499,436 @@
 +    }
 +  }
 +}
+--- /dev/null
++++ b/packages/drawnix/src/components/CanvasImageContextMenu.tsx
+@@ -0,0 +1,246 @@
++import { useEffect, useRef } from "react";
++import {
++  Copy,
++  Download,
++  FolderOpen,
++  ScanSearch,
++  TextQuote,
++} from "lucide-react";
++import {
++  PlaitBoard,
++  getHitElementByPoint,
++  toHostPoint,
++  toViewBoxPoint,
++} from "@plait/core";
++import { PlaitDrawElement } from "@plait/draw";
++import {
++  ContextMenu,
++  useContextMenuState,
++  type ContextMenuEntry,
++} from "./shared/ContextMenu";
++import { getAssistantAccount } from "../services/assistant-account";
++import {
++  copyImagePrompt,
++  runCanvasImageAction,
++  type CanvasImageAction,
++} from "../utils/canvas-image-actions";
++import { MessagePlugin } from "../utils/message-plugin";
++import { isVideoElement } from "../plugins/with-video";
++import { isAudioElement } from "../data/audio";
++import { useI18n } from "../i18n";
++import "./canvas-image-context-menu.scss";
++
++type Target = { id: string; url: string; prompt: string };
++
++export function CanvasImageContextMenu({
++  board,
++  onPreview,
++}: {
++  board: PlaitBoard | null;
++  onPreview: (id: string) => void;
++}) {
++  const { language } = useI18n();
++  const zh = language === "zh";
++  const { contextMenu, openAt, close } = useContextMenuState<Target>();
++  const busy = useRef(false);
++  useEffect(() => {
++    if (!board) return;
++    const host = PlaitBoard.getBoardContainer(board);
++    const imageAt = (event: MouseEvent) => {
++      const target = event.target as Element;
++      if (
++        !target.closest(".board-host-svg, .board-active-svg") ||
++        target.closest(
++          'input, textarea, [contenteditable="true"], .plait-tool-container',
++        )
++      )
++        return;
++      const hit = getHitElementByPoint(
++        board,
++        toViewBoxPoint(board, toHostPoint(board, event.clientX, event.clientY)),
++      );
++      if (
++        !hit ||
++        !PlaitDrawElement.isDrawElement(hit) ||
++        !PlaitDrawElement.isImage(hit) ||
++        isVideoElement(hit) ||
++        isAudioElement(hit)
++      )
++        return;
++      if ((hit as any).pptImagePlaceholder || !hit.url) return;
++      return hit;
++    };
++    const blockDrawing = (event: MouseEvent) => {
++      if (event.button !== 2 || !imageAt(event)) return;
++      event.preventDefault();
++      event.stopPropagation();
++    };
++    const handler = (event: MouseEvent) => {
++      const hit = imageAt(event);
++      if (!hit) return;
++      event.preventDefault();
++      event.stopPropagation();
++      const metadata = hit as any;
++      const prompt =
++        [metadata.generationPrompt, metadata.aiPrompt, metadata.prompt].find(
++          (value) => typeof value === "string" && value.trim(),
++        ) || "";
++      // Bind actions to the right-clicked element, never the previous selection.
++      openAt(event.clientX, event.clientY, {
++        id: hit.id,
++        url: hit.url,
++        prompt,
++      });
++    };
++    const pointerEvents = [
++      "pointerdown",
++      "pointerup",
++      "mousedown",
++      "mouseup",
++    ] as const;
++    for (const name of pointerEvents)
++      host.addEventListener(name, blockDrawing, true);
++    host.addEventListener("contextmenu", handler, true);
++    return () => {
++      for (const name of pointerEvents)
++        host.removeEventListener(name, blockDrawing, true);
++      host.removeEventListener("contextmenu", handler, true);
++      close();
++    };
++  }, [board, openAt, close]);
++
++  useEffect(() => {
++    if (!contextMenu) return;
++    const getItems = () => [
++      ...document.querySelectorAll<HTMLButtonElement>(
++        ".canvas-image-menu button:not(:disabled)",
++      ),
++    ];
++    const frame = requestAnimationFrame(() => getItems()[0]?.focus());
++    const navigate = (event: KeyboardEvent) => {
++      if (event.key === "Escape") {
++        event.preventDefault();
++        event.stopImmediatePropagation();
++        close();
++        return;
++      }
++      if (["Delete", "Backspace"].includes(event.key)) {
++        event.preventDefault();
++        event.stopImmediatePropagation();
++        return;
++      }
++      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
++      const items = getItems();
++      if (!items.length) return;
++      event.preventDefault();
++      event.stopPropagation();
++      const current = items.indexOf(
++        document.activeElement as HTMLButtonElement,
++      );
++      const index =
++        event.key === "Home"
++          ? 0
++          : event.key === "End"
++            ? items.length - 1
++            : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) %
++              items.length;
++      items[index].focus();
++    };
++    document.addEventListener("keydown", navigate, true);
++    return () => {
++      cancelAnimationFrame(frame);
++      document.removeEventListener("keydown", navigate, true);
++    };
++  }, [contextMenu, close]);
++
++  const run = async (action: CanvasImageAction | "prompt", target: Target) => {
++    if (busy.current) return;
++    busy.current = true;
++    const message = MessagePlugin.loading(
++      zh ? "正在处理图片…" : "Processing image…",
++      0,
++    );
++    try {
++      const result =
++        action === "prompt"
++          ? (await copyImagePrompt(target.prompt), "copied")
++          : await runCanvasImageAction(
++              action,
++              target.url,
++              `image-${target.id}`,
++            );
++      if (result !== "cancelled")
++        MessagePlugin.success(
++          result === "copied"
++            ? zh
++              ? "已复制，可直接粘贴"
++              : "Copied, ready to paste"
++            : result === "revealed"
++              ? zh
++                ? "已在文件管理器中显示图片"
++                : "Image revealed in file manager"
++              : result === "download-started"
++                ? zh
++                  ? "已发起下载"
++                  : "Download started"
++                : zh
++                  ? "图片已保存"
++                  : "Image saved",
++        );
++    } catch (error) {
++      MessagePlugin.error(
++        error instanceof Error
++          ? error.message
++          : zh
++            ? "图片操作失败，请重试"
++            : "Image operation failed",
++      );
++    } finally {
++      MessagePlugin.close(message);
++      busy.current = false;
++    }
++  };
++  const items: ContextMenuEntry<Target>[] = [
++    {
++      key: "copy",
++      label: zh ? "复制图片" : "Copy image",
++      icon: <Copy size={16} />,
++      onSelect: (t) => void run("copy", t),
++    },
++    {
++      key: "save",
++      label: zh ? "图片另存为…" : "Save image as…",
++      icon: <Download size={16} />,
++      onSelect: (t) => void run("save", t),
++    },
++    {
++      key: "reveal",
++      label: zh ? "显示图片文件" : "Show image file",
++      icon: <FolderOpen size={16} />,
++      disabled: !getAssistantAccount()?.imageAction,
++      onSelect: (t) => void run("reveal", t),
++    },
++    { key: "divider", type: "divider" },
++    {
++      key: "preview",
++      label: zh ? "预览原图" : "Preview image",
++      icon: <ScanSearch size={16} />,
++      onSelect: (t) => onPreview(t.id),
++    },
++    {
++      key: "prompt",
++      label: zh ? "复制提示词" : "Copy prompt",
++      icon: <TextQuote size={16} />,
++      disabled: (t) => !t.prompt,
++      onSelect: (t) => void run("prompt", t),
++    },
++  ];
++  return (
++    <ContextMenu
++      state={contextMenu}
++      items={items}
++      onClose={close}
++      className="canvas-image-menu"
++    />
++  );
++}
+--- /dev/null
++++ b/packages/drawnix/src/components/canvas-image-context-menu.scss
+@@ -0,0 +1,22 @@
++.canvas-image-menu {
++  background: var(--color-bg-container, #fff);
++  color: var(--color-text-primary, #334155);
++}
++.canvas-image-menu .context-menu__item {
++  color: inherit;
++}
++.canvas-image-menu .context-menu__item:focus-visible {
++  outline: 2px solid #3b82f6;
++  outline-offset: -2px;
++}
++.creative-root[data-theme="dark"] .canvas-image-menu {
++  background: #252a33;
++  color: #e2e8f0;
++  border-color: #444b57;
++  .context-menu__item:hover:not(:disabled) {
++    background: #353d49;
++  }
++  .context-menu__divider {
++    background: #444b57;
++  }
++}
+--- /dev/null
++++ b/packages/drawnix/src/utils/canvas-image-actions.ts
+@@ -0,0 +1,102 @@
++import { normalizeImageDataUrl, downloadFromBlob } from "@aitu/utils";
++import { getAssistantAccount } from "../services/assistant-account";
++import { unifiedCacheService } from "../services/unified-cache-service";
++import { isVirtualMediaUrl } from "./virtual-media-url";
++import { copyToClipboard } from "./runtime-helpers";
++
++export type CanvasImageAction = "copy" | "save" | "reveal";
++
++/** Always use the original; a thumbnail is not a successful image export. */
++export async function readCanvasImage(url: string): Promise<Blob> {
++  const source = normalizeImageDataUrl(url);
++  const cached = await unifiedCacheService.getCachedBlob(source, {
++    allowNetwork: false,
++  });
++  if (cached?.size) {
++    if (cached.size > 64 * 1024 * 1024) throw new Error("图片超过 64 MB。");
++    return cached;
++  }
++  if (isVirtualMediaUrl(source)) {
++    throw new Error("原图缓存暂不可用，请从任务列表找回已有结果后重试。");
++  }
++  if (!/^(https?:|blob:|data:image\/)/i.test(source)) {
++    throw new Error("无法读取此图片来源。");
++  }
++  const response = await fetch(source, {
++    referrerPolicy: "no-referrer",
++    credentials: "omit",
++  });
++  if (!response.ok)
++    throw new Error("原图读取失败，请检查网络或从任务列表找回已有结果。");
++  const blob = await response.blob();
++  if (!blob.size || blob.size > 64 * 1024 * 1024)
++    throw new Error("图片为空或超过 64 MB。");
++  return blob;
++}
++
++async function pngForClipboard(blob: Blob): Promise<Blob> {
++  if (blob.type === "image/png") return blob;
++  const url = URL.createObjectURL(blob);
++  try {
++    const image = new Image();
++    image.src = url;
++    await image.decode();
++    if (image.naturalWidth * image.naturalHeight > 32 * 1024 * 1024)
++      throw new Error("图片尺寸过大，无法复制。");
++    const canvas = document.createElement("canvas");
++    canvas.width = image.naturalWidth;
++    canvas.height = image.naturalHeight;
++    const context = canvas.getContext("2d");
++    if (!context) throw new Error("无法转换图片。");
++    context.drawImage(image, 0, 0);
++    return await new Promise<Blob>((resolve, reject) =>
++      canvas.toBlob(
++        (result) =>
++          result ? resolve(result) : reject(new Error("图片转换失败。")),
++        "image/png",
++      ),
++    );
++  } finally {
++    URL.revokeObjectURL(url);
++  }
++}
++
++export async function runCanvasImageAction(
++  action: CanvasImageAction,
++  url: string,
++  name?: string,
++) {
++  const native = getAssistantAccount()?.imageAction;
++  if (native) return native(action, await readCanvasImage(url), name);
++  if (action === "reveal")
++    throw new Error("请在兔子助手桌面客户端中显示图片文件。");
++  if (action === "copy") {
++    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
++      throw new Error("当前环境不支持复制图片，请使用另存为。");
++    }
++    // Start clipboard.write in the click gesture, before reading cached bytes.
++    await navigator.clipboard.write([
++      new ClipboardItem({
++        "image/png": readCanvasImage(url).then(pngForClipboard),
++      }),
++    ]);
++    return "copied" as const;
++  }
++  const blob = await readCanvasImage(url);
++  const ext =
++    (
++      {
++        "image/jpeg": "jpg",
++        "image/webp": "webp",
++        "image/gif": "gif",
++      } as Record<string, string>
++    )[blob.type] || "png";
++  downloadFromBlob(blob, `opentu-image.${ext}`);
++  return "download-started" as const;
++}
++
++export async function copyImagePrompt(prompt: string) {
++  const native = getAssistantAccount()?.copyText;
++  if (native) await native(prompt);
++  else await copyToClipboard(prompt);
++}
+--- /dev/null
++++ b/openspec/changes/add-canvas-image-menu/proposal.md
+@@ -0,0 +1,14 @@
++# Change: Canvas image context menu
++
++## Why
++In the unified desktop, image right-click currently exposes the WebView menu. Cached originals have no user-visible file location.
++
++## What Changes
++- Provide copy image, save as, show file, preview and copy prompt on canvas images.
++- User approved option B on 2026-11-04: automatically export an original copy under Pictures/兔子助手 before revealing it. Reuse identical copies, recreate deleted copies, preserve edited copies.
++- Route single-image downloads through the same explicit native save boundary.
++
++## Impact
++- Canvas menu, host bridge, native clipboard/file dialogs and file manager. No account contract, generation request or database schema changes.
++- Canonical implementation/verification record: host docs/development/2026-11-04-image-context-menu.md.
++- Approved locally; no publication in this task.
+--- /dev/null
++++ b/openspec/changes/add-canvas-image-menu/specs/canvas-image-actions/spec.md
+@@ -0,0 +1,25 @@
++## ADDED Requirements
++### Requirement: Image actions target the clicked image
++The system SHALL offer copy image, save as, show image file, preview and copy prompt for the right-clicked canvas image without invoking drawing actions.
++
++#### Scenario: Another element is selected
++- **WHEN** an image is right-clicked while another element or drawing tool is active
++- **THEN** actions use the clicked image and do not modify the board.
++
++### Requirement: Original image export and automatic reveal
++The desktop SHALL use original bytes and save reveal copies under system Pictures/兔子助手 using content-derived names.
++
++#### Scenario: Repeated reveal
++- **WHEN** the original copy exists unchanged
++- **THEN** it is reused; a deleted copy is recreated, and an edited copy is preserved with a separate original copy.
++
++#### Scenario: Save cancellation or missing original
++- **WHEN** saving is cancelled or the original is unavailable
++- **THEN** no successful save is reported, no thumbnail is substituted and no generation is submitted.
++
++### Requirement: Accessible bounded menu
++The menu SHALL remain within the host viewport and support keyboard navigation and dismissal.
++
++#### Scenario: Near bottom edge
++- **WHEN** the image is right-clicked near the bottom of the contained creative workspace
++- **THEN** all actions remain visible; Escape closes the menu without changing the canvas.
+--- /dev/null
++++ b/openspec/changes/add-canvas-image-menu/tasks.md
+@@ -0,0 +1,6 @@
++## 1. Implementation
++- [x] 1.1 Confirm B behavior with user.
++- [x] 1.2 Add explicit native image copy/save/reveal and original-byte reader.
++- [x] 1.3 Add context menu and single-image download integration.
++- [x] 1.4 Verify file handling, cancellation, cache/reload, keyboard, viewport and WebKit.
++- [x] 1.5 Record host verification and regenerate vendored provenance patch.

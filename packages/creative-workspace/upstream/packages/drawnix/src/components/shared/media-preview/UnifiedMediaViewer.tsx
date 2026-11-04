@@ -1,3 +1,6 @@
+import { getAssistantAccount } from '../../../services/assistant-account';
+import { runCanvasImageAction } from '../../../utils/canvas-image-actions';
+import { MessagePlugin } from '../../../utils/message-plugin';
 /**
  * 统一媒体预览系统 - 主组件
  * 支持单图预览、对比预览和编辑模式，可相互切换
@@ -418,6 +421,15 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
       currentItem.type === 'image'
         ? normalizeImageDataUrl(currentItem.url)
         : currentItem.url;
+    if (currentItem.type === 'image' && getAssistantAccount()?.imageAction) {
+      try {
+        const result = await runCanvasImageAction('save', url, currentItem.title);
+        if (result === 'saved') MessagePlugin.success('图片已保存');
+      } catch (error) {
+        MessagePlugin.error(error instanceof Error ? error.message : '图片保存失败');
+      }
+      return;
+    }
     const isDesktopDownload =
       typeof window !== 'undefined' &&
       Boolean((window as any).__TUZI_CREATIVE_NATIVE__);

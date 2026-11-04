@@ -89,15 +89,17 @@ function clampPosition(
   x: number,
   y: number,
   width: number,
-  height: number
+  height: number,
+  viewportWidth = window.innerWidth,
+  viewportHeight = window.innerHeight
 ): { x: number; y: number } {
   const maxX = Math.max(
     CONTEXT_MENU_VIEWPORT_PADDING,
-    window.innerWidth - width - CONTEXT_MENU_VIEWPORT_PADDING
+    viewportWidth - width - CONTEXT_MENU_VIEWPORT_PADDING
   );
   const maxY = Math.max(
     CONTEXT_MENU_VIEWPORT_PADDING,
-    window.innerHeight - height - CONTEXT_MENU_VIEWPORT_PADDING
+    viewportHeight - height - CONTEXT_MENU_VIEWPORT_PADDING
   );
 
   return {
@@ -131,7 +133,14 @@ function ContextMenuPanel<TPayload>({
     if (!element) return;
 
     const rect = element.getBoundingClientRect();
-    const next = clampPosition(x, y, rect.width, rect.height);
+    // The unified host contains layout/paint, so fixed coordinates are relative
+    // to its creative root, while MouseEvent coordinates are viewport-relative.
+    const root = element.closest('.creative-root')?.getBoundingClientRect();
+    const next = clampPosition(
+      x - (root?.left || 0), y - (root?.top || 0), rect.width, rect.height,
+      root ? Math.min(root.width, window.innerWidth - root.left) : window.innerWidth,
+      root ? Math.min(root.height, window.innerHeight - root.top) : window.innerHeight,
+    );
     if (next.x !== position.x || next.y !== position.y) {
       setPosition(next);
     }

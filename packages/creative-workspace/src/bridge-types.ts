@@ -31,6 +31,13 @@ export interface CreativeAccountBridge {
   openExternalTool?: (toolId: string) => Promise<void>;
   /** Native manual transport is independent of account connection state. */
   requestManual?: (url: string, init: RequestInit) => Promise<Response>;
+  /** User-triggered image operations. No arbitrary destination path or URL. */
+  imageAction?: (
+    action: "copy" | "save" | "reveal",
+    blob: Blob,
+    name?: string,
+  ) => Promise<"copied" | "saved" | "revealed" | "cancelled">;
+  copyText?: (text: string) => Promise<void>;
   listKeys: (
     page: number,
     search: string,
