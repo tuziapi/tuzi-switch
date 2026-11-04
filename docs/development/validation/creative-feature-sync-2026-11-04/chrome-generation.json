@@ -1,0 +1,32 @@
+[
+  {
+    "scenario": "stay",
+    "status": "passed",
+    "posts": 1,
+    "reloadPosts": 0
+  },
+  {
+    "scenario": "assistant",
+    "status": "passed",
+    "posts": 1,
+    "reloadPosts": 0
+  },
+  {
+    "scenario": "projects",
+    "status": "passed",
+    "posts": 1,
+    "reloadPosts": 0
+  },
+  {
+    "scenario": "other-project",
+    "status": "passed",
+    "posts": 1,
+    "reloadPosts": 0
+  },
+  {
+    "scenario": "unknown-result",
+    "status": "passed",
+    "posts": 1,
+    "reloadPosts": 0
+  }
+]

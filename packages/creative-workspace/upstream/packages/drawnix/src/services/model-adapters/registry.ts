@@ -1,3 +1,4 @@
+import { isSunoNativeModel } from '../suno-native';
 import type { ModelAdapter, ModelKind } from './types';
 import { getModelConfig, ModelVendor } from '../../constants/model-config';
 import type { ModelType } from '../../constants/model-config';
@@ -10,6 +11,8 @@ import {
   type ProviderModelBinding,
 } from '../provider-routing';
 import { isTuziCompatibleBaseUrl } from '../provider-routing/tuzi-api-endpoints';
+import { isTuziGPTImageAlias } from './image-request-schemas';
+import { isSunoV2Model } from '../suno-v2';
 
 const adapterRegistry = new Map<string, ModelAdapter>();
 
@@ -150,7 +153,7 @@ function resolveGPTImageAdapterForLegacyRoute(
   modelId?: string | null,
   modelRef?: ModelRef | null
 ): ModelAdapter | undefined {
-  if (!isGPTImageModel(modelId)) {
+  if (!isGPTImageModel(modelId) && !isTuziGPTImageAlias(modelId)) {
     return undefined;
   }
 
@@ -159,7 +162,9 @@ function resolveGPTImageAdapterForLegacyRoute(
     return findImageAdapterBySchema('tuzi.image.gpt-generation-json');
   }
 
-  return findImageAdapterBySchema('openai.image.gpt-generation-json');
+  return isGPTImageModel(modelId)
+    ? findImageAdapterBySchema('openai.image.gpt-generation-json')
+    : undefined;
 }
 
 export function resolveAdapterForInvocation(
@@ -177,6 +182,10 @@ export function resolveAdapterForInvocation(
     routeModel,
     options
   );
+
+  if (isSunoNativeModel(modelRef?.modelId || modelId) && (kind !== 'audio' || plan?.binding.protocol !== 'tuzi.suno.native')) return undefined;
+  if (isSunoV2Model(modelRef?.modelId || modelId) &&
+      (kind !== 'audio' || plan?.binding.protocol !== 'tuzi.suno.v2')) return undefined;
 
   if (plan) {
     // Persisted discovery data can still advertise the unverified Flux task path.

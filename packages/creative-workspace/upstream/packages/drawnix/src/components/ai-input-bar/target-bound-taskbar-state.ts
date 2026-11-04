@@ -29,6 +29,14 @@ export function readBoundTargetGenerationPrompt(
       return value.trim();
     }
   }
+  if (targetType === 'image') {
+    const operation = record?.localImageOperation as
+      | { sourcePrompt?: unknown }
+      | undefined;
+    if (typeof operation?.sourcePrompt === 'string') {
+      return operation.sourcePrompt.trim();
+    }
+  }
   return '';
 }
 
@@ -171,7 +179,12 @@ export function pinBoundTargetReferenceContent<
     : target.text
     ? (item: T) => item.type === target.type && item.text === target.text
     : (item: T) => item === target;
-  return [target, ...content.filter((item) => !matchesTarget(item))];
+  // A submitted reference may already carry an exported mask/dimension snapshot.
+  const submittedTarget = content.find(matchesTarget);
+  return [
+    submittedTarget ? { ...target, ...submittedTarget } : target,
+    ...content.filter((item) => !matchesTarget(item)),
+  ];
 }
 
 export function isBoundTargetReferenceOnly(element: unknown): boolean {
@@ -473,11 +486,15 @@ export function shouldUseBoundTargetForSubmission(
 
 export function buildBoundTargetGenerationParams(
   target: BoundTargetGenerationMetadata | null,
-  count = 1
+  count = 1,
+  maskEdit?: { url: string; maskImage: string } | null
 ): Record<string, unknown> | null {
   if (!target || count > 1) return null;
   return {
-    generationMode: 'image_to_image',
+    generationMode: maskEdit ? 'image_edit' : 'image_to_image',
+    ...(maskEdit
+      ? { referenceImages: [maskEdit.url], maskImage: maskEdit.maskImage }
+      : {}),
     replaceElementId: target.elementId,
     targetElementId: target.elementId,
     anchorId: target.generationAnchorId,

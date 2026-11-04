@@ -20,6 +20,7 @@ import {
 import { RetryImage } from '../retry-image';
 import { getImageTaskProgressStatusText } from '../../utils/image-task-progress';
 import { buildImageGenerationAnchorPresentationPatch } from '../../utils/image-generation-anchor-state';
+import { retryImageGenerationResultLoads } from '../../utils/image-generation-anchor-readiness';
 import {
   getTasksForImageGenerationAnchor,
   selectPrimaryImageGenerationAnchorTask,
@@ -52,7 +53,10 @@ const STACK_SLOT_STATUS_LABELS = {
 export const ImageGenerationAnchorContent: React.FC<
   ImageGenerationAnchorContentProps
 > = ({ board, element, selected }) => {
-  const { viewModel } = useImageGenerationAnchorController({ anchor: element });
+  const { viewModel } = useImageGenerationAnchorController({
+    board,
+    anchor: element,
+  });
   const [detailsOpen, setDetailsOpen] = useState(false);
   const relatedTasks = useMemo(
     () => getTasksForImageGenerationAnchor(element, taskQueueService.getAllTasks()),
@@ -80,6 +84,8 @@ export const ImageGenerationAnchorContent: React.FC<
     ? batchPreview?.statusText || PHASE_CENTER_LABELS[viewModel.phase]
     : showDeterminateProgress
     ? getImageTaskProgressStatusText(progressValue)
+    : viewModel.failureStage === 'post-processing'
+    ? viewModel.phaseLabel
     : PHASE_CENTER_LABELS[viewModel.phase];
   const progressTone: ImageGenerationProgressTone =
     viewModel.phase === 'failed'
@@ -181,6 +187,16 @@ export const ImageGenerationAnchorContent: React.FC<
       }
 
       if (actionType === 'retry') {
+        if (retryImageGenerationResultLoads(board, element, relatedTasks)) {
+          ImageGenerationAnchorTransforms.updateAnchor(
+            board,
+            element.id,
+            buildImageGenerationAnchorPresentationPatch('inserting', {
+              subtitle: '正在重新加载已有图片',
+            })
+          );
+          return;
+        }
         const retryableTask =
           relatedTasks.find(
             (task) =>
@@ -206,35 +222,19 @@ export const ImageGenerationAnchorContent: React.FC<
           return;
         }
 
-        const retryablePostProcessingStatus = retryableTask
-          ? workflowCompletionService.getPostProcessingStatus(retryableTask.id)
-              ?.status
-          : undefined;
-
-        if (retryableTask) {
+        if (
+          retryableTask &&
+          (retryableTask.status === TaskStatus.FAILED ||
+            retryableTask.status === TaskStatus.CANCELLED)
+        ) {
           ImageGenerationAnchorTransforms.updateAnchor(
             board,
             element.id,
             buildImageGenerationAnchorPresentationPatch('retrying')
           );
 
-          if (
-            retryableTask.status === TaskStatus.FAILED ||
-            retryableTask.status === TaskStatus.CANCELLED
-          ) {
-            taskQueueService.retryTask(retryableTask.id);
-            return;
-          }
-
-          if (
-            retryableTask.status === TaskStatus.COMPLETED &&
-            retryablePostProcessingStatus === 'failed'
-          ) {
-            taskQueueService.retryTask(retryableTask.id, {
-              allowCompleted: true,
-            });
-            return;
-          }
+          taskQueueService.retryTask(retryableTask.id);
+          return;
         }
 
         window.dispatchEvent(
@@ -369,7 +369,9 @@ export const ImageGenerationAnchorContent: React.FC<
                 {index + 1}
               </span>
               <span className="image-generation-anchor__stack-slot-status">
-                {STACK_SLOT_STATUS_LABELS[slot.status]}
+                {slot.failureStage === 'post-processing'
+                  ? '插入失败'
+                  : STACK_SLOT_STATUS_LABELS[slot.status]}
               </span>
             </span>
             <span className="image-generation-anchor__stack-slot-sheen" />

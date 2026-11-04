@@ -17,11 +17,16 @@ import {
   type PlaitArrowLine,
 } from '@plait/draw';
 import type { CanvasAssociationRef } from '../types/shared/core.types';
+import { readImageToolbarPreferences } from '../utils/image-toolbar-preferences';
+import {
+  ASSOCIATION_STROKE_COLOR,
+  ASSOCIATION_STROKE_WIDTH,
+  CanvasAssociationLineComponent,
+  isHitCanvasAssociationLine,
+} from './canvas-association-line';
 
 export const CANVAS_ASSOCIATION_VERSION = 1 as const;
 
-const ASSOCIATION_STROKE_COLOR = '#000000';
-const ASSOCIATION_STROKE_WIDTH = 2;
 const ASSOCIATION_LINE_SHAPE = ArrowLineShape.curve;
 const SYSTEM_ELEMENT_TYPES = new Set(['generation-anchor', 'workzone']);
 const MAX_DEFERRED_ASSOCIATION_LINKS = 256;
@@ -50,7 +55,7 @@ export interface CanvasAssociationMetadata {
 
 export interface PlaitCanvasAssociationLine extends PlaitArrowLine {
   canvasAssociation: CanvasAssociationMetadata;
-  locked: true;
+  locked: false;
 }
 
 export interface CreateCanvasAssociationLinesOptions {
@@ -611,7 +616,8 @@ export function createCanvasAssociationLines(
         strokeWidth: ASSOCIATION_STROKE_WIDTH,
       }
     ) as PlaitCanvasAssociationLine;
-    line.locked = true;
+    // Keep managed links selectable so the normal canvas delete action works.
+    line.locked = false;
     line.canvasAssociation = {
       version: CANVAS_ASSOCIATION_VERSION,
       boardId,
@@ -805,7 +811,7 @@ export function reconcileCanvasAssociationLines(
     }
 
     const restoreManagedState =
-      element.locked !== true ||
+      element.locked !== false ||
       Boolean(element.source.boundId || element.source.connection) ||
       Boolean(element.target.boundId || element.target.connection);
     const restoreManagedStyle =
@@ -833,7 +839,7 @@ export function reconcileCanvasAssociationLines(
       points: update.points,
     };
     if (update.restoreManagedState) {
-      patch.locked = true;
+      patch.locked = false;
       patch.source = { marker: ArrowLineMarkerType.none };
       patch.target = { marker: ArrowLineMarkerType.none };
     }
@@ -912,7 +918,7 @@ function reconcileAffectedCanvasAssociationLines(
       continue;
     }
     const restoreManagedState =
-      line.locked !== true ||
+      line.locked !== false ||
       Boolean(line.source.boundId || line.source.connection) ||
       Boolean(line.target.boundId || line.target.connection);
     const restoreManagedStyle =
@@ -940,7 +946,7 @@ function reconcileAffectedCanvasAssociationLines(
       points: update.points,
     };
     if (update.restoreManagedState) {
-      patch.locked = true;
+      patch.locked = false;
       patch.source = { marker: ArrowLineMarkerType.none };
       patch.target = { marker: ArrowLineMarkerType.none };
     }
@@ -965,7 +971,20 @@ function reconcileAffectedCanvasAssociationLines(
 }
 
 export const withCanvasAssociation: PlaitPlugin = (board) => {
-  const { afterChange } = board;
+  const { afterChange, drawElement, isHit, isRectangleHit } = board;
+  board.isHit = (element, point, ...rest) =>
+    isCanvasAssociationLine(element)
+      ? isHitCanvasAssociationLine(board, element, point)
+      : isHit(element, point, ...rest);
+  board.isRectangleHit = (element, selection) =>
+    isCanvasAssociationLine(element) &&
+    !readImageToolbarPreferences().referenceLines
+      ? false
+      : isRectangleHit(element, selection);
+  board.drawElement = (context) =>
+    isCanvasAssociationLine(context.element)
+      ? CanvasAssociationLineComponent
+      : drawElement(context);
   let applyingOperationDepth = 0;
   let reconciling = false;
   let appliedOperationShouldSave = false;

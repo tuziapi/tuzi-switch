@@ -222,17 +222,22 @@ function appendFormValue(
   formData.append(key, String(value));
 }
 
-async function imageInputToBlob(
+export async function imageInputToBlob(
   value: string,
   filenamePrefix: string,
-  fetcher: typeof fetch = fetch
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal
 ): Promise<{ blob: Blob; filename: string }> {
+  signal?.throwIfAborted();
   try {
     return await prepareReferenceImageForMultipart(value, {
       filenamePrefix,
       fetcher,
+      signal,
+      keepOriginal: filenamePrefix === 'mask' ? true : undefined,
     });
   } catch (error) {
+    if (signal?.aborted) throw signal.reason;
     throw new Error(
       `GPT Image 编辑图片读取失败: ${
         error instanceof Error ? error.message : String(error)

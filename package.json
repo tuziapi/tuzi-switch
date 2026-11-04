@@ -22,7 +22,8 @@
     "postversion": "git push && git push origin --tags",
     "build:creative": "pnpm --filter @tuzi/creative-workspace build",
     "preview:creative": "pnpm build:creative && vite --config tests/visual/vite.config.ts --port 5197",
-    "build:download": "pnpm --filter @tuzi/download-page build"
+    "build:download": "pnpm --filter @tuzi/download-page build",
+    "test:creative": "pnpm --filter @tuzi/creative-workspace exec vitest run --config vitest.config.ts"
   },
   "keywords": [],
   "author": "Jason Young",

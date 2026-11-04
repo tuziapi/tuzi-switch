@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ATTACHED_ELEMENT_CLASS_NAME } from '@plait/core';
+import { ATTACHED_ELEMENT_CLASS_NAME, type PlaitBoard } from '@plait/core';
 import { Info, RefreshCw, X } from 'lucide-react';
 import { ToolButton } from '../../tool-button';
 import { HoverTip } from '../../shared/hover';
@@ -10,6 +10,7 @@ import {
   type CanvasImageDetailsSource,
 } from '../../../utils/canvas-image-details';
 import type { Task } from '../../../types/task.types';
+import { resolveCanvasImageDetailsDimensions } from '../../../utils/canvas-image-details-dimensions';
 import {
   readImageDetailsOnClickEnabled,
   persistImageDetailsOnClickEnabled,
@@ -83,11 +84,13 @@ export function PopupImageDetailsButton({
   language,
   autoOpenRequest = 0,
   selectionRect,
+  board,
 }: {
   image: CanvasImageDetailsSource;
   language: 'zh' | 'en';
   autoOpenRequest?: number;
   selectionRect?: ImageScreenRect;
+  board?: PlaitBoard;
 }) {
   const [autoEnabled, setAutoEnabled] = useState(
     readImageDetailsOnClickEnabled
@@ -97,6 +100,7 @@ export function PopupImageDetailsButton({
   );
   const [retry, setRetry] = useState(0);
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
+  const [decodedImage, setDecodedImage] = useState<CanvasImageDetailsSource>();
   const zh = language === 'zh';
   const kind = image.kind || 'image';
   const kindLabel = {
@@ -122,6 +126,12 @@ export function PopupImageDetailsButton({
   useEffect(() => {
     if (!open) return;
     let active = true;
+    if (image.localOperation) {
+      setLoad({ status: 'ready' });
+      return () => {
+        active = false;
+      };
+    }
     setLoad({ status: 'loading' });
     void findCanvasImageTask({ id, url, generationTaskId, kind }).then(
       (task) => {
@@ -134,15 +144,59 @@ export function PopupImageDetailsButton({
     return () => {
       active = false;
     };
-  }, [open, id, url, generationTaskId, kind, retry]);
+  }, [open, id, url, generationTaskId, kind, retry, image.localOperation]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      kind !== 'image' ||
+      image.localOperation ||
+      (image.width && image.height)
+    )
+      return;
+    let active = true;
+    void resolveCanvasImageDetailsDimensions(
+      { id, url, kind },
+      board,
+      () => active
+    ).then(
+      (resolved) => {
+        if (active) setDecodedImage(resolved);
+      },
+      (error) => {
+        console.debug('[ImageDetails] Original dimensions unavailable:', error);
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [
+    open,
+    id,
+    url,
+    kind,
+    image.width,
+    image.height,
+    image.localOperation,
+    board,
+    retry,
+  ]);
 
   const details = getCanvasImageDetails(
-    image,
+    decodedImage?.id === id && decodedImage.url === url
+      ? { ...image, width: decodedImage.width, height: decodedImage.height }
+      : image,
     load.status === 'ready' ? load.task : undefined
   );
   const rows = [
     [
-      zh ? '生成时间' : 'Generation time',
+      image.localOperation
+        ? zh
+          ? '处理时间'
+          : 'Processing time'
+        : zh
+        ? '生成时间'
+        : 'Generation time',
       formatTime(details.createdAt, language),
     ],
     ...(details.completedAt
@@ -153,7 +207,20 @@ export function PopupImageDetailsButton({
           ],
         ]
       : []),
-    [zh ? '模型' : 'Model', details.model],
+    [
+      image.localOperation
+        ? zh
+          ? '处理方式'
+          : 'Operation'
+        : zh
+        ? '模型'
+        : 'Model',
+      image.localOperation
+        ? zh
+          ? '本地缩放（非 AI）'
+          : 'Local resize (non-AI)'
+        : details.model,
+    ],
     ...(kind === 'image' || kind === 'video'
       ? [
           [
@@ -262,7 +329,7 @@ export function PopupImageDetailsButton({
         )}
         {load.status === 'ready' && (
           <>
-            {!load.task && (
+            {!load.task && !details.localOperation && (
               <p className="image-details-panel__missing">
                 {zh
                   ? `未找到该${kindLabel}的生成记录`
@@ -278,14 +345,70 @@ export function PopupImageDetailsButton({
               ))}
             </dl>
             <section>
-              <h4>{zh ? '提示词' : 'Prompt'}</h4>
+              <h4>
+                {details.localOperation
+                  ? zh
+                    ? '处理说明'
+                    : 'Processing'
+                  : zh
+                  ? '提示词'
+                  : 'Prompt'}
+              </h4>
               <p className="image-details-panel__prompt">
-                {details.prompt || unrecorded}
+                {details.localOperation
+                  ? zh
+                    ? '通过本地像素插值缩放，不调用 AI，也不会增加图像细节。'
+                    : 'Resized locally using interpolation. No AI generation or added image detail.'
+                  : details.prompt || unrecorded}
               </p>
             </section>
             <section>
-              <h4>{zh ? '模型参数' : 'Model parameters'}</h4>
-              {details.parameters.length ? (
+              <h4>
+                {details.localOperation
+                  ? zh
+                    ? '缩放参数'
+                    : 'Resize details'
+                  : zh
+                  ? '模型参数'
+                  : 'Model parameters'}
+              </h4>
+              {details.localOperation ? (
+                <dl className="image-details-panel__fields">
+                  <dt>{zh ? '原图尺寸' : 'Source dimensions'}</dt>
+                  <dd>
+                    {details.localOperation.sourceWidth} ×{' '}
+                    {details.localOperation.sourceHeight} px
+                  </dd>
+                  <dt>{zh ? '插值方式' : 'Interpolation'}</dt>
+                  <dd>
+                    {
+                      {
+                        high: zh ? '高质量' : 'High quality',
+                        bilinear: zh ? '平滑' : 'Bilinear',
+                        nearest: zh
+                          ? '最近邻（像素画）'
+                          : 'Nearest neighbor (pixel art)',
+                      }[details.localOperation.algorithm]
+                    }
+                  </dd>
+                  <dt>{zh ? '缩放倍数（长边）' : 'Scale (long edge)'}</dt>
+                  <dd>
+                    {Number(
+                      (
+                        Math.max(
+                          details.localOperation.outputWidth,
+                          details.localOperation.outputHeight
+                        ) /
+                        Math.max(
+                          details.localOperation.sourceWidth,
+                          details.localOperation.sourceHeight
+                        )
+                      ).toFixed(2)
+                    )}
+                    ×
+                  </dd>
+                </dl>
+              ) : details.parameters.length ? (
                 <dl className="image-details-panel__fields">
                   {details.parameters.map(({ name, value }) => (
                     <React.Fragment key={name}>
@@ -298,6 +421,14 @@ export function PopupImageDetailsButton({
                 <p>{unrecorded}</p>
               )}
             </section>
+            {details.localOperation?.sourcePrompt && (
+              <section>
+                <h4>{zh ? '原图提示词' : 'Source prompt'}</h4>
+                <p className="image-details-panel__prompt">
+                  {details.localOperation.sourcePrompt}
+                </p>
+              </section>
+            )}
           </>
         )}
       </PopoverContent>

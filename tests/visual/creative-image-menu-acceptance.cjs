@@ -134,6 +134,29 @@ async function configure(p) {
       "image not delivered",
     );
     await paintedCanvas(p, original.id, "initial");
+    await p.evaluate(() => {
+      window.__menuEvents = [];
+      for (const type of ["pointerdown", "pointerup", "contextmenu"])
+        document.addEventListener(
+          type,
+          (event) => {
+            window.__menuEvents.push({
+              type,
+              button: event.button,
+              x: event.clientX,
+              y: event.clientY,
+              target: event.target.outerHTML.slice(0, 500),
+              path: event
+                .composedPath()
+                .slice(0, 8)
+                .map(
+                  (e) => e.nodeName + ":" + (e.getAttribute?.("class") || ""),
+                ),
+            });
+          },
+          true,
+        );
+    });
     const element = (
       await records(p, "aitu-workspace", "boards")
     )[0].elements.find((e) => e.type === "image");
@@ -142,11 +165,26 @@ async function configure(p) {
       .first();
     const menu = p.locator(".canvas-image-menu");
     async function open() {
-      const r = await loc.boundingBox();
-      assert(r, "image visible");
-      await p.mouse.click(r.x + r.width / 2, r.y + r.height / 2, {
-        button: "right",
+      // The input bar can overlap the image after generation. Right-click an
+      // exposed canvas pixel, never force-click through an editable overlay.
+      const point = await loc.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        for (const fy of [0.5, 0.2, 0.8, 0.05, 0.95])
+          for (const fx of [0.5, 0.2, 0.8, 0.05, 0.95]) {
+            const x = r.x + r.width * fx,
+              y = r.y + r.height * fy;
+            if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
+            if (
+              document
+                .elementFromPoint(x, y)
+                ?.closest(".board-host-svg, .board-active-svg")
+            )
+              return { x, y };
+          }
+        return null;
       });
+      assert(point, "image must have an exposed canvas region");
+      await p.mouse.click(point.x, point.y, { button: "right" });
       await menu.waitFor();
     }
     await open();
@@ -390,6 +428,18 @@ async function configure(p) {
     console.log(JSON.stringify({ engine, checks, errors }, null, 2));
   } catch (error) {
     await p.screenshot({ path: `${output}/failure.png` });
+    fs.writeFileSync(
+      `${output}/menu-diagnostics.json`,
+      JSON.stringify(
+        await p.evaluate(() => ({
+          events: window.__menuEvents,
+          board: window.__drawnixBoard?.children,
+          viewport: window.__drawnixBoard?.viewport,
+        })),
+        null,
+        2,
+      ),
+    );
     fs.writeFileSync(
       `${output}/failure.txt`,
       `${error.stack}\n${await p.locator("body").innerText()}`,

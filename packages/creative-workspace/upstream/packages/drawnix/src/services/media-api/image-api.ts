@@ -78,12 +78,17 @@ export function buildImageRequestBody(
   if (requestedSize) {
     const resolvedSize = resolveGeminiImageRequestSize(
       requestedSize,
-      quality === '1k' || quality === '2k' || quality === '4k' ? quality : undefined,
+      quality === '1k' || quality === '2k' || quality === '4k'
+        ? quality
+        : undefined,
       params.model
     );
-    body.size = quality && isGeminiImageModel(params.model) && /^\d{1,2}[x:]\d{1,2}$/.test(requestedSize.trim())
-      ? resolvedSize
-      : aspectRatioToSize(resolvedSize);
+    body.size =
+      quality &&
+      isGeminiImageModel(params.model) &&
+      /^\d{1,2}[x:]\d{1,2}$/.test(requestedSize.trim())
+        ? resolvedSize
+        : aspectRatioToSize(resolvedSize);
   }
 
   if (quality) {

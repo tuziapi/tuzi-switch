@@ -33,10 +33,12 @@ import {
 import { RetryImage } from '../../components/retry-image';
 import { isNativeRenderEnvironment } from '../../utils/tauri-env';
 import { mountNativeImageOverlay } from './native-image-overlay';
+import { registerCanvasImage } from '../../services/canvas-image-readiness';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
 const EXTERNAL_IMAGE_RETRY_DELAYS = [500, 1500, 3000];
+const GENERATED_IMAGE_LOAD_TIMEOUT_MS = 60_000;
 
 const image3DForeignObjectOverflowRefs = new WeakMap<
   SVGForeignObjectElement,
@@ -160,6 +162,32 @@ const isVideoElement = (imageItem: any): boolean => {
 };
 
 export const Image: React.FC<ImageProps> = (props: ImageProps) => {
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const retryImageLoad = useCallback(() => setLoadAttempt((value) => value + 1), []);
+  const canvasImageRenderRef = useRef<ReturnType<
+    typeof registerCanvasImage
+  > | null>(null);
+  useLayoutEffect(() => {
+    const render = registerCanvasImage(
+      props.board,
+      props.element.id,
+      props.imageItem.url,
+      retryImageLoad
+    );
+    canvasImageRenderRef.current = render;
+    return () => {
+      render.dispose();
+      if (canvasImageRenderRef.current === render) {
+        canvasImageRenderRef.current = null;
+      }
+    };
+  }, [
+    props.board,
+    props.element.id,
+    props.imageItem.url,
+    loadAttempt,
+    retryImageLoad,
+  ]);
   const currentImageUrlRef = useRef(props.imageItem.url);
   const cleanupSWRecoveryRef = useRef<(() => void) | null>(null);
   const fallbackBlobUrlRef = useRef<string | null>(null);
@@ -203,6 +231,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
     };
   }, [
     props.imageItem.url,
+    loadAttempt,
     clearExternalImageRetry,
     clearFallbackBlobUrl,
     clearSWRecovery,
@@ -306,6 +335,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
   const handleImageError = useCallback(
     async (event: any) => {
       const imageElement = event.currentTarget as HTMLImageElement;
+      canvasImageRenderRef.current?.setReady(false);
       imageElement.style.visibility = 'hidden';
       if (
         isVirtualMediaUrl(props.imageItem.url) &&
@@ -374,6 +404,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
         props.element,
         props.imageItem.url
       );
+      canvasImageRenderRef.current?.setReady(true);
     },
     [
       clearExternalImageRetry,
@@ -383,6 +414,13 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
       props.imageItem.url,
     ]
   );
+  const handleImageLoadFailure = useCallback((error: Error) => {
+    canvasImageRenderRef.current?.setError(
+      error.name === 'ImageOperationTimeoutError'
+        ? '图片加载超时，可重试加载已有结果'
+        : '图片加载失败，可重试加载已有结果'
+    );
+  }, []);
 
   const elementData = props.element as any;
   const pptStatus = elementData?.pptImageStatus as
@@ -795,6 +833,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
       }
     >
       <RetryImage
+        key={loadAttempt}
         {...imgProps}
         alt=""
         className={classNames('image-origin', {
@@ -803,12 +842,17 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
         eager
         showSkeleton={false}
         preferCachedBlob
+        loadTimeoutMs={
+          elementData.generationTaskId ? GENERATED_IMAGE_LOAD_TIMEOUT_MS : undefined
+        }
+        recoverAfterTimeout
         initialRetryDelay={500}
         bypassSWAfterRetries={1}
         onSourceChange={handleResolvedImageUrlChange}
         style={imgProps.style}
         onError={handleImageError}
         onLoad={handleImageLoad}
+        onLoadFailure={handleImageLoadFailure}
       />
     </div>
   );

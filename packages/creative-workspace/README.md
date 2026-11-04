@@ -1,5 +1,9 @@
 # 兔子助手创作模块
 
+2026-11-04 UC-SYNC-FEATURE-01：当前已增量同步另一会话 `5148d469`，以桌面 `f3626780` 为创作原始基线，保留助手 `501af92c` 的图片右键/原生导出与账户适配。当前状态和旧字段兼容见 [同步记录](../../docs/development/2026-11-04-creative-feature-sync.md)；下文历史阶段说明不作为当前验收结论。
+
+`pnpm test:creative` 独立运行创作测试（Vitest 3），`pnpm test:unit` 运行宿主测试（Vitest 2）。运行浏览器和宿主测试时不要同时重建创作 dist。来源补丁可用 `python3 scripts/refresh-creative-provenance.py --source-repo <包含固定桌面提交的本地仓库>` 重建，脚本不联网、不修改来源仓库，并逐文件验证重建字节一致。
+
 本地 React 业务包，来源固定在 `UPSTREAM.json`。`upstream/LICENSE` 保留原许可；`UPSTREAM-PATCHES.patch` 记录集成补丁。更新上游时先比对原始哈希，再审查/应用补丁，不能直接用新目录覆盖本地改动。
 
 `src/index.tsx` 装配真实项目服务与 Drawnix，`vite.config.ts` 负责依赖别名、React external、CSS 作用域及 worker 构建。宿主通过包导出懒加载，不运行 opentu 独立 bootstrap 或 updater。

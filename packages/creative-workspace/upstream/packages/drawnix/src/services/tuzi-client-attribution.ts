@@ -1,7 +1,20 @@
 import { accountReferenceFromHeaders, requestAssistantAccount, hasAssistantTransport, fetchAssistantManual } from './assistant-account';
+import nativeCatalog from './suno-native-catalog.json';
+import v2Catalog from './suno-v2-catalog.json';
 import { isTuziRequestRecoveryBaseUrl } from './provider-routing/tuzi-api-endpoints';
 
 declare const __OPENTU_DESKTOP_CHANNEL_PROOF__: string;
+
+// Derive invocation paths from the same catalogs used by the Suno adapters.
+// Credit/metadata and arbitrary media URLs must retain their original query.
+const sunoInvocationPaths = new Set([
+  ...nativeCatalog.actions
+    .filter((entry) => entry.action !== 'credits')
+    .flatMap((entry) => [entry.path, ...('pollPath' in entry ? [entry.pollPath] : [])]),
+  ...v2Catalog.actions.map((entry) => `/suno/v2/${entry.action}`),
+  '/suno/uploads/audio-url',
+  '/suno/submit/concat',
+]);
 
 /** Client-reported analytics only; this value is never identity or billing authority. */
 export function readTuziClientChannel(
@@ -53,7 +66,9 @@ export function withTuziClientChannel(
     /^\/(?:v\d+(?:beta\d*)?\/)?(?:chat\/completions|completions|responses(?:\/[^/]+)?|messages|embeddings|images\/(?:generations|edits|variations)(?:\/result)?|audio\/(?:speech|transcriptions|translations|generations)|videos(?:\/[^/]+)?|models\/[^/]+:(?:generateContent|streamGenerateContent|predict|predictLongRunning)|(?:models\/[^/]+\/)?operations\/[^/]+)\/?$/i;
   const adapterPath =
     /^\/(?:mj\/(?:submit\/[^/]+|task\/[^/]+\/fetch)|flux\/v1\/[^/]+|kling\/v1\/videos\/[^/]+(?:\/[^/]+)?|v2\/(?:video_generation|query\/video_generation\/[^/]+))\/?$/i;
-  if (!modelPath.test(target.pathname) && !adapterPath.test(target.pathname)) {
+  const sunoPath = sunoInvocationPaths.has(target.pathname.replace(/\/$/, '')) ||
+    /^\/suno\/(?:v2\/)?fetch\/[^/]+\/?$/.test(target.pathname);
+  if (!modelPath.test(target.pathname) && !adapterPath.test(target.pathname) && !sunoPath) {
     return url;
   }
   const hashIndex = url.indexOf('#');

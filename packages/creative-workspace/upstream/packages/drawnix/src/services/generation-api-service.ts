@@ -890,6 +890,7 @@ class GenerationAPIService {
         primaryClipId: result.primaryClipId,
         clipIds: result.clipIds,
         clips: result.clips,
+        analysisData: result.analysisData,
       };
     } catch (error: any) {
       console.error('[GenerationAPI] Audio generation error:', error);
@@ -1040,6 +1041,7 @@ class GenerationAPIService {
       });
 
       const pollingPromise = audioAPIService.resumePolling(remoteId, {
+        params: taskQueueService.getTask(taskId)?.params.params as Record<string, unknown> | undefined,
         interval: 5000,
         assertAvailable,
         routeModel,
@@ -1078,6 +1080,7 @@ class GenerationAPIService {
         primaryClipId: result.primaryClipId,
         clipIds: result.clipIds,
         clips: result.clips,
+        analysisData: result.analysisData,
       };
     } catch (error: any) {
       const duration = Date.now() - startTime;

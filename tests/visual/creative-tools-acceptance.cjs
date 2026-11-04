@@ -25,7 +25,7 @@ const external = new Set(['chat-mj','banana-prompt','pose-library']);
     });
     const result = {id,theme,width,height,external:external.has(id),errors,missing};
     try {
-     await page.goto('http://127.0.0.1:5197/ui04.html?canvas=1&page=creative&theme='+theme);
+     await page.goto((process.env.CREATIVE_QA_BASE_URL || 'http://127.0.0.1:5197') + '/ui04.html?canvas=1&page=creative&theme='+theme);
      await page.getByRole('navigation',{name:'创作导航'}).getByRole('button',{name:'自由画布',exact:true}).click();
      await page.locator('.plait-board-container').waitFor();
      const expand=page.getByRole('button',{name:'展开工具栏',exact:true});if(await expand.isVisible())await expand.click();

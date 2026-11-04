@@ -11,6 +11,10 @@ import {
   isSeedance25ModelId,
   SEEDANCE_25_MODEL_ID,
 } from '../utils/seedance-model';
+import { isSunoV2Model, isUnavailableSunoModel } from '../services/suno-v2';
+import { isSunoNativeModel } from '../services/suno-native';
+import { getSunoNativeParams } from '../services/suno-native-params';
+import { getSunoV2Params } from '../services/suno-v2-params';
 
 /**
  * 模型类型
@@ -107,7 +111,7 @@ export interface ParamConfig {
   /** 可选值列表（enum 类型时使用） */
   options?: Array<{ value: string; label: string }>;
   /** 二元枚举的展示控件 */
-  control?: 'switch';
+  control?: 'switch' | 'select' | 'multiselect' | 'textarea' | 'file';
   advanced?: boolean;
   /** 默认值 */
   defaultValue?: string;
@@ -1945,7 +1949,7 @@ export const AUDIO_MODEL_SELECT_OPTIONS = AUDIO_MODELS.map((model) => ({
 /**
  * 默认图片模型 ID
  */
-export const DEFAULT_IMAGE_MODEL_ID = 'gpt-image-2';
+export const DEFAULT_IMAGE_MODEL_ID = 'gpt-image-2.5-sunburst';
 
 /**
  * 获取默认图片模型 ID（优先使用环境变量）
@@ -1961,10 +1965,10 @@ export function getDefaultImageModel(): string {
 /**
  * 默认视频模型 ID
  */
-export const DEFAULT_VIDEO_MODEL_ID = 'seedance-1.5-pro';
+export const DEFAULT_VIDEO_MODEL_ID = SEEDANCE_25_MODEL_ID;
 
 /**
- * 获取默认视频模型 ID（目前固定为 veo3）
+ * 获取默认视频模型 ID
  */
 export function getDefaultVideoModel(): string {
   return DEFAULT_VIDEO_MODEL_ID;
@@ -1979,7 +1983,7 @@ export const DEFAULT_VIDEO_MODEL = DEFAULT_VIDEO_MODEL_ID;
 /**
  * 默认文本模型 ID
  */
-export const DEFAULT_TEXT_MODEL_ID = 'gpt-5.5';
+export const DEFAULT_TEXT_MODEL_ID = 'gpt-6-sol';
 
 /**
  * 获取默认文本模型 ID
@@ -3500,6 +3504,9 @@ export function getParamsByModelType(modelType: ModelType): ParamConfig[] {
  * 根据模型 ID 获取兼容的参数列表
  */
 export function getCompatibleParams(modelId: string): ParamConfig[] {
+  if (isSunoNativeModel(modelId)) return getSunoNativeParams(modelId);
+  if (isUnavailableSunoModel(modelId)) return [];
+  if (isSunoV2Model(modelId)) return getSunoV2Params(modelId);
   const modelConfig = getModelConfig(modelId);
   if (!modelConfig) return [];
   const normalizedModelId = modelConfig.id.toLowerCase();
@@ -3554,6 +3561,21 @@ export function getCompatibleParams(modelId: string): ParamConfig[] {
     }
     return idMatched || tagMatched;
   });
+
+  if (
+    modelConfig.type === 'image' &&
+    modelConfig.vendor === ModelVendor.GEMINI &&
+    !compatibleParams.some((param) => param.id === 'size')
+  ) {
+    const geminiSizeParam = IMAGE_PARAMS.find(
+      (param) =>
+        param.id === 'size' &&
+        param.compatibleModels.some((id) =>
+          GEMINI_IMAGE_MODEL_IDS_EXCLUDING_FLASH31.includes(id)
+        )
+    );
+    if (geminiSizeParam) compatibleParams.push(geminiSizeParam);
+  }
 
   if (!isSeedance25ModelId(modelId)) {
     return compatibleParams;

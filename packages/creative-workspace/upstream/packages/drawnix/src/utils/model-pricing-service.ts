@@ -20,6 +20,7 @@ type PricingListener = () => void;
 type FetchAndCacheOptions = {
   force?: boolean;
   promoteToAutoRefresh?: boolean;
+  requestUrl?: string;
 };
 
 type ResolvedProviderPricingConfig = {
@@ -40,6 +41,7 @@ const DEFAULT_GROUP_NAME = 'default';
 export const DEFAULT_TUZI_CNY_PER_USD = 0.7;
 export const MODEL_PRICING_CACHE_TTL_MS = 5 * 60 * 1000;
 export const TUZI_PRICING_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MODEL_PRICING_REQUEST_TIMEOUT_MS = 15_000;
 
 function round4(v: number): number {
   return Math.round(v * 10000) / 10000;
@@ -69,6 +71,19 @@ export function derivePricingUrl(baseUrl: string): string {
   }
 }
 
+export function getPricingRequestUrl(pricingUrl: string): string {
+  if (typeof window === 'undefined') return pricingUrl;
+  try {
+    const url = new URL(pricingUrl);
+    if (url.origin === window.location.origin) return pricingUrl;
+    if (url.origin !== `https://${TUZI_API_HOST}`) return pricingUrl;
+    const prefix = '/__opentu_tuzi_session__';
+    return new URL(`${prefix}${url.pathname}${url.search}`, window.location.origin).toString();
+  } catch {
+    return pricingUrl;
+  }
+}
+
 function isTuziProvider(baseUrl: string): boolean {
   try {
     const hostname = new URL(baseUrl).hostname.toLowerCase();
@@ -94,6 +109,15 @@ function isTuziPricingUrl(pricingUrl: string): boolean {
       stripPricingUrlSearch(normalized) ===
       `https://${TUZI_API_HOST}/api/pricing`
     );
+  }
+}
+
+function isPublicTuziPricingUrl(pricingUrl: string): boolean {
+  try {
+    const url = new URL(pricingUrl);
+    return url.origin === `https://${TUZI_API_HOST}` && url.pathname === '/api/pricing';
+  } catch {
+    return false;
   }
 }
 
@@ -167,8 +191,9 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isTuziPricingResponse(json: PricingApiResponse): json is TuziPricingApiResponse {
+function isTuziPricingResponse(json: unknown): json is TuziPricingApiResponse {
   return (
+    isPlainRecord(json) &&
     isPlainRecord(json.data) &&
     isPlainRecord(json.data.group_info) &&
     Array.isArray(json.data.model_info)
@@ -176,20 +201,19 @@ function isTuziPricingResponse(json: PricingApiResponse): json is TuziPricingApi
 }
 
 function isNewApiPricingResponse(
-  json: PricingApiResponse
+  json: unknown
 ): json is NewApiPricingApiResponse {
-  const candidate = json as Partial<NewApiPricingApiResponse>;
   return (
+    isPlainRecord(json) &&
     Array.isArray(json.data) &&
-    (!candidate.group_ratio || isPlainRecord(candidate.group_ratio)) &&
-    (!candidate.usable_group || isPlainRecord(candidate.usable_group)) &&
-    (!candidate.group_info || isPlainRecord(candidate.group_info)) &&
-    (!candidate.group_model_pricing ||
-      isPlainRecord(candidate.group_model_pricing))
+    (!json.group_ratio || isPlainRecord(json.group_ratio)) &&
+    (!json.usable_group || isPlainRecord(json.usable_group)) &&
+    (!json.group_info || isPlainRecord(json.group_info)) &&
+    (!json.group_model_pricing || isPlainRecord(json.group_model_pricing))
   );
 }
 
-function isSupportedPricingResponse(json: PricingApiResponse): boolean {
+function isSupportedPricingResponse(json: unknown): json is PricingApiResponse {
   return isTuziPricingResponse(json) || isNewApiPricingResponse(json);
 }
 
@@ -389,6 +413,8 @@ function normalizeNewApiEndpointInfo(
     !label &&
     !description &&
     !scenario &&
+    !endpoint.transport &&
+    typeof endpoint.async !== 'boolean' &&
     !highlights?.length &&
     !parameters?.length &&
     requestTemplate === undefined
@@ -403,6 +429,8 @@ function normalizeNewApiEndpointInfo(
     ...(label ? { label } : {}),
     ...(description ? { description } : {}),
     ...(scenario ? { scenario } : {}),
+    ...(endpoint.transport ? { transport: endpoint.transport } : {}),
+    ...(typeof endpoint.async === 'boolean' ? { async: endpoint.async } : {}),
     ...(highlights?.length ? { highlights } : {}),
     ...(parameters?.length ? { parameters } : {}),
     ...(requestTemplate !== undefined ? { request_template: requestTemplate } : {}),
@@ -645,7 +673,11 @@ class ModelPricingService {
     options: FetchAndCacheOptions = {}
   ): Promise<PricingApiResponse> {
     const normalizedPricingUrl = normalizePricingUrl(pricingUrl);
-    const requestKey = this.buildSharedCacheKey(normalizedPricingUrl, apiKey);
+    // This public directory rejects generation keys as invalid site tokens.
+    // Match its logical upstream URL, even when fetched via the local proxy.
+    const publicPricing = isPublicTuziPricingUrl(normalizedPricingUrl);
+    const requestApiKey = publicPricing ? '' : apiKey;
+    const requestKey = this.buildSharedCacheKey(normalizedPricingUrl, requestApiKey);
     const ttlMs = getPricingCacheTtlMs(normalizedPricingUrl);
     const now = Date.now();
 
@@ -663,16 +695,40 @@ class ModelPricingService {
       return inflight;
     }
 
-    const promise = (async () => {
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timeoutId = setTimeout(() => {
+        const error = new Error('模型广场请求超时，请稍后重试');
+        reject(error);
+        controller.abort(error);
+      }, MODEL_PRICING_REQUEST_TIMEOUT_MS);
+    });
+    const request = (async () => {
       const headers: Record<string, string> = { Accept: 'application/json' };
-      if (apiKey && !isAccountReference(apiKey)) {
-        headers['Authorization'] = `Bearer ${apiKey}`;
+      if (requestApiKey && !isAccountReference(requestApiKey)) {
+        headers['Authorization'] = `Bearer ${requestApiKey}`;
       }
-      const response = await fetch(normalizedPricingUrl, { headers });
+      const response = await fetch(options.requestUrl || normalizedPricingUrl, {
+        headers,
+        credentials: publicPricing ? 'omit' : undefined,
+        signal: controller.signal,
+      });
       if (!response.ok) {
         throw new Error(`Pricing API error: ${response.status}`);
       }
-      const json = (await response.json()) as PricingApiResponse;
+      const json: unknown = await response.json();
+      controller.signal.throwIfAborted();
+      if (isPlainRecord(json) && json.success === false) {
+        const detail = typeof json.error === 'string'
+          ? json.error
+          : isPlainRecord(json.error) ? json.error.message : undefined;
+        const rawMessage = typeof json.message === 'string' && json.message.trim()
+          ? json.message : typeof detail === 'string' ? detail : '';
+        const message = (apiKey ? rawMessage.split(apiKey).join('[已隐藏]') : rawMessage)
+          .replace(/\s+/g, ' ').trim().slice(0, 300);
+        throw new Error(message ? `价格接口请求失败：${message}` : '价格接口请求失败，请稍后重试');
+      }
       if (!isSupportedPricingResponse(json)) {
         throw new Error('Invalid pricing API response');
       }
@@ -683,6 +739,10 @@ class ModelPricingService {
       });
       return json;
     })();
+    // Bound the full response even if a transport ignores cancellation.
+    const promise = Promise.race([request, timeout]).finally(() =>
+      clearTimeout(timeoutId)
+    );
 
     this.inflightRequestMap.set(requestKey, promise);
 
@@ -715,10 +775,17 @@ class ModelPricingService {
 
     const prices: Record<string, ModelPrice> = {};
     const modelEndpoints: Record<string, Record<string, PricingEndpointInfo>> = {};
+    const modelCatalog: NonNullable<ProviderPricingCache['modelCatalog']> = {};
     for (const model of json.data.model_info) {
       const groupPrices = model.price_info?.[effectiveGroup];
       const gp: PricingGroupPrice | undefined = groupPrices?.['default'];
       if (!gp) continue;
+      modelCatalog[model.model_name] = {
+        category: model.category,
+        tags: model.tags,
+        owned_by: model.owned_by,
+        supported_endpoint_types: Object.keys(model.endpoints || {}),
+      };
       const firstDocs = Object.values(model.endpoints || {}).find((ep) => ep.docs)?.docs;
       prices[model.model_name] = {
         ...computeModelPrice(gp, groupRatio, cnyPerUsd),
@@ -738,6 +805,7 @@ class ModelPricingService {
       groups,
       prices,
       modelEndpoints,
+      modelCatalog,
     };
   }
 
@@ -759,6 +827,8 @@ class ModelPricingService {
 
     const prices: Record<string, ModelPrice> = {};
     const modelEndpoints: Record<string, Record<string, PricingEndpointInfo>> = {};
+    const modelCatalog: NonNullable<ProviderPricingCache['modelCatalog']> = {};
+    const vendors = new Map((json.vendors || []).map((vendor) => [vendor.id, vendor.name]));
     for (const model of json.data) {
       if (!model.model_name) continue;
       const effectiveGroup = resolveNewApiModelEffectiveGroup(
@@ -776,6 +846,14 @@ class ModelPricingService {
         model,
         json.supported_endpoint
       );
+      modelCatalog[model.model_name] = {
+        category: model.category,
+        tags: model.tags,
+        owned_by: model.owned_by || model.owner_by ||
+          (model.vendor_id !== undefined ? vendors.get(model.vendor_id) : undefined),
+        supported_endpoint_types: model.supported_endpoint_types?.map(String) ||
+          Object.keys(endpoints || {}),
+      };
       const firstDocs = endpoints
         ? Object.values(endpoints).find((ep) => ep.docs)?.docs
         : undefined;
@@ -802,6 +880,7 @@ class ModelPricingService {
       groups,
       prices,
       modelEndpoints,
+      modelCatalog,
     };
   }
 
@@ -866,7 +945,10 @@ class ModelPricingService {
     const json = await this.fetchPricingResponse(
       normalizedPricingUrl,
       apiKey,
-      options
+      {
+        ...options,
+        requestUrl: getPricingRequestUrl(normalizedPricingUrl),
+      }
     );
     const autoRefreshSourceSignature =
       options.promoteToAutoRefresh ||

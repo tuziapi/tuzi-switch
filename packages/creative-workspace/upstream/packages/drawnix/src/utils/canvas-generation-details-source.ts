@@ -5,6 +5,7 @@ import { isToolElement } from '../plugins/with-tool';
 import { isAudioNodeElement } from '../types/audio-node.types';
 import { isCardElement } from '../types/card.types';
 import type { CanvasImageDetailsSource } from './canvas-image-details';
+import { readLocalImageOperation } from './local-image-operation';
 
 export function getCanvasGenerationDetailsSource(
   element?: PlaitElement
@@ -29,6 +30,17 @@ export function getCanvasGenerationDetailsSource(
     typeof value === 'number' && Number.isFinite(value) && value > 0
       ? value
       : undefined;
+  const validLocalOperation =
+    kind === 'image'
+      ? readLocalImageOperation(element.localImageOperation)
+      : undefined;
+  const naturalSize =
+    kind === 'image' &&
+    element.imageNaturalSize?.url === element.url &&
+    readNumber(element.imageNaturalSize?.width) &&
+    readNumber(element.imageNaturalSize?.height)
+      ? element.imageNaturalSize
+      : undefined;
   return {
     id: element.id,
     kind,
@@ -38,17 +50,22 @@ export function getCanvasGenerationDetailsSource(
       readString(element.generationPrompt) ||
       readString(element.aiPrompt) ||
       readString(element.prompt),
-    width:
-      kind === 'image' || kind === 'video'
-        ? readNumber(element.width)
-        : undefined,
-    height:
-      kind === 'image' || kind === 'video'
-        ? readNumber(element.height)
-        : undefined,
     duration:
       kind === 'audio' || kind === 'video'
         ? readNumber(element.duration)
         : undefined,
+    localOperation: validLocalOperation,
+    width:
+      validLocalOperation?.outputWidth ??
+      naturalSize?.width ??
+      (kind === 'image' || kind === 'video'
+        ? readNumber(element.width)
+        : undefined),
+    height:
+      validLocalOperation?.outputHeight ??
+      naturalSize?.height ??
+      (kind === 'image' || kind === 'video'
+        ? readNumber(element.height)
+        : undefined),
   };
 }

@@ -30,6 +30,7 @@ import { formatFriendlyError } from './error-classifier';
 import { unifiedCacheService } from '../unified-cache-service';
 import {
   getAdapterContextFromSettings,
+  getTuziGPTImageRequestPath,
   GPT_IMAGE_EDIT_REQUEST_SCHEMAS,
   isGPTImageEditRequestSchema,
 } from '../model-adapters';
@@ -164,7 +165,14 @@ export async function executeImageViaAdapter(
     adapterContext.binding?.modelId || params.modelRef?.modelId || params.model;
 
   const logId = startLLMApiLog({
-    endpoint: `adapter:${adapter.id}`,
+    endpoint:
+      adapter.id === 'tuzi-gpt-image-adapter'
+        ? getTuziGPTImageRequestPath({
+            prompt: params.prompt,
+            maskImage: params.maskImage,
+            params: params.params,
+          })
+        : `adapter:${adapter.id}`,
     model: requestModel,
     taskType: 'image',
     prompt: params.prompt,
@@ -187,9 +195,13 @@ export async function executeImageViaAdapter(
         {
           ...options,
           preserveUrl: (imgUrl) =>
-            supportsRemoteImageReferences(
+            // Mask coordinates require the original image dimensions.
+            (adapter.id === 'tuzi-gpt-image-adapter' &&
+              !!(params.maskImage?.trim() ||
+                getStringParam(params, ['maskImage', 'mask_image']))) ||
+            (supportsRemoteImageReferences(
               adapterContext.binding?.requestSchema
-            ) && /^https?:\/\//i.test(imgUrl),
+            ) && /^https?:\/\//i.test(imgUrl)),
         }
       );
     }

@@ -9,6 +9,7 @@ import {
   PlaitBoard,
   Point,
   Transforms,
+  RectangleClient,
   type PlaitElement,
 } from '@plait/core';
 import { DrawTransforms } from '@plait/draw';
@@ -16,6 +17,7 @@ import {
   insertImageNodeAtPoint,
   insertImageFromUrl,
   loadImageElementForCanvas,
+  buildImage,
 } from '../../data/image';
 import { insertVideoFromUrl } from '../../data/video';
 import {
@@ -29,6 +31,7 @@ import { insertCardsToCanvas } from '../../utils/insert-cards';
 import type { MCPResult } from '../../mcp/types';
 import type { DataURL } from '../../types';
 import { parseSizeToPixels } from '../../utils/size-ratio';
+import { readLocalImageOperation } from '../../utils/local-image-operation';
 import {
   getSelectedInsertionFrame,
   insertMediaIntoSelectedFrame,
@@ -51,6 +54,18 @@ import {
   parseSvgDimensions,
   svgToDataUrl,
 } from '../../utils/svg-utils';
+import {
+  getImageReferenceBounds,
+  IMAGE_LINEAGE_GAP,
+  placeImageColumn,
+} from '../../utils/image-generation-lineage-placement';
+import {
+  getWorkZoneVisualRectangle,
+  isWorkZoneElement,
+} from '../../plugins/workzone-transforms';
+import { withImageOperationTimeout } from '../../utils/image-operation-timeout';
+
+const IMAGE_INSERTION_TIMEOUT_MS = 60_000;
 
 export {
   setCanvasBoard,
@@ -102,6 +117,8 @@ export interface CanvasInsertionParams {
   horizontalGap?: number;
   /** 画板切换后阻止异步插入写入复用的 Board 实例。 */
   boardGuard?: () => boolean;
+  /** 本地图片处理结果沿来源右侧避让，不重排已有元素。 */
+  referenceElementIds?: readonly string[];
 }
 
 export interface CanvasInsertionResultItem {
@@ -184,6 +201,9 @@ function buildGenerationMetadataPatch(
   if (generationAnchorId) {
     patch.generationAnchorId = generationAnchorId;
   }
+
+  const localOperation = readLocalImageOperation(metadata?.localImageOperation);
+  if (localOperation) patch.localImageOperation = localOperation;
 
   return patch;
 }
@@ -689,6 +709,33 @@ function commitStagedCanvasInsertion(
 export async function executeCanvasInsertion(
   params: CanvasInsertionParams
 ): Promise<MCPResult> {
+  if (!params.items?.some((item) => item.type === 'image')) {
+    return executeCanvasInsertionInternal(params);
+  }
+
+  try {
+    return await withImageOperationTimeout(
+      (signal) => executeCanvasInsertionInternal({
+        ...params,
+        // Staging, frame insertion and the final commit all use this guard.
+        // A timed-out operation may finish its I/O but cannot write a result.
+        boardGuard: () => !signal.aborted && (!params.boardGuard || params.boardGuard()),
+      }),
+      IMAGE_INSERTION_TIMEOUT_MS,
+      '画布插入超时，可重试插入已有结果'
+    );
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '画布插入失败',
+      type: 'error',
+    };
+  }
+}
+
+async function executeCanvasInsertionInternal(
+  params: CanvasInsertionParams
+): Promise<MCPResult> {
   const board = params.board || readCanvasBoard();
 
   if (!board) {
@@ -700,10 +747,11 @@ export async function executeCanvasInsertion(
   }
 
   const {
-    items,
+    items: inputItems,
     verticalGap = LAYOUT_CONSTANTS.DEFAULT_VERTICAL_GAP,
     horizontalGap = LAYOUT_CONSTANTS.DEFAULT_HORIZONTAL_GAP,
   } = params;
+  const items = inputItems?.slice();
 
   if (!items || items.length === 0) {
     return {
@@ -717,7 +765,33 @@ export async function executeCanvasInsertion(
     if (params.boardGuard && !params.boardGuard()) {
       throw new Error('画板已切换，取消本次插入');
     }
-    if (!params.startPoint && items.length === 1) {
+    if (params.referenceElementIds?.length) {
+      // Resolve each output before reserving slots, so its aspect ratio cannot
+      // expand an estimated square over an existing image after insertion.
+      for (const [index, item] of items.entries()) {
+        if (item.type !== 'image' || item.dimensions) continue;
+        const image = await loadImageElementForCanvas(item.content as DataURL);
+        if (params.boardGuard && !params.boardGuard()) {
+          throw new Error('画板已切换，取消本次插入');
+        }
+        const { width, height } = buildImage(
+          image,
+          item.content as DataURL,
+          undefined,
+          true,
+          {
+            width: LAYOUT_CONSTANTS.MEDIA_DEFAULT_SIZE,
+            height: LAYOUT_CONSTANTS.MEDIA_DEFAULT_SIZE,
+          }
+        );
+        items[index] = { ...item, dimensions: { width, height } };
+      }
+    }
+    if (
+      !params.referenceElementIds?.length &&
+      !params.startPoint &&
+      items.length === 1
+    ) {
       const item = items[0];
       if (item.type === 'image' || item.type === 'video') {
         if (
@@ -810,6 +884,34 @@ export async function executeCanvasInsertion(
         verticalGap,
       }
     );
+    if (params.referenceElementIds?.length) {
+      const source = getImageReferenceBounds(board, params.referenceElementIds);
+      const origin: Point = source
+        ? [source.x + source.width + IMAGE_LINEAGE_GAP, source.y]
+        : startPoint;
+      const taskRectangles = board.children
+        .filter(isWorkZoneElement)
+        .map(getWorkZoneVisualRectangle)
+        .filter(
+          (rect) =>
+            [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) &&
+            rect.width > 0 &&
+            rect.height > 0
+        );
+      gridLayout.positions = placeImageColumn(
+        board,
+        origin,
+        estimatedSizes,
+        taskRectangles
+      );
+      gridLayout.bounds = RectangleClient.getBoundingRectangle(
+        gridLayout.positions.map((point, index) => ({
+          x: point[0],
+          y: point[1],
+          ...estimatedSizes[index],
+        }))
+      );
+    }
     flowState.bounds = gridLayout.bounds;
 
     if (items.length === 1) {

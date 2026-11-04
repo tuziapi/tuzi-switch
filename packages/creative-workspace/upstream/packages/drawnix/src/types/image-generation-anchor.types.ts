@@ -37,6 +37,7 @@ export interface ImageGenerationAnchorBatchSlot {
   status: ImageGenerationAnchorBatchSlotStatus;
   previewImageUrl?: string;
   error?: string;
+  failureStage?: 'generation' | 'post-processing';
 }
 
 export interface ImageGenerationAnchorBatchPreview {
@@ -63,6 +64,8 @@ export interface ImageGenerationAnchorSubmissionContext {
   workflowId: string;
   taskIds?: string[];
   expectedInsertPosition?: Point;
+  /** Space reserved for the result while its actual aspect ratio is unknown. */
+  reservedInsertSize?: { width: number; height: number };
   prompt?: string;
   resultElementId?: string;
   targetElementId?: string;
@@ -88,6 +91,7 @@ export interface ImageGenerationAnchorViewModel {
   progress: number | null;
   progressMode: 'determinate' | 'indeterminate' | 'hidden';
   phaseLabel: string;
+  failureStage?: 'generation' | 'post-processing';
   tone: 'default' | 'warning' | 'success' | 'danger';
   geometry: ImageGenerationAnchorGeometry;
   transitionMode: ImageGenerationAnchorTransitionMode;
@@ -116,6 +120,7 @@ export interface ImageGenerationAnchorCreateOptions
 
 export interface PlaitImageGenerationAnchor extends PlaitElement {
   type: 'generation-anchor';
+  reservedInsertSize?: { width: number; height: number };
   points: [Point, Point];
   angle: number;
   anchorType: ImageGenerationAnchorType;

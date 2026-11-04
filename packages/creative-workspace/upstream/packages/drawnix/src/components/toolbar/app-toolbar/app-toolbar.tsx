@@ -33,6 +33,8 @@ import { ToolbarContextMenu } from '../toolbar-context-menu';
 import MenuItem from '../../menu/menu-item';
 import { ImageDown } from 'lucide-react';
 import { OPEN_IMAGE_RECOVERY } from '../../image-recovery/recovery-events';
+import { useFeatureDiscovery } from '../../../hooks/use-feature-discovery';
+import { NewFeatureDot } from '../../shared/new-feature-dot';
 
 export interface AppToolbarProps extends ToolbarSectionProps {
   onOpenBackupRestore?: () => void;
@@ -46,7 +48,12 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
   onOpenCloudSync,
 }) => {
   const board = useBoard();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const { hasNewFeature, markSeen } = useFeatureDiscovery('app-menu');
+  const menuLabel = t('general.menu');
+  const accessibleMenuLabel = hasNewFeature
+    ? `${menuLabel} (${language === 'zh' ? '有新功能' : 'New features'})`
+    : menuLabel;
   const { isButtonVisible, visibleButtons } = useToolbarConfig();
   const container = PlaitBoard.getBoardContainer(board);
   const [appMenuOpen, setAppMenuOpen] = useState(false);
@@ -68,21 +75,34 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
         sideOffset={12}
         open={appMenuOpen}
         onOpenChange={(open) => {
+          if (open) markSeen();
           setAppMenuOpen(open);
         }}
         placement={embedded ? 'right-start' : 'bottom-start'}
       >
         <PopoverTrigger asChild>
           <ToolButton
-            type="icon"
+            type="button"
             visible={true}
             selected={appMenuOpen}
-            icon={<MenuIcon />}
+            icon={
+              <>
+                <MenuIcon />
+                {hasNewFeature && <NewFeatureDot corner />}
+              </>
+            }
             tooltip={appMenuOpen ? undefined : t('general.menu')}
             tooltipPlacement={embedded ? 'right' : 'bottom'}
-            aria-label={t('general.menu')}
+            aria-label={accessibleMenuLabel}
             data-track="toolbar_click_menu"
+            onClick={(event) => {
+              if (event.detail === 0) {
+                if (!appMenuOpen) markSeen();
+                setAppMenuOpen(!appMenuOpen);
+              }
+            }}
             onPointerDown={() => {
+              if (!appMenuOpen) markSeen();
               setAppMenuOpen(!appMenuOpen);
             }}
           />

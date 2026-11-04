@@ -1,0 +1,184 @@
+// @vitest-environment jsdom
+
+import React from 'react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ParametersDropdown } from './ParametersDropdown';
+import { getEffectiveVideoCompatibleParams } from '../../services/video-binding-utils';
+import { getSunoV2Params } from '../../services/suno-v2-params';
+
+vi.mock('../shared/hover', () => ({
+  HoverTip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+afterEach(cleanup);
+
+describe('Suno v2 parameter controls', () => {
+  it('accepts multiple reference URL lines for training instead of an empty multiselect', () => {
+    const onParamChange = vi.fn();
+    render(<ParametersDropdown isOpen modelId="suno/create-model" selectedParams={{}} onParamChange={onParamChange} />);
+    const urls = 'https://cdn.test/one.mp3\nhttps://cdn.test/two.mp3';
+    fireEvent.change(screen.getByRole('textbox', { name: '音频地址列表' }), { target: { value: urls } });
+    expect(onParamChange).toHaveBeenCalledWith('audio_urls', urls, { keepOpen: true });
+    expect(screen.queryByRole('listbox', { name: '音频地址列表' })).toBeNull();
+  });
+  it.each(['suno/create-voice', 'suno/add-instrumental', 'suno/add-vocals'])('does not expose callable parameters for %s', (modelId) => {
+    render(<ParametersDropdown isOpen modelId={modelId} selectedParams={{}} onParamChange={vi.fn()} />);
+    expect(screen.queryByRole('textbox', { name: '音频地址' })).toBeNull();
+    expect(screen.queryByText('源曲目')).toBeNull();
+    expect(screen.queryByText('模型版本')).toBeNull();
+  });
+  it('selects public resources and multiple export formats', () => {
+    const onParamChange = vi.fn();
+    render(<ParametersDropdown isOpen modelId="suno/download" selectedParams={{ music_id: 'm', formats: '["mp3"]' }}
+      compatibleParams={getSunoV2Params('suno/download', [{ id: 'm', kind: 'music_id', profileId: 'p' }])} onParamChange={onParamChange} />);
+    fireEvent.change(screen.getByRole('combobox', { name: '源曲目' }), { target: { value: 'm' } });
+    expect(onParamChange).toHaveBeenCalledWith('music_id', 'm', { keepOpen: true });
+    const formats = screen.getByRole('listbox', { name: '导出格式' }) as HTMLSelectElement;
+    formats.options[2].selected = true;
+    fireEvent.change(formats);
+    expect(onParamChange).toHaveBeenCalledWith('formats', '["mp3","wav"]', { keepOpen: true });
+    expect(screen.queryByText('动作类型')).toBeNull();
+  });
+});
+
+describe('Seedream API parameters', () => {
+  it.each(['doubao-seedream-5-0-lite-260128', 'seedream-5.0'])(
+    'offers size and 2K/3K controls for %s', (modelId) => {
+    const onParamChange = vi.fn();
+    render(
+      <ParametersDropdown
+        isOpen
+        modelId={modelId}
+        selectedParams={{ size: '1x1', seedream_quality: '2k' }}
+        onParamChange={onParamChange}
+      />
+    );
+    expect(screen.getByText('图片尺寸')).toBeTruthy();
+    expect(screen.getByText('图片质量')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '3K' }));
+    expect(onParamChange).toHaveBeenCalledWith('seedream_quality', '3k');
+    fireEvent.click(screen.getByRole('button', { name: '16:9 横版' }));
+    expect(onParamChange).toHaveBeenCalledWith('size', '16x9');
+    expect(screen.queryByText('图片水印')).toBeNull();
+    expect(screen.queryByText('输出格式')).toBeNull();
+    expect(screen.queryByRole('switch', { name: '高级功能' })).toBeNull();
+  });
+});
+
+describe('GPT Image advanced parameters', () => {
+  it('shows Veo advanced controls without a channel declaration', () => {
+    const onParamChange = vi.fn();
+    render(<ParametersDropdown isOpen modelId="veo3.1" selectedParams={{}}
+      compatibleParams={getEffectiveVideoCompatibleParams('veo3.1', 'veo3.1', null)}
+      onParamChange={onParamChange} />);
+    fireEvent.click(screen.getByRole('switch', { name: '高级功能' }));
+    for (const label of ['负向提示词', '生成音频', '随机种子', '人物生成']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'allow_adult' }));
+    expect(onParamChange).toHaveBeenCalledWith('person_generation', 'allow_adult');
+  });
+  it.each([
+    'gpt-image-2.5-1k',
+    'gpt-image-2.5',
+    'gpt-image-2.5-vip',
+    'gpt-image-2.5-sunburst',
+    'gpt-image-2.5-flare',
+  ])(
+    'keeps basic controls visible and reveals advanced controls for %s only after toggling',
+    (modelId) => {
+      const onParamChange = vi.fn();
+      render(
+        <ParametersDropdown
+          isOpen
+          modelId={modelId}
+          selectedParams={{}}
+          onParamChange={onParamChange}
+        />
+      );
+      expect(screen.getByText('图片背景')).toBeTruthy();
+      expect(screen.queryByText('输出格式')).toBeNull();
+      fireEvent.click(screen.getByRole('switch', { name: '高级功能' }));
+      expect(screen.getByText('输出格式')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'WebP' }));
+      expect(onParamChange).toHaveBeenCalledWith('output_format', 'webp');
+      fireEvent.click(screen.getByRole('switch', { name: '高级功能' }));
+      expect(screen.queryByText('输出格式')).toBeNull();
+    }
+  );
+
+  it.each(['gpt-image-2', 'gpt-image-2-vip'])(
+    'does not add an advanced toggle to %s',
+    (modelId) => {
+      render(
+        <ParametersDropdown
+          isOpen
+          modelId={modelId}
+          selectedParams={{}}
+          onParamChange={vi.fn()}
+        />
+      );
+      expect(screen.queryByRole('switch', { name: '高级功能' })).toBeNull();
+    }
+  );
+
+  it.each([
+    ['veo3.1', '生成音频', 'generate_audio'],
+  ])('lets %s select an optional boolean and restore the upstream default', (modelId, label, id) => {
+    const onParamChange = vi.fn();
+    const { rerender } = render(<ParametersDropdown isOpen modelId={modelId} selectedParams={{}} onParamChange={onParamChange} />);
+    if (modelId === 'veo3.1') fireEvent.click(screen.getByRole('switch', { name: '高级功能' }));
+    expect(screen.getByRole('button', { name: `${label}默认` }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: `${label}开启` }));
+    expect(onParamChange).toHaveBeenCalledWith(id, 'true');
+    rerender(<ParametersDropdown isOpen modelId={modelId} selectedParams={{ [id]: 'false' }} onParamChange={onParamChange} />);
+    expect(screen.getByRole('button', { name: `${label}关闭` }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: `${label}关闭` }));
+    expect(onParamChange).toHaveBeenCalledWith(id, 'false');
+    fireEvent.click(screen.getByRole('button', { name: `${label}默认` }));
+    expect(onParamChange).toHaveBeenCalledWith(id, '');
+  });
+
+  it('clears advanced values when advanced functionality is turned off', () => {
+    const onParamChange = vi.fn();
+    render(
+      <ParametersDropdown
+        isOpen
+        modelId="gpt-image-2.5"
+        selectedParams={{
+          output_format: 'jpeg',
+          output_compression: '80',
+          moderation: 'low',
+          user: 'user-1',
+        }}
+        onParamChange={onParamChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('switch', { name: '高级功能' }));
+    fireEvent.click(screen.getByRole('switch', { name: '高级功能' }));
+
+    expect(onParamChange).toHaveBeenCalledWith('output_format', '', {
+      keepOpen: true,
+    });
+    expect(onParamChange).toHaveBeenCalledWith('output_compression', '', {
+      keepOpen: true,
+    });
+    expect(onParamChange).toHaveBeenCalledWith('moderation', '', {
+      keepOpen: true,
+    });
+    expect(onParamChange).toHaveBeenCalledWith('user', '', { keepOpen: true });
+  });
+
+  it('does not add an advanced toggle to unrelated models', () => {
+    render(
+      <ParametersDropdown
+        isOpen
+        modelId="gemini-3-pro-image-preview"
+        selectedParams={{}}
+        onParamChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('switch', { name: '高级功能' })).toBeNull();
+  });
+});

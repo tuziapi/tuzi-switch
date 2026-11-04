@@ -1,6 +1,6 @@
 {
   "repository": "AiW520/opentuAI",
-  "revision": "7d05f299fec40599221294a34c9b26f888177c9e",
+  "revision": "f36267808b131c416e6d6efebce3259692ee40f8",
   "files": [
     {
       "path": "AGENTS.md",
@@ -39,6 +39,18 @@
       "sha256": "8663a7cd3809b9282cfe0f3320f2ab12f277ae90c77b3e6cff247f702831326a"
     },
     {
+      "path": "apps/web/public/logo-tuzi.png",
+      "sha256": "c6dea1fd5da9b784beb05b4acb92d432825297bba9bc1c5ee6ca1e6896ffdaf3"
+    },
+    {
+      "path": "apps/web/public/logo/opentu-community-qr.png",
+      "sha256": "83457fb6a0e26515b21b64eb59a079fc73a7e3da0ba4a6b3671919c41452ecdc"
+    },
+    {
+      "path": "apps/web/public/logo/opentu-support-qr.png",
+      "sha256": "ee3eb581f28160304ef17c8dea6c8c1069be8bbd5a913429088e7e1228c84ace"
+    },
+    {
       "path": "apps/web/public/sw-debug/shared/backup-core.d.ts",
       "sha256": "b54d29dbbbe3d163c465927002a84f99e6efd6dea58ffee8af4db3382627c18a"
     },
@@ -59,16 +71,28 @@
       "sha256": "f05cf021619267b53a3ff90c9ce17c60baeba77615c76f857ac036cddd286029"
     },
     {
+      "path": "apps/web/src/app/app-sync.spec.ts",
+      "sha256": "01fcd01ff4a4a1ee525b9ae5d6fbf95d47c222b928762297c2c27efa7d8316f3"
+    },
+    {
       "path": "apps/web/src/app/app.module.scss",
       "sha256": "446bb7bd5b408ec75b3da5603aa3ede22e83ffb28691301302ae61327653d5ae"
     },
     {
       "path": "apps/web/src/app/app.tsx",
-      "sha256": "e43717909971150b1072f2da52c616ee4ea7ba7efc54e7e250fe68455aaebc5c"
+      "sha256": "918a0f98a3fc9a1aa3be9142b1a2c533ff226a36cc48d6e4ea3324cf1251a92a"
     },
     {
       "path": "apps/web/src/app/bootstrap.tsx",
       "sha256": "b8780f2ea9a6f017483d47e04c049a329c77bd24a93fa878d2058db35fcdbd3f"
+    },
+    {
+      "path": "apps/web/src/app/pending-persistence.spec.ts",
+      "sha256": "879e274d4636fe4ff0c37e9dcdaf64ee2dc88ea5374f64e88c0e761014c10fd0"
+    },
+    {
+      "path": "apps/web/src/app/pending-persistence.ts",
+      "sha256": "0ff050a5c59e6fe4a681f3dc66a485960d07f4e02358c64a4c84de4b9807ba04"
     },
     {
       "path": "apps/web/src/assets/.gitkeep",
@@ -243,12 +267,48 @@
       "sha256": "57739586918274c5b2658c9fbff86e44ebf0f8748bfaa54a0a06c104f80b0f55"
     },
     {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.canvas-input-clicks.test.tsx",
+      "sha256": "a1ccc54b6ae9517fafb0011413712b03cdaac0e05b9cfe3669d9b380233b2848"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts",
+      "sha256": "caccf6eb97dd1b68d7d24bf7635d2f241440856d92808012487dc5f6c2e06bcb"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.ppt-models.test.tsx",
+      "sha256": "fe45cb4fd60a08648272b9d54f8e91c341786d4f54228964803abcfb4ff9b0fc"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.prefill-images.test.ts",
+      "sha256": "1d671a3ae9da4d696547923c76ed7e510a204969eda738cfc1c9a11da21aeab7"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.prompt-history.test.tsx",
+      "sha256": "2b7d71f86797f8d9f0daf775e14a5694ad09b2bedee0100ef1c6d6c7cf1fdfdf"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.selection.test.tsx",
+      "sha256": "4467800cecf4150f14500e12afa8a23e9a15cd4df4ad49af674354e4504b4998"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.toolbar-draft.test.ts",
+      "sha256": "b6a7fe3457845f9768f1f395f20c2f2b4dd635fd67a43f8997dabcf70f1d8d7e"
+    },
+    {
       "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx",
-      "sha256": "687392e4e71314a9130280afde70e5429cc512d9df629e646dad35b169204f42"
+      "sha256": "023c928c5df1267b28d7120acfe47a1f7b1cc578f47bda6b24b2b77b99a2e60c"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/AIInputComposerShell.tsx",
       "sha256": "6f73cf3f44fd057774deb39ad86600d5bc1549776f1a37e78b4b58467e380d4d"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/BoundImageContentPreview.test.tsx",
+      "sha256": "cac40522897d053305f1379c2a7df13a7431f9c99a2c3bdccd3b88d40fe2b719"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/BoundImageContentPreview.tsx",
+      "sha256": "290955c37545cfcb536fba13705898d8fc67f784a5150adf926c435ec7ab8933"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/CanvasAssociationHighlight.tsx",
@@ -267,24 +327,36 @@
       "sha256": "57d3baba80c703368ffd914d7979a00b246349630d0d794c83e4da93adfb3e1f"
     },
     {
+      "path": "packages/drawnix/src/components/ai-input-bar/ModelDropdown.test.tsx",
+      "sha256": "38a10e9dd0e0c79a3b67c66de0b80e38537a2ae8f566793e856b508cc778098b"
+    },
+    {
       "path": "packages/drawnix/src/components/ai-input-bar/ModelDropdown.tsx",
-      "sha256": "9ba8df45b396c81a6012a935aab113c1822e5fe3e6f162eeea3e8a31c0036847"
+      "sha256": "8b97e77af720399fc483486bf6ebaa6a61cf43304d6568b1455e46b38a6f28c7"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/ModelSelector.tsx",
       "sha256": "dd6eaa23396a9489e22782f22760957606d17d44469d8318a2a2378b6574bc8a"
     },
     {
+      "path": "packages/drawnix/src/components/ai-input-bar/ParametersDropdown.test.tsx",
+      "sha256": "0bb5591121f44119d2878e35b67c433f48c29604dac1c79d5143be5303034844"
+    },
+    {
       "path": "packages/drawnix/src/components/ai-input-bar/ParametersDropdown.tsx",
-      "sha256": "83ce8230890add39b772359bd8b9411b02db7e2e44c913025e98dcefc383e190"
+      "sha256": "8664252ec7ee4114953894db3b0ac56448490f08e055dfa13febf48738ea08a3"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/PptExplainerDialog.tsx",
       "sha256": "a56adec1eaa390863df9618be3b6064d0ef84795d162a652d6c00126d64b1db9"
     },
     {
+      "path": "packages/drawnix/src/components/ai-input-bar/PromptHistoryPopover.test.tsx",
+      "sha256": "c035eddd3c02abb74a7ded7a88b6027a5ecfb41dc2b4b5d128a61df77d03f1bb"
+    },
+    {
       "path": "packages/drawnix/src/components/ai-input-bar/PromptHistoryPopover.tsx",
-      "sha256": "9df7016936b654fd11ef3320ad090461333c891ae4f5acc18134698d62ebee1f"
+      "sha256": "9ffa9ec3da1200d82fb5196a1c9dac3606bee2a5273cc91a9c7af86e64f8b62f"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/PromptSuggestionPanel.tsx",
@@ -299,8 +371,12 @@
       "sha256": "f5780d65a4ba4c6840d81463f213abe1c6838b82a3f411f67248e8d84c1d7b92"
     },
     {
+      "path": "packages/drawnix/src/components/ai-input-bar/__tests__/workflow-converter.test.ts",
+      "sha256": "c95fde7141e33cd7ff70797aed63320ef7ee2946574a80d8ad29b59c83edb2a4"
+    },
+    {
       "path": "packages/drawnix/src/components/ai-input-bar/ai-input-bar.scss",
-      "sha256": "2c00253df338492f6357c121ec33fdeee0b150874126ce91310b9c340423e18a"
+      "sha256": "dcb111207592f412697e71b2d8849a507449221357db75b1db5db668076671c9"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/bound-taskbar-layout.ts",
@@ -323,16 +399,32 @@
       "sha256": "8f209ed457e8bef61cfad632ea643149368ed6e18be695e4d296dafb7d9bc7b4"
     },
     {
+      "path": "packages/drawnix/src/components/ai-input-bar/canvas-view-settings.test.ts",
+      "sha256": "6de129b4ad9465b40be0b4884bb24dde63ddd1a54cddb4dae1943d1ac3625c98"
+    },
+    {
       "path": "packages/drawnix/src/components/ai-input-bar/canvas-view-settings.ts",
-      "sha256": "fc4b84df7d70ebfbb615feab3997fab1f0f70cbaee84ea91d3c0154ffa099f0f"
+      "sha256": "2e5718b14e57be80cb00a9dbcf0c4e3a21e4c3238397526156acf8aa3da48ff1"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/image-mask-submission.test.ts",
+      "sha256": "ab1192a6e86a4a80481891f3cf101cc5d75a1cf86c71b281e6216dec43b4de6a"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/image-mask-submission.ts",
+      "sha256": "70b4430472781d8bf7a461775259df8bc00b11676afef2397f348d0fff42e134"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/index.ts",
       "sha256": "fc538df5d3485c9a069e41c6acac259ba08e6316763b04b07dd5175d812f931e"
     },
     {
+      "path": "packages/drawnix/src/components/ai-input-bar/model-dropdown-styles.test.ts",
+      "sha256": "eeb8040c716feabb56613751a5b239391d030f3e448f24dd8491526843575811"
+    },
+    {
       "path": "packages/drawnix/src/components/ai-input-bar/model-dropdown.scss",
-      "sha256": "d1cc28f81c1cbfa3a4cea65cc0f96a125432ab8b660b44be19af0392e5d848c6"
+      "sha256": "19f0c1fd48427a31bf228ad4a0a4cd9ec9a87be642d090db289101c90d66c3ec"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/model-selector.scss",
@@ -340,7 +432,7 @@
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/parameters-dropdown.scss",
-      "sha256": "cfd434b80151c61af0cb17f764084bcc56ea40e60b7c5ca93bcc95928f3005b5"
+      "sha256": "397b9145e1bf63662a142c3331c4e219ee320aef89935cbe7f1a2086dca93caa"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/ppt-explainer-dialog.scss",
@@ -375,12 +467,16 @@
       "sha256": "039bb13701af6b914272f6b56e8eba0dde5e76efbab7bf3e27ac2daabb787665"
     },
     {
+      "path": "packages/drawnix/src/components/ai-input-bar/target-bound-taskbar-state.test.ts",
+      "sha256": "5e0716b6775d9f5db6cf773943e56ecac6d500d3e6b98b99fe4fbd02015d1faf"
+    },
+    {
       "path": "packages/drawnix/src/components/ai-input-bar/target-bound-taskbar-state.ts",
-      "sha256": "82059b5d5d36cc9432c387e14faaf1bdc46f3b1e5d7139a0e1907508f02c01f6"
+      "sha256": "1250448f333329c460d7aca2686efb7a70e766e2455480f51c93fa08f716d8a3"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/workflow-converter.ts",
-      "sha256": "64ef29ac83d940cca72b553ab92aeb755909c5ce99cead1badfccd8b0c904a17"
+      "sha256": "dc8f6688df7cd40567c83b58b901bce892de53b8cf063f52c2a3c7f2e426f0f6"
     },
     {
       "path": "packages/drawnix/src/components/ai-input-bar/workflow-types.ts",
@@ -452,11 +548,15 @@
     },
     {
       "path": "packages/drawnix/src/components/backup-restore/backup-restore-dialog.tsx",
-      "sha256": "ff93691d22f1f0bc21c46882df85a2743edc5d90d9d1b00cd93a9c7093175b48"
+      "sha256": "71f9620b9be9ffc5661945e3c075a0e8277903c4e4caf5022b2fa6cf6f1c59db"
     },
     {
       "path": "packages/drawnix/src/components/backup-restore/index.ts",
       "sha256": "7ef1f7f80a6299cbf3fec76d9e3fe4e750cae875fe4b587b5e9a32ac431a78e2"
+    },
+    {
+      "path": "packages/drawnix/src/components/backup-restore/legacy-canvas-recovery.tsx",
+      "sha256": "1dfa1e0f7293a0594384721410d77c952df975fb87654d326bb5e4b4696ec4da"
     },
     {
       "path": "packages/drawnix/src/components/cache-quota-provider/CacheQuotaProvider.tsx",
@@ -763,24 +863,36 @@
       "sha256": "38c9ed5ced809116eda9e233ecd23c77514511bafcbee7543d571c1539d56ca6"
     },
     {
+      "path": "packages/drawnix/src/components/image-editor/DecodedImagePreview.tsx",
+      "sha256": "ec3db0448fe896f47b84fdcd380f289c903097907ba06beedc9077bc47cb6dcf"
+    },
+    {
       "path": "packages/drawnix/src/components/image-editor/FilterPanel.tsx",
-      "sha256": "eb5e3e54b75d91bbdf870563a17485d5e0124015a501aad30a8bf5126d0187f6"
+      "sha256": "46f39235df6e3660117379ad664567207398c696f94d031781ea455cb80868ed"
     },
     {
       "path": "packages/drawnix/src/components/image-editor/ImageEditor.scss",
       "sha256": "109a24c4a922847892ff9c6f045ea6fc792765fae39836144bfd6b8a2b1f0505"
     },
     {
+      "path": "packages/drawnix/src/components/image-editor/ImageEditor.test.tsx",
+      "sha256": "f011f841c8252274c820336abb1d5998415309a19e6b2481a13a2e75837a8cbe"
+    },
+    {
       "path": "packages/drawnix/src/components/image-editor/ImageEditor.tsx",
-      "sha256": "19d5e7d9df15e5b7141a704fb92ac7b2bd5815e586e37bdd44f40b60d271bd79"
+      "sha256": "af25bed6685f3f78e46158bc780b816b87c0fe0dff2a9b41260768e4b6e0297b"
     },
     {
       "path": "packages/drawnix/src/components/image-editor/ImageEditorCore.scss",
-      "sha256": "9451ac1aad771458571698fa54147975eb1096bf0bcf2213da3ef62dfa6f5b75"
+      "sha256": "4f150eb61f6ef29c708316323c4a7ad5124fb9e2fb1a29aa94d697730c7b366b"
     },
     {
       "path": "packages/drawnix/src/components/image-editor/ImageEditorCore.tsx",
-      "sha256": "a4a2a0629a03f558163dd6416b6b02bf665f3dbec988aaf61d714dead74a6e27"
+      "sha256": "b18dcbddf52d4be6a98a349c187f09b6b30cb0ea10dda1b2e10c793e2de67dbe"
+    },
+    {
+      "path": "packages/drawnix/src/components/image-editor/ImageResizePanel.tsx",
+      "sha256": "71092dc51b637ae3bd18b0f828ab1433aec41e89b2a0240ed3451def0277f05f"
     },
     {
       "path": "packages/drawnix/src/components/image-editor/index.ts",
@@ -788,11 +900,15 @@
     },
     {
       "path": "packages/drawnix/src/components/image-editor/types.ts",
-      "sha256": "4e2e3ab85be7ddc6eee9660b7bb73116a490ac1ab9ae712cbe40f12987d476d4"
+      "sha256": "dedca478eafe9dd58df94cb4cc00b9de0ed400f346458961fc7bc5a534e6ae1f"
+    },
+    {
+      "path": "packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx",
+      "sha256": "a827ea15b6966e228a05d1fe581593cc39a551616a9eb21cdf9ebbdac08cac70"
     },
     {
       "path": "packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx",
-      "sha256": "7938ca4a1c5c169cb5abe8d580d82429359d690301058901872b4ffa37f65ba9"
+      "sha256": "e2917bfd51e13dc55dd71761e317852d5bb8f7d5611003aa7fcb9856e9ac437d"
     },
     {
       "path": "packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.component.ts",
@@ -808,7 +924,7 @@
     },
     {
       "path": "packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.transforms.ts",
-      "sha256": "e3de6f780bed60b2b3921bd92dc1e303307b1e25aaca3d94e9fc853f1686e16e"
+      "sha256": "1608164f378dd10d2a55fefc09ed01bca80af38718b64268760a5e7a3d656fe8"
     },
     {
       "path": "packages/drawnix/src/components/image-generation-anchor/index.ts",
@@ -1132,11 +1248,11 @@
     },
     {
       "path": "packages/drawnix/src/components/music-analyzer/MusicAnalyzer.scss",
-      "sha256": "5dd2c98665992b84e3c6eef22d24355d299aea07f8f9b36861c006e711e9053e"
+      "sha256": "950fe22b627e1b10e7d48674f104e7d4f6bcbdf255b4cd8b884228512e104d61"
     },
     {
       "path": "packages/drawnix/src/components/music-analyzer/MusicAnalyzer.tsx",
-      "sha256": "dcc3e890a1bed61fa88cbcb638d062d6f2f32dfd35ce48b6cd40957dd6b205c1"
+      "sha256": "40940b2602d1a57af4a4d562ac40df87d5e1760f84d52eda674da5e036d07b0a"
     },
     {
       "path": "packages/drawnix/src/components/music-analyzer/audio-source-cache.ts",
@@ -1152,11 +1268,11 @@
     },
     {
       "path": "packages/drawnix/src/components/music-analyzer/pages/CreatePage.tsx",
-      "sha256": "e42a9883d33f76bc49786d09291656c571bcf5d1622e8d876142c6698fc8b265"
+      "sha256": "a36affc7a4c9a8c9ac862021685031286aad16fe175a32498cdfde15a7ef01a8"
     },
     {
       "path": "packages/drawnix/src/components/music-analyzer/pages/GeneratePage.tsx",
-      "sha256": "56c4c3073adbe1b1b4d63b4df53987245bf7165211302e3218ba72fff83de6c9"
+      "sha256": "ccf312b131898401fccefb3d10fc9cbd7d86688c63c430f2bf5a7cef23e27021"
     },
     {
       "path": "packages/drawnix/src/components/music-analyzer/pages/HistoryPage.tsx",
@@ -1167,20 +1283,40 @@
       "sha256": "ce5e2ce0252006be1c51389429400e95a08f09e4bea4234aef6527f572cfcfcd"
     },
     {
+      "path": "packages/drawnix/src/components/music-analyzer/pages/SunoNativePage.test.tsx",
+      "sha256": "b3116801c720799b66d94db65477ab2ee9c3294975895ca6483a2be5e078dfa9"
+    },
+    {
+      "path": "packages/drawnix/src/components/music-analyzer/pages/SunoNativePage.tsx",
+      "sha256": "f86629ec0ce9906b9e9e3188763a14f7635a99bf268a76c09bc8073771c1d1bb"
+    },
+    {
+      "path": "packages/drawnix/src/components/music-analyzer/pages/SunoV2Page.test.tsx",
+      "sha256": "d177d8787ed0cd6d5ae5d855b843cbc1df1d021eb465d51d5c955051acd21593"
+    },
+    {
+      "path": "packages/drawnix/src/components/music-analyzer/pages/SunoV2Page.tsx",
+      "sha256": "38a31fcebe33f03cbc397d1228a1738227e88afabf623f4607e8d5c0d3f1e15d"
+    },
+    {
       "path": "packages/drawnix/src/components/music-analyzer/storage.ts",
       "sha256": "6c5db7a636f8f403b6fcd99bf06c9ac82f7e50831da6c70991f17c916d6bc384"
     },
     {
+      "path": "packages/drawnix/src/components/music-analyzer/task-sync.test.ts",
+      "sha256": "9ec59b0333bb3e23bc740aa773fe074c357e756adb2bea1034bb439b9914716d"
+    },
+    {
       "path": "packages/drawnix/src/components/music-analyzer/task-sync.ts",
-      "sha256": "b5a36ced38aaf1393aaaa3987f46e491e6bd139d91ec60bf67aa5179aa1fc2a6"
+      "sha256": "fb9402bc1041afeb54d0973596f2efb1a4f64d9c9efd80aa1aa0ad9896cab969"
     },
     {
       "path": "packages/drawnix/src/components/music-analyzer/types.ts",
-      "sha256": "48adad5e78cf8575d86e23c35ff0da517e2eef6ada886b5202dfa6a139b2b1a9"
+      "sha256": "86c88d9ad9d8d8d4dbda3ee6db0c20614721aaadc3e96a21ec3d1d83ae0e30fe"
     },
     {
       "path": "packages/drawnix/src/components/music-analyzer/utils.ts",
-      "sha256": "4a4106cec554f7867a4352f82ad66cd8cc13c4bb66b824bb708d78adf5e99f3b"
+      "sha256": "e291c5568ff4aeff5041104c9f3202a5591d699858ea2f1b77a4b47ee1fb3d67"
     },
     {
       "path": "packages/drawnix/src/components/mv-creator/MVCreator.scss",
@@ -1299,8 +1435,12 @@
       "sha256": "99c885881337398cef43b699e043ad529ad0d6a4c6b64d000b277787f8b377e3"
     },
     {
+      "path": "packages/drawnix/src/components/retry-image.test.tsx",
+      "sha256": "b4b554b333d4bbbc9b38766c84324871b2b94bdbb7a49d93a3e12164985ae2a7"
+    },
+    {
       "path": "packages/drawnix/src/components/retry-image.tsx",
-      "sha256": "842a0304c2692d610797a5be0b219e082ffb8ae5857d3eef787b5e7f46014108"
+      "sha256": "b606c42bd023861f41e52bdc422ea5fb4841a1dfa8f1bcce58ea1b0ba9db1e6f"
     },
     {
       "path": "packages/drawnix/src/components/settings-dialog/DesktopStorageCleanup.tsx",
@@ -1315,8 +1455,20 @@
       "sha256": "aaf28926bd39baba3ceac1be55cf989648d027d474a1a3c6979e45e0c8e18a27"
     },
     {
+      "path": "packages/drawnix/src/components/settings-dialog/__tests__/provider-model-refresh.test.ts",
+      "sha256": "c2d6110d69a53062202992867f1ed15c913d943f3881c8bb998a4017fd554278"
+    },
+    {
       "path": "packages/drawnix/src/components/settings-dialog/desktop-storage-cleanup.scss",
       "sha256": "201be9f976a3fa47bbb280ef22e482a694c9bd31ba79a252740d19109b406024"
+    },
+    {
+      "path": "packages/drawnix/src/components/settings-dialog/image-toolbar-settings.test.tsx",
+      "sha256": "c6c0422eb3d3f62d0b15bcf8748eaeb08d1b3936478c8c4d787f1305416afd95"
+    },
+    {
+      "path": "packages/drawnix/src/components/settings-dialog/image-toolbar-settings.tsx",
+      "sha256": "70650262e8ee6f998079278d47581b05f4d261b3f58e16317175e4ef52c6125e"
     },
     {
       "path": "packages/drawnix/src/components/settings-dialog/model-discovery-dialog.scss",
@@ -1340,7 +1492,7 @@
     },
     {
       "path": "packages/drawnix/src/components/settings-dialog/provider-model-refresh.ts",
-      "sha256": "d6d8d079815a703d543d1c1594b5a71d252c4fd67a40699007c79b3f144fdfe1"
+      "sha256": "0ff2ce013dbdec8c48a19177018814f5a697b38b1b9d142f96cfed54d57b801a"
     },
     {
       "path": "packages/drawnix/src/components/settings-dialog/provider-profile-draft.ts",
@@ -1356,11 +1508,11 @@
     },
     {
       "path": "packages/drawnix/src/components/settings-dialog/settings-dialog.scss",
-      "sha256": "be0667e64eb2945e9d7e3be5e8663ddc694780a2db9376a6c7f3c59a7eaefb26"
+      "sha256": "afa8649a7c3500e6558b0f486c1466b0807b99ab66d75625de63d3e70fb32776"
     },
     {
       "path": "packages/drawnix/src/components/settings-dialog/settings-dialog.tsx",
-      "sha256": "8769b7d0af766bccba264ea0bacf26cb148d6244ab078707cb4d7dd3f8d22564"
+      "sha256": "525f4b220ac3ac64960187a89ebf91b61720787db6f8b9b0ddccfdc85bd83b2d"
     },
     {
       "path": "packages/drawnix/src/components/settings-dialog/tuzi-account-panel.scss",
@@ -1443,8 +1595,32 @@
       "sha256": "6f42251d8f99ddf373429ccb4f5c4b8241e041a4a936357d98d15e2eabca9011"
     },
     {
+      "path": "packages/drawnix/src/components/shared/SelectedContentPreview.test.tsx",
+      "sha256": "8588aa8b145a33c772982f29235d46b524bc0ed5525c05091815f12b5559113c"
+    },
+    {
       "path": "packages/drawnix/src/components/shared/SelectedContentPreview.tsx",
-      "sha256": "95dcd4e9cf5f3bf1495c2e88781f8209bfe6fc582d7627320f6ea9acf49119ef"
+      "sha256": "00f04485d621c75a0ba9bf66f414afd98267e2dd9224800447a7a63cf707a36e"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/SunoFileInput.tsx",
+      "sha256": "a474068879f0c7de2d80da1ed66f0f93f683c3ce9c4eddb5fd40665465b9c066"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/SunoNativeResultDetails.test.tsx",
+      "sha256": "7528fa2570c46398decaf1af9eed30a643a24f1877b87f15ee4200b8d32a763a"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/SunoNativeResultDetails.tsx",
+      "sha256": "29743542306a187101b13587820e7c51ef0cf54f560e5204d5e36730599a872d"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/SunoV2ResultDetails.test.tsx",
+      "sha256": "4728d9f1a6df09fb6c878d56dcabeb87f625df930fae2bb956cff5bd694de000"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/SunoV2ResultDetails.tsx",
+      "sha256": "956e28404d93fc4c2a234eca94642c329b3c6f71804f079154735bd426641c63"
     },
     {
       "path": "packages/drawnix/src/components/shared/VendorTabPanel.tsx",
@@ -1575,6 +1751,14 @@
       "sha256": "3f091fae07f01a37c6e0bad8e2e96c5ec7a7f90a3b8ad6d86bbf4a6587e6c354"
     },
     {
+      "path": "packages/drawnix/src/components/shared/new-feature-dot.scss",
+      "sha256": "22a75290f50da7a8632a227791d4dda0fdc8923322b0dff9f8c4f5b40e6bb23c"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/new-feature-dot.tsx",
+      "sha256": "879275b8ba829a5b8587e66e859c39df31e370860e34165107d186d63b9e9c60"
+    },
+    {
       "path": "packages/drawnix/src/components/shared/prompt-list-item.scss",
       "sha256": "331cccd0fbe00bda80c94c54bc1f4a42a293d25526ac8211904418aa1373bdeb"
     },
@@ -1588,7 +1772,7 @@
     },
     {
       "path": "packages/drawnix/src/components/shared/selected-content-preview.scss",
-      "sha256": "320369bdc13604eb808efcf6466357c6d48d5c8aec256ed7de2bc2a5481aa60a"
+      "sha256": "7bf763ca9f78d66dde9c2228f5be71f153492e5ff4b5f8c3f259577a564c0611"
     },
     {
       "path": "packages/drawnix/src/components/shared/vendor-tab-panel.scss",
@@ -1775,28 +1959,48 @@
       "sha256": "c906bf2f4cb42987b2b415e791c08ee1e96f1187b69c63f063ee4fd60b318407"
     },
     {
+      "path": "packages/drawnix/src/components/task-queue/ArchivedTaskList.test.tsx",
+      "sha256": "ae43bbfc7811a0c19fdcce763f9f9dff975e8b54dd1547eeaefc8edf503dad32"
+    },
+    {
       "path": "packages/drawnix/src/components/task-queue/ArchivedTaskList.tsx",
-      "sha256": "b63fd5f468c1947823198e114b25b46af96c7bb037acf704930a9467b1a361de"
+      "sha256": "b234ec55239612404a1fff19a22da49c33379d0ff0a85d83719f3c7a2b0d7948"
     },
     {
       "path": "packages/drawnix/src/components/task-queue/DialogTaskList.tsx",
-      "sha256": "ea5f185782f4c52a20aaed93c43ff5c97b0a3c487dad78c99da7850b96de4ca3"
+      "sha256": "0f88d22d4a60ec25143835be6a720f1e93d5084b0c00d1d58574f8d72b5b1d68"
+    },
+    {
+      "path": "packages/drawnix/src/components/task-queue/TaskImagePreview.test.tsx",
+      "sha256": "c11af8e8823380c9d5e57f1e788a7ea321492f60fef22e6e0fac225966ef7d7f"
     },
     {
       "path": "packages/drawnix/src/components/task-queue/TaskImagePreview.tsx",
-      "sha256": "6618a0622b8503aa75ba5c0ae9a1abf6f32c2e7d8e541dabf7b055d790910ba9"
+      "sha256": "7031899964f3f202ac3179c07116a9aef48319fc3b531d8076a2dde7b542606b"
     },
     {
       "path": "packages/drawnix/src/components/task-queue/TaskItem.tsx",
-      "sha256": "57626d7826c05ee6b5dcad9cfafa1504da2318efff4d5c026a1e94bcbe479e36"
+      "sha256": "67788459a2ea27b689465b4017ef3f869e3e1d99931d05704f0ba0f635a107ac"
     },
     {
       "path": "packages/drawnix/src/components/task-queue/TaskProgressOverlay.tsx",
       "sha256": "ada6bf1c0c1142c2f5d2c7e889107e9ab40b578e9eb4dae2ee0ef39634761c62"
     },
     {
+      "path": "packages/drawnix/src/components/task-queue/TaskQueuePanel.filters.test.tsx",
+      "sha256": "9fa667ab99924e2f58196e7f084e7b964002ac048d795717ff50c75de2dc5b49"
+    },
+    {
       "path": "packages/drawnix/src/components/task-queue/TaskQueuePanel.tsx",
-      "sha256": "aa9af025c3609ef9ba8047a6d6fe817da2859194b8a9d72fea794df774b0becb"
+      "sha256": "6a767d2c2a7e5a2c6ef69631cd09fec62e01e5eb4d971409986d3a0b5aed65aa"
+    },
+    {
+      "path": "packages/drawnix/src/components/task-queue/TaskQueueSearchFilters.test.tsx",
+      "sha256": "3cc14467a4947e022eb79c4ab0833b3255dcb197fb3c3c18475493c4793be9d2"
+    },
+    {
+      "path": "packages/drawnix/src/components/task-queue/TaskQueueSearchFilters.tsx",
+      "sha256": "0d3bb473a52ede0dc20e66baff0c953970d3c398aa11dd3186bc2499aa22d7ad"
     },
     {
       "path": "packages/drawnix/src/components/task-queue/TaskSummary.tsx",
@@ -1820,7 +2024,7 @@
     },
     {
       "path": "packages/drawnix/src/components/task-queue/task-queue.scss",
-      "sha256": "e6c2e90e93e166143feb30f5ad8468f7962a75b49d07c98782906c54e2586435"
+      "sha256": "969a52a57e083408ba029cfcc0fdeef4c5afb833eff432ea1eb3179af27e474c"
     },
     {
       "path": "packages/drawnix/src/components/tool-button.tsx",
@@ -1859,8 +2063,12 @@
       "sha256": "771f18c4acd45f9058ad89aa9a3ec5cee00fa2902834b0b3a15d52e67680c3db"
     },
     {
+      "path": "packages/drawnix/src/components/toolbar/app-toolbar/app-toolbar.test.tsx",
+      "sha256": "629b873cd4904d8441ff369108f17802d6b32507e48987e68021f8489ed6e637"
+    },
+    {
       "path": "packages/drawnix/src/components/toolbar/app-toolbar/app-toolbar.tsx",
-      "sha256": "c79a553a7691230016aa0c51f1503001cba31ba8d693b69f33c8a094473c4268"
+      "sha256": "61ec4c8bfa97dab85df6161d40eec6be2f176f31f1a1210afc1698b120fe4d0c"
     },
     {
       "path": "packages/drawnix/src/components/toolbar/app-toolbar/language-switcher-menu.tsx",
@@ -1963,6 +2171,18 @@
       "sha256": "61e0f4fc91d97350f83f57aabe2dda0ca52a7fa92dd11a51a5ea575ef9e108fe"
     },
     {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/canvas-image-tools-dialog.test.tsx",
+      "sha256": "e71e788562b4d4da325ebd23c0efb888290ea06e9d2bb8ba365186e99fb7313f"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/canvas-image-tools-dialog.tsx",
+      "sha256": "bd4f3cacef82420c258965e99be63ddb5ac365ace58e2f85c8bca9ca090409dc"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/canvas-image-tools.scss",
+      "sha256": "a4f08c0e53c2cbb1613a750619ed206170e8b23699cd670e6539810126c1a8af"
+    },
+    {
       "path": "packages/drawnix/src/components/toolbar/popup-toolbar/corner-radius-button.tsx",
       "sha256": "3c96bda6d403af0c28668bb0b1429e0a31fff86cfb8803ef656080a4d76aa200"
     },
@@ -1999,12 +2219,24 @@
       "sha256": "35332f2878e60745a6de7aef410b89bd3e491b8a59f304e4f90fe81be1039c8f"
     },
     {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/image-details-button.test.tsx",
+      "sha256": "6010632a36c99332c80eec949769eb259153e3e59211e82f64cb58546719ae3b"
+    },
+    {
       "path": "packages/drawnix/src/components/toolbar/popup-toolbar/image-details-button.tsx",
-      "sha256": "53f7a9d787e410dcb450cd613adfaf33655ebfc2eaaaf899584588b5cfe01864"
+      "sha256": "cce9bf0b5c856239ecf6fcbf2c70695d6b05a584b47988544521f6c60cdea532"
     },
     {
       "path": "packages/drawnix/src/components/toolbar/popup-toolbar/image-details-settings.ts",
       "sha256": "e4302641088ff965d6f9cb68382cefcfc37aef847cc5c146cf964fe6e4f4b874"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/image-toolbar-contents.test.tsx",
+      "sha256": "04ffa6d795b80822e8dbce12ce9a68c3cdeafa145c7f8969505f1f9b94f332c3"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/image-toolbar-contents.tsx",
+      "sha256": "4ae12d76a2faea4edad48b6efe8fe522322ec0e4ee137de3f95353f078b3fc42"
     },
     {
       "path": "packages/drawnix/src/components/toolbar/popup-toolbar/layer-control-button.scss",
@@ -2024,7 +2256,7 @@
     },
     {
       "path": "packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx",
-      "sha256": "6aa5b7dedb87697993c64e8f24c66afe2675da2badaf6b1285779bc86d9a652a"
+      "sha256": "88a2a246423af5dd4aa3c3f4d982b3eaedf707350d9b50d05d9aa6c84dd9084e"
     },
     {
       "path": "packages/drawnix/src/components/toolbar/popup-toolbar/prompt-button.scss",
@@ -2115,6 +2347,22 @@
       "sha256": "27820de0bca46615fa673fb23a398d592f376faea59839bf8b9c234add4e602c"
     },
     {
+      "path": "packages/drawnix/src/components/ttd-dialog/BatchImportRowInput.test.tsx",
+      "sha256": "a55f8e1fae0d6b44bf9c7b037e3db19cef656b28da96e695907283074fbba74c"
+    },
+    {
+      "path": "packages/drawnix/src/components/ttd-dialog/BatchImportRowInput.tsx",
+      "sha256": "b07bb37146203595dce57c651b9679f3644510e660d1ddf3911e058a2218e355"
+    },
+    {
+      "path": "packages/drawnix/src/components/ttd-dialog/BatchLibraryThumbnail.test.tsx",
+      "sha256": "8f76913753b2261ae9ccd6bb87a3194578a456760662c61213719a1e5d0af4f9"
+    },
+    {
+      "path": "packages/drawnix/src/components/ttd-dialog/BatchLibraryThumbnail.tsx",
+      "sha256": "d01ae49c6c328bb7d944cabbea1c66862af1957362d7a0e23c8d6cd319a6d312"
+    },
+    {
       "path": "packages/drawnix/src/components/ttd-dialog/ai-image-generation.scss",
       "sha256": "defde4c289ead41021004028d58d9dd8e2f9c642cd0f090b845e99b832aa51f5"
     },
@@ -2135,12 +2383,16 @@
       "sha256": "7530c79b88a69ed0d0ea91ee42b2a42cc99587218ced1f2bb382df52571e6b4d"
     },
     {
+      "path": "packages/drawnix/src/components/ttd-dialog/batch-image-generation.import.test.ts",
+      "sha256": "73d3da72c30257c9797287af993c34862381424e0e74642ba0c3df0e675a4536"
+    },
+    {
       "path": "packages/drawnix/src/components/ttd-dialog/batch-image-generation.scss",
-      "sha256": "1705a8e34bf15c2de1f7814a0ce5d10d087cb903af144687068eef045725259e"
+      "sha256": "b4ebc272dfa0ddb25225e6bd84ff463db5770b73d97ce942426b988b0f03f760"
     },
     {
       "path": "packages/drawnix/src/components/ttd-dialog/batch-image-generation.tsx",
-      "sha256": "ba131f237f2ee03d9e4ec6e2154f4bc07576c21992bca33b24ef75998850f011"
+      "sha256": "b84ea3bc0dd8221f2db9a4af149edede82b2f1ff78f7235c552ba357e62752d6"
     },
     {
       "path": "packages/drawnix/src/components/ttd-dialog/markdown-to-drawnix.tsx",
@@ -2184,7 +2436,7 @@
     },
     {
       "path": "packages/drawnix/src/components/ttd-dialog/shared/ImageUpload.tsx",
-      "sha256": "216aaa4c0797e0ef07391aff30ea563b7ec638824d796b9f0603e59d578ebbd2"
+      "sha256": "dd0b15c9a01b789f365375bb23f1ab672acfab49ab6357fea5f2823a7e81e774"
     },
     {
       "path": "packages/drawnix/src/components/ttd-dialog/shared/LoadingState.tsx",
@@ -2196,7 +2448,7 @@
     },
     {
       "path": "packages/drawnix/src/components/ttd-dialog/shared/MultiImageUpload.tsx",
-      "sha256": "533ae8fe33753cd0b60ae11616e259d1996196285bd1aef6d23fb514d865062e"
+      "sha256": "95ccbd6a1b275919108d55de8b84b5a1aaa9ffc764fb681d904a2cf06f813462"
     },
     {
       "path": "packages/drawnix/src/components/ttd-dialog/shared/PromptInput.scss",
@@ -2211,8 +2463,12 @@
       "sha256": "2f595f123d6137a86eda164b06148d0fa676e4414169e12fd4cdc1483a0313d1"
     },
     {
+      "path": "packages/drawnix/src/components/ttd-dialog/shared/ReferenceImageUpload.test.tsx",
+      "sha256": "c2ca722e7815195ab17b3d80257e4983edfdb00a6736f388f051e2ecf36c0c92"
+    },
+    {
       "path": "packages/drawnix/src/components/ttd-dialog/shared/ReferenceImageUpload.tsx",
-      "sha256": "aa6ae1f6fbdb574b7ef7bfca7dae99f53b837c537a1f991b694164c5f618b76c"
+      "sha256": "3b0575c181fa6980c8af86f55c36e57e7cadb6d58cc1f4704d1a3039a3f7c433"
     },
     {
       "path": "packages/drawnix/src/components/ttd-dialog/shared/ResizableDivider.scss",
@@ -2495,6 +2751,10 @@
       "sha256": "b4962cc55223c01dc57acd3c52c20f2f1238704159b445247427f98b2285eb78"
     },
     {
+      "path": "packages/drawnix/src/constants/__tests__/model-config.test.ts",
+      "sha256": "7412fc8930ff2e5abdb9ce7033cf48693825d166de13ccf4441faeda4c714e86"
+    },
+    {
       "path": "packages/drawnix/src/constants/built-in-tools.ts",
       "sha256": "6eb75333b6b4465cf3f4a4c617efcae755013a3e1e33f5476099e9ce784f871c"
     },
@@ -2516,7 +2776,7 @@
     },
     {
       "path": "packages/drawnix/src/constants/model-config.ts",
-      "sha256": "525417c8afe6a99c79c12a4977f69b12fb33498242a857435dc98f390645385f"
+      "sha256": "9d21c574f4a5a5a377527ebc25e634cd15333d7495fbebb440030b7efd3d4944"
     },
     {
       "path": "packages/drawnix/src/constants/prompts.ts",
@@ -2528,7 +2788,7 @@
     },
     {
       "path": "packages/drawnix/src/constants/storage-keys.ts",
-      "sha256": "e8f5f8cbe0a12fd644d6e8ba1c8a82be162d0d38d1b62b441d998e40361ec28c"
+      "sha256": "65fcd9e622aa66344038cea0c09ee975ab07223671af6985d6e55fe7e216d226"
     },
     {
       "path": "packages/drawnix/src/constants/storage.ts",
@@ -2611,8 +2871,12 @@
       "sha256": "7216afd66846c475c3ef40a650ec8ae6ea1cd6647d15b688f993af6ddbb0244b"
     },
     {
+      "path": "packages/drawnix/src/data/image.test.ts",
+      "sha256": "29b6cd7d837212e8a2114fce019cc49041060a6a6bcd833d24e70d007348c928"
+    },
+    {
       "path": "packages/drawnix/src/data/image.ts",
-      "sha256": "1ded69c67c8fd6c484252cdfc6ed012063973ee5ba18846c1075e3522b2d567c"
+      "sha256": "688a0e8bf776d4a9bb515a4590213ea3bd2834d225c841647904a4b3d6706149"
     },
     {
       "path": "packages/drawnix/src/data/json.ts",
@@ -2628,7 +2892,7 @@
     },
     {
       "path": "packages/drawnix/src/drawnix.tsx",
-      "sha256": "7373dae7d4520a600787e8e43263d2bc4172e18211974b076afbaf4a4adde9f9"
+      "sha256": "d3bbfe5a5675c28c70cbe88c6c40bc476057bb065173436f0433a5ef66b78157"
     },
     {
       "path": "packages/drawnix/src/engine/index.ts",
@@ -2743,6 +3007,22 @@
       "sha256": "d28d8392eaf7932b809952153b597a9904ce7addb4e79d3182cad3e92d84cdcc"
     },
     {
+      "path": "packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts",
+      "sha256": "96daa6b31b7e6f80b9e0305500378555ce63173a5b513f5215bf2e468dd4bda3"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/__tests__/useDesktopCanvasBackground.test.tsx",
+      "sha256": "126703729c07c5af3d03edf88c832b0ac979920b7f48282cc7bfba427f2064b8"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts",
+      "sha256": "9ae92bc88be96a6ed01f88f41d620fbc456f931f962cd6d46413ab2bdee2fbdc"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/__tests__/useTabSync.test.tsx",
+      "sha256": "9fa0a4ab2d2c0fae3489471a36e074e946bce379cc69b05505e8e2b153710d75"
+    },
+    {
       "path": "packages/drawnix/src/hooks/chat-utils.ts",
       "sha256": "985e9f954e7d6868cbf564884cdf879d8c8230c6747ffef010dc91ea0ca5d333"
     },
@@ -2753,6 +3033,14 @@
     {
       "path": "packages/drawnix/src/hooks/use-drawnix.tsx",
       "sha256": "e40c6a8599076fd1c17e2b2c3abbfd304e9ebaa2fbaded1d2235a011e6e32889"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/use-feature-discovery.test.tsx",
+      "sha256": "bdb8498df1090741709858745eea0f9eb3907827f4dc878f061b09038cc3c87a"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/use-feature-discovery.ts",
+      "sha256": "e3e18986fc93b7fbe32067f8b2ef9162c3f537d0dc261ccaa699b00c2a88b2f1"
     },
     {
       "path": "packages/drawnix/src/hooks/use-global-mouse-position.ts",
@@ -2788,7 +3076,7 @@
     },
     {
       "path": "packages/drawnix/src/hooks/useAutoInsertToCanvas.ts",
-      "sha256": "46c42e624446bc722b25f6dda6fb8de9bee6ac8b61552c84d02c0ca698cdb1e0"
+      "sha256": "007bf5a5976150dd13985f8e7fbaa51c0370e35d4747512e5f027766bf6a4242"
     },
     {
       "path": "packages/drawnix/src/hooks/useBeforeUnload.ts",
@@ -2820,7 +3108,7 @@
     },
     {
       "path": "packages/drawnix/src/hooks/useDesktopCanvasBackground.ts",
-      "sha256": "3c3b7a23040a9c6086835d8776de16f6764d8c6074bffe2af4af23381b820ace"
+      "sha256": "ba6601317ad7fa1cdf1bab30885b7b3268e08de45e38b7c169d8eb95f7caa672"
     },
     {
       "path": "packages/drawnix/src/hooks/useDeviceType.ts",
@@ -2844,11 +3132,11 @@
     },
     {
       "path": "packages/drawnix/src/hooks/useImageGenerationAnchorController.ts",
-      "sha256": "0644b0911fa12559a3343fd69dc2951a4710fa7cc2df0835eecdd23109af52db"
+      "sha256": "7f0f5a41dc5c2c91298a6eff168694b25ddb3381176d25acdb8202d80e0d3d9f"
     },
     {
       "path": "packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts",
-      "sha256": "dc9970f87d6c7ac42927b3363210fb45fe183b7f1e05b99cfe4a4585b7b95750"
+      "sha256": "afcc422fc553de218c3b6b275d7623f347925e37877cc23595bbdc94f388440f"
     },
     {
       "path": "packages/drawnix/src/hooks/useImageLazyLoad.ts",
@@ -2900,7 +3188,7 @@
     },
     {
       "path": "packages/drawnix/src/hooks/useTabSync.ts",
-      "sha256": "0e408b64f64c0dc0f6d5ab0e6d037e0b167f18d92eb3b8db1903934a54733077"
+      "sha256": "961052c258ca394b8c8f63ec243e30a43e6c4ac37dbd4f59115efb94f59b1fe6"
     },
     {
       "path": "packages/drawnix/src/hooks/useTaskExecutor.ts",
@@ -3004,7 +3292,7 @@
     },
     {
       "path": "packages/drawnix/src/mcp/tools/audio-generation.ts",
-      "sha256": "6b6293cff510d439dcc863740bae42c5fe56214a7c3c2c58aad2dbcaa491e519"
+      "sha256": "37cff11b1122d305cd18eb27e16aee8d88b0b4f8e9fa90b861e7d53a0ddeb349"
     },
     {
       "path": "packages/drawnix/src/mcp/tools/canvas-insertion.ts",
@@ -3013,6 +3301,10 @@
     {
       "path": "packages/drawnix/src/mcp/tools/creative-photo-wall-tool.ts",
       "sha256": "974aa603dcd20e78801598c03186301eb7bc582e72cc1a28d2bf0e07f8e5e23a"
+    },
+    {
+      "path": "packages/drawnix/src/mcp/tools/generation-context-queue.test.ts",
+      "sha256": "f521f5a5bc9cdfca8dc0be7ea5868a8c7163d13996ef9ff2609be4dec59335ae"
     },
     {
       "path": "packages/drawnix/src/mcp/tools/image-generation.ts",
@@ -3091,16 +3383,32 @@
       "sha256": "b095f40ae464184f5a6d3831523093019c14c98e49f3b9bafceea9cb966e1978"
     },
     {
+      "path": "packages/drawnix/src/plugins/canvas-association-line.test.ts",
+      "sha256": "cfc5af44efde5ba43e05500e5ad8e323f1c54a42b3b66a575ea42a7a5648cff4"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/canvas-association-line.ts",
+      "sha256": "b57fded8e5c92030e9905f9d107f7a903da0f267b867d18419344ac238dce3ff"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/canvas-association.test.ts",
+      "sha256": "551a41c95e84f695b6d0b448d4821b13add85b015979e5be7d8238fc92478e09"
+    },
+    {
       "path": "packages/drawnix/src/plugins/canvas-association.ts",
-      "sha256": "5d954a37ed95c0efb5c4811010ea7b6cfa327346e5be5a56c852c140e11cf3bb"
+      "sha256": "05796f43f29a53ebd1e836432178fcfc5d9b3b3623dcae826218fc9657c7558d"
     },
     {
       "path": "packages/drawnix/src/plugins/components/emoji.tsx",
       "sha256": "970663ef3eb6eaed6be65caad775bc84f10cf52737c137739e843ea0b10d2aa0"
     },
     {
+      "path": "packages/drawnix/src/plugins/components/image.loading.test.tsx",
+      "sha256": "8cc0f33c0c8eeb09869add680048b3a1555b92ec7a8993b05d6da49003988602"
+    },
+    {
       "path": "packages/drawnix/src/plugins/components/image.tsx",
-      "sha256": "b5170fff3a5969bfe5bf9cb17bf406ea53ba13b73162e7443eb5c417bf261ca8"
+      "sha256": "de25e663c2f59210f4c050b80c0fa970fa7783129cac61b106ae2c656b2a10b1"
     },
     {
       "path": "packages/drawnix/src/plugins/components/native-image-overlay.ts",
@@ -3109,6 +3417,10 @@
     {
       "path": "packages/drawnix/src/plugins/components/video.tsx",
       "sha256": "4272203d3f495c81cc209746b9ed4d8cd26edc5b06a51b25fe5cf38f56e6fcc4"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/freehand/__tests__/image-mask-binding.test.ts",
+      "sha256": "33df271a7c3017d235b5f232f912382108053a1da81bef840c4703b6f39b3a3e"
     },
     {
       "path": "packages/drawnix/src/plugins/freehand/freehand-settings.ts",
@@ -3128,7 +3440,7 @@
     },
     {
       "path": "packages/drawnix/src/plugins/freehand/type.ts",
-      "sha256": "cde23ec9bd6eedaa804f92807b0a8959cb0dabde24c3dd28d242d070a46299f9"
+      "sha256": "9c5f9059d91dcefdd3f108d8dc4affe70db0407b96f14dca8390819333aed6c2"
     },
     {
       "path": "packages/drawnix/src/plugins/freehand/utils.ts",
@@ -3152,7 +3464,11 @@
     },
     {
       "path": "packages/drawnix/src/plugins/freehand/with-freehand.ts",
-      "sha256": "46a6a0ae2bba625a58f1aab067465fa46d023be30eb04636b36700d6d472c3cb"
+      "sha256": "312eb75bddebf0c5bf2fd61025476b83862dfb5a4beaff924c87e8066f915382"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/freehand/with-image-mask-binding.ts",
+      "sha256": "cf2a55233c91e726d4f6246388c10973472345159a25281b326f816fc1266719"
     },
     {
       "path": "packages/drawnix/src/plugins/freehand/with-laser-pointer.ts",
@@ -3351,6 +3667,90 @@
       "sha256": "5576a9511df16608684d2a77ac129555834a18e39593e3e4b3c24feade1f85c5"
     },
     {
+      "path": "packages/drawnix/src/services/__tests__/ai-generation-preferences-service.test.ts",
+      "sha256": "56342ab303d91961bdb9fd9e8b16804c8a7a70ca10bdbb64c786a66d68aff300"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/custom-http-adapter.test.ts",
+      "sha256": "d8a3144b1df81d1fbf53b8d4c42f2aca829a9b79346370de07b88c9191e444e5"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/fixtures/suno-native-contract.json",
+      "sha256": "4e57c41b41fde8db3a64be9b59dc034b0cb513666ea57fb95a92717210e95bc5"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/fixtures/suno-v2-contract.json",
+      "sha256": "63ca56f00df64c104781a835ef03bbf02d43b5dc6a7261117a15646924564fe9"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/image-generation-recovery-service.test.ts",
+      "sha256": "55e264a19abd19a0fe6af33b10c676a6e69cece886c561ab24d016679891d32e"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/image-routing-adapter-integration.test.ts",
+      "sha256": "f4b53d522fc83a683e00ddffe28afdee03e10b4a668791040b4493c5a9e4596f"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/media-executor.test.ts",
+      "sha256": "71c9de59d216dea3f9ca54734ba82111d1168fbd0b0d1b2646060fba55034383"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/provider-routing.test.ts",
+      "sha256": "c22325945066d0182e4f4f3dcf55a7b312ff6716aedd01ffa44fc9700125005d"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/seedream-alias-parameters.test.ts",
+      "sha256": "a662503bac28efa578d4132661acf268aea0efc8ca0304225b8a98ef59eef6b6"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/settings-routing-performance.test.ts",
+      "sha256": "d8fcd0da802b1442afb782bb8f1ad0325c6aa4dc00f41ceff6567ef81a8e88c9"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/suno-native.test.ts",
+      "sha256": "8316c63f77ee72934f3981200bbf1ee56910e9c4099b2d744f6c7eb182252ab3"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/suno-v2-audio-service.test.ts",
+      "sha256": "4e1515b7b6aecb419adcaa81ee0787fa9fda5a3df83686503b795a74515ab498"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/suno-v2-boundaries.test.ts",
+      "sha256": "b99c51765b256baaa7c60491123b1d7e0ad342dc900b1cd0dff0a1f333e3beda"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/suno-v2-contract.test.ts",
+      "sha256": "3a302493d832bb3e1dc37949ef9505c40888ff266bf11b0f163dc2d7072a9b28"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/suno-v2-params.test.ts",
+      "sha256": "a29f5b9ce48572cac37ab1d49278dd6d220a56e7a61bb3d39b461e01d8d4b0b6"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/suno-v2.test.ts",
+      "sha256": "0204a1e4bbd7832c070525810f76f3534b1e915fde0fa268b936b3e69ea8e94a"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/task-queue-service-image-retry.test.ts",
+      "sha256": "9d6a14ad79d82a370931e953b87f2c6617cc52b5bd6a821350913a29a63e9eac"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/tuzi-client-attribution.test.ts",
+      "sha256": "cd7d7b29baa590a7d02fc2ea394c46f698be6e4ebf1c71f31863def5035fdba8"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/tuzi-gpt-image-adapter.test.ts",
+      "sha256": "94e0a61237a0d1fc202ec0c7c74841d9de8a447c53a1e5109f04779540ca0a14"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/tuzi-managed-provider-models.test.ts",
+      "sha256": "0528de044f7bb3e56730b9b2e43b3106c644b26d8b81c9e6fa50efc813159b44"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/workspace-cache.test.ts",
+      "sha256": "3e293483154a79767f2d0c9e352e54609fcc4a87bf453a41995950d1731e63a9"
+    },
+    {
       "path": "packages/drawnix/src/services/agent/agent-executor.ts",
       "sha256": "99a48b184b4540fc5f7edb81b14c81a5db51db6c12772bf8f66404820baefd7f"
     },
@@ -3372,11 +3772,11 @@
     },
     {
       "path": "packages/drawnix/src/services/ai-generation-preferences-service.ts",
-      "sha256": "1f555c76d05031596e63a934077f9b89eeacfae5c3b33a5f25e560d6eb64ec16"
+      "sha256": "d40c910facb1d86e48832a88d36e7298f7f301de069e5e1a8620b2b9ed27a520"
     },
     {
       "path": "packages/drawnix/src/services/ai-input-ui-events.ts",
-      "sha256": "f9251d5656c17b7c6fb17fc0175cc12d900b62ace2901c511853ab8fc24c8ab0"
+      "sha256": "5ade5f7535761d7eccaa5eeb59da4a85ebff70198f69e19e1d7d1418681d610a"
     },
     {
       "path": "packages/drawnix/src/services/analysis-core.ts",
@@ -3400,7 +3800,11 @@
     },
     {
       "path": "packages/drawnix/src/services/audio-api-service.ts",
-      "sha256": "a38e8acb711bee055275a01ff897a722b6d9df7438bc7e94cf47a79d9376f157"
+      "sha256": "c90372c939ad70b0f0692bf71f3c006e41c68a91edf52a52600d6223c923b506"
+    },
+    {
+      "path": "packages/drawnix/src/services/audio-api-types.ts",
+      "sha256": "bf008d2e9b9af9eb66183c3d3a8ab1a7b0c4ab0f6915c0212585abc95b3bf673"
     },
     {
       "path": "packages/drawnix/src/services/audio-playlist-service.ts",
@@ -3447,6 +3851,14 @@
       "sha256": "31e627b09fac81d08f5416ec6e12c013e6d4e8a4eefbb340f0011e27d0f84029"
     },
     {
+      "path": "packages/drawnix/src/services/backup-restore/legacy-canvas-data.test.ts",
+      "sha256": "c131a55b4ca83fa1b3616ea57ca1442f2df1f8faa8e75829d6107748e81f7228"
+    },
+    {
+      "path": "packages/drawnix/src/services/backup-restore/legacy-canvas-data.ts",
+      "sha256": "74dd26e8306ce70b4f953e8d058ca7c1ae98c5290ae678620f430f91d7524bdf"
+    },
+    {
       "path": "packages/drawnix/src/services/backup-restore/types.ts",
       "sha256": "e56c1a61516bacc6f2b36b094bd6839a481dd00d50732a29ef79f987aedd13e5"
     },
@@ -3459,6 +3871,10 @@
       "sha256": "9c62a1f39f8154ba56b5bd2d1923be38aed66633156c5736a32605991d977988"
     },
     {
+      "path": "packages/drawnix/src/services/canvas-image-readiness.ts",
+      "sha256": "43c8c6b2b51730e8fdcc44cead641e6821537f01011b5244fee14dbeece23912"
+    },
+    {
       "path": "packages/drawnix/src/services/canvas-operations/ai-analyze.ts",
       "sha256": "fd9d73985f3660e1ba12a93e84c5e5759b88b98d6d9ed7cb296d0403a5df9634"
     },
@@ -3467,16 +3883,36 @@
       "sha256": "9db5e60bbf8be754285a793ae9aa1616e3c699057ad3ceb74f48de44a3e8750d"
     },
     {
+      "path": "packages/drawnix/src/services/canvas-operations/canvas-insertion.test.ts",
+      "sha256": "46070379d1db4b4bab6473114364b16d3a32e10b78d256398a4675b7803535c1"
+    },
+    {
       "path": "packages/drawnix/src/services/canvas-operations/canvas-insertion.ts",
-      "sha256": "5a92872d69c09f3df2a0c558fe4170191d250cb02ef1f0bea03781aabb69cb94"
+      "sha256": "126b40eb227bd3430a861f52f3fdd17c5696e06cc577fc20a71d4e9d9086cef6"
     },
     {
       "path": "packages/drawnix/src/services/canvas-operations/grid-image.ts",
       "sha256": "d2cdd6684a80e132cc4962cf0553e0aab99ed3a52dac58398dbe645de4ff26ea"
     },
     {
+      "path": "packages/drawnix/src/services/canvas-operations/image-generation-references.test.ts",
+      "sha256": "73840669f1a1520e98e63e280fda19199d3edb911eeb8835cf295578dafb6824"
+    },
+    {
+      "path": "packages/drawnix/src/services/canvas-operations/image-generation-references.ts",
+      "sha256": "03551183537f29480b06d510489201291a263aff43dc8801d734fc5fcb4cb874"
+    },
+    {
       "path": "packages/drawnix/src/services/canvas-operations/index.ts",
       "sha256": "3d80f4e71d3af006328baac759bfe588cabb5dfb59ba724005544a78a2390b23"
+    },
+    {
+      "path": "packages/drawnix/src/services/canvas-operations/insert-split-images.test.ts",
+      "sha256": "3a7c96a9992dc6c09a6f267f811218cc810da9f847374d591dd40dc217a47b98"
+    },
+    {
+      "path": "packages/drawnix/src/services/canvas-operations/insert-split-images.ts",
+      "sha256": "d0fb0f01228f44eb230cc6461ad03e048097be6f728fa788dc338659ce2f23e8"
     },
     {
       "path": "packages/drawnix/src/services/canvas-operations/inspiration-board.ts",
@@ -3489,6 +3925,14 @@
     {
       "path": "packages/drawnix/src/services/canvas-operations/media-quick-insert.ts",
       "sha256": "a4ac89054741041175ded0091a045257ad5f9a77425bc2e2a7214d6e8918ce3c"
+    },
+    {
+      "path": "packages/drawnix/src/services/canvas-operations/resize-canvas-image.test.ts",
+      "sha256": "334fab2b1e27fae7722897c391bbfac24991ad290592d93e174882e219fdaaf7"
+    },
+    {
+      "path": "packages/drawnix/src/services/canvas-operations/resize-canvas-image.ts",
+      "sha256": "32d74c3ff9437dfb022d057583c465355fc29ade30327311450f5d7ce105b1b7"
     },
     {
       "path": "packages/drawnix/src/services/character-api-service.ts",
@@ -3556,7 +4000,7 @@
     },
     {
       "path": "packages/drawnix/src/services/generation-api-service.ts",
-      "sha256": "d7dfe5cbb6f177ad142bece2dc9dbbbb6e6cd3b98b7278e9577c96c58f3435ec"
+      "sha256": "b5fe56ae5cd11989a0b0f9d47a4f6dfeb5cb7e32067cff67c4feb976d54177bb"
     },
     {
       "path": "packages/drawnix/src/services/generation-context-service.ts",
@@ -3804,7 +4248,7 @@
     },
     {
       "path": "packages/drawnix/src/services/media-api/image-api.ts",
-      "sha256": "51140eb0ac4ffe5df9b94418958146b61df8d14eaa4a96cdc9e92492d6e9a7f6"
+      "sha256": "932e5f195506a9194a021f4eab34f298ea483d8bd773517f519763154ed46663"
     },
     {
       "path": "packages/drawnix/src/services/media-api/index.ts",
@@ -3832,15 +4276,19 @@
     },
     {
       "path": "packages/drawnix/src/services/media-executor/fallback-adapter-routes.ts",
-      "sha256": "266719a11cc452549e5db4dee7add9b0454cd812a3b07c96069be0141ed5c49e"
+      "sha256": "e98cc7d0ebc95ea6ca73ce413c83cf4d7febdaea900675ad725e5285f8261b43"
     },
     {
       "path": "packages/drawnix/src/services/media-executor/fallback-executor.ts",
       "sha256": "8f7e460a8234e399f0a712595ea61905ba4a919be8c2158e3fc2c6753ab23496"
     },
     {
+      "path": "packages/drawnix/src/services/media-executor/fallback-utils.test.ts",
+      "sha256": "900cd1c370c7b10939274462da83395844bb90e669c6eec368f8028c6a187ec2"
+    },
+    {
       "path": "packages/drawnix/src/services/media-executor/fallback-utils.ts",
-      "sha256": "89b0ed3d232e77c00ba787c881b542ccc446465d574da5cd266472e9662eec85"
+      "sha256": "176483a08c4f25039bc3d132813ee7764c34a91e046c97419f5e4ffc022de799"
     },
     {
       "path": "packages/drawnix/src/services/media-executor/index.ts",
@@ -3857,6 +4305,10 @@
     {
       "path": "packages/drawnix/src/services/media-executor/task-storage-writer.ts",
       "sha256": "2729bb98a501b6ab0b31509da1d7e0e322e91e4880a45832804cddbec2b5995b"
+    },
+    {
+      "path": "packages/drawnix/src/services/media-executor/text-response.test.ts",
+      "sha256": "c34124cd8d668e9fddcba180288876edac5d9c403b4645b61b31ff45283cb169"
     },
     {
       "path": "packages/drawnix/src/services/media-executor/text-response.ts",
@@ -3899,6 +4351,10 @@
       "sha256": "3bfd38659deba993af5149367b58bfd6dbc8b5cb67516a2ac596f20123fa171a"
     },
     {
+      "path": "packages/drawnix/src/services/model-adapters/__tests__/seedream-response.test.ts",
+      "sha256": "5c14d826a8d8d0459666c7a28dd2630e5cfa41269d0b0eb1a69a07db7b390782"
+    },
+    {
       "path": "packages/drawnix/src/services/model-adapters/context.ts",
       "sha256": "19da813a805c055232311edd07e5f7e7f8d9bc18cf5fed154da4ac5d20debadb"
     },
@@ -3908,7 +4364,7 @@
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/default-adapters.ts",
-      "sha256": "681a1a51ef7a2b7a2436571961d8c7175b2a83dd6e1a263c5a3b853c5250f1d3"
+      "sha256": "6c2ec01420ea3ad5f86a2638345911ed414ca4db715fd1527dc30e5dd54e4c49"
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/flux-adapter.ts",
@@ -3916,7 +4372,7 @@
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/gpt-image-adapter.ts",
-      "sha256": "c79d88652c726d0c978a5c35084f3787b8e2d37be87c8401e0b16229bd2e7539"
+      "sha256": "d2355e010a8f89029261d53d57a1c989e2e99c167f97c1b5f3b7e054631e3c8d"
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/happyhorse-adapter.ts",
@@ -3924,7 +4380,7 @@
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/image-request-schemas.ts",
-      "sha256": "4a90a6e78ae218266d0266b626505614a209f59f6740d0d3d7a14738a4e29747"
+      "sha256": "3c43c56ce38974441b0df29af11ef843f2cf629e6354af1a87e0fb528098cfe9"
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/image-size-quality-resolver.ts",
@@ -3944,7 +4400,7 @@
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/registry.ts",
-      "sha256": "0334593da8c0fd6d3b4e0f60122b42e6cad0af8ff00d719cc5846bbfd025d8b1"
+      "sha256": "e52f07decef7f228da14e5fc1ae7fae38499da9d443bd60adedcc8b408e767a9"
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/seedance-adapter.ts",
@@ -3956,7 +4412,7 @@
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/seedream-adapter.ts",
-      "sha256": "cee79c444dbbc48ea614c3fecf01dd2dae8482f2729a7e329a17d2dafea6b3dd"
+      "sha256": "a40742bae624cb5bea5aea33f9e3bcfd5cf1139dafc7344f488d4c6d626eaf9f"
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/tuzi-flux-3-image-adapter.ts",
@@ -3964,11 +4420,11 @@
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/tuzi-gpt-image-adapter.ts",
-      "sha256": "06672feefac8a33ce60e1073aba81a28d7aafb9f4c4aa1068be976bd3cd48938"
+      "sha256": "0dfa40befdc820964c6de4bb9d8c4f6963187e239fb3119b04dae24e95d03f18"
     },
     {
       "path": "packages/drawnix/src/services/model-adapters/types.ts",
-      "sha256": "d36b0f8489085ca93456cf9f52e24a47eca4469819f0787e5c75021fa1664af6"
+      "sha256": "e547411666459d7c99cea6a9b49a84b17f90d14b9391cc4e06fbcac1812a5033"
     },
     {
       "path": "packages/drawnix/src/services/model-benchmark-launcher.ts",
@@ -4135,12 +4591,20 @@
       "sha256": "6a271168fa1be5f4ab8a23d5246d141972eeae449bd063254b74414978a05379"
     },
     {
+      "path": "packages/drawnix/src/services/provider-model-catalog.test.ts",
+      "sha256": "0b270562729e32fe52e79eaa63aa75f474a1b180aac47d887a9a0e51d5dba7a2"
+    },
+    {
+      "path": "packages/drawnix/src/services/provider-model-catalog.ts",
+      "sha256": "5b96a835ac801df089999a461210e66f5e9fc994768e4d5ef33302cd0e58611f"
+    },
+    {
       "path": "packages/drawnix/src/services/provider-routing/binding-inference.ts",
-      "sha256": "343460e46d2faf4d1111e7a1a2ff494394662269de6e11d24e4799d2380423c5"
+      "sha256": "25a1a7e28a9f7e5a5709da3591172bd5d022f8c1d8d6b873883e7e1315872de8"
     },
     {
       "path": "packages/drawnix/src/services/provider-routing/endpoint-binding-inference.ts",
-      "sha256": "e9fea43ee91a0aa3a572ec715907b42699cc52f020bd342333d07c9a27511571"
+      "sha256": "f9e25da6ed66173c1f2e14c927f633735a7f401682e88328fb4bc60ff2f3f14a"
     },
     {
       "path": "packages/drawnix/src/services/provider-routing/index.ts",
@@ -4160,7 +4624,7 @@
     },
     {
       "path": "packages/drawnix/src/services/provider-routing/settings-repository.ts",
-      "sha256": "9928b38c62ac5973f783132c0ef2619c300b1ac5ba77984b59405491f958167f"
+      "sha256": "c5b46786c218c427ab9ef4d2b2926871fb87637e4de616a73785f4a7a2dd8e0a"
     },
     {
       "path": "packages/drawnix/src/services/provider-routing/text-binding-capabilities.ts",
@@ -4172,15 +4636,27 @@
     },
     {
       "path": "packages/drawnix/src/services/provider-routing/types.ts",
-      "sha256": "c0a09036c945eb477825b54ca63b920c3d3c7b26b5cf3ee31932dd7e0dcc70b6"
+      "sha256": "627ab391c112e767d041fe39082808616da11fcf02f31ecf0ad91318a07a217d"
     },
     {
       "path": "packages/drawnix/src/services/reading-playback-source.ts",
       "sha256": "1b0bb0f1ff1f0a89b46bebb507173ac8d922b5ab76396cbee78476878c87de6f"
     },
     {
+      "path": "packages/drawnix/src/services/reference-image-form-data.test.ts",
+      "sha256": "cfd0e2be07747319dff30bd638d9a9f0566e14202f27241ac53b106d8351609e"
+    },
+    {
       "path": "packages/drawnix/src/services/reference-image-form-data.ts",
-      "sha256": "9e968c6b5f33bea3eeb16667e9e8b1bdd91556754d05658cb643ae2e0de73528"
+      "sha256": "7148cab9b480f8543dbaf80f77c6482f53bffcecd9da12ceb95075f86fef8b63"
+    },
+    {
+      "path": "packages/drawnix/src/services/reference-image-settings.test.ts",
+      "sha256": "9fafaa7bc6431f7eafb05412c4aa875f0fb89bac4ad627226d210bb60dc67354"
+    },
+    {
+      "path": "packages/drawnix/src/services/reference-image-settings.ts",
+      "sha256": "adbcfc9be07abc222991376e83938b6a3f93ca96eae5d08b922e025b6ee70833"
     },
     {
       "path": "packages/drawnix/src/services/storage-migration-service.ts",
@@ -4193,6 +4669,30 @@
     {
       "path": "packages/drawnix/src/services/submission-persistence.ts",
       "sha256": "1a672b3a12da77fb58d2f36f35210396281bfbd3b4bea43315fefcaaf67de827"
+    },
+    {
+      "path": "packages/drawnix/src/services/suno-native-catalog.json",
+      "sha256": "acc7dd06a8d773597d75c8d40a9c876c1887779c1e21bc67cfc21a7c79ae3895"
+    },
+    {
+      "path": "packages/drawnix/src/services/suno-native-params.ts",
+      "sha256": "3ed0eaf39f293c0f7ffd6dff62b0e95beab448e86d3e5fa990189668e72b6907"
+    },
+    {
+      "path": "packages/drawnix/src/services/suno-native.ts",
+      "sha256": "bf944b0417e015de678577c325b286f0482e8ec0055ef368efde65ff00c973f5"
+    },
+    {
+      "path": "packages/drawnix/src/services/suno-v2-catalog.json",
+      "sha256": "103efb27b058290a467f46c82d703aefc97f1bd19ed977f94962aa5f2baf3041"
+    },
+    {
+      "path": "packages/drawnix/src/services/suno-v2-params.ts",
+      "sha256": "23db6ac92352e17a2e56cb5de7c2c424848c9606b4e5da0f0f2e6a3f5c7f1acf"
+    },
+    {
+      "path": "packages/drawnix/src/services/suno-v2.ts",
+      "sha256": "9cd17e4dd10d8d58f4f40565f483f602ee881bf03d4f143c5982cb37bd03e7fa"
     },
     {
       "path": "packages/drawnix/src/services/sw-capabilities/handler.ts",
@@ -4248,15 +4748,19 @@
     },
     {
       "path": "packages/drawnix/src/services/task-queue-service.ts",
-      "sha256": "7d6c699a8ff219575a6c3187f9d37071fb24f40fe89f8ba50c4c44cb0c616c6a"
+      "sha256": "c6cdf1e95720031f2cce938ccb0f382b66474fe373b26abce73bafc29524542c"
     },
     {
       "path": "packages/drawnix/src/services/task-queue/index.ts",
       "sha256": "e95082d91c3434b4901ab2bc72049d4bd213d2f6bc85a707f6f8dc128a91696f"
     },
     {
+      "path": "packages/drawnix/src/services/task-storage-reader.test.ts",
+      "sha256": "5fcab901cbd703bd7caa4b0fd0bf5c060dd078219a7593d433372f16d74eb757"
+    },
+    {
       "path": "packages/drawnix/src/services/task-storage-reader.ts",
-      "sha256": "c9a53b3049f5b1655b239ee01341ac286753586a19df7308c76d8fee010ec7c0"
+      "sha256": "2c597b5809a70184567f7a357651d7960a3de820580612a1d17b5366182646c4"
     },
     {
       "path": "packages/drawnix/src/services/thumbnail-generator.ts",
@@ -4308,7 +4812,7 @@
     },
     {
       "path": "packages/drawnix/src/services/tuzi-client-attribution.ts",
-      "sha256": "58af7ae2479e02f0d93099a7a047826ccf1843699c352254ff18e24b4a03d20f"
+      "sha256": "64c076e1e101a5a5416bc361f6e22ad2564b172274ca190ad4c4b45bdf1893e1"
     },
     {
       "path": "packages/drawnix/src/services/tuzi-embedded-config.ts",
@@ -4320,7 +4824,7 @@
     },
     {
       "path": "packages/drawnix/src/services/tuzi-managed-provider-models.ts",
-      "sha256": "dd9845de7b15adbf1eb2555fb58c813e5b4e73a8e46fa8d3f40ec0a45c4313f9"
+      "sha256": "3a31d752588961747fc3ad756e9bb5b372ab652e8ce29c9efff260c341b88b36"
     },
     {
       "path": "packages/drawnix/src/services/tuzi-managed-providers.ts",
@@ -4355,8 +4859,12 @@
       "sha256": "74461b95c9cedb3907a7dc8b9d7cbefd85c7e199173d471f4937d0502648ce17"
     },
     {
+      "path": "packages/drawnix/src/services/unified-cache-service.test.ts",
+      "sha256": "046122ee6734194ba2b4e826f228b7ca087d7734743ed9d0ca636d95717a9de2"
+    },
+    {
       "path": "packages/drawnix/src/services/unified-cache-service.ts",
-      "sha256": "2e1597541f6dfddb572cb53be3dd5d43a2427c100fda744cfb3edcdca4d81f99"
+      "sha256": "57df7da6181d048eb46e185b3f568f4907c8ef1b7449e2e495e0046e87aec2b1"
     },
     {
       "path": "packages/drawnix/src/services/unified-log-service.ts",
@@ -4383,8 +4891,12 @@
       "sha256": "b21584ac7c7174c0d526266ffa8c7a003f275b9ed7ea1b8882db9967d31dad41"
     },
     {
+      "path": "packages/drawnix/src/services/video-reference-image-utils.test.ts",
+      "sha256": "0ba969421712eea14ac3d75e01917d660c9a230ee0bdeb33e41a2db1e1250438"
+    },
+    {
       "path": "packages/drawnix/src/services/video-reference-image-utils.ts",
-      "sha256": "478b9cadb303f82d6822ab6637cb8b0d3168c20ace0cdb2c0005229a855e53c5"
+      "sha256": "3e96e6a1bfa3502d442fc8f6b541f05691df1080825d0fd7eff66c19528f788c"
     },
     {
       "path": "packages/drawnix/src/services/web-vitals-service.ts",
@@ -4440,7 +4952,7 @@
     },
     {
       "path": "packages/drawnix/src/services/workspace-service.ts",
-      "sha256": "ec332402516cf9c20ea360b9cd6ae5cd34d94822dc9db9a5dbfed290cab6309a"
+      "sha256": "d2a79064f61f987572c9076e9fa5d9e99a44a57b711db031c0aff826758139c4"
     },
     {
       "path": "packages/drawnix/src/services/workspace-storage-service.ts",
@@ -4632,7 +5144,7 @@
     },
     {
       "path": "packages/drawnix/src/types/image-generation-anchor.types.ts",
-      "sha256": "3e8af448548e71c2c6fbcaa9579e2b5c62ea0892ab1da8adf08ed42094d435d3"
+      "sha256": "45a862bd1c3ee8bb344c44dfde9afdd541be8bec21c78a1a654423b7db119603"
     },
     {
       "path": "packages/drawnix/src/types/knowledge-base.types.ts",
@@ -4699,6 +5211,54 @@
       "sha256": "4d794f06f1bf435d38e402166ffd2884d3ae801fc13e1cb42329c503c53cd549"
     },
     {
+      "path": "packages/drawnix/src/utils/__tests__/ai-mask-brush.test.ts",
+      "sha256": "40952071d58a9a2c0d5f6a95ac5dc7cd55cadb8ffe28462c6faa841685133d74"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/canvas-media-preview.test.ts",
+      "sha256": "e687107efd91a1fdeddd058d0ca91d917cbe410c683161c4280a55f583ae9d53"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/image-generation-anchor-readiness.test.ts",
+      "sha256": "0abed422403a34c89bc563abdfa49bb94b8685f720d6a1539569dd49fa8d1b64"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/image-generation-anchor-view-model.test.ts",
+      "sha256": "f742626c89f6ee62dc3feb4bcb43d582c1f56ebd8d73dc8022cec331d68b1d8e"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/image-generation-lineage-placement.test.ts",
+      "sha256": "8a9437f3e76d82c075b1fc49e8c5e7ab74f686a49b992d450a9db7bba3fc9080"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/model-pricing-service.test.ts",
+      "sha256": "52f9416dbcedb24a1f9432f0731980f289b0260288ddad7e79fa9e1cf558f342"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/model-sort.test.ts",
+      "sha256": "5c8df2e9b548e6a187853e856788c3e1cc6c661f63ed2b2f1889e313899fd59b"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/runtime-model-classification.test.ts",
+      "sha256": "ced8d8d8f5fdb92f83afe4586ee4d3545f5d7b39d5b6e33b8a0c80c4b725cfa2"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/runtime-model-discovery.test.ts",
+      "sha256": "85c50d37571ca13624cc84b0280ca96443f171b3be2f320572424ca12800bdf2"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/selection-utils.test.ts",
+      "sha256": "e6bcf1ea8611bae88efbc8a7d53098b313cf7320629b39fad7ac0c72857fa904"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/settings-manager.test.ts",
+      "sha256": "d85bf0a98bd71b837155e0d296510d45c191e1470b943992ea550cb8c94315c9"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/suno-v2-discovery.test.ts",
+      "sha256": "1d49ef9860dcff4ead0a5972afda8e523a073086c7c8fbf7dee88593a7c2b63e"
+    },
+    {
       "path": "packages/drawnix/src/utils/active-tasks.ts",
       "sha256": "198edc396e0e1d0edf0425d04f4cb89b7dc02916463a3bb76fa882439cca6a5b"
     },
@@ -4712,7 +5272,7 @@
     },
     {
       "path": "packages/drawnix/src/utils/ai-mask-brush.ts",
-      "sha256": "ebb0c1aafb2eef77878d0c178418991c50e32b30dba72284c2262362857d9b27"
+      "sha256": "689b7b164607b53d90913ff1179690cc5fcef450bc3fb97f27fe86b6511c214c"
     },
     {
       "path": "packages/drawnix/src/utils/ai-model-selection-storage.ts",
@@ -4743,12 +5303,36 @@
       "sha256": "508ffbac62395dce7190a443d1d5fabb2618dff8e5fd5d2bb95bd1d422c03520"
     },
     {
+      "path": "packages/drawnix/src/utils/canvas-generation-details-source.test.ts",
+      "sha256": "9e9c439c1a62511f6fa6d29f11d7e2e9e9551e10d8fa2ef60a5ee5ebc58b2ec0"
+    },
+    {
       "path": "packages/drawnix/src/utils/canvas-generation-details-source.ts",
-      "sha256": "c0ac740bf45b59a114d582b7ccef3f313c01ee0d53098fd3504e1842ef15a71f"
+      "sha256": "8368411affa23447c0cbe6f59253fff8f2c5e58aabe440b10e0fff25639b338d"
+    },
+    {
+      "path": "packages/drawnix/src/utils/canvas-image-details-dimensions.ts",
+      "sha256": "9d39b097b2f6c0490fe4b472302f1887aa833a08fe48ec32a1c67225abaea915"
+    },
+    {
+      "path": "packages/drawnix/src/utils/canvas-image-details.test.ts",
+      "sha256": "a62ac87dce80c678b4da7ecbdbc1baddbaf5e5c37053f6af0c35c679d6606df0"
     },
     {
       "path": "packages/drawnix/src/utils/canvas-image-details.ts",
-      "sha256": "e378eb611f2292ce79ea792115c5726fdfebebd0d682224b7b9a4335c9314554"
+      "sha256": "c883f03155be9c5e49f7147950823d959bdc46738eb160f06e63754f972be97c"
+    },
+    {
+      "path": "packages/drawnix/src/utils/canvas-image-dimensions.test.ts",
+      "sha256": "1ccba066e501faa64950d3946b609e7cb5f4e38f771e0a31b0d7a4bc815a30cd"
+    },
+    {
+      "path": "packages/drawnix/src/utils/canvas-image-tools.test.ts",
+      "sha256": "e9dce36826813533254b1eea5f36fecdf1e0aa4bf703ee8eab814b3ac50f4c13"
+    },
+    {
+      "path": "packages/drawnix/src/utils/canvas-image-tools.ts",
+      "sha256": "875fbefdba948a99d6eef79d09d549da65e669a6916281d4cd07b97491315596"
     },
     {
       "path": "packages/drawnix/src/utils/canvas-insertion-layout.ts",
@@ -4756,7 +5340,7 @@
     },
     {
       "path": "packages/drawnix/src/utils/canvas-media-preview.ts",
-      "sha256": "8c48709c540d7ae6f5906a2c6a4c3fc9e4c756a6255f5920547f5d34084284d1"
+      "sha256": "885fbebec7a630221a6c1a6694a1be6b1407f1f61b196a0054d9a92263f9891e"
     },
     {
       "path": "packages/drawnix/src/utils/canvas-target-centering.ts",
@@ -4807,6 +5391,14 @@
       "sha256": "68ce67e538660dd723fea27b16a4e5eaefefe92604f196b692d8e48d4f145002"
     },
     {
+      "path": "packages/drawnix/src/utils/feature-discovery.test.ts",
+      "sha256": "03ecd5257d1688f8b2395a4eda8669f38dfcfd07852e6108590413715d2a159d"
+    },
+    {
+      "path": "packages/drawnix/src/utils/feature-discovery.ts",
+      "sha256": "39aab06b19e692467530e977c81400393134678ae915ecd237aea8a9272653a0"
+    },
+    {
       "path": "packages/drawnix/src/utils/fill-renderer.ts",
       "sha256": "331670847eeffd09454021ae83e5bceb218cc6e8c860a4a17f8ded142ef754c5"
     },
@@ -4833,6 +5425,10 @@
     {
       "path": "packages/drawnix/src/utils/frame-title-utils.ts",
       "sha256": "83d36fa4e9926d7ed3251b4a224ffe6b9e98d8471b49fa8ea05aeb19152de2ab"
+    },
+    {
+      "path": "packages/drawnix/src/utils/gemini-api/apiCalls.test.ts",
+      "sha256": "06a1592ad47f7ce8940325aeaf9f8b4e9dcc594957888a32db8497ccd6b079d7"
     },
     {
       "path": "packages/drawnix/src/utils/gemini-api/apiCalls.ts",
@@ -4867,8 +5463,12 @@
       "sha256": "e896e02667a5cde21a54d4e66db0115b2d97bbcacb4fb3ec413fa2cc5b983d41"
     },
     {
+      "path": "packages/drawnix/src/utils/gemini-api/services.test.ts",
+      "sha256": "d5b5c70e4b7f4c4c5289cb0e66e1322f6e2ece11feac2c87295e247df37cd2dd"
+    },
+    {
       "path": "packages/drawnix/src/utils/gemini-api/services.ts",
-      "sha256": "29c633e0e129b9a13490787452a788f8e6cab5bcbf1b5af3beeb4546405bb340"
+      "sha256": "5dba9d836ebcad1507f1a1deece55e4ef7d7060ceddb36b16240b50065e32e00"
     },
     {
       "path": "packages/drawnix/src/utils/gemini-api/types.ts",
@@ -4900,7 +5500,7 @@
     },
     {
       "path": "packages/drawnix/src/utils/image-generation-anchor-controller.ts",
-      "sha256": "9a3301b980df3d0f7b5a347aaa71808f0e6c5bc53d6edd8e0910aa09fba07249"
+      "sha256": "823c3e0764e639ea08d85f111788845f666134539f20d3743a51f752cd51b65f"
     },
     {
       "path": "packages/drawnix/src/utils/image-generation-anchor-insertion.ts",
@@ -4913,6 +5513,10 @@
     {
       "path": "packages/drawnix/src/utils/image-generation-anchor-placement.ts",
       "sha256": "f53f46540fdf5229b8fca15880ea813d4e9ac3f36319d4657c31a6fc1fc46c96"
+    },
+    {
+      "path": "packages/drawnix/src/utils/image-generation-anchor-readiness.ts",
+      "sha256": "5a25de2f7f4f70b62e869c87bf03e95f1a6d697ef30baa51b685bf3569b248a8"
     },
     {
       "path": "packages/drawnix/src/utils/image-generation-anchor-state.ts",
@@ -4928,7 +5532,11 @@
     },
     {
       "path": "packages/drawnix/src/utils/image-generation-anchor-view-model.ts",
-      "sha256": "3d3a97cc9e0faaf7a6143f1d9296c484c1c721bd315b3ec5bd2d99136ca7ac16"
+      "sha256": "91e3c0ffbcbc6878cd82e4fb89a887782c72f63a1d654aedc4b2ef83b03047e4"
+    },
+    {
+      "path": "packages/drawnix/src/utils/image-generation-lineage-placement.ts",
+      "sha256": "33fe7fdc65ca06a5b97dabc72932853f750f7afb317e256934302b1cebf4975e"
     },
     {
       "path": "packages/drawnix/src/utils/image-natural-size.ts",
@@ -4936,7 +5544,7 @@
     },
     {
       "path": "packages/drawnix/src/utils/image-operation-timeout.ts",
-      "sha256": "91f1fba49868af53391c46610246195f9705605fd1a074c1d373ab8a70065107"
+      "sha256": "bdffb05e475449e45df783afc68eee2ed6ee7efdf504624aef53eaa4dea39d51"
     },
     {
       "path": "packages/drawnix/src/utils/image-split-core.ts",
@@ -4955,6 +5563,10 @@
       "sha256": "afc09f32162c234329d506d3cc5742786e73fff379499e5e26250c42e4c7de3a"
     },
     {
+      "path": "packages/drawnix/src/utils/image-toolbar-preferences.ts",
+      "sha256": "15a5d989ab9537a5ac44dfb91ff1d9c809e4800e9e8a37d4bdff29f8bbce1d4a"
+    },
+    {
       "path": "packages/drawnix/src/utils/image.ts",
       "sha256": "36358bd9137e115f065405c1ea325c5875763b69b943aecdf35c1de566ea9e18"
     },
@@ -4967,8 +5579,16 @@
       "sha256": "e6dd06c8df01eddef36e8dfe8e193453d41894337a28d50a0e2afd8b6484cb53"
     },
     {
+      "path": "packages/drawnix/src/utils/legacy-canvas-location.ts",
+      "sha256": "f6a065f79a1be1f81cf158b29aff7bee2d24d1d6cb38b8bd2bee15f8af45c6dd"
+    },
+    {
       "path": "packages/drawnix/src/utils/llm-json-extractor.ts",
       "sha256": "9a3353929c89fbc86762380d50871474bc5f90657d90ad8453f0ec8eafe06f18"
+    },
+    {
+      "path": "packages/drawnix/src/utils/local-image-operation.ts",
+      "sha256": "d508ea06eebdf8ec65b7eb2b6afde9a17c6d21b4952c5887f73389d19216262a"
     },
     {
       "path": "packages/drawnix/src/utils/logger.ts",
@@ -5012,11 +5632,11 @@
     },
     {
       "path": "packages/drawnix/src/utils/model-pricing-service.ts",
-      "sha256": "9049e7771e7982596656bf17937dd0d730ecfded4ec38f6e4ce7da2076eaedae"
+      "sha256": "200955cdf6d793911c32f95e5e5f68c7162db4de4319dbc79c77ffa075d35b1f"
     },
     {
       "path": "packages/drawnix/src/utils/model-pricing-types.ts",
-      "sha256": "e4589528953ff0ff2536052a1a721ac289522836192a486b4cc1f87c9238eeb5"
+      "sha256": "5f0d198003952fe76aea1a988924ef05b84dfacdddab37691ce0c9597135061e"
     },
     {
       "path": "packages/drawnix/src/utils/model-selection.ts",
@@ -5024,7 +5644,7 @@
     },
     {
       "path": "packages/drawnix/src/utils/model-sort.ts",
-      "sha256": "ac74aea9af1028033136c61362e5a790e9d2c3dcaf3ab686fff2caa587a12d69"
+      "sha256": "65761ed49cc2d65a288429cf735ebb6463fdc64170bfc5167d6613fa0899dfce"
     },
     {
       "path": "packages/drawnix/src/utils/photo-wall-splitter.ts",
@@ -5052,7 +5672,7 @@
     },
     {
       "path": "packages/drawnix/src/utils/runtime-model-discovery.ts",
-      "sha256": "45fa6e2faa0b360a51824ffd9a8f9da4b89daf4e0b831454df6d81d7272221fd"
+      "sha256": "2e8bdf2bc29a860f64f3702eac3f77ab8274e0a1a4b8743a28fd0216ff58688e"
     },
     {
       "path": "packages/drawnix/src/utils/seedance-model.ts",
@@ -5064,15 +5684,15 @@
     },
     {
       "path": "packages/drawnix/src/utils/selection-utils.ts",
-      "sha256": "2b0814c1aca88f2743b3e448832de5e6f0ea9463c4713ad2aef1c996fc4dd5ec"
+      "sha256": "86a00c0d4140b21cbdad0f1827bd03daca8a2f33e48e048ecfe5ed1f3ee2da83"
     },
     {
       "path": "packages/drawnix/src/utils/settings-manager.ts",
-      "sha256": "c6e28b126b88e61f248e41301418be3958b4d45d907ca9dacdd679d01c67e3ef"
+      "sha256": "88f5b18143cd57d5ecfbe2de2a1707a771530dc4cfd74a758cfce41b761bd9f6"
     },
     {
       "path": "packages/drawnix/src/utils/settings-types.ts",
-      "sha256": "a694cd45ff3c39e883402a76a8411ff273427c675c78668e3c3c2ed9ce223d4b"
+      "sha256": "661fa07f7bd30ee8f72457e9dbf1e957e81f00fdfc4950faeb7e004a37713ff7"
     },
     {
       "path": "packages/drawnix/src/utils/size-ratio.ts",
@@ -5092,11 +5712,19 @@
     },
     {
       "path": "packages/drawnix/src/utils/suno-model-aliases.ts",
-      "sha256": "b8696ef74b5cdc78545e3c1c65372138a66ee7fa94a748ab6f098bab702e167b"
+      "sha256": "b8c7c046633ea9ab9fb672da14d17f1dc6195e2956089495ae98cffa284da618"
     },
     {
       "path": "packages/drawnix/src/utils/svg-utils.ts",
       "sha256": "df4c72f44ab977b8b279e69b06a83caacb3e1b156ead0aa7ad2b7c60d81dc402"
+    },
+    {
+      "path": "packages/drawnix/src/utils/task-queue-filters.test.ts",
+      "sha256": "aa891d52f8594f7e983eea7d996897966e560e01397842cf274a227c962b75ea"
+    },
+    {
+      "path": "packages/drawnix/src/utils/task-queue-filters.ts",
+      "sha256": "af09c5eefc426a06ac10f028771a1db29a67e035bf3e60b4274d1b2a7ef31d7f"
     },
     {
       "path": "packages/drawnix/src/utils/task-test-utils.ts",
@@ -5425,18 +6053,6 @@
     {
       "path": "packages/utils/src/workflow/workflow-guard.ts",
       "sha256": "7404d3d7692503f5bf35a2ad49186348177fdae8097506e05a73d4795c9358e4"
-    },
-    {
-      "path": "apps/web/public/logo/opentu-community-qr.png",
-      "sha256": "83457fb6a0e26515b21b64eb59a079fc73a7e3da0ba4a6b3671919c41452ecdc"
-    },
-    {
-      "path": "apps/web/public/logo/opentu-support-qr.png",
-      "sha256": "ee3eb581f28160304ef17c8dea6c8c1069be8bbd5a913429088e7e1228c84ace"
-    },
-    {
-      "path": "apps/web/public/logo-tuzi.png",
-      "sha256": "c6dea1fd5da9b784beb05b4acb92d432825297bba9bc1c5ee6ca1e6896ffdaf3"
     }
   ],
   "omittedPaths": [
@@ -5513,6 +6129,28 @@
       "path": "openspec/changes/add-canvas-image-menu/tasks.md",
       "origin": "assistant-integration",
       "reason": "Approved canvas image context menu and original-image copy/save/reveal (UC-IMG-MENU-01)"
+    },
+    {
+      "path": "openspec/changes/sync-assistant-creative-features/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "Current assistant feature sync requirements and source compatibility (UC-SYNC-FEATURE-01)"
+    },
+    {
+      "path": "openspec/changes/sync-assistant-creative-features/specs/creative-integration/spec.md",
+      "origin": "assistant-integration",
+      "reason": "Current assistant feature sync requirements and source compatibility (UC-SYNC-FEATURE-01)"
+    },
+    {
+      "path": "openspec/changes/sync-assistant-creative-features/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "Current assistant feature sync requirements and source compatibility (UC-SYNC-FEATURE-01)"
     }
-  ]
+  ],
+  "integration": {
+    "assistantRevision": "501af92c9a495b9b8d4b6b6c6c15650dc928ec08",
+    "featureSourceRevision": "5148d469986d0c7469ef3cd3d71fddebe8d78e3b",
+    "featureBaseRevision": "7d05f299fec40599221294a34c9b26f888177c9e",
+    "date": "2026-11-04",
+    "strategy": "three-way feature adaptation; preserve assistant host patches and workflow exclusions"
+  }
 }

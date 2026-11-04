@@ -9,10 +9,14 @@ export function useDesktopCanvasBackground(board: PlaitBoard | null) {
     const container = PlaitBoard.getBoardContainer(board);
     const host = PlaitBoard.getHost(board);
     const viewport = PlaitBoard.getViewportContainer(board);
+    // Returning from workflow briefly retains the previous board instance.
+    // Its DOM has already been removed; afterInit supplies the new board next.
+    if (!container || !host || !viewport) return;
     let frame = 0;
 
     const paint = () => {
       frame = 0;
+      if (!container.isConnected || !host.isConnected) return;
       const zoom = board.viewport.zoom;
       // Subsample the same world grid at distant zooms instead of forming a solid texture.
       const step = 24 * 2 ** Math.max(0, Math.ceil(Math.log2(0.5 / zoom)));

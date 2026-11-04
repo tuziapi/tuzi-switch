@@ -403,7 +403,9 @@ function linkCanvasAssociationsToResult(
   task: Task,
   resultElementId: string
 ): void {
-  if (!isCanonicalCanvasAssociationTask(task)) return;
+  const batchIndex = task.params?.batchIndex;
+  if (typeof batchIndex === 'number' && (!Number.isInteger(batchIndex) || batchIndex < 1)) return;
+  if (task.type !== TaskType.IMAGE && !isCanonicalCanvasAssociationTask(task)) return;
   if (!canInsertTaskCanvasAssociationsOnCurrentBoard(task, board)) return;
 
   const associations = getTaskCanvasAssociations(task);
@@ -426,6 +428,7 @@ function linkCanvasAssociationsToResult(
     if (sourceElementIds.length === 0) return;
 
     const temporaryTargetElementId =
+      getTaskAnchorId(task) ||
       findImageGenerationAnchorForTask(board, task)?.id ||
       findWorkZoneForTask(board, task.id)?.id;
 
@@ -437,6 +440,8 @@ function linkCanvasAssociationsToResult(
       taskId: task.id,
       ...(temporaryTargetElementId
         ? { previousResultElementId: temporaryTargetElementId }
+        : task.type === TaskType.IMAGE
+        ? { previousResultElementId: resultElementId }
         : {}),
     });
   } catch (error) {
@@ -3243,26 +3248,21 @@ export function useAutoInsertToCanvas(
         return;
       }
 
-      const shouldRegenerateCompletedTask =
-        retryTask.status === TaskStatus.COMPLETED &&
-        postProcessingStatus === 'failed';
-
       if (
         retryTask.status === TaskStatus.FAILED ||
-        retryTask.status === TaskStatus.CANCELLED ||
-        shouldRegenerateCompletedTask
+        retryTask.status === TaskStatus.CANCELLED
       ) {
         updateRetryAnchor('retrying');
         releaseTaskInsertion(taskId);
         workflowCompletionService.clearTask(taskId);
-        getTaskQueueService().retryTask(
-          taskId,
-          shouldRegenerateCompletedTask ? { allowCompleted: true } : undefined
-        );
+        getTaskQueueService().retryTask(taskId);
         return;
       }
 
       if (retryTask.status === TaskStatus.COMPLETED) {
+        updateRetryAnchor('inserting', {
+          subtitle: '图片已生成，正在重新加载并插入',
+        });
         releaseTaskInsertion(taskId);
         workflowCompletionService.clearTask(taskId);
         handleTaskCompleted(retryTask);

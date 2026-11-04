@@ -13,7 +13,7 @@ const engine = process.env.CREATIVE_QA_BROWSER || "chromium";
 const output =
   process.env.CREATIVE_QA_OUTPUT || "/tmp/creative-generation-acceptance";
 fs.mkdirSync(output, { recursive: true });
-const url = "http://127.0.0.1:5197/ui04.html?canvas=1&page=creative";
+const url = (process.env.CREATIVE_QA_BASE_URL || 'http://127.0.0.1:5197') + '/ui04.html?canvas=1&page=creative';
 async function records(page, db, store) {
   return page.evaluate(
     ({ db, store }) =>

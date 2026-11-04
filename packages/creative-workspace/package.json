@@ -76,10 +76,12 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
     "@vitejs/plugin-react": "^4.2.0",
+    "fake-indexeddb": "6.2.5",
     "postcss": "^8.5.6",
     "postcss-selector-parser": "^7.1.6",
     "sass": "^1.55.0",
     "tailwindcss": "^4.1.17",
-    "vite": "^6.2.2"
+    "vite": "^6.2.2",
+    "vitest": "3.2.4"
   }
 }

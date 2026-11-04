@@ -23,6 +23,11 @@ import {
 } from '../utils/image-generation-anchor-task';
 import { parseSizeToPixels } from '../utils/size-ratio';
 import { hasResolvedImageGenerationBatchCount } from '../utils/image-generation-anchor-batch';
+import {
+  areImageGenerationResultsReady,
+  getImageGenerationResultLoadError,
+} from '../utils/image-generation-anchor-readiness';
+import { subscribeCanvasImageReadiness } from '../services/canvas-image-readiness';
 
 export interface UseImageGenerationAnchorSyncOptions {
   board: PlaitBoard | null;
@@ -416,6 +421,8 @@ export function useImageGenerationAnchorSync({
         isInserting:
           anchor.phase === 'inserting' && postProcessingStatus === 'processing',
         hasInserted,
+        canvasReady: areImageGenerationResultsReady(board, anchor, relatedTasks),
+        canvasError: getImageGenerationResultLoadError(board, anchor, relatedTasks),
       });
       const { viewModel, nextPatch } = controllerResult;
 
@@ -582,6 +589,10 @@ export function useImageGenerationAnchorSync({
       candidateAnchorIds.forEach((anchorId) => reconcileAnchor(anchorId));
     };
 
+    const unsubscribeImageReadiness = subscribeCanvasImageReadiness(
+      board,
+      reconcileAllAnchors
+    );
     reconcileAllAnchors();
 
     const taskSubscription = taskQueueService
@@ -665,6 +676,7 @@ export function useImageGenerationAnchorSync({
       taskSubscription.unsubscribe();
       completionSubscription.unsubscribe();
       clearInterval(progressTimer);
+      unsubscribeImageReadiness();
       clearInterval(staleCheckTimer);
       removalTimers.forEach((timer) => clearTimeout(timer));
       removalTimers.clear();

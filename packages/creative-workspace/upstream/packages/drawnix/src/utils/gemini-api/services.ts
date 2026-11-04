@@ -44,7 +44,10 @@ import {
   type LLMApiLog,
 } from '../../services/media-executor/llm-api-logger';
 import { normalizeImageDataUrl, truncate } from '@aitu/utils';
-import { inferGeminiImageQuality, resolveGeminiImageRequestSize } from '../gemini-image-size';
+import {
+  inferGeminiImageQuality,
+  resolveGeminiImageRequestSize,
+} from '../gemini-image-size';
 
 function inferAuthTypeFromRoute(
   route: ReturnType<typeof resolveInvocationRoute>
@@ -156,6 +159,13 @@ function normalizeGoogleImageSize(
   }
 
   return quality.toUpperCase() as '1K' | '2K' | '4K';
+}
+
+function resolveImageQuality(
+  quality: '1k' | '2k' | '4k' | undefined,
+  modelId?: string
+): '1k' | '2k' | '4k' | undefined {
+  return quality || inferGeminiImageQuality(modelId);
 }
 
 function normalizeGoogleImageResult(content: string): {
@@ -282,9 +292,13 @@ export async function generateImageDirect(
 
   try {
     const validatedConfig = await validateAndEnsureConfig(runtimeConfig);
-    const imageQuality = options.quality || inferGeminiImageQuality(modelName);
+    const imageQuality = resolveImageQuality(options.quality, modelName);
 
     if (validatedConfig.protocol === 'google.generateContent') {
+      const imageSize = normalizeGoogleImageSize(
+        imageQuality ||
+          (modelName === 'gemini-nano-banana-2.1' ? '1k' : undefined)
+      );
       const content = [
         {
           type: 'text' as const,
@@ -376,7 +390,11 @@ export async function generateImageDirect(
 
     // size 参数可选，不传则由 API 自动决定（对应 auto）
     if (options.size && options.size !== 'auto') {
-      data.size = resolveGeminiImageRequestSize(options.size, imageQuality, modelName);
+      data.size = resolveGeminiImageRequestSize(
+        options.size,
+        imageQuality,
+        modelName
+      );
     }
 
     // image 参数可选（单图或多图）

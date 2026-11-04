@@ -112,6 +112,7 @@ export interface ProviderCatalogManualBinding {
 }
 
 export interface ProviderCatalog {
+  discoverySource?: 'marketplace' | 'models-endpoint';
   profileId: string;
   discoveredAt: number | null;
   discoveredModels: ModelConfig[];
@@ -145,6 +146,7 @@ export interface SettingsMigrations {
   independentManualProvidersV1?: boolean;
   legacyDefaultImageApiCompatibilityV1?: boolean;
   legacyDefaultImageModelV1?: boolean;
+  compatibilityDefaultModelsV2?: boolean;
 }
 
 export interface TtsSettings {

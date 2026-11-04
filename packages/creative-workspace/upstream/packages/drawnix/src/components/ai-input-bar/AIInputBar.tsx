@@ -1,3 +1,5 @@
+import { isSunoNativeModel, getSunoNativeAction } from '../../services/suno-native';
+import { getSunoNativeParams, buildSunoNativeInputParams, collectSunoNativeResources } from '../../services/suno-native-params';
 /**
  * AI Input Bar Component
  *
@@ -24,6 +26,7 @@ import React, {
   useCallback,
   useRef,
   useMemo,
+  useId,
 } from 'react';
 import {
   AtSign,
@@ -46,7 +49,7 @@ import {
 import { useConfirmDialog } from '../dialog/ConfirmDialog';
 import { ImageUploadIcon, MediaLibraryIcon } from '../icons';
 import { useBoard } from '@plait-board/react-board';
-import { SelectedContentPreview } from '../shared/SelectedContentPreview';
+import { BoundImageContentPreview } from './BoundImageContentPreview';
 import { CanvasAssociationHighlight } from './CanvasAssociationHighlight';
 import { PromptOptimizeButton } from '../shared/PromptOptimizeButton';
 import { KnowledgeNoteContextSelector } from '../shared/KnowledgeNoteContextSelector';
@@ -67,12 +70,16 @@ import {
 import { useI18n } from '../../i18n';
 import { TaskStatus, type KnowledgeContextRef } from '../../types/task.types';
 import { taskQueueService } from '../../services/task-queue';
+import { useSharedTaskState } from '../../hooks/useTaskQueue';
+import { getSunoV2Action, isSunoV2Model, isUnavailableSunoModel } from '../../services/suno-v2';
+import { buildSunoV2InputParams, collectSunoV2Resources, getSunoV2Params, getVisibleSunoV2Params } from '../../services/suno-v2-params';
 import {
   AI_SELECTION_CONTENT_REFRESH_EVENT,
   extractTextFromElement,
   processSelectedContentForAI,
   scrollToPointIfNeeded,
 } from '../../utils/selection-utils';
+import { prepareImageMaskSubmission } from './image-mask-submission';
 import { useTextSelection } from '../../hooks/useTextSelection';
 import {
   useChatDrawerControl,
@@ -173,6 +180,7 @@ import {
 import { knowledgeBaseService } from '../../services/knowledge-base-service';
 import { externalSkillService } from '../../services/external-skill-service';
 import {
+  createSettingsInvocationPlanResolver,
   getTextBindingMaxImageCount,
   resolveInvocationPlanFromRoute,
   supportsTextBindingImageInput,
@@ -212,6 +220,8 @@ import { workflowCompletionService } from '../../services/workflow-completion-se
 import { ImageGenerationAnchorTransforms } from '../../plugins/with-image-generation-anchor';
 import { buildImageGenerationAnchorCreateOptions } from '../../utils/image-generation-anchor-submission';
 import { resolveImageGenerationBatchAnchorPositions } from '../../utils/image-generation-anchor-placement';
+import { resolveImageLineagePositions } from '../../utils/image-generation-lineage-placement';
+import { prepareImageGenerationReferences } from '../../services/canvas-operations/image-generation-references';
 import {
   buildImageGenerationAnchorPresentationPatch,
   type ImageGenerationAnchorPresentationState,
@@ -298,9 +308,19 @@ import {
   type BoundImageTargetMode,
 } from './target-bound-taskbar-state';
 import {
+  CANVAS_VIEW_SETTINGS_CHANGE_EVENT,
   persistCenterImageOnClickEnabled,
+  persistHorizontalImageBatchEnabled,
   readCenterImageOnClickEnabled,
+  readHorizontalImageBatchEnabled,
 } from './canvas-view-settings';
+import {
+  persistAutoInsertReferenceImagesEnabled,
+  persistKeepOriginalImageEnabled,
+  readAutoInsertReferenceImagesEnabled,
+  readKeepOriginalImageEnabled,
+  REFERENCE_IMAGE_SETTINGS_CHANGE_EVENT,
+} from '../../services/reference-image-settings';
 import {
   appendCanvasAssociationRef,
   areCanvasAssociationRefsEqual,
@@ -427,16 +447,20 @@ function linkWorkflowCanvasAssociationsToTaskTarget(
   if (!context || !targetElementId.trim()) return 0;
 
   try {
-    const lines = createCanvasAssociationLines(board, {
+    const batchTargets = board.children.filter((element) =>
+      element.type === 'generation-anchor' && element.workflowId === workflow.id
+    ).map((element) => element.id);
+    const targetIds = batchTargets.includes(targetElementId) ? batchTargets : [targetElementId];
+    const lines = targetIds.flatMap((resultElementId) => createCanvasAssociationLines(board, {
       ...context,
-      resultElementId: targetElementId,
+      resultElementId,
       workflowId: workflow.id,
-    });
+    }));
     const expectedLineCount = new Set(
       context.sourceElementIds.filter(
         (sourceElementId) => sourceElementId !== targetElementId
       )
-    ).size;
+    ).size * targetIds.length;
     if (lines.length < expectedLineCount) {
       console.warn(
         `[AIInputBar] Canvas association task links incomplete for workflow ${workflow.id}: expected ${expectedLineCount}, created ${lines.length}`
@@ -590,6 +614,27 @@ function normalizeAIInputImageUrl(url: string): string {
   }
 }
 
+// Match canvas identity as well as pixels: distinct elements may share a URL.
+function isUploadedCanvasReference(
+  content: SelectedContent,
+  uploaded: SelectedContent[]
+): boolean {
+  const url = content.url;
+  return (
+    content.type === 'image' &&
+    !!content.sourceElementId &&
+    typeof url === 'string' &&
+    uploaded.some(
+      (item) =>
+        item.type === 'image' &&
+        item.sourceElementId === content.sourceElementId &&
+        typeof item.url === 'string' &&
+        normalizeAIInputImageUrl(item.url) === normalizeAIInputImageUrl(url) &&
+        item.maskImage === content.maskImage
+    )
+  );
+}
+
 function buildPromptLineageMeta(
   workflow: WorkflowDefinition,
   step: Pick<WorkflowDefinition['steps'][number], 'mcp' | 'args'>
@@ -722,6 +767,7 @@ interface SelectedContent {
   name: string; // 显示名称
   width?: number; // 图片/视频宽度
   height?: number; // 图片/视频高度
+  sourceElementId?: string; // 本次引用的画布图片身份，不依赖后续选中状态
 }
 
 interface GenerationRequestOverride {
@@ -738,11 +784,12 @@ interface GenerationRequestOverride {
 
 function filterExecutablePptModels(
   type: 'image' | 'video',
-  models: ModelConfig[]
+  models: ModelConfig[],
+  resolvePlan: ReturnType<typeof createSettingsInvocationPlanResolver>
 ): ModelConfig[] {
   return models.filter((model) => {
     const modelRef = getModelRefFromConfig(model);
-    const plan = resolveInvocationPlanFromRoute(type, modelRef || model.id);
+    const plan = resolvePlan(type, modelRef || model.id);
     return Boolean(
       plan?.provider.baseUrl.trim() && plan.provider.apiKey.trim()
     );
@@ -1133,6 +1180,7 @@ function selectedContentFromBoundTarget(
   return {
     type: target.type as 'image' | 'video' | 'audio',
     url: target.url,
+    sourceElementId: target.elementId,
     name:
       language === 'zh'
         ? referenceOnly
@@ -1197,6 +1245,7 @@ const SelectionWatcher: React.FC<{
     elements: PlaitElement[]
   ) => boolean;
   onBoundImageTargetChange?: (target: BoundImageTarget | null) => void;
+  onCanvasPointer?: () => void;
   onBoundInputViewportChange?: () => void;
   /** 用于存储 board 引用的 ref，供父组件使用 */
   externalBoardRef?: React.MutableRefObject<any>;
@@ -1218,6 +1267,7 @@ const SelectionWatcher: React.FC<{
     canvasAssociationPickingToken,
     onCanvasAssociationSelection,
     onBoundImageTargetChange,
+    onCanvasPointer,
     onBoundInputViewportChange,
     externalBoardRef,
     onCanvasEmptyChange,
@@ -1314,6 +1364,8 @@ const SelectionWatcher: React.FC<{
 
     const onBoundImageTargetChangeRef = useRef(onBoundImageTargetChange);
     onBoundImageTargetChangeRef.current = onBoundImageTargetChange;
+    const onCanvasPointerRef = useRef(onCanvasPointer);
+    onCanvasPointerRef.current = onCanvasPointer;
 
     const onBoundInputViewportChangeRef = useRef(onBoundInputViewportChange);
     onBoundInputViewportChangeRef.current = onBoundInputViewportChange;
@@ -1321,6 +1373,8 @@ const SelectionWatcher: React.FC<{
     const onFrameSelectedRef = useRef(onFrameSelected);
     onFrameSelectedRef.current = onFrameSelected;
     const selectionRunIdRef = useRef(0);
+    const boundTargetRunIdRef = useRef(0);
+    const refreshSelectionRef = useRef<(() => void) | null>(null);
     const currentBoardIdRef = useRef(currentBoardId);
     currentBoardIdRef.current = currentBoardId;
 
@@ -1333,6 +1387,7 @@ const SelectionWatcher: React.FC<{
         const selectionBoardId = currentBoardIdRef.current;
         const runId = selectionRunIdRef.current + 1;
         selectionRunIdRef.current = runId;
+        const boundTargetRunId = ++boundTargetRunIdRef.current;
 
         const selectedElements =
           canvasAssociationPickElements ?? getSelectedElements(currentBoard);
@@ -1385,7 +1440,9 @@ const SelectionWatcher: React.FC<{
         ) {
           return;
         }
-        onBoundImageTargetChangeRef.current?.(boundImageTarget);
+        if (boundTargetRunId === boundTargetRunIdRef.current) {
+          onBoundImageTargetChangeRef.current?.(boundImageTarget);
+        }
 
         // 检测是否选中了单个 Frame，通知父组件
         if (
@@ -1442,6 +1499,7 @@ const SelectionWatcher: React.FC<{
 
             content.push({
               url: imgUrl,
+              sourceElementId: img.sourceElementId,
               maskImage: !isVideo ? processedContent.maskImage : undefined,
               name:
                 img.name ||
@@ -1493,11 +1551,16 @@ const SelectionWatcher: React.FC<{
         const isCanvasPointer = Boolean(
           pointerTarget &&
             boardContainer?.contains(pointerTarget) &&
-            !pointerTarget.closest(`.${ATTACHED_ELEMENT_CLASS_NAME}`)
+            !pointerTarget.closest(
+              `.${ATTACHED_ELEMENT_CLASS_NAME}, .Dialog-overlay, [role="dialog"], .ai-input-bar`
+            )
         );
 
         if (pickingAtPointer && !isCanvasPointer) {
           return;
+        }
+        if (isCanvasPointer && !pickingAtPointer) {
+          onCanvasPointerRef.current?.();
         }
         const pointer = {
           clientX: event.clientX,
@@ -1533,6 +1596,7 @@ const SelectionWatcher: React.FC<{
       const handleSelectionRefresh = () => {
         void handleSelectionChange();
       };
+      refreshSelectionRef.current = handleSelectionRefresh;
       let viewportRaf: number | null = null;
       const handleViewportChange = () => {
         if (viewportRaf !== null) return;
@@ -1543,8 +1607,10 @@ const SelectionWatcher: React.FC<{
           const currentBoard = boardRef.current;
           if (!currentBoard) return;
           const selectionBoardId = currentBoardIdRef.current;
-          const runId = selectionRunIdRef.current + 1;
-          selectionRunIdRef.current = runId;
+          // Moving/zooming only refreshes the bound target's position. It must
+          // not cancel content still being extracted for the same selection.
+          const runId = selectionRunIdRef.current;
+          const boundTargetRunId = ++boundTargetRunIdRef.current;
           void resolveBoundImageTarget(
             currentBoard,
             getSelectedElements(currentBoard),
@@ -1552,6 +1618,7 @@ const SelectionWatcher: React.FC<{
           ).then((target) => {
             if (
               runId === selectionRunIdRef.current &&
+              boundTargetRunId === boundTargetRunIdRef.current &&
               selectionBoardId === currentBoardIdRef.current
             ) {
               onBoundImageTargetChangeRef.current?.(target);
@@ -1574,6 +1641,9 @@ const SelectionWatcher: React.FC<{
       );
 
       return () => {
+        selectionRunIdRef.current += 1;
+        boundTargetRunIdRef.current += 1;
+        refreshSelectionRef.current = null;
         document.removeEventListener('pointerup', handlePointerUp);
         document.removeEventListener('keyup', handleViewportChange);
         document.removeEventListener('pointermove', handleViewportChange);
@@ -1603,21 +1673,9 @@ const SelectionWatcher: React.FC<{
       const currentBoard = boardRef.current;
       const selectedElements = getSelectedElements(currentBoard);
       if (selectedElements.length !== 1) return;
-      const selectionBoardId = currentBoardIdRef.current;
-      const runId = selectionRunIdRef.current + 1;
-      selectionRunIdRef.current = runId;
-      void resolveBoundImageTarget(
-        currentBoard,
-        selectedElements,
-        semanticEditPrompt
-      ).then((target) => {
-        if (
-          runId === selectionRunIdRef.current &&
-          selectionBoardId === currentBoardIdRef.current
-        ) {
-          onBoundImageTargetChangeRef.current?.(target);
-        }
-      });
+      // Prompt changes can change target binding. Refresh content as well so
+      // replacing an in-flight selection never leaves an unbound image empty.
+      refreshSelectionRef.current?.();
     }, [semanticEditPrompt]);
 
     return null; // 这个组件不渲染任何内容
@@ -1643,17 +1701,6 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     const configuredVideoModels = useConfiguredSelectableModels('video');
     const audioModels = useSelectableModels('audio');
     const textModels = useSelectableModels('text');
-    // Configured model lists stay referentially stable until discovery,
-    // credentials, or bindings change, so route planning stays off hot renders.
-    const executablePptImageModels = useMemo(
-      () => filterExecutablePptModels('image', configuredImageModels),
-      [configuredImageModels]
-    );
-    const executablePptVideoModels = useMemo(
-      () => filterExecutablePptModels('video', configuredVideoModels),
-      [configuredVideoModels]
-    );
-
     const chatDrawerControl = useChatDrawerControl();
     const workflowControl = useWorkflowControl();
     const { setActiveSelections: setActiveHealthSelections } =
@@ -1977,6 +2024,35 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     );
     const [centerImageOnClickEnabled, setCenterImageOnClickEnabled] =
       useState(() => readCenterImageOnClickEnabled());
+    const [horizontalImageBatchEnabled, setHorizontalImageBatchEnabled] =
+      useState(() => readHorizontalImageBatchEnabled());
+    const horizontalImageBatchHintId = useId();
+    useEffect(() => {
+      const sync = () => {
+        setCenterImageOnClickEnabled(readCenterImageOnClickEnabled());
+        setHorizontalImageBatchEnabled(readHorizontalImageBatchEnabled());
+      };
+      window.addEventListener(CANVAS_VIEW_SETTINGS_CHANGE_EVENT, sync);
+      return () =>
+        window.removeEventListener(CANVAS_VIEW_SETTINGS_CHANGE_EVENT, sync);
+    }, []);
+    const [keepOriginalImageEnabled, setKeepOriginalImageEnabled] =
+      useState(() => readKeepOriginalImageEnabled());
+    const [autoInsertReferenceImagesEnabled, setAutoInsertReferenceImagesEnabled] =
+      useState(() => readAutoInsertReferenceImagesEnabled());
+    const keepOriginalImageHintId = useId();
+    const autoInsertReferenceImagesHintId = useId();
+    useEffect(() => {
+      const sync = () => {
+        setKeepOriginalImageEnabled(readKeepOriginalImageEnabled());
+        setAutoInsertReferenceImagesEnabled(
+          readAutoInsertReferenceImagesEnabled()
+        );
+      };
+      window.addEventListener(REFERENCE_IMAGE_SETTINGS_CHANGE_EVENT, sync);
+      return () =>
+        window.removeEventListener(REFERENCE_IMAGE_SETTINGS_CHANGE_EVENT, sync);
+    }, []);
     const [boundTargetError, setBoundTargetError] = useState<string | null>(
       null
     );
@@ -2048,7 +2124,29 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       SkillMediaType[]
     >([]);
     const usesStrictPptModels =
-      selectedSkillId === 'generate_ppt_explainer_video';
+      selectedSkillId === 'generate_ppt_explainer_video' &&
+      (generationType === 'agent' || pptExplainerDialogOpen);
+    // Build one routing snapshot only while the PPT skill or dialog is in use.
+    const executablePptModels = useMemo(() => {
+      if (!usesStrictPptModels) {
+        return { image: configuredImageModels, video: configuredVideoModels };
+      }
+      const resolvePlan = createSettingsInvocationPlanResolver();
+      return {
+        image: filterExecutablePptModels(
+          'image',
+          configuredImageModels,
+          resolvePlan
+        ),
+        video: filterExecutablePptModels(
+          'video',
+          configuredVideoModels,
+          resolvePlan
+        ),
+      };
+    }, [usesStrictPptModels, configuredImageModels, configuredVideoModels]);
+    const executablePptImageModels = executablePptModels.image;
+    const executablePptVideoModels = executablePptModels.video;
     const visibleImageModels = useMemo(() => {
       if (generationType !== 'image') {
         return imageModels;
@@ -2253,6 +2351,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       canvasAssociationTrigger
     );
     const suppressSelectionContentUrlsRef = useRef<Set<string>>(new Set());
+    const canvasToolbarPrefillElementIdRef = useRef<string | null>(null);
     const applyCanvasAssociationRefs = useCallback(
       (references: readonly CanvasAssociationRef[]) => {
         const snapshot = snapshotCanvasAssociationRefs(references);
@@ -2400,6 +2499,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         activeDraftBaselineRef.current = null;
         lastBoundImageTargetKeyRef.current = null;
         suppressedBoundImageElementIdRef.current = null;
+        canvasToolbarPrefillElementIdRef.current = null;
         dismissedPromptElementIdRef.current = null;
         dismissedPromptGenerationTaskIdRef.current = null;
         lastPrunedBoardChildrenRef.current = null;
@@ -2484,7 +2584,12 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
     // 合并画布选中内容和用户上传内容
     const allContent = useMemo(() => {
-      return [...uploadedContent, ...selectedContent];
+      return [
+        ...uploadedContent,
+        ...selectedContent.filter(
+          (item) => !isUploadedCanvasReference(item, uploadedContent)
+        ),
+      ];
     }, [uploadedContent, selectedContent]);
     const effectiveBoundTargetMode = resolveBoundTargetMode(
       boundImageTargetMode,
@@ -2517,14 +2622,27 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     const displayContent = useMemo(
       () =>
         boundTargetContent
-          ? [...uploadedContent, boundTargetContent]
+          ? [
+              ...uploadedContent,
+              ...(isUploadedCanvasReference(boundTargetContent, uploadedContent)
+                ? []
+                : [boundTargetContent]),
+            ]
           : allContent,
       [allContent, boundTargetContent, uploadedContent]
     );
     const generationContent = useMemo(
       () =>
         boundTargetGenerationContent
-          ? [boundTargetGenerationContent, ...uploadedContent]
+          ? [
+              ...(isUploadedCanvasReference(
+                boundTargetGenerationContent,
+                uploadedContent
+              )
+                ? []
+                : [boundTargetGenerationContent]),
+              ...uploadedContent,
+            ]
           : allContent,
       [allContent, boundTargetGenerationContent, uploadedContent]
     );
@@ -2759,9 +2877,21 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       };
     }, [generationType, selectedSkillId]);
 
+    const { tasks: parameterTasks } = useSharedTaskState();
+    const sunoParameterProfileId = generationType === 'audio' && (isSunoV2Model(selectedModel) || isSunoNativeModel(selectedModel))
+      ? resolveInvocationPlanFromRoute('audio', selectedModelRef || selectedModel)?.provider.profileId || '' : '';
+    const sunoParameterResources = useMemo(
+      () => collectSunoV2Resources(parameterTasks, sunoParameterProfileId),
+      [parameterTasks, sunoParameterProfileId]
+    );
+
     // 预计算当前模型的可用参数，避免子组件内部 stale 计算
     const compatibleParams = useMemo(() => {
       if (generationType === 'agent') return [];
+      if (generationType === 'audio' && isSunoNativeModel(selectedModel)) return getSunoNativeParams(selectedModel, selectedParams, collectSunoNativeResources(parameterTasks, sunoParameterProfileId));
+      if (generationType === 'audio' && isSunoV2Model(selectedModel)) {
+        return isUnavailableSunoModel(selectedModel) ? [] : getSunoV2Params(selectedModel, sunoParameterResources);
+      }
       if (generationType === 'video') {
         return getEffectiveVideoCompatibleParams(
           selectedModel,
@@ -2790,7 +2920,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       }
 
       return params;
-    }, [generationType, selectedModel, selectedModelRef, selectedParams]);
+    }, [generationType, selectedModel, selectedModelRef, selectedParams, sunoParameterResources, parameterTasks, sunoParameterProfileId]);
 
     // 点击外部关闭输入框的展开状态
     useEffect(() => {
@@ -3679,10 +3809,24 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           width: image.width,
           height: image.height,
           maskImage: image.maskImage,
+          sourceElementId: image.sourceElementId,
         }));
         const nextKnowledgeContextRefs = normalizeKnowledgeContextRefs(
           detail.knowledgeContextRefs
         );
+        if (
+          detail.source === 'canvas-toolbar' &&
+          boundImageTargetRef.current?.type === 'image' &&
+          nextUploadedContent.some(
+            (item) => item.sourceElementId === boundImageTargetRef.current?.elementId
+          )
+        ) {
+          // Tool instructions belong to the new generation, not the source
+          // image's draft. Preserve that draft before replacing the input.
+          detachTaskbarDraft(true);
+          canvasToolbarPrefillElementIdRef.current =
+            boundImageTargetRef.current.elementId;
+        }
         applyCanvasAssociationPromptOverwrite(nextPrompt);
         uploadedContentRef.current = nextUploadedContent;
         knowledgeContextRefsRef.current = nextKnowledgeContextRefs;
@@ -3719,6 +3863,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       audioModels,
       applyCanvasAssociationPromptOverwrite,
       confirmOverwriteInputIfNeeded,
+      detachTaskbarDraft,
       focusInput,
       imageModels,
       language,
@@ -3766,33 +3911,29 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       [applyCanvasAssociationPromptOverwrite, confirmOverwriteInputIfNeeded]
     );
 
-    // 处理历史提示词选择：将提示词回填到输入框并切换生成类型
+    // 我的提示词只追加正文，保留已准备好的参考内容和生成配置。
     const handleSelectHistoryPrompt = useCallback(
-      (info: { content: string; modelType?: PromptType }) => {
-        void confirmOverwriteInputIfNeeded().then((confirmed) => {
-          if (!confirmed) return;
-          applyCanvasAssociationPromptOverwrite(info.content);
-          setIsInspirationSendGuideActive(false);
-
-          // 根据 modelType 自动切换生成类型
-          if (info.modelType) {
-            if (info.modelType === 'image') {
-              setGenerationType('image');
-            } else if (info.modelType === 'video') {
-              setGenerationType('video');
-            } else if (info.modelType === 'audio') {
-              setGenerationType('audio');
-            } else if (info.modelType === 'text') {
-              setGenerationType('text');
-            } else if (info.modelType === 'agent') {
-              setGenerationType('agent');
-            }
-          }
-
-          inputRef.current?.focus();
-        });
+      (info: { content: string }) => {
+        const content = info.content.trim();
+        if (!content) return;
+        const currentPrompt = promptRef.current;
+        const separator = currentPrompt && !/\s$/.test(currentPrompt) ? '\n' : '';
+        const nextPrompt = `${currentPrompt}${separator}${content}`;
+        dismissPromptSuggestion();
+        pendingCanvasAssociationEditRef.current = null;
+        updateCanvasAssociationTrigger(null);
+        promptRef.current = nextPrompt;
+        setPrompt(nextPrompt);
+        saveActiveTaskbarDraft();
+        setIsInspirationSendGuideActive(false);
+        focusInput();
       },
-      [applyCanvasAssociationPromptOverwrite, confirmOverwriteInputIfNeeded]
+      [
+        dismissPromptSuggestion,
+        focusInput,
+        saveActiveTaskbarDraft,
+        updateCanvasAssociationTrigger,
+      ]
     );
 
     // 处理添加 Skill：打开知识库并定位到 Skill 目录，自动新建笔记
@@ -4006,6 +4147,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       async (files: File[] | FileList) => {
         const fileList = Array.from(files);
         if (fileList.length === 0) return;
+        const keepOriginal = readKeepOriginalImageEnabled();
 
         const newContent: SelectedContent[] = [];
 
@@ -4065,7 +4207,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
             let processedBlob: Blob = file;
 
-            if (file.size > 10 * 1024 * 1024) {
+            if (!keepOriginal && file.size > 10 * 1024 * 1024) {
               const { compressImageBlob, getCompressionStrategy } =
                 await import('@aitu/utils');
               const strategy = getCompressionStrategy(
@@ -4244,9 +4386,32 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       [selectedModel]
     );
 
+    const handleCanvasPointer = useCallback(() => {
+      if (!canvasToolbarPrefillElementIdRef.current) return;
+      canvasToolbarPrefillElementIdRef.current = null;
+      lastBoundImageTargetKeyRef.current = null;
+      dismissedPromptElementIdRef.current = null;
+      dismissedPromptGenerationTaskIdRef.current = null;
+    }, []);
+
     const handleBoundImageTargetChange = useCallback(
       (target: BoundImageTarget | null) => {
         resetBoundTaskbarDraftsForBoard(currentBoardId ?? null);
+        if (canvasToolbarPrefillElementIdRef.current) {
+          if (
+            target?.elementId === canvasToolbarPrefillElementIdRef.current
+          ) {
+            // Viewport/async refreshes must not discard freshly filled input.
+            boundImageTargetRef.current = target;
+            setBoundImageTarget(target);
+            setBoundInputLayoutTick((tick) => tick + 1);
+            return;
+          }
+          canvasToolbarPrefillElementIdRef.current = null;
+          lastBoundImageTargetKeyRef.current = null;
+          dismissedPromptElementIdRef.current = null;
+          dismissedPromptGenerationTaskIdRef.current = null;
+        }
         const targetSupportsFollowControls = Boolean(
           target && supportsBoundTargetFollowControls(target.type)
         );
@@ -4829,9 +4994,14 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           baseParams.ratio = legacyRatio;
         }
       }
+      let restoredParams = compatibleParams;
+      if (isSunoNativeModel(selectedModel)) {
+        try { restoredParams = getSunoNativeParams(selectedModel, baseParams, collectSunoNativeResources(parameterTasks, sunoParameterProfileId)); }
+        catch { /* Restore the default action if a saved action was removed. */ }
+      }
       const nextParams: Record<string, string> = {};
 
-      const sizeParam = compatibleParams.find((p) => p.id === 'size');
+      const sizeParam = restoredParams.find((p) => p.id === 'size');
       const prevSize = baseParams.size;
       const prevSizeIsValid =
         !prevSize ||
@@ -4844,12 +5014,13 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             : sizeParam.defaultValue || getDefaultSizeForModel(selectedModel);
       }
 
-      compatibleParams.forEach((p) => {
+      restoredParams.forEach((p) => {
         if (p.id === 'size') return;
         const prevVal = baseParams[p.id];
         const prevValIsValid =
           !prevVal ||
           p.valueType !== 'enum' ||
+          p.control === 'multiselect' ||
           !p.options ||
           p.options.some((option) => option.value === prevVal);
         if (prevVal && prevValIsValid) {
@@ -4902,7 +5073,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
         // 更新参数对象
         setSelectedParams((prev) => {
-          const next = { ...prev };
+          const next = isSunoNativeModel(selectedModel) && paramId === 'sunoNativeAction'
+            ? { callBackUrl: prev.callBackUrl || '' } as Record<string, string> : { ...prev };
           if (value === undefined || value === '') {
             delete next[paramId];
           } else {
@@ -5197,6 +5369,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
         if (
           !trimmedPrompt &&
+          !(effectiveGenerationType === 'audio' && (isSunoV2Model(effectiveSelectedModel) || isSunoNativeModel(effectiveSelectedModel))) &&
           baseEffectiveContent.length === 0 &&
           submittedCanvasAssociations.length === 0
         ) {
@@ -5204,6 +5377,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         }
         if (submitLockRef.current || isSubmitting) {
           return; // 仅防止快速重复点击
+        }
+        if (effectiveGenerationType === 'audio' && isUnavailableSunoModel(effectiveSelectedModel)) {
+          MessagePlugin.error('该 Suno 动作当前未接入，请选择已开放的 Suno v2 模型');
+          return;
         }
         submitLockRef.current = true;
         setIsInspirationSendGuideActive(false);
@@ -5419,6 +5596,18 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               return;
             }
           }
+          // A selected image is still the mask source when taskbar follow is disabled.
+          // Resolve before the credential handoff so the deferred request keeps the mask.
+          const maskSubmission = await prepareImageMaskSubmission(
+            submittedBoard,
+            activeBoundImageTarget || boundImageTarget,
+            effectiveGenerationType,
+            effectiveContent
+          );
+          if (abortIfSubmittedBoardChanged('mask_ready')) return;
+          effectiveContent = maskSubmission.content;
+          const boundImageMaskEdit = maskSubmission.maskEdit;
+
           const currentRouteType =
             effectiveGenerationType === 'video'
               ? 'video'
@@ -5563,11 +5752,29 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 : undefined,
           });
           const promptForHistory = effectivePrompt;
+          if (effectiveGenerationType === 'audio' && isSunoNativeModel(effectiveSelectedModel)) {
+            const plan = resolveInvocationPlanFromRoute('audio', effectiveSelectedModelRef || effectiveSelectedModel);
+            if (!plan || plan.binding.protocol !== 'tuzi.suno.native') throw new Error('当前渠道未配置 Suno 原生接口');
+            parsedParams.extraParams = buildSunoNativeInputParams(effectiveSelectedModel, effectiveSelectedParams, parsedParams.prompt,
+              plan.provider.profileId, collectSunoNativeResources(taskQueueService.getAllTasks()));
+            parsedParams.prompt = effectivePrompt || getSunoNativeAction(effectiveSelectedModel, parsedParams.extraParams).label;
+          }
+          if (effectiveGenerationType === 'audio' && isSunoV2Model(effectiveSelectedModel)) {
+            const plan = resolveInvocationPlanFromRoute('audio', effectiveSelectedModelRef || effectiveSelectedModel);
+            if (!plan || plan.binding.protocol !== 'tuzi.suno.v2') throw new Error('当前渠道未配置 Suno v2 动作');
+            parsedParams.extraParams = buildSunoV2InputParams(
+              effectiveSelectedModel, effectiveSelectedParams, parsedParams.prompt,
+              plan.provider.profileId,
+              collectSunoV2Resources(taskQueueService.getAllTasks(), plan.provider.profileId)
+            );
+            parsedParams.prompt = effectivePrompt || getSunoV2Action(effectiveSelectedModel)?.label || effectiveSelectedModel;
+          }
           let imageBoundTargetGenerationParams =
-            activeBoundImageTarget?.type === 'image'
+            activeBoundImageTarget?.type === 'image' && activeBoundImageTarget.semanticReplacement
               ? buildBoundTargetGenerationParams(
                   activeBoundImageTarget,
-                  effectiveSelectedCount
+                  effectiveSelectedCount,
+                  boundImageMaskEdit
                 )
               : null;
           const semanticReplacement =
@@ -5638,6 +5845,27 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
           // 收集所有参考媒体（图片 + 图形 + 视频）
           const referenceImages = [...selection.images, ...selection.graphics];
+          let imageSourceIds: string[] = [];
+          if (parsedParams.generationType === 'image' && !replacementBoundImageTarget) {
+            if (!submittedBoard || !submittedDraftBoardId) throw new Error('画布尚未就绪，请稍后发送');
+            const referenceSources = await prepareImageGenerationReferences({
+              board: submittedBoard,
+              boardId: submittedDraftBoardId,
+              images: [...imageItems, ...graphicsItems].map((item) => ({
+                url: item.url || '',
+                name: item.name,
+                sourceElementId: item.sourceElementId,
+              })),
+              associations: resolvedCanvasAssociations,
+              insertMissingReferences: readAutoInsertReferenceImagesEnabled(),
+              emptyPosition: [submittedBoard.viewport?.origination?.[0] || 0, submittedBoard.viewport?.origination?.[1] || 0],
+              boardGuard: () => isSubmittedBoardCurrent(submittedBoard, submittedDraftBoardId, SelectionWatcherBoardRef.current, activeTaskbarBoardIdRef.current),
+            });
+            if (abortIfSubmittedBoardChanged('reference_sources_ready')) return;
+            resolvedCanvasAssociations = referenceSources.references;
+            imageSourceIds = referenceSources.imageSourceIds;
+            parsedParams.canvasAssociations = resolvedCanvasAssociations;
+          }
 
           if (
             parsedParams.generationType === 'video' &&
@@ -5966,40 +6194,32 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 ReturnType<typeof ImageGenerationAnchorTransforms.insertAnchor>
               > = [];
               const workflowBatchId = `wf_batch_${workflow.id}`;
-              const plannedAnchorPositions = !anchorTargetFrameId
-                ? resolveImageGenerationBatchAnchorPositions(
-                    board,
-                    [expectedInsertLeftX, expectedInsertY],
-                    buildImageGenerationAnchorCreateOptions({
-                      workflowId: workflow.id,
-                      expectedInsertPosition: [
-                        expectedInsertLeftX,
-                        expectedInsertY,
-                      ],
-                      requestedSize: parsedParams.size,
-                      requestedCount: 1,
-                      zoom,
-                      prompt: parsedParams.prompt,
-                      targetElementId: replacementBoundImageTarget?.elementId,
-                      sourceTaskId:
-                        replacementBoundImageTarget?.generationTaskId,
-                      title: workflowMessageData.name || '图片生成',
-                      ...buildImageGenerationAnchorPresentationPatch(
-                        'submitted'
-                      ),
-                    }).size ?? {
-                      width: 320,
-                      height: 180,
-                    },
+              const anchorSize = buildImageGenerationAnchorCreateOptions({
+                workflowId: workflow.id,
+                expectedInsertPosition: [expectedInsertLeftX, expectedInsertY],
+                requestedSize: parsedParams.size,
+                requestedCount: 1,
+                zoom,
+              }).size ?? { width: 400, height: 400 };
+              // Results fit a 400px width / 600px height envelope. Reserve it
+              // while auto aspect ratio is unknown, without stretching the card.
+              const reservedInsertSize = { width: Math.max(400, anchorSize.width), height: Math.max(600, anchorSize.height) };
+              const plannedAnchorPositions = anchorTargetFrameId
+                ? null
+                : !targetFrameId && !replacementBoundImageTarget
+                ? resolveImageLineagePositions(
+                    board, imageSourceIds, reservedInsertSize, requestedCount,
+                    [viewportCenterX - 200, viewportCenterY],
+                    readHorizontalImageBatchEnabled() ? 'row' : 'column'
+                  )
+                : resolveImageGenerationBatchAnchorPositions(
+                    board, [expectedInsertLeftX, expectedInsertY], anchorSize,
                     requestedCount,
                     {
-                      frameRect: shouldCreateIndependentBatchAnchors
-                        ? targetFrameRect
-                        : undefined,
+                      frameRect: shouldCreateIndependentBatchAnchors ? targetFrameRect : undefined,
                       extraOccupiedRects: getRetainedTaskCardRectangles(board),
                     }
-                  )
-                : null;
+                  );
 
               for (let index = 0; index < requestedCount; index += 1) {
                 let anchorCreateOptions =
@@ -6018,6 +6238,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                       ? targetFrameDimensions
                       : undefined,
                     requestedSize: parsedParams.size,
+                    reservedInsertSize: !targetFrameId && !replacementBoundImageTarget ? reservedInsertSize : undefined,
                     requestedCount: shouldCreateIndependentBatchAnchors
                       ? 1
                       : requestedCount,
@@ -6735,6 +6956,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           });
         } catch (error) {
           console.error('Failed to create generation task:', error);
+          if (effectiveGenerationType === 'audio') {
+            MessagePlugin.error(error instanceof Error ? error.message : '创建音频任务失败');
+          }
           trackSubmitStatus('failed', {
             submitMode: 'setup',
             submit_mode: 'setup',
@@ -7726,8 +7950,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     const isPptExplainerSkillSelected =
       generationType === 'agent' && usesStrictPptModels;
     const canGenerate =
+      !(generationType === 'audio' && isUnavailableSunoModel(selectedModel)) &&
       !canvasAssociationTrigger &&
       (isPptExplainerSkillSelected ||
+        (generationType === 'audio' && (isSunoV2Model(selectedModel) || isSunoNativeModel(selectedModel))) ||
         prompt.trim().length > 0 ||
         generationContent.length > 0 ||
         canvasAssociationRefs.length > 0);
@@ -7985,7 +8211,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       ],
       [boundTargetFollowCopy]
     );
-    const boundTargetFollowActions = followControlsTarget ? (
+    const boundTargetFollowActions = (
       <Popup
         trigger="click"
         placement="top-right"
@@ -8036,7 +8262,85 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 }
               />
             </div>
-            {boundTargetFollowEnabled ? (
+            <div className="ai-input-bar__settings-row">
+              <span>
+                {language === 'zh' ? '多图横向排列' : 'Arrange batch in a row'}
+              </span>
+              <Switch
+                size="small"
+                value={horizontalImageBatchEnabled}
+                aria-label={
+                  language === 'zh' ? '多图横向排列' : 'Arrange batch in a row'
+                }
+                aria-describedby={horizontalImageBatchHintId}
+                onChange={(checked) =>
+                  setHorizontalImageBatchEnabled(
+                    persistHorizontalImageBatchEnabled(checked as boolean)
+                  )
+                }
+              />
+            </div>
+            <p
+              id={horizontalImageBatchHintId}
+              className="ai-input-bar__settings-hint"
+            >
+              {language === 'zh'
+                ? '普通生图一次多张时生效：开启横排，关闭竖排。只影响新任务。'
+                : 'For new multi-image requests: on for a row, off for a column.'}
+            </p>
+            <div className="ai-input-bar__settings-row">
+              <span>{language === 'zh' ? '保留原图' : 'Keep original image'}</span>
+              <Switch
+                size="small"
+                value={keepOriginalImageEnabled}
+                aria-label={language === 'zh' ? '保留原图' : 'Keep original image'}
+                aria-describedby={keepOriginalImageHintId}
+                onChange={(checked) =>
+                  setKeepOriginalImageEnabled(
+                    persistKeepOriginalImageEnabled(checked as boolean)
+                  )
+                }
+              />
+            </div>
+            <p
+              id={keepOriginalImageHintId}
+              className="ai-input-bar__settings-hint"
+            >
+              {language === 'zh'
+                ? '开启后图片体积更大，上传和生成可能明显变慢。'
+                : 'Original images are larger and may make uploads and generation much slower.'}
+            </p>
+            <div className="ai-input-bar__settings-row">
+              <span>
+                {language === 'zh'
+                  ? '参考图自动加入画布'
+                  : 'Add reference images to canvas'}
+              </span>
+              <Switch
+                size="small"
+                value={autoInsertReferenceImagesEnabled}
+                aria-label={
+                  language === 'zh'
+                    ? '参考图自动加入画布'
+                    : 'Add reference images to canvas'
+                }
+                aria-describedby={autoInsertReferenceImagesHintId}
+                onChange={(checked) =>
+                  setAutoInsertReferenceImagesEnabled(
+                    persistAutoInsertReferenceImagesEnabled(checked as boolean)
+                  )
+                }
+              />
+            </div>
+            <p
+              id={autoInsertReferenceImagesHintId}
+              className="ai-input-bar__settings-hint"
+            >
+              {language === 'zh'
+                ? '发送生图时生效。关闭后，未在画布上的图片仅作生成参考，不加入画布。'
+                : 'Applies when sending image requests. When off, images outside the canvas are used only as references.'}
+            </p>
+            {followControlsTarget && boundTargetFollowEnabled ? (
               <div className="ai-input-bar__settings-actions">
                 <button
                   type="button"
@@ -8092,7 +8396,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           <Settings2 size={18} aria-hidden="true" />
         </button>
       </Popup>
-    ) : null;
+    );
 
     const boundInputStyle = {
       '--ai-input-viewport-width': `${inputViewport.width}px`,
@@ -8113,7 +8417,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
     const selectedContentPreview =
       displayContent.length > 0 ? (
-        <SelectedContentPreview
+        <BoundImageContentPreview
+          board={SelectionWatcherBoardRef.current}
+          target={boundImageTarget}
           items={displayContent}
           language={language}
           enableHoverPreview={true}
@@ -8192,6 +8498,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             canvasAssociationPickingToken={canvasAssociationTrigger}
             onCanvasAssociationSelection={handleCanvasAssociationSelection}
             onBoundImageTargetChange={handleBoundImageTargetChange}
+            onCanvasPointer={handleCanvasPointer}
             onBoundInputViewportChange={handleBoundInputViewportChange}
             externalBoardRef={SelectionWatcherBoardRef}
             onCanvasEmptyChange={setIsCanvasEmpty}
@@ -8484,12 +8791,16 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                   )}
 
                 {/* Parameters dropdown selector - Hidden for Agent mode */}
+                {generationType === 'audio' && isUnavailableSunoModel(selectedModel) && (
+                  <span role="status">该 Suno 动作暂不可用</span>
+                )}
                 {generationType !== 'agent' && compatibleParams.length > 0 && (
                   <ParametersDropdown
                     key={selectedModel} // 强制在模型切换时重新挂载以刷新可配置参数
                     selectedParams={selectedParams}
                     onParamChange={handleParamSelect}
-                    compatibleParams={compatibleParams}
+                    compatibleParams={generationType === 'audio' && isSunoV2Model(selectedModel)
+                      ? getVisibleSunoV2Params(selectedModel, compatibleParams, selectedParams) : compatibleParams}
                     modelId={selectedModel}
                     language={language}
                     isOpen={paramsDropdownOpen}

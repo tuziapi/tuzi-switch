@@ -1,3 +1,4 @@
+import { readKeepOriginalImageEnabled } from './reference-image-settings';
 import {
   compressImageBlob,
   getFileExtension,
@@ -23,17 +24,12 @@ interface PrepareReferenceImageOptions {
   fetcher?: typeof fetch;
   signal?: AbortSignal;
   maxBytes?: number;
+  keepOriginal?: boolean;
 }
 
 interface PreparedReferenceImage {
   blob: Blob;
   filename: string;
-}
-
-function isLocalResolvableImage(value: string): boolean {
-  return (
-    value.startsWith('/__aitu_cache__/') || value.startsWith('/asset-library/')
-  );
 }
 
 function decodeDataUrlToBlob(value: string): Blob | null {
@@ -85,16 +81,6 @@ function getReferenceFileName(
   return `${prefix}.${extension === 'bin' ? 'png' : extension}`;
 }
 
-async function normalizeReferenceSource(value: string): Promise<string> {
-  const trimmed = value.trim();
-  if (!isLocalResolvableImage(trimmed)) {
-    return trimmed;
-  }
-
-  const imageData = await unifiedCacheService.getImageForAI(trimmed);
-  return imageData.value;
-}
-
 async function fetchReferenceBlob(
   source: string,
   fetcher: typeof fetch,
@@ -125,32 +111,14 @@ async function readDesktopReferenceBlob(source: string): Promise<Blob | null> {
     });
   }
 
-  if (isVirtualMediaUrl(source)) {
-    const imageData = await unifiedCacheService.getImageForAI(source);
-    if (imageData.type === 'base64') {
-      const match = imageData.value.match(/^data:([^;,]+)?(?:;[^,]*)?;base64,([\s\S]*)$/i);
-      if (match) {
-        const mimeType = (match[1] || 'image/png').toLowerCase();
-        const payload = (match[2] || '').replace(/\s+/g, '');
-        const binary = atob(payload);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i += 1) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        return new Blob([bytes], { type: mimeType });
-      }
-    } else if (imageData.type === 'url') {
-      return unifiedCacheService.getCachedBlob(source);
-    }
-  }
-
   return null;
 }
 
 async function normalizeReferenceBlob(
   blob: Blob,
   source: string,
-  maxBytes: number
+  maxBytes: number,
+  keepOriginal: boolean
 ): Promise<Blob> {
   let normalized = withImageMimeType(blob, source);
 
@@ -166,7 +134,7 @@ async function normalizeReferenceBlob(
     throw new Error('引用图超过 25MB，请先压缩后再使用');
   }
 
-  if (normalized.size > COMPRESSION_THRESHOLD_BYTES) {
+  if (!keepOriginal && normalized.size > COMPRESSION_THRESHOLD_BYTES) {
     try {
       normalized = await compressImageBlob(normalized, COMPRESSION_TARGET_MB);
     } catch (error) {
@@ -178,7 +146,7 @@ async function normalizeReferenceBlob(
     }
   }
 
-  if (normalized.size > COMPRESSION_THRESHOLD_BYTES) {
+  if (!keepOriginal && normalized.size > COMPRESSION_THRESHOLD_BYTES) {
     throw new Error('引用图压缩后仍超过 10MB，请换一张更小的图片');
   }
 
@@ -189,9 +157,11 @@ export async function prepareReferenceImageForMultipart(
   value: string,
   options: PrepareReferenceImageOptions = {}
 ): Promise<PreparedReferenceImage> {
+  options.signal?.throwIfAborted();
+  const keepOriginal = options.keepOriginal ?? readKeepOriginalImageEnabled();
   const maxBytes = options.maxBytes || MAX_REFERENCE_IMAGE_BYTES;
   const fetcher = options.fetcher || fetch;
-  const source = await normalizeReferenceSource(value);
+  const source = value.trim();
   const normalizedSource = normalizeImageDataUrl(source, 'image/png');
   let blob: Blob | null = decodeDataUrlToBlob(normalizedSource);
 
@@ -200,7 +170,8 @@ export async function prepareReferenceImageForMultipart(
   }
 
   if (!blob && isVirtualMediaUrl(normalizedSource)) {
-    blob = await unifiedCacheService.getCachedBlob(normalizedSource);
+    blob = await unifiedCacheService.getCachedBlob(normalizedSource, { allowNetwork: false });
+    if (!blob) throw new Error('本地图片缓存已失效');
   }
 
   if (!blob) {
@@ -210,8 +181,10 @@ export async function prepareReferenceImageForMultipart(
   const normalizedBlob = await normalizeReferenceBlob(
     blob,
     normalizedSource,
-    maxBytes
+    maxBytes,
+    keepOriginal
   );
+  options.signal?.throwIfAborted();
 
   return {
     blob: normalizedBlob,

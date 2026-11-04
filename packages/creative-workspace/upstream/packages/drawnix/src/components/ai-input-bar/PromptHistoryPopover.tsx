@@ -22,6 +22,7 @@ import {
   useInteractions,
 } from '@floating-ui/react';
 import { MoreHorizontal } from 'lucide-react';
+import { ATTACHED_ELEMENT_CLASS_NAME } from '@plait/core';
 import { usePromptHistory } from '../../hooks/usePromptHistory';
 import { useGenerationHistory } from '../../hooks/useGenerationHistory';
 import { useConfirmDialog } from '../dialog/ConfirmDialog';
@@ -335,12 +336,12 @@ export const PromptHistoryPopover: React.FC<PromptHistoryPopoverProps> = ({
 
       {/* 提示词面板 */}
       {isOpen && (
-        <FloatingPortal>
+        <FloatingPortal root={document.getElementById('creative-portals') || undefined}>
           <div
             ref={refs.setFloating}
             style={floatingStyles}
             {...getFloatingProps()}
-            className="prompt-history-popover__panel-wrapper"
+            className={`prompt-history-popover__panel-wrapper ${ATTACHED_ELEMENT_CLASS_NAME}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >

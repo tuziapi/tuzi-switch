@@ -34,6 +34,7 @@ jobs:
       - run: pnpm --filter @tuzi/download-page test
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
+      - run: pnpm test:creative
       - run: python3 -m unittest discover -s src-tauri/resources/builtin-skills/codex-image-render-fallback/scripts -p 'test_*.py'
 
   installers:
