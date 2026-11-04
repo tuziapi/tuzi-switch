@@ -25,7 +25,11 @@ export function nativeCreativeResponse(
     let finished = false;
     let started = false;
     let cancelled = false;
-    const cleanup = () => signal?.removeEventListener("abort", abort);
+    let drainTimeout: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
+      signal?.removeEventListener("abort", abort);
+      if (drainTimeout !== undefined) clearTimeout(drainTimeout);
+    };
     const cancelNative = () => {
       cancelled = true;
       void invoke(cancelCommand, { requestId: request.requestId }).catch(
@@ -101,7 +105,15 @@ export function nativeCreativeResponse(
     signal?.addEventListener("abort", abort, { once: true });
     void invoke(command, { request, onChunk })
       .then(() => {
-        if (!finished) fail("creative_outcome_unknown");
+        // Tauri fetches large Channel messages asynchronously. Command success
+        // can arrive before those messages, so only our explicit end chunk
+        // completes the response. Bound missing delivery without replaying it.
+        if (!finished) {
+          drainTimeout = setTimeout(() => {
+            cancelNative();
+            fail("creative_outcome_unknown");
+          }, 30_000);
+        }
       })
       .catch(fail);
   });

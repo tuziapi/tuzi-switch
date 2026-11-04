@@ -363,11 +363,11 @@ fn supports_action(model: &Value, action: &str) -> bool {
         ),
         "image.generate" => (
             "/v1/images/generations",
-            &["openai-image", "openai-images", "image-generation"],
+            &["openai-image", "openai-images", "image-generation", "generate"],
         ),
         "image.edit" => (
             "/v1/images/edits",
-            &["openai-image", "openai-images", "image-edit"],
+            &["openai-image", "openai-images", "image-edit", "edit"],
         ),
         "video.create" => ("/v1/videos", &["openai-video", "openai-videos"]),
         "audio.speech" => ("/v1/audio/speech", &["openai-tts", "text-to-speech"]),
@@ -670,6 +670,18 @@ mod tests {
             &json!({"supported_endpoint_types":["openai"],"endpoints":{"openai":{"path":"/v1/images/generations","method":"POST"}}}),
             "chat"
         ));
+    }
+    #[test]
+    fn website_image_endpoint_labels_preserve_membership_and_operation_checks() {
+        let catalog = json!({"items":[{"model_name":"synthetic","supported_endpoint_types":["generate","edit"]}]});
+        assert!(validate_model(&request("image.generate"), &catalog).is_ok());
+        assert!(validate_model(&request("image.edit"), &catalog).is_ok());
+        assert!(validate_model(&request("chat"), &catalog).is_err());
+        assert!(validate_model(&request("image.generate"), &json!({"items":[]})).is_err());
+        assert!(!supports_action(&json!({"supported_endpoint_types":["edit"]}), "image.generate"));
+        assert!(!supports_action(&json!({"supported_endpoint_types":["generate"]}), "image.edit"));
+        assert!(!supports_action(&json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/chat/completions","method":"POST"}}}), "image.generate"));
+        assert!(!supports_action(&json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/images/generations","method":"GET"}}}), "image.generate"));
     }
     #[test]
     fn multipart_is_encoded_natively_and_rejects_header_injection() {

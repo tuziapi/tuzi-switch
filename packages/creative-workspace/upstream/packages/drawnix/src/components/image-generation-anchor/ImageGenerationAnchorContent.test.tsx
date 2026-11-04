@@ -92,7 +92,7 @@ describe('ImageGenerationAnchorContent result recovery', () => {
     workflowCompletionService.clear();
   });
 
-  it('keeps the developing animation until the actual canvas result has loaded', () => {
+  it('keeps the loading label without a ring until the actual canvas result has loaded', () => {
     mocks.tasks[0].insertedToCanvas = true;
     const anchor = {
       ...createAnchor(), phase: 'inserting' as const, error: undefined,
@@ -105,12 +105,13 @@ describe('ImageGenerationAnchorContent result recovery', () => {
       }],
     } as unknown as PlaitBoard;
     render(<ImageGenerationAnchorContent board={board} element={anchor} selected={false} />);
-    expect(screen.getByText('正在显现')).toBeTruthy();
+    expect(screen.getByText('正在加载图片')).toBeTruthy();
+    expect(document.querySelector('.image-generation-progress-display__ring')).toBeNull();
 
     act(() => {
       registerCanvasImage(board, 'image-1', '/__aitu_cache__/image/result.png').setReady(true);
     });
-    expect(screen.queryByText('正在显现')).toBeNull();
+    expect(screen.queryByText('正在加载图片')).toBeNull();
     expect(document.querySelector('.image-generation-anchor--phase-completed')).not.toBeNull();
   });
 
@@ -134,7 +135,7 @@ describe('ImageGenerationAnchorContent result recovery', () => {
       return <ImageGenerationAnchorContent board={board} element={anchor} selected={false} />;
     }
     render(<CachedResult />);
-    expect(screen.queryByText('正在显现')).toBeNull();
+    expect(screen.queryByText('正在加载图片')).toBeNull();
   });
 
   it('shows successful generation and retries insertion without regenerating', async () => {
@@ -215,9 +216,9 @@ describe('ImageGenerationAnchorContent result recovery', () => {
       expect(mocks.retryTask).not.toHaveBeenCalled();
       expect(retryInsertion).not.toHaveBeenCalled();
       expect(board.children).toHaveLength(2);
-      expect(screen.getByText('正在显现')).toBeTruthy();
+      expect(screen.getByText('正在加载图片')).toBeTruthy();
       act(() => image.setReady(true));
-      expect(screen.queryByText('正在显现')).toBeNull();
+      expect(screen.queryByText('正在加载图片')).toBeNull();
       expect(screen.queryByText('图片加载超时，可重试加载已有结果')).toBeNull();
     } finally {
       window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, retryInsertion);

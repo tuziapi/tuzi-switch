@@ -1190,6 +1190,104 @@ index e05911f..fc36ccf 100644
        cursor: pointer;
        transition:
          background 0.15s ease,
+diff --git a/packages/drawnix/src/components/dialog/ConfirmDialog.test.tsx b/packages/drawnix/src/components/dialog/ConfirmDialog.test.tsx
+new file mode 100644
+index 0000000..23233c1
+--- /dev/null
++++ b/packages/drawnix/src/components/dialog/ConfirmDialog.test.tsx
+@@ -0,0 +1,71 @@
++import React, { useState } from 'react';
++import { fireEvent, render, screen, waitFor } from '@testing-library/react';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { ConfirmDialog } from './ConfirmDialog';
++
++let host: HTMLDivElement | undefined;
++afterEach(() => {
++  host?.remove();
++  host = undefined;
++});
++function fixture() {
++  host = document.createElement('div');
++  host.className = 'creative-root';
++  host.innerHTML = '<div id="creative-portals"></div>';
++  document.body.append(host);
++}
++function Task({ remove }: { remove: () => void }) {
++  const [open, setOpen] = useState(false);
++  const [deleted, setDeleted] = useState(false);
++  return (
++    <>
++      {!deleted && <button onClick={() => setOpen(true)}>删除合成任务</button>}
++      <ConfirmDialog
++        open={open}
++        title="确认删除"
++        onOpenChange={setOpen}
++        onConfirm={() => {
++          remove();
++          setDeleted(true);
++        }}
++        confirmText="删除"
++      />
++    </>
++  );
++}
++
++describe('creative confirmation portal', () => {
++  it('stays inside the creative scope, cancels without deleting, then confirms once', async () => {
++    fixture();
++    const remove = vi.fn();
++    render(<Task remove={remove} />);
++    fireEvent.click(screen.getByRole('button', { name: '删除合成任务' }));
++    const dialog = await screen.findByRole('dialog', { name: '确认删除' });
++    expect(dialog.closest('#creative-portals')).not.toBeNull();
++    fireEvent.click(screen.getByRole('button', { name: '取消' }));
++    expect(remove).not.toHaveBeenCalled();
++    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
++    fireEvent.click(screen.getByRole('button', { name: '删除合成任务' }));
++    fireEvent.click(
++      await screen.findByRole('button', { name: '删除', exact: true }),
++    );
++    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
++    expect(remove).toHaveBeenCalledOnce();
++    expect(screen.queryByRole('button', { name: '删除合成任务' })).toBeNull();
++  });
++
++  it('preserves an explicit container', async () => {
++    fixture();
++    const explicit = document.createElement('div');
++    host!.append(explicit);
++    render(<ConfirmDialog open title="指定容器" container={explicit} />);
++    expect(explicit.contains(await screen.findByRole('dialog'))).toBe(true);
++  });
++
++  it('still works standalone without an assistant portal', async () => {
++    render(<ConfirmDialog open title="独立画布" />);
++    expect(document.body.contains(await screen.findByRole('dialog'))).toBe(
++      true,
++    );
++  });
++});
+diff --git a/packages/drawnix/src/components/dialog/dialog.tsx b/packages/drawnix/src/components/dialog/dialog.tsx
+index 2a64775..84b9a33 100644
+--- a/packages/drawnix/src/components/dialog/dialog.tsx
++++ b/packages/drawnix/src/components/dialog/dialog.tsx
+@@ -137,14 +137,14 @@ export const DialogTrigger = React.forwardRef<
+ export const DialogContent = React.forwardRef<
+   HTMLDivElement,
+   React.HTMLProps<HTMLDivElement> & { container?: HTMLElement | null }
+->(function DialogContent(props, propRef) {
++>(function DialogContent({ container, ...props }, propRef) {
+   const { context: floatingContext, ...context } = useDialogContext();
+   const ref = useMergeRefs([context.refs.setFloating, propRef]);
+ 
+   if (!floatingContext.open) return null;
+ 
+   return (
+-    <FloatingPortal root={props.container}>
++    <FloatingPortal root={container ?? document.getElementById('creative-portals') ?? undefined}>
+       <FloatingOverlay className="Dialog-overlay" lockScroll>
+         <FloatingFocusManager context={floatingContext}>
+           <div
 diff --git a/packages/drawnix/src/components/image-editor/ImageEditor.tsx b/packages/drawnix/src/components/image-editor/ImageEditor.tsx
 index cea65fe..2b7d460 100644
 --- a/packages/drawnix/src/components/image-editor/ImageEditor.tsx
@@ -1237,8 +1335,93 @@ index 30be31c..7ff5760 100644
              break;
            }
          }
+diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
+index 4ef1925..485ddb2 100644
+--- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
++++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
+@@ -92,7 +92,7 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+     workflowCompletionService.clear();
+   });
+ 
+-  it('keeps the developing animation until the actual canvas result has loaded', () => {
++  it('keeps the loading label without a ring until the actual canvas result has loaded', () => {
+     mocks.tasks[0].insertedToCanvas = true;
+     const anchor = {
+       ...createAnchor(), phase: 'inserting' as const, error: undefined,
+@@ -105,12 +105,13 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+       }],
+     } as unknown as PlaitBoard;
+     render(<ImageGenerationAnchorContent board={board} element={anchor} selected={false} />);
+-    expect(screen.getByText('正在显现')).toBeTruthy();
++    expect(screen.getByText('正在加载图片')).toBeTruthy();
++    expect(document.querySelector('.image-generation-progress-display__ring')).toBeNull();
+ 
+     act(() => {
+       registerCanvasImage(board, 'image-1', '/__aitu_cache__/image/result.png').setReady(true);
+     });
+-    expect(screen.queryByText('正在显现')).toBeNull();
++    expect(screen.queryByText('正在加载图片')).toBeNull();
+     expect(document.querySelector('.image-generation-anchor--phase-completed')).not.toBeNull();
+   });
+ 
+@@ -134,7 +135,7 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+       return <ImageGenerationAnchorContent board={board} element={anchor} selected={false} />;
+     }
+     render(<CachedResult />);
+-    expect(screen.queryByText('正在显现')).toBeNull();
++    expect(screen.queryByText('正在加载图片')).toBeNull();
+   });
+ 
+   it('shows successful generation and retries insertion without regenerating', async () => {
+@@ -215,9 +216,9 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+       expect(mocks.retryTask).not.toHaveBeenCalled();
+       expect(retryInsertion).not.toHaveBeenCalled();
+       expect(board.children).toHaveLength(2);
+-      expect(screen.getByText('正在显现')).toBeTruthy();
++      expect(screen.getByText('正在加载图片')).toBeTruthy();
+       act(() => image.setReady(true));
+-      expect(screen.queryByText('正在显现')).toBeNull();
++      expect(screen.queryByText('正在加载图片')).toBeNull();
+       expect(screen.queryByText('图片加载超时，可重试加载已有结果')).toBeNull();
+     } finally {
+       window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, retryInsertion);
+diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
+index b20cedc..10c55af 100644
+--- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
++++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
+@@ -37,8 +37,8 @@ const PHASE_CENTER_LABELS = {
+   submitted: '等待执行',
+   queued: '等待执行',
+   generating: '生成中',
+-  developing: '正在显影',
+-  inserting: '正在显现',
++  developing: '正在加载图片',
++  inserting: '正在加载图片',
+   completed: '',
+   failed: '生成失败',
+ } as const;
+@@ -80,7 +80,9 @@ export const ImageGenerationAnchorContent: React.FC<
+     viewModel.progressMode === 'determinate' && viewModel.progress != null;
+   const progressValue = Math.round(viewModel.progress ?? 0);
+   const showCenterLabel = viewModel.phase !== 'completed';
+-  const centerLabel = isStack
++  const centerLabel = isRenderingResult
++    ? '正在加载图片'
++    : isStack
+     ? batchPreview?.statusText || PHASE_CENTER_LABELS[viewModel.phase]
+     : showDeterminateProgress
+     ? getImageTaskProgressStatusText(progressValue)
+@@ -270,7 +272,7 @@ export const ImageGenerationAnchorContent: React.FC<
+             tone={progressTone}
+             statusText={centerLabel}
+             compact
+-            showRing={showRing || viewModel.phase === 'failed'}
++            showRing={!isRenderingResult && (showRing || viewModel.phase === 'failed')}
+             className="image-generation-anchor__progress-display"
+           />
+         ) : null}
 diff --git a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
-index d8018b2..6e1aa44 100644
+index d8018b2..ef84637 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 +++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 @@ -6,7 +6,7 @@ import {
@@ -1250,6 +1433,17 @@ index d8018b2..6e1aa44 100644
  import { ImageGenerationAnchorContent } from './ImageGenerationAnchorContent';
  
  const SVG_NS = 'http://www.w3.org/2000/svg';
+@@ -15,8 +15,8 @@ const DESKTOP_PHASE_LABELS: Record<ImageGenerationAnchorPhase, string> = {
+   submitted: '准备生成',
+   queued: '等待执行',
+   generating: '生成中',
+-  developing: '正在显影',
+-  inserting: '正在放入画布',
++  developing: '正在加载图片',
++  inserting: '正在加载图片',
+   completed: '已完成',
+   failed: '生成失败',
+ };
 @@ -63,7 +63,7 @@ export class ImageGenerationAnchorGenerator {
      g.setAttribute('class', 'image-generation-anchor-element');
      parentG.appendChild(g);
@@ -1259,6 +1453,41 @@ index d8018b2..6e1aa44 100644
        this.createDesktopFallback(element, g);
      } else {
        this.createForeignObject(element, g);
+@@ -115,6 +115,7 @@ export class ImageGenerationAnchorGenerator {
+     const rect = RectangleClient.getRectangleByPoints(element.points);
+     const isFailed = element.phase === 'failed';
+     const isCompleted = element.phase === 'completed';
++    const isLoadingImage = element.phase === 'developing' || element.phase === 'inserting';
+     const accent = isFailed ? '#c15a5a' : '#25755e';
+     const background = isFailed
+       ? '#fffafa'
+@@ -138,7 +139,7 @@ export class ImageGenerationAnchorGenerator {
+ 
+     host.setAttribute(
+       'aria-label',
+-      `${DESKTOP_PHASE_LABELS[element.phase]}：${subtitle}`
++      isLoadingImage ? phaseLabel : `${phaseLabel}：${subtitle}`
+     );
+ 
+     const backgroundRect = createSvgElement('rect');
+@@ -235,7 +236,7 @@ export class ImageGenerationAnchorGenerator {
+     }
+ 
+     const centerX = rect.x + rect.width / 2;
+-    const spinning = !isFailed && !isCompleted;
++    const spinning = !isFailed && !isCompleted && !isLoadingImage;
+     const spinnerRadius = compact ? 10 : Math.min(28, minDimension * 0.1);
+     const contentCenterY =
+       rect.y +
+@@ -302,7 +303,7 @@ export class ImageGenerationAnchorGenerator {
+     title.textContent = phaseLabel;
+     host.appendChild(title);
+ 
+-    if (!compact) {
++    if (!compact && !isLoadingImage) {
+       const maxChars = Math.max(
+         12,
+         Math.floor((rect.width - padding * 2) / 13)
 diff --git a/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx b/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx
 index 3406255..7150338 100644
 --- a/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx
@@ -2479,6 +2708,182 @@ index 878384d..318956d 100644
          )}
      </section>
    );
+diff --git a/packages/drawnix/src/components/settings-dialog/__tests__/model-fetch-interaction.test.tsx b/packages/drawnix/src/components/settings-dialog/__tests__/model-fetch-interaction.test.tsx
+new file mode 100644
+index 0000000..7308a0d
+--- /dev/null
++++ b/packages/drawnix/src/components/settings-dialog/__tests__/model-fetch-interaction.test.tsx
+@@ -0,0 +1,170 @@
++import { readFileSync } from 'node:fs';
++import { resolve } from 'node:path';
++import { runInNewContext } from 'node:vm';
++import React, { useRef, useState } from 'react';
++import {
++  act,
++  fireEvent,
++  render,
++  screen,
++  waitFor,
++} from '@testing-library/react';
++import { beforeEach, expect, it, vi } from 'vitest';
++import * as ts from 'typescript';
++
++// Execute the production handler with React state; isolate network/storage only.
++const source = readFileSync(
++  resolve(__dirname, '../settings-dialog.tsx'),
++  'utf8',
++);
++const tree = ts.createSourceFile(
++  'settings.tsx',
++  source,
++  ts.ScriptTarget.Latest,
++  true,
++  ts.ScriptKind.TSX,
++);
++let handler = '';
++function visit(node: ts.Node) {
++  if (
++    ts.isVariableDeclaration(node) &&
++    node.name.getText(tree) === 'handleFetchModels'
++  )
++    handler = `const ${node.getText(tree)};`;
++  ts.forEachChild(node, visit);
++}
++visit(tree);
++if (!handler) throw new Error('Missing production model fetch handler');
++const discover = vi.fn();
++const persist = vi.fn();
++const prompt = vi.fn();
++const setError = vi.fn();
++const compiled = ts.transpileModule(
++  `
++exports.Harness = function Harness({ pending = false, emptyKey = false }) {
++  const [isFetchingModels, setIsFetchingModels] = useState(false);
++  const [modelFetchError, setModelFetchError] = useState('');
++  const [discoveryDialogOpen, setDiscoveryDialogOpen] = useState(false);
++  const modelFetchRef = useRef(null);
++  const selectedProfile = { id: 'synthetic-profile', name: 'Synthetic', apiKey: emptyKey ? '' : 'tuzi-account:synthetic', baseUrl: 'https://synthetic.invalid/v1' };
++  const hasPendingChanges = pending;
++  const isPersisting = false;
++  const isSelectedTuziProfile = false;
++  const tuziApiEndpointOptions = [];
++  const persistDrafts = persist;
++  const updateProfile = () => {};
++  ${handler}
++  return <><button disabled={isFetchingModels} onClick={handleFetchModels}>{isFetchingModels ? '正在获取模型' : '获取模型'}</button>
++    <button onClick={() => modelFetchRef.current?.abort()}>模拟关闭</button>
++    {modelFetchError && <p role="alert">{modelFetchError}</p>}
++    {discoveryDialogOpen && <div role="dialog">模型列表</div>}
++  </>;
++};`,
++  {
++    compilerOptions: {
++      module: ts.ModuleKind.CommonJS,
++      jsx: ts.JsxEmit.React,
++      target: ts.ScriptTarget.ES2020,
++    },
++  },
++).outputText;
++const exports: {
++  Harness?: React.FC<{ pending?: boolean; emptyKey?: boolean }>;
++} = {};
++runInNewContext(compiled, {
++  exports,
++  React,
++  useState,
++  useRef,
++  AbortController,
++  Error,
++  persist,
++  discoverProviderModels: discover,
++  promptForApiKey: prompt,
++  normalizeModelApiBaseUrl: (value: string) => value,
++  TUZI_PROVIDER_DEFAULT_BASE_URL: 'https://synthetic.invalid/v1',
++  analytics: { trackUIInteraction: vi.fn() },
++  runtimeModelDiscovery: { setError },
++  MessagePlugin: { warning: vi.fn(), error: vi.fn() },
++});
++const Harness = exports.Harness!;
++function deferred<T>() {
++  let resolve!: (value: T) => void;
++  const promise = new Promise<T>((r) => {
++    resolve = r;
++  });
++  return { promise, resolve };
++}
++beforeEach(() => {
++  vi.clearAllMocks();
++  persist.mockResolvedValue(true);
++  discover.mockResolvedValue([]);
++});
++
++it('shows loading during save and ignores repeated clicks before discovery starts', async () => {
++  const save = deferred<boolean>();
++  persist.mockReturnValue(save.promise);
++  render(<Harness pending />);
++  const button = screen.getByRole('button', { name: '获取模型' });
++  fireEvent.click(button);
++  expect(
++    screen
++      .getByRole('button', { name: '正在获取模型' })
++      .hasAttribute('disabled'),
++  ).toBe(true);
++  fireEvent.click(button);
++  expect(persist).toHaveBeenCalledOnce();
++  expect(discover).not.toHaveBeenCalled();
++  await act(async () => save.resolve(true));
++  expect(await screen.findByRole('dialog')).toBeTruthy();
++  expect(discover).toHaveBeenCalledOnce();
++});
++
++it('does not fetch after failed save and allows retry', async () => {
++  persist.mockResolvedValueOnce(false);
++  render(<Harness pending />);
++  fireEvent.click(screen.getByRole('button', { name: '获取模型' }));
++  await waitFor(() =>
++    expect(
++      screen.getByRole('button', { name: '获取模型' }).hasAttribute('disabled'),
++    ).toBe(false),
++  );
++  expect(discover).not.toHaveBeenCalled();
++  fireEvent.click(screen.getByRole('button', { name: '获取模型' }));
++  expect(await screen.findByRole('dialog')).toBeTruthy();
++});
++
++it('shows a persistent error and succeeds on retry', async () => {
++  discover.mockRejectedValueOnce(new Error('合成网络故障'));
++  render(<Harness />);
++  fireEvent.click(screen.getByRole('button', { name: '获取模型' }));
++  expect((await screen.findByRole('alert')).textContent).toContain(
++    '合成网络故障',
++  );
++  fireEvent.click(screen.getByRole('button', { name: '获取模型' }));
++  expect(await screen.findByRole('dialog')).toBeTruthy();
++  expect(screen.queryByRole('alert')).toBeNull();
++});
++
++it('does not open a stale result after closing while discovery is pending', async () => {
++  const result = deferred<unknown[]>();
++  discover.mockReturnValue(result.promise);
++  render(<Harness />);
++  fireEvent.click(screen.getByRole('button', { name: '获取模型' }));
++  fireEvent.click(screen.getByRole('button', { name: '模拟关闭' }));
++  await act(async () => result.resolve([]));
++  expect(screen.queryByRole('dialog')).toBeNull();
++  expect(screen.queryByRole('alert')).toBeNull();
++});
++
++it('releases loading when credential entry is cancelled', async () => {
++  prompt.mockResolvedValueOnce(null);
++  render(<Harness emptyKey />);
++  fireEvent.click(screen.getByRole('button', { name: '获取模型' }));
++  await waitFor(() =>
++    expect(
++      screen.getByRole('button', { name: '获取模型' }).hasAttribute('disabled'),
++    ).toBe(false),
++  );
++  expect(discover).not.toHaveBeenCalled();
++});
 diff --git a/packages/drawnix/src/components/settings-dialog/assistant-account-binding.scss b/packages/drawnix/src/components/settings-dialog/assistant-account-binding.scss
 new file mode 100644
 index 0000000..11e43e2
@@ -2730,7 +3135,7 @@ index 0000000..11e43e2
 +  :is(.settings-dialog__endpoint-error, .settings-dialog__danger-button) { color: #f59d92; }
 +}
 diff --git a/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx b/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx
-index 85c440c..99c065a 100644
+index 85c440c..5f28060 100644
 --- a/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx
 +++ b/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx
 @@ -1,9 +1,12 @@
@@ -2806,7 +3211,130 @@ index 85c440c..99c065a 100644
        void requestTuziParentContext({ refresh: appState.openSettings }).finally(
          syncBridgeMode
        );
-@@ -3101,7 +3106,8 @@ export const SettingsDialog = ({
+@@ -1222,6 +1227,22 @@ export const SettingsDialog = ({
+   const [modelSearchQuery, setModelSearchQuery] = useState('');
+   const [discoveryDialogOpen, setDiscoveryDialogOpen] = useState(false);
+   const [isFetchingModels, setIsFetchingModels] = useState(false);
++  const modelFetchRef = useRef<AbortController | null>(null);
++  const [modelFetchError, setModelFetchError] = useState('');
++  useEffect(() => {
++    setIsFetchingModels(false);
++    setModelFetchError('');
++    setDiscoveryDialogOpen(false);
++    return () => {
++      if (modelFetchRef.current) {
++        modelFetchRef.current.abort();
++        if (runtimeModelDiscovery.getState(selectedProfileId).status === 'loading') {
++          runtimeModelDiscovery.setError(selectedProfileId, '模型获取已取消，请重新获取');
++        }
++        modelFetchRef.current = null;
++      }
++    };
++  }, [selectedProfileId, appState.openSettings]);
+   const [customModelId, setCustomModelId] = useState('');
+   const [customModelType, setCustomModelType] = useState<ModelType>('image');
+   const [customModelLabel, setCustomModelLabel] = useState('');
+@@ -2421,35 +2442,41 @@ export const SettingsDialog = ({
+   };
+ 
+   const handleFetchModels = async () => {
+-    if (isFetchingModels) return;
++    if (modelFetchRef.current || isPersisting) return;
+     if (!selectedProfile) {
+       MessagePlugin.warning('请先选择供应商配置');
+       return;
+     }
+ 
+-    if (hasPendingChanges) {
+-      const saved = await persistDrafts(false);
+-      if (!saved) {
+-        return;
++    const controller = new AbortController();
++    modelFetchRef.current = controller;
++    setIsFetchingModels(true);
++    setModelFetchError('');
++    try {
++      if (hasPendingChanges) {
++        const saved = await persistDrafts(false);
++        if (!saved) {
++          if (!controller.signal.aborted) setModelFetchError('配置保存失败，尚未获取模型，请重新保存后重试。');
++          return;
++        }
+       }
+-    }
+ 
+-    let trimmedApiKey = selectedProfile.apiKey.trim();
+-    const normalizedBaseUrl = normalizeModelApiBaseUrl(
+-      selectedProfile.baseUrl.trim() || TUZI_PROVIDER_DEFAULT_BASE_URL
+-    );
++      controller.signal.throwIfAborted();
++      let trimmedApiKey = selectedProfile.apiKey.trim();
++      const normalizedBaseUrl = normalizeModelApiBaseUrl(
++        selectedProfile.baseUrl.trim() || TUZI_PROVIDER_DEFAULT_BASE_URL
++      );
+ 
+-    if (!trimmedApiKey) {
+-      const apiKey = await promptForApiKey({
+-        contextId: selectedProfile.id, providerName: selectedProfile.name, showTuziGuide: isSelectedTuziProfile,
+-        onSave: async (key) => { updateProfile(selectedProfile.id, (profile) => ({ ...profile, apiKey: key })); },
+-      });
+-      if (!apiKey) return;
+-      trimmedApiKey = apiKey;
+-    }
++      if (!trimmedApiKey) {
++        const apiKey = await promptForApiKey({
++          contextId: selectedProfile.id, providerName: selectedProfile.name, showTuziGuide: isSelectedTuziProfile,
++          onSave: async (key) => { updateProfile(selectedProfile.id, (profile) => ({ ...profile, apiKey: key })); },
++        });
++        if (!apiKey) return;
++        trimmedApiKey = apiKey;
++      }
+ 
+-    setIsFetchingModels(true);
+-    try {
++      controller.signal.throwIfAborted();
+       analytics.trackUIInteraction({
+         area: 'settings',
+         action: 'model_discovery_started',
+@@ -2466,8 +2493,9 @@ export const SettingsDialog = ({
+         isSelectedTuziProfile
+           ? tuziApiEndpointOptions.map((endpoint) => endpoint.url)
+           : [],
+-        { forceMarketplaceRefresh: true }
++        { signal: controller.signal }
+       );
++      controller.signal.throwIfAborted();
+       analytics.trackUIInteraction({
+         area: 'settings',
+         action: 'model_discovery_succeeded',
+@@ -2477,6 +2505,7 @@ export const SettingsDialog = ({
+       });
+       setDiscoveryDialogOpen(true);
+     } catch (error) {
++      if (controller.signal.aborted) return;
+       const message = error instanceof Error ? error.message : '模型同步失败';
+       analytics.trackUIInteraction({
+         area: 'settings',
+@@ -2488,13 +2517,17 @@ export const SettingsDialog = ({
+           error: message,
+         },
+       });
++      setModelFetchError(message);
+       runtimeModelDiscovery.setError(selectedProfile.id, message);
+       MessagePlugin.error({
+         content: message,
+         duration: 3600,
+       });
+     } finally {
+-      setIsFetchingModels(false);
++      if (modelFetchRef.current === controller) {
++        modelFetchRef.current = null;
++        setIsFetchingModels(false);
++      }
+     }
+   };
+ 
+@@ -3101,7 +3134,8 @@ export const SettingsDialog = ({
      if (discoveryDialogOpen || isPersisting) {
        return;
      }
@@ -2816,7 +3344,7 @@ index 85c440c..99c065a 100644
    };
  
    const renderProviderRow = (profile: ProviderProfile) => {
-@@ -3415,6 +3421,7 @@ export const SettingsDialog = ({
+@@ -3415,6 +3449,7 @@ export const SettingsDialog = ({
            </div>
          </div>
  
@@ -2824,7 +3352,7 @@ index 85c440c..99c065a 100644
          <div className="settings-dialog__section">
            <div className="settings-dialog__section-header">
              <div>
-@@ -3440,13 +3447,14 @@ export const SettingsDialog = ({
+@@ -3440,13 +3475,14 @@ export const SettingsDialog = ({
                />
              </div>
  
@@ -2840,7 +3368,7 @@ index 85c440c..99c065a 100644
                  onChange={(event) =>
                    updateProfile(selectedProfile.id, (profile) => {
                      const providerType = event.target
-@@ -3476,6 +3484,9 @@ export const SettingsDialog = ({
+@@ -3476,6 +3512,9 @@ export const SettingsDialog = ({
                </select>
              </div>
  
@@ -2850,7 +3378,7 @@ index 85c440c..99c065a 100644
              <div className="settings-dialog__field settings-dialog__field--column settings-dialog__field--full">
                <label className="settings-dialog__label settings-dialog__label--stacked">
                  图片接口格式
-@@ -3557,7 +3568,10 @@ export const SettingsDialog = ({
+@@ -3557,7 +3596,10 @@ export const SettingsDialog = ({
                </span>
              </div>
  
@@ -2862,7 +3390,7 @@ index 85c440c..99c065a 100644
                <label className="settings-dialog__label settings-dialog__label--stacked">
                  API 地址
                </label>
-@@ -3565,6 +3579,7 @@ export const SettingsDialog = ({
+@@ -3565,6 +3607,7 @@ export const SettingsDialog = ({
                  type="text"
                  className="settings-dialog__input"
                  value={selectedProfile.baseUrl}
@@ -2870,7 +3398,7 @@ index 85c440c..99c065a 100644
                  onChange={(event) =>
                    updateProfile(selectedProfile.id, (profile) => ({
                      ...profile,
-@@ -3573,7 +3588,7 @@ export const SettingsDialog = ({
+@@ -3573,7 +3616,7 @@ export const SettingsDialog = ({
                  }
                  placeholder={TUZI_PROVIDER_DEFAULT_BASE_URL}
                />
@@ -2879,7 +3407,7 @@ index 85c440c..99c065a 100644
                  <div className="settings-dialog__endpoint-panel">
                    <div className="settings-dialog__endpoint-toolbar">
                      <div className="settings-dialog__endpoint-title">
-@@ -3792,7 +3807,7 @@ export const SettingsDialog = ({
+@@ -3792,7 +3835,7 @@ export const SettingsDialog = ({
                        >
                          <iframe
                            title="Bilibili tutorial video"
@@ -2888,7 +3416,7 @@ index 85c440c..99c065a 100644
                            allowFullScreen={true}
                            style={{
                              position: 'absolute',
-@@ -3828,9 +3843,10 @@ export const SettingsDialog = ({
+@@ -3828,9 +3871,10 @@ export const SettingsDialog = ({
                    style={{ flex: isCompactLayout ? 'none' : 1 }}
                  >
                    <input
@@ -2901,7 +3429,7 @@ index 85c440c..99c065a 100644
                      onChange={(event) =>
                        updateProfile(selectedProfile.id, (profile) => ({
                          ...profile,
-@@ -3846,6 +3862,7 @@ export const SettingsDialog = ({
+@@ -3846,6 +3890,7 @@ export const SettingsDialog = ({
                      <button
                        type="button"
                        className="settings-dialog__secret-toggle"
@@ -2909,8 +3437,21 @@ index 85c440c..99c065a 100644
                        aria-label={
                          isApiKeyVisible ? '隐藏 API Key' : '查看 API Key'
                        }
-@@ -3882,7 +3899,7 @@ export const SettingsDialog = ({
-                       同步中
+@@ -3870,7 +3915,7 @@ export const SettingsDialog = ({
+                   }}
+                   onClick={handleFetchModels}
+                   disabled={
+-                    !selectedProfile || isFetchingModels || runtimeState.status === 'loading'
++                    !selectedProfile || isPersisting || isFetchingModels || runtimeState.status === 'loading'
+                   }
+                 >
+                   {isFetchingModels || runtimeState.status === 'loading' ? (
+@@ -3879,23 +3924,22 @@ export const SettingsDialog = ({
+                         size={15}
+                         className="settings-dialog__button-spinner"
+                       />
+-                      同步中
++                      {isPersisting ? '正在保存…' : '正在获取模型…'}
                      </>
                    ) : (
 -                    '获取模型'
@@ -2918,7 +3459,8 @@ index 85c440c..99c065a 100644
                    )}
                  </button>
                </div>
-@@ -3890,12 +3907,10 @@ export const SettingsDialog = ({
++              {modelFetchError && <p role="alert">{modelFetchError}</p>}
+             </div>
            </div>
          </div>
  
@@ -2935,7 +3477,7 @@ index 85c440c..99c065a 100644
  
          {selectedProfile.id === LEGACY_DEFAULT_PROVIDER_PROFILE_ID ? (
            <div className="settings-dialog__section settings-dialog__section--compact">
-@@ -4048,7 +4063,8 @@ export const SettingsDialog = ({
+@@ -4048,7 +4092,8 @@ export const SettingsDialog = ({
          ) : null}
  
          {canManageModels ? (
@@ -2945,7 +3487,7 @@ index 85c440c..99c065a 100644
              <div className="settings-dialog__custom-model-grid">
                <label className="settings-dialog__field settings-dialog__field--column">
                  <span className="settings-dialog__label settings-dialog__label--stacked">
-@@ -4405,7 +4421,7 @@ export const SettingsDialog = ({
+@@ -4405,7 +4450,7 @@ export const SettingsDialog = ({
                  {customModelError}
                </div>
              ) : null}
@@ -2954,7 +3496,7 @@ index 85c440c..99c065a 100644
          ) : null}
  
          {modelGroups.length > 0 ? (
-@@ -5115,23 +5131,23 @@ export const SettingsDialog = ({
+@@ -5115,23 +5160,23 @@ export const SettingsDialog = ({
        <WinBoxWindow
          id="settings-dialog"
          visible={appState.openSettings}
@@ -2983,7 +3525,7 @@ index 85c440c..99c065a 100644
          minimizable={false}
          resizable={!isCompactLayout}
          movable={!isCompactLayout}
-@@ -5142,7 +5158,7 @@ export const SettingsDialog = ({
+@@ -5142,7 +5187,7 @@ export const SettingsDialog = ({
        >
          <div
            ref={dialogRef}
@@ -2992,7 +3534,7 @@ index 85c440c..99c065a 100644
              isCompactLayout ? 'settings-dialog--compact' : ''
            }`}
            data-testid="settings-dialog"
-@@ -5151,6 +5167,11 @@ export const SettingsDialog = ({
+@@ -5151,6 +5196,11 @@ export const SettingsDialog = ({
              {renderSettingsNav()}
              <div className="settings-dialog__main">{renderActiveView()}</div>
            </div>
@@ -5648,6 +6190,383 @@ index 0d99c53..6c4ea35 100644
    let abort: (() => void) | undefined;
    const cancelled = new Promise<never>((_, reject) => {
      abort = () => reject(init.signal?.reason || new DOMException('Aborted', 'AbortError'));
+diff --git a/packages/drawnix/src/services/provider-model-catalog.test.ts b/packages/drawnix/src/services/provider-model-catalog.test.ts
+index cacf9e2..6443528 100644
+--- a/packages/drawnix/src/services/provider-model-catalog.test.ts
++++ b/packages/drawnix/src/services/provider-model-catalog.test.ts
+@@ -3,7 +3,10 @@ import type {
+   ProviderCatalog,
+   ProviderProfile,
+ } from '../utils/settings-manager';
+-import { discoverProviderModels } from './provider-model-catalog';
++import {
++  discoverProviderModels,
++  MODEL_METADATA_WAIT_MS,
++} from './provider-model-catalog';
+ import { runtimeModelDiscovery } from '../utils/runtime-model-discovery';
+ 
+ const mocks = vi.hoisted(() => ({
+@@ -88,7 +91,10 @@ describe('provider model catalog', () => {
+       },
+     });
+   });
+-  afterEach(() => vi.unstubAllGlobals());
++  afterEach(() => {
++    vi.unstubAllGlobals();
++    vi.useRealTimers();
++  });
+ 
+   it('uses the current key for discovery and only enriches returned model IDs', async () => {
+     const fetchMock = mockModels([
+@@ -101,7 +107,7 @@ describe('provider model catalog', () => {
+       {
+         forceMarketplaceRefresh: true,
+         selectAll: true,
+-      }
++      },
+     );
+     expect(fetchMock).toHaveBeenCalledOnce();
+     expect(fetchMock).toHaveBeenCalledWith(
+@@ -112,7 +118,7 @@ describe('provider model catalog', () => {
+           'Cache-Control': 'no-cache',
+         },
+         cache: 'no-store',
+-      })
++      }),
+     );
+     expect(models.map((model) => model.id)).toEqual([
+       'configured-renderer',
+@@ -124,7 +130,7 @@ describe('provider model catalog', () => {
+       description: 'Marketplace image',
+     });
+     expect(
+-      runtimeModelDiscovery.getSelectedModelIds('tuzi-token-default')
++      runtimeModelDiscovery.getSelectedModelIds('tuzi-token-default'),
+     ).toEqual(['configured-renderer', 'key-only-model']);
+     expect(mocks.fetchAndCache).toHaveBeenCalledWith(
+       'tuzi-token-default',
+@@ -132,10 +138,10 @@ describe('provider model catalog', () => {
+       'test-key',
+       'default',
+       0.7,
+-      { force: true }
++      { force: true },
+     );
+     expect(
+-      runtimeModelDiscovery.getState('tuzi-token-default').discoverySource
++      runtimeModelDiscovery.getState('tuzi-token-default').discoverySource,
+     ).toBe('models-endpoint');
+   });
+ 
+@@ -153,7 +159,7 @@ describe('provider model catalog', () => {
+                   : 'model-b',
+             },
+           ],
+-        })
++        }),
+       );
+     vi.stubGlobal('fetch', fetchMock);
+     for (const key of ['key-a', 'key-b']) {
+@@ -168,13 +174,13 @@ describe('provider model catalog', () => {
+     }
+     expect(fetchMock).toHaveBeenCalledTimes(2);
+     expect(
+-      runtimeModelDiscovery.getSelectedModelIds('tuzi-token-default')
++      runtimeModelDiscovery.getSelectedModelIds('tuzi-token-default'),
+     ).toEqual(['model-b']);
+     expect(
+       runtimeModelDiscovery.getPinnedSelectableModel('text', 'model-a', {
+         profileId: 'tuzi-token-default',
+         modelId: 'model-a',
+-      })
++      }),
+     ).toBeNull();
+   });
+ 
+@@ -186,32 +192,32 @@ describe('provider model catalog', () => {
+         .mockResolvedValue(
+           Response.json(
+             { error: { message: 'Invalid API key' } },
+-            { status: 401 }
+-          )
+-        )
++            { status: 401 },
++          ),
++        ),
+     );
+     await expect(discoverProviderModels(profile())).rejects.toThrow(
+-      'Invalid API key'
++      'Invalid API key',
+     );
+     expect(
+-      runtimeModelDiscovery.getDiscoveredModels('tuzi-token-default')
++      runtimeModelDiscovery.getDiscoveredModels('tuzi-token-default'),
+     ).toEqual([]);
+   });
+ 
+   it('rejects an empty authenticated list instead of filling it from pricing', async () => {
+     mockModels([]);
+     await expect(discoverProviderModels(profile())).rejects.toThrow(
+-      '模型列表为空'
++      '模型列表为空',
+     );
+   });
+ 
+   it('continues authenticated discovery when the marketplace fails', async () => {
+     mocks.fetchAndCache.mockRejectedValueOnce(
+-      new Error('Pricing API error: 503')
++      new Error('Pricing API error: 503'),
+     );
+     mockModels([{ id: 'key-only-model' }]);
+     expect(
+-      (await discoverProviderModels(profile())).map((model) => model.id)
++      (await discoverProviderModels(profile())).map((model) => model.id),
+     ).toEqual(['key-only-model']);
+   });
+ 
+@@ -223,9 +229,9 @@ describe('provider model catalog', () => {
+       else mocks.fetchAndCache.mockResolvedValueOnce({ prices: {} });
+       mockModels([{ id: 'key-only-model' }]);
+       expect(
+-        (await discoverProviderModels(profile())).map((model) => model.id)
++        (await discoverProviderModels(profile())).map((model) => model.id),
+       ).toEqual(['key-only-model']);
+-    }
++    },
+   );
+ 
+   it('prefers authenticated metadata over conflicting marketplace metadata', async () => {
+@@ -242,6 +248,100 @@ describe('provider model catalog', () => {
+     });
+   });
+ 
++  it('bounds optional pricing latency and never adds public-only models', async () => {
++    vi.useFakeTimers();
++    mocks.fetchAndCache.mockReturnValueOnce(new Promise(() => {}));
++    const fetchMock = mockModels([{ id: 'key-only-model' }]);
++    const result = discoverProviderModels(profile());
++    await vi.advanceTimersByTimeAsync(MODEL_METADATA_WAIT_MS + 1);
++    expect((await result).map((model) => model.id)).toEqual(['key-only-model']);
++    expect(fetchMock).toHaveBeenCalledOnce();
++  });
++
++  it('cancels while waiting for metadata without starting a model request', async () => {
++    mocks.fetchAndCache.mockReturnValueOnce(new Promise(() => {}));
++    const fetchMock = mockModels([{ id: 'key-only-model' }]);
++    const controller = new AbortController();
++    const result = discoverProviderModels(profile(), [], {
++      signal: controller.signal,
++    });
++    const rejected = expect(result).rejects.toThrow();
++    controller.abort();
++    await rejected;
++    expect(fetchMock).not.toHaveBeenCalled();
++  });
++
++  it.each(['headers', 'body'])(
++    'times out a stalled %s even when transport ignores abort, then allows retry',
++    async (stage) => {
++      vi.useFakeTimers();
++      const never = new Promise<Response>(() => {});
++      const fetchMock = vi
++        .fn()
++        .mockResolvedValueOnce(
++          stage === 'headers'
++            ? never
++            : {
++                ok: true,
++                text: () => new Promise(() => {}),
++              },
++        )
++        .mockResolvedValueOnce(
++          Response.json({ data: [{ id: 'recovered-model' }] }),
++        );
++      vi.stubGlobal('fetch', fetchMock);
++      const current = profile({
++        id: 'custom-provider',
++        baseUrl: 'https://synthetic.invalid/v1',
++      });
++      mocks.profiles = [current];
++      const pending = discoverProviderModels(current);
++      const failure = expect(pending).rejects.toThrow('模型列表请求超时');
++      await vi.advanceTimersByTimeAsync(15001);
++      await failure;
++      expect(
++        (await discoverProviderModels(current)).map((model) => model.id),
++      ).toEqual(['recovered-model']);
++      expect(fetchMock).toHaveBeenCalledTimes(2);
++    },
++  );
++
++  it('ignores a late response after cancellation', async () => {
++    let finish!: (value: Response) => void;
++    const delayed = new Promise<Response>((resolve) => {
++      finish = resolve;
++    });
++    const fetchMock = vi
++      .fn()
++      .mockReturnValueOnce(delayed)
++      .mockResolvedValueOnce(
++        Response.json({ data: [{ id: 'current-model' }] }),
++      );
++    vi.stubGlobal('fetch', fetchMock);
++    const current = profile({
++      id: 'custom-provider',
++      baseUrl: 'https://synthetic.invalid/v1',
++    });
++    mocks.profiles = [current];
++    const controller = new AbortController();
++    const pending = discoverProviderModels(current, [], {
++      signal: controller.signal,
++    });
++    const rejected = expect(pending).rejects.toMatchObject({
++      name: 'AbortError',
++    });
++    controller.abort();
++    await rejected;
++    await discoverProviderModels(current);
++    finish(Response.json({ data: [{ id: 'stale-model' }] }));
++    await Promise.resolve();
++    expect(
++      runtimeModelDiscovery
++        .getDiscoveredModels(current.id)
++        .map((model) => model.id),
++    ).toEqual(['current-model']);
++  });
++
+   it('keeps authenticated discovery for non-Tuzi providers without fetching pricing', async () => {
+     const current = profile({
+       id: 'custom-provider',
+@@ -250,14 +350,14 @@ describe('provider model catalog', () => {
+     mocks.profiles = [current];
+     const fetchMock = mockModels([{ id: 'custom-model' }]);
+     expect(
+-      (await discoverProviderModels(current)).map((model) => model.id)
++      (await discoverProviderModels(current)).map((model) => model.id),
+     ).toEqual(['custom-model']);
+     expect(mocks.fetchAndCache).not.toHaveBeenCalled();
+     expect(fetchMock).toHaveBeenCalledWith(
+       'https://models.example.com/v1/models',
+       expect.objectContaining({
+         headers: expect.objectContaining({ Authorization: 'Bearer test-key' }),
+-      })
++      }),
+     );
+   });
+ });
+diff --git a/packages/drawnix/src/services/provider-model-catalog.ts b/packages/drawnix/src/services/provider-model-catalog.ts
+index fff1a5b..a5a0378 100644
+--- a/packages/drawnix/src/services/provider-model-catalog.ts
++++ b/packages/drawnix/src/services/provider-model-catalog.ts
+@@ -15,10 +15,35 @@ interface DiscoverProviderModelsOptions
+   forceMarketplaceRefresh?: boolean;
+ }
+ 
++// Pricing enriches labels/categories only. A slow optional endpoint must not
++// hold the authenticated model list behind its full 15-second timeout.
++export const MODEL_METADATA_WAIT_MS = 2_000;
++async function optionalMetadata<T>(
++  request: Promise<T>,
++  signal?: AbortSignal,
++): Promise<T | null> {
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  let abort: (() => void) | undefined;
++  const fallback = new Promise<null>((resolve) => {
++    abort = () => resolve(null);
++    timer = setTimeout(abort, MODEL_METADATA_WAIT_MS);
++    signal?.addEventListener('abort', abort, { once: true });
++    if (signal?.aborted) abort();
++  });
++  try {
++    return await Promise.race([request, fallback]);
++  } finally {
++    clearTimeout(timer);
++    if (abort) signal?.removeEventListener('abort', abort);
++  }
++}
++
+ export function usesTuziMarketplace(profile: ProviderProfile): boolean {
+   return (
+     profile.id.startsWith('tuzi-') ||
+-    isTuziCompatibleBaseUrl(profile.baseUrl || TUZI_PROVIDER_DEFAULT_BASE_URL) ||
++    isTuziCompatibleBaseUrl(
++      profile.baseUrl || TUZI_PROVIDER_DEFAULT_BASE_URL,
++    ) ||
+     isTuziCompatibleBaseUrl(profile.pricingUrl)
+   );
+ }
+@@ -26,10 +51,11 @@ export function usesTuziMarketplace(profile: ProviderProfile): boolean {
+ export async function discoverProviderModels(
+   profile: ProviderProfile,
+   fallbackBaseUrls: string[] = [],
+-  options: DiscoverProviderModelsOptions = {}
++  options: DiscoverProviderModelsOptions = {},
+ ): Promise<ModelConfig[]> {
++  options.signal?.throwIfAborted();
+   const baseUrl = normalizeModelApiBaseUrl(
+-    profile.baseUrl || TUZI_PROVIDER_DEFAULT_BASE_URL
++    profile.baseUrl || TUZI_PROVIDER_DEFAULT_BASE_URL,
+   );
+   let modelMetadata: RuntimeModelDiscoveryOptions['modelMetadata'];
+ 
+@@ -40,28 +66,34 @@ export async function discoverProviderModels(
+     const pricingConfig = resolveProviderPricingConfig(profile);
+     try {
+       if (pricingConfig) {
+-        const catalog = await modelPricingService.fetchAndCache(
+-          profile.id,
+-          pricingConfig.pricingUrl,
+-          profile.apiKey.trim(),
+-          pricingConfig.pricingGroup,
+-          pricingConfig.cnyPerUsd,
+-          { force: options.forceMarketplaceRefresh }
++        const catalog = await optionalMetadata(
++          modelPricingService.fetchAndCache(
++            profile.id,
++            pricingConfig.pricingUrl,
++            profile.apiKey.trim(),
++            pricingConfig.pricingGroup,
++            pricingConfig.cnyPerUsd,
++            { force: options.forceMarketplaceRefresh },
++          ),
++          options.signal,
+         );
+-        modelMetadata = Object.entries(catalog.prices).map(([id, price]) => ({
+-          id,
+-          description: price.description,
+-          ...catalog.modelCatalog?.[id],
+-          supported_endpoint_types:
+-            catalog.modelCatalog?.[id]?.supported_endpoint_types ||
+-            Object.keys(catalog.modelEndpoints?.[id] || {}),
+-        }));
++        modelMetadata = catalog
++          ? Object.entries(catalog.prices).map(([id, price]) => ({
++              id,
++              description: price.description,
++              ...catalog.modelCatalog?.[id],
++              supported_endpoint_types:
++                catalog.modelCatalog?.[id]?.supported_endpoint_types ||
++                Object.keys(catalog.modelEndpoints?.[id] || {}),
++            }))
++          : undefined;
+       }
+     } catch {
+       // Pricing is optional metadata; availability comes from the authenticated request.
+     }
+   }
+ 
++  options.signal?.throwIfAborted();
+   return runtimeModelDiscovery.discover(
+     profile.id,
+     baseUrl,
+@@ -71,6 +103,6 @@ export async function discoverProviderModels(
+       selectAll: options.selectAll,
+       signal: options.signal,
+       modelMetadata,
+-    }
++    },
+   );
+ }
 diff --git a/packages/drawnix/src/services/provider-routing/provider-transport.ts b/packages/drawnix/src/services/provider-routing/provider-transport.ts
 index 12d1f35..0223231 100644
 --- a/packages/drawnix/src/services/provider-routing/provider-transport.ts
@@ -6476,7 +7395,7 @@ index 66e74c8..f63f656 100644
        }
        const response = await fetch(options.requestUrl || normalizedPricingUrl, {
 diff --git a/packages/drawnix/src/utils/runtime-model-discovery.ts b/packages/drawnix/src/utils/runtime-model-discovery.ts
-index 314fa85..579ea48 100644
+index 314fa85..d70fb10 100644
 --- a/packages/drawnix/src/utils/runtime-model-discovery.ts
 +++ b/packages/drawnix/src/utils/runtime-model-discovery.ts
 @@ -1,3 +1,4 @@
@@ -6484,16 +7403,89 @@ index 314fa85..579ea48 100644
  import { isSunoNativeModel } from '../services/suno-native';
  import {
    isCurrentTuziEndpoint,
-@@ -204,7 +205,7 @@ async function fetchRemoteModelList(
+@@ -195,43 +196,51 @@ async function fetchRemoteModelList(
+   signal?: AbortSignal,
+   accountManaged = false
+ ): Promise<string> {
+-  const controller =
+-    typeof AbortController !== 'undefined' ? new AbortController() : null;
+-  const timeoutId = controller
+-    ? setTimeout(() => controller.abort(), MODEL_DISCOVERY_TIMEOUT_MS)
+-    : undefined;
+-  const abortFromCaller = () => controller?.abort();
++  const controller = new AbortController();
++  const timeoutId = setTimeout(() => controller.abort(), MODEL_DISCOVERY_TIMEOUT_MS);
++  const abortFromCaller = () => controller.abort();
++  let rejectOnAbort: (() => void) | undefined;
++  // Bound both headers and body even if a native/proxy transport ignores abort.
++  const cancelled = new Promise<never>((_, reject) => {
++    rejectOnAbort = () => reject(new DOMException('Aborted', 'AbortError'));
++    controller.signal.addEventListener('abort', rejectOnAbort, { once: true });
++  });
    if (signal?.aborted) abortFromCaller();
    signal?.addEventListener('abort', abortFromCaller, { once: true });
    try {
 -    const requestUrl = getModelListRequestUrl(baseUrl, accountManaged);
-+    const requestUrl = isAccountReference(apiKey) ? `${baseUrl}/models` : getModelListRequestUrl(baseUrl, accountManaged);
-     const response = await fetchModelDiscovery(requestUrl, {
-       headers: {
-         Authorization: `Bearer ${apiKey}`,
-@@ -240,7 +241,7 @@ function getModelListRequestUrl(
+-    const response = await fetchModelDiscovery(requestUrl, {
+-      headers: {
+-        Authorization: `Bearer ${apiKey}`,
+-        'Cache-Control': 'no-cache',
+-      },
+-      cache: 'no-store',
+-      ...(controller ? { signal: controller.signal } : {}),
+-    }, MODEL_DISCOVERY_TIMEOUT_MS);
+-
+-    const rawText = await response.text();
+-    if (!response.ok) {
+-      const detail = extractDiscoveryErrorMessage(rawText, `获取模型列表失败: HTTP ${response.status}`);
+-      throw new Error(
+-        [401, 403].includes(response.status)
+-          ? `API Key 无效或无模型访问权限（HTTP ${response.status}），请检查渠道和令牌配置：${detail}`
+-          : detail
+-      );
+-    }
+-
+-    return rawText;
++    const request = (async () => {
++      controller.signal.throwIfAborted();
++      const requestUrl = isAccountReference(apiKey) ? `${baseUrl}/models` : getModelListRequestUrl(baseUrl, accountManaged);
++      const response = await fetchModelDiscovery(requestUrl, {
++        headers: {
++          Authorization: `Bearer ${apiKey}`,
++          'Cache-Control': 'no-cache',
++        },
++        cache: 'no-store',
++        signal: controller.signal,
++      }, MODEL_DISCOVERY_TIMEOUT_MS);
++      controller.signal.throwIfAborted();
++      const rawText = await response.text();
++      controller.signal.throwIfAborted();
++      if (!response.ok) {
++        const detail = extractDiscoveryErrorMessage(rawText, `获取模型列表失败: HTTP ${response.status}`);
++        throw new Error(
++          [401, 403].includes(response.status)
++            ? `API Key 无效或无模型访问权限（HTTP ${response.status}），请检查渠道和令牌配置：${detail}`
++            : detail
++        );
++      }
++      return rawText;
++    })();
++    return await Promise.race([request, cancelled]);
+   } catch (error) {
+-    if (controller?.signal.aborted && !signal?.aborted) {
+-      throw new Error('模型列表请求超时，请稍后重试');
++    if (controller.signal.aborted && !signal?.aborted) {
++      throw new Error('模型列表请求超时，请检查网络后重试');
+     }
+     throw error;
+   } finally {
+-    if (timeoutId !== undefined) clearTimeout(timeoutId);
++    clearTimeout(timeoutId);
++    if (rejectOnAbort) controller.signal.removeEventListener('abort', rejectOnAbort);
+     signal?.removeEventListener('abort', abortFromCaller);
+   }
+ }
+@@ -240,7 +249,7 @@ function getModelListRequestUrl(
    baseUrl: string,
    accountManaged: boolean
  ): string {
@@ -6502,7 +7494,7 @@ index 314fa85..579ea48 100644
      return `${baseUrl}/models`;
    }
  
-@@ -292,7 +293,7 @@ async function fetchRemoteModelListWithFallback(
+@@ -292,7 +301,7 @@ async function fetchRemoteModelListWithFallback(
  ): Promise<string> {
    const baseUrls = buildModelDiscoveryBaseUrls(
      primaryBaseUrl,
@@ -6511,6 +7503,14 @@ index 314fa85..579ea48 100644
    );
    let lastFetchError: unknown = null;
  
+@@ -305,6 +314,7 @@ async function fetchRemoteModelListWithFallback(
+         accountManaged
+       );
+     } catch (error) {
++      if (signal?.aborted) throw error;
+       if (error instanceof Error && !/failed to fetch/i.test(error.message)) {
+         throw error;
+       }
 diff --git a/packages/drawnix/src/utils/tauri-env.ts b/packages/drawnix/src/utils/tauri-env.ts
 index b20d61e..b2260c0 100644
 --- a/packages/drawnix/src/utils/tauri-env.ts

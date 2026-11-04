@@ -6144,6 +6144,14 @@
       "path": "openspec/changes/sync-assistant-creative-features/tasks.md",
       "origin": "assistant-integration",
       "reason": "Current assistant feature sync requirements and source compatibility (UC-SYNC-FEATURE-01)"
+    },
+    {
+      "path": "packages/drawnix/src/components/dialog/ConfirmDialog.test.tsx",
+      "reason": "Assistant regression: scoped confirmation and single-click model discovery."
+    },
+    {
+      "path": "packages/drawnix/src/components/settings-dialog/__tests__/model-fetch-interaction.test.tsx",
+      "reason": "Assistant regression: scoped confirmation and single-click model discovery."
     }
   ],
   "integration": {

@@ -3,7 +3,7 @@ import { CreativeWorkspace } from "@/features/creative/CreativeWorkspace";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 import { nativePreviewIPC } from "./native-tool-fixture";
 // Synthetic provider workspace. No real IPC, filesystem or external requests.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
@@ -547,6 +547,17 @@ function Canvas() {
     </div>
   );
 }
+function ModelFetchProof() {
+  const [attempts, setAttempts] = useState(0);
+  useEffect(() => {
+    const record = (event: Event) => setAttempts((event as CustomEvent<number>).detail);
+    window.addEventListener('synthetic-model-request', record);
+    return () => window.removeEventListener('synthetic-model-request', record);
+  }, []);
+  return <output style={{ position: 'fixed', top: 2, right: 8, zIndex: 40000, background: 'white' }}>
+    隔离合成模型请求：{attempts} 次 · {params.get('model-fetch-qa') === 'stall' ? '首次模拟无响应' : '延迟 3 秒 · 首次模拟失败'}
+  </output>;
+}
 function Preview() {
   const [width, setWidth] = useState(1000);
   const [theme, setTheme] = useState("light");
@@ -602,6 +613,7 @@ function Preview() {
 createRoot(document.getElementById("root")!).render(
   params.has("canvas") ? (
     <QueryClientProvider client={client}>
+      {params.has("model-fetch-qa") && <ModelFetchProof />}
       <ThemeProvider
         defaultTheme={params.get("theme") === "dark" ? "dark" : "light"}
         storageKey={`ui04-${params.get("theme")}`}

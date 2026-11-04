@@ -15,8 +15,8 @@ const DESKTOP_PHASE_LABELS: Record<ImageGenerationAnchorPhase, string> = {
   submitted: '准备生成',
   queued: '等待执行',
   generating: '生成中',
-  developing: '正在显影',
-  inserting: '正在放入画布',
+  developing: '正在加载图片',
+  inserting: '正在加载图片',
   completed: '已完成',
   failed: '生成失败',
 };
@@ -115,6 +115,7 @@ export class ImageGenerationAnchorGenerator {
     const rect = RectangleClient.getRectangleByPoints(element.points);
     const isFailed = element.phase === 'failed';
     const isCompleted = element.phase === 'completed';
+    const isLoadingImage = element.phase === 'developing' || element.phase === 'inserting';
     const accent = isFailed ? '#c15a5a' : '#25755e';
     const background = isFailed
       ? '#fffafa'
@@ -138,7 +139,7 @@ export class ImageGenerationAnchorGenerator {
 
     host.setAttribute(
       'aria-label',
-      `${DESKTOP_PHASE_LABELS[element.phase]}：${subtitle}`
+      isLoadingImage ? phaseLabel : `${phaseLabel}：${subtitle}`
     );
 
     const backgroundRect = createSvgElement('rect');
@@ -235,7 +236,7 @@ export class ImageGenerationAnchorGenerator {
     }
 
     const centerX = rect.x + rect.width / 2;
-    const spinning = !isFailed && !isCompleted;
+    const spinning = !isFailed && !isCompleted && !isLoadingImage;
     const spinnerRadius = compact ? 10 : Math.min(28, minDimension * 0.1);
     const contentCenterY =
       rect.y +
@@ -302,7 +303,7 @@ export class ImageGenerationAnchorGenerator {
     title.textContent = phaseLabel;
     host.appendChild(title);
 
-    if (!compact) {
+    if (!compact && !isLoadingImage) {
       const maxChars = Math.max(
         12,
         Math.floor((rect.width - padding * 2) / 13)

@@ -42,7 +42,7 @@ async fn connected() -> (Arc<AccountService>, Fixture, tokio::task::JoinHandle<(
             "/api/user/self/bootstrap" => Json(json!({"success":true,"data":{"id":7,"username":"synthetic-user"}})).into_response(),
             "/api/token/9" => Json(json!({"success":true,"data":{"id":9,"name":"Synthetic","key":"****1234","status":if mode=="disabled" {2} else {1},"group":"default","expired_time":-1,"remain_quota":100,"used_quota":0,"unlimited_quota":true,"model_limits_enabled":false,"model_limits":""}})).into_response(),
             "/api/token/9/key" => Json(json!({"success":true,"data":{"key":"SYNTHETIC_CREATIVE_KEY"}})).into_response(),
-            "/v1/models" => Json(json!({"data":[{"id":"synthetic","supported_endpoint_types":["openai-image"]}]})).into_response(),
+            "/v1/models" => Json(json!({"data":[{"id":"synthetic","supported_endpoint_types":["generate","edit"]}]})).into_response(),
             "/v1/images/generations" => {
                 *f.submissions.lock().unwrap() += 1;
                 f.entered.notify_one();

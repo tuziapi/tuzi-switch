@@ -6,6 +6,7 @@ import {
 import type { DesktopRequest } from "@/lib/api/account";
 import type { DesktopKey, DesktopPricing } from "@/lib/api/desktop";
 let mode = "normal";
+let creativeModelAttempts = 0;
 export function setAccountPreviewMode(value: string) {
   mode = value;
 }
@@ -158,6 +159,15 @@ export async function accountPreviewIPC(command: string, args?: unknown) {
   if(command === "creative_account_request") {
     const {request,onChunk}=args as {request:{action:string;bindingId:string};onChunk:{onmessage:(value:unknown)=>void}};
     if(request.action!=="models" || !creativeBindings.some(item=>item.id===request.bindingId)) throw "creative_action_unsupported";
+    if (new URLSearchParams(location.search).has('model-fetch-qa')) {
+      creativeModelAttempts += 1;
+      window.dispatchEvent(new CustomEvent('synthetic-model-request', { detail: creativeModelAttempts }));
+      if (new URLSearchParams(location.search).get('model-fetch-qa') === 'stall' && creativeModelAttempts === 1) {
+        await new Promise(() => {}); // Intentionally ignore cancellation to test the UI deadline.
+      }
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      if (creativeModelAttempts === 1) throw 'creative_account_unavailable';
+    }
     onChunk.onmessage({type:"start",status:200,content_type:"application/json"});
     onChunk.onmessage({type:"data",data:btoa(JSON.stringify({data:[
       {id:"gpt-image-2",supported_endpoint_types:["image-generation"],endpoints:{"image-generation":{path:"/v1/images/generations",method:"POST"}}},

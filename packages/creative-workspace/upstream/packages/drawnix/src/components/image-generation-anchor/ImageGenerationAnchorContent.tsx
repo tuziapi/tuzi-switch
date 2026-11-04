@@ -37,8 +37,8 @@ const PHASE_CENTER_LABELS = {
   submitted: '等待执行',
   queued: '等待执行',
   generating: '生成中',
-  developing: '正在显影',
-  inserting: '正在显现',
+  developing: '正在加载图片',
+  inserting: '正在加载图片',
   completed: '',
   failed: '生成失败',
 } as const;
@@ -80,7 +80,9 @@ export const ImageGenerationAnchorContent: React.FC<
     viewModel.progressMode === 'determinate' && viewModel.progress != null;
   const progressValue = Math.round(viewModel.progress ?? 0);
   const showCenterLabel = viewModel.phase !== 'completed';
-  const centerLabel = isStack
+  const centerLabel = isRenderingResult
+    ? '正在加载图片'
+    : isStack
     ? batchPreview?.statusText || PHASE_CENTER_LABELS[viewModel.phase]
     : showDeterminateProgress
     ? getImageTaskProgressStatusText(progressValue)
@@ -270,7 +272,7 @@ export const ImageGenerationAnchorContent: React.FC<
             tone={progressTone}
             statusText={centerLabel}
             compact
-            showRing={showRing || viewModel.phase === 'failed'}
+            showRing={!isRenderingResult && (showRing || viewModel.phase === 'failed')}
             className="image-generation-anchor__progress-display"
           />
         ) : null}

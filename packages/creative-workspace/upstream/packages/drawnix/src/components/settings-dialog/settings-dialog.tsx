@@ -1227,6 +1227,22 @@ export const SettingsDialog = ({
   const [modelSearchQuery, setModelSearchQuery] = useState('');
   const [discoveryDialogOpen, setDiscoveryDialogOpen] = useState(false);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const modelFetchRef = useRef<AbortController | null>(null);
+  const [modelFetchError, setModelFetchError] = useState('');
+  useEffect(() => {
+    setIsFetchingModels(false);
+    setModelFetchError('');
+    setDiscoveryDialogOpen(false);
+    return () => {
+      if (modelFetchRef.current) {
+        modelFetchRef.current.abort();
+        if (runtimeModelDiscovery.getState(selectedProfileId).status === 'loading') {
+          runtimeModelDiscovery.setError(selectedProfileId, '模型获取已取消，请重新获取');
+        }
+        modelFetchRef.current = null;
+      }
+    };
+  }, [selectedProfileId, appState.openSettings]);
   const [customModelId, setCustomModelId] = useState('');
   const [customModelType, setCustomModelType] = useState<ModelType>('image');
   const [customModelLabel, setCustomModelLabel] = useState('');
@@ -2426,35 +2442,41 @@ export const SettingsDialog = ({
   };
 
   const handleFetchModels = async () => {
-    if (isFetchingModels) return;
+    if (modelFetchRef.current || isPersisting) return;
     if (!selectedProfile) {
       MessagePlugin.warning('请先选择供应商配置');
       return;
     }
 
-    if (hasPendingChanges) {
-      const saved = await persistDrafts(false);
-      if (!saved) {
-        return;
-      }
-    }
-
-    let trimmedApiKey = selectedProfile.apiKey.trim();
-    const normalizedBaseUrl = normalizeModelApiBaseUrl(
-      selectedProfile.baseUrl.trim() || TUZI_PROVIDER_DEFAULT_BASE_URL
-    );
-
-    if (!trimmedApiKey) {
-      const apiKey = await promptForApiKey({
-        contextId: selectedProfile.id, providerName: selectedProfile.name, showTuziGuide: isSelectedTuziProfile,
-        onSave: async (key) => { updateProfile(selectedProfile.id, (profile) => ({ ...profile, apiKey: key })); },
-      });
-      if (!apiKey) return;
-      trimmedApiKey = apiKey;
-    }
-
+    const controller = new AbortController();
+    modelFetchRef.current = controller;
     setIsFetchingModels(true);
+    setModelFetchError('');
     try {
+      if (hasPendingChanges) {
+        const saved = await persistDrafts(false);
+        if (!saved) {
+          if (!controller.signal.aborted) setModelFetchError('配置保存失败，尚未获取模型，请重新保存后重试。');
+          return;
+        }
+      }
+
+      controller.signal.throwIfAborted();
+      let trimmedApiKey = selectedProfile.apiKey.trim();
+      const normalizedBaseUrl = normalizeModelApiBaseUrl(
+        selectedProfile.baseUrl.trim() || TUZI_PROVIDER_DEFAULT_BASE_URL
+      );
+
+      if (!trimmedApiKey) {
+        const apiKey = await promptForApiKey({
+          contextId: selectedProfile.id, providerName: selectedProfile.name, showTuziGuide: isSelectedTuziProfile,
+          onSave: async (key) => { updateProfile(selectedProfile.id, (profile) => ({ ...profile, apiKey: key })); },
+        });
+        if (!apiKey) return;
+        trimmedApiKey = apiKey;
+      }
+
+      controller.signal.throwIfAborted();
       analytics.trackUIInteraction({
         area: 'settings',
         action: 'model_discovery_started',
@@ -2471,8 +2493,9 @@ export const SettingsDialog = ({
         isSelectedTuziProfile
           ? tuziApiEndpointOptions.map((endpoint) => endpoint.url)
           : [],
-        { forceMarketplaceRefresh: true }
+        { signal: controller.signal }
       );
+      controller.signal.throwIfAborted();
       analytics.trackUIInteraction({
         area: 'settings',
         action: 'model_discovery_succeeded',
@@ -2482,6 +2505,7 @@ export const SettingsDialog = ({
       });
       setDiscoveryDialogOpen(true);
     } catch (error) {
+      if (controller.signal.aborted) return;
       const message = error instanceof Error ? error.message : '模型同步失败';
       analytics.trackUIInteraction({
         area: 'settings',
@@ -2493,13 +2517,17 @@ export const SettingsDialog = ({
           error: message,
         },
       });
+      setModelFetchError(message);
       runtimeModelDiscovery.setError(selectedProfile.id, message);
       MessagePlugin.error({
         content: message,
         duration: 3600,
       });
     } finally {
-      setIsFetchingModels(false);
+      if (modelFetchRef.current === controller) {
+        modelFetchRef.current = null;
+        setIsFetchingModels(false);
+      }
     }
   };
 
@@ -3887,7 +3915,7 @@ export const SettingsDialog = ({
                   }}
                   onClick={handleFetchModels}
                   disabled={
-                    !selectedProfile || isFetchingModels || runtimeState.status === 'loading'
+                    !selectedProfile || isPersisting || isFetchingModels || runtimeState.status === 'loading'
                   }
                 >
                   {isFetchingModels || runtimeState.status === 'loading' ? (
@@ -3896,13 +3924,14 @@ export const SettingsDialog = ({
                         size={15}
                         className="settings-dialog__button-spinner"
                       />
-                      同步中
+                      {isPersisting ? '正在保存…' : '正在获取模型…'}
                     </>
                   ) : (
                     import.meta.env.VITE_TUZI_ASSISTANT === 'true' && hasPendingChanges ? '保存并获取模型' : '获取模型'
                   )}
                 </button>
               </div>
+              {modelFetchError && <p role="alert">{modelFetchError}</p>}
             </div>
           </div>
         </div>

@@ -3,7 +3,10 @@ import type {
   ProviderCatalog,
   ProviderProfile,
 } from '../utils/settings-manager';
-import { discoverProviderModels } from './provider-model-catalog';
+import {
+  discoverProviderModels,
+  MODEL_METADATA_WAIT_MS,
+} from './provider-model-catalog';
 import { runtimeModelDiscovery } from '../utils/runtime-model-discovery';
 
 const mocks = vi.hoisted(() => ({
@@ -88,7 +91,10 @@ describe('provider model catalog', () => {
       },
     });
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
 
   it('uses the current key for discovery and only enriches returned model IDs', async () => {
     const fetchMock = mockModels([
@@ -101,7 +107,7 @@ describe('provider model catalog', () => {
       {
         forceMarketplaceRefresh: true,
         selectAll: true,
-      }
+      },
     );
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledWith(
@@ -112,7 +118,7 @@ describe('provider model catalog', () => {
           'Cache-Control': 'no-cache',
         },
         cache: 'no-store',
-      })
+      }),
     );
     expect(models.map((model) => model.id)).toEqual([
       'configured-renderer',
@@ -124,7 +130,7 @@ describe('provider model catalog', () => {
       description: 'Marketplace image',
     });
     expect(
-      runtimeModelDiscovery.getSelectedModelIds('tuzi-token-default')
+      runtimeModelDiscovery.getSelectedModelIds('tuzi-token-default'),
     ).toEqual(['configured-renderer', 'key-only-model']);
     expect(mocks.fetchAndCache).toHaveBeenCalledWith(
       'tuzi-token-default',
@@ -132,10 +138,10 @@ describe('provider model catalog', () => {
       'test-key',
       'default',
       0.7,
-      { force: true }
+      { force: true },
     );
     expect(
-      runtimeModelDiscovery.getState('tuzi-token-default').discoverySource
+      runtimeModelDiscovery.getState('tuzi-token-default').discoverySource,
     ).toBe('models-endpoint');
   });
 
@@ -153,7 +159,7 @@ describe('provider model catalog', () => {
                   : 'model-b',
             },
           ],
-        })
+        }),
       );
     vi.stubGlobal('fetch', fetchMock);
     for (const key of ['key-a', 'key-b']) {
@@ -168,13 +174,13 @@ describe('provider model catalog', () => {
     }
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(
-      runtimeModelDiscovery.getSelectedModelIds('tuzi-token-default')
+      runtimeModelDiscovery.getSelectedModelIds('tuzi-token-default'),
     ).toEqual(['model-b']);
     expect(
       runtimeModelDiscovery.getPinnedSelectableModel('text', 'model-a', {
         profileId: 'tuzi-token-default',
         modelId: 'model-a',
-      })
+      }),
     ).toBeNull();
   });
 
@@ -186,32 +192,32 @@ describe('provider model catalog', () => {
         .mockResolvedValue(
           Response.json(
             { error: { message: 'Invalid API key' } },
-            { status: 401 }
-          )
-        )
+            { status: 401 },
+          ),
+        ),
     );
     await expect(discoverProviderModels(profile())).rejects.toThrow(
-      'Invalid API key'
+      'Invalid API key',
     );
     expect(
-      runtimeModelDiscovery.getDiscoveredModels('tuzi-token-default')
+      runtimeModelDiscovery.getDiscoveredModels('tuzi-token-default'),
     ).toEqual([]);
   });
 
   it('rejects an empty authenticated list instead of filling it from pricing', async () => {
     mockModels([]);
     await expect(discoverProviderModels(profile())).rejects.toThrow(
-      '模型列表为空'
+      '模型列表为空',
     );
   });
 
   it('continues authenticated discovery when the marketplace fails', async () => {
     mocks.fetchAndCache.mockRejectedValueOnce(
-      new Error('Pricing API error: 503')
+      new Error('Pricing API error: 503'),
     );
     mockModels([{ id: 'key-only-model' }]);
     expect(
-      (await discoverProviderModels(profile())).map((model) => model.id)
+      (await discoverProviderModels(profile())).map((model) => model.id),
     ).toEqual(['key-only-model']);
   });
 
@@ -223,9 +229,9 @@ describe('provider model catalog', () => {
       else mocks.fetchAndCache.mockResolvedValueOnce({ prices: {} });
       mockModels([{ id: 'key-only-model' }]);
       expect(
-        (await discoverProviderModels(profile())).map((model) => model.id)
+        (await discoverProviderModels(profile())).map((model) => model.id),
       ).toEqual(['key-only-model']);
-    }
+    },
   );
 
   it('prefers authenticated metadata over conflicting marketplace metadata', async () => {
@@ -242,6 +248,100 @@ describe('provider model catalog', () => {
     });
   });
 
+  it('bounds optional pricing latency and never adds public-only models', async () => {
+    vi.useFakeTimers();
+    mocks.fetchAndCache.mockReturnValueOnce(new Promise(() => {}));
+    const fetchMock = mockModels([{ id: 'key-only-model' }]);
+    const result = discoverProviderModels(profile());
+    await vi.advanceTimersByTimeAsync(MODEL_METADATA_WAIT_MS + 1);
+    expect((await result).map((model) => model.id)).toEqual(['key-only-model']);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('cancels while waiting for metadata without starting a model request', async () => {
+    mocks.fetchAndCache.mockReturnValueOnce(new Promise(() => {}));
+    const fetchMock = mockModels([{ id: 'key-only-model' }]);
+    const controller = new AbortController();
+    const result = discoverProviderModels(profile(), [], {
+      signal: controller.signal,
+    });
+    const rejected = expect(result).rejects.toThrow();
+    controller.abort();
+    await rejected;
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['headers', 'body'])(
+    'times out a stalled %s even when transport ignores abort, then allows retry',
+    async (stage) => {
+      vi.useFakeTimers();
+      const never = new Promise<Response>(() => {});
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          stage === 'headers'
+            ? never
+            : {
+                ok: true,
+                text: () => new Promise(() => {}),
+              },
+        )
+        .mockResolvedValueOnce(
+          Response.json({ data: [{ id: 'recovered-model' }] }),
+        );
+      vi.stubGlobal('fetch', fetchMock);
+      const current = profile({
+        id: 'custom-provider',
+        baseUrl: 'https://synthetic.invalid/v1',
+      });
+      mocks.profiles = [current];
+      const pending = discoverProviderModels(current);
+      const failure = expect(pending).rejects.toThrow('模型列表请求超时');
+      await vi.advanceTimersByTimeAsync(15001);
+      await failure;
+      expect(
+        (await discoverProviderModels(current)).map((model) => model.id),
+      ).toEqual(['recovered-model']);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('ignores a late response after cancellation', async () => {
+    let finish!: (value: Response) => void;
+    const delayed = new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(delayed)
+      .mockResolvedValueOnce(
+        Response.json({ data: [{ id: 'current-model' }] }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const current = profile({
+      id: 'custom-provider',
+      baseUrl: 'https://synthetic.invalid/v1',
+    });
+    mocks.profiles = [current];
+    const controller = new AbortController();
+    const pending = discoverProviderModels(current, [], {
+      signal: controller.signal,
+    });
+    const rejected = expect(pending).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    controller.abort();
+    await rejected;
+    await discoverProviderModels(current);
+    finish(Response.json({ data: [{ id: 'stale-model' }] }));
+    await Promise.resolve();
+    expect(
+      runtimeModelDiscovery
+        .getDiscoveredModels(current.id)
+        .map((model) => model.id),
+    ).toEqual(['current-model']);
+  });
+
   it('keeps authenticated discovery for non-Tuzi providers without fetching pricing', async () => {
     const current = profile({
       id: 'custom-provider',
@@ -250,14 +350,14 @@ describe('provider model catalog', () => {
     mocks.profiles = [current];
     const fetchMock = mockModels([{ id: 'custom-model' }]);
     expect(
-      (await discoverProviderModels(current)).map((model) => model.id)
+      (await discoverProviderModels(current)).map((model) => model.id),
     ).toEqual(['custom-model']);
     expect(mocks.fetchAndCache).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(
       'https://models.example.com/v1/models',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer test-key' }),
-      })
+      }),
     );
   });
 });

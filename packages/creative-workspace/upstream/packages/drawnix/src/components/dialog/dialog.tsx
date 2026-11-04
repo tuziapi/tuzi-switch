@@ -137,14 +137,14 @@ export const DialogTrigger = React.forwardRef<
 export const DialogContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLProps<HTMLDivElement> & { container?: HTMLElement | null }
->(function DialogContent(props, propRef) {
+>(function DialogContent({ container, ...props }, propRef) {
   const { context: floatingContext, ...context } = useDialogContext();
   const ref = useMergeRefs([context.refs.setFloating, propRef]);
 
   if (!floatingContext.open) return null;
 
   return (
-    <FloatingPortal root={props.container}>
+    <FloatingPortal root={container ?? document.getElementById('creative-portals') ?? undefined}>
       <FloatingOverlay className="Dialog-overlay" lockScroll>
         <FloatingFocusManager context={floatingContext}>
           <div

@@ -1,5 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createCreativeAccountBridge } from "@/features/creative/accountBridge";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createCreativeAccountBridge,
+  creativeError,
+} from "@/features/creative/accountBridge";
 import { disconnectedAccount } from "@/lib/api/account";
 import { requestCreativeManual } from "@/features/creative/manualTransport";
 
@@ -27,8 +30,24 @@ beforeEach(() => {
   mocks.invoke.mockReset();
   mocks.desktop.mockReset();
 });
+afterEach(() => vi.useRealTimers());
 
 describe("creative account native boundary", () => {
+  it.each([
+    ["network_uncertain", "尚未提交生成请求"],
+    ["model_list_unavailable", "模型列表无法读取"],
+    ["rate_limited", "校验请求过于频繁"],
+    ["invalid_model", "未包含有效模型"],
+    ["invalid_token", "系统令牌已失效"],
+  ])(
+    "explains safe native failure %s without raw diagnostics",
+    (code, message) => {
+      expect(creativeError(code).message).toContain(message);
+      expect(
+        creativeError({ code, message: "sk-SYNTHETIC-SECRET" }).message,
+      ).not.toContain("SYNTHETIC");
+    },
+  );
   it("passes source references and generation without renderer credentials", async () => {
     mocks.invoke.mockImplementation(async (command, args) => {
       expect(command).toBe("creative_account_request");
@@ -114,6 +133,7 @@ describe("creative account native boundary", () => {
   it("does not expose native diagnostics or leave an unfinished stream hanging", async () => {
     mocks.invoke.mockRejectedValue("upstream says sk-SYNTHETIC-SECRET");
     await expect(send()).rejects.toThrow("配置操作失败");
+    vi.useFakeTimers();
     mocks.invoke.mockImplementation(async (_, args) => {
       args.onChunk.onmessage({
         type: "start",
@@ -122,7 +142,82 @@ describe("creative account native boundary", () => {
       });
     });
     const response = await send();
-    await expect(response.text()).rejects.toThrow("结果待确认");
+    const rejected = expect(response.text()).rejects.toThrow("结果待确认");
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejected;
+  });
+  it.each(["account", "manual"])(
+    "waits for delayed large %s channel data after command success",
+    async (transport) => {
+      vi.useFakeTimers();
+      const payload = JSON.stringify({
+        data: [{ b64_json: "synthetic-image-".repeat(8192) }],
+      });
+      mocks.invoke.mockImplementation(async (_, args) => {
+        args.onChunk.onmessage({ type: "ready" });
+        args.onChunk.onmessage({
+          type: "start",
+          status: 200,
+          content_type: "application/json",
+        });
+        setTimeout(() => {
+          args.onChunk.onmessage({ type: "data", data: btoa(payload) });
+          args.onChunk.onmessage({ type: "end" });
+        }, 100);
+      });
+      const response = await (transport === "account"
+        ? send()
+        : requestCreativeManual("https://example.invalid/v1/models"));
+      const body = response.text();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(await body).toBe(payload);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("accepts headers delivered after command success", async () => {
+    vi.useFakeTimers();
+    mocks.invoke.mockImplementation(async (_, args) => {
+      setTimeout(() => {
+        args.onChunk.onmessage({
+          type: "start",
+          status: 200,
+          content_type: "application/json",
+        });
+        args.onChunk.onmessage({ type: "data", data: btoa('{"data":[]}') });
+        args.onChunk.onmessage({ type: "end" });
+      }, 100);
+    });
+    const pending = send();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await (await pending).json()).toEqual({ data: [] });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("cancels during channel draining without replay or accepting late chunks", async () => {
+    vi.useFakeTimers();
+    let channel: { onmessage: (message: unknown) => void };
+    mocks.invoke.mockImplementation(async (command, args) => {
+      if (command === "account_cancel_request") return;
+      channel = args.onChunk;
+      channel.onmessage({
+        type: "start",
+        status: 200,
+        content_type: "application/json",
+      });
+    });
+    const controller = new AbortController();
+    const response = await send("/v1/models", { signal: controller.signal });
+    const rejected = expect(response.text()).rejects.toThrow("Aborted");
+    controller.abort();
+    await rejected;
+    channel!.onmessage({ type: "data", data: btoa("late") });
+    channel!.onmessage({ type: "end" });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mocks.invoke.mock.calls.map(([command]) => command)).toEqual([
+      "creative_account_request",
+      "account_cancel_request",
+    ]);
+    expect(vi.getTimerCount()).toBe(0);
   });
   it("fetches an explicitly selected Key outside the current page", async () => {
     mocks.desktop

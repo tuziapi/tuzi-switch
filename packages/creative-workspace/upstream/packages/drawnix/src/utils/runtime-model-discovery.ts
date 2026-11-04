@@ -196,43 +196,51 @@ async function fetchRemoteModelList(
   signal?: AbortSignal,
   accountManaged = false
 ): Promise<string> {
-  const controller =
-    typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timeoutId = controller
-    ? setTimeout(() => controller.abort(), MODEL_DISCOVERY_TIMEOUT_MS)
-    : undefined;
-  const abortFromCaller = () => controller?.abort();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), MODEL_DISCOVERY_TIMEOUT_MS);
+  const abortFromCaller = () => controller.abort();
+  let rejectOnAbort: (() => void) | undefined;
+  // Bound both headers and body even if a native/proxy transport ignores abort.
+  const cancelled = new Promise<never>((_, reject) => {
+    rejectOnAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+    controller.signal.addEventListener('abort', rejectOnAbort, { once: true });
+  });
   if (signal?.aborted) abortFromCaller();
   signal?.addEventListener('abort', abortFromCaller, { once: true });
   try {
-    const requestUrl = isAccountReference(apiKey) ? `${baseUrl}/models` : getModelListRequestUrl(baseUrl, accountManaged);
-    const response = await fetchModelDiscovery(requestUrl, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Cache-Control': 'no-cache',
-      },
-      cache: 'no-store',
-      ...(controller ? { signal: controller.signal } : {}),
-    }, MODEL_DISCOVERY_TIMEOUT_MS);
-
-    const rawText = await response.text();
-    if (!response.ok) {
-      const detail = extractDiscoveryErrorMessage(rawText, `获取模型列表失败: HTTP ${response.status}`);
-      throw new Error(
-        [401, 403].includes(response.status)
-          ? `API Key 无效或无模型访问权限（HTTP ${response.status}），请检查渠道和令牌配置：${detail}`
-          : detail
-      );
-    }
-
-    return rawText;
+    const request = (async () => {
+      controller.signal.throwIfAborted();
+      const requestUrl = isAccountReference(apiKey) ? `${baseUrl}/models` : getModelListRequestUrl(baseUrl, accountManaged);
+      const response = await fetchModelDiscovery(requestUrl, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Cache-Control': 'no-cache',
+        },
+        cache: 'no-store',
+        signal: controller.signal,
+      }, MODEL_DISCOVERY_TIMEOUT_MS);
+      controller.signal.throwIfAborted();
+      const rawText = await response.text();
+      controller.signal.throwIfAborted();
+      if (!response.ok) {
+        const detail = extractDiscoveryErrorMessage(rawText, `获取模型列表失败: HTTP ${response.status}`);
+        throw new Error(
+          [401, 403].includes(response.status)
+            ? `API Key 无效或无模型访问权限（HTTP ${response.status}），请检查渠道和令牌配置：${detail}`
+            : detail
+        );
+      }
+      return rawText;
+    })();
+    return await Promise.race([request, cancelled]);
   } catch (error) {
-    if (controller?.signal.aborted && !signal?.aborted) {
-      throw new Error('模型列表请求超时，请稍后重试');
+    if (controller.signal.aborted && !signal?.aborted) {
+      throw new Error('模型列表请求超时，请检查网络后重试');
     }
     throw error;
   } finally {
-    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
+    if (rejectOnAbort) controller.signal.removeEventListener('abort', rejectOnAbort);
     signal?.removeEventListener('abort', abortFromCaller);
   }
 }
@@ -306,6 +314,7 @@ async function fetchRemoteModelListWithFallback(
         accountManaged
       );
     } catch (error) {
+      if (signal?.aborted) throw error;
       if (error instanceof Error && !/failed to fetch/i.test(error.message)) {
         throw error;
       }
