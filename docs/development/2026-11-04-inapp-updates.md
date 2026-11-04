@@ -26,4 +26,20 @@ v1.5.0/v1.5.1 内置的是手动下载实现，需手动安装一次 v1.5.2。�
 
 本机 macOS ARM 隔离原生更新验证通过：独立应用 1.5.90 从本地签名源下载并安装为 1.5.91，Info.plist 版本正确，安装后二进制 SHA256 与目标包一致。篡改包被原生签名校验拒绝，旧二进制保持不变。验证使用独立应用与合成配置，未替换用户应用；原生 CLI 验证的是后台下载/签名/安装，UI 点击与重启顺序由合成浏览器覆盖。初次验证因 `/tmp` 符号链接和手工 tar 的 AppleDouble 元数据被拒绝，改用真实路径和干净归档后通过。正式 CI 使用 Tauri 产出的归档。
 
-相称验证：宿主 93 文件/669 项、创作 109 文件/1839 项、下载元数据8项、签名2项通过；类型、Rust 编译、renderer/下载页构建与 OpenSpec strict 通过。全量宿主曾与重建 dist 并行导致导入失败，改为构建结束后完整重跑通过。上游补丁 1513 原文件+15本地文件还原一致。生成的 patch 中空白上下文行不做破坏性 trim。正式发布结果待完成后追加。真实付费生图、Windows/Linux 用户桌面安装升级以及历史完整迁移等未完成范围不因本轮更新而视为通过。
+相称验证：宿主 93 文件/669 项、创作 109 文件/1839 项、下载元数据8项、签名2项通过；类型、Rust 编译、renderer/下载页构建与 OpenSpec strict 通过。全量宿主曾与重建 dist 并行导致导入失败，改为构建结束后完整重跑通过。上游补丁 1513 原文件+15本地文件还原一致。生成的 patch 中空白上下文行不做破坏性 trim。正式发布与公网核验已完成，详见下文。真实付费生图、Windows/Linux 用户桌面安装升级以及历史完整迁移等未完成范围不因本轮更新而视为通过。
+
+
+补充：已核对 Tauri 能力许可包含独立 download/install 与 process restart，fork/upstream 配置分别通过仓库/公钥检查。尝试进一步操作隔离原生界面的按钮时，本机锁屏阻止 UI 控制，已关闭该临时应用；未将此次尝试计为原生点击端到端通过。真实原生后台安装与合成 UI 验证仍按上文分别记录。
+
+
+## 正式发布与公网交付
+
+- 源码提交 `1fb5ed790a0296711c36ec8ddcfb1f97f8ae5877`、标签 `v1.5.2` 已正常原子推送到 fork main 与集成分支，未强推或覆盖旧标签。
+- 云端 [run 41777314996](https://github.com/AiW520/tuzi-switch/actions/runs/41777314996) 的 verify、四个平台构建、原生回归、签名及 publish 全部成功。
+- [v1.5.2 Release](https://github.com/AiW520/tuzi-switch/releases/tag/v1.5.2) 于 2026-11-04 13:41:31（Asia/Shanghai）正式公开，Pages 于 13:42:05 部署成功。无测试版本标签；23个附件符合预期清单。
+- [公网下载页](https://aiw520.github.io/tuzi-switch/) 实测显示“下载兔子助手 v1.5.2”。Mac双架构、Windows EXE/MSI、Linux DEB/RPM/AppImage 七个 UI 选项逐项检查正确；public release.json 的 URL、大小、SHA256 与 Release 一致。本地下载预览的旧 release.json 也已同步为真实公开的 v1.5.2。
+- 实际下载22个验证附件（七个直接安装包、两个 Mac 更新归档、七个签名、四个构建 manifest、latest.json 和 SHA256SUMS），全部与 GitHub asset 摘要一致。`verify-release-assets.py` 再核对源码、版本、构建run、平台及摘要通过；七种更新包的载荷/公钥ID/可信注释签名全部通过，9个更新目标含兼容别名映射正确。源码归档另已公开，本轮未重复下载它。
+- ARM DMG 的 hdiutil 完整性检查通过；只读挂载确认内部版本1.5.2、应用ID `com.tuziswitch.desktop`、arm64；DMG和签名更新归档的程序二进制一致。两个Mac更新归档的plist版本/ID和Mach-O架构均正确。验证后卸载挂载点，没有覆盖用户应用。
+- 上游 [PR #53](https://github.com/tuziapi/tuzi-switch/pull/53) 同步代码与证据，保持 Draft，未合并。
+
+临时验证证据位于 `/tmp/tuzi-v152-delivery/`：公网下载摘要、run状态、页面元数据/截图、DMG身份、隔离原生升级记录。原生UI完整点击链受锁屏阻塞、Windows/Linux实机安装升级及真实付费生成等限制仍保留；发布成功不代表这些未完成验收通过。
