@@ -1271,6 +1271,7 @@ pub fn run() {
             tuzi_account::creative::creative_account_bindings,
             tuzi_account::creative::creative_account_bind,
             tuzi_account::creative::creative_account_request,
+            tuzi_account::creative::transport::creative_account_http_request,
             tuzi_account::account_take_open_request,
             tuzi_account::business::account_request,
             tuzi_account::business::account_cancel_request,

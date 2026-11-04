@@ -5,6 +5,8 @@ use futures::StreamExt;
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, path::Path, sync::LazyLock};
 
+pub mod transport;
+
 static BINDING_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 const MAX_BODY: usize = 64 * 1024 * 1024;
 
@@ -176,11 +178,10 @@ async fn bind(
         return Err("invalid_key_id".into());
     }
     let identity = account(&service, request.generation)?;
-    let catalog = service
-        .key_model_catalog(request.generation, &request.token_id)
+    let (key, _secret) = service
+        .creative_key(request.generation, &request.token_id)
         .await
         .map_err(|e| e.code)?;
-    let key = &catalog["key"];
     let mask = key["masked_key"].as_str().unwrap_or("");
     let tail: String = mask
         .chars()

@@ -50,14 +50,15 @@ describe("creative account native boundary", () => {
   );
   it("passes source references and generation without renderer credentials", async () => {
     mocks.invoke.mockImplementation(async (command, args) => {
-      expect(command).toBe("creative_account_request");
+      expect(command).toBe("creative_account_http_request");
       expect(args.request).toMatchObject({
         generation: 9,
         bindingId: "synthetic-binding",
-        action: "models",
+        method: "GET",
+        url: "https://api.tu-zi.com/v1/models",
       });
-      expect(args.request).not.toHaveProperty("headers");
-      expect(args.request).not.toHaveProperty("url");
+      expect(args.request.headers).not.toHaveProperty("authorization");
+      expect(args.request).not.toHaveProperty("action");
       args.onChunk.onmessage({
         type: "start",
         status: 200,
@@ -121,7 +122,7 @@ describe("creative account native boundary", () => {
     await expect(response.text()).rejects.toThrow();
     expect(
       mocks.invoke.mock.calls.filter(
-        ([name]) => name === "creative_account_request",
+        ([name]) => name === "creative_account_http_request",
       ),
     ).toHaveLength(1);
     expect(
@@ -214,7 +215,7 @@ describe("creative account native boundary", () => {
     channel!.onmessage({ type: "end" });
     await vi.advanceTimersByTimeAsync(30_000);
     expect(mocks.invoke.mock.calls.map(([command]) => command)).toEqual([
-      "creative_account_request",
+      "creative_account_http_request",
       "account_cancel_request",
     ]);
     expect(vi.getTimerCount()).toBe(0);

@@ -156,9 +156,12 @@ export async function accountPreviewIPC(command: string, args?: unknown) {
     if(request.generation!==1 || !binding) throw new Error("synthetic binding rejected");
     return binding;
   }
-  if(command === "creative_account_request") {
-    const {request,onChunk}=args as {request:{action:string;bindingId:string};onChunk:{onmessage:(value:unknown)=>void}};
-    if(request.action!=="models" || !creativeBindings.some(item=>item.id===request.bindingId)) throw "creative_action_unsupported";
+  if(command === "creative_account_request" || command === "creative_account_http_request") {
+    const {request,onChunk}=args as {request:{action?:string;bindingId:string;url?:string;method?:string};onChunk:{onmessage:(value:unknown)=>void}};
+    const modelsRequest = command === "creative_account_http_request"
+      ? request.method === "GET" && request.url === "https://api.tu-zi.com/v1/models"
+      : request.action === "models";
+    if(!modelsRequest || !creativeBindings.some(item=>item.id===request.bindingId)) throw "creative_action_unsupported";
     if (new URLSearchParams(location.search).has('model-fetch-qa')) {
       creativeModelAttempts += 1;
       window.dispatchEvent(new CustomEvent('synthetic-model-request', { detail: creativeModelAttempts }));

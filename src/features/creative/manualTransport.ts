@@ -1,34 +1,15 @@
-import { encodeCreativeBytes, nativeCreativeResponse } from "./nativeStream";
+import { nativeCreativeResponse } from "./nativeStream";
+import { prepareCreativeRequest } from "./requestTransport";
 
 export async function requestCreativeManual(
   url: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const target = new URL(url);
-  if (
-    !["http:", "https:"].includes(target.protocol) ||
-    target.username ||
-    target.password ||
-    target.hash
-  )
-    throw new Error("请填写完整的 HTTP 或 HTTPS 接口地址。");
-  init.signal?.throwIfAborted();
-  const prepared = new Request(url, init);
-  const bytes = prepared.body
-    ? new Uint8Array(await prepared.arrayBuffer())
-    : undefined;
-  if (bytes && bytes.length > 64 * 1024 * 1024)
-    throw new Error("单次上传内容不能超过 64 MB。");
+  const request = await prepareCreativeRequest(url, init);
   return nativeCreativeResponse(
     "creative_manual_request",
     "creative_manual_cancel",
-    {
-      requestId: crypto.randomUUID(),
-      url,
-      method: prepared.method,
-      headers: Object.fromEntries(prepared.headers),
-      body: bytes ? encodeCreativeBytes(bytes) : null,
-    },
+    request,
     init.signal,
     (error) =>
       new Error(

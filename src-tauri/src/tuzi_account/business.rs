@@ -827,8 +827,9 @@ impl AccountService {
         self.qualified_creative_key(generation, token_id).await.map(|(catalog, _)| catalog)
     }
 
-    // Shared native qualification; no renderer reveal and no tool-save proof mutation.
-    pub(super) async fn qualified_creative_key(
+    // Resolve an owned, active model Key without imposing another model adapter.
+    // Native memory only; never create/consume a tool-save proof.
+    pub(super) async fn creative_key(
         &self, generation: u64, token_id: &str,
     ) -> Result<(Value, zeroize::Zeroizing<String>), BusinessError> {
         let token = self.business_tokens(generation)?;
@@ -857,6 +858,14 @@ impl AccountService {
         let secret =
             zeroize::Zeroizing::new(secret["key"].as_str().ok_or_else(invalid)?.to_owned());
         self.business_tokens(generation)?;
+        Ok((current_key, secret))
+    }
+
+    // Model discovery for the account/tool UI and legacy creative requests.
+    pub(super) async fn qualified_creative_key(
+        &self, generation: u64, token_id: &str,
+    ) -> Result<(Value, zeroize::Zeroizing<String>), BusinessError> {
+        let (current_key, secret) = self.creative_key(generation, token_id).await?;
         let response = self
             .http
             .get(format!("{}/v1/models", self.origin))

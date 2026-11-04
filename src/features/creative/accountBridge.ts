@@ -7,10 +7,11 @@ import type {
   CreativeAccountKey,
 } from "@tuzi/creative-workspace";
 
+import { nativeCreativeResponse } from "./nativeStream";
 import {
-  encodeCreativeBytes as encode,
-  nativeCreativeResponse,
-} from "./nativeStream";
+  prepareCreativeRequest,
+  prepareAccountTarget,
+} from "./requestTransport";
 import { requestCreativeManual } from "./manualTransport";
 import { nativeImageAction } from "./imageActions";
 import { selectCreativeMediaAction } from "./mediaActions";
@@ -20,7 +21,12 @@ const messages: Record<string, string> = {
   creative_account_unavailable: "兔子账户未连接或已切换，请重新连接后再试。",
   creative_binding_not_found: "当前账户没有此关联，请重新选择 API Key。",
   stale_account: "账户已切换，请重新选择 API Key。",
-  creative_action_unsupported: "此接口暂未接入账户关联，可使用手动供应商配置。",
+  creative_action_unsupported: "旧版请求接口不支持此操作，请更新完整客户端。",
+  creative_destination_rejected: "账户关联请求必须使用兔子模型服务地址。",
+  invalid_headers: "请求头无效，请检查模型配置。",
+  invalid_url: "模型请求地址无效，请检查模型配置。",
+  creative_redirect_rejected:
+    "模型接口发生重定向，已停止请求，请检查模型配置。",
   model_not_qualified:
     "当前 Key 未开放此模型或未声明对应接口，请刷新模型列表或使用手动配置。",
   provider_selection_not_qualified: "此 Key 已停用、过期或额度不足。",
@@ -60,90 +66,6 @@ export function creativeError(error: unknown): Error {
       ? "模型服务拒绝了请求，请检查 Key 状态、模型权限或额度。"
       : "配置操作失败，请稍后重试。");
   return new Error(errorMessage);
-}
-function actionFor(url: string, method: string) {
-  const parsed = new URL(url);
-  if (
-    parsed.origin !== "https://api.tu-zi.com" ||
-    parsed.username ||
-    parsed.password ||
-    parsed.hash
-  )
-    throw new Error("账户关联仅支持兔子账户的受管地址。");
-  const path = parsed.pathname.replace(/\/$/, "");
-  const actions: Record<string, string> = {
-    "GET /v1/models": "models",
-    "POST /v1/images/generations": "image.generate",
-    "POST /v1/images/edits": "image.edit",
-    "POST /v1/chat/completions": "chat",
-    "POST /v1/responses": "responses",
-    "POST /v1/videos": "video.create",
-    "POST /v1/audio/speech": "audio.speech",
-    "POST /v1/audio/transcriptions": "audio.transcribe",
-  };
-  const action = actions[method + " " + path];
-  const mediaAction = selectCreativeMediaAction(parsed, method);
-  if (mediaAction) return mediaAction;
-  const allowedQuery = [
-    "ch",
-    "tuzi_client",
-    "client_channel",
-    "channel",
-    "request_id",
-    "id",
-    "alt",
-  ];
-  if (
-    [...parsed.searchParams.keys()].some((key) => !allowedQuery.includes(key))
-  )
-    throw new Error("账户关联不支持此请求参数。");
-  if (action) return { action };
-  if (method === "GET" && path === "/log/get-request")
-    return {
-      action: "image.result",
-      taskId: parsed.searchParams.get("id") || "",
-    };
-  const video = path.match(/^\/v1\/videos\/([\w.-]+)(\/content)?$/);
-  if (method === "GET" && video)
-    return {
-      action: video[2] ? "video.content" : "video.poll",
-      taskId: video[1],
-    };
-  if (method === "GET" && path === "/v1/images/generations/result")
-    return {
-      action: "image.result",
-      taskId: parsed.searchParams.get("request_id") || "",
-    };
-  const gemini = path.match(
-    /^\/v1beta\/models\/([\w.-]+):(generateContent|streamGenerateContent)$/,
-  );
-  if (method === "POST" && gemini)
-    return {
-      action:
-        gemini[2] === "generateContent" ? "gemini.generate" : "gemini.stream",
-      model: gemini[1],
-    };
-  throw creativeError("creative_action_unsupported");
-}
-async function bodyFor(body: BodyInit | null | undefined) {
-  if (body == null) return {};
-  if (body instanceof FormData) {
-    const parts = [];
-    for (const [name, value] of body.entries()) {
-      parts.push(
-        typeof value === "string"
-          ? { name, value }
-          : {
-              name,
-              data: encode(new Uint8Array(await value.arrayBuffer())),
-              mime: value.type || "application/octet-stream",
-            },
-      );
-    }
-    return { parts };
-  }
-  if (typeof body === "string") return { body: JSON.parse(body) };
-  throw new Error("账户关联暂不支持这种请求格式。");
 }
 export function createCreativeAccountBridge(
   state: AccountState,
@@ -229,21 +151,17 @@ export function createCreativeAccountBridge(
       if (!reference.startsWith(PREFIX) || !reference.slice(PREFIX.length))
         throw creativeError("creative_binding_not_found");
       init.signal?.throwIfAborted();
-      const selection = actionFor(url, (init.method || "GET").toUpperCase());
-      const payload = await bodyFor(init.body);
+      const target = prepareAccountTarget(reference, url, init);
+      const request = await prepareCreativeRequest(target.url, target.init);
       init.signal?.throwIfAborted();
-      const requestId = crypto.randomUUID();
       const bindingId = reference.slice(PREFIX.length);
       return nativeCreativeResponse(
-        "creative_account_request",
+        "creative_account_http_request",
         "account_cancel_request",
         {
           generation,
           bindingId,
-          requestId,
-          upstreamRequestId: new Headers(init.headers).get("x-request-id"),
-          ...selection,
-          ...payload,
+          ...request,
         },
         init.signal,
         creativeError,

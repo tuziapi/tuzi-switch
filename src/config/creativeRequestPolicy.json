@@ -1,0 +1,28 @@
+{
+  "modelPathPrefixes": [
+    "/v1/",
+    "/v1beta/",
+    "/v2/",
+    "/kling/",
+    "/suno/",
+    "/mj/",
+    "/flux/",
+    "/minimax/"
+  ],
+  "modelPaths": ["/log/get-request"],
+  "credentialHeaders": [
+    "authorization",
+    "x-api-key",
+    "x-goog-api-key",
+    "api-key",
+    "new-api-user"
+  ],
+  "credentialQueryKeys": [
+    "key",
+    "api_key",
+    "apikey",
+    "api-key",
+    "access_token",
+    "token"
+  ]
+}
