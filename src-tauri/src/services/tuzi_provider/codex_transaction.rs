@@ -30,6 +30,10 @@ fn rows(conn: &Connection, table: &str) -> Result<Vec<Vec<rusqlite::types::Value
 fn snapshot_codex(db: &Database) -> Result<Connection, AppError> {
     let source = crate::database::lock_conn!(db.conn);
     let snapshot = Connection::open_in_memory()?;
+    // A historical/imported database can contain orphan endpoints. A recovery
+    // snapshot must faithfully retain them, not reject every new Codex save.
+    // This is a private copy only; live database constraints stay enabled.
+    snapshot.pragma_update(None, "foreign_keys", false)?;
     for table in CODEX_TABLES.iter().copied().chain(["settings"]) {
         let schema: String = source.query_row(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name=?1",
@@ -108,6 +112,31 @@ fn rollback_database(
     for table in &CODEX_TABLES[1..] {
         let old = rows(before, table)?;
         if old == rows(after, table)? {
+            continue;
+        }
+        if *table == "provider_endpoints" {
+            // Leave identical historical rows in place. Replaying the entire
+            // table would reject pre-existing orphans during compensation.
+            // Compare the current transaction after parent restoration, since
+            // deleting newly added providers may already have cascaded rows.
+            let current = rows(&tx, table)?;
+            for row in &current {
+                if !old.contains(row) {
+                    tx.execute(
+                        "DELETE FROM provider_endpoints WHERE id=?1 AND app_type='codex'",
+                        [&row[0]],
+                    )?;
+                }
+            }
+            for row in old {
+                if !current.contains(&row) {
+                    let sql = format!(
+                        "INSERT INTO provider_endpoints VALUES ({})",
+                        vec!["?"; row.len()].join(",")
+                    );
+                    tx.execute(&sql, rusqlite::params_from_iter(row))?;
+                }
+            }
             continue;
         }
         tx.execute(&format!("DELETE FROM {table} WHERE app_type='codex'"), [])?;
