@@ -14,8 +14,9 @@ export const creativeRequestFixture: SyntheticRequestState = {
   release() { for (const finish of pending) finish(); pending.clear(); },
 };
 (window as unknown as { __creativeRequestFixture: SyntheticRequestState }).__creativeRequestFixture = creativeRequestFixture;
-// A 1px synthetic PNG for persistence/decoding checks, not a generated artwork.
-const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j8uQAAAAASUVORK5CYII=';
+// Opaque 64px red/cyan checkerboard: screenshot assertions must detect painted
+// pixels, not just successful decoding of an effectively invisible 1px image.
+const png = 'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAXklEQVR4nO3QMQ0AMAwDwbAogdIqyOIokcIIhgzeTvrdOtffJ9q6L1oBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIwB6YH0QQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4xqp5OFaPsrjbQAAAABJRU5ErkJggg==';
 export async function creativeManualPreviewIPC(command: string, args: unknown) {
   const payload = args as { requestId?: string; request: { requestId: string; url: string; method: string }; onChunk: {onmessage: (value: unknown) => void} };
   if (command === 'creative_manual_cancel') { cancelled.add(payload.requestId!); creativeRequestFixture.release(); return; }

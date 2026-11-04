@@ -686,6 +686,26 @@
  };
  
  export default ImageEditor;
+--- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
++++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
+@@ -6,7 +6,7 @@
+   type ImageGenerationAnchorPhase,
+   type PlaitImageGenerationAnchor,
+ } from '../../types/image-generation-anchor.types';
+-import { isTauriEnvironment } from '../../utils/tauri-env';
++import { isNativeRenderEnvironment } from '../../utils/tauri-env';
+ import { ImageGenerationAnchorContent } from './ImageGenerationAnchorContent';
+ 
+ const SVG_NS = 'http://www.w3.org/2000/svg';
+@@ -63,7 +63,7 @@
+     g.setAttribute('class', 'image-generation-anchor-element');
+     parentG.appendChild(g);
+ 
+-    if (isTauriEnvironment()) {
++    if (isNativeRenderEnvironment()) {
+       this.createDesktopFallback(element, g);
+     } else {
+       this.createForeignObject(element, g);
 --- a/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx
 +++ b/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx
 @@ -4,7 +4,6 @@
@@ -3810,6 +3830,73 @@
      'menu.debugPanel': 'Log / Debug',
      'menu.version': 'Version',
      'menu.more': 'More',
+--- a/packages/drawnix/src/plugins/components/image.tsx
++++ b/packages/drawnix/src/plugins/components/image.tsx
+@@ -31,7 +31,7 @@
+   sanitizeImage3DTransform,
+ } from '../../utils/image-3d-transform';
+ import { RetryImage } from '../../components/retry-image';
+-import { isTauriEnvironment } from '../../utils/desktop-asset-url';
++import { isNativeRenderEnvironment } from '../../utils/tauri-env';
+ import { mountNativeImageOverlay } from './native-image-overlay';
+ 
+ const SVG_NS = 'http://www.w3.org/2000/svg';
+@@ -363,6 +363,9 @@
+     (event: any) => {
+       const imageElement = event.currentTarget as HTMLImageElement;
+       imageElement.style.visibility = '';
++      // Also cover error recovery that assigns img.src directly, outside
++      // RetryImage's state. SVG and HTML must display the same resolved asset.
++      setResolvedImageUrl(imageElement.currentSrc || imageElement.src);
+       externalImageRetryAttemptRef.current = 0;
+       clearExternalImageRetry();
+       clearSWRecovery();
+@@ -435,7 +438,7 @@
+ 
+   useLayoutEffect(() => {
+     if (
+-      !isTauriEnvironment() ||
++      !isNativeRenderEnvironment() ||
+       isVideo ||
+       isLegacyAudioElement ||
+       hasImage3DTransform ||
+--- a/packages/drawnix/src/plugins/components/native-image-overlay.ts
++++ b/packages/drawnix/src/plugins/components/native-image-overlay.ts
+@@ -12,7 +12,6 @@
+   const image = document.createElementNS(SVG_NS, 'image');
+   image.setAttribute('data-native-image-overlay', 'true');
+   image.setAttribute('pointer-events', 'none');
+-  image.setAttribute('href', source);
+   image.setAttribute(
+     'preserveAspectRatio',
+     options.contain ? 'xMidYMid meet' : 'none'
+@@ -31,16 +30,23 @@
+     }
+   };
+   syncRectangle();
++  const previousVisibility = foreignObject.style.visibility;
++  const onLoad = () => { foreignObject.style.visibility = 'hidden'; };
++  const onError = () => { foreignObject.style.visibility = previousVisibility; };
++  // A virtual cache path may not be resolved yet. Keep the HTML fallback until
++  // the SVG has loaded the resolved blob; never turn a load error into a blank.
++  image.addEventListener('load', onLoad);
++  image.addEventListener('error', onError);
++  image.setAttribute('href', source);
+   parent.insertBefore(image, foreignObject.nextSibling);
+   const observer = new MutationObserver(syncRectangle);
+   observer.observe(foreignObject, {
+     attributes: true,
+     attributeFilter: ['x', 'y', 'width', 'height'],
+   });
+-  const previousVisibility = foreignObject.style.visibility;
+-  foreignObject.style.visibility = 'hidden';
+-
+   return () => {
++    image.removeEventListener('load', onLoad);
++    image.removeEventListener('error', onError);
+     observer.disconnect();
+     image.remove();
+     foreignObject.style.visibility = previousVisibility;
 --- a/packages/drawnix/src/services/asset-storage-service.ts
 +++ b/packages/drawnix/src/services/asset-storage-service.ts
 @@ -245,7 +245,7 @@
@@ -4492,13 +4579,21 @@
  
 --- a/packages/drawnix/src/utils/tauri-env.ts
 +++ b/packages/drawnix/src/utils/tauri-env.ts
-@@ -6,5 +6,5 @@
+@@ -6,5 +6,13 @@
   * 检测是否在 Tauri 桌面环境中运行
   */
  export function isTauriEnvironment(): boolean {
 -  return typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 +  return typeof window !== 'undefined' && !!(window as any).__TUZI_CREATIVE_NATIVE__;
  }
++
++/** WebView painting capability; does not enable standalone storage/IPC. */
++export function isNativeRenderEnvironment(): boolean {
++  return typeof window !== 'undefined' && Boolean(
++    (window as any).__TAURI_INTERNALS__ ||
++    (window as any).__TUZI_CREATIVE_NATIVE__
++  );
++}
 --- a/packages/drawnix/src/utils/url-template.ts
 +++ b/packages/drawnix/src/utils/url-template.ts
 @@ -16,7 +16,7 @@

@@ -31,7 +31,7 @@ import {
   sanitizeImage3DTransform,
 } from '../../utils/image-3d-transform';
 import { RetryImage } from '../../components/retry-image';
-import { isTauriEnvironment } from '../../utils/desktop-asset-url';
+import { isNativeRenderEnvironment } from '../../utils/tauri-env';
 import { mountNativeImageOverlay } from './native-image-overlay';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -363,6 +363,9 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
     (event: any) => {
       const imageElement = event.currentTarget as HTMLImageElement;
       imageElement.style.visibility = '';
+      // Also cover error recovery that assigns img.src directly, outside
+      // RetryImage's state. SVG and HTML must display the same resolved asset.
+      setResolvedImageUrl(imageElement.currentSrc || imageElement.src);
       externalImageRetryAttemptRef.current = 0;
       clearExternalImageRetry();
       clearSWRecovery();
@@ -435,7 +438,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
 
   useLayoutEffect(() => {
     if (
-      !isTauriEnvironment() ||
+      !isNativeRenderEnvironment() ||
       isVideo ||
       isLegacyAudioElement ||
       hasImage3DTransform ||

@@ -12,7 +12,6 @@ export function mountNativeImageOverlay(
   const image = document.createElementNS(SVG_NS, 'image');
   image.setAttribute('data-native-image-overlay', 'true');
   image.setAttribute('pointer-events', 'none');
-  image.setAttribute('href', source);
   image.setAttribute(
     'preserveAspectRatio',
     options.contain ? 'xMidYMid meet' : 'none'
@@ -31,16 +30,23 @@ export function mountNativeImageOverlay(
     }
   };
   syncRectangle();
+  const previousVisibility = foreignObject.style.visibility;
+  const onLoad = () => { foreignObject.style.visibility = 'hidden'; };
+  const onError = () => { foreignObject.style.visibility = previousVisibility; };
+  // A virtual cache path may not be resolved yet. Keep the HTML fallback until
+  // the SVG has loaded the resolved blob; never turn a load error into a blank.
+  image.addEventListener('load', onLoad);
+  image.addEventListener('error', onError);
+  image.setAttribute('href', source);
   parent.insertBefore(image, foreignObject.nextSibling);
   const observer = new MutationObserver(syncRectangle);
   observer.observe(foreignObject, {
     attributes: true,
     attributeFilter: ['x', 'y', 'width', 'height'],
   });
-  const previousVisibility = foreignObject.style.visibility;
-  foreignObject.style.visibility = 'hidden';
-
   return () => {
+    image.removeEventListener('load', onLoad);
+    image.removeEventListener('error', onError);
     observer.disconnect();
     image.remove();
     foreignObject.style.visibility = previousVisibility;

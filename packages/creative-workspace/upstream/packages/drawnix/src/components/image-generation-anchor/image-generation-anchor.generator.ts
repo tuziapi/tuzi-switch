@@ -6,7 +6,7 @@ import {
   type ImageGenerationAnchorPhase,
   type PlaitImageGenerationAnchor,
 } from '../../types/image-generation-anchor.types';
-import { isTauriEnvironment } from '../../utils/tauri-env';
+import { isNativeRenderEnvironment } from '../../utils/tauri-env';
 import { ImageGenerationAnchorContent } from './ImageGenerationAnchorContent';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -63,7 +63,7 @@ export class ImageGenerationAnchorGenerator {
     g.setAttribute('class', 'image-generation-anchor-element');
     parentG.appendChild(g);
 
-    if (isTauriEnvironment()) {
+    if (isNativeRenderEnvironment()) {
       this.createDesktopFallback(element, g);
     } else {
       this.createForeignObject(element, g);
