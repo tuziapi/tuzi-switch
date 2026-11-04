@@ -238,6 +238,7 @@ class WorkspaceStorageService {
   private initialized: boolean = false;
   private initPromise: Promise<void> | null = null;
   private writesSuspended = false;
+  isWriteSuspended(): boolean { return this.writesSuspended; }
 
   constructor() {
     // Defer store creation until initialization to detect version first

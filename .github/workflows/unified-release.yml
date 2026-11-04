@@ -44,6 +44,7 @@ jobs:
       - run: pnpm build:creative
       - run: pnpm --filter @tuzi/download-page test
       - run: python3 scripts/test_release_assets.py
+      - run: node --test scripts/verify-updater-assets.mjs
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
       - run: pnpm test:creative
@@ -106,17 +107,29 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib native_mcp_service_ -- --ignored --test-threads=1
+      - name: Prepare updater signing key
+        shell: bash
+        env:
+          UPDATER_KEY: ${{ secrets.TUZI_UPDATER_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$UPDATER_KEY" ]]; then echo 'Missing TUZI_UPDATER_PRIVATE_KEY; refusing unsigned release'; exit 1; fi
+          umask 077
+          KEY_PATH="$RUNNER_TEMP/tuzi-updater.key"
+          printf '%s' "$UPDATER_KEY" > "$KEY_PATH"
+          echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_PATH" >> "$GITHUB_ENV"
       - name: Build installers
         shell: bash
         env:
           APPLE_SIGNING_IDENTITY: '-'
           BUILD_TARGET: ${{ matrix.target }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: |
           set -euo pipefail
           if [[ "$RUNNER_OS" == "macOS" ]]; then
-            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --unsigned)"
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs)"
           else
-            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --unsigned --desktop-product-name)"
+            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --desktop-product-name)"
           fi
           pnpm tauri build --target "$BUILD_TARGET" --config "$RELEASE_CONFIG"
       - name: Collect installers and source manifest
@@ -147,6 +160,15 @@ jobs:
               'applicationId': 'com.tuziswitch.desktop', 'isolatedLocalProfile': False, 'files': files
           }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
+      - name: Collect and verify signed updater artifacts
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: node scripts/updater-assets.mjs collect "src-tauri/target/${{ matrix.target }}/release/bundle" release-assets "${{ matrix.name }}"
+      - name: Remove temporary signing key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/tuzi-updater.key"
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.name }}
@@ -173,6 +195,11 @@ jobs:
           merge-multiple: true
       - name: Verify every package against its build manifest
         run: python3 scripts/verify-release-assets.py release-assets
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify signatures and generate updater manifest
+        run: node scripts/updater-assets.mjs manifest release-assets
       - name: Prepare release notes and source
         shell: bash
         run: |

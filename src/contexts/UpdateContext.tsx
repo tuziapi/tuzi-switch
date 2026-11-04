@@ -9,7 +9,15 @@ import React, {
 import type { UpdateInfo, UpdateHandle } from "../lib/updater";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
-import { openReleasePage } from "../lib/updater";
+import { relaunchApp } from "../lib/updater";
+import {
+  UpdateSession,
+  initialInstallState,
+  type InstallState,
+} from "@/lib/updateSession";
+import { prepareForUpdate } from "@/lib/updateSafety";
+import { UpdateDialog } from "@/components/UpdateDialog";
+import { invoke } from "@tauri-apps/api/core";
 import { checkForUpdate } from "../lib/updater";
 
 function readPreference(key: string): string | null {
@@ -35,6 +43,12 @@ function removePreference(key: string): void {
 }
 
 interface UpdateContextValue {
+  installState: InstallState;
+  updateDialogOpen: boolean;
+  openUpdateDialog: () => void;
+  closeUpdateDialog: () => void;
+  downloadUpdate: () => Promise<void>;
+  installUpdate: () => Promise<void>;
   // 更新状态
   hasUpdate: boolean;
   updateInfo: UpdateInfo | null;
@@ -67,9 +81,44 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
 
+  const [installState, setInstallState] =
+    useState<InstallState>(initialInstallState);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const session = useRef<UpdateSession | null>(null);
+  const openUpdateDialog = useCallback(() => setUpdateDialogOpen(true), []);
+  const closeUpdateDialog = useCallback(() => setUpdateDialogOpen(false), []);
+  const downloadUpdate = useCallback(async () => {
+    if (!updateHandle) return;
+    if (updateHandle.manual) {
+      try {
+        await updateHandle.downloadAndInstall();
+        toast.success(t("settings.updatePageOpened"));
+      } catch {
+        toast.error(t("settings.updateDownloadFailed"));
+      }
+      return;
+    }
+    setUpdateDialogOpen(true);
+    if (!session.current)
+      session.current = new UpdateSession(
+        updateHandle,
+        setInstallState,
+        async () => {
+          await prepareForUpdate();
+          await invoke("check_update_ready");
+        },
+        relaunchApp,
+      );
+    await session.current.download();
+  }, [updateHandle, t]);
+  const installUpdate = useCallback(async () => {
+    await session.current?.installAndRestart();
+  }, []);
+
   const inFlight = useRef<Promise<boolean> | null>(null);
 
   const checkUpdate = useCallback((): Promise<boolean> => {
+    if (session.current) return Promise.resolve(true); // Keep downloaded bytes and the selected version pinned.
     if (inFlight.current) return inFlight.current;
     lastCheckAt.current = Date.now();
     const operation = (async () => {
@@ -78,6 +127,11 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const result = await checkForUpdate({ timeout: 30000 });
+        if (session.current) {
+          if (result.status === "available")
+            void result.update.close?.().catch(() => {});
+          return true;
+        }
 
         if (result.status === "available") {
           setHasUpdate(true);
@@ -104,6 +158,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
           return false; // 已是最新
         }
       } catch (err) {
+        if (session.current) return true;
         console.error("检查更新失败:", err);
         setError(err instanceof Error ? err.message : "检查更新失败");
         setHasUpdate(false);
@@ -179,25 +234,50 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       description: t(
         updateInfo.channel === "acceptance"
           ? "settings.acceptanceUpdateNotice"
-          : "settings.manualUpdateHint",
+          : updateHandle.manual
+            ? "settings.manualUpdateHint"
+            : "settings.inAppUpdateHint",
       ),
       action: {
         label: t("settings.downloadUpdate"),
         onClick: () => {
-          const open = updateHandle.manual
-            ? updateHandle.downloadAndInstall()
-            : openReleasePage(updateInfo.availableVersion);
-          void open
-            .then(() => toast.success(t("settings.updatePageOpened")))
-            .catch(() => toast.error(t("settings.updateDownloadFailed")));
+          if (updateHandle.manual) void downloadUpdate();
+          else {
+            setUpdateDialogOpen(true);
+            void downloadUpdate();
+          }
         },
       },
       cancel: { label: t("settings.updateLater"), onClick: dismissUpdate },
       onDismiss: dismissUpdate,
     });
-  }, [hasUpdate, updateInfo, updateHandle, isDismissed, dismissUpdate, t]);
+  }, [
+    hasUpdate,
+    updateInfo,
+    updateHandle,
+    isDismissed,
+    dismissUpdate,
+    downloadUpdate,
+    t,
+  ]);
+
+  useEffect(() => {
+    if (installState.phase === "ready" && !installState.error) {
+      toast.success("更新已下载并完成校验", {
+        id: "tuzi-update-ready",
+        description: "方便时打开更新窗口，点击重启安装。",
+        action: { label: "查看更新", onClick: openUpdateDialog },
+      });
+    }
+  }, [installState.phase, installState.error, openUpdateDialog]);
 
   const value: UpdateContextValue = {
+    installState,
+    updateDialogOpen,
+    openUpdateDialog,
+    closeUpdateDialog,
+    downloadUpdate,
+    installUpdate,
     hasUpdate,
     updateInfo,
     updateHandle,
@@ -210,7 +290,10 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <UpdateContext.Provider value={value}>{children}</UpdateContext.Provider>
+    <UpdateContext.Provider value={value}>
+      {children}
+      <UpdateDialog />
+    </UpdateContext.Provider>
   );
 }
 

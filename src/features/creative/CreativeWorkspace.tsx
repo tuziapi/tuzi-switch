@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 import { createCreativeAccountBridge } from "./accountBridge";
 
+import { registerUpdateGuard } from "@/lib/updateSafety";
+
 const Workspace = lazy(async () => {
   const module = await import("@tuzi/creative-workspace");
   await import("@tuzi/creative-workspace/style.css");
@@ -76,6 +78,13 @@ export function CreativeWorkspace({
   useEffect(() => {
     if (active) setHasOpened(true);
   }, [active]);
+  useEffect(() => {
+    if (!hasOpened && !active) return;
+    return registerUpdateGuard(async () => {
+      const module = await import("@tuzi/creative-workspace");
+      await module.prepareCreativeUpdate();
+    });
+  }, [hasOpened, active]);
   const [settingsOpen, setSettingsOpen] = useState(Boolean(selectedKeyId));
   const manageAccountRef = useRef(onManageAccount);
   manageAccountRef.current = onManageAccount;

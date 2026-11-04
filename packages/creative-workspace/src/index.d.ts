@@ -11,3 +11,5 @@ export interface CreativeWorkspaceProps {
   accountBridge?: CreativeAccountBridge;
 }
 export const CreativeWorkspace: ComponentType<CreativeWorkspaceProps>;
+
+export function prepareCreativeUpdate(): Promise<void>;

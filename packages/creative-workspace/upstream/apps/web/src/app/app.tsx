@@ -35,6 +35,7 @@ import type {
 import { ErrorFallbackUI, safeModeReload, goToDebug } from './ErrorBoundary';
 import { collectAndDownloadErrorLog } from '../utils/error-log-exporter';
 import { PendingPersistence } from './pending-persistence';
+import { registerEditorUpdateGuard } from '../../../../../src/updateGuard';
 
 // Account credentials belong exclusively to the assistant host.
 
@@ -884,6 +885,28 @@ export function App() {
     },
     [pendingPersistence]
   );
+
+  useEffect(() => registerEditorUpdateGuard(async () => {
+    if (!isDataReadyRef.current || isSyncingRef.current) {
+      throw new Error('画布正在加载或同步，请稍后重试更新。');
+    }
+    if (viewportSaveTimerRef.current) {
+      clearTimeout(viewportSaveTimerRef.current);
+      viewportSaveTimerRef.current = null;
+    }
+    const snapshot = latestBoardDataRef.current;
+    const boardId = currentBoardIdRef.current;
+    const revision = pendingPersistence.currentRevision;
+    if (pendingPersistence.hasPending) {
+      if (!snapshot || snapshot.boardId !== boardId) throw new Error('作品尚未保存，请返回画布保存后再更新。');
+      await WorkspaceService.getInstance().saveBoard(snapshot.boardId, {
+        children: snapshot.children, viewport: latestViewportRef.current ?? snapshot.viewport, theme: snapshot.theme,
+      });
+      if (pendingPersistence.currentRevision !== revision) throw new Error('作品发生变化，请稍后重试更新。');
+      pendingPersistence.complete(revision);
+      clearBoardCloseSnapshot(snapshot.boardId);
+    }
+  }), [pendingPersistence]);
 
   // 页面关闭/隐藏前保存当前画布快照，并尽量 flush 到 IndexedDB
   useEffect(() => {

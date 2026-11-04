@@ -9,6 +9,7 @@ import type { CreativeWorkspaceProps } from './index.d';
 import './workspace.css';
 import { useTaskStorage } from '../upstream/packages/drawnix/src/hooks/useTaskStorage';
 import { useTaskExecutor } from '../upstream/packages/drawnix/src/hooks/useTaskExecutor';
+import { setCreativeRuntimeReady, registerEditorUpdateGuard } from './updateGuard';
 import { useBeforeUnload } from '../upstream/packages/drawnix/src/hooks/useBeforeUnload';
 
 // Host lifetime, independent of canvas/project/assistant navigation. The editor
@@ -16,6 +17,7 @@ import { useBeforeUnload } from '../upstream/packages/drawnix/src/hooks/useBefor
 function CreativeTaskRuntime() {
   const ready = useTaskStorage();
   useTaskExecutor(ready);
+  useEffect(() => { setCreativeRuntimeReady(ready); return () => setCreativeRuntimeReady(false); }, [ready]);
   useBeforeUnload();
   return null;
 }
@@ -40,6 +42,10 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
   const [busy, setBusy] = useState(false);
   const [editor, setEditor] = useState(false);
   const [renaming, setRenaming] = useState<{id: string; name: string} | null>(null);
+  useEffect(() => registerEditorUpdateGuard(async () => {
+    if (!ready || busy || error) throw new Error('创作工作区正在处理操作，请完成后再更新。');
+    if (settingsOpen || renaming) throw new Error('请先保存或关闭创作配置/重命名窗口，再更新。');
+  }), [ready, busy, error, settingsOpen, renaming]);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
   useEffect(() => {
     const observer = new MutationObserver(() => setDark(document.documentElement.classList.contains('dark')));
@@ -112,3 +118,5 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
     </div>}
   </ConfigProvider>;
 }
+
+export { prepareCreativeUpdate } from "./updateGuard";

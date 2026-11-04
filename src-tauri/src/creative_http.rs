@@ -207,3 +207,14 @@ pub fn creative_manual_cancel(request_id: String) {
 
 #[cfg(test)]
 mod tests;
+
+/// The frontend saves boards first; refuse installation while native requests remain.
+#[tauri::command]
+pub fn check_update_ready(
+    service: tauri::State<'_, std::sync::Arc<crate::tuzi_account::AccountService>>,
+) -> Result<(), String> {
+    if !PENDING.lock().unwrap().is_empty() || service.has_pending_requests() {
+        return Err("仍有请求正在处理，请稍后重试更新。".into());
+    }
+    Ok(())
+}

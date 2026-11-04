@@ -26,19 +26,21 @@ index 920c7f1..5f1ce65 100644
          resolve(process.cwd(), 'src/app/app.tsx'),
        ].find(existsSync);
 diff --git a/apps/web/src/app/app.tsx b/apps/web/src/app/app.tsx
-index b1fcad1..f493ba5 100644
+index b1fcad1..13df234 100644
 --- a/apps/web/src/app/app.tsx
 +++ b/apps/web/src/app/app.tsx
-@@ -36,7 +36,7 @@ import { ErrorFallbackUI, safeModeReload, goToDebug } from './ErrorBoundary';
+@@ -35,8 +35,9 @@ import type {
+ import { ErrorFallbackUI, safeModeReload, goToDebug } from './ErrorBoundary';
  import { collectAndDownloadErrorLog } from '../utils/error-log-exporter';
  import { PendingPersistence } from './pending-persistence';
++import { registerEditorUpdateGuard } from '../../../../../src/updateGuard';
  
 -importLocalTuziCredentials();
 +// Account credentials belong exclusively to the assistant host.
  
  const Drawnix = lazy(() =>
    // eslint-disable-next-line @nx/enforce-module-boundaries -- 同上，仅放行 Drawnix 正式入口。
-@@ -135,49 +135,10 @@ async function waitForTuziStartup(
+@@ -135,49 +136,10 @@ async function waitForTuziStartup(
  /**
   * 从 URL 获取画布 ID 参数
   */
@@ -91,7 +93,7 @@ index b1fcad1..f493ba5 100644
  
  function saveBoardCloseSnapshot(snapshot: BoardCloseSnapshot): void {
    try {
-@@ -259,7 +220,7 @@ export function App() {
+@@ -259,7 +221,7 @@ export function App() {
    const [pendingPersistence] = useState(() => new PendingPersistence());
  
    // 使用 useDocumentTitle hook 管理页面标题
@@ -100,7 +102,7 @@ index b1fcad1..f493ba5 100644
  
    useEffect(() => {
      currentBoardIdRef.current = currentBoardId;
-@@ -321,6 +282,8 @@ export function App() {
+@@ -321,6 +283,8 @@ export function App() {
      [pendingPersistence]
    );
  
@@ -109,7 +111,7 @@ index b1fcad1..f493ba5 100644
    useEffect(() => {
      const bootController = getBootController();
      if (!bootController) {
-@@ -342,7 +305,7 @@ export function App() {
+@@ -342,7 +306,7 @@ export function App() {
  
    // Initialize workspace and handle migration
    useEffect(() => {
@@ -118,7 +120,7 @@ index b1fcad1..f493ba5 100644
      const initialize = async () => {
        // 检查是否需要显示崩溃恢复对话框
        if (
-@@ -391,6 +354,9 @@ export function App() {
+@@ -391,6 +355,9 @@ export function App() {
            );
            pendingPersistence.reset();
            setValue(nextData);
@@ -128,7 +130,36 @@ index b1fcad1..f493ba5 100644
          }
          setIsLoading(false);
          // 标记加载完成
-@@ -1048,7 +1014,7 @@ export function App() {
+@@ -919,6 +886,28 @@ export function App() {
+     [pendingPersistence]
+   );
+ 
++  useEffect(() => registerEditorUpdateGuard(async () => {
++    if (!isDataReadyRef.current || isSyncingRef.current) {
++      throw new Error('画布正在加载或同步，请稍后重试更新。');
++    }
++    if (viewportSaveTimerRef.current) {
++      clearTimeout(viewportSaveTimerRef.current);
++      viewportSaveTimerRef.current = null;
++    }
++    const snapshot = latestBoardDataRef.current;
++    const boardId = currentBoardIdRef.current;
++    const revision = pendingPersistence.currentRevision;
++    if (pendingPersistence.hasPending) {
++      if (!snapshot || snapshot.boardId !== boardId) throw new Error('作品尚未保存，请返回画布保存后再更新。');
++      await WorkspaceService.getInstance().saveBoard(snapshot.boardId, {
++        children: snapshot.children, viewport: latestViewportRef.current ?? snapshot.viewport, theme: snapshot.theme,
++      });
++      if (pendingPersistence.currentRevision !== revision) throw new Error('作品发生变化，请稍后重试更新。');
++      pendingPersistence.complete(revision);
++      clearBoardCloseSnapshot(snapshot.boardId);
++    }
++  }), [pendingPersistence]);
++
+   // 页面关闭/隐藏前保存当前画布快照，并尽量 flush 到 IndexedDB
+   useEffect(() => {
+     const flushBoardBeforeLeave = (
+@@ -1048,7 +1037,7 @@ export function App() {
            display: 'flex',
            alignItems: 'center',
            justifyContent: 'center',
@@ -137,7 +168,7 @@ index b1fcad1..f493ba5 100644
          }}
        >
          加载中...
-@@ -1057,7 +1023,7 @@ export function App() {
+@@ -1057,7 +1046,7 @@ export function App() {
    }
  
    return (
@@ -5222,6 +5253,45 @@ index a4e43c0..125dfdc 100644
        }
      }
    });
+diff --git a/packages/drawnix/src/services/__tests__/workspace-cache.test.ts b/packages/drawnix/src/services/__tests__/workspace-cache.test.ts
+index 55fbcd5..d4a9dc6 100644
+--- a/packages/drawnix/src/services/__tests__/workspace-cache.test.ts
++++ b/packages/drawnix/src/services/__tests__/workspace-cache.test.ts
+@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ import { workspaceService } from '../workspace-service';
+ import type { Board, BoardChangeData } from '../../types/workspace.types';
+ 
+-const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn() }));
++const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn(), isWriteSuspended: vi.fn(() => false) }));
+ vi.mock('../workspace-storage-service', () => ({ workspaceStorageService: storage }));
+ vi.mock('../github-sync/sync-log-service', () => ({ logDebug: vi.fn(), logWarning: vi.fn(), logError: vi.fn() }));
+ 
+@@ -112,3 +112,25 @@ describe('workspace full-board retention', () => {
+         expect(runtime.loadedBoards.size).toBeLessThanOrEqual(3);
+     });
+ });
++
++
++describe('update persistence barrier', () => {
++    it('flushes a failed write with original elements before allowing update', async () => {
++        await workspaceService.reloadBoard('a');
++        storage.saveBoard.mockRejectedValueOnce(new Error('quota'));
++        const data = { children: [{ id: 'new-image' }], viewport: {}, theme: {} } as unknown as BoardChangeData;
++        await expect(workspaceService.saveBoard('a', data)).rejects.toThrow('quota');
++        await workspaceService.flushForAppUpdate();
++        expect(runtime.unsavedBoards.size).toBe(0);
++        expect(storage.saveBoard.mock.lastCall?.[0].elements).toEqual(data.children);
++    });
++    it('does not report success on storage failure or migration', async () => {
++        await workspaceService.reloadBoard('a');
++        runtime.unsavedBoards.set('a', {});
++        storage.saveBoard.mockRejectedValueOnce(new Error('quota'));
++        await expect(workspaceService.flushForAppUpdate()).rejects.toThrow('quota');
++        expect(runtime.unsavedBoards.has('a')).toBe(true);
++        storage.isWriteSuspended.mockReturnValueOnce(true);
++        await expect(workspaceService.flushForAppUpdate()).rejects.toThrow('迁移');
++    });
++});
 diff --git a/packages/drawnix/src/services/asset-storage-service.ts b/packages/drawnix/src/services/asset-storage-service.ts
 index 559282a..185b4de 100644
 --- a/packages/drawnix/src/services/asset-storage-service.ts
@@ -5907,6 +5977,41 @@ index a2e237d..76dbf49 100644
          'get_file_path',
          {
            fileName,
+diff --git a/packages/drawnix/src/services/workspace-service.ts b/packages/drawnix/src/services/workspace-service.ts
+index 36a5ecd..e727d0c 100644
+--- a/packages/drawnix/src/services/workspace-service.ts
++++ b/packages/drawnix/src/services/workspace-service.ts
+@@ -975,6 +975,18 @@ class WorkspaceService {
+   /**
+    * Save data to the current board (convenience method)
+    */
++  /** Retry outstanding board writes, including a canvas just unmounted by the host. */
++  async flushForAppUpdate(): Promise<void> {
++    await this.ensureInitialized();
++    if (workspaceStorageService.isWriteSuspended()) throw new Error('作品存储正在迁移，请稍后重试更新。');
++    for (const boardId of [...this.unsavedBoards.keys()]) {
++      const board = this.loadedBoards.get(boardId) || this.boards.get(boardId);
++      if (!board) throw new Error('存在尚未保存的作品，请返回画布保存后再更新。');
++      await this.saveBoard(boardId, { children: board.elements, viewport: board.viewport, theme: board.theme });
++    }
++    if (this.unsavedBoards.size) throw new Error('作品仍在保存，请稍后重试更新。');
++  }
++
+   async saveCurrentBoard(data: BoardChangeData): Promise<void> {
+     const currentBoardId = this.state.currentBoardId;
+     if (!currentBoardId) {
+diff --git a/packages/drawnix/src/services/workspace-storage-service.ts b/packages/drawnix/src/services/workspace-storage-service.ts
+index 30a3220..f71f3ad 100644
+--- a/packages/drawnix/src/services/workspace-storage-service.ts
++++ b/packages/drawnix/src/services/workspace-storage-service.ts
+@@ -238,6 +238,7 @@ class WorkspaceStorageService {
+   private initialized: boolean = false;
+   private initPromise: Promise<void> | null = null;
+   private writesSuspended = false;
++  isWriteSuspended(): boolean { return this.writesSuspended; }
+ 
+   constructor() {
+     // Defer store creation until initialization to detect version first
 diff --git a/packages/drawnix/src/styles/index.scss b/packages/drawnix/src/styles/index.scss
 index 7b4fee3..106e81c 100644
 --- a/packages/drawnix/src/styles/index.scss

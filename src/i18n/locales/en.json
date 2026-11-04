@@ -914,7 +914,9 @@
     "unifyCodexHistoryRestoreCompleted": "Official session history restored from backup ({{files}} session files, {{rows}} index rows)",
     "unifyCodexHistoryRestoreFailed": "Failed to restore official session history, please try again",
     "unifyCodexHistoryRestoreNothing": "No restorable migration backup for the current Codex directory",
-    "unifyCodexHistoryRestoreSkippedToggleOn": "Unified session history was re-enabled; restore skipped"
+    "unifyCodexHistoryRestoreSkippedToggleOn": "Unified session history was re-enabled; restore skipped",
+    "inAppUpdateHint": "Download in the app, then restart to install when ready.",
+    "restartAndUpdate": "Restart and update"
   },
   "apps": {
     "claude": "Claude",

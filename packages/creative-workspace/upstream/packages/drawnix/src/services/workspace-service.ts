@@ -975,6 +975,18 @@ class WorkspaceService {
   /**
    * Save data to the current board (convenience method)
    */
+  /** Retry outstanding board writes, including a canvas just unmounted by the host. */
+  async flushForAppUpdate(): Promise<void> {
+    await this.ensureInitialized();
+    if (workspaceStorageService.isWriteSuspended()) throw new Error('作品存储正在迁移，请稍后重试更新。');
+    for (const boardId of [...this.unsavedBoards.keys()]) {
+      const board = this.loadedBoards.get(boardId) || this.boards.get(boardId);
+      if (!board) throw new Error('存在尚未保存的作品，请返回画布保存后再更新。');
+      await this.saveBoard(boardId, { children: board.elements, viewport: board.viewport, theme: board.theme });
+    }
+    if (this.unsavedBoards.size) throw new Error('作品仍在保存，请稍后重试更新。');
+  }
+
   async saveCurrentBoard(data: BoardChangeData): Promise<void> {
     const currentBoardId = this.state.currentBoardId;
     if (!currentBoardId) {

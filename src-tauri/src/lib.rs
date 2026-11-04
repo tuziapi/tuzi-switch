@@ -1265,6 +1265,7 @@ pub fn run() {
             commands::get_providers,
             tuzi_account::account_get_state,
             creative_http::creative_manual_request,
+            creative_http::check_update_ready,
             creative_images::creative_image_action,
             creative_http::creative_manual_cancel,
             tuzi_account::creative::creative_account_bindings,

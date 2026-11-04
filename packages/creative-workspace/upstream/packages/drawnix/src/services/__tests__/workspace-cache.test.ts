@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceService } from '../workspace-service';
 import type { Board, BoardChangeData } from '../../types/workspace.types';
 
-const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn() }));
+const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn(), isWriteSuspended: vi.fn(() => false) }));
 vi.mock('../workspace-storage-service', () => ({ workspaceStorageService: storage }));
 vi.mock('../github-sync/sync-log-service', () => ({ logDebug: vi.fn(), logWarning: vi.fn(), logError: vi.fn() }));
 
@@ -110,5 +110,27 @@ describe('workspace full-board retention', () => {
         expect(runtime.unsavedBoards.has('a')).toBe(false);
         for (const id of ['current', 'b', 'c', 'd']) await workspaceService.reloadBoard(id);
         expect(runtime.loadedBoards.size).toBeLessThanOrEqual(3);
+    });
+});
+
+
+describe('update persistence barrier', () => {
+    it('flushes a failed write with original elements before allowing update', async () => {
+        await workspaceService.reloadBoard('a');
+        storage.saveBoard.mockRejectedValueOnce(new Error('quota'));
+        const data = { children: [{ id: 'new-image' }], viewport: {}, theme: {} } as unknown as BoardChangeData;
+        await expect(workspaceService.saveBoard('a', data)).rejects.toThrow('quota');
+        await workspaceService.flushForAppUpdate();
+        expect(runtime.unsavedBoards.size).toBe(0);
+        expect(storage.saveBoard.mock.lastCall?.[0].elements).toEqual(data.children);
+    });
+    it('does not report success on storage failure or migration', async () => {
+        await workspaceService.reloadBoard('a');
+        runtime.unsavedBoards.set('a', {});
+        storage.saveBoard.mockRejectedValueOnce(new Error('quota'));
+        await expect(workspaceService.flushForAppUpdate()).rejects.toThrow('quota');
+        expect(runtime.unsavedBoards.has('a')).toBe(true);
+        storage.isWriteSuspended.mockReturnValueOnce(true);
+        await expect(workspaceService.flushForAppUpdate()).rejects.toThrow('迁移');
     });
 });

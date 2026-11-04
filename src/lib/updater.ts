@@ -1,4 +1,3 @@
-import { checkInstallerUpdate } from "./installerUpdater";
 import { checkAcceptanceUpdate, getUpdateBuildInfo } from "./acceptanceUpdater";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
@@ -47,7 +46,8 @@ export interface UpdateHandle {
   downloadAndInstall: (
     onProgress?: (e: UpdateProgressEvent) => void,
   ) => Promise<void>;
-  download?: () => Promise<void>;
+  download?: (onProgress?: (e: UpdateProgressEvent) => void) => Promise<void>;
+  close?: () => Promise<void>;
   install?: () => Promise<void>;
 }
 
@@ -81,32 +81,31 @@ function withTimeout<T>(
   });
 }
 
-function mapUpdateHandle(raw: Update): UpdateHandle {
+export function mapUpdateHandle(raw: Update): UpdateHandle {
+  const progress =
+    (onProgress?: (e: UpdateProgressEvent) => void) =>
+    (evt: import("@tauri-apps/plugin-updater").DownloadEvent) => {
+      onProgress?.({
+        event: evt.event,
+        ...(evt.event === "Started"
+          ? { total: evt.data.contentLength ?? 0, downloaded: 0 }
+          : {}),
+        ...(evt.event === "Progress"
+          ? { downloaded: evt.data.chunkLength }
+          : {}),
+      });
+    };
   return {
     version: raw.version ?? "",
     notes: raw.body,
     date: raw.date,
-    async downloadAndInstall(onProgress?: (e: UpdateProgressEvent) => void) {
-      await raw.downloadAndInstall((evt) => {
-        if (!onProgress) return;
-        const mapped: UpdateProgressEvent = {
-          event: evt.event,
-        };
-        if (evt.event === "Started") {
-          mapped.total = evt.data.contentLength ?? 0;
-          mapped.downloaded = 0;
-        } else if (evt.event === "Progress") {
-          mapped.downloaded = evt.data.chunkLength;
-        }
-        onProgress(mapped);
-      });
-    },
-    download: async () => {
-      await raw.download();
-    },
-    install: async () => {
-      await raw.install();
-    },
+    downloadAndInstall: (onProgress) =>
+      raw.downloadAndInstall(progress(onProgress)),
+    // download resolves only after the native updater verifies the signature.
+    download: (onProgress) =>
+      raw.download(progress(onProgress), { timeout: 600_000 }),
+    install: () => raw.install(),
+    close: () => raw.close(),
   };
 }
 
@@ -227,9 +226,7 @@ export async function checkForUpdate(
     "Get current app version timed out",
   ).catch(() => "");
 
-  if (build.repository === "AiW520/tuzi-switch") {
-    return checkInstallerUpdate(build, currentVersion, timeout);
-  }
+  const integratedChannel = build.repository === "AiW520/tuzi-switch";
 
   let update: Update | null;
   try {
@@ -240,6 +237,7 @@ export async function checkForUpdate(
       "Tauri updater check timed out",
     );
   } catch (error) {
+    if (integratedChannel) throw error; // Never silently open a browser or bypass signing.
     console.warn(
       "Tauri updater check failed, falling back to GitHub release",
       error,
@@ -247,6 +245,7 @@ export async function checkForUpdate(
     return await checkGitHubReleaseFallback(currentVersion, timeout);
   }
   if (!update) {
+    if (integratedChannel) return { status: "up-to-date" };
     return await checkGitHubReleaseFallback(currentVersion, timeout);
   }
 
