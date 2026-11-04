@@ -25,6 +25,7 @@ import {
 import { normalizeImageDataUrl } from '@aitu/utils';
 import { Task, TaskStatus, TaskType } from '../../types/task.types';
 import {
+  getTaskStatusText,
   formatDateTime,
   formatImageTaskResultSize,
   formatTaskDuration,
@@ -216,26 +217,6 @@ function getStatusTagTheme(
 }
 
 /**
- * Gets the status label in Chinese
- * Note: PENDING is deprecated, displayed as '处理中' for legacy compatibility
- */
-function getStatusLabel(status: TaskStatus): string {
-  switch (status) {
-    case TaskStatus.PENDING:
-    case TaskStatus.PROCESSING:
-      return '处理中';
-    case TaskStatus.COMPLETED:
-      return '已完成';
-    case TaskStatus.FAILED:
-      return '失败';
-    case TaskStatus.CANCELLED:
-      return '已取消';
-    default:
-      return '未知';
-  }
-}
-
-/**
  * TaskItem component - displays a single task
  */
 export const TaskItem: React.FC<TaskItemProps> = React.memo(
@@ -284,7 +265,7 @@ export const TaskItem: React.FC<TaskItemProps> = React.memo(
         task.status === TaskStatus.PROCESSING) &&
       pptExplainerStageText
         ? pptExplainerStageText
-        : getStatusLabel(task.status);
+        : getTaskStatusText(task);
     const modelLabel = getPptExplainerModelLabel(
       pptExplainerStage,
       task.params.model

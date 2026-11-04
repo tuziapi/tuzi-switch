@@ -41,7 +41,7 @@
 
 调用时重新校验来源、代次、Key 和模型目录。POST 必须属于已授权模型并具有匹配端点元数据或明确协议标签；未知能力拒绝，不根据模型名放行。原生动作映射固定 URL，拒绝 renderer URL/headers 和跨域重定向；账户关联不自动切线路、切 Key 或重新提交。图片 multipart、文本流式响应、取消及结果找回走同一桥接。请求体与响应均限 64 MiB，单次上游请求最长 600 秒；大媒体内容仍受该边界约束。
 
-当前动作：模型列表；图片生成/编辑/找回；Chat/Responses；OpenAI 视频提交/轮询/内容；音频 speech/transcriptions；Gemini generateContent/streamGenerateContent。其他专有接口（如 MJ、部分 Flux/Kling/Suno、自定义 HTTP、图片巡检）明确拒绝受管关联并提示手动配置，不能以回填模型密钥绕过。此列表表示本地动作适配范围，不代表全部协议已做真实账户验证。
+当前动作：模型列表；图片生成/编辑/找回；Chat/Responses；OpenAI 视频提交/轮询/内容；音频 speech/transcriptions；Gemini generateContent/streamGenerateContent。2026-11-04 UC-MEDIA-01 经用户选择 B 后扩展 MiniMax-H3、Seedance、Kling 与既有 Suno 音乐能力，固定动作与权限要求见 `src/features/creative/mediaActions.json` 及 [验收记录](2026-11-04-media-acceptance.md)。其余专有接口（如 MJ、部分 Flux、自定义 HTTP、图片巡检）仍拒绝受管关联并提示手动配置，不能以回填模型密钥绕过。此列表表示本地动作适配范围，不代表全部协议已做真实账户验证。
 
 ## 生命周期与兼容
 

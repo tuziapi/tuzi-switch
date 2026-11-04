@@ -427,6 +427,7 @@ export async function executeVideoViaAdapter(
       ? parseInt(params.duration, 10)
       : undefined;
 
+    let submitted = false;
     const result = await adapter.generateVideo(
       getAdapterContextFromSettings('video', params.modelRef || params.model),
       {
@@ -448,7 +449,7 @@ export async function executeVideoViaAdapter(
             const safeProgress = Math.min(100, Math.max(10, progress));
             options?.onProgress?.({
               progress: safeProgress,
-              phase: safeProgress <= 10 ? 'submitting' : 'polling',
+              phase: submitted || safeProgress > 10 ? 'polling' : 'submitting',
             });
           },
           onSubmitted: async (videoId: string) => {
@@ -458,6 +459,8 @@ export async function executeVideoViaAdapter(
             ) {
               return;
             }
+            submitted = true;
+            options?.onProgress?.({ progress: 10, phase: 'polling' });
             await taskStorageWriter.updateRemoteId(
               taskId,
               videoId,

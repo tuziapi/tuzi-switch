@@ -1,6 +1,7 @@
 import { RectangleClient, type PlaitBoard } from '@plait/core';
 import { createRoot, type Root } from 'react-dom/client';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useImageGenerationAnchorController } from '../../hooks/useImageGenerationAnchorController';
 import {
   IMAGE_GENERATION_ANCHOR_RETRY_EVENT,
   type ImageGenerationAnchorPhase,
@@ -45,6 +46,16 @@ function truncateText(value: string, maxLength: number): string {
   return `${value.slice(0, Math.max(1, maxLength - 1))}…`;
 }
 
+function NativeAnchorState({ board, element, render }: {
+  board: PlaitBoard;
+  element: PlaitImageGenerationAnchor;
+  render: (element: PlaitImageGenerationAnchor) => void;
+}) {
+  const { nextPatch } = useImageGenerationAnchorController({ board, anchor: element });
+  useEffect(() => { render({ ...element, ...nextPatch }); }, [element, nextPatch, render]);
+  return null;
+}
+
 export class ImageGenerationAnchorGenerator {
   constructor(private board: PlaitBoard) {}
 
@@ -65,6 +76,7 @@ export class ImageGenerationAnchorGenerator {
 
     if (isNativeRenderEnvironment()) {
       this.createDesktopFallback(element, g);
+      this.renderNativeController(element);
     } else {
       this.createForeignObject(element, g);
       // WebKit is sensitive to mounting a React root before foreignObject is
@@ -83,13 +95,26 @@ export class ImageGenerationAnchorGenerator {
     selected: boolean
   ): void {
     if (this.desktopFallback) {
-      this.renderDesktopFallback(element);
+      this.renderNativeController(element);
       return;
     }
 
     this.updateForeignObject(element);
     this.renderReact(element, selected);
   }
+
+  private renderNativeController(element: PlaitImageGenerationAnchor): void {
+    // Keep the existing task/readiness subscriptions alive for the SVG renderer.
+    if (!this.htmlContainer) this.htmlContainer = document.createElement('div');
+    if (!this.reactRoot) this.reactRoot = createRoot(this.htmlContainer);
+    this.reactRoot.render(React.createElement(NativeAnchorState, {
+      board: this.board, element, render: this.renderNativeState,
+    }));
+  }
+
+  private renderNativeState = (element: PlaitImageGenerationAnchor): void => {
+    this.renderDesktopFallback(element);
+  };
 
   private createDesktopFallback(
     element: PlaitImageGenerationAnchor,
@@ -224,7 +249,7 @@ export class ImageGenerationAnchorGenerator {
       host.appendChild(counter);
     }
 
-    if (element.previewImageUrl) {
+    if (element.previewImageUrl && !isLoadingImage) {
       const preview = createSvgElement('image');
       preview.setAttribute('x', String(rect.x));
       preview.setAttribute('y', String(rect.y));

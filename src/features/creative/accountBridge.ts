@@ -13,6 +13,7 @@ import {
 } from "./nativeStream";
 import { requestCreativeManual } from "./manualTransport";
 import { nativeImageAction } from "./imageActions";
+import { selectCreativeMediaAction } from "./mediaActions";
 
 const PREFIX = "tuzi-account:";
 const messages: Record<string, string> = {
@@ -81,6 +82,8 @@ function actionFor(url: string, method: string) {
     "POST /v1/audio/transcriptions": "audio.transcribe",
   };
   const action = actions[method + " " + path];
+  const mediaAction = selectCreativeMediaAction(parsed, method);
+  if (mediaAction) return mediaAction;
   const allowedQuery = [
     "ch",
     "tuzi_client",

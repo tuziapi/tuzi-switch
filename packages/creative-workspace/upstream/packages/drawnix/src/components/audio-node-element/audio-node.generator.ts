@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import React from 'react';
 import type { PlaitAudioNode } from '../../types/audio-node.types';
 import type { CanvasAudioPlaybackSource } from '../../services/canvas-audio-playback-service';
+import { NativeMediaOverlay } from '../../plugins/components/native-media-overlay';
 import { AudioNodeContent } from './AudioNodeContent';
 
 export class AudioNodeGenerator {
@@ -90,11 +91,11 @@ export class AudioNodeGenerator {
     }
 
     this.reactRoot.render(
-      React.createElement(AudioNodeContent, {
+      React.createElement(NativeMediaOverlay, { children: React.createElement(AudioNodeContent, {
         element,
         selected,
         canvasQueue,
-      })
+      }) })
     );
   }
 

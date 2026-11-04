@@ -5,7 +5,7 @@
  * status checking, timeout detection, and duration formatting.
  */
 
-import { Task, TaskStatus, TaskType } from '../types/task.types';
+import { Task, TaskStatus, TaskType, TaskExecutionPhase } from '../types/task.types';
 import { TASK_TIMEOUT } from '../constants/TASK_CONSTANTS';
 import { isAsyncImageModel } from '../constants/model-config';
 import { generateUUID, formatDate } from '@aitu/utils';
@@ -238,3 +238,15 @@ export function getTaskElapsedTime(task: Task): number {
  * formatDateTime(Date.now()) // Returns "2025-12-18 14:30:25"
  */
 export const formatDateTime = formatDate;
+
+/** Shared wording for the queue and canvas; submission is distinct from generation. */
+export function getTaskStatusText(task: Pick<Task, 'status' | 'executionPhase'>): string {
+  switch (task.status) {
+    case TaskStatus.PENDING: return '等待执行';
+    case TaskStatus.PROCESSING: return task.executionPhase === TaskExecutionPhase.SUBMITTING ? '正在提交' : '生成中';
+    case TaskStatus.COMPLETED: return '已完成';
+    case TaskStatus.FAILED: return '生成失败';
+    case TaskStatus.CANCELLED: return '已取消';
+    default: return '未知';
+  }
+}

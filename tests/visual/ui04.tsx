@@ -1,4 +1,4 @@
-import { creativeManualPreviewIPC } from "./creative-request-fixture";
+import { creativeManualPreviewIPC, creativeAccountMediaPreviewIPC } from "./creative-request-fixture";
 import { CreativeWorkspace } from "@/features/creative/CreativeWorkspace";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 import { nativePreviewIPC } from "./native-tool-fixture";
@@ -135,6 +135,7 @@ mockIPC(
       (state.__creativeOpenedTools ??= []).push((args as {url: string}).url);
       return;
     }
+    if (new URLSearchParams(location.search).has("media-qa") && ["creative_account_request", "account_cancel_request"].includes(command)) return creativeAccountMediaPreviewIPC(command, args);
     if (command === "creative_manual_request" || command === "creative_manual_cancel") return creativeManualPreviewIPC(command, args);
     if (
       [

@@ -1,7 +1,8 @@
 use super::*;
 use axum::{
+    body::Bytes,
     extract::State,
-    http::{HeaderMap, Uri},
+    http::{HeaderMap, Method, Uri},
     response::{IntoResponse, Response},
     Json, Router,
 };
@@ -21,11 +22,19 @@ impl TokenStore for MemoryStore {
 struct Fixture {
     mode: Arc<Mutex<&'static str>>,
     submissions: Arc<Mutex<usize>>,
+    requests: Arc<Mutex<Vec<(String, String, Vec<u8>)>>>,
     entered: Arc<tokio::sync::Notify>,
 }
 async fn connected() -> (Arc<AccountService>, Fixture, tokio::task::JoinHandle<()>) {
-    async fn endpoint(State(f): State<Fixture>, uri: Uri, headers: HeaderMap) -> Response {
-        let model_request = uri.path().starts_with("/v1/");
+    async fn endpoint(
+        State(f): State<Fixture>,
+        uri: Uri,
+        method: Method,
+        headers: HeaderMap,
+        body: Bytes,
+    ) -> Response {
+        let model_request =
+            !uri.path().starts_with("/api/token/") && !uri.path().starts_with("/api/user/");
         assert_eq!(
             headers["authorization"],
             if model_request {
@@ -42,7 +51,18 @@ async fn connected() -> (Arc<AccountService>, Fixture, tokio::task::JoinHandle<(
             "/api/user/self/bootstrap" => Json(json!({"success":true,"data":{"id":7,"username":"synthetic-user"}})).into_response(),
             "/api/token/9" => Json(json!({"success":true,"data":{"id":9,"name":"Synthetic","key":"****1234","status":if mode=="disabled" {2} else {1},"group":"default","expired_time":-1,"remain_quota":100,"used_quota":0,"unlimited_quota":true,"model_limits_enabled":false,"model_limits":""}})).into_response(),
             "/api/token/9/key" => Json(json!({"success":true,"data":{"key":"SYNTHETIC_CREATIVE_KEY"}})).into_response(),
-            "/v1/models" => Json(json!({"data":[{"id":"synthetic","supported_endpoint_types":["generate","edit"]}]})).into_response(),
+            "/v1/models" => {
+                let mut items = vec![json!({"id":"synthetic","supported_endpoint_types":["generate","edit","openai-video"]})];
+                if mode == "media" {
+                    let mut names = std::collections::HashSet::new();
+                    for action in MEDIA_ACTIONS.iter() {
+                        for model in &action.models {
+                            if names.insert(model) { items.push(json!({"id":model})); }
+                        }
+                    }
+                }
+                Json(json!({"data":items})).into_response()
+            },
             "/v1/images/generations" => {
                 *f.submissions.lock().unwrap() += 1;
                 f.entered.notify_one();
@@ -52,6 +72,10 @@ async fn connected() -> (Arc<AccountService>, Fixture, tokio::task::JoinHandle<(
                     "error" => (axum::http::StatusCode::UNAUTHORIZED, "SYNTHETIC_CREATIVE_KEY").into_response(),
                     _ => Json(json!({"data":[{"b64_json":"c3ludGhldGlj"}]})).into_response(),
                 }
+            },
+            _ if mode == "media" && MEDIA_ACTIONS.iter().any(|a| a.method == method.as_str() && a.path.replace("{taskId}", "synthetic-task_1") == uri.to_string()) => {
+                f.requests.lock().unwrap().push((method.to_string(), uri.to_string(), body.to_vec()));
+                Json(json!({"task_id":"synthetic-task_1","status":"SUCCESS"})).into_response()
             },
             _ => panic!("Unexpected fixture path: {}", uri.path()),
         }
@@ -181,6 +205,55 @@ async fn disconnect_cancels_waiting_model_request_without_replaying_it() {
         "creative_cancelled_outcome_unknown"
     );
     assert_eq!(*fixture.submissions.lock().unwrap(), 1);
+    assert!(service.business_pending.lock().unwrap().is_empty());
+    server.abort();
+}
+
+#[tokio::test]
+async fn media_manifest_executes_over_http_with_model_key_and_exact_payloads() {
+    let (service, fixture, server) = connected().await;
+    *fixture.mode.lock().unwrap() = "media";
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("bindings.json");
+    let generation = service.state().generation;
+    let binding = bind(
+        &service,
+        BindRequest {
+            generation,
+            token_id: "9".into(),
+        },
+        &path,
+    )
+    .await
+    .unwrap();
+    for entry in MEDIA_ACTIONS.iter() {
+        let mut r = request(&entry.action);
+        r.generation = generation;
+        r.binding_id = binding.id.clone();
+        r.task_id = "synthetic-task_1".into();
+        let expected_body = if entry.method == "GET" {
+            None
+        } else if let Some(field) = &entry.model_field {
+            Some(json!({field: "synthetic", "prompt": "SYNTHETIC MEDIA ONLY"}))
+        } else {
+            Some(json!({"prompt":"SYNTHETIC MUSIC ONLY","mv":"chirp-v5"}))
+        };
+        r.body = expected_body.clone();
+        let (channel, chunks) = output();
+        execute(&service, r, &path, channel)
+            .await
+            .unwrap_or_else(|e| panic!("{}: {e}", entry.action));
+        assert_eq!(chunks.lock().unwrap().last().unwrap()["type"], "end");
+        let requests = fixture.requests.lock().unwrap();
+        let sent = requests.last().unwrap();
+        assert_eq!(sent.0, entry.method);
+        assert_eq!(sent.1, entry.path.replace("{taskId}", "synthetic-task_1"));
+        match expected_body {
+            Some(body) => assert_eq!(serde_json::from_slice::<Value>(&sent.2).unwrap(), body),
+            None => assert!(sent.2.is_empty()),
+        }
+    }
+    assert_eq!(fixture.requests.lock().unwrap().len(), MEDIA_ACTIONS.len());
     assert!(service.business_pending.lock().unwrap().is_empty());
     server.abort();
 }

@@ -20,6 +20,7 @@ import {
 } from '@plait/common';
 import { createRoot, Root } from 'react-dom/client';
 import React from 'react';
+import { isNativeRenderEnvironment } from '../utils/tauri-env';
 import type { PlaitWorkZone } from '../types/workzone.types';
 import type { WorkflowMessageData } from '../types/chat.types';
 import { WorkZoneContent } from '../components/workzone-element/WorkZoneContent';
@@ -50,7 +51,7 @@ function isWorkZoneCardVisible(): boolean {
  */
 export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, PlaitBoard> {
   private g: SVGGElement | null = null;
-  private container: HTMLElement | null = null;
+  private container: HTMLElement | SVGGElement | null = null;
   private reactRoot: Root | null = null;
 
   activeGenerator!: ActiveGenerator<PlaitWorkZone>;
@@ -90,6 +91,15 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     this.g.setAttribute('data-element-id', this.element.id);
     this.g.classList.add('plait-workzone-element');
     this.g.style.pointerEvents = 'auto';
+
+    if (isNativeRenderEnvironment()) {
+      this.container = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      this.container.classList.add('workzone-native-content');
+      this.container.setAttribute('transform', `translate(${rect.x} ${rect.y}) scale(${getWorkZoneRenderScale(this.element)})`);
+      this.g.appendChild(this.container);
+      this.getElementG().appendChild(this.g);
+      return;
+    }
 
     // 创建 foreignObject
     const foreignObject = document.createElementNS(
@@ -140,19 +150,12 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
    * 处理工作流状态变更（来自 SW claim 结果）
    * 当 SW 中的工作流已完成/失败/不存在时更新 UI
    */
-  private handleWorkflowStateChange = (workflowId: string, status: 'completed' | 'failed', error?: string): void => {
-    // 失败的工作流直接删除 WorkZone，避免残留无用卡片
-    if (status === 'failed') {
-      setTimeout(() => {
-        WorkZoneTransforms.removeWorkZone(this.board, this.element.id);
-      }, 1500);
-      return;
-    }
-
+  private handleWorkflowStateChange = (workflowId: string, status: 'completed' | 'failed' | 'cancelled', error?: string): void => {
     // 更新 workflow 状态
     const updatedWorkflow = {
       ...this.element.workflow,
       status,
+      ...(error ? { error } : {}),
     };
 
     // 通过 WorkZoneTransforms 更新工作流
@@ -203,6 +206,10 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
       foreignObject.setAttribute('height', String(visualRect.height));
     }
 
+    if (this.container instanceof SVGGElement) {
+      this.container.setAttribute('transform', `translate(${rect.x} ${rect.y}) scale(${getWorkZoneRenderScale(element)})`);
+      return;
+    }
     if (this.container) {
       this.container.style.width = `${rect.width}px`;
       this.container.style.height = `${rect.height}px`;
@@ -225,6 +232,7 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
       React.createElement(ToolProviderWrapper as any, { board: this.board },
         React.createElement(WorkZoneContent as any, {
           workflow: this.element.workflow,
+          nativeSize: isNativeRenderEnvironment() ? RectangleClient.getRectangleByPoints(this.element.points) : undefined,
           onDelete: this.handleDelete,
           onWorkflowStateChange: this.handleWorkflowStateChange,
           onRetry: this.handleRetry,
@@ -251,6 +259,7 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
           React.createElement(ToolProviderWrapper as any, { board: this.board },
             React.createElement(WorkZoneContent as any, {
               workflow: value.element.workflow,
+              nativeSize: isNativeRenderEnvironment() ? RectangleClient.getRectangleByPoints(value.element.points) : undefined,
               onDelete: this.handleDelete,
               onWorkflowStateChange: this.handleWorkflowStateChange,
               onRetry: this.handleRetry,

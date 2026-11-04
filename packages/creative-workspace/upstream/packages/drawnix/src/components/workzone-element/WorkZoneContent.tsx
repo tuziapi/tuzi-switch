@@ -17,6 +17,11 @@ import type { WorkflowMessageData } from '../../types/chat.types';
 import { ConfirmDialog } from '../dialog/ConfirmDialog';
 import { HoverTip } from '../shared/hover';
 import './workzone-content.scss';
+import { taskQueueService } from '../../services/task-queue';
+import { findWorkflowStepForTask } from '../../utils/workflow-task-linking';
+import { applyTaskUpdateToWorkflowMessage } from '../../utils/workflow-task-sync';
+import { getTaskStatusText } from '../../utils/task-utils';
+import { TaskStatus, TaskExecutionPhase } from '../../types/task.types';
 
 // 状态图标映射
 type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
@@ -34,12 +39,13 @@ const claimedWorkflows = new Set<string>();
 
 interface WorkZoneContentProps {
   workflow: WorkflowMessageData;
+  nativeSize?: { width: number; height: number };
   className?: string;
   onDelete?: () => void;
   /** 当 SW 中找不到工作流或工作流状态变更时的回调 */
   onWorkflowStateChange?: (
     workflowId: string,
-    status: 'completed' | 'failed',
+    status: 'completed' | 'failed' | 'cancelled',
     error?: string
   ) => void;
   /** 从失败步骤重试工作流 */
@@ -49,13 +55,30 @@ interface WorkZoneContentProps {
 }
 
 export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
-  workflow,
+  workflow: sourceWorkflow,
+  nativeSize,
   className = '',
   onDelete,
   onWorkflowStateChange,
   onRetry,
   onHideForever,
 }) => {
+  const [taskRevision, setTaskRevision] = useState(0);
+  useEffect(() => {
+    const subscription = taskQueueService.observeTaskUpdates().subscribe(({ task }) => {
+      if (findWorkflowStepForTask(sourceWorkflow, task)) setTaskRevision((n) => n + 1);
+    });
+    setTaskRevision((n) => n + 1);
+    return () => subscription.unsubscribe();
+  }, [sourceWorkflow]);
+  const relatedTasks = useMemo(() => taskQueueService.getAllTasks().filter(
+    (task) => findWorkflowStepForTask(sourceWorkflow, task)
+  ), [sourceWorkflow, taskRevision]);
+  const workflow = useMemo(() => relatedTasks.reduce(
+    (current, task) => applyTaskUpdateToWorkflowMessage(current, task) || current,
+    sourceWorkflow
+  ), [sourceWorkflow, relatedTasks]);
+
   // 用于追踪是否已经尝试 claim
   const hasClaimedRef = useRef(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -128,7 +151,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
             ) {
               onWorkflowStateChange?.(
                 workflowId,
-                status === 'completed' ? 'completed' : 'failed',
+                status,
                 fallbackWorkflow.error
               );
             }
@@ -160,7 +183,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
             ) {
               onWorkflowStateChange?.(
                 workflowId,
-                status === 'completed' ? 'completed' : 'failed',
+                status,
                 localWorkflow.error
               );
               return true;
@@ -237,8 +260,10 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
     const failedSteps = steps.filter((s) => s.status === 'failed').length;
     const runningSteps = steps.filter((s) => s.status === 'running').length;
 
-    let status: 'pending' | 'running' | 'completed' | 'failed' = 'pending';
-    if (failedSteps > 0) {
+    let status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' = 'pending';
+    if (sourceWorkflow.status === 'cancelled' || (totalSteps > 0 && steps.every((s) => s.status === 'skipped'))) {
+      status = 'cancelled';
+    } else if (failedSteps > 0) {
       status = 'failed';
     } else if (completedSteps === totalSteps && totalSteps > 0) {
       status = 'completed';
@@ -247,7 +272,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
     }
 
     return { status, totalSteps, completedSteps };
-  }, [workflow.steps]);
+  }, [workflow.steps, sourceWorkflow.status]);
 
   // 计算进度百分比
   const progress =
@@ -259,12 +284,18 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
   const statusLabel = useMemo(() => {
     const labels: Record<typeof workflowStatus.status, string> = {
       pending: '待开始',
-      running: '执行中',
+      running: '生成中',
       completed: '已完成',
-      failed: '执行失败',
+      failed: '生成失败',
+      cancelled: '已取消',
     };
+    if (workflowStatus.status === 'running') {
+      const active = relatedTasks.filter((task) => [TaskStatus.PENDING, TaskStatus.PROCESSING].includes(task.status));
+      if (active.length && active.every((task) => task.status === TaskStatus.PENDING)) return getTaskStatusText(active[0]);
+      if (active.length && active.every((task) => task.executionPhase === TaskExecutionPhase.SUBMITTING)) return getTaskStatusText(active[0]);
+    }
     return labels[workflowStatus.status];
-  }, [workflowStatus.status]);
+  }, [workflowStatus.status, relatedTasks]);
 
   // 获取当前执行步骤
   const currentStep = useMemo(() => {
@@ -325,6 +356,40 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
     },
     []
   );
+
+  if (nativeSize) {
+    const { width, height } = nativeSize;
+    const failed = workflowStatus.status === 'failed';
+    const color = failed ? '#b42318' : '#475569';
+    const clipId = `workzone-text-${workflow.id.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    const action = (label: string, x: number, run: () => void, disabled = false) => (
+      <g role="button" tabIndex={disabled ? -1 : 0} aria-label={label} aria-disabled={disabled}
+        style={{ cursor: disabled ? 'default' : 'pointer' }}
+        onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); if (!disabled) run(); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!disabled) run(); } }}>
+        <rect x={x} y={height - 37} width={78} height={26} rx={5} fill="#f1f5f9" stroke="#cbd5e1" />
+        <text x={x + 39} y={height - 20} textAnchor="middle" fontSize={11} fill="#334155">{label}</text>
+      </g>
+    );
+    return <g className="workzone-native-card" role="group" aria-label={`${workflow.name}：${statusLabel}`}>
+      <rect width={width} height={height} rx={10} fill={failed ? '#fff7f6' : '#ffffff'} stroke={failed ? '#fda29b' : '#cbd5e1'} />
+      <defs><clipPath id={clipId}><rect x={14} y={12} width={width - 28} height={height - 57} /></clipPath></defs>
+      <g clipPath={`url(#${clipId})`} fontFamily="system-ui, sans-serif" fill={color}>
+        <text x={16} y={31} fontSize={12}>{typeIcon} {workflow.name}</text>
+        <text x={16} y={65} fontSize={20} fontWeight={600}>{statusLabel}</text>
+        <text x={16} y={89} fontSize={11}>{workflowStatus.completedSteps}/{workflowStatus.totalSteps} 步骤</text>
+        {workflow.steps.slice(0, Math.max(1, Math.floor((height - 155) / 24))).map((step, i) =>
+          <text key={step.id} x={16} y={116 + i * 24} fontSize={12}>{STATUS_ICONS[step.status]} {step.error || step.description}</text>
+        )}
+      </g>
+      {onDelete && action('删除', width - 92, onDelete)}
+      {canRetry && action(isRetrying ? '重试中' : '重试', 14, () => void handleRetry(), isRetrying)}
+      {onHideForever && action('隐藏卡片', canRetry ? 98 : 14, handleHideForeverClick)}
+      <ConfirmDialog open={showHideConfirm} title="隐藏进度卡片" description="确定不再显示进度卡片？任务仍会在后台执行，可在设置中恢复显示。"
+        confirmText="确定" cancelText="取消" onOpenChange={setShowHideConfirm} onConfirm={handleHideConfirm} />
+    </g>;
+  }
 
   return (
     <div

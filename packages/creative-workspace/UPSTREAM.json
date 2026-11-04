@@ -2711,6 +2711,10 @@
       "sha256": "18e23d98a0c0b7f6a75508b324abe995d48ed143773f1402b8e7c6cebae44a1c"
     },
     {
+      "path": "packages/drawnix/src/components/workzone-element/WorkZoneContent.test.tsx",
+      "sha256": "50ac8a734a0aa8127d7ac0d6db66c0ca4c818716bdab13ea104fd1a4ba12b24b"
+    },
+    {
       "path": "packages/drawnix/src/components/workzone-element/WorkZoneContent.tsx",
       "sha256": "215c028257a80f4e3f27952ca35078cf74e0150cb2794f582b7af391ca4a9b44"
     },
@@ -6152,6 +6156,41 @@
     {
       "path": "packages/drawnix/src/components/settings-dialog/__tests__/model-fetch-interaction.test.tsx",
       "reason": "Assistant regression: scoped confirmation and single-click model discovery."
+    },
+    {
+      "path": "packages/drawnix/src/components/workzone-element/WorkZoneContent.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-MEDIA-01 account media and native presentation acceptance"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/components/native-media-overlay.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-MEDIA-01 account media and native presentation acceptance"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/components/native-media-overlay.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-MEDIA-01 account media and native presentation acceptance"
+    },
+    {
+      "path": "openspec/changes/complete-assistant-media/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-MEDIA-01 account media and native presentation acceptance"
+    },
+    {
+      "path": "openspec/changes/complete-assistant-media/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-MEDIA-01 account media and native presentation acceptance"
+    },
+    {
+      "path": "openspec/changes/complete-assistant-media/specs/creative-integration/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-MEDIA-01 account media and native presentation acceptance"
+    },
+    {
+      "path": "packages/drawnix/src/components/settings-dialog/__tests__/model-discovery-selection.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-MEDIA-01 prevent catalogue refresh from discarding selected models"
     }
   ],
   "integration": {

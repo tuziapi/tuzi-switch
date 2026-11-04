@@ -59,6 +59,15 @@ async function paintedCanvas(p, boardId, label) {
   const host = p
     .locator(`[plait-data-id="${element.id}"] foreignObject`)
     .first();
+  // Wait for this result, not an unrelated toolbar/thumbnail image. Reopening
+  // a project can briefly leave the board mounted under its loading screen.
+  await p.waitForFunction((id) => {
+    const image = document.querySelector(`[plait-data-id="${id}"] img`);
+    return image?.complete && image.naturalWidth > 0 &&
+      ![...document.querySelectorAll('.creative-root *')].some(node =>
+        node.childElementCount === 0 && node.textContent === '正在读取本地项目...' &&
+        node.getBoundingClientRect().height > 0);
+  }, element.id);
   const rect = await host.boundingBox();
   assert(
     rect && rect.width > 20 && rect.height > 20,

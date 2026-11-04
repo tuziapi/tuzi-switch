@@ -16,6 +16,7 @@ import {
 } from '../../types/image-generation-anchor.types';
 import { workflowCompletionService } from '../../services/workflow-completion-service';
 import { ImageGenerationAnchorContent } from './ImageGenerationAnchorContent';
+import { ImageGenerationAnchorGenerator } from './image-generation-anchor.generator';
 import { registerCanvasImage } from '../../services/canvas-image-readiness';
 
 const mocks = vi.hoisted(() => ({
@@ -222,6 +223,35 @@ describe('ImageGenerationAnchorContent result recovery', () => {
       expect(screen.queryByText('图片加载超时，可重试加载已有结果')).toBeNull();
     } finally {
       window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, retryInsertion);
+    }
+  });
+});
+
+
+describe('native SVG anchor readiness', () => {
+  it('receives real readiness events and never paints a loading placeholder image', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {});
+    const task = { id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.COMPLETED,
+      params: {}, createdAt: 1, insertedToCanvas: true, result: { url: '/__aitu_cache__/image/result.png' } } as Task;
+    mocks.tasks = [task];
+    const anchor = { ...createAnchor(), phase: 'inserting' as const, error: undefined,
+      resultElementId: 'image-1', previewImageUrl: 'data:image/png;base64,synthetic-invalid-preview' };
+    const board = { children: [{ id: 'image-1', type: 'image', url: task.result!.url, generationTaskId: task.id }] } as unknown as PlaitBoard;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const host = document.createElementNS(svg.namespaceURI, 'g') as SVGGElement;
+    svg.appendChild(host); document.body.appendChild(svg);
+    const generator = new ImageGenerationAnchorGenerator(board);
+    try {
+      await act(async () => { generator.processDrawing(anchor, host, false); });
+      expect(host.textContent).toContain('正在加载图片');
+      expect(host.querySelector('image')).toBeNull();
+      await act(async () => { registerCanvasImage(board, 'image-1', task.result!.url).setReady(true); });
+      expect(host.textContent).toContain('已完成');
+      expect(host.textContent).not.toContain('正在加载图片');
+    } finally {
+      generator.destroy();
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
+      svg.remove(); vi.unstubAllGlobals(); mocks.tasks = [];
     }
   });
 });

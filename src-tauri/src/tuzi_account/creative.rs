@@ -221,9 +221,53 @@ async fn bind(
     Ok(binding)
 }
 
+// Shared, audited paths. Unknown actions never become arbitrary proxy requests.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MediaAction {
+    action: String,
+    method: String,
+    path: String,
+    #[serde(default)]
+    models: Vec<String>,
+    model_field: Option<String>,
+    #[serde(default)]
+    aliases: Vec<String>,
+    #[serde(default)]
+    compatible_paths: Vec<String>,
+}
+static MEDIA_ACTIONS: LazyLock<Vec<MediaAction>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!(
+        "../../../src/features/creative/mediaActions.json"
+    ))
+    .expect("bundled media action contract")
+});
+fn media_action(action: &str) -> Option<&'static MediaAction> {
+    MEDIA_ACTIONS.iter().find(|entry| entry.action == action)
+}
+fn valid_task_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 200
+        && id.as_bytes()[0] != b'.'
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"_-.".contains(&b))
+}
+
 // Only known model actions, never renderer-supplied URLs or arbitrary headers.
 fn target(request: &ModelRequest) -> Result<(&'static str, String), String> {
     let id = &request.task_id;
+    if let Some(entry) = media_action(&request.action) {
+        if entry.path.contains("{taskId}") && !valid_task_id(id) {
+            return Err("invalid_task_id".into());
+        }
+        let method = match entry.method.as_str() {
+            "GET" => "GET",
+            "POST" => "POST",
+            _ => return Err("creative_action_unsupported".into()),
+        };
+        return Ok((method, entry.path.replace("{taskId}", id)));
+    }
     let valid_id = || {
         !id.is_empty()
             && id.len() <= 200
@@ -341,6 +385,48 @@ fn encode_body(request: &ModelRequest) -> Result<(Vec<u8>, String), String> {
 }
 
 fn supports_action(model: &Value, action: &str) -> bool {
+    if let Some(entry) = media_action(action) {
+        let valid_detail = |detail: &Value| {
+            let path = detail.as_str().or_else(|| detail["path"].as_str());
+            detail["method"]
+                .as_str()
+                .unwrap_or("POST")
+                .eq_ignore_ascii_case(&entry.method)
+                && path.is_some_and(|p| {
+                    p == entry.path || entry.compatible_paths.iter().any(|v| v == p)
+                })
+        };
+        if model["endpoints"]
+            .as_object()
+            .is_some_and(|m| m.values().any(valid_detail))
+        {
+            return true;
+        }
+        return model["supported_endpoint_types"]
+            .as_array()
+            .is_some_and(|types| {
+                types.iter().any(|t| {
+                    let Some(name) = t.as_str() else {
+                        return false;
+                    };
+                    if !entry
+                        .aliases
+                        .iter()
+                        .any(|a| a.eq_ignore_ascii_case(name.trim()))
+                    {
+                        return false;
+                    }
+                    match model["endpoints"]
+                        .as_object()
+                        .and_then(|m| m.iter().find(|(k, _)| k.eq_ignore_ascii_case(name.trim())))
+                        .map(|(_, v)| v)
+                    {
+                        Some(detail) if !detail.is_null() => valid_detail(detail),
+                        _ => true,
+                    }
+                })
+            });
+    }
     let (path, aliases): (&str, &[&str]) = match action {
         "chat" => (
             "/v1/chat/completions",
@@ -363,17 +449,25 @@ fn supports_action(model: &Value, action: &str) -> bool {
         ),
         "image.generate" => (
             "/v1/images/generations",
-            &["openai-image", "openai-images", "image-generation", "generate"],
+            &[
+                "openai-image",
+                "openai-images",
+                "image-generation",
+                "generate",
+            ],
         ),
         "image.edit" => (
             "/v1/images/edits",
             &["openai-image", "openai-images", "image-edit", "edit"],
         ),
         "video.create" => ("/v1/videos", &["openai-video", "openai-videos"]),
-        "audio.speech" => ("/v1/audio/speech", &["openai-tts", "text-to-speech"]),
+        "audio.speech" => (
+            "/v1/audio/speech",
+            &["openai-tts", "text-to-speech", "audio-speech"],
+        ),
         "audio.transcribe" => (
             "/v1/audio/transcriptions",
-            &["openai-stt", "speech-to-text"],
+            &["openai-stt", "speech-to-text", "audio-transcription"],
         ),
         "gemini.generate" | "gemini.stream" => (
             "/v1beta/models/{model}:generateContent",
@@ -430,6 +524,42 @@ fn supports_action(model: &Value, action: &str) -> bool {
 }
 
 fn validate_model(request: &ModelRequest, catalog: &Value) -> Result<(), String> {
+    if let Some(entry) = media_action(&request.action) {
+        // Suno chooses permission/billing models from the endpoint, not body.model
+        // (which is a music version such as V6). Check every server-required model.
+        if !entry.models.is_empty() {
+            let items = catalog["items"].as_array().ok_or("invalid_catalog")?;
+            return if entry.models.iter().all(|required| {
+                items
+                    .iter()
+                    .any(|m| m["model_name"].as_str() == Some(required))
+            }) {
+                Ok(())
+            } else {
+                Err("model_not_qualified".into())
+            };
+        }
+        if let Some(field) = &entry.model_field {
+            let body = request.body.as_ref().ok_or("missing_body")?;
+            if !request.parts.is_empty() {
+                return Err("invalid_body".into());
+            }
+            let model = body[field]
+                .as_str()
+                .filter(|m| !m.is_empty())
+                .ok_or("invalid_model")?;
+            return if catalog["items"].as_array().is_some_and(|items| {
+                items
+                    .iter()
+                    .any(|m| m["model_name"] == model && supports_action(m, &request.action))
+            }) {
+                Ok(())
+            } else {
+                Err("model_not_qualified".into())
+            };
+        }
+        return Err("invalid_model".into());
+    }
     let models: Vec<&str> = if request.parts.is_empty() {
         request
             .body
@@ -515,6 +645,11 @@ async fn execute(
                 })
                 .map_err(|_| "consumer_closed")?;
         } else {
+            if method == "GET"
+                && media_action(&request.action).is_some_and(|a| !a.models.is_empty())
+            {
+                validate_model(&request, &catalog)?;
+            }
             let payload = if method == "POST" {
                 validate_model(&request, &catalog)?;
                 Some(encode_body(&request)?)
@@ -637,6 +772,68 @@ mod tests {
         serde_json::from_value(json!({"generation":1,"bindingId":"synthetic","requestId":uuid::Uuid::new_v4().to_string(),"action":action,"body":{"model":"synthetic"}})).unwrap()
     }
     #[test]
+    fn every_media_action_has_a_fixed_target_and_enforces_qualification() {
+        let mut names = std::collections::HashSet::new();
+        for entry in MEDIA_ACTIONS.iter() {
+            assert!(names.insert(&entry.action));
+            let mut r = request(&entry.action);
+            r.task_id = "synthetic-task_1".into();
+            assert_eq!(
+                target(&r).unwrap(),
+                (
+                    entry.method.as_str(),
+                    entry.path.replace("{taskId}", &r.task_id)
+                )
+            );
+            if entry.path.contains("{taskId}") {
+                for id in [
+                    "",
+                    "..",
+                    "../secret",
+                    "one/two",
+                    "one?admin=true",
+                    "%2e%2e",
+                    "a#b",
+                ] {
+                    r.task_id = id.into();
+                    assert!(target(&r).is_err(), "{} {id}", entry.action);
+                }
+            }
+            if !entry.models.is_empty() {
+                // body.model is the music engine, never a substitute permission.
+                r.body = Some(json!({"model":"V6"}));
+                let catalog = json!({"items": entry.models.iter().map(|m| json!({"model_name":m})).collect::<Vec<_>>()});
+                assert!(validate_model(&r, &catalog).is_ok(), "{}", entry.action);
+                assert!(validate_model(&r, &json!({"items":[{"model_name":"V6"}]})).is_err());
+                for missing in 0..entry.models.len() {
+                    let items: Vec<_> = entry
+                        .models
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| *i != missing)
+                        .map(|(_, m)| json!({"model_name":m}))
+                        .collect();
+                    assert!(validate_model(&r, &json!({"items":items})).is_err());
+                }
+            } else if let Some(field) = &entry.model_field {
+                r.body = Some(json!({field:"synthetic-video"}));
+                let catalog = json!({"items":[{"model_name":"synthetic-video","supported_endpoint_types":["openai-video"]}]});
+                assert!(validate_model(&r, &catalog).is_ok(), "{}", entry.action);
+                assert!(validate_model(&r, &json!({"items":[{"model_name":"synthetic-video","supported_endpoint_types":["openai"]}]})).is_err());
+                assert!(validate_model(&r, &json!({"items":[]})).is_err());
+                assert!(!supports_action(
+                    &json!({"supported_endpoint_types":["openai-video"],"endpoints":{"openai-video":{"path":"/admin/private","method":"POST"}}}),
+                    &entry.action
+                ));
+                r.body = Some(json!({"model":"wrong-field"}));
+                if field != "model" {
+                    assert!(validate_model(&r, &catalog).is_err());
+                }
+            }
+        }
+    }
+
+    #[test]
     fn controlled_actions_reject_paths_and_unknown_operations() {
         assert_eq!(
             target(&request("image.generate")).unwrap(),
@@ -678,10 +875,22 @@ mod tests {
         assert!(validate_model(&request("image.edit"), &catalog).is_ok());
         assert!(validate_model(&request("chat"), &catalog).is_err());
         assert!(validate_model(&request("image.generate"), &json!({"items":[]})).is_err());
-        assert!(!supports_action(&json!({"supported_endpoint_types":["edit"]}), "image.generate"));
-        assert!(!supports_action(&json!({"supported_endpoint_types":["generate"]}), "image.edit"));
-        assert!(!supports_action(&json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/chat/completions","method":"POST"}}}), "image.generate"));
-        assert!(!supports_action(&json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/images/generations","method":"GET"}}}), "image.generate"));
+        assert!(!supports_action(
+            &json!({"supported_endpoint_types":["edit"]}),
+            "image.generate"
+        ));
+        assert!(!supports_action(
+            &json!({"supported_endpoint_types":["generate"]}),
+            "image.edit"
+        ));
+        assert!(!supports_action(
+            &json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/chat/completions","method":"POST"}}}),
+            "image.generate"
+        ));
+        assert!(!supports_action(
+            &json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/images/generations","method":"GET"}}}),
+            "image.generate"
+        ));
     }
     #[test]
     fn multipart_is_encoded_natively_and_rejects_header_injection() {

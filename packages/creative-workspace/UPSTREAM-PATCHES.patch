@@ -240,6 +240,65 @@ index 0000000..231d3a4
 +- [x] 1.3 Add context menu and single-image download integration.
 +- [x] 1.4 Verify file handling, cancellation, cache/reload, keyboard, viewport and WebKit.
 +- [x] 1.5 Record host verification and regenerate vendored provenance patch.
+diff --git a/openspec/changes/complete-assistant-media/proposal.md b/openspec/changes/complete-assistant-media/proposal.md
+new file mode 100644
+index 0000000..3672a1f
+--- /dev/null
++++ b/openspec/changes/complete-assistant-media/proposal.md
+@@ -0,0 +1,16 @@
++# Change: Complete account-backed media in the unified client
++
++## Why
++The user reported MiniMax-H3 rejection, invisible video placeholders, image loading artifacts and inconsistent task status. Existing image-only acceptance missed these paths.
++
++## Scope and approval
++2026-11-04 the user explicitly chose B: complete account integration for existing video/music capabilities and comprehensively validate them. Preserve manual providers and existing key/account checks. This approval covers local implementation and verification. Do not treat historical publication as blanket authorization for a new release.
++
++## What Changes
++- Share a finite media action manifest between renderer and Rust, including MiniMax, Kling, Seedance and existing Suno legacy/v2/native operations.
++- Resolve implicit Suno permission models from audited server routes; never copy managed secrets to frontend configuration.
++- Repair native task card painting and make native image state use the existing readiness controller.
++- Verify images, video, audio and text with explicit distinction between synthetic transport and live provider acceptance.
++
++## Impact
++Host account bridge/native request validation, embedded task presentation and regression fixtures. No database or binding-file schema migration. Canonical record: host docs/development/2026-11-04-media-acceptance.md.
+diff --git a/openspec/changes/complete-assistant-media/specs/creative-integration/spec.md b/openspec/changes/complete-assistant-media/specs/creative-integration/spec.md
+new file mode 100644
+index 0000000..1b9a213
+--- /dev/null
++++ b/openspec/changes/complete-assistant-media/specs/creative-integration/spec.md
+@@ -0,0 +1,17 @@
++## ADDED Requirements
++### Requirement: Account media requests are explicit and validated
++The client SHALL support the existing documented video and music actions through a shared finite action manifest, preserving account ownership, key eligibility, request cancellation and credential isolation.
++#### Scenario: MiniMax generation and polling
++- **WHEN** an eligible account key submits MiniMax-H3 video
++- **THEN** the native request uses the fixed generation endpoint and polls the returned task without replaying the submission.
++#### Scenario: Suno implicit model
++- **WHEN** a Suno action omits the API permission model from its body
++- **THEN** the native layer checks the server-defined routing and billing models in that key's catalogue, independently of renderer input.
++#### Scenario: Unknown route
++- **WHEN** a caller supplies an unknown action, task path injection or unapproved query
++- **THEN** the request is rejected before credentials reach the network.
++### Requirement: Native canvas media state is visible and current
++The client SHALL paint video/music/text task feedback in the native WebView and derive image loading state from the same task and readiness events as the web presentation.
++#### Scenario: Task and canvas status agree
++- **WHEN** an associated task changes from pending to generating, completed, failed or cancelled
++- **THEN** the canvas card reflects its current state and does not remain blank or stale.
+diff --git a/openspec/changes/complete-assistant-media/tasks.md b/openspec/changes/complete-assistant-media/tasks.md
+new file mode 100644
+index 0000000..51157c8
+--- /dev/null
++++ b/openspec/changes/complete-assistant-media/tasks.md
+@@ -0,0 +1,8 @@
++## Implementation and verification
++- [x] Recover user scope, worktree and source revisions; inspect screenshots and existing routes.
++- [x] Implement and test 75 account media actions, permission models and hostile inputs.
++- [x] Fix native canvas placeholders, media painting and task/readiness presentation.
++- [x] Preserve model selection through background catalogue updates.
++- [x] Verify synthetic video/audio/text submission, polling, completion, failure, cancellation and persisted recovery without duplicate POSTs; verify image navigation/recovery.
++- [x] Rebuild isolated native app, verify source provenance and record layered evidence.
++- [ ] Complete real native media playback and live provider acceptance with user-configured test account and explicit new paid-call limits. See host docs/development/2026-11-04-media-acceptance.md; this is not a release approval.
 diff --git a/openspec/changes/sync-assistant-creative-features/proposal.md b/openspec/changes/sync-assistant-creative-features/proposal.md
 new file mode 100644
 index 0000000..0bd44a2
@@ -747,6 +806,58 @@ index 6dcd651..a4577ee 100644
              )}
          </div>
        )}
+diff --git a/packages/drawnix/src/components/audio-node-element/audio-node-content.scss b/packages/drawnix/src/components/audio-node-element/audio-node-content.scss
+index 1ca1cc3..3abe2d9 100644
+--- a/packages/drawnix/src/components/audio-node-element/audio-node-content.scss
++++ b/packages/drawnix/src/components/audio-node-element/audio-node-content.scss
+@@ -5,7 +5,8 @@
+   width: 100%;
+   height: 100%;
+   display: grid;
+-  grid-template-columns: max-content minmax(0, 1fr);
++  // Explicit artwork track avoids WebKit cyclic intrinsic sizing (percentage height + aspect ratio).
++  grid-template-columns: min(84px, 25%) minmax(0, 1fr);
+   align-items: stretch;
+   gap: 16px;
+   padding: 12px 14px;
+@@ -105,8 +106,9 @@
+   position: relative;
+   border: none;
+   padding: 0;
+-  width: auto;
+-  height: var(--audio-node-content-band-height);
++  width: 100%;
++  height: auto;
++  max-height: 100%;
+   flex-shrink: 0;
+   aspect-ratio: 1;
+   border-radius: 18px;
+diff --git a/packages/drawnix/src/components/audio-node-element/audio-node.generator.ts b/packages/drawnix/src/components/audio-node-element/audio-node.generator.ts
+index 669c33f..b5d0a5e 100644
+--- a/packages/drawnix/src/components/audio-node-element/audio-node.generator.ts
++++ b/packages/drawnix/src/components/audio-node-element/audio-node.generator.ts
+@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
+ import React from 'react';
+ import type { PlaitAudioNode } from '../../types/audio-node.types';
+ import type { CanvasAudioPlaybackSource } from '../../services/canvas-audio-playback-service';
++import { NativeMediaOverlay } from '../../plugins/components/native-media-overlay';
+ import { AudioNodeContent } from './AudioNodeContent';
+ 
+ export class AudioNodeGenerator {
+@@ -90,11 +91,11 @@ export class AudioNodeGenerator {
+     }
+ 
+     this.reactRoot.render(
+-      React.createElement(AudioNodeContent, {
++      React.createElement(NativeMediaOverlay, { children: React.createElement(AudioNodeContent, {
+         element,
+         selected,
+         canvasQueue,
+-      })
++      }) })
+     );
+   }
+ 
 diff --git a/packages/drawnix/src/components/backup-restore/backup-restore-dialog.tsx b/packages/drawnix/src/components/backup-restore/backup-restore-dialog.tsx
 index f3e41d2..720a53f 100644
 --- a/packages/drawnix/src/components/backup-restore/backup-restore-dialog.tsx
@@ -1336,10 +1447,18 @@ index 30be31c..7ff5760 100644
            }
          }
 diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
-index 4ef1925..485ddb2 100644
+index 4ef1925..3cbd82e 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 +++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
-@@ -92,7 +92,7 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+@@ -16,6 +16,7 @@ import {
+ } from '../../types/image-generation-anchor.types';
+ import { workflowCompletionService } from '../../services/workflow-completion-service';
+ import { ImageGenerationAnchorContent } from './ImageGenerationAnchorContent';
++import { ImageGenerationAnchorGenerator } from './image-generation-anchor.generator';
+ import { registerCanvasImage } from '../../services/canvas-image-readiness';
+ 
+ const mocks = vi.hoisted(() => ({
+@@ -92,7 +93,7 @@ describe('ImageGenerationAnchorContent result recovery', () => {
      workflowCompletionService.clear();
    });
  
@@ -1348,7 +1467,7 @@ index 4ef1925..485ddb2 100644
      mocks.tasks[0].insertedToCanvas = true;
      const anchor = {
        ...createAnchor(), phase: 'inserting' as const, error: undefined,
-@@ -105,12 +105,13 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+@@ -105,12 +106,13 @@ describe('ImageGenerationAnchorContent result recovery', () => {
        }],
      } as unknown as PlaitBoard;
      render(<ImageGenerationAnchorContent board={board} element={anchor} selected={false} />);
@@ -1364,7 +1483,7 @@ index 4ef1925..485ddb2 100644
      expect(document.querySelector('.image-generation-anchor--phase-completed')).not.toBeNull();
    });
  
-@@ -134,7 +135,7 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+@@ -134,7 +136,7 @@ describe('ImageGenerationAnchorContent result recovery', () => {
        return <ImageGenerationAnchorContent board={board} element={anchor} selected={false} />;
      }
      render(<CachedResult />);
@@ -1373,7 +1492,7 @@ index 4ef1925..485ddb2 100644
    });
  
    it('shows successful generation and retries insertion without regenerating', async () => {
-@@ -215,9 +216,9 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+@@ -215,12 +217,41 @@ describe('ImageGenerationAnchorContent result recovery', () => {
        expect(mocks.retryTask).not.toHaveBeenCalled();
        expect(retryInsertion).not.toHaveBeenCalled();
        expect(board.children).toHaveLength(2);
@@ -1385,6 +1504,38 @@ index 4ef1925..485ddb2 100644
        expect(screen.queryByText('图片加载超时，可重试加载已有结果')).toBeNull();
      } finally {
        window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, retryInsertion);
+     }
+   });
+ });
++
++
++describe('native SVG anchor readiness', () => {
++  it('receives real readiness events and never paints a loading placeholder image', async () => {
++    vi.stubGlobal('__TAURI_INTERNALS__', {});
++    const task = { id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.COMPLETED,
++      params: {}, createdAt: 1, insertedToCanvas: true, result: { url: '/__aitu_cache__/image/result.png' } } as Task;
++    mocks.tasks = [task];
++    const anchor = { ...createAnchor(), phase: 'inserting' as const, error: undefined,
++      resultElementId: 'image-1', previewImageUrl: 'data:image/png;base64,synthetic-invalid-preview' };
++    const board = { children: [{ id: 'image-1', type: 'image', url: task.result!.url, generationTaskId: task.id }] } as unknown as PlaitBoard;
++    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
++    const host = document.createElementNS(svg.namespaceURI, 'g') as SVGGElement;
++    svg.appendChild(host); document.body.appendChild(svg);
++    const generator = new ImageGenerationAnchorGenerator(board);
++    try {
++      await act(async () => { generator.processDrawing(anchor, host, false); });
++      expect(host.textContent).toContain('正在加载图片');
++      expect(host.querySelector('image')).toBeNull();
++      await act(async () => { registerCanvasImage(board, 'image-1', task.result!.url).setReady(true); });
++      expect(host.textContent).toContain('已完成');
++      expect(host.textContent).not.toContain('正在加载图片');
++    } finally {
++      generator.destroy();
++      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
++      svg.remove(); vi.unstubAllGlobals(); mocks.tasks = [];
++    }
++  });
++});
 diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
 index b20cedc..10c55af 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
@@ -1421,10 +1572,17 @@ index b20cedc..10c55af 100644
            />
          ) : null}
 diff --git a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
-index d8018b2..ef84637 100644
+index d8018b2..2e474bc 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 +++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
-@@ -6,7 +6,7 @@ import {
+@@ -1,12 +1,13 @@
+ import { RectangleClient, type PlaitBoard } from '@plait/core';
+ import { createRoot, type Root } from 'react-dom/client';
+-import React from 'react';
++import React, { useEffect } from 'react';
++import { useImageGenerationAnchorController } from '../../hooks/useImageGenerationAnchorController';
+ import {
+   IMAGE_GENERATION_ANCHOR_RETRY_EVENT,
    type ImageGenerationAnchorPhase,
    type PlaitImageGenerationAnchor,
  } from '../../types/image-generation-anchor.types';
@@ -1433,7 +1591,7 @@ index d8018b2..ef84637 100644
  import { ImageGenerationAnchorContent } from './ImageGenerationAnchorContent';
  
  const SVG_NS = 'http://www.w3.org/2000/svg';
-@@ -15,8 +15,8 @@ const DESKTOP_PHASE_LABELS: Record<ImageGenerationAnchorPhase, string> = {
+@@ -15,8 +16,8 @@ const DESKTOP_PHASE_LABELS: Record<ImageGenerationAnchorPhase, string> = {
    submitted: '准备生成',
    queued: '等待执行',
    generating: '生成中',
@@ -1444,16 +1602,64 @@ index d8018b2..ef84637 100644
    completed: '已完成',
    failed: '生成失败',
  };
-@@ -63,7 +63,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -45,6 +46,16 @@ function truncateText(value: string, maxLength: number): string {
+   return `${value.slice(0, Math.max(1, maxLength - 1))}…`;
+ }
+ 
++function NativeAnchorState({ board, element, render }: {
++  board: PlaitBoard;
++  element: PlaitImageGenerationAnchor;
++  render: (element: PlaitImageGenerationAnchor) => void;
++}) {
++  const { nextPatch } = useImageGenerationAnchorController({ board, anchor: element });
++  useEffect(() => { render({ ...element, ...nextPatch }); }, [element, nextPatch, render]);
++  return null;
++}
++
+ export class ImageGenerationAnchorGenerator {
+   constructor(private board: PlaitBoard) {}
+ 
+@@ -63,8 +74,9 @@ export class ImageGenerationAnchorGenerator {
      g.setAttribute('class', 'image-generation-anchor-element');
      parentG.appendChild(g);
  
 -    if (isTauriEnvironment()) {
 +    if (isNativeRenderEnvironment()) {
        this.createDesktopFallback(element, g);
++      this.renderNativeController(element);
      } else {
        this.createForeignObject(element, g);
-@@ -115,6 +115,7 @@ export class ImageGenerationAnchorGenerator {
+       // WebKit is sensitive to mounting a React root before foreignObject is
+@@ -83,7 +95,7 @@ export class ImageGenerationAnchorGenerator {
+     selected: boolean
+   ): void {
+     if (this.desktopFallback) {
+-      this.renderDesktopFallback(element);
++      this.renderNativeController(element);
+       return;
+     }
+ 
+@@ -91,6 +103,19 @@ export class ImageGenerationAnchorGenerator {
+     this.renderReact(element, selected);
+   }
+ 
++  private renderNativeController(element: PlaitImageGenerationAnchor): void {
++    // Keep the existing task/readiness subscriptions alive for the SVG renderer.
++    if (!this.htmlContainer) this.htmlContainer = document.createElement('div');
++    if (!this.reactRoot) this.reactRoot = createRoot(this.htmlContainer);
++    this.reactRoot.render(React.createElement(NativeAnchorState, {
++      board: this.board, element, render: this.renderNativeState,
++    }));
++  }
++
++  private renderNativeState = (element: PlaitImageGenerationAnchor): void => {
++    this.renderDesktopFallback(element);
++  };
++
+   private createDesktopFallback(
+     element: PlaitImageGenerationAnchor,
+     g: SVGGElement
+@@ -115,6 +140,7 @@ export class ImageGenerationAnchorGenerator {
      const rect = RectangleClient.getRectangleByPoints(element.points);
      const isFailed = element.phase === 'failed';
      const isCompleted = element.phase === 'completed';
@@ -1461,7 +1667,7 @@ index d8018b2..ef84637 100644
      const accent = isFailed ? '#c15a5a' : '#25755e';
      const background = isFailed
        ? '#fffafa'
-@@ -138,7 +139,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -138,7 +164,7 @@ export class ImageGenerationAnchorGenerator {
  
      host.setAttribute(
        'aria-label',
@@ -1470,7 +1676,16 @@ index d8018b2..ef84637 100644
      );
  
      const backgroundRect = createSvgElement('rect');
-@@ -235,7 +236,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -223,7 +249,7 @@ export class ImageGenerationAnchorGenerator {
+       host.appendChild(counter);
+     }
+ 
+-    if (element.previewImageUrl) {
++    if (element.previewImageUrl && !isLoadingImage) {
+       const preview = createSvgElement('image');
+       preview.setAttribute('x', String(rect.x));
+       preview.setAttribute('y', String(rect.y));
+@@ -235,7 +261,7 @@ export class ImageGenerationAnchorGenerator {
      }
  
      const centerX = rect.x + rect.width / 2;
@@ -1479,7 +1694,7 @@ index d8018b2..ef84637 100644
      const spinnerRadius = compact ? 10 : Math.min(28, minDimension * 0.1);
      const contentCenterY =
        rect.y +
-@@ -302,7 +303,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -302,7 +328,7 @@ export class ImageGenerationAnchorGenerator {
      title.textContent = phaseLabel;
      host.appendChild(title);
  
@@ -2708,6 +2923,57 @@ index 878384d..318956d 100644
          )}
      </section>
    );
+diff --git a/packages/drawnix/src/components/settings-dialog/__tests__/model-discovery-selection.test.tsx b/packages/drawnix/src/components/settings-dialog/__tests__/model-discovery-selection.test.tsx
+new file mode 100644
+index 0000000..30ac8e8
+--- /dev/null
++++ b/packages/drawnix/src/components/settings-dialog/__tests__/model-discovery-selection.test.tsx
+@@ -0,0 +1,45 @@
++import React from "react";
++import { cleanup, fireEvent, render, screen } from "@testing-library/react";
++import { afterEach, expect, it, vi } from "vitest";
++import { ModelDiscoveryDialog } from "../model-discovery-dialog";
++import { ModelVendor, type ModelConfig } from "../../../constants/model-config";
++vi.mock("../../dialog/dialog", () => ({
++  Dialog: ({ open, children }: any) => (open ? children : null),
++  DialogContent: ({ children }: any) => <div>{children}</div>,
++}));
++vi.mock("../../shared", () => ({ HoverTip: ({ children }: any) => children }));
++afterEach(cleanup);
++it("keeps user selection across catalogue array refreshes and resets on reopening", () => {
++  const model = {
++    id: "MiniMax-H3",
++    label: "MiniMax-H3",
++    shortLabel: "H3",
++    shortCode: "h3",
++    type: "video",
++    vendor: ModelVendor.MINIMAX,
++  } as ModelConfig;
++  const confirm = vi.fn();
++  const props = {
++    open: true,
++    container: null,
++    models: [model],
++    selectedModelIds: [],
++    onClose: vi.fn(),
++    onConfirm: confirm,
++  };
++  const view = render(<ModelDiscoveryDialog {...props} />);
++  fireEvent.click(screen.getByRole("button", { name: "全选" }));
++  view.rerender(
++    <ModelDiscoveryDialog
++      {...props}
++      models={[{ ...model }]}
++      selectedModelIds={[]}
++    />,
++  );
++  expect(screen.getAllByText("已选 1").length).toBeGreaterThan(0);
++  fireEvent.click(screen.getByRole("button", { name: "添加模型" }));
++  expect(confirm).toHaveBeenLastCalledWith(["MiniMax-H3"]);
++  view.rerender(<ModelDiscoveryDialog {...props} open={false} />);
++  view.rerender(<ModelDiscoveryDialog {...props} />);
++  expect(screen.getByText("已选 0")).toBeTruthy();
++});
 diff --git a/packages/drawnix/src/components/settings-dialog/__tests__/model-fetch-interaction.test.tsx b/packages/drawnix/src/components/settings-dialog/__tests__/model-fetch-interaction.test.tsx
 new file mode 100644
 index 0000000..7308a0d
@@ -3134,6 +3400,33 @@ index 0000000..11e43e2
 +      .settings-dialog__compat-card span, .settings-dialog__sidebar-badge--accent) { color: #e8b959; }
 +  :is(.settings-dialog__endpoint-error, .settings-dialog__danger-button) { color: #f59d92; }
 +}
+diff --git a/packages/drawnix/src/components/settings-dialog/model-discovery-dialog.tsx b/packages/drawnix/src/components/settings-dialog/model-discovery-dialog.tsx
+index 0bc5d58..c462f29 100644
+--- a/packages/drawnix/src/components/settings-dialog/model-discovery-dialog.tsx
++++ b/packages/drawnix/src/components/settings-dialog/model-discovery-dialog.tsx
+@@ -1,4 +1,4 @@
+-import React, { useEffect, useMemo, useState } from 'react';
++import React, { useEffect, useMemo, useRef, useState } from 'react';
+ import { Check, ChevronDown, FlaskConical, Search, X } from 'lucide-react';
+ import { Dialog, DialogContent } from '../dialog/dialog';
+ import {
+@@ -50,10 +50,16 @@ export const ModelDiscoveryDialog: React.FC<ModelDiscoveryDialogProps> = ({
+     Partial<Record<ModelVendor, boolean>>
+   >({});
+ 
++  const initialized = useRef(false);
+   useEffect(() => {
+     if (!open) {
++      initialized.current = false;
+       return;
+     }
++    // Catalogue/pricing persistence emits fresh array references while open.
++    // Initialize once per opening so those events cannot discard user edits.
++    if (initialized.current) return;
++    initialized.current = true;
+ 
+     setSearchQuery('');
+     setActiveType('all');
 diff --git a/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx b/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx
 index 85c440c..5f28060 100644
 --- a/packages/drawnix/src/components/settings-dialog/settings-dialog.tsx
@@ -3731,6 +4024,54 @@ index 5469d9d..0e07366 100644
        if (result.openedCount > 0 && result.downloadedCount === 0) {
          MessagePlugin.success(
            result.openedCount > 1
+diff --git a/packages/drawnix/src/components/task-queue/TaskItem.tsx b/packages/drawnix/src/components/task-queue/TaskItem.tsx
+index 1b26481..85884c5 100644
+--- a/packages/drawnix/src/components/task-queue/TaskItem.tsx
++++ b/packages/drawnix/src/components/task-queue/TaskItem.tsx
+@@ -25,6 +25,7 @@ import {
+ import { normalizeImageDataUrl } from '@aitu/utils';
+ import { Task, TaskStatus, TaskType } from '../../types/task.types';
+ import {
++  getTaskStatusText,
+   formatDateTime,
+   formatImageTaskResultSize,
+   formatTaskDuration,
+@@ -215,26 +216,6 @@ function getStatusTagTheme(
+   }
+ }
+ 
+-/**
+- * Gets the status label in Chinese
+- * Note: PENDING is deprecated, displayed as '处理中' for legacy compatibility
+- */
+-function getStatusLabel(status: TaskStatus): string {
+-  switch (status) {
+-    case TaskStatus.PENDING:
+-    case TaskStatus.PROCESSING:
+-      return '处理中';
+-    case TaskStatus.COMPLETED:
+-      return '已完成';
+-    case TaskStatus.FAILED:
+-      return '失败';
+-    case TaskStatus.CANCELLED:
+-      return '已取消';
+-    default:
+-      return '未知';
+-  }
+-}
+-
+ /**
+  * TaskItem component - displays a single task
+  */
+@@ -284,7 +265,7 @@ export const TaskItem: React.FC<TaskItemProps> = React.memo(
+         task.status === TaskStatus.PROCESSING) &&
+       pptExplainerStageText
+         ? pptExplainerStageText
+-        : getStatusLabel(task.status);
++        : getTaskStatusText(task);
+     const modelLabel = getPptExplainerModelLabel(
+       pptExplainerStage,
+       task.params.model
 diff --git a/packages/drawnix/src/components/task-queue/TaskQueuePanel.tsx b/packages/drawnix/src/components/task-queue/TaskQueuePanel.tsx
 index ecd1fb1..c9c74c6 100644
 --- a/packages/drawnix/src/components/task-queue/TaskQueuePanel.tsx
@@ -5312,6 +5653,275 @@ index ea7b02d..653b2d1 100644
    // 使用 Portal 渲染内容到 WinBox 的 .wb-body 中
    // 这样可以保持 React 事件系统正常工作
    return (
+diff --git a/packages/drawnix/src/components/workzone-element/WorkZoneContent.test.tsx b/packages/drawnix/src/components/workzone-element/WorkZoneContent.test.tsx
+index 1beb41e..e427bdd 100644
+--- a/packages/drawnix/src/components/workzone-element/WorkZoneContent.test.tsx
++++ b/packages/drawnix/src/components/workzone-element/WorkZoneContent.test.tsx
+@@ -1,58 +1,45 @@
+-import { fireEvent, render, screen } from '@testing-library/react';
+-import type React from 'react';
+-import { describe, expect, it, vi } from 'vitest';
++import React from 'react';
++import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
++import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+ import { WorkZoneContent } from './WorkZoneContent';
++import { TaskStatus, TaskExecutionPhase, TaskType, type Task } from '../../types/task.types';
+ import type { WorkflowMessageData } from '../../types/chat.types';
+-
+-vi.mock('../dialog/ConfirmDialog', () => ({
+-  ConfirmDialog: () => null,
+-}));
+-
+-vi.mock('../shared/hover', () => ({
+-  HoverTip: ({ children }: { children: React.ReactNode }) => children,
+-}));
+-
+-const workflow: WorkflowMessageData = {
+-  id: 'workflow-1',
+-  name: '生成 PPT 大纲',
+-  generationType: 'text',
+-  prompt: '生成 PPT 大纲',
+-  count: 1,
+-  status: 'completed',
+-  createdAt: Date.now(),
+-  steps: [
+-    {
+-      id: 'step-1',
+-      description: '执行 generate_ppt',
+-      status: 'completed',
+-      mcp: 'generate_ppt',
+-      args: {},
+-    },
+-  ],
+-};
+-
+-describe('WorkZoneContent actions', () => {
+-  it('runs delete from click instead of pointerup', () => {
++const mocks = vi.hoisted(() => ({ tasks: [] as Task[], subscribers: new Set<(e: { task: Task }) => void>() }));
++vi.mock('../../services/task-queue', () => ({ taskQueueService: {
++  getAllTasks: () => mocks.tasks,
++  observeTaskUpdates: () => ({ subscribe: (f: (e: {task: Task}) => void) => { mocks.subscribers.add(f); return { unsubscribe: () => mocks.subscribers.delete(f) }; } }),
++} }));
++vi.mock('../shared/hover', () => ({ HoverTip: ({children}: {children: React.ReactNode}) => <>{children}</> }));
++vi.mock('../dialog/ConfirmDialog', () => ({ ConfirmDialog: () => null }));
++beforeEach(() => { mocks.tasks = []; mocks.subscribers.clear(); });
++afterEach(cleanup);
++function workflow(type: WorkflowMessageData['generationType']): WorkflowMessageData {
++  return { id: 'workflow-synthetic', name: '合成验收', prompt: 'synthetic', generationType: type,
++    status: 'running', createdAt: Date.now(), steps: [{ id: 'step-1', mcp: 'generate_' + type, args: {}, description: '生成结果', status: 'running', result: { taskId: 'task-1' } }] };
++}
++function update(status: TaskStatus, executionPhase?: TaskExecutionPhase) {
++  const task = { id: 'task-1', status, executionPhase, type: TaskType.VIDEO, params: { workflowId: 'workflow-synthetic' }, createdAt: Date.now(), error: status === TaskStatus.FAILED ? { code: 'synthetic', message: '合成失败' } : undefined } as Task;
++  mocks.tasks = [task]; mocks.subscribers.forEach(f => f({ task }));
++}
++describe.each(['video', 'audio', 'text'] as const)('%s canvas task presentation', type => {
++  it.each([false, true])('tracks queue events, failure, cancellation and retry (SVG=%s)', native => {
+     const onDelete = vi.fn();
+-    render(<WorkZoneContent workflow={workflow} onDelete={onDelete} />);
+-
+-    const deleteButton = screen.getByRole('button', { name: '删除' });
+-    fireEvent.pointerUp(deleteButton);
+-    expect(onDelete).not.toHaveBeenCalled();
+-
+-    fireEvent.click(deleteButton);
+-    expect(onDelete).toHaveBeenCalledTimes(1);
+-  });
+-
+-  it('stops pointerdown before canvas handlers can start dragging', () => {
+-    const onPointerDown = vi.fn();
+-    render(
+-      <div onPointerDown={onPointerDown}>
+-        <WorkZoneContent workflow={workflow} onDelete={vi.fn()} />
+-      </div>
+-    );
+-
+-    fireEvent.pointerDown(screen.getByRole('button', { name: '删除' }));
+-    expect(onPointerDown).not.toHaveBeenCalled();
++    const onRetry = vi.fn().mockResolvedValue(undefined);
++    const source = workflow(type);
++    source.retryContext = { aiContext: {} as never, referenceImages: [] };
++    const content = <WorkZoneContent workflow={source} onDelete={onDelete} onRetry={onRetry} {...(native ? {nativeSize: {width: 400, height: 260}} : {})} />;
++    const view = render(native ? <svg>{content}</svg> : content);
++    expect(screen.getByText('生成中')).toBeTruthy();
++    act(() => update(TaskStatus.PENDING)); expect(screen.getByText('等待执行')).toBeTruthy();
++    act(() => update(TaskStatus.PROCESSING, TaskExecutionPhase.SUBMITTING)); expect(screen.getByText('正在提交')).toBeTruthy();
++    act(() => update(TaskStatus.PROCESSING)); expect(screen.getByText('生成中')).toBeTruthy();
++    act(() => update(TaskStatus.FAILED)); expect(screen.getByText('生成失败')).toBeTruthy();
++    fireEvent.click(screen.getByRole('button', { name: /重试/ }));expect(onRetry).toHaveBeenCalledWith(expect.objectContaining({id:source.id}),0);
++    act(() => update(TaskStatus.CANCELLED)); expect(screen.getByText('已取消')).toBeTruthy();
++    act(() => update(TaskStatus.PROCESSING)); expect(screen.getByText('生成中')).toBeTruthy();
++    act(() => update(TaskStatus.COMPLETED)); expect(screen.getAllByText(/已完成/).length).toBeGreaterThan(0);
++    if (native) expect(view.container.querySelector('foreignObject')).toBeNull();
++    fireEvent.click(screen.getByRole('button', { name: '删除' })); expect(onDelete).toHaveBeenCalledOnce();
++    view.unmount(); expect(mocks.subscribers.size).toBe(0);
+   });
+ });
+diff --git a/packages/drawnix/src/components/workzone-element/WorkZoneContent.tsx b/packages/drawnix/src/components/workzone-element/WorkZoneContent.tsx
+index 72d5ea0..e2a04b6 100644
+--- a/packages/drawnix/src/components/workzone-element/WorkZoneContent.tsx
++++ b/packages/drawnix/src/components/workzone-element/WorkZoneContent.tsx
+@@ -17,6 +17,11 @@ import type { WorkflowMessageData } from '../../types/chat.types';
+ import { ConfirmDialog } from '../dialog/ConfirmDialog';
+ import { HoverTip } from '../shared/hover';
+ import './workzone-content.scss';
++import { taskQueueService } from '../../services/task-queue';
++import { findWorkflowStepForTask } from '../../utils/workflow-task-linking';
++import { applyTaskUpdateToWorkflowMessage } from '../../utils/workflow-task-sync';
++import { getTaskStatusText } from '../../utils/task-utils';
++import { TaskStatus, TaskExecutionPhase } from '../../types/task.types';
+ 
+ // 状态图标映射
+ type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+@@ -34,12 +39,13 @@ const claimedWorkflows = new Set<string>();
+ 
+ interface WorkZoneContentProps {
+   workflow: WorkflowMessageData;
++  nativeSize?: { width: number; height: number };
+   className?: string;
+   onDelete?: () => void;
+   /** 当 SW 中找不到工作流或工作流状态变更时的回调 */
+   onWorkflowStateChange?: (
+     workflowId: string,
+-    status: 'completed' | 'failed',
++    status: 'completed' | 'failed' | 'cancelled',
+     error?: string
+   ) => void;
+   /** 从失败步骤重试工作流 */
+@@ -49,13 +55,30 @@ interface WorkZoneContentProps {
+ }
+ 
+ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
+-  workflow,
++  workflow: sourceWorkflow,
++  nativeSize,
+   className = '',
+   onDelete,
+   onWorkflowStateChange,
+   onRetry,
+   onHideForever,
+ }) => {
++  const [taskRevision, setTaskRevision] = useState(0);
++  useEffect(() => {
++    const subscription = taskQueueService.observeTaskUpdates().subscribe(({ task }) => {
++      if (findWorkflowStepForTask(sourceWorkflow, task)) setTaskRevision((n) => n + 1);
++    });
++    setTaskRevision((n) => n + 1);
++    return () => subscription.unsubscribe();
++  }, [sourceWorkflow]);
++  const relatedTasks = useMemo(() => taskQueueService.getAllTasks().filter(
++    (task) => findWorkflowStepForTask(sourceWorkflow, task)
++  ), [sourceWorkflow, taskRevision]);
++  const workflow = useMemo(() => relatedTasks.reduce(
++    (current, task) => applyTaskUpdateToWorkflowMessage(current, task) || current,
++    sourceWorkflow
++  ), [sourceWorkflow, relatedTasks]);
++
+   // 用于追踪是否已经尝试 claim
+   const hasClaimedRef = useRef(false);
+   const [isRetrying, setIsRetrying] = useState(false);
+@@ -128,7 +151,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
+             ) {
+               onWorkflowStateChange?.(
+                 workflowId,
+-                status === 'completed' ? 'completed' : 'failed',
++                status,
+                 fallbackWorkflow.error
+               );
+             }
+@@ -160,7 +183,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
+             ) {
+               onWorkflowStateChange?.(
+                 workflowId,
+-                status === 'completed' ? 'completed' : 'failed',
++                status,
+                 localWorkflow.error
+               );
+               return true;
+@@ -237,8 +260,10 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
+     const failedSteps = steps.filter((s) => s.status === 'failed').length;
+     const runningSteps = steps.filter((s) => s.status === 'running').length;
+ 
+-    let status: 'pending' | 'running' | 'completed' | 'failed' = 'pending';
+-    if (failedSteps > 0) {
++    let status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' = 'pending';
++    if (sourceWorkflow.status === 'cancelled' || (totalSteps > 0 && steps.every((s) => s.status === 'skipped'))) {
++      status = 'cancelled';
++    } else if (failedSteps > 0) {
+       status = 'failed';
+     } else if (completedSteps === totalSteps && totalSteps > 0) {
+       status = 'completed';
+@@ -247,7 +272,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
+     }
+ 
+     return { status, totalSteps, completedSteps };
+-  }, [workflow.steps]);
++  }, [workflow.steps, sourceWorkflow.status]);
+ 
+   // 计算进度百分比
+   const progress =
+@@ -259,12 +284,18 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
+   const statusLabel = useMemo(() => {
+     const labels: Record<typeof workflowStatus.status, string> = {
+       pending: '待开始',
+-      running: '执行中',
++      running: '生成中',
+       completed: '已完成',
+-      failed: '执行失败',
++      failed: '生成失败',
++      cancelled: '已取消',
+     };
++    if (workflowStatus.status === 'running') {
++      const active = relatedTasks.filter((task) => [TaskStatus.PENDING, TaskStatus.PROCESSING].includes(task.status));
++      if (active.length && active.every((task) => task.status === TaskStatus.PENDING)) return getTaskStatusText(active[0]);
++      if (active.length && active.every((task) => task.executionPhase === TaskExecutionPhase.SUBMITTING)) return getTaskStatusText(active[0]);
++    }
+     return labels[workflowStatus.status];
+-  }, [workflowStatus.status]);
++  }, [workflowStatus.status, relatedTasks]);
+ 
+   // 获取当前执行步骤
+   const currentStep = useMemo(() => {
+@@ -326,6 +357,40 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
+     []
+   );
+ 
++  if (nativeSize) {
++    const { width, height } = nativeSize;
++    const failed = workflowStatus.status === 'failed';
++    const color = failed ? '#b42318' : '#475569';
++    const clipId = `workzone-text-${workflow.id.replace(/[^a-zA-Z0-9_-]/g, '')}`;
++    const action = (label: string, x: number, run: () => void, disabled = false) => (
++      <g role="button" tabIndex={disabled ? -1 : 0} aria-label={label} aria-disabled={disabled}
++        style={{ cursor: disabled ? 'default' : 'pointer' }}
++        onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}
++        onClick={(e) => { e.stopPropagation(); if (!disabled) run(); }}
++        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!disabled) run(); } }}>
++        <rect x={x} y={height - 37} width={78} height={26} rx={5} fill="#f1f5f9" stroke="#cbd5e1" />
++        <text x={x + 39} y={height - 20} textAnchor="middle" fontSize={11} fill="#334155">{label}</text>
++      </g>
++    );
++    return <g className="workzone-native-card" role="group" aria-label={`${workflow.name}：${statusLabel}`}>
++      <rect width={width} height={height} rx={10} fill={failed ? '#fff7f6' : '#ffffff'} stroke={failed ? '#fda29b' : '#cbd5e1'} />
++      <defs><clipPath id={clipId}><rect x={14} y={12} width={width - 28} height={height - 57} /></clipPath></defs>
++      <g clipPath={`url(#${clipId})`} fontFamily="system-ui, sans-serif" fill={color}>
++        <text x={16} y={31} fontSize={12}>{typeIcon} {workflow.name}</text>
++        <text x={16} y={65} fontSize={20} fontWeight={600}>{statusLabel}</text>
++        <text x={16} y={89} fontSize={11}>{workflowStatus.completedSteps}/{workflowStatus.totalSteps} 步骤</text>
++        {workflow.steps.slice(0, Math.max(1, Math.floor((height - 155) / 24))).map((step, i) =>
++          <text key={step.id} x={16} y={116 + i * 24} fontSize={12}>{STATUS_ICONS[step.status]} {step.error || step.description}</text>
++        )}
++      </g>
++      {onDelete && action('删除', width - 92, onDelete)}
++      {canRetry && action(isRetrying ? '重试中' : '重试', 14, () => void handleRetry(), isRetrying)}
++      {onHideForever && action('隐藏卡片', canRetry ? 98 : 14, handleHideForeverClick)}
++      <ConfirmDialog open={showHideConfirm} title="隐藏进度卡片" description="确定不再显示进度卡片？任务仍会在后台执行，可在设置中恢复显示。"
++        confirmText="确定" cancelText="取消" onOpenChange={setShowHideConfirm} onConfirm={handleHideConfirm} />
++    </g>;
++  }
++
+   return (
+     <div
+       className={`workzone-content workzone-content--${workflowStatus.status} ${className}`}
 diff --git a/packages/drawnix/src/data/filesystem.ts b/packages/drawnix/src/data/filesystem.ts
 index 5df3b2f..444397b 100644
 --- a/packages/drawnix/src/data/filesystem.ts
@@ -5690,10 +6300,18 @@ index 999d03e..1e96173 100644
      'menu.version': 'Version',
      'menu.more': 'More',
 diff --git a/packages/drawnix/src/plugins/components/image.tsx b/packages/drawnix/src/plugins/components/image.tsx
-index f9203d1..2d53b49 100644
+index f9203d1..c198825 100644
 --- a/packages/drawnix/src/plugins/components/image.tsx
 +++ b/packages/drawnix/src/plugins/components/image.tsx
-@@ -31,7 +31,7 @@ import {
+@@ -9,6 +9,7 @@ import {
+   useState,
+ } from 'react';
+ import { Video } from './video';
++import { NativeMediaOverlay } from './native-media-overlay';
+ import { generateImage } from '../../mcp/tools/image-generation';
+ import { getImageRegion } from '../../services/ppt';
+ import {
+@@ -31,7 +32,7 @@ import {
    sanitizeImage3DTransform,
  } from '../../utils/image-3d-transform';
  import { RetryImage } from '../../components/retry-image';
@@ -5702,7 +6320,7 @@ index f9203d1..2d53b49 100644
  import { mountNativeImageOverlay } from './native-image-overlay';
  import { registerCanvasImage } from '../../services/canvas-image-readiness';
  
-@@ -393,6 +393,9 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
+@@ -393,6 +394,9 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
      (event: any) => {
        const imageElement = event.currentTarget as HTMLImageElement;
        imageElement.style.visibility = '';
@@ -5712,7 +6330,7 @@ index f9203d1..2d53b49 100644
        externalImageRetryAttemptRef.current = 0;
        clearExternalImageRetry();
        clearSWRecovery();
-@@ -473,7 +476,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
+@@ -473,7 +477,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
  
    useLayoutEffect(() => {
      if (
@@ -5721,6 +6339,24 @@ index f9203d1..2d53b49 100644
        isVideo ||
        isLegacyAudioElement ||
        hasImage3DTransform ||
+@@ -763,7 +767,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
+   if (isVideo) {
+     return (
+       <div ref={rootRef} style={{ width: '100%', height: '100%' }}>
+-        <Video
++        <NativeMediaOverlay><Video
+           videoItem={{
+             url: props.imageItem.url,
+             width: props.imageItem.width,
+@@ -774,7 +778,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
+           isFocus={props.isFocus}
+           isSelected={(props as any).isSelected}
+           readonly={(props as any).readonly}
+-        />
++        /></NativeMediaOverlay>
+       </div>
+     );
+   }
 diff --git a/packages/drawnix/src/plugins/components/native-image-overlay.ts b/packages/drawnix/src/plugins/components/native-image-overlay.ts
 index d8822e6..22f4cfc 100644
 --- a/packages/drawnix/src/plugins/components/native-image-overlay.ts
@@ -5760,6 +6396,249 @@ index d8822e6..22f4cfc 100644
      observer.disconnect();
      image.remove();
      foreignObject.style.visibility = previousVisibility;
+diff --git a/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx b/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx
+new file mode 100644
+index 0000000..cf68a91
+--- /dev/null
++++ b/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx
+@@ -0,0 +1,75 @@
++import React from "react";
++import { act, cleanup, render } from "@testing-library/react";
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { NativeMediaOverlay } from "./native-media-overlay";
++vi.mock("../../utils/tauri-env", () => ({
++  isNativeRenderEnvironment: () => true,
++}));
++afterEach(() => {
++  cleanup();
++  vi.unstubAllGlobals();
++  document.body.innerHTML = "";
++});
++describe("native media overlay", () => {
++  it("keeps interactive media outside foreignObject, follows geometry and releases its layer", async () => {
++    vi.stubGlobal(
++      "ResizeObserver",
++      class {
++        observe() {}
++        disconnect() {}
++      },
++    );
++    let scheduled: FrameRequestCallback | undefined;
++    vi.stubGlobal("requestAnimationFrame", (f: FrameRequestCallback) => {
++      scheduled = f;
++      return 1;
++    });
++    vi.stubGlobal("cancelAnimationFrame", vi.fn());
++    const board = document.createElement("div");
++    board.className = "plait-board-container";
++    document.body.append(board);
++    board.getBoundingClientRect = () => ({ left: 10, top: 20 }) as DOMRect;
++    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
++    board.append(svg);
++    const fo = document.createElementNS(
++      svg.namespaceURI,
++      "foreignObject",
++    ) as SVGForeignObjectElement;
++    svg.append(fo);
++    for (const [name, value] of Object.entries({
++      x: 30,
++      y: 40,
++      width: 200,
++      height: 100,
++    }))
++      Object.defineProperty(fo, name, {
++        value: { baseVal: { value } },
++        configurable: true,
++      });
++    fo.getScreenCTM = () =>
++      ({ a: 2, b: 0, c: 0, d: 2, e: 10, f: 20 }) as DOMMatrix;
++    const target = document.createElement("div");
++    fo.append(target);
++    const click = vi.fn();
++    const view = render(
++      <NativeMediaOverlay>
++        <button onClick={click}>Play</button>
++      </NativeMediaOverlay>,
++      { container: target },
++    );
++    const layer = board.querySelector<HTMLElement>(
++      "[data-native-media-overlay]",
++    )!;
++    expect(layer.style.transform).toBe("matrix(2,0,0,2,60,80)");
++    expect(fo.querySelector("button")).toBeNull();
++    layer.querySelector("button")!.click();
++    expect(click).toHaveBeenCalledOnce();
++    fo.x.baseVal.value = 50;
++    fo.setAttribute("x", "50");
++    await act(async () => {});
++    act(() => scheduled?.(0));
++    expect(layer.style.transform).toBe("matrix(2,0,0,2,100,80)");
++    view.unmount();
++    expect(board.querySelector("[data-native-media-overlay]")).toBeNull();
++  });
++});
+diff --git a/packages/drawnix/src/plugins/components/native-media-overlay.tsx b/packages/drawnix/src/plugins/components/native-media-overlay.tsx
+new file mode 100644
+index 0000000..c02154d
+--- /dev/null
++++ b/packages/drawnix/src/plugins/components/native-media-overlay.tsx
+@@ -0,0 +1,70 @@
++import React, { useLayoutEffect, useRef, useState } from "react";
++import { createPortal } from "react-dom";
++import { isNativeRenderEnvironment } from "../../utils/tauri-env";
++
++/** WebKit does not reliably composite HTML media inside SVG foreignObject. */
++export function NativeMediaOverlay({
++  children,
++}: {
++  children: React.ReactNode;
++}) {
++  const anchor = useRef<HTMLDivElement>(null);
++  const [host, setHost] = useState<HTMLDivElement | null>(null);
++  useLayoutEffect(() => {
++    if (!isNativeRenderEnvironment()) return;
++    const foreignObject = anchor.current?.closest("foreignObject");
++    const board = foreignObject?.closest<HTMLElement>(".plait-board-container");
++    const svg = foreignObject?.ownerSVGElement;
++    if (!foreignObject || !board || !svg) return;
++    const layer = document.createElement("div");
++    layer.dataset.nativeMediaOverlay = "true";
++    layer.style.cssText =
++      "position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:auto;";
++    board.appendChild(layer);
++    let frame = 0;
++    const sync = () => {
++      frame = 0;
++      const matrix = foreignObject.getScreenCTM();
++      const rect = board.getBoundingClientRect();
++      if (!matrix || !foreignObject.isConnected) {
++        layer.style.display = "none";
++        return;
++      }
++      const x = foreignObject.x.baseVal.value;
++      const y = foreignObject.y.baseVal.value;
++      layer.style.display =
++        getComputedStyle(foreignObject).visibility === "hidden" ? "none" : "";
++      layer.style.width = `${foreignObject.width.baseVal.value}px`;
++      layer.style.height = `${foreignObject.height.baseVal.value}px`;
++      layer.style.transform = `matrix(${matrix.a},${matrix.b},${matrix.c},${matrix.d},${matrix.e + matrix.a * x + matrix.c * y - rect.left - board.clientLeft + board.scrollLeft},${matrix.f + matrix.b * x + matrix.d * y - rect.top - board.clientTop + board.scrollTop})`;
++    };
++    const schedule = () => {
++      if (!frame) frame = requestAnimationFrame(sync);
++    };
++    const observer = new MutationObserver(schedule);
++    observer.observe(svg, { attributes: true, subtree: true, childList: true });
++    const resize = new ResizeObserver(schedule);
++    resize.observe(board);
++    window.addEventListener("scroll", schedule, true);
++    window.addEventListener("resize", schedule);
++    sync();
++    setHost(layer);
++    return () => {
++      observer.disconnect();
++      resize.disconnect();
++      cancelAnimationFrame(frame);
++      window.removeEventListener("scroll", schedule, true);
++      window.removeEventListener("resize", schedule);
++      layer.remove();
++    };
++  }, []);
++  return (
++    <div
++      ref={anchor}
++      data-native-media-anchor="true"
++      style={{ width: "100%", height: "100%" }}
++    >
++      {host ? createPortal(children, host) : children}
++    </div>
++  );
++}
+diff --git a/packages/drawnix/src/plugins/with-workzone.ts b/packages/drawnix/src/plugins/with-workzone.ts
+index 8293d8b..3857e24 100644
+--- a/packages/drawnix/src/plugins/with-workzone.ts
++++ b/packages/drawnix/src/plugins/with-workzone.ts
+@@ -20,6 +20,7 @@ import {
+ } from '@plait/common';
+ import { createRoot, Root } from 'react-dom/client';
+ import React from 'react';
++import { isNativeRenderEnvironment } from '../utils/tauri-env';
+ import type { PlaitWorkZone } from '../types/workzone.types';
+ import type { WorkflowMessageData } from '../types/chat.types';
+ import { WorkZoneContent } from '../components/workzone-element/WorkZoneContent';
+@@ -50,7 +51,7 @@ function isWorkZoneCardVisible(): boolean {
+  */
+ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, PlaitBoard> {
+   private g: SVGGElement | null = null;
+-  private container: HTMLElement | null = null;
++  private container: HTMLElement | SVGGElement | null = null;
+   private reactRoot: Root | null = null;
+ 
+   activeGenerator!: ActiveGenerator<PlaitWorkZone>;
+@@ -91,6 +92,15 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
+     this.g.classList.add('plait-workzone-element');
+     this.g.style.pointerEvents = 'auto';
+ 
++    if (isNativeRenderEnvironment()) {
++      this.container = document.createElementNS('http://www.w3.org/2000/svg', 'g');
++      this.container.classList.add('workzone-native-content');
++      this.container.setAttribute('transform', `translate(${rect.x} ${rect.y}) scale(${getWorkZoneRenderScale(this.element)})`);
++      this.g.appendChild(this.container);
++      this.getElementG().appendChild(this.g);
++      return;
++    }
++
+     // 创建 foreignObject
+     const foreignObject = document.createElementNS(
+       'http://www.w3.org/2000/svg',
+@@ -140,19 +150,12 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
+    * 处理工作流状态变更（来自 SW claim 结果）
+    * 当 SW 中的工作流已完成/失败/不存在时更新 UI
+    */
+-  private handleWorkflowStateChange = (workflowId: string, status: 'completed' | 'failed', error?: string): void => {
+-    // 失败的工作流直接删除 WorkZone，避免残留无用卡片
+-    if (status === 'failed') {
+-      setTimeout(() => {
+-        WorkZoneTransforms.removeWorkZone(this.board, this.element.id);
+-      }, 1500);
+-      return;
+-    }
+-
++  private handleWorkflowStateChange = (workflowId: string, status: 'completed' | 'failed' | 'cancelled', error?: string): void => {
+     // 更新 workflow 状态
+     const updatedWorkflow = {
+       ...this.element.workflow,
+       status,
++      ...(error ? { error } : {}),
+     };
+ 
+     // 通过 WorkZoneTransforms 更新工作流
+@@ -203,6 +206,10 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
+       foreignObject.setAttribute('height', String(visualRect.height));
+     }
+ 
++    if (this.container instanceof SVGGElement) {
++      this.container.setAttribute('transform', `translate(${rect.x} ${rect.y}) scale(${getWorkZoneRenderScale(element)})`);
++      return;
++    }
+     if (this.container) {
+       this.container.style.width = `${rect.width}px`;
+       this.container.style.height = `${rect.height}px`;
+@@ -225,6 +232,7 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
+       React.createElement(ToolProviderWrapper as any, { board: this.board },
+         React.createElement(WorkZoneContent as any, {
+           workflow: this.element.workflow,
++          nativeSize: isNativeRenderEnvironment() ? RectangleClient.getRectangleByPoints(this.element.points) : undefined,
+           onDelete: this.handleDelete,
+           onWorkflowStateChange: this.handleWorkflowStateChange,
+           onRetry: this.handleRetry,
+@@ -251,6 +259,7 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
+           React.createElement(ToolProviderWrapper as any, { board: this.board },
+             React.createElement(WorkZoneContent as any, {
+               workflow: value.element.workflow,
++              nativeSize: isNativeRenderEnvironment() ? RectangleClient.getRectangleByPoints(value.element.points) : undefined,
+               onDelete: this.handleDelete,
+               onWorkflowStateChange: this.handleWorkflowStateChange,
+               onRetry: this.handleRetry,
 diff --git a/packages/drawnix/src/services/__tests__/provider-routing.test.ts b/packages/drawnix/src/services/__tests__/provider-routing.test.ts
 index a4e43c0..125dfdc 100644
 --- a/packages/drawnix/src/services/__tests__/provider-routing.test.ts
@@ -6109,6 +6988,36 @@ index 3403036..34404fd 100644
    const result = await internals.invoke('query_image_recovery', { url, authorization });
    if (init.signal?.aborted) throw init.signal.reason;
    return new Response([204, 205, 304].includes(result.status) ? null : result.body, { status: result.status });
+diff --git a/packages/drawnix/src/services/media-executor/fallback-adapter-routes.ts b/packages/drawnix/src/services/media-executor/fallback-adapter-routes.ts
+index 4df9cd4..acc1ab0 100644
+--- a/packages/drawnix/src/services/media-executor/fallback-adapter-routes.ts
++++ b/packages/drawnix/src/services/media-executor/fallback-adapter-routes.ts
+@@ -427,6 +427,7 @@ export async function executeVideoViaAdapter(
+       ? parseInt(params.duration, 10)
+       : undefined;
+ 
++    let submitted = false;
+     const result = await adapter.generateVideo(
+       getAdapterContextFromSettings('video', params.modelRef || params.model),
+       {
+@@ -448,7 +449,7 @@ export async function executeVideoViaAdapter(
+             const safeProgress = Math.min(100, Math.max(10, progress));
+             options?.onProgress?.({
+               progress: safeProgress,
+-              phase: safeProgress <= 10 ? 'submitting' : 'polling',
++              phase: submitted || safeProgress > 10 ? 'polling' : 'submitting',
+             });
+           },
+           onSubmitted: async (videoId: string) => {
+@@ -458,6 +459,8 @@ export async function executeVideoViaAdapter(
+             ) {
+               return;
+             }
++            submitted = true;
++            options?.onProgress?.({ progress: 10, phase: 'polling' });
+             await taskStorageWriter.updateRemoteId(
+               taskId,
+               videoId,
 diff --git a/packages/drawnix/src/services/media-executor/fallback-utils.test.ts b/packages/drawnix/src/services/media-executor/fallback-utils.test.ts
 index 3df57b2..c4f52e3 100644
 --- a/packages/drawnix/src/services/media-executor/fallback-utils.test.ts
@@ -7511,6 +8420,35 @@ index 314fa85..d70fb10 100644
        if (error instanceof Error && !/failed to fetch/i.test(error.message)) {
          throw error;
        }
+diff --git a/packages/drawnix/src/utils/task-utils.ts b/packages/drawnix/src/utils/task-utils.ts
+index 1c0406c..d745069 100644
+--- a/packages/drawnix/src/utils/task-utils.ts
++++ b/packages/drawnix/src/utils/task-utils.ts
+@@ -5,7 +5,7 @@
+  * status checking, timeout detection, and duration formatting.
+  */
+ 
+-import { Task, TaskStatus, TaskType } from '../types/task.types';
++import { Task, TaskStatus, TaskType, TaskExecutionPhase } from '../types/task.types';
+ import { TASK_TIMEOUT } from '../constants/TASK_CONSTANTS';
+ import { isAsyncImageModel } from '../constants/model-config';
+ import { generateUUID, formatDate } from '@aitu/utils';
+@@ -238,3 +238,15 @@ export function getTaskElapsedTime(task: Task): number {
+  * formatDateTime(Date.now()) // Returns "2025-12-18 14:30:25"
+  */
+ export const formatDateTime = formatDate;
++
++/** Shared wording for the queue and canvas; submission is distinct from generation. */
++export function getTaskStatusText(task: Pick<Task, 'status' | 'executionPhase'>): string {
++  switch (task.status) {
++    case TaskStatus.PENDING: return '等待执行';
++    case TaskStatus.PROCESSING: return task.executionPhase === TaskExecutionPhase.SUBMITTING ? '正在提交' : '生成中';
++    case TaskStatus.COMPLETED: return '已完成';
++    case TaskStatus.FAILED: return '生成失败';
++    case TaskStatus.CANCELLED: return '已取消';
++    default: return '未知';
++  }
++}
 diff --git a/packages/drawnix/src/utils/tauri-env.ts b/packages/drawnix/src/utils/tauri-env.ts
 index b20d61e..b2260c0 100644
 --- a/packages/drawnix/src/utils/tauri-env.ts

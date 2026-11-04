@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import { Video } from './video';
+import { NativeMediaOverlay } from './native-media-overlay';
 import { generateImage } from '../../mcp/tools/image-generation';
 import { getImageRegion } from '../../services/ppt';
 import {
@@ -766,7 +767,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
   if (isVideo) {
     return (
       <div ref={rootRef} style={{ width: '100%', height: '100%' }}>
-        <Video
+        <NativeMediaOverlay><Video
           videoItem={{
             url: props.imageItem.url,
             width: props.imageItem.width,
@@ -777,7 +778,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
           isFocus={props.isFocus}
           isSelected={(props as any).isSelected}
           readonly={(props as any).readonly}
-        />
+        /></NativeMediaOverlay>
       </div>
     );
   }

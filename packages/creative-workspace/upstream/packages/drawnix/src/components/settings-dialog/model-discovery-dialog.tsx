@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, FlaskConical, Search, X } from 'lucide-react';
 import { Dialog, DialogContent } from '../dialog/dialog';
 import {
@@ -50,10 +50,16 @@ export const ModelDiscoveryDialog: React.FC<ModelDiscoveryDialogProps> = ({
     Partial<Record<ModelVendor, boolean>>
   >({});
 
+  const initialized = useRef(false);
   useEffect(() => {
     if (!open) {
+      initialized.current = false;
       return;
     }
+    // Catalogue/pricing persistence emits fresh array references while open.
+    // Initialize once per opening so those events cannot discard user edits.
+    if (initialized.current) return;
+    initialized.current = true;
 
     setSearchQuery('');
     setActiveType('all');
