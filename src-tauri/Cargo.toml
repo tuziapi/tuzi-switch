@@ -1,6 +1,6 @@
 [package]
 name = "tu-zi-switch"
-version = "1.5.0"
+version = "1.5.1"
 description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI - tuzi switch"
 authors = ["lkj020626-lgtm"]
 license = "MIT"
