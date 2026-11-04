@@ -8,7 +8,7 @@ macOS 提供 ARM64 / Intel DMG，Windows 提供 EXE / MSI，Linux 提供 DEB / R
 
 `Unified desktop release` 在全部校验和四平台安装包构建成功后公开正式 Release，再构建部署 Pages。Pages 使用 GitHub Actions，github-pages 环境允许版本标签。版本标签和公开安装文件不覆写。若后续 Pages 发布失败，已发布安装包仍可直接下载，可从同一标签重新构建网站并部署，不能重新覆盖安装包。
 
-前端更新提醒直接读分发仓库 Release，按原生架构打开 DMG / EXE / AppImage；不执行自动覆盖安装或重启。旧独立测试客户端须手动安装正式版本，旧测试数据保留在其独立目录。
+v1.5.2 起客户端使用分发仓库的签名更新清单，在应用内下载并校验，用户明确点击“重启并更新”后安装。网页仍直接下载对应平台的 DMG / EXE / MSI / DEB / RPM / AppImage。v1.5.0 / v1.5.1 及旧独立测试客户端须先手动安装新版本，旧测试数据保留在其独立目录。
 
 `pnpm --filter @tuzi/download-page test` 检查来源、缺包、摘要和统计桥。历史 acceptance 模块保留用于旧元数据回归，不再用于公开下载入口。`VITE_DOWNLOAD_SOURCE_URL` 指向此页面对应的精确源码；Pages 和 Release 同时提供源码归档。
 
