@@ -57,12 +57,15 @@ if (
   for (const entry of previousInstallers) {
     if (!/^v\d+\.\d+\.\d+$/.test(entry.tag))
       throw Error("Invalid historical installer tag");
-    const previous = await readFile(`public/install-macos-${entry.tag}.sh`);
+    const previous = await readFile(
+      `scripts/macos-installers/install-macos-${entry.tag}.sh`,
+    );
     if (
       createHash("sha256").update(previous).digest("hex") !== entry.sha256 ||
       !previous.toString().includes(`VERSION=${entry.tag.slice(1)}\n`)
     )
       throw Error(`Historical installer changed: ${entry.tag}`);
+    await writeFile(`public/install-macos-${entry.tag}.sh`, previous);
   }
   await writeFile(
     "public/install.sh",

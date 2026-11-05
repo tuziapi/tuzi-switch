@@ -56,6 +56,6 @@ RELEASE_TAG=v1.5.5 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTA
 
 v1.5.6 延续正式 Release 提醒、展示更新说明及手动安装。模型基础接入、升级增量获取与批量生成性能优化由正式 main 源码构建；AiW520 仅执行固定 SHA 的四平台构建，不作为正式下载目标。Pages 仍使用正式 main 根目录快照。
 
-`macosInstallerTag`、当前安装器版本和真实两种 DMG 摘要同步更新；`release-metadata.mjs` 校验实际正式 Release 后才生成网页清单。默认加载器安装 v1.5.6，`--version v1.5.5` 继续使用保留的旧脚本。历史注册表 `scripts/previous-macos-installers.json` 固定旧脚本摘要，构建校验文件未变；不支持的版本会明确报错，不回退。不要将前述 v1.5.5 历史说明当作当前自动安装方式。
+`macosInstallerTag`、当前安装器版本和真实两种 DMG 摘要同步更新；`release-metadata.mjs` 校验实际正式 Release 后才生成网页清单。默认加载器安装 v1.5.6，`--version v1.5.5` 继续使用保留的旧脚本。历史注册表 `scripts/previous-macos-installers.json` 固定旧脚本摘要，旧脚本随源码存放于 `scripts/macos-installers/`，构建校验文件未变后复制到 public；不支持的版本会明确报错，不回退。不要将前述 v1.5.5 历史说明当作当前自动安装方式。
 
 当前版本核验：`RELEASE_TAG=v1.5.6 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm build:download`。完整发布证据见仓库 `docs/development/2026-11-05-v1.5.6-release.md`。
