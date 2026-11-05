@@ -10,6 +10,16 @@ fn main() {
         "invalid release repository: {release_repository}"
     );
     println!("cargo:rustc-env=TUZI_SWITCH_RELEASE_REPOSITORY={release_repository}");
+    // Native identity survives renderer changes and distinguishes CI test builds
+    // whose package semver intentionally stays unchanged.
+    for (source, target) in [
+        ("GITHUB_RUN_NUMBER", "TUZI_BUILD_NUMBER"),
+        ("GITHUB_SHA", "TUZI_BUILD_COMMIT"),
+    ] {
+        println!("cargo:rerun-if-env-changed={source}");
+        let value = std::env::var(source).unwrap_or_default();
+        println!("cargo:rustc-env={target}={value}");
+    }
 
     tauri_build::build();
 

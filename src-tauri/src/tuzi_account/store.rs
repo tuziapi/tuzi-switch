@@ -27,9 +27,9 @@ impl LocalFileStore {
             .map(|v| PathBuf::from(v.trim()).join(".local/share"))
             .or_else(dirs::data_local_dir)
             .ok_or_else(AccountError::storage)?;
-        #[cfg(feature = "local-preview")]
-        let application = "com.tuziswitch.desktop.preview";
-        #[cfg(not(feature = "local-preview"))]
+        #[cfg(feature = "isolated-profile")]
+        let application = crate::config::ISOLATED_PROFILE_ID;
+        #[cfg(not(feature = "isolated-profile"))]
         let application = "com.tuziswitch.desktop";
         // Explicitly separate sites and clients without putting credentials in paths.
         let namespace = format!("{origin}\0{client}");

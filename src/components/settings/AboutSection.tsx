@@ -23,12 +23,15 @@ import { toast } from "sonner";
 import { settingsApi } from "@/lib/api";
 import type { WebHotUpdateStatus } from "@/lib/api/settings";
 import { useUpdate } from "@/contexts/UpdateContext";
-import { relaunchApp } from "@/lib/updater";
+import {
+  getUpdateBuildInfo,
+  ACCEPTANCE_DOWNLOAD_PAGE,
+  type UpdateBuildInfo,
+} from "@/lib/acceptanceUpdater";
 import { RELEASES_URL } from "@/lib/releaseRepository";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { isWindows } from "@/lib/platform";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import appIcon from "../../../src-tauri/icons/icon.png";
 
 interface AboutSectionProps {
@@ -94,20 +97,29 @@ curl -fsSL https://opencode.ai/install | bash`;
 export function AboutSection({ isPortable }: AboutSectionProps) {
   // ... (use hooks as before) ...
   const { t } = useTranslation();
-  const version = __APP_VERSION__;
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [build, setBuild] = useState<UpdateBuildInfo | null>(null);
+  useEffect(() => {
+    void getUpdateBuildInfo()
+      .then(setBuild)
+      .catch(() => {});
+  }, []);
+  const version =
+    build?.channel === "acceptance"
+      ? `test-${build.commit.slice(0, 8) || "local"} (#${build.runNumber})`
+      : `v${__APP_VERSION__}`;
   const [webUpdateStatus, setWebUpdateStatus] =
     useState<WebHotUpdateStatus | null>(null);
   const [toolVersions, setToolVersions] = useState<ToolVersion[]>([]);
   const [isLoadingTools, setIsLoadingTools] = useState(true);
-  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
 
   const {
     hasUpdate,
     updateInfo,
     updateHandle,
     checkUpdate,
-    resetDismiss,
+    openUpdateDialog,
+    downloadUpdate,
+    installState,
     isChecking,
   } = useUpdate();
 
@@ -248,6 +260,14 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
 
   const handleOpenReleaseNotes = useCallback(async () => {
     try {
+      if (updateInfo?.channel === "acceptance" && updateInfo.releaseUrl) {
+        await settingsApi.openExternal(updateInfo.releaseUrl);
+        return;
+      }
+      if (build?.channel === "acceptance") {
+        await settingsApi.openExternal(ACCEPTANCE_DOWNLOAD_PAGE);
+        return;
+      }
       const targetVersion = updateInfo?.availableVersion ?? version ?? "";
       const displayVersion = targetVersion.startsWith("v")
         ? targetVersion
@@ -265,48 +285,21 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
       console.error("[AboutSection] Failed to open release notes", error);
       toast.error(t("settings.openReleaseNotesFailed"));
     }
-  }, [t, updateInfo?.availableVersion, version]);
+  }, [t, updateInfo, version, build]);
 
   const handleCheckUpdate = useCallback(async () => {
+    if (
+      ["downloading", "verifying", "preparing", "installing"].includes(
+        installState.phase,
+      )
+    ) {
+      openUpdateDialog();
+      return;
+    }
     if (hasUpdate && updateHandle) {
-      if (isPortable) {
-        try {
-          await settingsApi.checkUpdates();
-        } catch (error) {
-          console.error("[AboutSection] Portable update failed", error);
-        }
-        return;
-      }
-
-      setIsDownloading(true);
-      try {
-        resetDismiss();
-        await updateHandle.downloadAndInstall();
-        if (updateHandle.manual) {
-          toast.success(t("settings.updatePageOpened"), {
-            closeButton: true,
-          });
-        } else {
-          setIsDownloading(false);
-          toast.success(t("settings.updateInstalledRestarting"), {
-            closeButton: true,
-          });
-          setRestartConfirmOpen(true);
-        }
-      } catch (error) {
-        console.error("[AboutSection] Update failed", error);
-        toast.error(t("settings.updateFailed"));
-        try {
-          await settingsApi.checkUpdates();
-        } catch (fallbackError) {
-          console.error(
-            "[AboutSection] Failed to open fallback updater",
-            fallbackError,
-          );
-        }
-      } finally {
-        setIsDownloading(false);
-      }
+      if (installState.phase === "ready" || installState.phase === "installed")
+        openUpdateDialog();
+      else await downloadUpdate();
       return;
     }
 
@@ -338,8 +331,9 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     checkUpdate,
     handleCheckWebUpdate,
     hasUpdate,
-    isPortable,
-    resetDismiss,
+    openUpdateDialog,
+    downloadUpdate,
+    installState,
     t,
     updateHandle,
   ]);
@@ -351,16 +345,6 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     } catch (error) {
       console.error("[AboutSection] Failed to copy install commands", error);
       toast.error(t("settings.installCommandsCopyFailed"));
-    }
-  }, [t]);
-
-  const handleConfirmRestart = useCallback(async () => {
-    setRestartConfirmOpen(false);
-    try {
-      await relaunchApp();
-    } catch (error) {
-      console.error("[AboutSection] Failed to relaunch app", error);
-      toast.error(t("settings.restartFailed"));
     }
   }, [t]);
 
@@ -397,7 +381,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
                 <span className="text-muted-foreground">
                   {t("common.version")}
                 </span>
-                <span className="font-medium">{`v${version}`}</span>
+                <span className="font-medium">{version}</span>
               </Badge>
               {isPortable && (
                 <Badge variant="secondary" className="gap-1.5">
@@ -433,20 +417,30 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
               type="button"
               size="sm"
               onClick={handleCheckUpdate}
-              disabled={isChecking || isDownloading}
+              disabled={isChecking}
               className="h-8 gap-1.5 text-xs"
             >
-              {isDownloading ? (
+              {["downloading", "verifying", "preparing", "installing"].includes(
+                installState.phase,
+              ) ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {t("settings.updating")}
+                  <span onClick={openUpdateDialog}>
+                    {t("settings.updating")}
+                  </span>
                 </>
               ) : hasUpdate ? (
                 <>
                   <Download className="h-3.5 w-3.5" />
-                  {t("settings.updateTo", {
-                    version: updateInfo?.availableVersion ?? "",
-                  })}
+                  {t(
+                    installState.phase === "ready" ||
+                      installState.phase === "installed"
+                      ? "settings.restartAndUpdate"
+                      : "settings.downloadUpdate",
+                    {
+                      version: updateInfo?.availableVersion ?? "",
+                    },
+                  )}
                 </>
               ) : isChecking ? (
                 <>
@@ -650,16 +644,6 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
           </div>
         </motion.div>
       )}
-      <ConfirmDialog
-        isOpen={restartConfirmOpen}
-        title={t("settings.updateRestartTitle")}
-        message={t("settings.updateRestartMessage")}
-        confirmText={t("settings.restartNow")}
-        cancelText={t("settings.restartLater")}
-        variant="info"
-        onConfirm={handleConfirmRestart}
-        onCancel={() => setRestartConfirmOpen(false)}
-      />
     </motion.section>
   );
 }

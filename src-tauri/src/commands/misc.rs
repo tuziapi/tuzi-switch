@@ -136,12 +136,47 @@ pub async fn open_webview_with_key(app: AppHandle, url: String, key: String) -> 
 }
 
 /// 检查更新
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateBuildInfo {
+    channel: &'static str,
+    repository: &'static str,
+    run_number: u64,
+    commit: &'static str,
+    platform: &'static str,
+}
+
+#[tauri::command]
+pub fn get_update_build_info() -> UpdateBuildInfo {
+    UpdateBuildInfo {
+        channel: if cfg!(feature = "isolated-profile") {
+            "acceptance"
+        } else {
+            "stable"
+        },
+        repository: crate::release_repository::RELEASE_REPOSITORY,
+        run_number: env!("TUZI_BUILD_NUMBER").parse().unwrap_or(0),
+        commit: env!("TUZI_BUILD_COMMIT"),
+        platform: match (std::env::consts::OS, std::env::consts::ARCH) {
+            ("macos", "aarch64") => "macos",
+            ("macos", "x86_64") => "macos-intel",
+            ("windows", "x86_64") => "windows",
+            ("linux", "x86_64") => "linux",
+            _ => "unsupported",
+        },
+    }
+}
+
 #[tauri::command]
 pub async fn check_for_updates(handle: AppHandle) -> Result<bool, String> {
     handle
         .opener()
         .open_url(
-            crate::release_repository::latest_release_url(),
+            if cfg!(feature = "isolated-profile") {
+                "https://aiw520.github.io/tuzi-switch/".to_string()
+            } else {
+                crate::release_repository::latest_release_url()
+            },
             None::<String>,
         )
         .map_err(|e| format!("打开更新页面失败: {e}"))?;
@@ -1899,5 +1934,31 @@ mod tests {
             command,
             "pushd \"\\\\server\\share\\100%%^&^(test^)\" || exit /b 1\r\n"
         );
+    }
+}
+
+#[cfg(test)]
+mod update_build_tests {
+    #[test]
+    fn update_build_identity_matches_native_profile() {
+        let info = super::get_update_build_info();
+        assert_eq!(
+            info.channel,
+            if cfg!(feature = "isolated-profile") {
+                "acceptance"
+            } else {
+                "stable"
+            }
+        );
+        assert_eq!(
+            info.repository,
+            crate::release_repository::RELEASE_REPOSITORY
+        );
+        assert_eq!(info.commit, env!("TUZI_BUILD_COMMIT"));
+        assert_eq!(
+            info.run_number,
+            env!("TUZI_BUILD_NUMBER").parse().unwrap_or(0)
+        );
+        assert_ne!(info.platform, "unsupported");
     }
 }

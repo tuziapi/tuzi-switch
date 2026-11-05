@@ -1,0 +1,449 @@
+[
+  {
+    "action": "minimax.create",
+    "method": "POST",
+    "path": "/v2/video_generation",
+    "modelField": "model",
+    "aliases": ["openai-video", "minimax-video"],
+    "compatiblePaths": ["/v1/videos"]
+  },
+  {
+    "action": "minimax.enhance",
+    "method": "POST",
+    "path": "/v2/h3_context_ir",
+    "modelField": "model",
+    "aliases": ["openai-video", "minimax-video"],
+    "compatiblePaths": ["/v1/videos"]
+  },
+  {
+    "action": "minimax.regenerate",
+    "method": "POST",
+    "path": "/v2/video_regeneration",
+    "modelField": "model",
+    "aliases": ["openai-video", "minimax-video"],
+    "compatiblePaths": ["/v1/videos"]
+  },
+  {
+    "action": "minimax.poll",
+    "method": "GET",
+    "path": "/v2/query/video_generation/{taskId}"
+  },
+  {
+    "action": "seedance.create",
+    "method": "POST",
+    "path": "/api/v3/contents/generations/tasks",
+    "modelField": "model",
+    "aliases": ["openai-video", "seedance"],
+    "compatiblePaths": ["/v1/videos"]
+  },
+  {
+    "action": "seedance.poll",
+    "method": "GET",
+    "path": "/api/v3/contents/generations/tasks/{taskId}"
+  },
+  {
+    "action": "kling.text2video",
+    "method": "POST",
+    "path": "/kling/v1/videos/text2video",
+    "modelField": "model_name",
+    "aliases": ["openai-video", "kling"],
+    "compatiblePaths": ["/v1/videos"]
+  },
+  {
+    "action": "kling.text2video.poll",
+    "method": "GET",
+    "path": "/kling/v1/videos/text2video/{taskId}"
+  },
+  {
+    "action": "kling.image2video",
+    "method": "POST",
+    "path": "/kling/v1/videos/image2video",
+    "modelField": "model_name",
+    "aliases": ["openai-video", "kling"],
+    "compatiblePaths": ["/v1/videos"]
+  },
+  {
+    "action": "kling.image2video.poll",
+    "method": "GET",
+    "path": "/kling/v1/videos/image2video/{taskId}"
+  },
+  {
+    "action": "suno.legacy.music",
+    "method": "POST",
+    "path": "/suno/submit/music",
+    "models": ["suno_music"]
+  },
+  {
+    "action": "suno.legacy.lyrics",
+    "method": "POST",
+    "path": "/suno/submit/lyrics",
+    "models": ["suno_lyrics"]
+  },
+  {
+    "action": "suno.legacy.concat",
+    "method": "POST",
+    "path": "/suno/submit/concat",
+    "models": ["suno_concat"]
+  },
+  {
+    "action": "suno.legacy.upload",
+    "method": "POST",
+    "path": "/suno/uploads/audio-url",
+    "models": ["suno_uploads"]
+  },
+  {
+    "action": "suno.legacy.poll",
+    "method": "GET",
+    "path": "/suno/fetch/{taskId}"
+  },
+  {
+    "action": "suno.v2.add-stem",
+    "method": "POST",
+    "path": "/suno/v2/add-stem",
+    "models": ["suno/add-stem"]
+  },
+  {
+    "action": "suno.v2.adjust-speed",
+    "method": "POST",
+    "path": "/suno/v2/adjust-speed",
+    "models": ["suno/adjust-speed"]
+  },
+  {
+    "action": "suno.v2.aligned-lyrics",
+    "method": "POST",
+    "path": "/suno/v2/aligned-lyrics",
+    "models": ["suno/aligned-lyrics"]
+  },
+  {
+    "action": "suno.v2.concat",
+    "method": "POST",
+    "path": "/suno/v2/concat",
+    "models": ["suno/concat"]
+  },
+  {
+    "action": "suno.v2.cover",
+    "method": "POST",
+    "path": "/suno/v2/cover",
+    "models": ["suno/cover"]
+  },
+  {
+    "action": "suno.v2.create-model",
+    "method": "POST",
+    "path": "/suno/v2/create-model",
+    "models": ["suno/create-model"]
+  },
+  {
+    "action": "suno.v2.download",
+    "method": "POST",
+    "path": "/suno/v2/download",
+    "models": ["suno/download"]
+  },
+  {
+    "action": "suno.v2.extend",
+    "method": "POST",
+    "path": "/suno/v2/extend",
+    "models": ["suno/extend"]
+  },
+  {
+    "action": "suno.v2.gen-midi",
+    "method": "POST",
+    "path": "/suno/v2/gen-midi",
+    "models": ["suno/gen-midi"]
+  },
+  {
+    "action": "suno.v2.inspo",
+    "method": "POST",
+    "path": "/suno/v2/inspo",
+    "models": ["suno/inspo"]
+  },
+  {
+    "action": "suno.v2.lyrics",
+    "method": "POST",
+    "path": "/suno/v2/lyrics",
+    "models": ["suno/lyrics"]
+  },
+  {
+    "action": "suno.v2.mashup",
+    "method": "POST",
+    "path": "/suno/v2/mashup",
+    "models": ["suno/mashup"]
+  },
+  {
+    "action": "suno.v2.music",
+    "method": "POST",
+    "path": "/suno/v2/music",
+    "models": ["suno/music"]
+  },
+  {
+    "action": "suno.v2.persona",
+    "method": "POST",
+    "path": "/suno/v2/persona",
+    "models": ["suno/persona"]
+  },
+  {
+    "action": "suno.v2.remaster",
+    "method": "POST",
+    "path": "/suno/v2/remaster",
+    "models": ["suno/remaster"]
+  },
+  {
+    "action": "suno.v2.replace-section",
+    "method": "POST",
+    "path": "/suno/v2/replace-section",
+    "models": ["suno/replace-section"]
+  },
+  {
+    "action": "suno.v2.sample",
+    "method": "POST",
+    "path": "/suno/v2/sample",
+    "models": ["suno/sample"]
+  },
+  {
+    "action": "suno.v2.sounds",
+    "method": "POST",
+    "path": "/suno/v2/sounds",
+    "models": ["suno/sounds"]
+  },
+  {
+    "action": "suno.v2.stems",
+    "method": "POST",
+    "path": "/suno/v2/stems",
+    "models": ["suno/stems"]
+  },
+  {
+    "action": "suno.v2.stems-all",
+    "method": "POST",
+    "path": "/suno/v2/stems-all",
+    "models": ["suno/stems-all"]
+  },
+  {
+    "action": "suno.v2.upload",
+    "method": "POST",
+    "path": "/suno/v2/upload",
+    "models": ["suno/upload"]
+  },
+  {
+    "action": "suno.v2.upload-cover",
+    "method": "POST",
+    "path": "/suno/v2/upload-cover",
+    "models": ["suno/upload-cover"]
+  },
+  {
+    "action": "suno.v2.upload-extend",
+    "method": "POST",
+    "path": "/suno/v2/upload-extend",
+    "models": ["suno/upload-extend"]
+  },
+  {
+    "action": "suno.v2.upsample-tags",
+    "method": "POST",
+    "path": "/suno/v2/upsample-tags",
+    "models": ["suno/upsample-tags"]
+  },
+  {
+    "action": "suno.v2.poll",
+    "method": "GET",
+    "path": "/suno/v2/fetch/{taskId}"
+  },
+  {
+    "action": "suno.native.generate",
+    "method": "POST",
+    "path": "/suno/api/v1/generate",
+    "models": ["suno_music"]
+  },
+  {
+    "action": "suno.native.poll.generate",
+    "method": "GET",
+    "path": "/suno/api/v1/generate/record-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.sounds",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/sounds",
+    "models": ["suno_music"]
+  },
+  {
+    "action": "suno.native.extend",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/extend",
+    "models": ["suno_music", "suno-continue"]
+  },
+  {
+    "action": "suno.native.upload-cover",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/upload-cover",
+    "models": ["suno_uploads", "suno-remix-uploaded"]
+  },
+  {
+    "action": "suno.native.upload-extend",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/upload-extend",
+    "models": ["suno_uploads", "suno-continue-uploaded"]
+  },
+  {
+    "action": "suno.native.add-instrumental",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/add-instrumental",
+    "models": ["suno_music", "suno-all-stems"]
+  },
+  {
+    "action": "suno.native.add-vocals",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/add-vocals",
+    "models": ["suno_music", "suno-vocal-stems"]
+  },
+  {
+    "action": "suno.native.mashup",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/mashup",
+    "models": ["suno_music"]
+  },
+  {
+    "action": "suno.native.replace-section",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/replace-section",
+    "models": ["suno_music", "suno-infill"]
+  },
+  {
+    "action": "suno.native.lyrics",
+    "method": "POST",
+    "path": "/suno/api/v1/lyrics",
+    "models": ["suno_lyrics"]
+  },
+  {
+    "action": "suno.native.poll.lyrics",
+    "method": "GET",
+    "path": "/suno/api/v1/lyrics/record-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.wav",
+    "method": "POST",
+    "path": "/suno/api/v1/wav/generate",
+    "models": ["suno_act_wav"]
+  },
+  {
+    "action": "suno.native.poll.wav",
+    "method": "GET",
+    "path": "/suno/api/v1/wav/record-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.stems",
+    "method": "POST",
+    "path": "/suno/api/v1/vocal-removal/generate",
+    "models": ["suno_act_stems"]
+  },
+  {
+    "action": "suno.native.poll.stems",
+    "method": "GET",
+    "path": "/suno/api/v1/vocal-removal/record-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.midi",
+    "method": "POST",
+    "path": "/suno/api/v1/midi/generate",
+    "models": ["suno-midi"]
+  },
+  {
+    "action": "suno.native.poll.midi",
+    "method": "GET",
+    "path": "/suno/api/v1/midi/record-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.mp4",
+    "method": "POST",
+    "path": "/suno/api/v1/mp4/generate",
+    "models": ["suno_act_mp4"]
+  },
+  {
+    "action": "suno.native.poll.mp4",
+    "method": "GET",
+    "path": "/suno/api/v1/mp4/record-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.cover-image",
+    "method": "POST",
+    "path": "/suno/api/v1/suno/cover/generate",
+    "models": ["suno_music", "suno-tags"]
+  },
+  {
+    "action": "suno.native.poll.cover-image",
+    "method": "GET",
+    "path": "/suno/api/v1/suno/cover/record-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.style",
+    "method": "POST",
+    "path": "/suno/api/v1/style/generate",
+    "models": ["suno_music", "suno-tags"]
+  },
+  {
+    "action": "suno.native.persona",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/generate-persona",
+    "models": ["suno_music"]
+  },
+  {
+    "action": "suno.native.timestamped-lyrics",
+    "method": "POST",
+    "path": "/suno/api/v1/generate/get-timestamped-lyrics",
+    "models": ["suno_music"]
+  },
+  {
+    "action": "suno.native.voice-validate",
+    "method": "POST",
+    "path": "/suno/api/v1/voice/validate",
+    "models": ["suno_music", "suno-vocal-stems"]
+  },
+  {
+    "action": "suno.native.poll.voice-validate",
+    "method": "GET",
+    "path": "/suno/api/v1/voice/validate-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.voice-generate",
+    "method": "POST",
+    "path": "/suno/api/v1/voice/generate",
+    "models": ["suno_music", "suno-vocal-stems"]
+  },
+  {
+    "action": "suno.native.poll.voice-generate",
+    "method": "GET",
+    "path": "/suno/api/v1/voice/record-info?taskId={taskId}"
+  },
+  {
+    "action": "suno.native.voice-regenerate",
+    "method": "POST",
+    "path": "/suno/api/v1/voice/regenerate",
+    "models": ["suno_music", "suno-vocal-stems"]
+  },
+  {
+    "action": "suno.native.voice-check",
+    "method": "POST",
+    "path": "/suno/api/v1/voice/check-voice",
+    "models": ["suno_music"]
+  },
+  {
+    "action": "suno.native.upload-url",
+    "method": "POST",
+    "path": "/suno/api/file-url-upload",
+    "models": ["suno_uploads"]
+  },
+  {
+    "action": "suno.native.upload-base64",
+    "method": "POST",
+    "path": "/suno/api/file-base64-upload",
+    "models": ["suno_uploads"]
+  },
+  {
+    "action": "suno.native.upload-stream",
+    "method": "POST",
+    "path": "/suno/api/file-stream-upload",
+    "models": ["suno_uploads"]
+  },
+  {
+    "action": "suno.native.credits",
+    "method": "GET",
+    "path": "/suno/api/v1/generate/credit",
+    "models": ["suno_music"]
+  }
+]

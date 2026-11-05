@@ -1,0 +1,1493 @@
+/**
+ * TaskQueuePanel Component
+ *
+ * Side panel that displays all tasks in the queue.
+ * Supports filtering by status and provides batch operations.
+ */
+
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { copyToClipboard } from '../../utils/runtime-helpers';
+import { Button, Tabs, MessagePlugin, Checkbox } from 'tdesign-react';
+import {
+  DeleteIcon,
+  UserIcon,
+  RefreshIcon,
+  PauseCircleIcon,
+  CheckDoubleIcon,
+  ImageIcon,
+  VideoIcon,
+  FilterIcon,
+} from 'tdesign-icons-react';
+import { Music4 } from 'lucide-react';
+import { VirtualTaskList } from './VirtualTaskList';
+import { ArchivedTaskList } from './ArchivedTaskList';
+import { TaskQueueSearchFilters } from './TaskQueueSearchFilters';
+import {
+  buildTaskQueueFilters,
+  matchesTaskQueueFilters,
+  type TaskDateRange,
+} from '../../utils/task-queue-filters';
+import { useTaskQueue } from '../../hooks/useTaskQueue';
+import { Task, TaskType, TaskStatus } from '../../types/task.types';
+import { unifiedCacheService } from '../../services/unified-cache-service';
+import { taskStorageReader } from '../../services/task-storage-reader';
+import { taskQueueService } from '../../services/task-queue';
+import { useDrawnix, DialogType } from '../../hooks/use-drawnix';
+import { insertImageFromUrl } from '../../data/image';
+import {
+  AUDIO_CARD_DEFAULT_HEIGHT,
+  AUDIO_CARD_DEFAULT_WIDTH,
+} from '../../data/audio';
+import { executeCanvasInsertion } from '../../services/canvas-operations';
+import {
+  getImageTaskResultDimensions,
+  resolveImageTaskInsertionDimensions,
+} from '../../utils/task-utils';
+import {
+  bindImageTaskToCanvasInsertion,
+  getCachedImageInsertionUrls,
+} from '../../utils/canvas-media-preview';
+import { normalizeImageDataUrl } from '@aitu/utils';
+import {
+  buildTaskDownloadItems,
+  smartDownload,
+} from '../../utils/download-utils';
+import { BaseDrawer } from '../side-drawer';
+import { CharacterCreateDialog } from '../character/CharacterCreateDialog';
+import { CharacterList } from '../character/CharacterList';
+import { useCharacters } from '../../hooks/useCharacters';
+import {
+  UnifiedMediaViewer,
+  type MediaItem as UnifiedMediaItem,
+} from '../shared/media-preview';
+import { ImageEditor } from '../image-editor';
+import { useGitHubSync } from '../../contexts/GitHubSyncContext';
+import { mediaSyncService } from '../../services/github-sync/media-sync-service';
+import { CloudUploadIcon } from 'tdesign-icons-react';
+import {
+  formatLyricsForCanvas,
+  getLyricsTags,
+  getLyricsTitle,
+  isLyricsTask,
+} from '../../utils/lyrics-task-utils';
+import { resolveAudioResultUrls } from '../../services/audio-task-result-utils';
+import { ConfirmDialog } from '../dialog/ConfirmDialog';
+import { analytics } from '../../utils/umami-analytics';
+import { DRAWER_PIN_KEYS } from '../../utils/drawer-pin';
+import {
+  buildImageTaskAIInputPrefillData,
+  buildImageTaskPrefillInitialData,
+} from '../../utils/image-task-prefill';
+import { requestAIInputPrefill } from '../../services/ai-input-ui-events';
+import './task-queue.scss';
+import { HoverTip } from '../shared';
+import { createMiniMaxH3RegenerationTask } from '../../services/minimax-h3-regeneration-service';
+
+const { TabPanel } = Tabs;
+
+// Storage key for drawer width
+export const TASK_DRAWER_WIDTH_KEY = 'task-queue-drawer-width';
+
+export interface TaskQueuePanelProps {
+  /** Whether the panel is expanded */
+  expanded: boolean;
+  /** Callback when close button is clicked */
+  onClose?: () => void;
+  /** Callback when a task action is performed */
+  onTaskAction?: (action: string, taskId: string) => void;
+}
+
+function getTaskResultCount(task: Task): number {
+  if (Array.isArray(task.result?.urls) && task.result.urls.length > 0) {
+    return task.result.urls.length;
+  }
+  if (task.result?.url || task.result?.chatResponse || isLyricsTask(task)) {
+    return 1;
+  }
+  return 0;
+}
+
+function buildTaskAnalyticsPayload(task: Task): Record<string, unknown> {
+  const resultCount = getTaskResultCount(task);
+  return {
+    taskId: task.id,
+    taskType: task.type,
+    taskStatus: task.status,
+    model:
+      typeof task.params.model === 'string' && task.params.model.trim()
+        ? task.params.model
+        : undefined,
+    resultCount: resultCount || undefined,
+    hasMultipleResults: resultCount > 1,
+  };
+}
+
+/**
+ * TaskQueuePanel component - displays the full task queue
+ */
+export const TaskQueuePanel: React.FC<TaskQueuePanelProps> = ({
+  expanded,
+  onClose,
+  onTaskAction,
+}) => {
+  const {
+    tasks,
+    activeTasks,
+    completedTasks,
+    failedTasks,
+    cancelledTasks,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    totalCount,
+    loadedCount,
+    loadMore,
+    retryTask,
+    deleteTask,
+    clearCompleted,
+    clearFailed,
+    batchDeleteTasks,
+    batchRetryTasks,
+    batchCancelTasks,
+  } = useTaskQueue();
+
+  const { board, openDialog } = useDrawnix();
+  const { characters } = useCharacters();
+  const [activeTab, setActiveTab] = useState<string>('all');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearType, setClearType] = useState<'completed' | 'failed'>(
+    'completed'
+  );
+  const [searchText, setSearchText] = useState<string>('');
+  const [dateRange, setDateRange] = useState<TaskDateRange>([]);
+  const taskFilters = useMemo(
+    () => buildTaskQueueFilters(searchText, dateRange),
+    [searchText, dateRange]
+  );
+  const [typeFilter, setTypeFilter] = useState<
+    'all' | 'image' | 'video' | 'audio' | 'text' | 'character'
+  >('all');
+  const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewInitialIndex, setPreviewInitialIndex] = useState<
+    number | number[]
+  >(0);
+  const [previewInitialMode, setPreviewInitialMode] = useState<
+    'single' | 'compare'
+  >('single');
+
+  // 图片编辑器状态
+  const [imageEditorVisible, setImageEditorVisible] = useState(false);
+  const [imageEditorUrl, setImageEditorUrl] = useState('');
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  // Character extraction dialog state
+  const [characterDialogTask, setCharacterDialogTask] = useState<Task | null>(
+    null
+  );
+  // Multi-selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
+  const [archivedCount, setArchivedCount] = useState<number | null>(null);
+
+  // Sync state
+  const { isConfigured } = useGitHubSync();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+
+  // Check if showing characters view
+  const isCharacterView =
+    typeFilter === 'character' && activeTab !== 'archived';
+
+  // Initialize media cache status on component mount
+  useEffect(() => {
+    unifiedCacheService.initCacheStatus();
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) {
+      return;
+    }
+
+    let cancelled = false;
+
+    taskStorageReader
+      .getArchivedTaskCount()
+      .then((count) => {
+        if (!cancelled) {
+          setArchivedCount(count);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setArchivedCount(0);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, activeTab]);
+
+  // Filter and sort tasks
+  const filteredTasks = useMemo(() => {
+    // Get tasks based on active tab
+    let tasksToFilter: Task[];
+    switch (activeTab) {
+      case 'all':
+        tasksToFilter = tasks;
+        break;
+      case 'active':
+        tasksToFilter = activeTasks;
+        break;
+      case 'completed':
+        tasksToFilter = completedTasks;
+        break;
+      case 'failed':
+        tasksToFilter = failedTasks;
+        break;
+      case 'cancelled':
+        tasksToFilter = cancelledTasks;
+        break;
+      case 'archived':
+        // 归档任务由 ArchivedTaskList 独立加载
+        return [];
+      default:
+        tasksToFilter = tasks;
+    }
+
+    // Apply type filter
+    if (typeFilter !== 'all' && typeFilter !== 'character') {
+      tasksToFilter = tasksToFilter.filter(
+        (task) =>
+          task.type ===
+          (typeFilter === 'image'
+            ? TaskType.IMAGE
+            : typeFilter === 'audio'
+            ? TaskType.AUDIO
+            : typeFilter === 'text'
+            ? TaskType.CHAT
+            : TaskType.VIDEO)
+      );
+    }
+
+    tasksToFilter = tasksToFilter.filter((task) =>
+      matchesTaskQueueFilters(task, taskFilters)
+    );
+
+    // Sort by time - newest first (reverse chronological)
+    return [...tasksToFilter].sort((a, b) => b.createdAt - a.createdAt);
+  }, [
+    activeTab,
+    tasks,
+    activeTasks,
+    completedTasks,
+    failedTasks,
+    cancelledTasks,
+    typeFilter,
+    taskFilters,
+  ]);
+
+  // Handle clear action
+  const handleClear = (type: 'completed' | 'failed') => {
+    setClearType(type);
+    setShowClearConfirm(true);
+  };
+
+  const confirmClear = () => {
+    if (clearType === 'completed') {
+      clearCompleted();
+    } else {
+      clearFailed();
+    }
+    setShowClearConfirm(false);
+  };
+
+  // Task action handlers
+  const handleRetry = (taskId: string) => {
+    retryTask(taskId);
+    onTaskAction?.('retry', taskId);
+  };
+
+  const handleDelete = (taskId: string) => {
+    setTaskToDelete(taskId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (taskToDelete) {
+      deleteTask(taskToDelete);
+      onTaskAction?.('delete', taskToDelete);
+    }
+    setShowDeleteConfirm(false);
+    setTaskToDelete(null);
+  };
+
+  // Multi-selection handlers
+  const handleToggleSelectionMode = () => {
+    if (selectionMode) {
+      // Exit selection mode and clear selections
+      setSelectionMode(false);
+      setSelectedTaskIds(new Set());
+    } else {
+      setSelectionMode(true);
+    }
+  };
+
+  const handleSelectionChange = (taskId: string, selected: boolean) => {
+    setSelectedTaskIds((prev) => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(taskId);
+      } else {
+        newSet.delete(taskId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const allTaskIds = filteredTasks.map((t) => t.id);
+    setSelectedTaskIds(new Set(allTaskIds));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedTaskIds(new Set());
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedTaskIds.size === 0) return;
+    setShowBatchDeleteConfirm(true);
+  };
+
+  const confirmBatchDelete = () => {
+    batchDeleteTasks(Array.from(selectedTaskIds));
+    setSelectedTaskIds(new Set());
+    setSelectionMode(false);
+    setShowBatchDeleteConfirm(false);
+    MessagePlugin.success(`已删除 ${selectedTaskIds.size} 个任务`);
+  };
+
+  const handleBatchRetry = () => {
+    // Retry failed and cancelled tasks
+    const retryableSelectedIds = Array.from(selectedTaskIds).filter((id) => {
+      const task = tasks.find((t) => t.id === id);
+      return (
+        task?.params.agentAnalysis !== true &&
+        (task?.status === TaskStatus.FAILED ||
+          task?.status === TaskStatus.CANCELLED)
+      );
+    });
+    if (retryableSelectedIds.length === 0) {
+      MessagePlugin.warning('没有可重试的任务');
+      return;
+    }
+    batchRetryTasks(retryableSelectedIds);
+    setSelectedTaskIds(new Set());
+    setSelectionMode(false);
+    MessagePlugin.success(`已重试 ${retryableSelectedIds.length} 个任务`);
+  };
+
+  // Count selected failed/cancelled tasks for retry button
+  const selectedRetryableCount = useMemo(() => {
+    return Array.from(selectedTaskIds).filter((id) => {
+      const task = tasks.find((t) => t.id === id);
+      return (
+        task?.params.agentAnalysis !== true &&
+        (task?.status === TaskStatus.FAILED ||
+          task?.status === TaskStatus.CANCELLED)
+      );
+    }).length;
+  }, [selectedTaskIds, tasks]);
+
+  // Count selected active tasks for cancel button
+  const selectedActiveCount = useMemo(() => {
+    return Array.from(selectedTaskIds).filter((id) => {
+      const task = tasks.find((t) => t.id === id);
+      return (
+        task?.status === TaskStatus.PENDING ||
+        task?.status === TaskStatus.PROCESSING
+      );
+    }).length;
+  }, [selectedTaskIds, tasks]);
+
+  // Count selected completed tasks for sync button
+  const selectedSyncableCount = useMemo(() => {
+    return Array.from(selectedTaskIds).filter((id) => {
+      const task = tasks.find((t) => t.id === id);
+      return (
+        task?.status === TaskStatus.COMPLETED &&
+        (task?.type === TaskType.IMAGE || task?.type === TaskType.VIDEO)
+      );
+    }).length;
+  }, [selectedTaskIds, tasks]);
+
+  // Type counts for filter buttons
+  const typeCounts = useMemo(() => {
+    return {
+      all: tasks.length,
+      image: tasks.filter((t) => t.type === TaskType.IMAGE).length,
+      video: tasks.filter((t) => t.type === TaskType.VIDEO).length,
+      audio: tasks.filter((t) => t.type === TaskType.AUDIO).length,
+      text: tasks.filter((t) => t.type === TaskType.CHAT).length,
+      character: characters.length,
+    };
+  }, [tasks, characters]);
+
+  const handleBatchCancel = () => {
+    // Only cancel active tasks
+    const activeSelectedIds = Array.from(selectedTaskIds).filter((id) => {
+      const task = tasks.find((t) => t.id === id);
+      return (
+        task?.status === TaskStatus.PENDING ||
+        task?.status === TaskStatus.PROCESSING
+      );
+    });
+    if (activeSelectedIds.length === 0) {
+      MessagePlugin.warning('没有可取消的进行中任务');
+      return;
+    }
+    batchCancelTasks(activeSelectedIds);
+    setSelectedTaskIds(new Set());
+    setSelectionMode(false);
+    MessagePlugin.success(`已取消 ${activeSelectedIds.length} 个任务`);
+  };
+
+  const handleBatchSync = async () => {
+    // Only sync completed image/video tasks
+    const syncableSelectedIds = Array.from(selectedTaskIds).filter((id) => {
+      const task = tasks.find((t) => t.id === id);
+      return (
+        task?.status === TaskStatus.COMPLETED &&
+        (task?.type === TaskType.IMAGE || task?.type === TaskType.VIDEO)
+      );
+    });
+
+    if (syncableSelectedIds.length === 0 || isSyncing) return;
+
+    setIsSyncing(true);
+    setSyncProgress(0);
+
+    try {
+      const result = await (mediaSyncService as any).syncMultipleTasks(
+        syncableSelectedIds,
+        (current: any, total: any) => {
+          setSyncProgress(Math.round((current / total) * 100));
+        }
+      );
+      setSyncProgress(100);
+
+      if (result.succeeded > 0) {
+        MessagePlugin.success(`已同步 ${result.succeeded} 个任务`);
+      }
+      if (result.failed > 0) {
+        MessagePlugin.warning(`${result.failed} 个任务同步失败`);
+      }
+    } catch (error) {
+      console.error('[TaskQueuePanel] Batch sync failed:', error);
+      MessagePlugin.error('同步失败，请稍后重试');
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(0);
+    }
+  };
+
+  const handleDownload = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task && isLyricsTask(task)) {
+      MessagePlugin.info('歌词任务支持复制或插入画布');
+      return;
+    }
+    if (!task) return;
+
+    const downloadItems = buildTaskDownloadItems(task);
+    if (downloadItems.length === 0) return;
+
+    try {
+      const result = await smartDownload(downloadItems);
+      if (result.openedCount === 0 && result.downloadedCount === 0 && result.failedCount === 0) return;
+      if (result.openedCount > 0 && result.downloadedCount === 0) {
+        MessagePlugin.success(
+          result.openedCount > 1
+            ? `已打开 ${result.openedCount} 个链接，请在新标签页下载`
+            : '资源不支持直接下载，已打开链接'
+        );
+      } else {
+        MessagePlugin.success(
+          task.type === TaskType.AUDIO
+            ? downloadItems.length > 1
+              ? '多条音频已开始下载'
+              : '音频下载成功'
+            : downloadItems.length > 1
+            ? '多图已开始下载'
+            : '下载成功'
+        );
+      }
+      analytics.track('generation_result_download', {
+        ...buildTaskAnalyticsPayload(task),
+        downloadedCount: result.downloadedCount,
+        openedCount: result.openedCount,
+      });
+      onTaskAction?.('download', taskId);
+    } catch (error) {
+      console.error('Download failed:', error);
+      MessagePlugin.error('下载失败，请稍后重试');
+    }
+  };
+
+  const handleCopy = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || !isLyricsTask(task)) {
+      MessagePlugin.warning('暂无可复制的歌词');
+      return;
+    }
+
+    const text = formatLyricsForCanvas(task);
+    if (!text.trim()) {
+      MessagePlugin.warning('暂无可复制的歌词');
+      return;
+    }
+
+    try {
+      await copyToClipboard(text);
+      MessagePlugin.success('歌词已复制');
+      onTaskAction?.('copy', taskId);
+    } catch (error) {
+      console.error('Failed to copy lyrics:', error);
+      MessagePlugin.error('复制失败，请稍后重试');
+    }
+  };
+
+  const handleInsert = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || !board) {
+      console.warn('Cannot insert: task result or board not available');
+      MessagePlugin.warning('无法插入：白板未就绪');
+      return;
+    }
+    if (
+      !task.result?.url &&
+      !task.result?.urls?.length &&
+      !isLyricsTask(task)
+    ) {
+      const chatResponse =
+        task.type === TaskType.CHAT ? task.result?.chatResponse : undefined;
+      if (chatResponse?.trim()) {
+        const promptLabel =
+          (task.params.prompt || '').slice(0, 20) || undefined;
+        await executeCanvasInsertion({
+          board,
+          items: [
+            {
+              type: 'text',
+              content: chatResponse,
+              label: promptLabel,
+              metadata: {
+                prompt: task.params.prompt,
+                generationTaskId: task.id,
+              },
+            },
+          ],
+        });
+        MessagePlugin.success('文本已插入到白板');
+        taskQueueService.markAsInserted(taskId, 'manual');
+        onTaskAction?.('insert', taskId);
+        return;
+      }
+      console.warn('Cannot insert: task result is empty');
+      MessagePlugin.warning('无法插入：任务结果为空');
+      return;
+    }
+
+    try {
+      const taskResult = task.result!;
+      if (task.type === TaskType.IMAGE) {
+        const urls = taskResult.urls?.length
+          ? taskResult.urls
+          : [taskResult.url];
+        const insertionResult = await executeCanvasInsertion({
+          board,
+          items: urls.map((url) => ({
+            type: 'image',
+            content: normalizeImageDataUrl(url),
+            groupId: urls.length > 1 ? `task-image-${task.id}` : undefined,
+            dimensions: resolveImageTaskInsertionDimensions(task),
+            waitForImageLoad: true,
+          })),
+        });
+        if (!insertionResult.success) {
+          throw new Error(insertionResult.error || '图片插入失败');
+        }
+        bindImageTaskToCanvasInsertion(board, insertionResult, task.id);
+        const cachedUrls = await getCachedImageInsertionUrls(
+          board,
+          insertionResult
+        );
+        if (cachedUrls?.length === urls.length) {
+          taskQueueService.updateTaskStatus(task.id, task.status, {
+            result: {
+              ...taskResult,
+              url: cachedUrls[0],
+              urls: cachedUrls.length > 1 ? cachedUrls : undefined,
+              cacheWarning: undefined,
+            },
+          });
+        }
+        MessagePlugin.success(
+          urls.length > 1 ? '多图已插入到白板' : '图片已插入到白板'
+        );
+      } else if (task.type === TaskType.VIDEO) {
+        const insertionResult = await executeCanvasInsertion({
+          board,
+          items: [
+            {
+              type: 'video',
+              content: taskResult.url,
+              metadata: {
+                prompt: task.params.prompt,
+                generationTaskId: task.id,
+              },
+            },
+          ],
+        });
+        if (!insertionResult.success) {
+          throw new Error(insertionResult.error || '视频插入失败');
+        }
+        MessagePlugin.success('视频已插入到白板');
+      } else if (task.type === TaskType.AUDIO) {
+        if (isLyricsTask(task)) {
+          const lyricsLabel =
+            getLyricsTitle(
+              taskResult,
+              task.params.title || task.params.prompt
+            ) ||
+            (task.params.prompt || '').slice(0, 20) ||
+            undefined;
+          await executeCanvasInsertion({
+            board,
+            items: [
+              {
+                type: 'text',
+                content: formatLyricsForCanvas(task),
+                label: lyricsLabel,
+                metadata: {
+                  title: getLyricsTitle(
+                    taskResult,
+                    task.params.title || task.params.prompt
+                  ),
+                  tags: getLyricsTags(taskResult),
+                  prompt: task.params.prompt,
+                  generationTaskId: task.id,
+                },
+              },
+            ],
+          });
+          MessagePlugin.success('歌词已插入到白板');
+          taskQueueService.markAsInserted(taskId, 'manual');
+          onTaskAction?.('insert', taskId);
+          return;
+        }
+
+        const urls = resolveAudioResultUrls(taskResult);
+        const primaryClipDuration = taskResult.clips?.[0]?.duration;
+        const baseMetadata = {
+          title: taskResult.title || task.params.title || task.params.prompt,
+          duration:
+            typeof primaryClipDuration === 'number'
+              ? primaryClipDuration
+              : taskResult.duration,
+          previewImageUrl: taskResult.previewImageUrl,
+          tags:
+            typeof task.params.tags === 'string' ? task.params.tags : undefined,
+          mv: typeof task.params.mv === 'string' ? task.params.mv : undefined,
+          prompt: task.params.prompt,
+          providerTaskId: taskResult.providerTaskId || task.remoteId,
+          clipId:
+            taskResult.primaryClipId ||
+            taskResult.clips?.[0]?.clipId ||
+            taskResult.clips?.[0]?.id ||
+            taskResult.clipIds?.[0],
+          clipIds: taskResult.clipIds,
+          generationTaskId: task.id,
+        };
+
+        const insertionResult = await executeCanvasInsertion({
+          board,
+          items: urls.map((audioUrl, index) => ({
+            type: 'audio',
+            content: audioUrl,
+            groupId: urls.length > 1 ? `task-audio-${task.id}` : undefined,
+            dimensions: {
+              width: AUDIO_CARD_DEFAULT_WIDTH,
+              height: AUDIO_CARD_DEFAULT_HEIGHT,
+            },
+            metadata: {
+              ...baseMetadata,
+              title:
+                taskResult.clips?.[index]?.title ||
+                (urls.length > 1
+                  ? `${baseMetadata.title || 'Audio'} ${index + 1}`
+                  : baseMetadata.title),
+              previewImageUrl:
+                taskResult.clips?.[index]?.imageLargeUrl ||
+                taskResult.clips?.[index]?.imageUrl ||
+                baseMetadata.previewImageUrl,
+              duration:
+                typeof taskResult.clips?.[index]?.duration === 'number'
+                  ? taskResult.clips[index]!.duration || undefined
+                  : baseMetadata.duration,
+              clipId:
+                taskResult.clips?.[index]?.clipId ||
+                taskResult.clips?.[index]?.id ||
+                taskResult.clipIds?.[index] ||
+                baseMetadata.clipId,
+            },
+          })),
+        });
+        if (!insertionResult.success) {
+          throw new Error(insertionResult.error || '音频插入失败');
+        }
+
+        MessagePlugin.success(
+          urls.length > 1 ? '多条音频卡片已插入到白板' : '音频卡片已插入到白板'
+        );
+      } else if (task.type === TaskType.CHAT) {
+        const chatResponse = taskResult.chatResponse || '';
+        const promptLabel =
+          (task.params.prompt || '').slice(0, 20) || undefined;
+        await executeCanvasInsertion({
+          board,
+          items: [
+            {
+              type: 'text',
+              content: chatResponse,
+              label: promptLabel,
+              metadata: {
+                prompt: task.params.prompt,
+                generationTaskId: task.id,
+              },
+            },
+          ],
+        });
+        MessagePlugin.success('文本已插入到白板');
+      }
+      taskQueueService.markAsInserted(taskId, 'manual');
+      onTaskAction?.('insert', taskId);
+    } catch (error) {
+      console.error('Failed to insert to board:', error);
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : typeof error === 'string' && error.trim()
+          ? error
+          : '未知错误';
+      MessagePlugin.error(
+        message.startsWith('插入失败') ? message : `插入失败: ${message}`
+      );
+    }
+  };
+
+  const handleRegenerate = async (taskId: string) => {
+    const task =
+      (await taskStorageReader.getTask(taskId)) ||
+      taskQueueService.getTask(taskId) ||
+      tasks.find((item) => item.id === taskId);
+    if (!task || task.type !== TaskType.IMAGE) {
+      MessagePlugin.warning('未找到可回填的图片任务');
+      return;
+    }
+
+    requestAIInputPrefill({
+      ...buildImageTaskAIInputPrefillData(task),
+      source: 'task-queue',
+    });
+    onTaskAction?.('regenerate', taskId);
+  };
+
+  const handleUpgradeTo2K = async (taskId: string) => {
+    try {
+      const sourceTask =
+        (await taskStorageReader.getTask(taskId)) ||
+        taskQueueService.getTask(taskId) ||
+        tasks.find((item) => item.id === taskId);
+      if (!sourceTask) {
+        throw new Error('未找到源视频任务');
+      }
+      createMiniMaxH3RegenerationTask(sourceTask);
+      MessagePlugin.success('已提交升至 2K 的视频重制任务');
+      onTaskAction?.('upgradeTo2K', taskId);
+    } catch (error) {
+      MessagePlugin.error(
+        error instanceof Error ? error.message : '视频升至 2K 提交失败'
+      );
+    }
+  };
+
+  const handleEdit = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) {
+      console.warn('Cannot edit: task not found');
+      return;
+    }
+
+    // 根据任务类型打开对应的对话框
+    if (task.type === TaskType.IMAGE) {
+      // 准备图片生成初始数据
+      openDialog(
+        DialogType.aiImageGeneration,
+        buildImageTaskPrefillInitialData(task)
+      );
+    } else if (task.type === TaskType.VIDEO) {
+      // 准备视频生成初始数据
+      const initialData = {
+        initialPrompt: task.params.prompt,
+        initialDuration:
+          typeof task.params.seconds === 'string'
+            ? parseInt(task.params.seconds, 10)
+            : task.params.seconds, // 确保转换为数字
+        initialModel: task.params.model, // 传递模型
+        initialSize: task.params.size, // 传递尺寸
+        initialImages: task.params.uploadedImages, // 传递上传的图片（多图片格式）
+        initialResultUrl: task.result?.url, // 传递结果URL用于预览
+        initialResultUrls: task.result?.urls, // 多图/多视频结果
+      };
+      openDialog(DialogType.aiVideoGeneration, initialData);
+    } else if (task.type === TaskType.AUDIO) {
+      MessagePlugin.info('音频任务暂不支持从任务面板直接编辑');
+      return;
+    }
+
+    onTaskAction?.('edit', taskId);
+  };
+
+  // Handle extract character action
+  const handleExtractCharacter = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      setCharacterDialogTask(task);
+      onTaskAction?.('extractCharacter', taskId);
+    }
+  };
+
+  // Get completed tasks with results for navigation (deduplicated by ID)
+  const completedTasksWithResults = useMemo(() => {
+    const seen = new Set<string>();
+    return filteredTasks.filter((t) => {
+      if (
+        t.status !== TaskStatus.COMPLETED ||
+        (!t.result?.url && !t.result?.urls?.length) ||
+        (t.type !== TaskType.IMAGE &&
+          t.type !== TaskType.VIDEO &&
+          !(t.type === TaskType.AUDIO && t.result?.resultKind !== 'lyrics'))
+      ) {
+        return false;
+      }
+      if (seen.has(t.id)) return false; // 跳过重复的任务 ID
+      seen.add(t.id);
+      return true;
+    });
+  }, [filteredTasks]);
+
+  // 展开多图任务为多个 MediaItem，同时建立 taskId -> 首个 previewIndex 的映射
+  const { previewMediaItems, taskIdToPreviewConfig } = useMemo(() => {
+    const items: UnifiedMediaItem[] = [];
+    const configMap = new Map<
+      string,
+      { mode: 'single' | 'compare'; index: number | number[] }
+    >();
+
+    for (const task of completedTasksWithResults) {
+      const startIndex = items.length;
+      const title =
+        task.result?.title ||
+        task.params.title ||
+        task.params.prompt?.substring(0, 50) ||
+        '媒体预览';
+
+      if (task.type === TaskType.AUDIO) {
+        const audioItems =
+          task.result?.clips
+            ?.filter((clip) => Boolean(clip.audioUrl))
+            .map((clip, i) => ({
+              id: clip.clipId || clip.id || `${task.id}-${i}`,
+              url: clip.audioUrl,
+              type: 'audio' as const,
+              title:
+                clip.title ||
+                (task.result?.clips && task.result.clips.length > 1
+                  ? `${title} (${i + 1}/${task.result.clips.length})`
+                  : title),
+              posterUrl:
+                clip.imageLargeUrl ||
+                clip.imageUrl ||
+                task.result?.previewImageUrl,
+              duration:
+                typeof clip.duration === 'number'
+                  ? clip.duration
+                  : task.result?.duration,
+              prompt: task.params.prompt,
+              generationTaskId: task.id,
+              tags:
+                typeof task.params.tags === 'string'
+                  ? task.params.tags
+                  : undefined,
+              artist: task.params.model || task.params.mv || 'Aitu',
+              album: 'Aitu Generated',
+            })) ?? [];
+        const fallbackUrls = task.result!.urls?.length
+          ? task.result!.urls
+          : task.result!.url
+          ? [task.result!.url]
+          : [];
+        const mediaItems =
+          audioItems.length > 0
+            ? audioItems
+            : fallbackUrls.map((url, i) => ({
+                id: fallbackUrls.length > 1 ? `${task.id}-${i}` : task.id,
+                url,
+                type: 'audio' as const,
+                title:
+                  fallbackUrls.length > 1
+                    ? `${title} (${i + 1}/${fallbackUrls.length})`
+                    : title,
+                posterUrl: task.result?.previewImageUrl,
+                duration: task.result?.duration,
+                prompt: task.params.prompt,
+                generationTaskId: task.id,
+                tags:
+                  typeof task.params.tags === 'string'
+                    ? task.params.tags
+                    : undefined,
+                artist: task.params.model || task.params.mv || 'Aitu',
+                album: 'Aitu Generated',
+              }));
+        items.push(...mediaItems);
+      } else {
+        const urls = task.result!.urls?.length
+          ? task.result!.urls
+          : [task.result!.url];
+        const mediaType =
+          task.type === TaskType.VIDEO
+            ? ('video' as const)
+            : ('image' as const);
+        const dimensions = getImageTaskResultDimensions(task);
+
+        for (let i = 0; i < urls.length; i++) {
+          const normalizedUrl =
+            mediaType === 'image' ? normalizeImageDataUrl(urls[i]) : urls[i];
+          items.push({
+            id: urls.length > 1 ? `${task.id}-${i}` : task.id,
+            url: normalizedUrl,
+            type: mediaType,
+            width: dimensions?.width,
+            height: dimensions?.height,
+            title:
+              urls.length > 1 ? `${title} (${i + 1}/${urls.length})` : title,
+            prompt: task.params.prompt,
+            generationTaskId: task.id,
+          });
+        }
+      }
+      configMap.set(task.id, {
+        mode: 'single',
+        index: startIndex,
+      });
+    }
+
+    return { previewMediaItems: items, taskIdToPreviewConfig: configMap };
+  }, [completedTasksWithResults]);
+
+  // Preview navigation handlers - 使用 Map 精确查找索引
+  const handlePreviewOpen = useCallback(
+    (taskId: string) => {
+      setPreviewTaskId(taskId);
+      const config = taskIdToPreviewConfig.get(taskId);
+      if (config !== undefined) {
+        setPreviewInitialMode(config.mode);
+        setPreviewInitialIndex(config.index);
+        setPreviewVisible(true);
+      }
+    },
+    [taskIdToPreviewConfig]
+  );
+
+  const handlePreviewClose = useCallback(() => {
+    setPreviewTaskId(null);
+    setPreviewVisible(false);
+  }, []);
+
+  // 处理图片编辑
+  const handlePreviewEdit = useCallback((item: UnifiedMediaItem) => {
+    if (item.type !== 'image') return;
+    setImageEditorUrl(item.url);
+    setImageEditorVisible(true);
+    setPreviewVisible(false); // 关闭预览
+  }, []);
+
+  // 编辑后插入画布
+  const handleEditInsert = useCallback(
+    async (editedImageUrl: string) => {
+      if (!board) return;
+
+      try {
+        const taskId = `edited-image-${Date.now()}`;
+        const stableUrl = `/__aitu_cache__/image/${taskId}.png`;
+
+        // 将 data URL 转换为 Blob
+        const response = await fetch(editedImageUrl);
+        const blob = await response.blob();
+
+        // 缓存到 Cache API
+        await unifiedCacheService.cacheMediaFromBlob(stableUrl, blob, 'image', {
+          taskId,
+        });
+
+        // 插入到画布
+        await insertImageFromUrl(board, stableUrl);
+
+        // 关闭编辑器
+        setImageEditorVisible(false);
+        setImageEditorUrl('');
+      } catch (error) {
+        console.error('Failed to insert edited image:', error);
+      }
+    },
+    [board]
+  );
+
+  // Handle close
+  const handleClose = useCallback(() => {
+    onClose?.();
+  }, [onClose]);
+
+  // 计算各 Tab 的显示数量（已加载数据中的分类 + 未加载的估算）
+  // 全部数量使用 totalCount（来自 SW），其他分类使用已加载数据的数量
+  const displayTotalCount = totalCount > 0 ? totalCount : tasks.length;
+  const taskRetentionHint =
+    '这里只显示最近 100 个任务，更早的任务会自动移到“历史”中继续保留。';
+  const allTabLabel = (
+    <HoverTip content={taskRetentionHint}>
+      <span>全部 ({displayTotalCount})</span>
+    </HoverTip>
+  );
+  const archivedTabLabel =
+    archivedCount === null ? '历史' : `历史 (${archivedCount})`;
+  const allLoadedText =
+    totalCount >= 100
+      ? `已加载最近 ${totalCount} 个任务，较早任务已移至“历史”`
+      : `已加载全部 ${totalCount} 个任务`;
+
+  // Filter section with tabs and filters
+  const filterSection = (
+    <div className="task-queue-panel__filters-container">
+      <Tabs
+        value={activeTab}
+        onChange={(value) => setActiveTab(value as string)}
+      >
+        <TabPanel value="all" label={allTabLabel} />
+        <TabPanel value="active" label={`生成中 (${activeTasks.length})`} />
+        <TabPanel value="failed" label={`失败 (${failedTasks.length})`} />
+        <TabPanel
+          value="completed"
+          label={`已完成 (${completedTasks.length})`}
+        />
+        <TabPanel value="archived" label={archivedTabLabel} />
+      </Tabs>
+
+      <div
+        className={`task-queue-panel__filters${
+          activeTab === 'archived' ? ' task-queue-panel__filters--archived' : ''
+        }`}
+      >
+        {/* Simplified Type Filters */}
+        {activeTab !== 'archived' && (
+          <div className="task-queue-panel__type-filters">
+            <HoverTip content={`全部 (${typeCounts.all})`}>
+              <Button
+                size="small"
+                variant="text"
+                shape="square"
+                onClick={() => setTypeFilter('all')}
+                className={
+                  typeFilter === 'all'
+                    ? 'task-queue-panel__filter-btn--active'
+                    : ''
+                }
+              >
+                <FilterIcon size="16px" />
+              </Button>
+            </HoverTip>
+            <HoverTip content={`图片 (${typeCounts.image})`}>
+              <Button
+                size="small"
+                variant="text"
+                shape="square"
+                onClick={() => setTypeFilter('image')}
+                className={
+                  typeFilter === 'image'
+                    ? 'task-queue-panel__filter-btn--active'
+                    : ''
+                }
+              >
+                <ImageIcon size="16px" />
+              </Button>
+            </HoverTip>
+            <HoverTip content={`视频 (${typeCounts.video})`}>
+              <Button
+                size="small"
+                variant="text"
+                shape="square"
+                onClick={() => setTypeFilter('video')}
+                className={
+                  typeFilter === 'video'
+                    ? 'task-queue-panel__filter-btn--active'
+                    : ''
+                }
+              >
+                <VideoIcon size="16px" />
+              </Button>
+            </HoverTip>
+            <HoverTip content={`音频 (${typeCounts.audio})`}>
+              <Button
+                size="small"
+                variant="text"
+                shape="square"
+                onClick={() => setTypeFilter('audio')}
+                className={
+                  typeFilter === 'audio'
+                    ? 'task-queue-panel__filter-btn--active'
+                    : ''
+                }
+              >
+                <Music4 size={16} strokeWidth={1.9} />
+              </Button>
+            </HoverTip>
+            <HoverTip content={`文本 (${typeCounts.text})`}>
+              <Button
+                size="small"
+                variant="text"
+                shape="square"
+                onClick={() => setTypeFilter('text')}
+                className={
+                  typeFilter === 'text'
+                    ? 'task-queue-panel__filter-btn--active'
+                    : ''
+                }
+              >
+                文
+              </Button>
+            </HoverTip>
+            <HoverTip content={`角色 (${typeCounts.character})`}>
+              <Button
+                size="small"
+                variant="text"
+                shape="square"
+                onClick={() => setTypeFilter('character')}
+                className={
+                  typeFilter === 'character'
+                    ? 'task-queue-panel__filter-btn--active'
+                    : ''
+                }
+              >
+                <UserIcon size="16px" />
+              </Button>
+            </HoverTip>
+          </div>
+        )}
+
+        <TaskQueueSearchFilters
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          actions={
+            activeTab !== 'archived' ? (
+              <div className="task-queue-panel__filter-actions">
+                <HoverTip content={selectionMode ? '退出多选' : '批量操作'}>
+                  <Button
+                    size="small"
+                    variant={selectionMode ? 'base' : 'outline'}
+                    theme={selectionMode ? 'primary' : 'default'}
+                    icon={<CheckDoubleIcon />}
+                    data-track="task_click_toggle_selection"
+                    onClick={handleToggleSelectionMode}
+                  >
+                    {selectionMode ? '退出' : '多选'}
+                  </Button>
+                </HoverTip>
+
+                {failedTasks.length > 0 && !selectionMode && (
+                  <HoverTip content="清除失败">
+                    <Button
+                      size="small"
+                      variant="text"
+                      theme="default"
+                      icon={
+                        <DeleteIcon
+                          style={{ color: 'var(--td-text-color-placeholder)' }}
+                        />
+                      }
+                      data-track="task_click_clear_failed"
+                      onClick={() => handleClear('failed')}
+                      className="task-queue-panel__clear-btn"
+                    />
+                  </HoverTip>
+                )}
+              </div>
+            ) : undefined
+          }
+        />
+      </div>
+
+      {/* Batch action bar - shown when in selection mode */}
+      {selectionMode && !isCharacterView && activeTab !== 'archived' && (
+        <div className="task-queue-panel__batch-actions">
+          <div className="task-queue-panel__batch-select">
+            <Checkbox
+              checked={
+                selectedTaskIds.size === filteredTasks.length &&
+                filteredTasks.length > 0
+              }
+              indeterminate={
+                selectedTaskIds.size > 0 &&
+                selectedTaskIds.size < filteredTasks.length
+              }
+              onChange={(checked) =>
+                checked ? handleSelectAll() : handleDeselectAll()
+              }
+            />
+            <span className="task-queue-panel__batch-count">
+              已选 {selectedTaskIds.size} / {filteredTasks.length}
+            </span>
+          </div>
+          <div className="task-queue-panel__batch-buttons">
+            {selectedActiveCount > 0 && (
+              <Button
+                size="small"
+                variant="outline"
+                theme="warning"
+                icon={<PauseCircleIcon />}
+                data-track="task_click_batch_cancel"
+                onClick={handleBatchCancel}
+              >
+                取消 ({selectedActiveCount})
+              </Button>
+            )}
+            {selectedRetryableCount > 0 && (
+              <Button
+                size="small"
+                theme="primary"
+                icon={<RefreshIcon />}
+                data-track="task_click_batch_retry"
+                onClick={handleBatchRetry}
+              >
+                重试 ({selectedRetryableCount})
+              </Button>
+            )}
+            {isConfigured && selectedSyncableCount > 0 && (
+              <HoverTip content="同步选中的任务到云端" placement="bottom">
+                <Button
+                  size="small"
+                  variant="outline"
+                  icon={<CloudUploadIcon />}
+                  data-track="task_click_batch_sync"
+                  onClick={handleBatchSync}
+                  disabled={isSyncing}
+                  loading={isSyncing}
+                >
+                  {isSyncing
+                    ? `${syncProgress}%`
+                    : `同步 (${selectedSyncableCount})`}
+                </Button>
+              </HoverTip>
+            )}
+            <Button
+              size="small"
+              variant="text"
+              theme="default"
+              icon={<DeleteIcon />}
+              data-track="task_click_batch_delete"
+              onClick={handleBatchDelete}
+              disabled={selectedTaskIds.size === 0}
+            >
+              删除 ({selectedTaskIds.size})
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <BaseDrawer
+        isOpen={expanded}
+        onClose={handleClose}
+        title="任务队列"
+        filterSection={filterSection}
+        position="toolbar-right"
+        width="responsive"
+        storageKey={TASK_DRAWER_WIDTH_KEY}
+        pinStorageKey={DRAWER_PIN_KEYS.task}
+        showBackdrop={false}
+        closeOnEsc={false}
+        showCloseButton={true}
+        className="task-queue-panel"
+        contentClassName="task-queue-panel__content"
+        resizable={true}
+        minWidth={320}
+        maxWidth={1024}
+        data-testid="task-queue-panel"
+      >
+        {isCharacterView ? (
+          /* Character List View */
+          <CharacterList showHeader={false} title="" />
+        ) : activeTab === 'archived' ? (
+          /* Archived Task List View */
+          <ArchivedTaskList
+            filters={taskFilters}
+            onPreviewOpen={handlePreviewOpen}
+            onDownload={handleDownload}
+            className="task-queue-panel__list"
+          />
+        ) : (
+          /* Task List View with Virtual Scrolling */
+          <VirtualTaskList
+            tasks={filteredTasks}
+            selectionMode={selectionMode}
+            selectedTaskIds={selectedTaskIds}
+            onSelectionChange={handleSelectionChange}
+            onRetry={handleRetry}
+            onDelete={handleDelete}
+            onDownload={handleDownload}
+            onInsert={handleInsert}
+            onCopy={handleCopy}
+            onEdit={handleEdit}
+            onRegenerate={handleRegenerate}
+            onUpgradeTo2K={handleUpgradeTo2K}
+            onPreviewOpen={handlePreviewOpen}
+            onExtractCharacter={handleExtractCharacter}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={loadMore}
+            totalCount={totalCount}
+            loadedCount={loadedCount}
+            allLoadedText={allLoadedText}
+            allLoadedHint={totalCount >= 100 ? taskRetentionHint : undefined}
+            className="task-queue-panel__list"
+            emptyContent={
+              isLoading ? (
+                <div className="task-queue-panel__empty">
+                  <div className="task-queue-panel__empty-icon">⏳</div>
+                  <div className="task-queue-panel__empty-text">加载中...</div>
+                </div>
+              ) : (
+                <div className="task-queue-panel__empty">
+                  <div className="task-queue-panel__empty-icon">📋</div>
+                  <div className="task-queue-panel__empty-text">
+                    {searchText.trim() || dateRange[0] || dateRange[1]
+                      ? '没有符合筛选条件的任务'
+                      : activeTab === 'all'
+                      ? '暂无任务'
+                      : `暂无${
+                          activeTab === 'active'
+                            ? '生成中'
+                            : activeTab === 'completed'
+                            ? '已完成'
+                            : activeTab === 'failed'
+                            ? '失败'
+                            : '已取消'
+                        }任务`}
+                  </div>
+                </div>
+              )
+            }
+          />
+        )}
+      </BaseDrawer>
+
+      {/* Clear Confirmation Dialog */}
+      <ConfirmDialog
+        open={showClearConfirm}
+        title="确认清除"
+        description={`确定要清除所有${
+          clearType === 'completed' ? '已完成' : '失败'
+        }的任务吗？此操作无法撤销。`}
+        confirmText="清除"
+        cancelText="取消"
+        danger
+        onOpenChange={setShowClearConfirm}
+        onConfirm={confirmClear}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="确认删除"
+        description="确定要删除此任务吗？此操作无法撤销。"
+        confirmText="删除"
+        cancelText="取消"
+        danger
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={confirmDelete}
+      />
+
+      {/* Batch Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showBatchDeleteConfirm}
+        title="确认批量删除"
+        description={`确定要删除选中的 ${selectedTaskIds.size} 个任务吗？此操作无法撤销。`}
+        confirmText="删除"
+        cancelText="取消"
+        danger
+        onOpenChange={setShowBatchDeleteConfirm}
+        onConfirm={confirmBatchDelete}
+      />
+
+      {/* 统一预览 */}
+      <UnifiedMediaViewer
+        visible={previewVisible}
+        items={previewMediaItems}
+        initialMode={previewInitialMode}
+        initialIndex={previewInitialIndex}
+        onClose={handlePreviewClose}
+        showThumbnails={true}
+        onEdit={handlePreviewEdit}
+      />
+
+      {/* 图片编辑器 - 任务场景只支持插入画布和下载 */}
+      {imageEditorVisible && imageEditorUrl && (
+        <ImageEditor
+          visible={imageEditorVisible}
+          imageUrl={imageEditorUrl}
+          showOverwrite={false}
+          onClose={() => {
+            setImageEditorVisible(false);
+            setImageEditorUrl('');
+          }}
+          onInsert={board ? handleEditInsert : undefined}
+        />
+      )}
+
+      {/* Character Create Dialog */}
+      <CharacterCreateDialog
+        visible={!!characterDialogTask}
+        task={characterDialogTask}
+        onClose={() => setCharacterDialogTask(null)}
+        onCreateStart={() => {
+          // Start indicator (API call begins)
+          // console.log('Character creation started');
+        }}
+        onCreateComplete={(characterId) => {
+          // console.log('Character created:', characterId);
+          // Close dialog (don't auto-switch to character view)
+          setCharacterDialogTask(null);
+        }}
+      />
+    </>
+  );
+};

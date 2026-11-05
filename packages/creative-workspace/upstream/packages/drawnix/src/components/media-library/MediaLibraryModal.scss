@@ -1,0 +1,273 @@
+/**
+ * Media Library Modal Styles
+ * 素材库弹窗样式 - WinBox 窗口 + 简洁素雅主题
+ */
+
+@import '../../styles/z-index.scss';
+
+// ========================================
+// WinBox 素材库专用样式 - 素雅风格
+// ========================================
+.winbox-media-library {
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: var(--aitu-ui-shadow-popover, 0 16px 40px rgba(15, 23, 42, 0.14)) !important;
+
+  // 标题栏 - 白色简洁风格
+  .wb-header {
+    background: var(--aitu-ui-surface, #ffffff) !important;
+    border-radius: 12px 12px 0 0;
+    height: 44px;
+    border-bottom: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+  }
+
+  // 标题文字
+  .wb-title {
+    font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--aitu-ui-text-primary, #1e293b);
+    padding: 0 8px 0 12px;
+    display: block !important;
+    min-width: 48px;
+    visibility: visible !important;
+  }
+
+  // 标题栏图标区域
+  .wb-icon-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 4px;
+
+    .wb-icon-content {
+      color: var(--aitu-ui-text-secondary, #64748b);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  // 控制按钮 - 灰黑色风格
+  .wb-min,
+  .wb-max,
+  .wb-full,
+  .wb-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background-size: 14px;
+    filter: invert(1) brightness(0.3);
+    transition: all 0.15s ease-out;
+
+    &:hover {
+      background-color: var(--aitu-ui-brand-softer, rgba(243, 156, 18, 0.06));
+      filter: invert(1) brightness(0.2);
+    }
+  }
+
+  .wb-close:hover {
+    background-color: var(--aitu-ui-danger-soft, rgba(233, 30, 99, 0.08));
+    filter: invert(1) brightness(0.2);
+  }
+
+  // 窗口主体
+  .wb-body {
+    background: var(--aitu-ui-surface, #ffffff);
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  // 内容包装器
+  .winbox-content-wrapper {
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    background: var(--aitu-ui-surface-subtle, #f8fafc) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+  }
+
+  // 聚焦状态
+  &.focus {
+    box-shadow: var(--aitu-ui-shadow-popover, 0 16px 40px rgba(15, 23, 42, 0.14)), 0 0 0 1px var(--aitu-ui-brand-border-soft, rgba(243, 156, 18, 0.28)) !important;
+  }
+
+  // 最大化状态
+  &.max {
+    border-radius: 0 !important;
+    
+    .wb-header {
+      border-radius: 0;
+    }
+    
+    .wb-body {
+      border-radius: 0;
+    }
+  }
+}
+
+// 标题栏内容
+.media-library-header-content {
+  display: flex;
+  align-items: center;
+  color: var(--aitu-ui-text-secondary, #64748b);
+  
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+// ========================================
+// 布局容器 - 无侧边栏，更简洁
+// ========================================
+.media-library-layout {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  background: var(--aitu-ui-surface, #ffffff);
+  overflow: hidden;
+
+  &__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--aitu-ui-surface, #ffffff);
+    min-width: 0;
+  }
+
+  &__inspector {
+    width: 300px;
+    border-left: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+    background: linear-gradient(180deg, var(--aitu-ui-surface, #ffffff) 0%, var(--aitu-ui-surface-subtle, #f8fafc) 100%);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+
+    // 自定义滚动条
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+      border-radius: 3px;
+
+      &:hover {
+        background: var(--aitu-ui-border-hover, rgba(15, 23, 42, 0.18));
+      }
+    }
+  }
+
+  // 响应式布局
+  @media (max-width: 1024px) {
+    &__sidebar {
+      width: 200px;
+      padding: 12px;
+    }
+
+    &__inspector {
+      width: 280px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+
+    &__sidebar {
+      width: 100%;
+      height: auto;
+      max-height: 100px;
+      border-right: none;
+      border-bottom: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+      padding: 10px;
+      overflow-y: auto;
+    }
+
+    &__main {
+      flex: 1;
+      min-height: 0;
+    }
+
+    &__inspector {
+      display: none;
+      width: 100%;
+      height: auto;
+      max-height: 40vh;
+      border-left: none;
+      border-top: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+      min-width: auto;
+    }
+  }
+
+  @media (max-width: 480px) {
+    &__sidebar {
+      max-height: 90px;
+      padding: 8px;
+    }
+  }
+}
+
+// ========================================
+// 移动端详情抽屉
+// ========================================
+.media-library-mobile-drawer {
+  .t-drawer__body {
+    padding: 0;
+    background: var(--aitu-ui-surface-subtle, #f8fafc);
+  }
+
+  .t-drawer__header {
+    border-bottom: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+    padding: 16px 20px;
+    background: var(--aitu-ui-surface, #ffffff);
+    font-weight: 600;
+    color: var(--aitu-ui-text-primary, #1e293b);
+  }
+
+  .t-drawer {
+    border-radius: 20px 20px 0 0;
+  }
+}
+
+// ========================================
+// 响应式 WinBox 调整
+// ========================================
+@media (max-width: 768px) {
+  .winbox-media-library {
+    .wb-header {
+      height: 44px;
+    }
+
+    .wb-title {
+      font-size: 14px;
+    }
+
+    .wb-min,
+    .wb-max,
+    .wb-full,
+    .wb-close {
+      width: 30px;
+      height: 30px;
+      background-size: 12px;
+    }
+
+    .media-library-header-content svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Tuzi Assistant Test",
+  "identifier": "com.tuziswitch.desktop.acceptance",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "兔子助手 · 集成测试",
+        "width": 1200,
+        "height": 800,
+        "visible": false
+      }
+    ]
+  },
+  "bundle": {
+    "createUpdaterArtifacts": false,
+    "windows": {
+      "wix": {
+        "upgradeCode": "8bf582de-0c01-4f65-b338-17ed8d4b95ba"
+      }
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "tuziswitch-test"
+        ]
+      }
+    },
+    "updater": {
+      "endpoints": []
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "url": "http://127.0.0.1:5197/ui04.html?canvas=1&page=creative",
+  "version": "1.5.0",
+  "checks": [
+    "Desktop warm dotted canvas visible: {\"background\":\"rgb(252, 250, 246)\",\"dots\":\"radial-gradient(circle, rgb(216, 206, 191) 0.7px, rgba(0, 0, 0, 0) 0.85px)\"}",
+    "Real PNG dimensions: 200x400 and 400x200 with createImageBitmap disabled",
+    "Prompt popover stays in viewport and Escape closes it at 1440 and 1024 px",
+    "Embedded template downloads with reference image columns",
+    "XLSX import keeps column order and maps images after a blank row",
+    "Production export embeds all three images, then parser re-imports the same row mappings",
+    "Selected export contains exactly one row/two images; insertion disabled without completed results",
+    "Selected-row import enforces capacity, fills only checked rows 1 and 6, and preserves unchecked references",
+    "Production manual insertion adds both completed results to the active canvas with task metadata",
+    "Desktop image overlay displays the inserted images; follow, center-target and keep-original settings can be toggled",
+    "Task history exposes working date filtering and clear controls",
+    "Assistant project/canvas navigation retains results; removed standalone workflow remains absent"
+  ],
+  "pageErrors": [],
+  "nativeBridge": "assistant synthetic IPC fixture",
+  "paidGenerationSubmitted": false,
+  "nativePackageTested": false
+}

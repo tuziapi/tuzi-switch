@@ -16,6 +16,8 @@ permissions:
   contents: read
 
 env:
+  # Creative workspace exceeds the 2 GiB heap default on macOS runners.
+  NODE_OPTIONS: --max-old-space-size=4096
   PNPM_VERSION: "9"
   NODE_VERSION: "20"
   TUZI_SWITCH_RELEASE_REPOSITORY: ${{ github.repository }}
@@ -23,6 +25,7 @@ env:
 
 jobs:
   create-release:
+    if: github.repository != 'AiW520/tuzi-switch'
     runs-on: ubuntu-latest
     permissions:
       contents: write

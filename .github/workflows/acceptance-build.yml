@@ -2,8 +2,6 @@ name: Acceptance installers
 run-name: "Installers · ${{ github.ref_name }} · ${{ github.sha }}"
 
 on:
-  push:
-    branches: [gaizhao]
   workflow_dispatch:
 
 permissions:
@@ -14,11 +12,14 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # Creative workspace exceeds the 2 GiB heap default on macOS runners.
+  NODE_OPTIONS: --max-old-space-size=4096
   TUZI_SWITCH_RELEASE_REPOSITORY: ${{ github.repository }}
   VITE_RELEASE_REPOSITORY: ${{ github.repository }}
 
 jobs:
   verify:
+    if: github.repository == 'AiW520/tuzi-switch'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +30,11 @@ jobs:
         with:
           version: '9'
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build:creative
+      - run: pnpm --filter @tuzi/download-page test
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
+      - run: pnpm test:creative
       - run: python3 -m unittest discover -s src-tauri/resources/builtin-skills/codex-image-render-fallback/scripts -p 'test_*.py'
 
   installers:
@@ -83,6 +87,9 @@ jobs:
       - name: Native regression (host target)
         shell: bash
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
+      - name: Acceptance profile regression
+        shell: bash
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --features isolated-profile acceptance_profile_ -- --test-threads=1
       - name: Isolated MCP service regression
         if: runner.os == 'macOS'
         shell: bash
@@ -94,12 +101,7 @@ jobs:
           BUILD_TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            CONFIG="$(node scripts/tauri-release-config.cjs --unsigned)"
-          else
-            CONFIG="$(node scripts/tauri-release-config.cjs --unsigned --desktop-product-name)"
-          fi
-          pnpm tauri build --target "$BUILD_TARGET" --config "$CONFIG"
+          pnpm tauri build --target "$BUILD_TARGET" --features isolated-profile --config src-tauri/tauri.acceptance.conf.json
       - name: Collect installers and source manifest
         shell: bash
         env:
@@ -123,7 +125,8 @@ jobs:
               'repository': os.environ['GITHUB_REPOSITORY'], 'commit': os.environ['GITHUB_SHA'],
               'run': os.environ['GITHUB_RUN_ID'], 'target': os.environ['BUILD_TARGET'],
               'version': json.loads(pathlib.Path('package.json').read_text(encoding='utf-8'))['version'],
-              'developerSigned': False, 'notarized': False, 'files': files
+              'developerSigned': False, 'notarized': False, 'channel': 'acceptance',
+              'applicationId': 'com.tuziswitch.desktop.acceptance', 'isolatedLocalProfile': True, 'files': files
           }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
       - uses: actions/upload-artifact@v4

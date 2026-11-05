@@ -12,6 +12,8 @@ mod codex_history_migration;
 mod codex_state_db;
 mod commands;
 mod config;
+mod creative_http;
+mod creative_images;
 mod database;
 mod deeplink;
 mod error;
@@ -1262,6 +1264,13 @@ pub fn run() {
             native_tools::native_tool_restore,
             commands::get_providers,
             tuzi_account::account_get_state,
+            creative_http::creative_manual_request,
+            creative_http::check_update_ready,
+            creative_images::creative_image_action,
+            creative_http::creative_manual_cancel,
+            tuzi_account::creative::creative_account_bindings,
+            tuzi_account::creative::creative_account_bind,
+            tuzi_account::creative::creative_account_request,
             tuzi_account::account_take_open_request,
             tuzi_account::business::account_request,
             tuzi_account::business::account_cancel_request,
@@ -1330,6 +1339,7 @@ pub fn run() {
             commands::set_log_config,
             commands::restart_app,
             commands::check_for_updates,
+            commands::get_update_build_info,
             capabilities::get_capability_manifest,
             capabilities::invoke_capability,
             web_hot_update::get_web_hot_update_status,

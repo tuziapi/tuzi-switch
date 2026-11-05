@@ -3,6 +3,7 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Brain,
   Cpu,
   FolderOpen,
@@ -14,6 +15,7 @@ import {
   Shield,
   SlidersHorizontal,
   Sparkles,
+  Palette,
   Wrench,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -25,6 +27,7 @@ import { cn } from "@/lib/utils";
 
 export type TuziView =
   | "account"
+  | "creative"
   | "providers"
   | "settings"
   | "prompts"
@@ -44,7 +47,8 @@ export type TuziView =
   | "auth"
   | "usage";
 
-interface TuziSidebarProps {
+export interface TuziSidebarProps {
+  presentation?: "sidebar" | "menu";
   activeApp: AppId;
   currentView: TuziView | string;
   visibleApps: VisibleApps;
@@ -77,6 +81,7 @@ const APP_NAMES: Record<AppId, string> = {
 };
 
 export function TuziSidebar({
+  presentation = "sidebar",
   activeApp,
   currentView,
   visibleApps,
@@ -112,10 +117,15 @@ export function TuziSidebar({
   return (
     <aside
       className={cn(
-        "fixed left-0 z-30 flex flex-col border-r border-border bg-muted/45 pt-3 transition-[width] duration-200",
-        collapsed ? "w-[68px]" : "w-[228px]",
+        "flex flex-col pt-3",
+        presentation === "menu"
+          ? "w-full min-h-0 flex-1 bg-popover"
+          : "fixed left-0 z-30 border-r border-border bg-muted/45 transition-[width] duration-200",
+        presentation === "sidebar" && (collapsed ? "w-[68px]" : "w-[228px]"),
       )}
-      style={{ top: topOffset, bottom: 0 }}
+      style={
+        presentation === "sidebar" ? { top: topOffset, bottom: 0 } : undefined
+      }
       aria-label="应用导航"
     >
       <div
@@ -139,12 +149,26 @@ export function TuziSidebar({
         )}
         <button
           type="button"
-          aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
-          title={collapsed ? "展开侧栏" : "收起侧栏"}
+          aria-label={
+            presentation === "menu"
+              ? "向上收起导航"
+              : collapsed
+                ? "展开侧栏"
+                : "收起侧栏"
+          }
+          title={
+            presentation === "menu"
+              ? "向上收起导航"
+              : collapsed
+                ? "展开侧栏"
+                : "收起侧栏"
+          }
           onClick={onToggleCollapsed}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
         >
-          {collapsed ? (
+          {presentation === "menu" ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : collapsed ? (
             <ChevronRight className="h-4 w-4" />
           ) : (
             <ChevronLeft className="h-4 w-4" />
@@ -166,6 +190,17 @@ export function TuziSidebar({
             {!collapsed && (
               <span className="truncate">{t("navigation.account")}</span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate("creative")}
+            className={itemClass(currentView === "creative")}
+            title="opentu 创作"
+            aria-label="opentu 创作"
+            aria-current={currentView === "creative" ? "page" : undefined}
+          >
+            <Palette size={18} aria-hidden="true" />
+            {!collapsed && <span className="truncate">opentu 创作</span>}
           </button>
           {!collapsed && (
             <div className="px-3 pb-1 pt-4 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">

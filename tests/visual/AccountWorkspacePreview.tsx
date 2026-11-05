@@ -1,5 +1,5 @@
 // Real account components with synthetic state. No real account connection or writes.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AccountPage } from "@/components/account/AccountPage";
 import { ConfigureTool } from "@/components/account/ConfigureTool";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
@@ -12,8 +12,12 @@ import { isNativeTool, type NativeTool } from "@/lib/api/nativeTools";
 import type { TuziProviderDraft } from "@/lib/tuziToolCompatibility";
 export function AccountWorkspacePreview({
   onNativeSaved,
+  onCreativeConfigure,
+  onStateChange,
 }: {
   onNativeSaved?: (tool: NativeTool, id: string) => void;
+  onCreativeConfigure?: (key: DesktopKey) => void;
+  onStateChange?: (state: AccountState) => void;
 }) {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
@@ -44,6 +48,7 @@ export function AccountWorkspacePreview({
   const blocked = async () => {
     throw new Error("Synthetic preview rejects external actions");
   };
+  useEffect(()=>{onStateChange?.(state);},[connected,onStateChange]);
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
@@ -78,6 +83,7 @@ export function AccountWorkspacePreview({
           <ConfigureTool
             state={state}
             keyDto={configure.key}
+            onCreative={onCreativeConfigure ? key=>{setConfigure(null);onCreativeConfigure(key);} : undefined}
             model={configure.model}
             onClose={() => setConfigure(null)}
             onExisting={(tool, id) => {

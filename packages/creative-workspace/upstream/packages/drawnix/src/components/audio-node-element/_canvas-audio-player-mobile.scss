@@ -1,0 +1,131 @@
+// Mobile responsive styles for CanvasAudioPlayer
+
+@media (max-width: 768px) {
+  .canvas-audio-player__queue-trigger {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .canvas-audio-player__cover {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .canvas-audio-player__meta {
+    align-self: center;
+    padding-top: 0;
+  }
+
+  .canvas-audio-player__title {
+    font-size: 12px;
+  }
+
+  .canvas-audio-player__subtitle {
+    margin-top: 1px;
+  }
+
+  .canvas-audio-player__subtitle-text--desktop {
+    display: none;
+  }
+
+  .canvas-audio-player__subtitle-text--mobile {
+    display: block;
+    font-size: 9px;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    text-transform: none;
+  }
+
+  .canvas-audio-player__controls {
+    justify-self: end;
+    align-self: center;
+    gap: 2px;
+    padding-top: 0;
+  }
+
+  .canvas-audio-player__volume {
+    display: none;
+  }
+
+  .canvas-audio-player__playlist {
+    left: 0;
+    top: calc(100% + 8px);
+    width: 100%;
+    max-height: min(300px, calc(100vh - 180px));
+    border-radius: 16px;
+  }
+
+  .canvas-audio-player__action,
+  .canvas-audio-player__close {
+    width: 30px;
+    height: 30px;
+  }
+
+  .canvas-audio-player__action--primary {
+    width: 34px;
+    height: 34px;
+    box-shadow: 0 6px 14px rgba(37, 99, 235, 0.18);
+  }
+
+  .canvas-audio-player__close {
+    align-self: center;
+    margin-top: 0;
+    color: rgba(71, 85, 105, 0.68);
+  }
+
+  .canvas-audio-player__progress {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    margin-top: -1px;
+    padding: 0 2px 1px 0;
+  }
+
+  .canvas-audio-player__time {
+    display: none;
+  }
+
+  .canvas-audio-player__slider--progress {
+    --canvas-audio-slider-track-height: 3px;
+    --canvas-audio-slider-thumb-size: 10px;
+  }
+
+  .canvas-audio-player__toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .canvas-audio-player__cover {
+    width: 32px;
+    height: 32px;
+  }
+
+  .canvas-audio-player__controls {
+    gap: 1px;
+  }
+
+  .canvas-audio-player__action,
+  .canvas-audio-player__close {
+    width: 28px;
+    height: 28px;
+  }
+
+  .canvas-audio-player__action--primary {
+    width: 32px;
+    height: 32px;
+  }
+
+  .canvas-audio-player__title {
+    font-size: 12px;
+  }
+
+  .canvas-audio-player__subtitle-text--mobile {
+    font-size: 9px;
+  }
+
+  .canvas-audio-player__slider--progress {
+    --canvas-audio-slider-track-height: 2.5px;
+    --canvas-audio-slider-thumb-size: 9px;
+  }
+}

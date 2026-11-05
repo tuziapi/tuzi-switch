@@ -1,0 +1,49 @@
+.prompt-textarea-wrapper {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  overflow: visible;
+}
+
+.prompt-textarea-wrapper .form-textarea {
+  padding-right: 64px;
+  padding-bottom: 56px;
+}
+
+.prompt-optimize-button {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border, #d9d9d9);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--color-text-placeholder, #999);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  transition: all 0.2s ease;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.prompt-optimize-button:hover:not(:disabled) {
+  color: #f39c12;
+  border-color: rgba(243, 156, 18, 0.55);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.18);
+}
+
+.prompt-optimize-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .prompt-optimize-button {
+    right: 4px;
+    bottom: 4px;
+  }
+}

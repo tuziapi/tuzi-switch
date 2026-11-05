@@ -1,0 +1,15 @@
+@import '../../styles/z-index.scss';
+
+.Dialog-overlay {
+    background: rgba(#121212, 0.2);
+    display: grid;
+    place-items: center;
+    z-index: $z-dialog; // Layer 5: Modals
+}
+
+.Dialog {
+    margin: 15px;
+    background-color: white;
+    padding: 15px;
+    border-radius: 4px;
+}

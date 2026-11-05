@@ -22,6 +22,7 @@ describe("checkForUpdate", () => {
     checkMock.mockReset();
     getVersionMock.mockReset();
     invokeMock.mockReset();
+    invokeMock.mockResolvedValue({ channel: "stable" });
     getVersionMock.mockResolvedValue("1.1.26");
   });
 
@@ -86,3 +87,57 @@ function mockLatestRelease() {
     }),
   );
 }
+
+describe("signed integrated release channel", () => {
+  beforeEach(() => {
+    invokeMock.mockResolvedValue({
+      channel: "stable",
+      repository: "AiW520/tuzi-switch",
+    });
+    getVersionMock.mockResolvedValue("1.5.2");
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  it("uses signed native updater and downloads separately from installation", async () => {
+    const download = vi.fn(async (cb) => {
+        cb({ event: "Progress", data: { chunkLength: 20 } });
+      }),
+      install = vi.fn(),
+      both = vi.fn();
+    checkMock.mockResolvedValue({
+      version: "1.5.3",
+      download,
+      install,
+      downloadAndInstall: both,
+    });
+    const { checkForUpdate } = await import("@/lib/updater");
+    const result = await checkForUpdate();
+    expect(result.status).toBe("available");
+    if (result.status === "available") {
+      const cb = vi.fn();
+      await result.update.download!(cb);
+      expect(cb).toHaveBeenCalledWith({ event: "Progress", downloaded: 20 });
+      expect(install).not.toHaveBeenCalled();
+      await result.update.install!();
+      expect(install).toHaveBeenCalledOnce();
+    }
+    expect(both).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "open_external",
+      expect.anything(),
+    );
+  });
+  it("does not turn a network/manifest error into browser download", async () => {
+    checkMock.mockRejectedValue(Error("invalid manifest"));
+    const { checkForUpdate } = await import("@/lib/updater");
+    await expect(checkForUpdate()).rejects.toThrow("invalid manifest");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("accepts no update without browser fallback", async () => {
+    checkMock.mockResolvedValue(null);
+    const { checkForUpdate } = await import("@/lib/updater");
+    expect(await checkForUpdate()).toEqual({ status: "up-to-date" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

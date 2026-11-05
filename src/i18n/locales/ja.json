@@ -759,6 +759,14 @@
     "browsePlaceholderHermes": "例: /home/<your-username>/.hermes",
     "browseDirectory": "ディレクトリを選択",
     "resetDefault": "デフォルトに戻す（保存後に反映）",
+    "updateNoticeTitle": "兔子助手の新しいバージョン",
+    "acceptanceUpdateNotice": "opentu テスト版。GitHub にログインしてダウンロード。",
+    "downloadUpdate": "更新をダウンロード",
+    "updateLater": "後で",
+    "manualUpdateHint": "ブラウザーでインストーラーをダウンロードし、インストール後にアプリを開いてください。",
+    "manualUpdateDescription": "現在: {{current}}。新しいバージョン: {{version}}。ブラウザーでダウンロードして手動でインストールしてください。",
+    "acceptanceUpdateHint": "opentu を含む未署名テスト版です。GitHub にログインしてダウンロードし、解凍後 Tuzi Assistant Test をインストールしてください。作業を先に保存してください。",
+    "updateDownloadFailed": "更新のダウンロードを開けませんでした。更新を再確認してください。",
     "checkForUpdates": "アップデートを確認",
     "updateTo": "v{{version}} に更新",
     "updating": "更新中...",
@@ -901,7 +909,9 @@
     "unifyCodexHistoryRestoreCompleted": "バックアップから公式セッション履歴を復元しました（セッションファイル {{files}} 件、インデックス {{rows}} 行）",
     "unifyCodexHistoryRestoreFailed": "公式セッション履歴の復元に失敗しました。もう一度お試しください",
     "unifyCodexHistoryRestoreNothing": "現在の Codex ディレクトリに復元可能な移行バックアップはありません",
-    "unifyCodexHistoryRestoreSkippedToggleOn": "統一セッション履歴が再度有効化されたため、復元をスキップしました"
+    "unifyCodexHistoryRestoreSkippedToggleOn": "統一セッション履歴が再度有効化されたため、復元をスキップしました",
+    "inAppUpdateHint": "アプリ内でダウンロードし、完了後に再起動して更新できます。",
+    "restartAndUpdate": "再起動して更新"
   },
   "apps": {
     "claude": "Claude",

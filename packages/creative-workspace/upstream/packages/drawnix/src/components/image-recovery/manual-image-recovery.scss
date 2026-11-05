@@ -1,0 +1,14 @@
+.manual-image-recovery-dialog.t-dialog__ctx.t-dialog__ctx--fixed {
+  z-index: 11020 !important;
+}
+
+.manual-image-recovery {
+  display: grid;
+  gap: 12px;
+  label { display: grid; gap: 5px; }
+  input, select { width: 100%; min-height: 36px; padding: 6px 8px; border: 1px solid var(--td-border-level-2-color); border-radius: 4px; background: var(--td-bg-color-container); color: var(--td-text-color-primary); }
+  p { margin: 0; }
+  &__results { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  &__result { display: grid; gap: 6px; }
+  img { width: 100%; max-height: 300px; object-fit: contain; }
+}

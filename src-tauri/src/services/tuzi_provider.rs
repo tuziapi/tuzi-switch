@@ -1479,6 +1479,101 @@ mod tests {
 
     #[test]
     #[serial]
+    fn ordinary_codex_add_preserves_legacy_orphan_endpoints() {
+        let _home = Home::new();
+        let state = state();
+        {
+            let conn = state.db.conn.lock().unwrap();
+            conn.execute_batch(
+                "PRAGMA foreign_keys=OFF;
+                INSERT INTO provider_endpoints(provider_id,app_type,url,added_at)
+                VALUES ('synthetic-deleted','codex','https://orphan.invalid/v1',1);
+                PRAGMA foreign_keys=ON;",
+            )
+            .unwrap();
+        }
+        let provider = ordinary_codex("ORPHANADD", "sk-synthetic-add");
+        super::super::ProviderService::add(&state, AppType::Codex, provider.clone(), false)
+            .unwrap();
+        assert!(state
+            .db
+            .get_provider_by_id(&provider.id, "codex")
+            .unwrap()
+            .is_some());
+        let conn = state.db.conn.lock().unwrap();
+        assert_eq!(
+            conn.query_row(
+                "SELECT count(*) FROM provider_endpoints WHERE provider_id='synthetic-deleted'",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            1
+        );
+        assert_eq!(
+            conn.query_row("PRAGMA foreign_keys", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        assert!(conn.execute("INSERT INTO provider_endpoints(provider_id,app_type,url) VALUES ('new-missing','codex','https://invalid.invalid')", []).is_err());
+    }
+
+    #[test]
+    #[serial]
+    fn ordinary_codex_endpoint_rollback_preserves_legacy_orphans() {
+        let _home = Home::new();
+        let state = state();
+        let provider = ordinary_codex("ORPHANROLLBACK", "sk-synthetic-rollback");
+        state.db.save_provider("codex", &provider).unwrap();
+        state
+            .db
+            .add_custom_endpoint("codex", &provider.id, "https://before.invalid/v1")
+            .unwrap();
+        {
+            let conn = state.db.conn.lock().unwrap();
+            conn.execute_batch(
+                "PRAGMA foreign_keys=OFF;
+                INSERT INTO provider_endpoints(provider_id,app_type,url,added_at)
+                VALUES ('synthetic-deleted','codex','https://orphan.invalid/v1',1);
+                PRAGMA foreign_keys=ON;",
+            )
+            .unwrap();
+        }
+        let before = db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap();
+        let result: Result<(), AppError> = codex_transaction::run(&state, &provider, || {
+            state
+                .db
+                .remove_custom_endpoint("codex", &provider.id, "https://before.invalid/v1")?;
+            state
+                .db
+                .add_custom_endpoint("codex", &provider.id, "https://after.invalid/v1")?;
+            let added = ordinary_codex("ORPHANNEW", "sk-synthetic-new");
+            state.db.save_provider("codex", &added)?;
+            state
+                .db
+                .add_custom_endpoint("codex", &added.id, "https://new.invalid/v1")?;
+            Err(AppError::Config(
+                "synthetic failure after endpoint writes".into(),
+            ))
+        });
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("synthetic failure after endpoint writes"));
+        assert_eq!(
+            db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap(),
+            before
+        );
+        let conn = state.db.conn.lock().unwrap();
+        assert_eq!(
+            conn.query_row("PRAGMA foreign_keys", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    #[serial]
     fn ordinary_codex_add_update_switch_compensate_each_file_write_failure() {
         for operation in ["add", "update", "switch"] {
             let mut failures = 0;

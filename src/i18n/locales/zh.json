@@ -759,6 +759,14 @@
     "browsePlaceholderHermes": "例如：/home/<你的用户名>/.hermes",
     "browseDirectory": "浏览目录",
     "resetDefault": "恢复默认目录（需保存后生效）",
+    "updateNoticeTitle": "兔子助手有新版本",
+    "acceptanceUpdateNotice": "含 opentu 的测试包，登录 GitHub 后下载。",
+    "downloadUpdate": "下载更新",
+    "updateLater": "稍后提醒",
+    "manualUpdateHint": "可在浏览器下载安装包，完成安装后再打开兔子助手。",
+    "manualUpdateDescription": "当前版本 {{current}}，新版本 {{version}}。点击后在浏览器下载并手动安装。",
+    "acceptanceUpdateHint": "含 opentu 的集成测试包，未签名。需要登录 GitHub 下载，解压后安装 Tuzi Assistant Test；请先保存创作任务。",
+    "updateDownloadFailed": "打开更新下载失败，请重新检查更新后重试。",
     "checkForUpdates": "检查更新",
     "updateTo": "更新到 v{{version}}",
     "updating": "更新中...",
@@ -906,7 +914,9 @@
     "unifyCodexHistoryRestoreCompleted": "已按备份还原官方会话历史（{{files}} 个会话文件、{{rows}} 条索引记录）",
     "unifyCodexHistoryRestoreFailed": "还原官方会话历史失败，请重试",
     "unifyCodexHistoryRestoreNothing": "当前 Codex 目录没有可恢复的迁移备份",
-    "unifyCodexHistoryRestoreSkippedToggleOn": "统一会话历史开关已重新开启，已跳过还原"
+    "unifyCodexHistoryRestoreSkippedToggleOn": "统一会话历史开关已重新开启，已跳过还原",
+    "inAppUpdateHint": "应用内下载安装，下载完成后可选择重启更新。",
+    "restartAndUpdate": "重启并更新"
   },
   "apps": {
     "claude": "Claude",

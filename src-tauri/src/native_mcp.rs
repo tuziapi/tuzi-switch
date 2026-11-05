@@ -27,7 +27,7 @@ impl NativeMcpTool {
             Self::Pi => home.join(".pi/agent/mcp.json"),
             Self::Mcode => home.join(".minimax/mcp.json"),
         };
-        #[cfg(not(feature = "local-preview"))]
+        #[cfg(not(feature = "isolated-profile"))]
         {
             let vars: &[&str] = match self {
                 Self::Grok => &[],

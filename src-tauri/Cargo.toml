@@ -1,6 +1,6 @@
 [package]
 name = "tu-zi-switch"
-version = "1.4.2"
+version = "1.5.4"
 description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI - tuzi switch"
 authors = ["lkj020626-lgtm"]
 license = "MIT"
@@ -18,7 +18,9 @@ doctest = false
 [features]
 default = []
 test-hooks = []
-local-preview = []
+# Isolate user data without enabling debug-only loopback fixtures.
+isolated-profile = []
+local-preview = ["isolated-profile"]
 
 [build-dependencies]
 tauri-build = { version = "2.4.0", features = [] }
@@ -42,6 +44,7 @@ toml = "0.8"
 toml_edit = "0.22"
 reqwest = { version = "0.12", features = ["rustls-tls", "json", "stream", "socks"] }
 arboard = "3.6"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
 flate2 = "1"
 tar = "0.4"
 brotli = "7"
