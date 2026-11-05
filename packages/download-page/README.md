@@ -23,3 +23,9 @@ Umami `switch_download_click` 仅记录 platform/version，包含 MSI、Mac Inte
 正式仓库沿用 `src-tauri/tauri.conf.json` 中的原公钥与 `TAURI_SIGNING_PRIVATE_KEY` / 可选 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。测试仓库使用 `scripts/aiw520-updater.pub` 及 `TUZI_UPDATER_PRIVATE_KEY`，不互相兜底。构建前签署合成文件验证密钥配对；不重置、替换或打印真实密钥。GitHub Pages 的 Source 须由管理员设为 GitHub Actions，且 github-pages 环境须允许版本标签；流水线在公开安装文件前检查 Pages Source。
 
 测试渠道已安装客户端不自动转入正式渠道；用户手动安装正式版，保留原数据。正式版使用完整安装更新，保留但不加载旧界面热更新缓存。新正式 Release 尚未存在时完整 `pnpm build:download` 应拒绝生成下载清单；可用 `pnpm --filter @tuzi/download-page exec vite build` 验证页面编译，但该产物缺少已发布安装文件清单，不能当作可用的公开下载页。
+
+### v1.5.5 手动交付补充（2026-11-05）
+
+用户随后明确要求“不需要签名，直接构建就好”。本次从正式源码构建未签名安装包，公开下载页设置 `VITE_MANUAL_INSTALL_ONLY=true`，显示手动安装说明；该变量省略时默认不显示此说明。客户端保留原正式公钥及验签，不生成 unsigned latest.json，也不复制测试密钥。标准签名流水线保留供后续版本使用，本次通过已验证产物手动发布。
+
+正式仓库 Pages 当前仍使用 main 根目录，因此本次将本地编译并核实真实 Release 元数据的静态页面提交至根目录，由现有 Pages 流程部署；不依赖已被计费锁定的自定义发布 runner。源码链接固定至对应页面源码提交，完整客户端源码附件保留于正式 Release。将来恢复 Actions 发布时应删除这份根目录快照，避免两种发布方式并行维护。
