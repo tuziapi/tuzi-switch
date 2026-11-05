@@ -1,6 +1,7 @@
 import { checkAcceptanceUpdate, getUpdateBuildInfo } from "./acceptanceUpdater";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { checkInstallerUpdate } from "./installerUpdater";
 
 // 可选导入：在未注册插件或非 Tauri 环境下，调用时会抛错，外层需做兜底
 // 我们按需加载并在运行时捕获错误，避免构建期类型问题
@@ -226,7 +227,15 @@ export async function checkForUpdate(
     "Get current app version timed out",
   ).catch(() => "");
 
-  const integratedChannel = build.repository === "AiW520/tuzi-switch";
+  // Official unsigned releases advertise manual installers independently of
+  // the signed updater manifest. Opening a download still requires a click.
+  if (build.repository === "tuziapi/tuzi-switch")
+    return checkInstallerUpdate(build, currentVersion, timeout);
+
+  const integratedChannel = [
+    "tuziapi/tuzi-switch",
+    "AiW520/tuzi-switch",
+  ].includes(build.repository);
 
   let update: Update | null;
   try {

@@ -28,7 +28,8 @@ export function UpdateBadge({ className = "" }: UpdateBadgeProps) {
       title={title}
       aria-label={title}
       onClick={() => {
-        if (updateHandle?.manual) void downloadUpdate();
+        if (updateHandle?.manual && updateInfo.channel !== "stable")
+          void downloadUpdate();
         else openUpdateDialog();
       }}
       className={`h-8 w-8 rounded-full text-green-600 dark:text-green-400 ${className}`}

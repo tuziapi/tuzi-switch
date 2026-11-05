@@ -167,6 +167,16 @@ export async function downloadMediaFile(
     });
   }
 
+  if (isVirtualMediaUrl(normalizedUrl)) {
+    // Read the original cache directly; a missing service worker may return app HTML.
+    return smartDownload([{
+      url: normalizedUrl,
+      type: fallbackName === 'audio' ? 'audio' : fallbackName === 'video' ? 'video' : 'image',
+      filename,
+      audioMetadata,
+    }]);
+  }
+
   if (fallbackName === 'audio') {
     return runSingleDownloadWithFallback(normalizedUrl, async () => {
       const response = await fetch(normalizedUrl, {

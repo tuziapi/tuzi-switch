@@ -1,3 +1,7 @@
+import {
+  setWorkZoneRenderedSize,
+  clearWorkZoneRenderedSize,
+} from './workzone-transforms';
 /**
  * WorkZone 插件
  *
@@ -49,10 +53,30 @@ function isWorkZoneCardVisible(): boolean {
 /**
  * WorkZone 元素组件
  */
-export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, PlaitBoard> {
+export class WorkZoneComponent extends CommonElementFlavour<
+  PlaitWorkZone,
+  PlaitBoard
+> {
   private g: SVGGElement | null = null;
   private container: HTMLElement | SVGGElement | null = null;
   private reactRoot: Root | null = null;
+  private destroyed = false;
+  private handleSizeChange = (size: {
+    width: number;
+    height: number;
+  }): void => {
+    if (
+      this.destroyed ||
+      !setWorkZoneRenderedSize(this.board, this.element.id, size)
+    )
+      return;
+    this.updateForeignObjectLayout(this.element);
+    this.activeGenerator.processDrawing(
+      this.element,
+      PlaitBoard.getActiveHost(this.board),
+      { selected: this.selected }
+    );
+  };
 
   activeGenerator!: ActiveGenerator<PlaitWorkZone>;
 
@@ -62,7 +86,7 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     // 创建选中状态生成器
     this.activeGenerator = createActiveGenerator(this.board, {
       getRectangle: (element: PlaitWorkZone) => {
-        return getWorkZoneVisualRectangle(element);
+        return getWorkZoneVisualRectangle(element, this.board);
       },
       getStrokeWidth: () => 2,
       getStrokeOpacity: () => 1,
@@ -76,7 +100,10 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     this.renderContent();
 
     // 监听全局可见性变化事件
-    window.addEventListener(WORKZONE_VISIBILITY_EVENT, this.handleVisibilityChange);
+    window.addEventListener(
+      WORKZONE_VISIBILITY_EVENT,
+      this.handleVisibilityChange
+    );
   }
 
   /**
@@ -84,7 +111,7 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
    */
   private createSVGStructure(): void {
     const rect = RectangleClient.getRectangleByPoints(this.element.points);
-    const visualRect = getWorkZoneVisualRectangle(this.element);
+    const visualRect = getWorkZoneVisualRectangle(this.element, this.board);
 
     // 创建 SVG group
     this.g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -114,7 +141,10 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     foreignObject.style.pointerEvents = 'auto';
 
     // 创建 HTML 容器（需要在 XHTML 命名空间中）
-    this.container = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+    this.container = document.createElementNS(
+      'http://www.w3.org/1999/xhtml',
+      'div'
+    );
     this.container.style.width = '100%';
     this.container.style.height = '100%';
     this.container.style.pointerEvents = 'auto';
@@ -125,7 +155,9 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     // 应用缩放以保持内容视觉大小恒定
     this.container.style.width = `${rect.width}px`;
     this.container.style.height = `${rect.height}px`;
-    this.container.style.transform = `scale(${getWorkZoneRenderScale(this.element)})`;
+    this.container.style.transform = `scale(${getWorkZoneRenderScale(
+      this.element
+    )})`;
     this.container.style.transformOrigin = 'top left';
 
     foreignObject.appendChild(this.container);
@@ -159,7 +191,11 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     };
 
     // 通过 WorkZoneTransforms 更新工作流
-    WorkZoneTransforms.updateWorkflow(this.board, this.element.id, updatedWorkflow);
+    WorkZoneTransforms.updateWorkflow(
+      this.board,
+      this.element.id,
+      updatedWorkflow
+    );
   };
 
   /**
@@ -182,7 +218,10 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
   /**
    * 处理工作流重试（从失败步骤开始）
    */
-  private handleRetry = async (workflow: WorkflowMessageData, stepIndex: number): Promise<void> => {
+  private handleRetry = async (
+    workflow: WorkflowMessageData,
+    stepIndex: number
+  ): Promise<void> => {
     const executeRetry = (this.board as any).__executeWorkflowRetry;
     if (executeRetry) {
       // 传入当前 WorkZone 的 element ID，以便重试时同步更新
@@ -196,7 +235,7 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     if (!this.g) return;
 
     const rect = RectangleClient.getRectangleByPoints(element.points);
-    const visualRect = getWorkZoneVisualRectangle(element);
+    const visualRect = getWorkZoneVisualRectangle(element, this.board);
     const foreignObject = this.g.querySelector('foreignObject');
 
     if (foreignObject) {
@@ -213,7 +252,9 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     if (this.container) {
       this.container.style.width = `${rect.width}px`;
       this.container.style.height = `${rect.height}px`;
-      this.container.style.transform = `scale(${getWorkZoneRenderScale(element)})`;
+      this.container.style.transform = `scale(${getWorkZoneRenderScale(
+        element
+      )})`;
     }
   }
 
@@ -229,10 +270,13 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
     // 创建 React root
     this.reactRoot = createRoot(this.container);
     this.reactRoot.render(
-      React.createElement(ToolProviderWrapper as any, { board: this.board },
+      React.createElement(
+        ToolProviderWrapper as any,
+        { board: this.board },
         React.createElement(WorkZoneContent as any, {
           workflow: this.element.workflow,
           nativeSize: isNativeRenderEnvironment() ? RectangleClient.getRectangleByPoints(this.element.points) : undefined,
+          onSizeChange: this.handleSizeChange,
           onDelete: this.handleDelete,
           onWorkflowStateChange: this.handleWorkflowStateChange,
           onRetry: this.handleRetry,
@@ -256,10 +300,13 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
       // 重新渲染 React 内容（workflow 数据可能变化）
       if (this.reactRoot) {
         this.reactRoot.render(
-          React.createElement(ToolProviderWrapper as any, { board: this.board },
+          React.createElement(
+            ToolProviderWrapper as any,
+            { board: this.board },
             React.createElement(WorkZoneContent as any, {
               workflow: value.element.workflow,
               nativeSize: isNativeRenderEnvironment() ? RectangleClient.getRectangleByPoints(value.element.points) : undefined,
+              onSizeChange: this.handleSizeChange,
               onDelete: this.handleDelete,
               onWorkflowStateChange: this.handleWorkflowStateChange,
               onRetry: this.handleRetry,
@@ -282,7 +329,12 @@ export class WorkZoneComponent extends CommonElementFlavour<PlaitWorkZone, Plait
    * 销毁
    */
   destroy(): void {
-    window.removeEventListener(WORKZONE_VISIBILITY_EVENT, this.handleVisibilityChange);
+    this.destroyed = true;
+    clearWorkZoneRenderedSize(this.board, this.element.id);
+    window.removeEventListener(
+      WORKZONE_VISIBILITY_EVENT,
+      this.handleVisibilityChange
+    );
 
     // 先从 DOM 中移除 SVG 元素（同步）
     if (this.g && this.g.parentNode) {
@@ -333,7 +385,7 @@ export const withWorkZone: PlaitPlugin = (board: PlaitBoard) => {
   // 注册 getRectangle
   board.getRectangle = (element: PlaitElement) => {
     if (isWorkZoneElement(element)) {
-      return getWorkZoneVisualRectangle(element);
+      return getWorkZoneVisualRectangle(element, board);
     }
     return getRectangle(element);
   };
@@ -341,7 +393,7 @@ export const withWorkZone: PlaitPlugin = (board: PlaitBoard) => {
   // 注册 isHit
   board.isHit = (element: PlaitElement, point: Point) => {
     if (isWorkZoneElement(element)) {
-      const rect = getWorkZoneVisualRectangle(element);
+      const rect = getWorkZoneVisualRectangle(element, board);
       const [x, y] = point;
       return (
         x >= rect.x &&
@@ -356,7 +408,7 @@ export const withWorkZone: PlaitPlugin = (board: PlaitBoard) => {
   // 注册 isRectangleHit
   board.isRectangleHit = (element: PlaitElement, selection: Selection) => {
     if (isWorkZoneElement(element)) {
-      const rect = getWorkZoneVisualRectangle(element as PlaitWorkZone);
+      const rect = getWorkZoneVisualRectangle(element as PlaitWorkZone, board);
       const selectionRect = RectangleClient.getRectangleByPoints([
         selection.anchor,
         selection.focus,

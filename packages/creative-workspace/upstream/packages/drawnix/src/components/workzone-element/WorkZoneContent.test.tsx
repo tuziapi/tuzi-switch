@@ -1,3 +1,4 @@
+import { setAssistantAccount } from '../../services/assistant-account';
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
@@ -42,4 +43,24 @@ describe.each(['video', 'audio', 'text'] as const)('%s canvas task presentation'
     fireEvent.click(screen.getByRole('button', { name: '删除' })); expect(onDelete).toHaveBeenCalledOnce();
     view.unmount(); expect(mocks.subscribers.size).toBe(0);
   });
+});
+
+
+it('keeps video API request IDs visible and copyable in the native SVG card', async () => {
+  const copyText = vi.fn().mockResolvedValue(undefined);
+  setAssistantAccount({ state: { status: 'disconnected' }, copyText } as unknown as NonNullable<Parameters<typeof setAssistantAccount>[0]>);
+  const source = workflow('video');
+  const onSizeChange = vi.fn();
+  try {
+    render(<svg><WorkZoneContent workflow={source} nativeSize={{ width: 400, height: 260 }} onSizeChange={onSizeChange} /></svg>);
+    const task = { id: 'task-1', type: TaskType.VIDEO, status: TaskStatus.FAILED, apiRequestId: 'api-original-126',
+      params: { workflowId: source.id, model: 'synthetic-video' }, createdAt: Date.now(),
+      error: { code: 'FAILED', message: '合成失败', details: { requestId: 'upstream-other-id' } } } as Task;
+    act(() => { mocks.tasks = [task]; mocks.subscribers.forEach(f => f({ task })); });
+    expect(screen.getByText('api-original-126')).toBeTruthy();
+    expect(screen.queryByText('upstream-other-id')).toBeNull();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '复制 全部错误信息' })));
+    expect(copyText).toHaveBeenCalledWith(expect.stringContaining('Request ID：api-original-126'));
+    expect(onSizeChange.mock.lastCall?.[0].height).toBeGreaterThan(260);
+  } finally { setAssistantAccount(undefined); }
 });

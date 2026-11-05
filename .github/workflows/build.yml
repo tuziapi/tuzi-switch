@@ -1,10 +1,7 @@
-name: Build & Release
+name: Legacy release (retired)
 run-name: "release: ${{ github.ref_name }}"
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -25,7 +22,7 @@ env:
 
 jobs:
   create-release:
-    if: github.repository != 'AiW520/tuzi-switch'
+    if: false # Retired: unified-release.yml owns all new releases.
     runs-on: ubuntu-latest
     permissions:
       contents: write

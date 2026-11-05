@@ -1,81 +1,49 @@
 #!/usr/bin/env bash
+# Compatibility entry point. Install only verified official release assets.
 set -euo pipefail
-
+umask 077
 REPO="${TUZI_SWITCH_REPO:-tuziapi/tuzi-switch}"
 TAG="${TUZI_SWITCH_TAG:-latest}"
+[[ "$REPO" == tuziapi/tuzi-switch ]] || { echo 'Only tuziapi/tuzi-switch is supported.' >&2; exit 1; }
 TMP_DIR="$(mktemp -d)"
-
-cleanup() {
-  rm -rf "$TMP_DIR"
-}
-trap cleanup EXIT
-
-OS="$(uname -s)"
-ARCH="$(uname -m)"
-
-case "$OS" in
+trap 'rm -rf "$TMP_DIR"' EXIT
+fetch() { curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fL "$@"; }
+case "$(uname -s)" in
   Darwin)
-    case "$ARCH" in
-      arm64|aarch64) FILE="tuzi-switch-macos-aarch64.dmg" ;;
-      x86_64)        echo "macOS x86_64 installer is not published yet." >&2; exit 1 ;;
-      *)             echo "Unsupported macOS arch: $ARCH" >&2; exit 1 ;;
-    esac
+    fetch https://tuziapi.github.io/tuzi-switch/install.sh -o "$TMP_DIR/install.sh"
+    if [[ "$TAG" == latest ]]; then
+      # The official bootstrap selects its published version and checks hashes.
+      env -u TUZI_SWITCH_TAG /bin/bash "$TMP_DIR/install.sh" "$@"
+    else
+      /bin/bash "$TMP_DIR/install.sh" --version "$TAG" "$@"
+    fi
     ;;
   Linux)
-    case "$ARCH" in
-      x86_64|amd64)  FILE="tuzi-switch-linux-x86_64.AppImage" ;;
-      aarch64|arm64) echo "Linux aarch64 installer is not published yet." >&2; exit 1 ;;
-      *)             echo "Unsupported Linux arch: $ARCH" >&2; exit 1 ;;
-    esac
-    ;;
-  *)
-    echo "Unsupported OS: $OS" >&2
-    exit 1
-    ;;
-esac
-
-if [[ "$TAG" == "latest" ]]; then
-  DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${FILE}"
-else
-  DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${FILE}"
-fi
-
-echo "Downloading $FILE ..."
-if ! curl -fL "$DOWNLOAD_URL" -o "$TMP_DIR/$FILE"; then
-  MIRROR_URL="https://mirror.ghproxy.com/${DOWNLOAD_URL}"
-  echo "Primary download failed, retrying via mirror ..."
-  curl -fL "$MIRROR_URL" -o "$TMP_DIR/$FILE"
-fi
-
-case "$(echo "$FILE" | tr '[:upper:]' '[:lower:]')" in
-  *.dmg)
-    MOUNT_DIR="$(mktemp -d)"
-    hdiutil attach "$TMP_DIR/$FILE" -mountpoint "$MOUNT_DIR" -nobrowse -quiet
-    app_path="$(find "$MOUNT_DIR" -name '*.app' -maxdepth 1 | head -n 1)"
-    if [[ -z "${app_path:-}" ]]; then
-      hdiutil detach "$MOUNT_DIR" -quiet || true
-      echo "No .app found in DMG" >&2
-      exit 1
+    VERIFY_ONLY=false
+    if [[ $# == 1 && "$1" == --verify-only ]]; then VERIFY_ONLY=true;
+    elif [[ $# != 0 ]]; then echo 'Linux accepts only --verify-only.' >&2; exit 1; fi
+    case "$(uname -m)" in x86_64|amd64) ;; *) echo 'Only Linux x86_64 is published.' >&2; exit 1 ;; esac
+    if [[ "$TAG" == latest ]]; then
+      RELEASE_URL=$(fetch -s -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest")
+      [[ "$RELEASE_URL" == "https://github.com/$REPO/releases/tag/"* ]] || exit 1
+      TAG=${RELEASE_URL##*/}
     fi
-    dest_dir="/Applications"
-    [[ ! -w "$dest_dir" ]] && dest_dir="$HOME/Applications"
-    mkdir -p "$dest_dir"
-    app_name="$(basename "$app_path")"
-    rm -rf "$dest_dir/$app_name"
-    ditto "$app_path" "$dest_dir/$app_name"
-    hdiutil detach "$MOUNT_DIR" -quiet || true
-    xattr -dr com.apple.quarantine "$dest_dir/$app_name" 2>/dev/null || true
-    echo "Installed to $dest_dir/$app_name"
+    [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release version.' >&2; exit 1; }
+    FILE=tuzi-assistant-linux-x64.AppImage
+    URL="https://github.com/$REPO/releases/download/$TAG"
+    fetch "$URL/SHA256SUMS" -o "$TMP_DIR/SHA256SUMS"
+    fetch "$URL/$FILE" -o "$TMP_DIR/$FILE"
+    awk -v file="$FILE" '$2 == file && length($1) == 64 && $1 !~ /[^a-f0-9]/ {print; n++} END {if(n != 1) exit 1}' "$TMP_DIR/SHA256SUMS" > "$TMP_DIR/selected.sha256"
+    (cd "$TMP_DIR" && sha256sum -c selected.sha256)
+    if $VERIFY_ONLY; then printf 'Verified official %s %s\n' "$TAG" "$FILE"; exit 0; fi
+    INSTALL_ROOT="$HOME/.local/share/tuzi-switch"
+    BIN_ROOT="$HOME/.local/bin"
+    mkdir -p "$INSTALL_ROOT" "$BIN_ROOT"
+    STAGED=$(mktemp "$INSTALL_ROOT/.tuzi-download.XXXXXX")
+    if ! install -m 755 "$TMP_DIR/$FILE" "$STAGED"; then rm -f "$STAGED"; exit 1; fi
+    mv -f "$STAGED" "$INSTALL_ROOT/tuzi-switch.AppImage"
+    ln -sfn "$INSTALL_ROOT/tuzi-switch.AppImage" "$BIN_ROOT/tuzi-switch"
+    printf 'Installed official %s to %s\n' "$TAG" "$INSTALL_ROOT/tuzi-switch.AppImage"
     ;;
-  *.appimage)
-    install_root="$HOME/.local/share/tuzi-switch"
-    bin_root="$HOME/.local/bin"
-    install_path="$install_root/tuzi-switch.AppImage"
-    mkdir -p "$install_root" "$bin_root"
-    mv "$TMP_DIR/$FILE" "$install_path"
-    chmod +x "$install_path"
-    ln -sf "$install_path" "$bin_root/tuzi-switch"
-    echo "Installed to $install_path"
-    echo "Symlink created at $bin_root/tuzi-switch"
-    ;;
+  *) echo 'Supported systems: macOS and Linux x86_64.' >&2; exit 1 ;;
 esac

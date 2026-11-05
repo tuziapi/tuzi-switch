@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { UpdateBadge } from "@/components/UpdateBadge";
 const state = {
   hasUpdate: true,
-  updateInfo: { availableVersion: "1.5.2" },
+  updateInfo: { availableVersion: "1.5.2", channel: "acceptance" },
   updateHandle: { manual: false },
   openUpdateDialog: vi.fn(),
   downloadUpdate: vi.fn(),
@@ -16,6 +16,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.hasUpdate = true;
   state.updateHandle.manual = false;
+  state.updateInfo.channel = "acceptance";
 });
 describe("global update entry", () => {
   it("opens shared dialog instead of starting an independent install", () => {
@@ -36,4 +37,13 @@ describe("global update entry", () => {
     render(<UpdateBadge />);
     expect(screen.queryByRole("button")).toBeNull();
   });
+});
+
+it("opens official manual release notes before downloading", () => {
+  state.updateHandle.manual = true;
+  state.updateInfo.channel = "stable";
+  render(<UpdateBadge />);
+  fireEvent.click(screen.getByRole("button"));
+  expect(state.openUpdateDialog).toHaveBeenCalledOnce();
+  expect(state.downloadUpdate).not.toHaveBeenCalled();
 });
