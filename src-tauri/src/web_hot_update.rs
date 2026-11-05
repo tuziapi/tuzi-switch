@@ -58,7 +58,10 @@ struct WebArchive {
 // Never load cached standalone renderer assets from an older installation.
 fn full_installer_updates_only() -> bool {
     cfg!(feature = "isolated-profile")
-        || crate::release_repository::RELEASE_REPOSITORY == "AiW520/tuzi-switch"
+        || matches!(
+            crate::release_repository::RELEASE_REPOSITORY,
+            "tuziapi/tuzi-switch" | "AiW520/tuzi-switch"
+        )
 }
 
 pub fn register_protocol<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
@@ -560,6 +563,16 @@ fn text_response(status: http::StatusCode, message: &str) -> http::Response<Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn integrated_channels_keep_the_bundled_creative_workspace() {
+        if matches!(
+            crate::release_repository::RELEASE_REPOSITORY,
+            "tuziapi/tuzi-switch" | "AiW520/tuzi-switch"
+        ) {
+            assert!(full_installer_updates_only());
+        }
+    }
 
     #[test]
     fn cached_web_assets_follow_the_installed_native_version() {

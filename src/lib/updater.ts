@@ -226,7 +226,10 @@ export async function checkForUpdate(
     "Get current app version timed out",
   ).catch(() => "");
 
-  const integratedChannel = build.repository === "AiW520/tuzi-switch";
+  const integratedChannel = [
+    "tuziapi/tuzi-switch",
+    "AiW520/tuzi-switch",
+  ].includes(build.repository);
 
   let update: Update | null;
   try {

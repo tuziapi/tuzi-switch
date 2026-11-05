@@ -19,13 +19,13 @@ import {
   Unplug,
 } from "lucide-react";
 import { FaApple, FaLinux, FaWindows } from "react-icons/fa6";
-import { isStableRelease } from "./stableRelease";
+import { isStableRelease, repository } from "./stableRelease";
 import "./tuzi-download.css";
 
 const pageSource =
   import.meta.env.VITE_DOWNLOAD_SOURCE_URL ||
-  "https://github.com/AiW520/tuzi-switch/tree/main/packages/download-page";
-const SOURCE = "https://github.com/AiW520/tuzi-switch";
+  `https://github.com/${repository}/tree/main/packages/download-page`;
+const SOURCE = `https://github.com/${repository}`;
 const screens = [
   {
     id: "tools",
