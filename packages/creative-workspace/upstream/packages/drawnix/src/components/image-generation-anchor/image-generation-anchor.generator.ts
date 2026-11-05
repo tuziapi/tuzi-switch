@@ -1,3 +1,5 @@
+import { createNativeFailureDetails, getNativeFailureLayout, type FailureRows } from '../shared/NativeGenerationFailureDetails';
+import { getImageFailureDetails } from '../../utils/image-error-details';
 import { RectangleClient, type PlaitBoard } from '@plait/core';
 import { createRoot, type Root } from 'react-dom/client';
 import React, { useEffect } from 'react';
@@ -49,10 +51,10 @@ function truncateText(value: string, maxLength: number): string {
 function NativeAnchorState({ board, element, render }: {
   board: PlaitBoard;
   element: PlaitImageGenerationAnchor;
-  render: (element: PlaitImageGenerationAnchor) => void;
+  render: (element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>) => void;
 }) {
-  const { nextPatch } = useImageGenerationAnchorController({ board, anchor: element });
-  useEffect(() => { render({ ...element, ...nextPatch }); }, [element, nextPatch, render]);
+  const { nextPatch, viewModel } = useImageGenerationAnchorController({ board, anchor: element });
+  useEffect(() => { render({ ...element, ...nextPatch }, viewModel.failureDetails); }, [element, nextPatch, viewModel.failureDetails, render]);
   return null;
 }
 
@@ -64,6 +66,7 @@ export class ImageGenerationAnchorGenerator {
   private reactRoot: Root | null = null;
   private desktopFallback: SVGGElement | null = null;
   private renderTimer: number | null = null;
+  onSizeChange?: (size: { width: number; height: number }) => void;
 
   processDrawing(
     element: PlaitImageGenerationAnchor,
@@ -112,8 +115,8 @@ export class ImageGenerationAnchorGenerator {
     }));
   }
 
-  private renderNativeState = (element: PlaitImageGenerationAnchor): void => {
-    this.renderDesktopFallback(element);
+  private renderNativeState = (element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>): void => {
+    this.renderDesktopFallback(element, failure);
   };
 
   private createDesktopFallback(
@@ -130,7 +133,7 @@ export class ImageGenerationAnchorGenerator {
     this.renderDesktopFallback(element);
   }
 
-  private renderDesktopFallback(element: PlaitImageGenerationAnchor): void {
+  private renderDesktopFallback(element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>): void {
     const host = this.desktopFallback;
     if (!host) {
       return;
@@ -139,6 +142,37 @@ export class ImageGenerationAnchorGenerator {
     host.replaceChildren();
     const rect = RectangleClient.getRectangleByPoints(element.points);
     const isFailed = element.phase === 'failed';
+    if (isFailed) {
+      const details = failure || getImageFailureDetails(undefined, element.error || '生成失败');
+      const rows: FailureRows = [
+        ['阶段', '生成失败'],
+        ['模型', details.modelId || '未记录'],
+        ['错误', details.error || '生成失败'],
+        ['Request ID', details.requestId || '未获取到'],
+        ...(details.remoteId ? [['任务 ID', details.remoteId] as const] : []),
+        ['本地任务', element.primaryTaskId || element.taskIds[0] || '未获取到'],
+        ['工作流', element.workflowId || '未获取到'],
+        ['形态', element.anchorType || '—'],
+        ['过渡', element.transitionMode || '—'],
+      ];
+      const width = Math.max(320, rect.width);
+      const height = Math.max(rect.height, getNativeFailureLayout(rows, width).height + 60);
+      host.setAttribute('aria-label', '生成失败');
+      const background = createSvgElement('rect');
+      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 10, fill: '#fffafa', stroke: '#e5caca' })) background.setAttribute(key, String(value));
+      host.appendChild(background);
+      const content = createNativeFailureDetails(rows, width);
+      content.setAttribute('transform', `translate(${rect.x} ${rect.y + 12})`);
+      host.appendChild(content);
+      this.appendDesktopActionButton(host, rect.x + 16, rect.y + height - 40, 92, 28, '重试', '#9c4b4b', () => {
+        const taskId = element.primaryTaskId || element.taskIds[0];
+        window.dispatchEvent(new CustomEvent(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, { detail: { taskId, anchorId: element.id } }));
+      });
+      this.appendDesktopActionButton(host, rect.x + 120, rect.y + height - 40, 92, 28, '关闭', '#7f1d1d', () => this.board.deleteFragment([element]), true);
+      this.onSizeChange?.({ width, height });
+      return;
+    }
+    this.onSizeChange?.({ width: rect.width, height: rect.height });
     const isCompleted = element.phase === 'completed';
     const isLoadingImage = element.phase === 'developing' || element.phase === 'inserting';
     const accent = isFailed ? '#c15a5a' : '#25755e';
@@ -540,6 +574,7 @@ export class ImageGenerationAnchorGenerator {
         board: this.board,
         element,
         selected,
+        onSizeChange: this.onSizeChange,
       })
     );
   }

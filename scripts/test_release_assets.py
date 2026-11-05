@@ -14,7 +14,7 @@ class ReleaseAssetsTest(unittest.TestCase):
             root = Path(temp)
             (root/'package.json').write_text('{"version":"1.5.0"}')
             assets = root/'assets'; assets.mkdir()
-            env = dict(os.environ, GITHUB_REPOSITORY='AiW520/tuzi-switch', GITHUB_SHA='a'*40, GITHUB_RUN_ID='123')
+            env = dict(os.environ, GITHUB_REPOSITORY='tuziapi/tuzi-switch', GITHUB_SHA='a'*40, GITHUB_RUN_ID='123')
             for name, target, suffixes in [('macos-arm64','aarch64-apple-darwin',['.dmg']),('macos-x64','x86_64-apple-darwin',['.dmg']),('windows-x64','x86_64-pc-windows-msvc',['.exe','.msi']),('linux-x64','x86_64-unknown-linux-gnu',['.AppImage','.deb','.rpm'])]:
                 files=[]
                 for ext in suffixes:
@@ -27,6 +27,10 @@ class ReleaseAssetsTest(unittest.TestCase):
     def test_complete(self): self.assertEqual(self.run_case(),0)
     def test_tampering(self): self.assertNotEqual(self.run_case(lambda a:(a/'tuzi-assistant-macos-arm64.dmg').write_bytes(b'changed')),0)
     def test_missing(self): self.assertNotEqual(self.run_case(lambda a:(a/'tuzi-assistant-windows-x64.exe').unlink()),0)
+    def test_wrong_repository(self):
+        def change(a):
+            p=a/'manifest-macos-arm64.json'; m=json.loads(p.read_text());m['repository']='AiW520/tuzi-switch';p.write_text(json.dumps(m))
+        self.assertNotEqual(self.run_case(change),0)
     def test_test_identity(self):
         def change(a):
             p=a/'manifest-macos-arm64.json'; m=json.loads(p.read_text());m['applicationId']='com.tuziswitch.desktop.acceptance';p.write_text(json.dumps(m))

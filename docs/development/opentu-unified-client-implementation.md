@@ -114,3 +114,14 @@ pnpm preview:creative
 ## UC-P02 后续：统一账户来源
 
 用户已批准统一账户关联并要求复用原设置。顶部入口、手动/账户来源、原生受限请求和本地验证已经接入，字段与真实联调限制见 [UC-P02](opentu-account-binding-implementation.md)；本文件此前未实施账户关联的文字保留为 UC-P01 当时状态，不代表最新本地代码。
+
+
+## UC-UI-04 项目首页精简（2026-11-05）
+
+按用户截图明确要求，删除“OPENTU · 创作空间”介绍区及执行新建操作的“自由画布”大卡片。“我的项目”成为内容首行，搜索与“新建项目”集中在标题右侧；窄窗口允许换行，深色模式补齐主按钮对比度。清除对应废弃样式，项目服务、数据结构与顶部自由画布导航不变。
+
+基于 `85ea34b0` 在 `codex/opentu-projects-layout` 本地实现，仅修改宿主包装层 JSX/CSS；未修改嵌入上游源码，无需重建来源补丁。
+
+验证：`pnpm typecheck`、`pnpm build:creative`、`git diff --check` 通过。复用 `tests/visual/creative-smoke.cjs`，临时补充搜索和标题栏布局检查（`/tmp/opentu-projects-layout-smoke.cjs`）。Chrome 隔离上下文通过新建、多项目、重命名、搜索、画布绘制/IndexedDB 保存、导航往返及刷新恢复；1360/1024/900/600/390 宽度无横向溢出，明暗主题 1360/900/600/390 标题栏无控件重叠。页面脚本错误为 0。截图与结果：`/tmp/opentu-projects-layout-qa/`。
+
+以上采用真实创作模块和本地 IndexedDB、合成宿主 IPC，阻断全部外部网络；不代表原生安装包验收。本轮未构建安装包、未推送或发布。

@@ -1,9 +1,12 @@
+import { readGenerationApiError, toGenerationTaskError } from '../../utils/generation-error-details';
 /**
  * Media Executor (Main Thread)
  *
  * 主线程媒体执行器，直接调用 API 并将结果写入 IndexedDB。
  * 所有 LLM API 请求在主线程直接发起（不经过 Service Worker）。
  */
+
+import { toImageTaskError, createImageApiError } from '../../utils/image-error-details';
 
 import type {
   IMediaExecutor,
@@ -522,20 +525,17 @@ export class FallbackMediaExecutor implements IMediaExecutor {
           duration,
           errorMessage: errorBody.substring(0, 500),
         });
-        throw Object.assign(
-          new Error(
-            `Image generation failed: ${
-              response.status
-            } - ${errorBody.substring(0, 200)}`
-          ),
-          { httpStatus: response.status }
-        );
+        throw createImageApiError(errorBody, response, '图片生成失败', { modelId: modelName });
       }
 
       const data = await readProviderResponseJson<Record<string, unknown>>(
         response
       );
       options?.onProgress?.({ progress: 80, phase: 'downloading' });
+
+      if (data.error || data.status === 'failed') {
+        throw createImageApiError(data, response, '图片生成失败', { modelId: modelName });
+      }
       const result = parseImageResponse(data);
       assertCurrentExecutionAttempt(options);
       const duration = Date.now() - startTime;
@@ -638,14 +638,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
       }
       await taskStorageWriter.failTask(
         taskId,
-        {
-          code: error.code || 'IMAGE_GENERATION_ERROR',
-          message: friendlyMessage,
-          details: {
-            originalError: originalMessage,
-            timestamp: Date.now(),
-          },
-        },
+        toImageTaskError(error, error.code || 'IMAGE_GENERATION_ERROR', modelName),
         requestId,
         createStorageWriteGuard(options)
       );
@@ -834,14 +827,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
       });
       await taskStorageWriter.failTask(
         taskId,
-        {
-          code: error.code || 'ASYNC_IMAGE_GENERATION_ERROR',
-          message: friendlyMessage,
-          details: {
-            originalError: originalMessage,
-            timestamp: Date.now(),
-          },
-        },
+        toImageTaskError(error, error.code || 'ASYNC_IMAGE_GENERATION_ERROR', params.model),
         submissionRequestId,
         createStorageWriteGuard(options)
       );
@@ -958,6 +944,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
         params: params.params,
         defaultModel: model,
       };
+      let apiRequestId: string | undefined;
       const videoId = await submitVideoGeneration(
         {
           prompt,
@@ -968,7 +955,10 @@ export class FallbackMediaExecutor implements IMediaExecutor {
           params: params.params,
         },
         videoApiConfig,
-        options?.signal
+        options?.signal,
+        (id) => {
+          apiRequestId = id;
+        }
       );
       assertCurrentExecutionAttempt(options);
 
@@ -993,7 +983,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
         videoId,
         invocationRoute,
         undefined,
-        createStorageWriteGuard(options)
+        { ...createStorageWriteGuard(options), apiRequestId }
       );
       assertCurrentExecutionAttempt(options);
 
@@ -1103,10 +1093,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
       });
       await taskStorageWriter.failTask(
         taskId,
-        {
-          code: error.code || 'VIDEO_GENERATION_ERROR',
-          message: friendlyMessage,
-        },
+        toGenerationTaskError(error, error.code || 'VIDEO_GENERATION_ERROR', params.model),
         undefined,
         createStorageWriteGuard(options)
       );
@@ -1259,6 +1246,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
       const elapsedTime = Date.now() - startTime;
       const originalMessage = error.message || 'AI analyze failed';
       const friendlyMessage = formatFriendlyError(error, 'analyze');
+      error.diagnostics = { modelId: modelName, ...error.diagnostics };
 
       // 检测认证错误，触发设置弹窗
       const credentialErrorKind = classifyApiCredentialError(error);
@@ -1436,15 +1424,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
             })
             .then(async (response) => {
               if (!response.ok) {
-                const rawError = await readResponseTextPreview(response);
-                const providerMessage = extractProviderErrorMessage(rawError);
-                throw new Error(
-                  `HTTP ${response.status}: ${
-                    providerMessage ||
-                    response.statusText ||
-                    'Text generation failed'
-                  }`
-                );
+                throw await readGenerationApiError(response, 'Text generation failed', {modelId: modelName}, readResponseTextPreview);
               }
               const rawText = await response.text();
               let payload: unknown = rawText;
@@ -1513,15 +1493,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
             })
             .then(async (response) => {
               if (!response.ok) {
-                const rawError = await readResponseTextPreview(response);
-                const providerMessage = extractProviderErrorMessage(rawError);
-                throw new Error(
-                  `HTTP ${response.status}: ${
-                    providerMessage ||
-                    response.statusText ||
-                    'Text generation failed'
-                  }`
-                );
+                throw await readGenerationApiError(response, 'Text generation failed', {modelId: modelName}, readResponseTextPreview);
               }
               return response.json();
             });
@@ -1565,10 +1537,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
         const friendlyMessage = formatFriendlyError(error, 'text');
         await taskStorageWriter.failTask(
           taskId,
-          {
-            code: 'TEXT_GENERATION_FAILED',
-            message: friendlyMessage,
-          },
+          toGenerationTaskError(error, 'TEXT_GENERATION_FAILED', modelName),
           undefined,
           createStorageWriteGuard(options)
         );
@@ -1577,6 +1546,7 @@ export class FallbackMediaExecutor implements IMediaExecutor {
         duration: Date.now() - startTime,
         errorMessage: error?.message || 'Text generation failed',
       });
+      error.diagnostics = { modelId: modelName, ...error.diagnostics };
       throw safeTextError(error, [config.textConfig.apiKey, ...Object.values(config.textConfig.extraHeaders || {})]);
     }
   }
@@ -1803,10 +1773,10 @@ export class FallbackMediaExecutor implements IMediaExecutor {
         error
       );
 
-      const errorInfo = {
-        code: error.code || 'RESUME_FAILED',
-        message: error.message || 'Failed to resume task',
-      };
+      const errorInfo = toImageTaskError(error, error.code || 'RESUME_FAILED', task.params.model);
+      if (task.apiRequestId) {
+        errorInfo.details.apiRequestId = task.apiRequestId;
+      }
 
       if (onTaskUpdate) {
         onTaskUpdate(task.id, TaskStatus.FAILED, { error: errorInfo });

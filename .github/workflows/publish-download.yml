@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.repository == 'AiW520/tuzi-switch' && github.ref == 'refs/heads/main'
+    if: (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -29,6 +29,7 @@ jobs:
       - run: pnpm build:download
         env:
           GH_TOKEN: ${{ github.token }}
+          VITE_RELEASE_REPOSITORY: ${{ github.repository }}
           VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
       - name: Package site and corresponding source
         run: |

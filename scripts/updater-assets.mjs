@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import os from "node:os";
+import channels from "./release-channel.cjs";
 import path from "node:path";
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -71,6 +73,43 @@ function walk(dir) {
       e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)],
     );
 }
+function signArtifact(target) {
+  const keyPath = process.env.TAURI_SIGNING_PRIVATE_KEY;
+  if (!keyPath || !fs.existsSync(keyPath))
+    throw Error("Missing updater signing key file");
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(root, "node_modules/@tauri-apps/cli/tauri.js"),
+      "signer",
+      "sign",
+      "-f",
+      keyPath,
+      "-p",
+      process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? "",
+      target,
+    ],
+    { stdio: "pipe" },
+  );
+  if (result.status !== 0)
+    throw Error(`Could not sign ${path.basename(target)}`);
+  verifySignature(
+    fs.readFileSync(target),
+    fs.readFileSync(`${target}.sig`, "utf8"),
+    channels.releaseChannel().pubkey,
+  );
+}
+export function checkKey() {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "tuzi-signing-check-"));
+  try {
+    const probe = path.join(temp, "synthetic.txt");
+    fs.writeFileSync(probe, "SYNTHETIC release key verification\n");
+    signArtifact(probe);
+    console.log("Signing key matches this repository's existing public key");
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+}
 export function collect(source, output, name) {
   if (!targets[name]) throw Error("Unknown build target");
   for (const ext of Object.values(targets[name])) {
@@ -82,43 +121,18 @@ export function collect(source, output, name) {
         throw Error(`Expected one updater artifact: ${name}${ext}`);
       fs.copyFileSync(candidates[0], target);
     }
-    const keyPath = process.env.TAURI_SIGNING_PRIVATE_KEY;
-    if (!keyPath || !fs.existsSync(keyPath))
-      throw Error("Missing updater signing key file");
-    const result = spawnSync(
-      process.execPath,
-      [
-        path.join(root, "node_modules/@tauri-apps/cli/tauri.js"),
-        "signer",
-        "sign",
-        "-f",
-        keyPath,
-        "-p",
-        process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? "",
-        target,
-      ],
-      { stdio: "pipe" },
-    );
-    if (result.status !== 0) throw Error(`Could not sign ${filename}`);
-    verifySignature(
-      fs.readFileSync(target),
-      fs.readFileSync(`${target}.sig`, "utf8"),
-      fs.readFileSync(path.join(root, "scripts/aiw520-updater.pub"), "utf8"),
-    );
+    signArtifact(target);
   }
 }
 export function manifest(dir, env = process.env) {
   const version = JSON.parse(
     fs.readFileSync(path.join(root, "package.json"), "utf8"),
   ).version;
-  const tag = env.GITHUB_REF_NAME;
-  if (tag !== `v${version}` || env.GITHUB_REPOSITORY !== "AiW520/tuzi-switch")
+  const tag = env.RELEASE_TAG || env.GITHUB_REF_NAME;
+  const { repository, pubkey } = channels.releaseChannel(env);
+  if (tag !== `v${version}` || env.GITHUB_REPOSITORY !== repository)
     throw Error("Invalid updater release identity");
   const platforms = {};
-  const pubkey = fs.readFileSync(
-    path.join(root, "scripts/aiw520-updater.pub"),
-    "utf8",
-  );
   for (const [name, entries] of Object.entries(targets)) {
     const source = JSON.parse(
       fs.readFileSync(path.join(dir, `manifest-${name}.json`), "utf8"),
@@ -165,7 +179,8 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  if (process.argv[2] === "collect") collect(...process.argv.slice(3));
+  if (process.argv[2] === "check-key") checkKey();
+  else if (process.argv[2] === "collect") collect(...process.argv.slice(3));
   else if (process.argv[2] === "manifest") manifest(process.argv[3]);
   else throw Error("Expected collect or manifest");
 }

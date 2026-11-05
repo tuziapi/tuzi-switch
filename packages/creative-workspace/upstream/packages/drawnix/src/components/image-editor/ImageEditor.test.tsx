@@ -354,9 +354,12 @@ describe('combined image editor', () => {
     expect(mocks.draw).toHaveBeenCalledWith(image, 0, 0, 100, 80);
     expect(container.querySelector('img')).toBeNull();
     expect(container.innerHTML).not.toContain('blob:revoked');
-    expect(
-      container.querySelector('.crop-canvas__crop-image canvas')
-    ).not.toBeNull();
+    // The crop area is initialized by an effect after the base preview mounts.
+    await waitFor(() =>
+      expect(
+        container.querySelector('.crop-canvas__crop-image canvas')
+      ).not.toBeNull()
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '滤镜' }));
     expect(screen.getByRole('img', { name: 'Preview' }).tagName).toBe('CANVAS');

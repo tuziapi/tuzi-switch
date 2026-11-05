@@ -14,18 +14,18 @@
     Inter,
     -apple-system,
     BlinkMacSystemFont,
-    'Segoe UI',
-    'PingFang SC',
-    'Microsoft YaHei',
+    "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
     sans-serif;
   line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   text-align: left;
 }
-.tuzi-download[data-theme='dark'],
-body[theme-mode='dark'] .tuzi-download:not([data-theme='light']),
-html.dark .tuzi-download:not([data-theme='light']) {
+.tuzi-download[data-theme="dark"],
+body[theme-mode="dark"] .tuzi-download:not([data-theme="light"]),
+html.dark .tuzi-download:not([data-theme="light"]) {
   --td-bg: #1c1d1b;
   --td-card: #242522;
   --td-soft: #30312c;
@@ -359,7 +359,7 @@ html.dark .tuzi-download:not([data-theme='light']) {
   background: none;
   color: var(--td-muted);
 }
-.tuzi-download .td-screen-tabs button[aria-selected='true'] {
+.tuzi-download .td-screen-tabs button[aria-selected="true"] {
   background: var(--td-card);
   color: var(--td-text);
   box-shadow: 0 2px 5px #00000008;
@@ -581,7 +581,7 @@ html.dark .tuzi-download:not([data-theme='light']) {
   border-radius: 7px;
   font-size: 12px;
 }
-.tuzi-download .td-platform-picker button[aria-pressed='true'] {
+.tuzi-download .td-platform-picker button[aria-pressed="true"] {
   background: #f1efe7;
   color: #30332a;
 }
@@ -669,31 +669,58 @@ html.dark .tuzi-download:not([data-theme='light']) {
   margin-top: 12px;
 }
 .tuzi-download .td-terminal {
-  grid-column: 1/-1;
-  border-top: 1px solid #505347;
-  padding-top: 20px;
-}
-.tuzi-download .td-terminal summary {
-  list-style: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: #c0c2b5;
+  border: 1px solid #d7b993;
+  border-radius: 10px;
+  background: #282c23;
+  padding: 16px;
+  margin-bottom: 24px;
 }
 .tuzi-download summary::-webkit-details-marker {
   display: none;
 }
-.tuzi-download .td-terminal summary > svg:last-child {
-  margin-left: auto;
-}
-.tuzi-download .td-terminal > div {
+.tuzi-download .td-terminal-heading,
+.tuzi-download .td-terminal-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin: 24px 0 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+}
+.tuzi-download .td-terminal-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #f2d9bb;
+  font-weight: 600;
+  font-size: 15px;
+}
+.tuzi-download .td-terminal-command {
+  margin-top: 16px;
+}
+.tuzi-download .td-terminal-heading > small {
+  color: #aeb2a3;
   font-size: 11px;
+  font-weight: normal;
+}
+.tuzi-download .td-terminal-footer {
+  color: #c0c2b5;
+  font-size: 11px;
+}
+.tuzi-download .td-terminal-footer p {
+  margin: 0;
+}
+.tuzi-download .td-terminal-footer a {
+  color: inherit;
+  text-decoration: underline;
+}
+.tuzi-download .td-copy-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .tuzi-download .td-terminal button {
   background: none;
@@ -708,7 +735,8 @@ html.dark .tuzi-download:not([data-theme='light']) {
 .tuzi-download .td-terminal pre {
   background: #22251f;
   border: 1px solid #505347;
-  padding: 16px;
+  padding: 10px;
+  margin: 8px 0 12px;
   border-radius: 8px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -718,6 +746,8 @@ html.dark .tuzi-download:not([data-theme='light']) {
 .tuzi-download .td-terminal > p {
   font-size: 11px;
   min-height: 18px;
+  line-height: 1.8;
+  color: #c0c2b5;
 }
 .tuzi-download .td-faq {
   display: grid;
@@ -1066,6 +1096,18 @@ html.dark .tuzi-download:not([data-theme='light']) {
 }
 
 /* Original desktop app icon; preserve the existing blue rabbit identity. */
-.tuzi-download .td-logo, .tuzi-download .td-art-center { overflow: hidden; }
-.tuzi-download .td-brand-icon { display: block; width: 100%; height: 100%; object-fit: contain; }
-.tuzi-download .td-footer .td-brand-icon { width: 24px; height: 24px; border-radius: 7px; }
+.tuzi-download .td-logo,
+.tuzi-download .td-art-center {
+  overflow: hidden;
+}
+.tuzi-download .td-brand-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.tuzi-download .td-footer .td-brand-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}

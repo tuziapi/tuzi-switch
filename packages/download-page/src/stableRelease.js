@@ -1,5 +1,15 @@
 /* Copyright (C) 2026 Tuzi. Licensed under AGPL-3.0-or-later. */
-export const repository = "AiW520/tuzi-switch";
+import { isMacosInstaller } from "./macosInstaller.js";
+// Vite injects the same explicit channel used by the metadata build script.
+const buildRepository = import.meta.env?.VITE_RELEASE_REPOSITORY;
+const nodeRepository =
+  typeof process !== "undefined"
+    ? process.env.VITE_RELEASE_REPOSITORY || process.env.GITHUB_REPOSITORY
+    : undefined;
+export const repository =
+  buildRepository || nodeRepository || "tuziapi/tuzi-switch";
+if (!["tuziapi/tuzi-switch", "AiW520/tuzi-switch"].includes(repository))
+  throw Error("Unsupported download repository");
 export const installerFormats = [
   {
     id: "macos",
@@ -62,6 +72,8 @@ export function isStableRelease(r) {
     r.sourceUrl !== `https://github.com/${repository}/releases/tag/${r.tag}` ||
     !Number.isFinite(Date.parse(r.publishedAt)) ||
     r.command !== "" ||
+    (r.macosInstaller !== undefined &&
+      !isMacosInstaller(r.macosInstaller, r)) ||
     !Array.isArray(r.downloads) ||
     r.downloads.length !== installerFormats.length
   )
