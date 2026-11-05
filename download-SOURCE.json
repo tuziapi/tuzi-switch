@@ -57,7 +57,7 @@
   },
   "currentDistribution": {
     "repository": "tuziapi/tuzi-switch",
-    "pageSourceCommit": "db1d263501dcf7ca7fd2ebb53366db596bfa1417",
+    "pageSourceCommit": "d9378b42694144f9da8b05dc838a6bc027deb570",
     "clientSourceCommit": "6bc275a1aa2916b573f5450a694927af2ef7b7fc",
     "release": "v1.5.5",
     "manualInstallOnly": true,

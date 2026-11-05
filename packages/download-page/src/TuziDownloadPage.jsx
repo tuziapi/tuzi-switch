@@ -149,7 +149,7 @@ export function TuziDownloadView({
   const [screen, setScreen] = useState(0);
   const [platform, setPlatform] = useState(detectPlatform);
   const [packageId, setPackageId] = useState("deb");
-  const [copied, setCopied] = useState("");
+  const [copied, setCopied] = useState({});
   const [dark, setDark] = useState(
     () =>
       typeof matchMedia !== "undefined" &&
@@ -157,6 +157,7 @@ export function TuziDownloadView({
   );
   const { release, loading, error, retry } = useRelease();
   const installCommand = macosInstallCommand(release);
+  const pinnedInstallCommand = macosInstallCommand(release, { pinned: true });
   const tracker = useRef(null),
     trackerReady = useRef(false),
     events = useRef([]),
@@ -206,15 +207,15 @@ export function TuziDownloadView({
         tracker.current?.contentWindow?.postMessage(message, location.origin),
       );
   };
-  const copy = async () => {
+  const copy = async (key, command) => {
     try {
-      await navigator.clipboard.writeText(installCommand);
-      setCopied(t("已复制"));
+      await navigator.clipboard.writeText(command);
+      setCopied({ key, message: t("已复制") });
     } catch {
-      setCopied(t("复制失败，请选中命令手动复制"));
+      setCopied({ key, message: t("复制失败，请手动复制") });
     }
     clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied(""), 3500);
+    copyTimer.current = setTimeout(() => setCopied({}), 3500);
   };
   const external = { target: "_blank", rel: "noopener noreferrer" };
   return (
@@ -502,7 +503,7 @@ export function TuziDownloadView({
                 <p className="td-preview-note">
                   {t(
                     installCommand
-                      ? "macOS：可使用下方安装脚本自动识别芯片并安装。手动安装时，请先退出旧版，将 DMG 中的兔子助手拖入“应用程序”并替换。"
+                      ? "macOS：终端安装会自动识别芯片；也可选择下方安装包手动安装。"
                       : "macOS：请先退出旧版，将 DMG 中的兔子助手拖入“应用程序”并替换，再从“应用程序”打开。",
                   )}
                 </p>
@@ -542,6 +543,55 @@ export function TuziDownloadView({
                   <span className="td-format">{selected.format}</span>
                 )}
               </div>
+              {platform === "macos" && installCommand && (
+                <div className="td-terminal">
+                  <div className="td-terminal-heading">
+                    <span className="td-terminal-title">
+                      <Terminal size={18} />
+                      {t("终端一键安装")}
+                    </span>
+                    <small>{t("自动识别 Apple 芯片 / Intel")}</small>
+                  </div>
+                  {[
+                    ["current", t("安装当前版本"), installCommand],
+                    [
+                      "pinned",
+                      `${t("指定版本")} ${release.tag}`,
+                      pinnedInstallCommand,
+                    ],
+                  ].map(([key, label, command]) => (
+                    <div className="td-terminal-command" key={key}>
+                      <div className="td-terminal-heading">
+                        <span>{label}</span>
+                        <button
+                          onClick={() => copy(key, command)}
+                          aria-label={`${t("复制")}${label}`}
+                        >
+                          <Copy size={14} />
+                          {copied.key === key ? copied.message : t("复制命令")}
+                        </button>
+                      </div>
+                      <pre tabIndex={0}>
+                        <code>{command}</code>
+                      </pre>
+                    </div>
+                  ))}
+                  <div className="td-terminal-footer">
+                    <p>
+                      {t("粘贴到终端，按提示确认。当前支持：")} {release.tag}
+                    </p>
+                    <a
+                      href={release.macosInstaller.href}
+                      download={`install-macos-${release.tag}.sh`}
+                    >
+                      {t("查看脚本")}
+                    </a>
+                  </div>
+                  <span className="td-copy-status" role="status">
+                    {copied.message}
+                  </span>
+                </div>
+              )}
               {choices.length > 1 && (
                 <label className="td-package-select">
                   {t(platform === "macos" ? "芯片类型" : "安装格式")}
@@ -600,7 +650,7 @@ export function TuziDownloadView({
                 {platform === "macos"
                   ? t(
                       installCommand
-                        ? "Mac 版未经 Apple 开发者签名或公证。如被系统拦截，可使用下方脚本，在明确确认后仅放行兔子助手。"
+                        ? "Mac 版未经 Apple 开发者签名或公证。如被系统拦截，可使用上方终端安装，确认后仅放行兔子助手。"
                         : "Mac 版未经 Apple 开发者签名或公证，系统可能提示无法验证发布者。",
                     )
                   : t("安装包尚未进行开发者签名，系统可能提示无法验证发布者。")}
@@ -628,36 +678,6 @@ export function TuziDownloadView({
                 <ArrowUpRight size={14} />
               </a>
             </div>
-            {platform === "macos" && installCommand && (
-              <div className="td-terminal">
-                <div className="td-terminal-heading">
-                  <span className="td-terminal-title">
-                    <Terminal size={17} />
-                    {t("macOS 终端安装")}
-                    <small>Apple 芯片 / Intel</small>
-                  </span>
-                  <button onClick={copy}>
-                    <Copy size={14} />
-                    {copied || t("复制命令")}
-                  </button>
-                </div>
-                <pre tabIndex={0}>
-                  <code>{installCommand}</code>
-                </pre>
-                <div className="td-terminal-footer">
-                  <p>{t("粘贴到“终端”运行，按提示确认即可。")}</p>
-                  <a
-                    href={release.macosInstaller.href}
-                    download="install-macos-v1.5.5.sh"
-                  >
-                    {t("查看脚本")}
-                  </a>
-                </div>
-                <span className="td-copy-status" role="status">
-                  {copied}
-                </span>
-              </div>
-            )}
           </section>
           <section
             className="td-faq"

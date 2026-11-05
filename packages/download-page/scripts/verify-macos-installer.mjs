@@ -175,3 +175,102 @@ test("old metadata remains valid without advertising an installer", () => {
   assert.equal(macosInstallCommand(r), "");
   assert.equal(macosInstallCommand(null), "");
 });
+
+test("version routing validates before download and forwards installer flags", async () => {
+  if (repository !== "tuziapi/tuzi-switch") return;
+  const { mkdtemp, writeFile, readFile, rm, access } = await import(
+    "node:fs/promises"
+  );
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { spawnSync } = await import("node:child_process");
+  const { createHash } = await import("node:crypto");
+  const dir = await mkdtemp(join(tmpdir(), "tuzi-version-routing-"));
+  const downloaded = join(dir, "downloaded");
+  const executed = join(dir, "executed");
+  const payload = '#!/bin/bash\nprintf "%s\\n" "$@" > "$EXECUTED"\n';
+  const r = fixture();
+  r.macosInstaller.sha256 = createHash("sha256").update(payload).digest("hex");
+  try {
+    await writeFile(join(dir, "payload"), payload);
+    await writeFile(join(dir, "bootstrap"), macosInstallBootstrap(r));
+    await writeFile(
+      join(dir, "curl"),
+      `#!/bin/bash
+printf downloaded > "$DOWNLOADED"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then cp "$PAYLOAD" "$2"; exit 0; fi
+  shift
+done
+cat "$BOOTSTRAP"
+`,
+      { mode: 0o755 },
+    );
+    const env = {
+      ...process.env,
+      TUZI_SWITCH_TAG: "",
+      PATH: dir + ":/usr/bin:/bin",
+      DOWNLOADED: downloaded,
+      EXECUTED: executed,
+      PAYLOAD: join(dir, "payload"),
+      BOOTSTRAP: join(dir, "bootstrap"),
+    };
+    for (const [args, tag, ok] of [
+      [["--help"], "", true],
+      [["--version", "v1.5.5", "--help"], "", true],
+      [
+        ["--no-open", "--version", "1.5.5", "--install-dir", "/tmp/tuzi test"],
+        "",
+        true,
+      ],
+      [["--help"], "v1.5.5", true],
+      [["--help"], "v1.3.1", false],
+      [["--version", "v1.5.5", "--help"], "v1.3.1", true],
+      [["--version", "v1.3.1"], "", false],
+      [["--version", "$(touch /tmp/tuzi-injection)"], "", false],
+      [["--version", ""], "", false],
+      [["--version"], "", false],
+      [["--version", "--help"], "", false],
+      [["--version", "v1.5.5", "--version", "v1.5.5"], "", false],
+    ]) {
+      await rm(downloaded, { force: true });
+      await rm(executed, { force: true });
+      const result = spawnSync("/bin/bash", [join(dir, "bootstrap"), ...args], {
+        env: { ...env, TUZI_SWITCH_TAG: tag },
+      });
+      assert.equal(
+        result.status === 0,
+        ok,
+        JSON.stringify({ args, tag, stderr: result.stderr.toString() }),
+      );
+      if (ok) {
+        const forwarded = args.filter(
+          (arg, index) =>
+            arg !== "--version" && args[index - 1] !== "--version",
+        );
+        assert.equal(
+          await readFile(executed, "utf8"),
+          forwarded.join("\n") + "\n",
+        );
+      } else {
+        await assert.rejects(access(downloaded));
+        await assert.rejects(access(executed));
+      }
+    }
+    for (const pinned of [false, true]) {
+      const result = spawnSync(
+        "/bin/bash",
+        ["-c", macosInstallCommand(r, { pinned })],
+        { env },
+      );
+      assert.equal(result.status, 0, result.stderr.toString());
+      assert.equal(await readFile(executed, "utf8"), "\n");
+    }
+    assert.match(
+      macosInstallCommand(r, { pinned: true }),
+      /--version v1\.5\.5/,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
