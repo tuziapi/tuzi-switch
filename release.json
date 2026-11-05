@@ -72,5 +72,10 @@
       "bytes": 102889976,
       "sha256": "1ec8b014a8eb7643cb230add438d76cca025c10f470e4b096d39b7d2e5ccee63"
     }
-  ]
+  ],
+  "macosInstaller": {
+    "tag": "v1.5.5",
+    "href": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.5.sh",
+    "sha256": "8246d04a259a83a56286c528525a28f7f6b8c4bed88a63607d8278e854fcc1ed"
+  }
 }
