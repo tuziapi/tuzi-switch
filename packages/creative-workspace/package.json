@@ -8,7 +8,11 @@
       "types": "./src/index.d.ts",
       "default": "./dist/creative.js"
     },
-    "./style.css": "./dist/creative-workspace.css"
+    "./style.css": "./dist/creative-workspace.css",
+    "./model-sync": {
+      "types": "./src/modelSync.d.ts",
+      "default": "./dist/model-sync.js"
+    }
   },
   "scripts": {
     "build": "vite build"

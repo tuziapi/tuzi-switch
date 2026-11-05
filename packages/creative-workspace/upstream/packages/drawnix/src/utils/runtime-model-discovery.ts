@@ -19,6 +19,8 @@ import {
   DEFAULT_VIDEO_MODEL_ID,
   DEFAULT_TEXT_MODEL_ID,
   GPT_IMAGE_25_MODEL_IDS,
+  GPT_IMAGE_26_BASIC_DESCRIPTION,
+  isGPTImage26ModelId,
   GPT_IMAGE_1K_MODEL_IDS,
   GPT_IMAGE_2_MODEL_IDS,
   getStaticModelsByType,
@@ -107,6 +109,10 @@ export interface ManualRuntimeModelInput {
 
 export interface RuntimeModelDiscoveryOptions {
   selectAll?: boolean;
+  /** Upgrade discovery enables only newly returned IDs, preserving deliberate deselections. */
+  selectNew?: boolean;
+  /** Rechecked just before committing a response from a background source. */
+  isCurrent?: () => boolean;
   signal?: AbortSignal;
   /** Supplements returned model IDs without adding models to the authenticated list. */
   modelMetadata?: readonly RemoteModelListItem[];
@@ -1466,6 +1472,12 @@ function decorateRuntimeModels(
   const marketplaceMetadata = (Array.isArray(pricingCaches) ? pricingCaches : [])
     .find((cache) => cache.profileId === profileId)?.modelCatalog;
   return models.map((model) => {
+    if (isGPTImage26ModelId(model.id) && !(model.tags || []).includes('manual')) {
+      return attachRuntimeSource(profileId, {
+        ...refreshPersistedModelConfig(model, useRemoteDisplayName),
+        description: GPT_IMAGE_26_BASIC_DESCRIPTION,
+      });
+    }
     if (
       (model.tags || []).includes('manual') ||
       discoverySource === 'models-endpoint'
@@ -1618,6 +1630,7 @@ class RuntimeModelDiscoveryStore {
   private listeners = new Set<() => void>();
   private inFlightDiscoveries = new Map<string, Promise<ModelConfig[]>>();
   private revision = 0;
+  private discoveryRequests = new Map<string, symbol>();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -2168,7 +2181,7 @@ class RuntimeModelDiscoveryStore {
       ? { signal: optionsOrSignal }
       : optionsOrSignal;
 
-    if (options.signal) {
+    if (options.signal || options.selectNew || options.isCurrent) {
       return this.discoverInternal(
         profileId,
         normalizedBaseUrl,
@@ -2214,6 +2227,10 @@ class RuntimeModelDiscoveryStore {
     return discovery;
   }
 
+  isDiscovering(profileId: string): boolean {
+    return this.discoveryRequests.has(profileId);
+  }
+
   private async discoverInternal(
     profileId: string,
     normalizedBaseUrl: string,
@@ -2222,107 +2239,129 @@ class RuntimeModelDiscoveryStore {
     fallbackBaseUrls: string[],
     options: RuntimeModelDiscoveryOptions
   ): Promise<ModelConfig[]> {
-    const state = this.getCatalogState(profileId);
+    options.signal?.throwIfAborted();
+    const requestId = Symbol();
+    this.discoveryRequests.set(profileId, requestId);
+    try {
+      const state = this.getCatalogState(profileId);
 
-    this.setCatalogState(
-      profileId,
-      {
-        ...state,
-        status: 'loading',
+      this.setCatalogState(
+        profileId,
+        {
+          ...state,
+          status: 'loading',
+          sourceBaseUrl: normalizedBaseUrl,
+          signature,
+          error: null,
+        },
+        false
+      );
+
+      const rawText = await fetchRemoteModelListWithFallback(
+        normalizedBaseUrl,
+        trimmedApiKey,
+        fallbackBaseUrls,
+        options.signal,
+        profileId.startsWith('tuzi-managed-') ||
+          profileId.startsWith('tuzi-token-')
+      );
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawText);
+      } catch {
+        throw new Error('模型列表接口未返回有效 JSON');
+      }
+
+      const data = (parsed as { data?: unknown }).data;
+      if (!Array.isArray(data)) {
+        throw new Error('模型列表接口缺少 data 数组');
+      }
+      const metadataById = new Map(
+        options.modelMetadata?.map((model) => [model.id, model])
+      );
+
+      const adaptedModels: ModelConfig[] = [];
+      const seen = new Set<string>();
+      const useRemoteDisplayName = isTuziCompatibleBaseUrl(normalizedBaseUrl);
+      for (const item of data) {
+        const remoteModel = {
+          ...metadataById.get(item?.id),
+          ...item,
+        } as RemoteModelListItem;
+        const adapted = adaptRuntimeModel(remoteModel);
+        if (!adapted || seen.has(adapted.id)) {
+          continue;
+        }
+        if (useRemoteDisplayName) {
+          adapted.label = remoteModel.id;
+          adapted.shortLabel = remoteModel.id;
+        }
+        if (remoteModel.description?.trim()) {
+          adapted.description = remoteModel.description.trim();
+        }
+        if (isGPTImage26ModelId(adapted.id)) {
+          adapted.description = GPT_IMAGE_26_BASIC_DESCRIPTION;
+        }
+        seen.add(adapted.id);
+        adaptedModels.push(attachRuntimeSource(profileId, adapted));
+      }
+
+      if (adaptedModels.length === 0) {
+        throw new Error('模型列表为空');
+      }
+
+      options.signal?.throwIfAborted();
+      if (this.discoveryRequests.get(profileId) !== requestId || options.isCurrent?.() === false) {
+        throw new DOMException('Obsolete model discovery', 'AbortError');
+      }
+      // A user may edit selections or bindings while the network request is pending.
+      const currentState = this.getCatalogState(profileId);
+      const discoveredModels = mergeDiscoveredWithManualModels(
+        adaptedModels,
+        currentState.discoveredModels
+      );
+      const manualModelIds = new Set(
+        discoveredModels
+          .filter((model) => (model.tags || []).includes('manual'))
+          .map((model) => model.id)
+      );
+      const previousIds = new Set(currentState.discoveredModels.map((model) => model.id));
+      const selectedModelIds = options.selectAll
+        ? discoveredModels.map((model) => model.id)
+        : options.selectNew
+        ? normalizeSelectedModelIds(discoveredModels, [
+            ...currentState.selectedModelIds,
+            ...adaptedModels.filter((model) => !previousIds.has(model.id)).map((model) => model.id),
+          ])
+        : state.signature === signature
+        ? normalizeSelectedModelIds(discoveredModels, currentState.selectedModelIds)
+        : normalizeSelectedModelIds(
+            discoveredModels,
+            currentState.selectedModelIds.filter((modelId) => manualModelIds.has(modelId))
+          );
+      const models = buildSelectedModels(discoveredModels, selectedModelIds);
+
+      this.setCatalogState(profileId, {
+        profileId,
+        status: 'ready',
+        discoverySource: 'models-endpoint',
         sourceBaseUrl: normalizedBaseUrl,
         signature,
+        discoveredAt: Date.now(),
+        discoveredModels,
+        selectedModelIds,
+        manualBindings: currentState.manualBindings,
+        models,
         error: null,
-      },
-      false
-    );
+      });
 
-    const rawText = await fetchRemoteModelListWithFallback(
-      normalizedBaseUrl,
-      trimmedApiKey,
-      fallbackBaseUrls,
-      options.signal,
-      profileId.startsWith('tuzi-managed-') ||
-        profileId.startsWith('tuzi-token-')
-    );
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(rawText);
-    } catch {
-      throw new Error('模型列表接口未返回有效 JSON');
-    }
-
-    const data = (parsed as { data?: unknown }).data;
-    if (!Array.isArray(data)) {
-      throw new Error('模型列表接口缺少 data 数组');
-    }
-    const metadataById = new Map(
-      options.modelMetadata?.map((model) => [model.id, model])
-    );
-
-    const adaptedModels: ModelConfig[] = [];
-    const seen = new Set<string>();
-    const useRemoteDisplayName = isTuziCompatibleBaseUrl(normalizedBaseUrl);
-    for (const item of data) {
-      const remoteModel = {
-        ...metadataById.get(item?.id),
-        ...item,
-      } as RemoteModelListItem;
-      const adapted = adaptRuntimeModel(remoteModel);
-      if (!adapted || seen.has(adapted.id)) {
-        continue;
+      return adaptedModels;
+    } finally {
+      if (this.discoveryRequests.get(profileId) === requestId) {
+        this.discoveryRequests.delete(profileId);
       }
-      if (useRemoteDisplayName) {
-        adapted.label = remoteModel.id;
-        adapted.shortLabel = remoteModel.id;
-      }
-      if (remoteModel.description?.trim()) {
-        adapted.description = remoteModel.description.trim();
-      }
-      seen.add(adapted.id);
-      adaptedModels.push(attachRuntimeSource(profileId, adapted));
     }
-
-    if (adaptedModels.length === 0) {
-      throw new Error('模型列表为空');
-    }
-
-    const discoveredModels = mergeDiscoveredWithManualModels(
-      adaptedModels,
-      state.discoveredModels
-    );
-    const manualModelIds = new Set(
-      discoveredModels
-        .filter((model) => (model.tags || []).includes('manual'))
-        .map((model) => model.id)
-    );
-    const selectedModelIds = options.selectAll
-      ? discoveredModels.map((model) => model.id)
-      : state.signature === signature
-      ? normalizeSelectedModelIds(discoveredModels, state.selectedModelIds)
-      : normalizeSelectedModelIds(
-          discoveredModels,
-          state.selectedModelIds.filter((modelId) =>
-            manualModelIds.has(modelId)
-          )
-        );
-    const models = buildSelectedModels(discoveredModels, selectedModelIds);
-
-    this.setCatalogState(profileId, {
-      profileId,
-      status: 'ready',
-      discoverySource: 'models-endpoint',
-      sourceBaseUrl: normalizedBaseUrl,
-      signature,
-      discoveredAt: Date.now(),
-      discoveredModels,
-      selectedModelIds,
-      manualBindings: state.manualBindings,
-      models,
-      error: null,
-    });
-
-    return adaptedModels;
   }
 
   setError(

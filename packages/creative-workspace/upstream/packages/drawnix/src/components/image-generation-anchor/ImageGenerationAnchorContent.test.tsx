@@ -292,3 +292,81 @@ describe('native SVG failure diagnostics', () => {
     }
   });
 });
+
+// The public generator path includes the native controller's extra readiness tick.
+// Retaining the spinner identity is important: replacing it restarts its animation.
+describe('native SVG progress rendering', () => {
+  it('reuses the entire SVG structure for progress, unchanged updates and subtitle changes', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {});
+    mocks.tasks = [{ id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.PROCESSING,
+      params: {}, createdAt: 1, progress: 10 } as Task];
+    let anchor = { ...createAnchor(), phase: 'generating' as const, error: undefined, progress: 10 };
+    const board = { children: [] } as unknown as PlaitBoard;
+    const host = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    document.body.appendChild(host);
+    const generator = new ImageGenerationAnchorGenerator(board);
+    try {
+      await act(async () => { generator.processDrawing(anchor, host, false); });
+      const fallback = host.querySelector('.image-generation-anchor-desktop-fallback')!;
+      const spinner = host.querySelector('animateTransform')!;
+      const background = fallback.firstChild;
+      const replace = vi.spyOn(fallback, 'replaceChildren');
+      const bar = [...host.querySelectorAll('rect')].find(node => node.getAttribute('height') === '3' && node.getAttribute('fill') === '#25755e')!;
+      expect(bar.getAttribute('width')).toBe('18');
+      for (const progress of [10, 20, 40, 60, 90, 90]) {
+        mocks.tasks[0] = { ...mocks.tasks[0], progress };
+        anchor = { ...anchor, progress, subtitle: `synthetic progress ${progress}` };
+        await act(async () => { generator.updateDrawing(anchor, host, false); });
+        expect(bar.getAttribute('width')).toBe(String(180 * progress / 100));
+        expect(fallback.firstChild).toBe(background);
+        expect(host.querySelector('animateTransform')).toBe(spinner);
+      }
+      expect(replace).not.toHaveBeenCalled();
+      expect(host.textContent).toContain('synthetic progress');
+      expect(fallback.getAttribute('aria-label')).toContain('synthetic progress 90');
+    } finally {
+      generator.destroy();
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
+      host.remove(); vi.unstubAllGlobals(); mocks.tasks = [];
+    }
+  });
+
+  it('refreshes geometry and batch labels, and paints the latest failure and retry target', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {});
+    mocks.tasks = [{ id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.PROCESSING,
+      params: {}, createdAt: 1, progress: 40 } as Task];
+    let anchor: PlaitImageGenerationAnchor = { ...createAnchor(), phase: 'generating', error: undefined, progress: 40 };
+    const board = { children: [], deleteFragment: vi.fn() } as unknown as PlaitBoard;
+    const host = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    document.body.appendChild(host);
+    const generator = new ImageGenerationAnchorGenerator(board);
+    const onRetry = vi.fn(); window.addEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, onRetry);
+    try {
+      await act(async () => { generator.processDrawing(anchor, host, false); });
+      const originalSpinner = host.querySelector('animateTransform');
+      anchor = { ...anchor, points: [[100, 200], [500, 600]], batchTotal: 20 };
+      await act(async () => { generator.updateDrawing(anchor, host, false); });
+      expect(host.querySelector('animateTransform')).not.toBe(originalSpinner);
+      const background = host.querySelector('.image-generation-anchor-desktop-fallback > rect')!;
+      expect(background.getAttribute('x')).toBe('100');
+      expect(background.getAttribute('y')).toBe('200');
+      expect(background.getAttribute('width')).toBe('400');
+      expect(host.textContent).toContain('20 张');
+      mocks.tasks = [{ ...mocks.tasks[0], id: 'task-retry', status: TaskStatus.FAILED,
+        error: { code: 'FAILED', message: 'synthetic new failure', details: { requestId: 'request-new' } } }];
+      anchor = { ...anchor, phase: 'failed', taskIds: ['task-retry'], primaryTaskId: 'task-retry' };
+      await act(async () => { generator.updateDrawing(anchor, host, false); });
+      expect(host.textContent).toContain('request-new');
+      expect(host.querySelector('animateTransform')).toBeNull();
+      fireEvent.click(host.querySelector('[aria-label="重试"]')!);
+      expect(onRetry.mock.lastCall?.[0].detail).toEqual({ taskId: 'task-retry', anchorId: anchor.id });
+      fireEvent.click(host.querySelector('[aria-label="关闭"]')!);
+      expect(board.deleteFragment).toHaveBeenCalledWith([expect.objectContaining({ primaryTaskId: 'task-retry', points: anchor.points })]);
+    } finally {
+      window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, onRetry);
+      generator.destroy();
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
+      host.remove(); vi.unstubAllGlobals(); mocks.tasks = [];
+    }
+  });
+});

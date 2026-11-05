@@ -114,12 +114,9 @@ export function doesTaskBelongToImageGenerationAnchor(
     return false;
   }
 
-  const taskIdSet = new Set<string>(anchor.taskIds);
-  if (anchor.primaryTaskId) {
-    taskIdSet.add(anchor.primaryTaskId);
-  }
-
-  if (taskIdSet.has(task.id)) {
+  // This predicate runs for every task in history on each anchor lookup.
+  // The binding list is small; avoid constructing the same Set per candidate.
+  if (anchor.primaryTaskId === task.id || anchor.taskIds.includes(task.id)) {
     return true;
   }
 

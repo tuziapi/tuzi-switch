@@ -1,0 +1,263 @@
+{
+  "baselineCommit": "e6020c53b7589a6c7f92a9066e3ea313a72f6c25",
+  "environment": "macOS local Chrome; synthetic HTTP, isolated browser storage; CPU=6 is DevTools slowdown, not a real device",
+  "baseline": [
+    {
+      "count": 1,
+      "anchors": 1,
+      "cpu": 6,
+      "idle": {
+        "replacements": 8,
+        "puts": {
+          "aitu-workspace/boards": 4
+        }
+      },
+      "replacements": 14,
+      "puts": {
+        "aitu-workspace/boards": 33
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.80000000000109,
+      "frameMax": 33.400000000001455,
+      "inputP95": 12.900000005960464,
+      "errors": []
+    },
+    {
+      "count": 10,
+      "anchors": 10,
+      "cpu": 6,
+      "idle": {
+        "replacements": 70,
+        "puts": {
+          "aitu-workspace/boards": 4
+        }
+      },
+      "replacements": 150,
+      "puts": {
+        "aitu-workspace/boards": 33
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 33.29999999999927,
+      "frameMax": 50.099999999998545,
+      "inputP95": 12.799999982118607,
+      "errors": []
+    },
+    {
+      "count": 20,
+      "anchors": 20,
+      "cpu": 6,
+      "idle": {
+        "replacements": 140,
+        "puts": {
+          "aitu-workspace/boards": 3
+        }
+      },
+      "replacements": 283,
+      "puts": {
+        "aitu-workspace/boards": 34
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 33.29999999999927,
+      "frameMax": 50.10000000000218,
+      "inputP95": 12.599999994039536,
+      "errors": []
+    }
+  ],
+  "optimized": [
+    {
+      "count": 1,
+      "anchors": 1,
+      "cpu": 6,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 26
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.799999999999272,
+      "frameMax": 50,
+      "inputP95": 13.099999994039536,
+      "errors": [],
+      "resultsPersisted": 1,
+      "generationRequests": 1
+    },
+    {
+      "count": 10,
+      "anchors": 10,
+      "cpu": 6,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 26
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.80000000000109,
+      "frameMax": 50.10000000000218,
+      "inputP95": 12.699999988079071,
+      "errors": [],
+      "resultsPersisted": 10,
+      "generationRequests": 10
+    },
+    {
+      "count": 20,
+      "anchors": 20,
+      "cpu": 6,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 26
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 33.29999999999927,
+      "frameMax": 50.099999999998545,
+      "inputP95": 12.199999988079071,
+      "errors": [],
+      "resultsPersisted": 20,
+      "generationRequests": 20
+    }
+  ],
+  "webkitResults": [
+    {
+      "count": 20,
+      "anchors": 20,
+      "engine": "webkit",
+      "cpu": 1,
+      "longTasksSupported": false,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 2
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 18,
+      "frameMax": 23,
+      "inputP95": 15,
+      "errors": [],
+      "resultsPersisted": 20,
+      "generationRequests": 20
+    }
+  ],
+  "limitations": [
+    "No paid provider calls or real-user project used",
+    "20-task throttled frame P95 did not materially improve; evidence proves removal of repeated work, not resolution of every source of lag",
+    "Initial WebKit middle-button pan did not move the canvas; subsequent hand-tool pan and complete input assertions passed in Chrome and WebKit"
+  ],
+  "baselineNormal": [
+    {
+      "count": 1,
+      "anchors": 1,
+      "replacements": 15,
+      "puts": {
+        "aitu-workspace/boards": 33
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.700000000000728,
+      "frameMax": 16.80000000000109,
+      "inputP95": 15.400000005960464,
+      "errors": []
+    },
+    {
+      "count": 10,
+      "anchors": 10,
+      "replacements": 150,
+      "puts": {
+        "aitu-workspace/boards": 33
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.799999999999272,
+      "frameMax": 16.80000000000109,
+      "inputP95": 14.199999988079071,
+      "errors": []
+    },
+    {
+      "count": 20,
+      "anchors": 20,
+      "replacements": 300,
+      "puts": {
+        "aitu-workspace/boards": 33
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.799999999999272,
+      "frameMax": 16.80000000000109,
+      "inputP95": 14.300000011920929,
+      "errors": []
+    }
+  ],
+  "optimizedNormalHand": [
+    {
+      "count": 20,
+      "anchors": 20,
+      "inputVerified": true,
+      "panDisplacement": {
+        "x": 100,
+        "y": 100
+      },
+      "engine": "chromium",
+      "cpu": 1,
+      "longTasksSupported": true,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 24
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.700000000000728,
+      "frameMax": 16.80000000000109,
+      "inputP95": 14.799999982118607,
+      "errors": [],
+      "resultsPersisted": 20,
+      "generationRequests": 20
+    }
+  ],
+  "webkitHandResults": [
+    {
+      "count": 20,
+      "anchors": 20,
+      "engine": "webkit",
+      "cpu": 1,
+      "longTasksSupported": false,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 2
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 18,
+      "frameMax": 28,
+      "inputP95": 14,
+      "errors": [],
+      "resultsPersisted": 20,
+      "generationRequests": 20
+    }
+  ]
+}
