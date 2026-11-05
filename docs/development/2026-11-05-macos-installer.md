@@ -18,8 +18,8 @@
 - Bash 语法检查、页面 12 项 Node 测试、真实 Release 元数据门禁和 Vite 编译通过。
 - 本机 13 项真实 DMG 隔离安装/失败回归通过（含 Intel / Rosetta 自动识别）；只 mock 网络复制（失败场景另 mock 指定工具），真实执行 SHA-256、hdiutil、file、codesign、ditto、xattr。涵盖用户取消、拒绝放行、损坏下载、网络失败、签名失败、升级备份、替换失败恢复、运行中拒绝、新版拒绝降级、未知目标/符号链接拒绝和双架构校验。
 - 浏览器已检查脚本显示、复制多行命令与页面完全一致、Intel 下载链接、Windows 不展示 Mac 脚本及原 EXE 下载链接。
-- Apple Silicon DMG 已从正式公开 URL 完整下载（慢速链路续传），SHA-256 为 `621c57fc05428447f5cb78d040e9fe08eac15ee819e0e3c8979984777eb21595`，与内置值一致。Intel 公开 URL 完整下载成功；首次长耗时脚本测试因开发期间源文件改动中断，固定副本的公网重测进行中；不将首次测试记为脚本成功。Intel 包通过架构/完整性校验，不冒充 Intel 实机启动验收；用户正在使用的应用未被退出、替换或启动。
+- Apple Silicon DMG 已从正式公开 URL 完整下载（慢速链路续传），SHA-256 为 `621c57fc05428447f5cb78d040e9fe08eac15ee819e0e3c8979984777eb21595`，与内置值一致。Intel 公开 URL 首轮完整下载成功；固定脚本副本的重复公网下载因本机链路过慢超时，未将该重测记为端到端成功。两种正式 DMG 的最终脚本隔离校验及安装/失败回归均已通过。Intel 包通过架构/完整性校验，不冒充 Intel 实机启动验收；用户正在使用的应用未被退出、替换或启动。
 
 ## 发布
 
-正式 PR #59 已创建，最终源代码提交 `9d864dcd`，根目录快照随同一 PR 更新，脚本 SHA-256 为 `2728e17ac0fe4f307f8732a13f0843339d20f9bf18675b617646ce7fe228ea7a`。待合并并核验公网页面。沿用正式 Pages 的 main 根目录，不更改仓库权限、账单或 Pages Source，不覆盖既有 v1.5.5 Release 附件。
+正式 PR #59 已创建，最终源代码提交 `9d864dcd`，根目录快照随同一 PR 更新，脚本 SHA-256 为 `2728e17ac0fe4f307f8732a13f0843339d20f9bf18675b617646ce7fe228ea7a`。PR #59 已合入正式 main `a2dc0f041a905020c33ad80c8c3e634d8d05a9ff`；GitHub Pages build 状态为 built、无错误。公网首页、独立页面、release.json、download-SOURCE.json、脚本及两份 JS/CSS 均与已验证快照逐字节一致。浏览器确认显示 v1.5.5、Mac 脚本入口和最终摘要，复制内容与页面完整多行命令一致。公开脚本再次通过 Bash 语法和 --help 检查。沿用正式 Pages 的 main 根目录，不更改仓库权限、账单或 Pages Source，不覆盖既有 v1.5.5 Release 附件。
