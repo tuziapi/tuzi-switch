@@ -15,52 +15,55 @@
 
 ## 下载
 
-最新安装包请前往 [GitHub Releases](https://github.com/tuziapi/tuzi-switch/releases)。
+**[打开正式下载页](https://tuziapi.github.io/tuzi-switch/)** · [查看 v1.5.5 发布说明与全部安装包](https://github.com/tuziapi/tuzi-switch/releases/tag/v1.5.5)
 
-推荐下载方式：
+当前正式版本为 **v1.5.5**，包含工具管理、兔子账户和 opentu 创作工作区。
 
-- Windows：下载 Windows 安装包
-- Linux：根据发行版选择 `.AppImage`、`.deb` 或 `.rpm`
-- macOS：下载 `macOS-unsigned.dmg` 或 `macOS-unsigned.zip`
+| 平台 | 安装包 |
+| --- | --- |
+| macOS Apple 芯片 | `tuzi-assistant-macos-arm64.dmg` |
+| macOS Intel | `tuzi-assistant-macos-x64.dmg` |
+| Windows x64 | `.exe` 或 `.msi` |
+| Linux x64 | `.AppImage`、`.deb` 或 `.rpm` |
 
-目前公开 Release 已支持 Windows、macOS 和 Linux 用户下载使用。
+### macOS 终端安装
 
-### macOS / Linux 一键安装
-
-直接安装当前推荐版本：
-```bash
-curl -fsSL https://cdn.jsdelivr.net/gh/tuziapi/tuzi-switch@main/scripts/install_tuzi_switch.sh | bash
-```
-```
-open "/Applications/兔子switch.app"
-```
-安装指定版本：
-```
-TUZI_SWITCH_TAG=v1.2.0 curl -fsSL https://raw.githubusercontent.com/tuziapi/tuzi-switch/v1.2.0/scripts/install_tuzi_switch.sh | bash
-```
-```
-open "/Applications/兔子switch.app"
-```
-补充说明：
-
-- 当前 Release 已按正式版本发布，GitHub `releases/latest` 会优先命中当前推荐版本
-- 当前 README 默认固定到 `v1.2.0`，这样可以确保安装到我们当前推荐版本
-- 需要安装其它版本时，可以改用 `env TUZI_SWITCH_TAG=vX.Y.Z bash`
-- 这个脚本会自动按系统选择对应安装包，macOS 装 `.zip`，Linux 装 `.AppImage`
-
-### macOS 未签名包打开方式
-
-如果第一次打开时被系统拦截，可以用下面两种方式之一：
-
-1. 对应用点右键，选择“打开”，然后在弹窗里再次确认“打开”
-2. 或在终端执行：
+先完全退出兔子助手，将下面整行命令粘贴到“终端”，按提示确认：
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/tuzi-switch.app"
-open "/Applications/tuzi-switch.app"
+(s=$(curl -fsSL https://tuziapi.github.io/tuzi-switch/install.sh) && bash -c "$s")
 ```
 
-如果你不是把应用放在 `/Applications`，把命令里的路径改成你自己的实际路径即可。
+指定版本：
+
+```bash
+(s=$(curl -fsSL https://tuziapi.github.io/tuzi-switch/install.sh) && bash -c "$s" -- --version v1.5.5)
+```
+
+- 目前两条命令均安装 **v1.5.5**；仅支持该版本，不能任意替换为旧版本。也兼容 `TUZI_SWITCH_TAG=v1.5.5`，显式 `--version` 优先。
+- 仅适用于 macOS，自动识别 Apple 芯片 / Intel。Windows、Linux 请使用上方下载页。
+- 校验安装器及 DMG 的 SHA-256、应用身份和包内签名完整性；替换前备份旧应用，保留账户和作品配置。
+- 安装和放行分别需要确认，不需要 `sudo`。目标应用名为 **兔子助手.app**，安装目录以终端提示为准。
+- 旧的 `scripts/install_tuzi_switch.sh` 入口尚未适配当前安装包，请勿继续使用旧教程中的命令。
+
+### macOS 手动安装与首次打开
+
+从正式下载页选择对应芯片的 DMG，退出旧版后，将“兔子助手”拖入“应用程序”并替换。
+
+此版本未经 Apple 开发者签名或公证。若系统拦截，可使用上面的终端安装流程；核对来源并确认信任后，脚本仅移除兔子助手副本的下载隔离标记，不关闭系统全局安全检查。这不等于 Apple 签名或公证。
+
+### 下载失败或速度慢
+
+安装包仍从 GitHub Releases 下载；能获取脚本不代表安装包连接也畅通。
+
+| 提示 | 原因与处理 |
+| --- | --- |
+| 下载 `tuzi-switch-macos-aarch64.dmg` 返回 404 | 使用了旧脚本和旧文件名，请改用上面的新命令。 |
+| `mirror.ghproxy.com` SSL 错误 | 旧脚本的镜像回退失败；新入口不使用该镜像。 |
+| `curl (28)` 或 `curl (16)` | 连接超时或 HTTP/2 传输失败，发生在下载阶段。可更换能稳定访问 GitHub 的网络后重试，或从正式下载页手动下载安装包。 |
+| 下载进度缓慢 | 当前到 GitHub 的链路速度较低；更换脚本地址不会加速安装包。 |
+
+当前脚本尚未加入 HTTP/1.1 回退和跨次断点续传。若在安装包下载阶段退出，原应用不会被替换；重跑会重新下载。本节是现有行为说明，不表示网络兼容问题已修复。
 
 ## tuzi-switch 是什么
 
@@ -77,7 +80,15 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 
 ## 当前版本更新
 
-当前公开版本为 `v1.2.0`，这一轮更新重点包括：
+当前正式版本为 **v1.5.5**：
+
+- 工具管理、兔子账户四个页面与 opentu 创作整合到同一客户端。
+- 安装包、下载页和版本说明统一使用正式仓库 `tuziapi/tuzi-switch`。
+- 本次提供完整安装包和 Mac 终端安装；应用内自动更新暂不可用，详见 [发布说明](https://github.com/tuziapi/tuzi-switch/releases/tag/v1.5.5)。
+
+### 历史更新：v1.2.0
+
+以下为 v1.2.0 已有能力的记录：
 
 ### Codex 官方登录与会话历史统一
 
@@ -178,6 +189,14 @@ tuzi-switch 是基于 CC Switch 定制的兔子业务版本。它保留了成熟
 - `~/.codex/config.toml`（Codex 配置）
 - `~/.codex/auth.json`（Codex 认证）
 - `~/.zshrc` 或 `~/.bashrc`（环境变量 managed block）
+
+## 更新机制
+
+**v1.5.5 请从正式下载页下载安装包，或使用上面的 Mac 终端命令更新。** 本次未发布更新签名与自动更新清单，应用内自动更新暂不可用。
+
+当前统一客户端通过完整安装包更新，避免旧界面热更新资源覆盖内置 opentu 工作区。已有更新验签机制保留，App 内不会执行安装脚本。
+
+历史更新架构与维护说明见 [docs/自动升级与能力层设计.md](./docs/自动升级与能力层设计.md)；其中的原生 updater 和界面热更新设计不代表 v1.5.5 已提供自动更新服务。
 
 ## 开发计划 / TODO List
 
