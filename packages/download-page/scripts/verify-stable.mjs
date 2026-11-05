@@ -54,3 +54,15 @@ test("browser fails closed for altered format or cross-version download URLs", (
     assert.equal(isStableRelease(r), false);
   }
 });
+
+test("rejects test repository metadata in an official page and vice versa", () => {
+  const other =
+    repository === "tuziapi/tuzi-switch"
+      ? "AiW520/tuzi-switch"
+      : "tuziapi/tuzi-switch";
+  const r = fixture();
+  r.html_url = r.html_url.replace(repository, other);
+  for (const a of r.assets)
+    a.browser_download_url = a.browser_download_url.replace(repository, other);
+  assert.throws(() => createStableRelease(r));
+});

@@ -47,7 +47,7 @@ export function validateInstallerRelease(
   const r = value as InstallerRelease;
   if (
     !r ||
-    repository !== "AiW520/tuzi-switch" ||
+    !["tuziapi/tuzi-switch", "AiW520/tuzi-switch"].includes(repository) ||
     r.draft !== false ||
     r.prerelease !== false ||
     !/^v\d+\.\d+\.\d+$/.test(r.tag_name) ||
@@ -83,7 +83,10 @@ export async function checkInstallerUpdate(
   | { status: "available"; info: UpdateInfo; update: UpdateHandle }
 > {
   versionParts(currentVersion);
-  if (build.repository !== "AiW520/tuzi-switch" || !installers[build.platform])
+  if (
+    !["tuziapi/tuzi-switch", "AiW520/tuzi-switch"].includes(build.repository) ||
+    !installers[build.platform]
+  )
     throw Error("Unsupported installer channel or platform");
   const fetchRelease = async () => {
     const controller = new AbortController();
