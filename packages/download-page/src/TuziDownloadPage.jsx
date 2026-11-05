@@ -629,42 +629,34 @@ export function TuziDownloadView({
               </a>
             </div>
             {platform === "macos" && installCommand && (
-              <details className="td-terminal" open>
-                <summary>
-                  <Terminal size={17} />
-                  {t("macOS 安装脚本 · 自动识别 Apple 芯片 / Intel")}
-                  <ChevronDown size={16} />
-                </summary>
-                <div>
-                  <span>macOS · {release.tag}</span>
+              <div className="td-terminal">
+                <div className="td-terminal-heading">
+                  <span className="td-terminal-title">
+                    <Terminal size={17} />
+                    {t("macOS 终端安装")}
+                    <small>Apple 芯片 / Intel</small>
+                  </span>
                   <button onClick={copy}>
                     <Copy size={14} />
-                    {t("复制命令")}
+                    {copied || t("复制命令")}
                   </button>
                 </div>
                 <pre tabIndex={0}>
                   <code>{installCommand}</code>
                 </pre>
-                <p>
-                  {t(
-                    "打开 Mac 的“终端”，粘贴上方整段命令并回车。按提示输入 y 确认安装，再确认仅放行兔子助手。请先完全退出旧版应用。",
-                  )}
-                </p>
-                <p>
-                  {t(
-                    "脚本和安装包均校验 SHA-256；旧版应用先备份，账户和作品配置保留。不需要 sudo，也不会关闭系统全局安全检查。脚本放行不等于 Apple 公证。",
-                  )}
-                </p>
-                <a
-                  className="td-release-link"
-                  href={release.macosInstaller.href}
-                  download="install-macos-v1.5.5.sh"
-                >
-                  <ArrowDownToLine size={14} />
-                  {t("下载 / 查看安装脚本")}
-                </a>
-                <p role="status">{copied}</p>
-              </details>
+                <div className="td-terminal-footer">
+                  <p>{t("粘贴到“终端”运行，按提示确认即可。")}</p>
+                  <a
+                    href={release.macosInstaller.href}
+                    download="install-macos-v1.5.5.sh"
+                  >
+                    {t("查看脚本")}
+                  </a>
+                </div>
+                <span className="td-copy-status" role="status">
+                  {copied}
+                </span>
+              </div>
             )}
           </section>
           <section
