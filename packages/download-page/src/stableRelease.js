@@ -1,4 +1,5 @@
 /* Copyright (C) 2026 Tuzi. Licensed under AGPL-3.0-or-later. */
+import { isMacosInstaller } from "./macosInstaller.js";
 // Vite injects the same explicit channel used by the metadata build script.
 const buildRepository = import.meta.env?.VITE_RELEASE_REPOSITORY;
 const nodeRepository =
@@ -71,6 +72,8 @@ export function isStableRelease(r) {
     r.sourceUrl !== `https://github.com/${repository}/releases/tag/${r.tag}` ||
     !Number.isFinite(Date.parse(r.publishedAt)) ||
     r.command !== "" ||
+    (r.macosInstaller !== undefined &&
+      !isMacosInstaller(r.macosInstaller, r)) ||
     !Array.isArray(r.downloads) ||
     r.downloads.length !== installerFormats.length
   )

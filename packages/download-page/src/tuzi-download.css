@@ -718,6 +718,8 @@ html.dark .tuzi-download:not([data-theme='light']) {
 .tuzi-download .td-terminal > p {
   font-size: 11px;
   min-height: 18px;
+  line-height: 1.8;
+  color: #c0c2b5;
 }
 .tuzi-download .td-faq {
   display: grid;
