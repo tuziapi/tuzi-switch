@@ -15,7 +15,8 @@ import {
   CommandList,
   CommandItem,
 } from "@/components/ui/command";
-import { ChevronsUpDown, Check, Palette } from "lucide-react";
+import { ChevronsUpDown, Check } from "lucide-react";
+import { OpentuIcon } from "@/components/icons/OpentuIcon";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { isNativeTool } from "@/lib/api/nativeTools";
 
@@ -276,7 +277,7 @@ function ConfigureToolSession({
               opentu 创作<small>关联账户 · 配置供应商与模型</small>
             </span>
             <span className="account-tool-icon" aria-hidden="true">
-              <Palette size={18} />
+              <OpentuIcon size={18} />
             </span>
           </Button>
         )}

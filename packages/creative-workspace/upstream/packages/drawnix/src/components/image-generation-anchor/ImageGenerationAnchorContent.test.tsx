@@ -1,3 +1,4 @@
+import { setAssistantAccount } from '../../services/assistant-account';
 import React from 'react';
 import {
   cleanup,
@@ -252,6 +253,42 @@ describe('native SVG anchor readiness', () => {
       generator.destroy();
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
       svg.remove(); vi.unstubAllGlobals(); mocks.tasks = [];
+    }
+  });
+});
+
+
+describe('native SVG failure diagnostics', () => {
+  it('shows and copies full diagnostics through the native bridge and expands selection bounds', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {});
+    const copyText = vi.fn().mockResolvedValue(undefined);
+    setAssistantAccount({ state: { status: 'disconnected' }, copyText } as unknown as NonNullable<Parameters<typeof setAssistantAccount>[0]>);
+    mocks.tasks = [{ id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.FAILED,
+      params: { model: 'gpt-image-2.6-1k' }, createdAt: 1,
+      error: { code: 'FAILED', message: '合成失败', details: { requestId: 'provider-126', modelId: 'gpt-image-2.6-1k', httpStatus: 400 } },
+    } as Task];
+    const anchor = createAnchor();
+    const board = { children: [], deleteFragment: vi.fn() } as unknown as PlaitBoard;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const host = document.createElementNS(svg.namespaceURI, 'g') as SVGGElement;
+    svg.appendChild(host); document.body.appendChild(svg);
+    const generator = new ImageGenerationAnchorGenerator(board);
+    const onSizeChange = vi.fn(); generator.onSizeChange = onSizeChange;
+    try {
+      await act(async () => { generator.processDrawing(anchor, host, false); });
+      expect(host.textContent).toContain('provider-126');
+      expect(host.textContent).toContain('gpt-image-2.6-1k');
+      expect(host.querySelector('foreignObject')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: '复制 全部错误信息' }));
+      await waitFor(() => expect(copyText).toHaveBeenCalledWith(expect.stringContaining('Request ID：provider-126')));
+      expect(copyText.mock.calls[0][0]).toContain('本地任务：task-1');
+      expect(onSizeChange.mock.lastCall?.[0].height).toBeGreaterThan(320);
+      fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+      expect(board.deleteFragment).toHaveBeenCalledWith([expect.objectContaining({ id: anchor.id, taskIds: anchor.taskIds })]);
+    } finally {
+      generator.destroy();
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
+      svg.remove(); setAssistantAccount(undefined); vi.unstubAllGlobals(); mocks.tasks = [];
     }
   });
 });

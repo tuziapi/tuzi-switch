@@ -1,5 +1,6 @@
 import { accountReferenceFromHeaders, requestAssistantAccount } from '../assistant-account';
 import { isTauriEnvironment } from '../../utils/tauri-env';
+import { extractGenerationErrorDiagnostics } from '../../utils/generation-error-details';
 import type { GeminiMessage } from '../../utils/gemini-api/types';
 import { fetchWithTuziClientChannel, withTuziClientChannel } from '../tuzi-client-attribution';
 
@@ -56,7 +57,10 @@ export function extractCompletionText(payload: unknown): string {
     choices?: Array<{ message?: { content?: unknown; refusal?: string }; finish_reason?: string }>;
   } | null;
   if (data?.error) {
-    throw new Error(typeof data.error === 'string' ? data.error : data.error.message || 'Text API returned an error');
+    throw Object.assign(
+      new Error(typeof data.error === 'string' ? data.error : data.error.message || 'Text API returned an error'),
+      { diagnostics: extractGenerationErrorDiagnostics(payload) }
+    );
   }
   if (data?.status === 'failed' || data?.status === 'cancelled') throw new Error(`Responses 请求状态：${data.status}`);
   const choice = data?.choices?.[0];
@@ -82,5 +86,15 @@ export function safeTextError(error: unknown, secrets: string[] = []): Error {
   }
   message = message.replace(/\bBearer\s+[^\s"',;]+/gi, 'Bearer [redacted]')
     .replace(/\bsk-[a-zA-Z0-9_-]+/g, '[redacted]');
-  return new Error(message);
+  const result = new Error(message);
+  const diagnostics = (error as {diagnostics?: Record<string, unknown>} | null)?.diagnostics;
+  if (diagnostics) {
+    Object.assign(result, {diagnostics: Object.fromEntries(
+      ['requestId', 'apiErrorCode', 'httpStatus', 'modelId', 'remoteId']
+        .filter(key => diagnostics[key] !== undefined)
+        .map(key => [key, typeof diagnostics[key] === 'string'
+          ? safeTextError(new Error(diagnostics[key] as string), secrets).message : diagnostics[key]])
+    )});
+  }
+  return result;
 }

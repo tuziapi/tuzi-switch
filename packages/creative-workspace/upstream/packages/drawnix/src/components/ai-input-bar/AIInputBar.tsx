@@ -1,3 +1,5 @@
+import type { TaskError } from '../../types/shared/core.types';
+import { toGenerationTaskError } from '../../utils/generation-error-details';
 import { isSunoNativeModel, getSunoNativeAction } from '../../services/suno-native';
 import { getSunoNativeParams, buildSunoNativeInputParams, collectSunoNativeResources } from '../../services/suno-native-params';
 /**
@@ -6619,7 +6621,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               stepId: string,
               status: string,
               result?: unknown,
-              error?: string
+              error?: string,
+              duration?: number,
+              errorDetails?: TaskError
             ) => {
               workflowControl.updateStep(
                 stepId,
@@ -6630,7 +6634,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                   | 'failed'
                   | 'skipped',
                 result,
-                error
+                error,
+                duration,
+                errorDetails
               );
 
               // 追加工具结果日志
@@ -6733,7 +6739,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                   'failed',
                   undefined,
                   result.error || '执行失败',
-                  Date.now() - stepStartTime
+                  Date.now() - stepStartTime,
+                  result.errorDetails
                 );
                 return false; // 返回失败
               } else if (result.taskId) {
@@ -6810,7 +6817,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 step.id,
                 'failed',
                 undefined,
-                String(stepError)
+                String(stepError),
+                undefined,
+                toGenerationTaskError(stepError, 'EXECUTION_ERROR')
               );
               return false; // 返回失败
             } finally {
@@ -7198,7 +7207,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             stepId: string,
             status: string,
             result?: unknown,
-            error?: string
+            error?: string,
+            duration?: number,
+            errorDetails?: TaskError
           ) => {
             workflowControl.updateStep(
               stepId,
@@ -7209,7 +7220,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 | 'failed'
                 | 'skipped',
               result,
-              error
+              error,
+              duration,
+              errorDetails
             );
             appendAgentLogRef.current({
               type: 'tool_result',
@@ -7302,7 +7315,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 'failed',
                 undefined,
                 result.error || '执行失败',
-                Date.now() - stepStartTime
+                Date.now() - stepStartTime,
+                result.errorDetails
               );
               return false;
             } else if (result.taskId) {
@@ -7374,7 +7388,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               step.id,
               'failed',
               undefined,
-              String(stepError)
+              String(stepError),
+              undefined,
+              toGenerationTaskError(stepError, 'EXECUTION_ERROR')
             );
             return false;
           } finally {

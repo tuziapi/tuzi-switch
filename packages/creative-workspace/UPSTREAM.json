@@ -3287,6 +3287,10 @@
       "sha256": "1a397aba6e131cb8ea8ea62ead2a55eacc013318c03c71d5d781c7600e4a6d4c"
     },
     {
+      "path": "packages/drawnix/src/mcp/tools/ai-analyze.test.ts",
+      "sha256": "e1339c1ae0882a21649aa7992d74d17de2cfcb465ce66cbeba295f099bd25e08"
+    },
+    {
       "path": "packages/drawnix/src/mcp/tools/ai-analyze.ts",
       "sha256": "9914347b5ada0d83b38dd7e4fd3b44cb63100c63c8ffa8a1a823f4804f2197ae"
     },
@@ -3659,6 +3663,10 @@
       "sha256": "1e5dac76af1662df8eb2b7087e269c8dd47a7d6df1e0486fd4390423a69f5c08"
     },
     {
+      "path": "packages/drawnix/src/plugins/with-workzone.test.ts",
+      "sha256": "8252291fae6d8efe395ec904c045747ac77aee7027bbca245e596bc68f177c16"
+    },
+    {
       "path": "packages/drawnix/src/plugins/with-workzone.ts",
       "sha256": "9736f8307f72c5865940c0c5f5fa3989130df435534cb14d3e9cdff7b167bc93"
     },
@@ -3677,6 +3685,10 @@
     {
       "path": "packages/drawnix/src/services/__tests__/custom-http-adapter.test.ts",
       "sha256": "d8a3144b1df81d1fbf53b8d4c42f2aca829a9b79346370de07b88c9191e444e5"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/default-image-adapter.test.ts",
+      "sha256": "e9dd29a9533ba82d1d6e46e069930c81d0e7093405a0f1b6fe123faa7257b904"
     },
     {
       "path": "packages/drawnix/src/services/__tests__/fixtures/suno-native-contract.json",
@@ -3701,6 +3713,10 @@
     {
       "path": "packages/drawnix/src/services/__tests__/provider-routing.test.ts",
       "sha256": "c22325945066d0182e4f4f3dcf55a7b312ff6716aedd01ffa44fc9700125005d"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/seedance2-adapter.test.ts",
+      "sha256": "67ac3dd05eaca2c6bf0e669cc0d268d1927ba9e0f7e11783187721e8e0666f38"
     },
     {
       "path": "packages/drawnix/src/services/__tests__/seedream-alias-parameters.test.ts",
@@ -3739,8 +3755,16 @@
       "sha256": "9d6a14ad79d82a370931e953b87f2c6617cc52b5bd6a821350913a29a63e9eac"
     },
     {
+      "path": "packages/drawnix/src/services/__tests__/task-storage-writer-image-attempt.test.ts",
+      "sha256": "eae2ba761de0b7c7a5b3cf68f0799b5133238c9a82b3be01e1ea0a25ce9d2b1c"
+    },
+    {
       "path": "packages/drawnix/src/services/__tests__/tuzi-client-attribution.test.ts",
       "sha256": "cd7d7b29baa590a7d02fc2ea394c46f698be6e4ebf1c71f31863def5035fdba8"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/tuzi-flux-3-image-adapter.test.ts",
+      "sha256": "053f75eb1b7dcd8b7e02d24cf5069741e9440eb29b2220afc4c7e0c94860019f"
     },
     {
       "path": "packages/drawnix/src/services/__tests__/tuzi-gpt-image-adapter.test.ts",
@@ -5219,8 +5243,16 @@
       "sha256": "40952071d58a9a2c0d5f6a95ac5dc7cd55cadb8ffe28462c6faa841685133d74"
     },
     {
+      "path": "packages/drawnix/src/utils/__tests__/api-auth-error-event.test.ts",
+      "sha256": "4363001b1007a221b639c1b293a7b3555d1793a2127e04b2eebf8071505a462f"
+    },
+    {
       "path": "packages/drawnix/src/utils/__tests__/canvas-media-preview.test.ts",
       "sha256": "e687107efd91a1fdeddd058d0ca91d917cbe410c683161c4280a55f583ae9d53"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/download-utils.test.ts",
+      "sha256": "9702e08c3190e4164cf3ca40397223d6cea63a2c42ec0f5ba9331d4468078eaa"
     },
     {
       "path": "packages/drawnix/src/utils/__tests__/image-generation-anchor-readiness.test.ts",
@@ -6158,11 +6190,6 @@
       "reason": "Assistant regression: scoped confirmation and single-click model discovery."
     },
     {
-      "path": "packages/drawnix/src/components/workzone-element/WorkZoneContent.test.tsx",
-      "origin": "assistant-integration",
-      "reason": "UC-MEDIA-01 account media and native presentation acceptance"
-    },
-    {
       "path": "packages/drawnix/src/plugins/components/native-media-overlay.tsx",
       "origin": "assistant-integration",
       "reason": "UC-MEDIA-01 account media and native presentation acceptance"
@@ -6191,6 +6218,163 @@
       "path": "packages/drawnix/src/components/settings-dialog/__tests__/model-discovery-selection.test.tsx",
       "origin": "assistant-integration",
       "reason": "UC-MEDIA-01 prevent catalogue refresh from discarding selected models"
+    },
+    {
+      "path": "packages/drawnix/src/components/image-generation-anchor/ImageGenerationCopyButton.tsx",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "42ea98f2997fb4f16e30809d370a906ed60d415f9746ae1524dbe02887fb7836"
+    },
+    {
+      "path": "packages/drawnix/src/components/image-generation-anchor/ImageGenerationErrorDetails.test.tsx",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "a599287034e8083fadaab892e70370ae3a17ac668922533259dd8434e8937e17"
+    },
+    {
+      "path": "packages/drawnix/src/components/image-generation-anchor/ImageGenerationErrorDetails.tsx",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "dc46bc514f99d890c61e88a015a296c5bd46e9139abc3322b76ce6365fefd40c"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/GenerationFailureDetails.test.tsx",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "5ffa98e8bdfeebafc6527da480c79875aacf84714a9f87dc9ec857053560ec95"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/GenerationFailureDetails.tsx",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "839fffeddd61d4a23a0757b7093b0f033a6b6c90a2a92697494cc8edab6db469"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/NativeGenerationFailureDetails.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics"
+    },
+    {
+      "path": "packages/drawnix/src/components/shared/generation-failure-details.scss",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "0072a5b5fcb3b2babba1f97584952fff148187a7a3d68063de00416a20c2d72d"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/gpt-image-26-integration.test.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "1a0c625caad6a1e64f9cf95dfec4d86c4e3618680b6a227419f564041f0b6def"
+    },
+    {
+      "path": "packages/drawnix/src/services/media-api/video-error-details.test.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "5263ac7113e664a8d544914c83def6735eab511e83a3e041435d26dd315a7295"
+    },
+    {
+      "path": "packages/drawnix/src/services/model-adapters/gpt-image-26-request.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "049c07e2bd6dcca3a9da82328b31db5d46a59207a9f5abab0de01d73b2ceec75"
+    },
+    {
+      "path": "packages/drawnix/src/services/workflow-engine/error-details.test.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "179c7908c31823de3f2a351caf595f78aff7a1a369e3746f703ef83f15cadcb7"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/image-error-details.test.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "24b714a70a271018b0db15854df075bb5a2b5afbe92e20e9c153dddc4575748e"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/image-generation-anchor-bounds.test.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "08b52f96cef5718b5a16820d2e855aeda52710cdb4ab18b54972dfb051bbdc27"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/video-request-id.test.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "b8b8a90a6237621b5c0cd3a341566ae9ce8701ef4a1afa038ce8d6c99fad8563"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/workflow-error-details.test.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "6bb91207a7e89f183ba31f53c74936668653267300643f61d171aa70d113ff0c"
+    },
+    {
+      "path": "packages/drawnix/src/utils/generation-error-details.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "f24b161d19c723ab7d76b9b2343dc8070e809370dfca37025dfaccbb5fe1be7f"
+    },
+    {
+      "path": "packages/drawnix/src/utils/image-error-details.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "56cd4e2cf07a832d5369cc0bd7b50a8a22edd28292d5f9511dd733f8e51a2fd6"
+    },
+    {
+      "path": "packages/drawnix/src/utils/image-generation-anchor-bounds.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "7783f029fbaa6e486c33367e2308ede1d6a4efe2216af00e2f1cded04dc0822a"
+    },
+    {
+      "path": "packages/drawnix/src/utils/video-request-id.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "3e35cd57a0b1710e4491a044fc88c72e8191dd446c8176a24c4a062d03a6d1e8"
+    },
+    {
+      "path": "packages/drawnix/src/utils/workflow-error-details.ts",
+      "origin": "opentu-develop-1.2.6",
+      "reason": "UC-SYNC-02 approved incremental develop sync and native desktop diagnostics",
+      "sourceRepository": "ljquan/opentu",
+      "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "sourceSha256": "297be496704e7322e422cf6164c64d94991deea4a4c503c8e66edab78732ae9e"
     }
   ],
   "integration": {
@@ -6199,5 +6383,16 @@
     "featureBaseRevision": "7d05f299fec40599221294a34c9b26f888177c9e",
     "date": "2026-11-04",
     "strategy": "three-way feature adaptation; preserve assistant host patches and workflow exclusions"
-  }
+  },
+  "featureUpdates": [
+    {
+      "task": "UC-SYNC-02",
+      "repository": "ljquan/opentu",
+      "baseRevision": "f6a3e0cf1b1e1a66d271ceb57eb4bbf6bd029114",
+      "revision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+      "date": "2026-11-05",
+      "strategy": "incremental three-way merge with native SVG diagnostics, native clipboard and original media preservation",
+      "record": "docs/development/2026-11-05-opentu-develop-sync.md"
+    }
+  ]
 }

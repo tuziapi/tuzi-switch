@@ -1,3 +1,4 @@
+import { NativeGenerationFailureDetails, getNativeFailureLayout, type FailureRows } from '../shared/NativeGenerationFailureDetails';
 /**
  * WorkZone 内容组件
  *
@@ -5,8 +6,11 @@
  * 这是 WorkflowMessageBubble 的简化版本，适合在画布元素中使用
  */
 
+import { GenerationFailureDetails } from '../shared/GenerationFailureDetails';
+import { getWorkflowFailureDetails } from '../../utils/workflow-error-details';
 import React, {
   useMemo,
+  useLayoutEffect,
   useEffect,
   useRef,
   useState,
@@ -41,6 +45,7 @@ interface WorkZoneContentProps {
   workflow: WorkflowMessageData;
   nativeSize?: { width: number; height: number };
   className?: string;
+  onSizeChange?: (size: { width: number; height: number }) => void;
   onDelete?: () => void;
   /** 当 SW 中找不到工作流或工作流状态变更时的回调 */
   onWorkflowStateChange?: (
@@ -58,6 +63,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
   workflow: sourceWorkflow,
   nativeSize,
   className = '',
+  onSizeChange,
   onDelete,
   onWorkflowStateChange,
   onRetry,
@@ -79,6 +85,26 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
     sourceWorkflow
   ), [sourceWorkflow, relatedTasks]);
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const failureDetails = useMemo(
+    () => getWorkflowFailureDetails(workflow, taskQueueService.getAllTasks()),
+    [workflow, taskRevision]
+  );
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root || !onSizeChange) return;
+    const measure = () =>
+      onSizeChange({ width: root.offsetWidth, height: root.offsetHeight });
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      const box = entry?.borderBoxSize?.[0];
+      if (box) onSizeChange({ width: box.inlineSize, height: box.blockSize });
+      else measure();
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [onSizeChange]);
   // 用于追踪是否已经尝试 claim
   const hasClaimedRef = useRef(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -263,7 +289,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
     let status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' = 'pending';
     if (sourceWorkflow.status === 'cancelled' || (totalSteps > 0 && steps.every((s) => s.status === 'skipped'))) {
       status = 'cancelled';
-    } else if (failedSteps > 0) {
+    } else if (failedSteps > 0 || workflow.status === 'failed') {
       status = 'failed';
     } else if (completedSteps === totalSteps && totalSteps > 0) {
       status = 'completed';
@@ -272,7 +298,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
     }
 
     return { status, totalSteps, completedSteps };
-  }, [workflow.steps, sourceWorkflow.status]);
+  }, [workflow.steps, workflow.status, sourceWorkflow.status]);
 
   // 计算进度百分比
   const progress =
@@ -344,7 +370,11 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
   }, [onHideForever]);
 
   const stopWorkZonePressEvent = useCallback(
-    (event: React.PointerEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
+    (
+      event:
+        | React.PointerEvent<HTMLButtonElement>
+        | React.MouseEvent<HTMLButtonElement>
+    ) => {
       event.stopPropagation();
     },
     []
@@ -357,8 +387,22 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
     []
   );
 
+  const nativeFailureRows: FailureRows = [
+    ['Request ID', failureDetails.requestId || '未获取到'],
+    ['错误', failureDetails.error || '执行失败'],
+    ['模型', failureDetails.modelId || '未记录'],
+    ...(failureDetails.remoteId ? [['任务 ID', failureDetails.remoteId] as const] : []),
+  ];
+  const nativeFailed = workflowStatus.status === 'failed';
+  const nativeWidth = nativeSize ? Math.max(nativeSize.width, nativeFailed ? 320 : 0) : 0;
+  const nativeHeight = nativeSize ? Math.max(nativeSize.height, nativeFailed ? 156 + getNativeFailureLayout(nativeFailureRows, nativeWidth).height : 0) : 0;
+  useLayoutEffect(() => {
+    if (nativeWidth && nativeHeight) onSizeChange?.({ width: nativeWidth, height: nativeHeight });
+  }, [nativeWidth, nativeHeight, onSizeChange]);
+
   if (nativeSize) {
-    const { width, height } = nativeSize;
+    const width = nativeWidth;
+    const height = nativeHeight;
     const failed = workflowStatus.status === 'failed';
     const color = failed ? '#b42318' : '#475569';
     const clipId = `workzone-text-${workflow.id.replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -379,10 +423,11 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
         <text x={16} y={31} fontSize={12}>{typeIcon} {workflow.name}</text>
         <text x={16} y={65} fontSize={20} fontWeight={600}>{statusLabel}</text>
         <text x={16} y={89} fontSize={11}>{workflowStatus.completedSteps}/{workflowStatus.totalSteps} 步骤</text>
-        {workflow.steps.slice(0, Math.max(1, Math.floor((height - 155) / 24))).map((step, i) =>
+        {!failed && workflow.steps.slice(0, Math.max(1, Math.floor((height - 155) / 24))).map((step, i) =>
           <text key={step.id} x={16} y={116 + i * 24} fontSize={12}>{STATUS_ICONS[step.status]} {step.error || step.description}</text>
         )}
       </g>
+      {failed && <g transform="translate(0 106)"><NativeGenerationFailureDetails rows={nativeFailureRows} width={width} /></g>}
       {onDelete && action('删除', width - 92, onDelete)}
       {canRetry && action(isRetrying ? '重试中' : '重试', 14, () => void handleRetry(), isRetrying)}
       {onHideForever && action('隐藏卡片', canRetry ? 98 : 14, handleHideForeverClick)}
@@ -393,6 +438,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
 
   return (
     <div
+      ref={rootRef}
       className={`workzone-content workzone-content--${workflowStatus.status} ${className}`}
     >
       {/* 头部 */}
@@ -492,11 +538,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
       {/* 失败提示 + 重试按钮 */}
       {workflowStatus.status === 'failed' && (
         <div className="workzone-content__error">
-          <span>
-            ❌{' '}
-            {workflow.steps.find((s) => s.status === 'failed')?.error ||
-              '执行失败'}
-          </span>
+          <GenerationFailureDetails details={failureDetails} />
           {canRetry && (
             <button
               type="button"

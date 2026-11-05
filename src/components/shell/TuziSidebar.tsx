@@ -15,7 +15,6 @@ import {
   Shield,
   SlidersHorizontal,
   Sparkles,
-  Palette,
   Wrench,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -23,6 +22,7 @@ import type { VisibleApps } from "@/types";
 import type { AppId } from "@/lib/api";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
+import { OpentuIcon } from "@/components/icons/OpentuIcon";
 import { cn } from "@/lib/utils";
 
 export type TuziView =
@@ -199,7 +199,7 @@ export function TuziSidebar({
             aria-label="opentu 创作"
             aria-current={currentView === "creative" ? "page" : undefined}
           >
-            <Palette size={18} aria-hidden="true" />
+            <OpentuIcon size={18} />
             {!collapsed && <span className="truncate">opentu 创作</span>}
           </button>
           {!collapsed && (
