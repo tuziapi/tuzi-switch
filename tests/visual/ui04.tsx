@@ -143,7 +143,6 @@ mockIPC(
         "creative_account_bindings",
         "creative_account_bind",
         "creative_account_request",
-        "creative_account_http_request",
         "account_cancel_request",
         "tuzi_provider_sources",
         "tuzi_native_tool_sources",

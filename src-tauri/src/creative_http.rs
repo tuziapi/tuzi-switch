@@ -1,5 +1,5 @@
-//! Shared creative HTTP serialization and response delivery. Credential sources
-//! prepare requests separately; this module never reads the account store.
+//! Manual creative providers use native HTTP without WebView CORS. This module
+//! has no access to the account store and never follows credentialed redirects.
 use crate::tuzi_account::creative::CreativeChunk;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use futures::StreamExt;
@@ -17,14 +17,14 @@ static PENDING: LazyLock<Mutex<BTreeMap<String, tokio::sync::watch::Sender<bool>
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ManualRequest {
-    pub(crate) request_id: String,
-    pub(crate) url: String,
-    pub(crate) method: String,
-    pub(crate) headers: BTreeMap<String, String>,
-    pub(crate) body: Option<String>,
+    request_id: String,
+    url: String,
+    method: String,
+    headers: BTreeMap<String, String>,
+    body: Option<String>,
 }
 
-pub(crate) fn prepare(
+fn prepare(
     request: &ManualRequest,
     client: &reqwest::Client,
 ) -> Result<reqwest::RequestBuilder, String> {
@@ -97,7 +97,7 @@ pub(crate) fn prepare(
     Ok(builder)
 }
 
-pub(crate) async fn execute(
+async fn execute(
     request: ManualRequest,
     send: impl Fn(CreativeChunk) -> Result<(), String>,
 ) -> Result<(), String> {
@@ -119,7 +119,64 @@ pub(crate) async fn execute(
     }
     let operation = async {
         send(CreativeChunk::Ready)?;
-        send_response(builder, &send, || Ok(())).await
+        let response = builder
+            .send()
+            .await
+            .map_err(|_| "creative_outcome_unknown")?;
+        if response.status().is_redirection() {
+            return Err("creative_redirect_rejected".into());
+        }
+        let status = response.status();
+        // Error pages can echo provider keys; expose only the HTTP status.
+        if !status.is_success() {
+            send(CreativeChunk::Start {
+                status: status.as_u16(),
+                content_type: "application/json".into(),
+                headers: BTreeMap::new(),
+            })?;
+            send(CreativeChunk::Data { data: STANDARD.encode(serde_json::json!({"error":{"message":format!("模型服务请求失败（HTTP {}）",status.as_u16())}}).to_string()) })?;
+        } else {
+            if response
+                .content_length()
+                .is_some_and(|n| n > MAX_BYTES as u64)
+            {
+                return Err("response_too_large".into());
+            }
+            let content_type = response
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("application/octet-stream")
+                .to_owned();
+            let headers = ["x-request-id", "x-oneapi-request-id", "retry-after"]
+                .iter()
+                .filter_map(|name| {
+                    response
+                        .headers()
+                        .get(*name)
+                        .and_then(|v| v.to_str().ok())
+                        .map(|v| (name.to_string(), v.to_string()))
+                })
+                .collect();
+            send(CreativeChunk::Start {
+                status: status.as_u16(),
+                content_type,
+                headers,
+            })?;
+            let mut stream = response.bytes_stream();
+            let mut total = 0usize;
+            while let Some(chunk) = stream.next().await {
+                let bytes = chunk.map_err(|_| "creative_outcome_unknown")?;
+                total += bytes.len();
+                if total > MAX_BYTES {
+                    return Err("response_too_large".into());
+                }
+                send(CreativeChunk::Data {
+                    data: STANDARD.encode(bytes),
+                })?;
+            }
+        }
+        send(CreativeChunk::End)
     };
     let result = tokio::select! {
         biased;
@@ -128,76 +185,6 @@ pub(crate) async fn execute(
     };
     PENDING.lock().unwrap().remove(&request.request_id);
     result
-}
-
-/// Identical status, streaming, size-limit and redaction semantics for all sources.
-pub(crate) async fn send_response(
-    builder: reqwest::RequestBuilder,
-    send: impl Fn(CreativeChunk) -> Result<(), String>,
-    validate: impl Fn() -> Result<(), String>,
-) -> Result<(), String> {
-    validate()?;
-    let response = builder
-        .send()
-        .await
-        .map_err(|_| "creative_outcome_unknown")?;
-    if response.status().is_redirection() {
-        return Err("creative_redirect_rejected".into());
-    }
-    validate()?;
-    let status = response.status();
-    // Error pages can echo provider keys; expose only the HTTP status.
-    if !status.is_success() {
-        send(CreativeChunk::Start {
-            status: status.as_u16(),
-            content_type: "application/json".into(),
-            headers: BTreeMap::new(),
-        })?;
-        send(CreativeChunk::Data { data: STANDARD.encode(serde_json::json!({"error":{"message":format!("模型服务请求失败（HTTP {}）",status.as_u16())}}).to_string()) })?;
-    } else {
-        if response
-            .content_length()
-            .is_some_and(|n| n > MAX_BYTES as u64)
-        {
-            return Err("response_too_large".into());
-        }
-        let content_type = response
-            .headers()
-            .get("content-type")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("application/octet-stream")
-            .to_owned();
-        let headers = ["x-request-id", "x-oneapi-request-id", "retry-after"]
-            .iter()
-            .filter_map(|name| {
-                response
-                    .headers()
-                    .get(*name)
-                    .and_then(|v| v.to_str().ok())
-                    .map(|v| (name.to_string(), v.to_string()))
-            })
-            .collect();
-        send(CreativeChunk::Start {
-            status: status.as_u16(),
-            content_type,
-            headers,
-        })?;
-        let mut stream = response.bytes_stream();
-        let mut total = 0usize;
-        while let Some(chunk) = stream.next().await {
-            validate()?;
-            let bytes = chunk.map_err(|_| "creative_outcome_unknown")?;
-            total += bytes.len();
-            if total > MAX_BYTES {
-                return Err("response_too_large".into());
-            }
-            send(CreativeChunk::Data {
-                data: STANDARD.encode(bytes),
-            })?;
-        }
-    }
-    validate()?;
-    send(CreativeChunk::End)
 }
 
 #[tauri::command]

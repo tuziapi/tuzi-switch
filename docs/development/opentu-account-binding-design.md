@@ -1,7 +1,5 @@
 # UC-D03 / UC-P02：复用创作配置与统一账户关联
 
-> 2026-11-04 UC-TRANSPORT-01：用户已批准统一模型适配流程、分开凭证获取。[ADR-018](decisions/0018-creative-shared-transport.md) 替代下文旧 action 请求字段、固定动作清单和目录端点标签资格限制；这些段落仅描述旧 IPC 兼容入口。新请求共用手动 HTTP 序列化和响应，绑定与凭证隔离规则保留。
-
 日期：2026-11-01。用户已选择 **B：统一账户关联**，并明确要求保留手动配置、直接复用已有设置、简化画面。此授权替代此前“设计待选择”的状态，以及另建快速配置抽屉的早期画面。实施与验证见 [UC-P02](opentu-account-binding-implementation.md)。
 
 基线：用户指定 `codex/assistant-main-sync` 的 `71314a670b4cca0e1aaf2b2af3295b4fca6d8ad8`；本地分支 `codex/opentu-assistant-sync`；opentu 来源固定 `7d05f299fec40599221294a34c9b26f888177c9e`。账户契约 `system-token-v1`、ADR-011 不变。本轮只本地实现及合成验证，不推送、不发布、不访问真实凭证或付费调用。
