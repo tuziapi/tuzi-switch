@@ -99,6 +99,35 @@ describe.each(["tuziapi/tuzi-switch", "AiW520/tuzi-switch"])(
           : "tuziapi/tuzi-switch";
       expect(() => validateInstallerRelease(fixture(other), repo)).toThrow();
     });
+    it("does not silently download a version different from the displayed notes", async () => {
+      const changed = JSON.parse(
+        JSON.stringify(fixture(repo)).split("v1.5.1").join("v1.5.2"),
+      );
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValueOnce({ ok: true, json: async () => fixture(repo) })
+          .mockResolvedValueOnce({ ok: true, json: async () => changed }),
+      );
+      const result = await checkInstallerUpdate(
+        {
+          channel: "stable",
+          repository: repo,
+          platform: "macos",
+          runNumber: 0,
+          commit: "",
+        },
+        "1.5.0",
+        1000,
+      );
+      expect(result.status).toBe("available");
+      if (result.status === "available")
+        await expect(result.update.download!()).rejects.toThrow(
+          "Release changed",
+        );
+      expect(invoke).not.toHaveBeenCalled();
+    });
     it("revalidates withdrawn releases before opening and never opens an artifact archive", async () => {
       const fetchMock = vi
         .fn()

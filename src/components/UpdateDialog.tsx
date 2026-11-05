@@ -13,6 +13,7 @@ import { Download, Loader2, RotateCcw } from "lucide-react";
 export function UpdateDialog() {
   const {
     updateInfo,
+    updateHandle,
     updateDialogOpen,
     closeUpdateDialog,
     installState,
@@ -20,10 +21,13 @@ export function UpdateDialog() {
     installUpdate,
   } = useUpdate();
   if (!updateInfo) return null;
+  const manual = updateHandle?.manual === true;
   const { phase, downloaded, total, error } = installState;
-  const downloading = phase === "downloading" || phase === "verifying";
-  const installing = phase === "preparing" || phase === "installing";
-  const ready = phase === "ready" || phase === "installed";
+  const downloading =
+    !manual && (phase === "downloading" || phase === "verifying");
+  const installing =
+    !manual && (phase === "preparing" || phase === "installing");
+  const ready = !manual && (phase === "ready" || phase === "installed");
   const progress =
     total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : null;
   const label =
@@ -59,7 +63,9 @@ export function UpdateDialog() {
           </DialogTitle>
           <DialogDescription>
             当前版本 {updateInfo.currentVersion}
-            。应用内下载，完成后点击重启安装。
+            {manual
+              ? "。查看更新说明后下载对应系统的安装包，下载完成后请手动安装。"
+              : "。应用内下载，完成后点击重启安装。"}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 px-6 py-4">
@@ -98,14 +104,14 @@ export function UpdateDialog() {
               )}
             </div>
           )}
-          {error && (
+          {!manual && error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
             </p>
           )}
-          {!downloading && !installing && updateInfo.notes && (
+          {!downloading && !installing && (
             <div className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
-              {updateInfo.notes}
+              {updateInfo.notes || "此版本暂无更新说明。"}
             </div>
           )}
         </div>
@@ -135,9 +141,11 @@ export function UpdateDialog() {
                 ? "正在下载"
                 : ready
                   ? "重启并更新"
-                  : phase === "error"
-                    ? "重新下载"
-                    : "下载更新"}
+                  : manual
+                    ? "下载安装包"
+                    : phase === "error"
+                      ? "重新下载"
+                      : "下载更新"}
           </Button>
         </DialogFooter>
       </DialogContent>

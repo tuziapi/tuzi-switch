@@ -49,7 +49,7 @@ export function macosInstallBootstrap(release) {
     '${installer.tag}'|'${installer.tag.slice(1)}') ;;
     *) printf '不支持的版本：%s。当前可安装：${installer.tag}。\\n' "$version" >&2; exit 2 ;;
   esac
-  installer="$(mktemp -t tuzi-install)"
+  installer="$(mktemp -t tuzi-install.XXXXXX)"
   trap 'rm -f "$installer"' EXIT
   curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fL '${installer.href}' -o "$installer"
   printf '%s  %s\\n' '${installer.sha256}' "$installer" | shasum -a 256 -c -

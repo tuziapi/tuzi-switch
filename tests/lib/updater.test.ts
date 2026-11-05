@@ -88,7 +88,7 @@ function mockLatestRelease() {
   );
 }
 
-describe.each(["tuziapi/tuzi-switch", "AiW520/tuzi-switch"])(
+describe.each(["AiW520/tuzi-switch"])(
   "signed integrated release channel: %s",
   (repository) => {
     beforeEach(() => {
@@ -144,3 +144,112 @@ describe.each(["tuziapi/tuzi-switch", "AiW520/tuzi-switch"])(
     });
   },
 );
+
+describe("official manual release notifications", () => {
+  const repository = "tuziapi/tuzi-switch";
+  const fixture = () => ({
+    tag_name: "v1.5.6",
+    html_url: `https://github.com/${repository}/releases/tag/v1.5.6`,
+    published_at: "2026-11-05T00:00:00Z",
+    draft: false,
+    prerelease: false,
+    body: "合成更新说明",
+    assets: [
+      "macos-arm64.dmg",
+      "macos-x64.dmg",
+      "windows-x64.exe",
+      "linux-x64.AppImage",
+    ].map((suffix) => ({
+      name: `tuzi-assistant-${suffix}`,
+      state: "uploaded",
+      size: 123,
+      digest: `sha256:${"a".repeat(64)}`,
+      browser_download_url: `https://github.com/${repository}/releases/download/v1.5.6/tuzi-assistant-${suffix}`,
+    })),
+  });
+  beforeEach(() => {
+    checkMock.mockReset();
+    invokeMock.mockReset();
+    getVersionMock.mockReset();
+    invokeMock.mockResolvedValue({
+      channel: "stable",
+      repository,
+      platform: "macos",
+      runNumber: 0,
+      commit: "",
+    });
+    getVersionMock.mockResolvedValue("1.5.5");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => fixture() }),
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  it.each([null, new Error("missing unsigned manifest")])(
+    "detects a newer installer independently of signed manifest status: %s",
+    async (nativeResult) => {
+      if (nativeResult instanceof Error)
+        checkMock.mockRejectedValue(nativeResult);
+      else checkMock.mockResolvedValue(nativeResult);
+      const { checkForUpdate } = await import("@/lib/updater");
+      const result = await checkForUpdate();
+      expect(result).toMatchObject({
+        status: "available",
+        info: {
+          currentVersion: "1.5.5",
+          availableVersion: "1.5.6",
+          notes: "合成更新说明",
+          channel: "stable",
+        },
+        update: { manual: true },
+      });
+      expect(checkMock).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledWith(
+        `https://api.github.com/repos/${repository}/releases/latest`,
+        expect.objectContaining({ credentials: "omit", cache: "no-store" }),
+      );
+      expect(invokeMock).not.toHaveBeenCalledWith(
+        "open_external",
+        expect.anything(),
+      );
+      if (result.status === "available") await result.update.download!();
+      expect(invokeMock).toHaveBeenCalledWith("open_external", {
+        url: `https://github.com/${repository}/releases/download/v1.5.6/tuzi-assistant-macos-arm64.dmg`,
+      });
+      expect(JSON.stringify(vi.mocked(fetch).mock.calls)).not.toContain(
+        "AiW520",
+      );
+    },
+  );
+  it("returns up-to-date only after a successful version check", async () => {
+    getVersionMock.mockResolvedValue("1.5.6");
+    const { checkForUpdate } = await import("@/lib/updater");
+    expect(await checkForUpdate()).toEqual({ status: "up-to-date" });
+    expect(checkMock).not.toHaveBeenCalled();
+  });
+  it("reports offline and unknown installed-version errors without a false up-to-date result", async () => {
+    const { checkForUpdate } = await import("@/lib/updater");
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("offline"));
+    await expect(checkForUpdate()).rejects.toThrow("offline");
+    getVersionMock.mockRejectedValueOnce(new Error("version unavailable"));
+    await expect(checkForUpdate()).rejects.toThrow("Invalid release version");
+    expect(checkMock).not.toHaveBeenCalled();
+  });
+  it("rejects a test-repository download injected into official metadata", async () => {
+    const release = fixture();
+    release.assets[0].browser_download_url =
+      release.assets[0].browser_download_url.replace("tuziapi", "AiW520");
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => release,
+    } as Response);
+    const { checkForUpdate } = await import("@/lib/updater");
+    await expect(checkForUpdate()).rejects.toThrow(
+      "Missing verified installer",
+    );
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "open_external",
+      expect.anything(),
+    );
+  });
+});

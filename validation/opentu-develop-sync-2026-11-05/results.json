@@ -1,0 +1,118 @@
+{
+  "task": "UC-SYNC-02",
+  "upstream": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
+  "assistantBase": "2b5a3f76acc454a00e1e2b65ddf3bbde27d08399",
+  "hostTests": {
+    "files": 94,
+    "passed": 772
+  },
+  "creativeTests": {
+    "files": 132,
+    "passed": 2149
+  },
+  "animatedFixtureTests": {
+    "passed": 4,
+    "frames": 2,
+    "sha256": "7613107642a0105c0907cfa198cecfe8464c174a498d4ae8143a2090dd6f5c0a"
+  },
+  "typecheck": "passed",
+  "rendererBuild": "passed",
+  "provenance": {
+    "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+    "originalFiles": 1522,
+    "localFiles": 43,
+    "reconstructedFiles": 1565,
+    "patchBytes": 603971
+  },
+  "browser": {
+    "chromium": {
+      "featureUI": [
+        {
+          "theme": "light",
+          "icon": "passed",
+          "pageErrors": []
+        },
+        {
+          "theme": "dark",
+          "icon": "passed",
+          "pageErrors": []
+        },
+        {
+          "outcome": "failure",
+          "status": "passed",
+          "pageErrors": []
+        },
+        {
+          "outcome": "gif",
+          "status": "passed",
+          "pageErrors": []
+        }
+      ],
+      "mediaFailureRecovery": [
+        {
+          "kind": "video",
+          "outcome": "failure",
+          "status": "passed",
+          "posts": 1,
+          "reloadPosts": 0
+        },
+        {
+          "kind": "text",
+          "outcome": "failure",
+          "status": "passed",
+          "posts": 1,
+          "reloadPosts": 0
+        }
+      ],
+      "animation": "Both synthetic red and cyan frame pixels observed",
+      "screenshots": "/tmp/opentu-sync-ui-chrome"
+    },
+    "webkit": {
+      "featureUI": [
+        {
+          "theme": "light",
+          "icon": "passed",
+          "pageErrors": []
+        },
+        {
+          "theme": "dark",
+          "icon": "passed",
+          "pageErrors": []
+        },
+        {
+          "outcome": "failure",
+          "status": "passed",
+          "pageErrors": []
+        },
+        {
+          "outcome": "gif",
+          "status": "passed",
+          "pageErrors": []
+        }
+      ],
+      "mediaFailureRecovery": [
+        {
+          "kind": "video",
+          "outcome": "failure",
+          "status": "passed",
+          "posts": 1,
+          "reloadPosts": 0
+        },
+        {
+          "kind": "text",
+          "outcome": "failure",
+          "status": "passed",
+          "posts": 1,
+          "reloadPosts": 0
+        }
+      ],
+      "animation": "Both synthetic red and cyan frame pixels observed",
+      "screenshots": "/tmp/opentu-sync-ui-webkit"
+    }
+  },
+  "limits": [
+    "Synthetic native transport and clipboard/file IPC; no paid supplier call",
+    "No native Tauri installer build or installed app verification this round",
+    "No push, PR, new version publication or public download-page change"
+  ]
+}

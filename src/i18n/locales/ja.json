@@ -760,6 +760,7 @@
     "browseDirectory": "ディレクトリを選択",
     "resetDefault": "デフォルトに戻す（保存後に反映）",
     "updateNoticeTitle": "兔子助手の新しいバージョン",
+    "viewUpdate": "更新内容を確認",
     "acceptanceUpdateNotice": "opentu テスト版。GitHub にログインしてダウンロード。",
     "downloadUpdate": "更新をダウンロード",
     "updateLater": "後で",
