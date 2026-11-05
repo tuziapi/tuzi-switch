@@ -352,7 +352,11 @@ export function useImageGenerationAnchorSync({
 
     const removalTimers = removalTimersRef.current;
 
-    const reconcileAnchor = (anchorId: string, displayOnlyTick = false) => {
+    const reconcileAnchor = (
+      anchorId: string,
+      displayOnlyTick = false,
+      taskSnapshot?: Task[]
+    ) => {
       const anchor = ImageGenerationAnchorTransforms.getAnchorById(
         board,
         anchorId
@@ -362,7 +366,7 @@ export function useImageGenerationAnchorSync({
         return;
       }
 
-      const allTasks = taskQueueService.getAllTasks();
+      const allTasks = taskSnapshot ?? taskQueueService.getAllTasks();
       const relatedTasks = getTasksForImageGenerationAnchor(anchor, allTasks);
       const primaryTask = selectPrimaryImageGenerationAnchorTask(
         anchor,
@@ -545,10 +549,18 @@ export function useImageGenerationAnchorSync({
       }
     };
 
+    // Reuse only within this synchronous sweep. Each later event/clock tick
+    // gets fresh tasks, and an empty canvas does not scan task history at all.
+    const reconcileAnchors = (anchorIds: string[], displayOnlyTick = false) => {
+      if (anchorIds.length === 0) return;
+      const tasks = taskQueueService.getAllTasks();
+      anchorIds.forEach((id) => reconcileAnchor(id, displayOnlyTick, tasks));
+    };
+
     const reconcileAllAnchors = () => {
-      ImageGenerationAnchorTransforms.getAllAnchors(board).forEach((anchor) => {
-        reconcileAnchor(anchor.id);
-      });
+      reconcileAnchors(
+        ImageGenerationAnchorTransforms.getAllAnchors(board).map((anchor) => anchor.id)
+      );
     };
 
     const reconcileTaskRelatedAnchors = (task: Task) => {
@@ -593,7 +605,7 @@ export function useImageGenerationAnchorSync({
         return;
       }
 
-      candidateAnchorIds.forEach((anchorId) => reconcileAnchor(anchorId));
+      reconcileAnchors([...candidateAnchorIds]);
     };
 
     const unsubscribeImageReadiness = subscribeCanvasImageReadiness(
@@ -629,11 +641,12 @@ export function useImageGenerationAnchorSync({
       });
 
     const progressTimer = setInterval(() => {
-      ImageGenerationAnchorTransforms.getAllAnchors(board).forEach((anchor) => {
-        if (isActiveAnchorPhase(anchor.phase)) {
-          reconcileAnchor(anchor.id, true);
-        }
-      });
+      reconcileAnchors(
+        ImageGenerationAnchorTransforms.getAllAnchors(board)
+          .filter((anchor) => isActiveAnchorPhase(anchor.phase))
+          .map((anchor) => anchor.id),
+        true
+      );
     }, ACTIVE_ANCHOR_PROGRESS_INTERVAL);
 
     const stalePhaseTimestamps = new Map<string, number>();

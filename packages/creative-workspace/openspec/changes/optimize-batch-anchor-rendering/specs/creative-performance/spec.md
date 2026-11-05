@@ -10,3 +10,8 @@ The desktop renderer SHALL retain an anchor's SVG structure when only its progre
 #### Scenario: Result, failure or geometry changes
 - **WHEN** an anchor changes phase, geometry, preview or failure diagnostics
 - **THEN** it renders the current state and preserves working retry, close and diagnostic-copy actions
+
+#### Scenario: Estimated progress stalls or history grows
+- **WHEN** displayed estimated progress does not change or reaches its cap
+- **THEN** no clock-driven React render is requested until the displayed value changes or a new attempt starts
+- **AND** a reconciliation sweep reads task history once and the next sweep observes fresh tasks
