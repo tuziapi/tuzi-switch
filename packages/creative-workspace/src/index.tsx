@@ -107,11 +107,13 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
       {error && <div role="alert" className="creative-error">{error}</div>}
       {!ready && !error && <div className="creative-loading" role="status">正在读取本地项目…</div>}
       {ready && page === 'projects' && <section className="creative-projects">
-        <div className="creative-projects-heading"><div><span className="creative-eyebrow">OPENTU · 创作空间</span><h2>把想法，变成作品。</h2><p>在自由画布中整理灵感，把想法变成作品。</p></div><button className="creative-primary" disabled={busy} onClick={createBoard}><Plus size={17} />新建项目</button></div>
-        <div className="creative-start-grid">
-          <button className="creative-start-card" disabled={busy} onClick={createBoard}><span className="creative-start-icon"><Pencil size={24} /></span><strong>自由画布</strong><span>绘图、文字、思维导图，在一张画布上展开。</span><ArrowUpRight size={18} /></button>
+        <div className="creative-project-list-header">
+          <h2>我的项目 <small>{boards.length}</small></h2>
+          <div className="creative-project-list-actions">
+            <label><Search size={15} /><input aria-label="搜索项目" placeholder="搜索项目" value={search} onChange={e => setSearch(e.target.value)} /></label>
+            <button className="creative-primary" disabled={busy} onClick={createBoard}><Plus size={17} />新建项目</button>
+          </div>
         </div>
-        <div className="creative-project-list-header"><h3>我的项目 <small>{boards.length}</small></h3><label><Search size={15} /><input aria-label="搜索项目" placeholder="搜索项目" value={search} onChange={e => setSearch(e.target.value)} /></label></div>
         {boards.length === 0 ? <div className="creative-empty"><LayoutGrid size={30} /><h3>从第一个项目开始</h3><p>你的作品保存在当前设备。创建一个空白画布，开始编辑。</p><button onClick={createBoard} disabled={busy}>创建项目 <ArrowUpRight size={15} /></button></div> : <div className="creative-project-grid">{boards.filter(b => b.name.toLowerCase().includes(search.toLowerCase())).sort((a,b) => b.updatedAt-a.updatedAt).map(board => <article className="creative-project-card" key={board.id}><button disabled={busy} onClick={() => openBoard(board.id)} className="creative-project-open"><span className="creative-project-thumbnail"><LayoutGrid size={28}/></span><strong>{board.name}</strong><span>{new Date(board.updatedAt).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></button><button aria-label={`重命名 ${board.name}`} onClick={() => setRenaming({ id: board.id, name: board.name })} className="creative-rename"><Pencil size={14}/></button></article>)}</div>}
       </section>}
       {ready && editor && page !== 'projects' && <div className="creative-editor"><App /></div>}
