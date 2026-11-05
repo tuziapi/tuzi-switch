@@ -116,6 +116,8 @@ export async function checkInstallerUpdate(
     const current = await fetchRelease();
     if (!isNewerInstallerVersion(current.tag_name, currentVersion))
       throw Error("Update withdrawn; check again");
+    if (current.tag_name !== release.tag_name)
+      throw Error("Release changed; check again before downloading");
     const asset = current.assets.find(
       (a) => a.name === installers[build.platform],
     )!;

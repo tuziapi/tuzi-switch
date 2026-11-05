@@ -297,7 +297,11 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
       return;
     }
     if (hasUpdate && updateHandle) {
-      if (installState.phase === "ready" || installState.phase === "installed")
+      if (
+        (updateHandle.manual && updateInfo?.channel === "stable") ||
+        installState.phase === "ready" ||
+        installState.phase === "installed"
+      )
         openUpdateDialog();
       else await downloadUpdate();
       return;
@@ -306,7 +310,10 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     let nativeUpdateError: unknown = null;
     try {
       const available = await checkUpdate();
-      if (available) return;
+      if (available) {
+        openUpdateDialog();
+        return;
+      }
     } catch (error) {
       nativeUpdateError = error;
       console.error("[AboutSection] Check update failed", error);
@@ -336,6 +343,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     installState,
     t,
     updateHandle,
+    updateInfo,
   ]);
 
   const handleCopyInstallCommands = useCallback(async () => {
