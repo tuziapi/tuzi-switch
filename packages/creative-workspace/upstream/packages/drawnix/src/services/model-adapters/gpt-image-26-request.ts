@@ -26,6 +26,11 @@ export function normalizeGPTImage26Request(
 ): ImageGenerationRequest {
   if (!modelId || !isGPTImage26ModelId(modelId)) return request;
 
+  const formats = [request.outputFormat, request.params?.output_format];
+  if (formats.some((value) => typeof value === 'string' && ['gif', 'svg'].includes(value.trim().toLowerCase()))) {
+    throw new Error('当前基础接入暂不支持 GIF/SVG 输出参数。default/Codex 分组生成 GIF 请移除格式参数，并在提示词写“生成 GIF 图”；官方分组专用格式暂未接入。');
+  }
+
   const requestedSize = typeof request.params?.size === 'string' && request.params.size.trim()
     ? request.params.size
     : request.size;

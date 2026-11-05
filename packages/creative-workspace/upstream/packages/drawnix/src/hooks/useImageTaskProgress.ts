@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { TaskStatus, TaskType } from '../types/task.types';
 import {
   IMAGE_GENERATION_ESTIMATE_MS,
+  IMAGE_GENERATION_MAX_PROGRESS,
+  calculateSimulatedImageProgress,
   resolveImageTaskDisplayProgress,
 } from '../utils/image-task-progress';
 
@@ -48,17 +50,23 @@ export function useImageTaskProgress({
       return;
     }
 
-    const tick = () => {
-      setProgressTick((value) => value + 1);
-    };
-
-    tick();
-    const interval = setInterval(tick, PROGRESS_UPDATE_INTERVAL);
+    // Rendering already computes the current value. Wake React only when the
+    // displayed integer changes, and stop the clock once the estimate is capped.
+    let previous = calculateSimulatedImageProgress(startedAt, estimatedDuration);
+    if (previous >= IMAGE_GENERATION_MAX_PROGRESS) return;
+    const interval = setInterval(() => {
+      const next = calculateSimulatedImageProgress(startedAt, estimatedDuration);
+      if (next !== previous) {
+        previous = next;
+        setProgressTick((value) => value + 1);
+      }
+      if (next >= IMAGE_GENERATION_MAX_PROGRESS) clearInterval(interval);
+    }, PROGRESS_UPDATE_INTERVAL);
 
     return () => {
       clearInterval(interval);
     };
-  }, [mediaUrl, startedAt, taskStatus, taskType]);
+  }, [estimatedDuration, mediaUrl, startedAt, taskStatus, taskType]);
 
   useEffect(() => {
     if (!mediaUrl || !isImageLoading || taskType !== TaskType.IMAGE) {

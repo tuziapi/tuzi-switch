@@ -1613,7 +1613,7 @@ index 30be31c..7ff5760 100644
            }
          }
 diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
-index 4ef1925..c3e5151 100644
+index 4ef1925..42252fb 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 +++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 @@ -1,3 +1,4 @@
@@ -1663,7 +1663,7 @@ index 4ef1925..c3e5151 100644
    });
  
    it('shows successful generation and retries insertion without regenerating', async () => {
-@@ -215,12 +218,77 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+@@ -215,12 +218,155 @@ describe('ImageGenerationAnchorContent result recovery', () => {
        expect(mocks.retryTask).not.toHaveBeenCalled();
        expect(retryInsertion).not.toHaveBeenCalled();
        expect(board.children).toHaveLength(2);
@@ -1740,6 +1740,84 @@ index 4ef1925..c3e5151 100644
 +      generator.destroy();
 +      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
 +      svg.remove(); setAssistantAccount(undefined); vi.unstubAllGlobals(); mocks.tasks = [];
++    }
++  });
++});
++
++// The public generator path includes the native controller's extra readiness tick.
++// Retaining the spinner identity is important: replacing it restarts its animation.
++describe('native SVG progress rendering', () => {
++  it('reuses the entire SVG structure for progress, unchanged updates and subtitle changes', async () => {
++    vi.stubGlobal('__TAURI_INTERNALS__', {});
++    mocks.tasks = [{ id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.PROCESSING,
++      params: {}, createdAt: 1, progress: 10 } as Task];
++    let anchor = { ...createAnchor(), phase: 'generating' as const, error: undefined, progress: 10 };
++    const board = { children: [] } as unknown as PlaitBoard;
++    const host = document.createElementNS('http://www.w3.org/2000/svg', 'g');
++    document.body.appendChild(host);
++    const generator = new ImageGenerationAnchorGenerator(board);
++    try {
++      await act(async () => { generator.processDrawing(anchor, host, false); });
++      const fallback = host.querySelector('.image-generation-anchor-desktop-fallback')!;
++      const spinner = host.querySelector('animateTransform')!;
++      const background = fallback.firstChild;
++      const replace = vi.spyOn(fallback, 'replaceChildren');
++      const bar = [...host.querySelectorAll('rect')].find(node => node.getAttribute('height') === '3' && node.getAttribute('fill') === '#25755e')!;
++      expect(bar.getAttribute('width')).toBe('18');
++      for (const progress of [10, 20, 40, 60, 90, 90]) {
++        mocks.tasks[0] = { ...mocks.tasks[0], progress };
++        anchor = { ...anchor, progress, subtitle: `synthetic progress ${progress}` };
++        await act(async () => { generator.updateDrawing(anchor, host, false); });
++        expect(bar.getAttribute('width')).toBe(String(180 * progress / 100));
++        expect(fallback.firstChild).toBe(background);
++        expect(host.querySelector('animateTransform')).toBe(spinner);
++      }
++      expect(replace).not.toHaveBeenCalled();
++      expect(host.textContent).toContain('synthetic progress');
++      expect(fallback.getAttribute('aria-label')).toContain('synthetic progress 90');
++    } finally {
++      generator.destroy();
++      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
++      host.remove(); vi.unstubAllGlobals(); mocks.tasks = [];
++    }
++  });
++
++  it('refreshes geometry and batch labels, and paints the latest failure and retry target', async () => {
++    vi.stubGlobal('__TAURI_INTERNALS__', {});
++    mocks.tasks = [{ id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.PROCESSING,
++      params: {}, createdAt: 1, progress: 40 } as Task];
++    let anchor: PlaitImageGenerationAnchor = { ...createAnchor(), phase: 'generating', error: undefined, progress: 40 };
++    const board = { children: [], deleteFragment: vi.fn() } as unknown as PlaitBoard;
++    const host = document.createElementNS('http://www.w3.org/2000/svg', 'g');
++    document.body.appendChild(host);
++    const generator = new ImageGenerationAnchorGenerator(board);
++    const onRetry = vi.fn(); window.addEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, onRetry);
++    try {
++      await act(async () => { generator.processDrawing(anchor, host, false); });
++      const originalSpinner = host.querySelector('animateTransform');
++      anchor = { ...anchor, points: [[100, 200], [500, 600]], batchTotal: 20 };
++      await act(async () => { generator.updateDrawing(anchor, host, false); });
++      expect(host.querySelector('animateTransform')).not.toBe(originalSpinner);
++      const background = host.querySelector('.image-generation-anchor-desktop-fallback > rect')!;
++      expect(background.getAttribute('x')).toBe('100');
++      expect(background.getAttribute('y')).toBe('200');
++      expect(background.getAttribute('width')).toBe('400');
++      expect(host.textContent).toContain('20 张');
++      mocks.tasks = [{ ...mocks.tasks[0], id: 'task-retry', status: TaskStatus.FAILED,
++        error: { code: 'FAILED', message: 'synthetic new failure', details: { requestId: 'request-new' } } }];
++      anchor = { ...anchor, phase: 'failed', taskIds: ['task-retry'], primaryTaskId: 'task-retry' };
++      await act(async () => { generator.updateDrawing(anchor, host, false); });
++      expect(host.textContent).toContain('request-new');
++      expect(host.querySelector('animateTransform')).toBeNull();
++      fireEvent.click(host.querySelector('[aria-label="重试"]')!);
++      expect(onRetry.mock.lastCall?.[0].detail).toEqual({ taskId: 'task-retry', anchorId: anchor.id });
++      fireEvent.click(host.querySelector('[aria-label="关闭"]')!);
++      expect(board.deleteFragment).toHaveBeenCalledWith([expect.objectContaining({ primaryTaskId: 'task-retry', points: anchor.points })]);
++    } finally {
++      window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, onRetry);
++      generator.destroy();
++      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
++      host.remove(); vi.unstubAllGlobals(); mocks.tasks = [];
 +    }
 +  });
 +});
@@ -2354,7 +2432,7 @@ index 380b825..8a4c5a4 100644
  
      if (this.activeGenerator) {
 diff --git a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
-index d8018b2..82e6018 100644
+index d8018b2..4c5967c 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 +++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 @@ -1,12 +1,15 @@
@@ -2403,15 +2481,18 @@ index d8018b2..82e6018 100644
  export class ImageGenerationAnchorGenerator {
    constructor(private board: PlaitBoard) {}
  
-@@ -53,6 +66,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -53,6 +66,10 @@ export class ImageGenerationAnchorGenerator {
    private reactRoot: Root | null = null;
    private desktopFallback: SVGGElement | null = null;
    private renderTimer: number | null = null;
++  private desktopLayout: readonly unknown[] | null = null;
++  private desktopProgressBar: SVGRectElement | null = null;
++  private desktopDescription: SVGTextElement | null = null;
 +  onSizeChange?: (size: { width: number; height: number }) => void;
  
    processDrawing(
      element: PlaitImageGenerationAnchor,
-@@ -63,8 +77,9 @@ export class ImageGenerationAnchorGenerator {
+@@ -63,8 +80,9 @@ export class ImageGenerationAnchorGenerator {
      g.setAttribute('class', 'image-generation-anchor-element');
      parentG.appendChild(g);
  
@@ -2422,7 +2503,7 @@ index d8018b2..82e6018 100644
      } else {
        this.createForeignObject(element, g);
        // WebKit is sensitive to mounting a React root before foreignObject is
-@@ -83,7 +98,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -83,7 +101,7 @@ export class ImageGenerationAnchorGenerator {
      selected: boolean
    ): void {
      if (this.desktopFallback) {
@@ -2431,7 +2512,7 @@ index d8018b2..82e6018 100644
        return;
      }
  
-@@ -91,6 +106,19 @@ export class ImageGenerationAnchorGenerator {
+@@ -91,6 +109,19 @@ export class ImageGenerationAnchorGenerator {
      this.renderReact(element, selected);
    }
  
@@ -2451,7 +2532,7 @@ index d8018b2..82e6018 100644
    private createDesktopFallback(
      element: PlaitImageGenerationAnchor,
      g: SVGGElement
-@@ -105,7 +133,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -105,16 +136,62 @@ export class ImageGenerationAnchorGenerator {
      this.renderDesktopFallback(element);
    }
  
@@ -2460,10 +2541,26 @@ index d8018b2..82e6018 100644
      const host = this.desktopFallback;
      if (!host) {
        return;
-@@ -114,7 +142,39 @@ export class ImageGenerationAnchorGenerator {
-     host.replaceChildren();
+     }
+ 
+-    host.replaceChildren();
      const rect = RectangleClient.getRectangleByPoints(element.points);
      const isFailed = element.phase === 'failed';
++    const layout = [
++      element.id, rect.x, rect.y, rect.width, rect.height, element.phase,
++      element.batchTotal || element.requestedCount || element.taskIds.length || 1,
++      element.previewImageUrl, typeof element.progress === 'number',
++    ];
++    // Progress arrives from both task/board updates and the display clock.
++    // Keep SVG animations and layout intact for these frequent, local changes.
++    if (!isFailed && this.desktopLayout?.every((value, index) => value === layout[index])) {
++      this.updateDesktopProgress(element, rect.width);
++      return;
++    }
++    this.desktopLayout = isFailed ? null : layout;
++    this.desktopProgressBar = null;
++    this.desktopDescription = null;
++    host.replaceChildren();
 +    if (isFailed) {
 +      const details = failure || getImageFailureDetails(undefined, element.error || '生成失败');
 +      const rows: FailureRows = [
@@ -2500,7 +2597,7 @@ index d8018b2..82e6018 100644
      const accent = isFailed ? '#c15a5a' : '#25755e';
      const background = isFailed
        ? '#fffafa'
-@@ -138,7 +198,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -138,7 +215,7 @@ export class ImageGenerationAnchorGenerator {
  
      host.setAttribute(
        'aria-label',
@@ -2509,7 +2606,7 @@ index d8018b2..82e6018 100644
      );
  
      const backgroundRect = createSvgElement('rect');
-@@ -223,7 +283,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -223,7 +300,7 @@ export class ImageGenerationAnchorGenerator {
        host.appendChild(counter);
      }
  
@@ -2518,7 +2615,7 @@ index d8018b2..82e6018 100644
        const preview = createSvgElement('image');
        preview.setAttribute('x', String(rect.x));
        preview.setAttribute('y', String(rect.y));
-@@ -235,7 +295,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -235,7 +312,7 @@ export class ImageGenerationAnchorGenerator {
      }
  
      const centerX = rect.x + rect.width / 2;
@@ -2527,7 +2624,7 @@ index d8018b2..82e6018 100644
      const spinnerRadius = compact ? 10 : Math.min(28, minDimension * 0.1);
      const contentCenterY =
        rect.y +
-@@ -302,7 +362,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -302,7 +379,7 @@ export class ImageGenerationAnchorGenerator {
      title.textContent = phaseLabel;
      host.appendChild(title);
  
@@ -2536,7 +2633,52 @@ index d8018b2..82e6018 100644
        const maxChars = Math.max(
          12,
          Math.floor((rect.width - padding * 2) / 13)
-@@ -514,6 +574,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -323,6 +400,7 @@ export class ImageGenerationAnchorGenerator {
+       );
+       description.setAttribute('font-size', String(bodySize));
+       description.textContent = truncateText(subtitle, maxChars);
++      this.desktopDescription = description;
+       host.appendChild(description);
+     }
+ 
+@@ -348,6 +426,7 @@ export class ImageGenerationAnchorGenerator {
+       progressBar.setAttribute('height', '3');
+       progressBar.setAttribute('rx', '1.5');
+       progressBar.setAttribute('fill', accent);
++      this.desktopProgressBar = progressBar;
+       host.appendChild(progressBar);
+     }
+ 
+@@ -389,6 +468,28 @@ export class ImageGenerationAnchorGenerator {
+     }
+   }
+ 
++  private updateDesktopProgress(element: PlaitImageGenerationAnchor, width: number): void {
++    const subtitle = element.subtitle || DESKTOP_PHASE_SUBTITLES[element.phase];
++    const phaseLabel = DESKTOP_PHASE_LABELS[element.phase];
++    const loading = element.phase === 'developing' || element.phase === 'inserting';
++    const label = loading ? phaseLabel : `${phaseLabel}：${subtitle}`;
++    if (this.desktopFallback?.getAttribute('aria-label') !== label) {
++      this.desktopFallback?.setAttribute('aria-label', label);
++    }
++    if (this.desktopDescription) {
++      // A description exists only in the non-compact layout (20px padding).
++      const text = truncateText(subtitle, Math.max(12, Math.floor((width - 40) / 13)));
++      if (this.desktopDescription.textContent !== text) this.desktopDescription.textContent = text;
++    }
++    if (this.desktopProgressBar && typeof element.progress === 'number') {
++      const progress = Math.max(0, Math.min(100, Math.round(element.progress)));
++      const value = String((Math.min(180, width - 40) * progress) / 100);
++      if (this.desktopProgressBar.getAttribute('width') !== value) {
++        this.desktopProgressBar.setAttribute('width', value);
++      }
++    }
++  }
++
+   private appendDesktopActionButton(
+     host: SVGGElement,
+     x: number,
+@@ -514,6 +615,7 @@ export class ImageGenerationAnchorGenerator {
          board: this.board,
          element,
          selected,
@@ -2544,6 +2686,16 @@ index d8018b2..82e6018 100644
        })
      );
    }
+@@ -536,6 +638,9 @@ export class ImageGenerationAnchorGenerator {
+       }, 0);
+     }
+ 
++    this.desktopLayout = null;
++    this.desktopProgressBar = null;
++    this.desktopDescription = null;
+     this.foreignObject = null;
+     this.htmlContainer = null;
+     this.desktopFallback = null;
 diff --git a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.scss b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.scss
 index f2d5ebb..2dfb623 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.scss
@@ -7303,14 +7455,18 @@ index bde67c4..8f612d9 100644
 +  .workzone-content__retry-btn { align-self: flex-end; }
 +}
 diff --git a/packages/drawnix/src/constants/model-config.ts b/packages/drawnix/src/constants/model-config.ts
-index e894544..ef65b37 100644
+index e894544..7e260e7 100644
 --- a/packages/drawnix/src/constants/model-config.ts
 +++ b/packages/drawnix/src/constants/model-config.ts
-@@ -22,6 +22,19 @@ import { getSunoV2Params } from '../services/suno-v2-params';
+@@ -22,6 +22,23 @@ import { getSunoV2Params } from '../services/suno-v2-params';
  export type ModelType = 'image' | 'video' | 'text' | 'audio';
  
  export const FLUX_3_IMAGE_MODEL_ID = 'flux-3-image';
 +export const GPT_IMAGE_26_1K_MODEL_ID = 'gpt-image-2.6-1k';
++export const GPT_IMAGE_26_MODEL_IDS = [
++  GPT_IMAGE_26_1K_MODEL_ID, 'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst',
++];
++export const GPT_IMAGE_26_BASIC_DESCRIPTION = '基础接入支持生图、普通图片编辑；default/Codex 分组可在提示词写“生成 GIF 图”。官方分组专用 GIF/SVG 参数暂未接入，尺寸以返回文件为准。';
 +export const GPT_IMAGE_26_SIZE_OPTIONS = [
 +  { value: 'auto', label: '自动（原始尺寸）' },
 +  { value: '1024x1024', label: '1:1 方形' },
@@ -7321,12 +7477,12 @@ index e894544..ef65b37 100644
 +];
 +
 +export function isGPTImage26ModelId(modelId?: string | null): boolean {
-+  return modelId?.trim().toLowerCase() === GPT_IMAGE_26_1K_MODEL_ID;
++  return GPT_IMAGE_26_MODEL_IDS.includes(modelId?.trim().toLowerCase() || '');
 +}
  export const FLUX_3_IMAGE_ASPECT_RATIOS = [
    'auto', '21:9', '2:1', '16:9', '3:2', '7:5', '4:3', '5:4',
    '1:1', '4:5', '3:4', '5:7', '2:3', '9:16', '1:2', '9:21',
-@@ -492,6 +505,17 @@ export const IMAGE_MODEL_MORE_OPTIONS: ModelConfig[] = [
+@@ -492,6 +509,28 @@ export const IMAGE_MODEL_MORE_OPTIONS: ModelConfig[] = [
      imageDefaults: IMAGE_DEFAULT_PARAMS,
      tags: ['new'],
    },
@@ -7334,17 +7490,28 @@ index e894544..ef65b37 100644
 +    id: GPT_IMAGE_26_1K_MODEL_ID,
 +    label: GPT_IMAGE_26_1K_MODEL_ID,
 +    shortCode: 'gpt261k',
-+    description: 'Tuzi 图像生成渠道；提示词写“生成 GIF 图”可生成动图。保留实际输出尺寸，1k 不代表固定 1024×1024。',
++    description: `${GPT_IMAGE_26_BASIC_DESCRIPTION} 1k 不代表固定 1024×1024。`,
 +    type: 'image',
 +    vendor: ModelVendor.GPT,
 +    supportsTools: true,
 +    imageDefaults: IMAGE_DEFAULT_PARAMS,
 +    tags: ['new'],
 +  },
++  ...['flare', 'sunburst'].map((variant): ModelConfig => ({
++    id: `gpt-image-2.6-${variant}`,
++    label: `gpt-image-2.6-${variant}`,
++    shortCode: `gpt26${variant === 'flare' ? 'f' : 's'}`,
++    description: GPT_IMAGE_26_BASIC_DESCRIPTION,
++    type: 'image',
++    vendor: ModelVendor.GPT,
++    supportsTools: true,
++    imageDefaults: IMAGE_DEFAULT_PARAMS,
++    tags: ['new'],
++  })),
    {
      id: 'gpt-image-2.5-1k',
      label: 'gpt-image-2.5-1k',
-@@ -2132,7 +2156,7 @@ export function isGPTImage25ModelId(modelId: string): boolean {
+@@ -2132,7 +2171,7 @@ export function isGPTImage25ModelId(modelId: string): boolean {
  
  export function isGPTImage2ModelId(modelId: string): boolean {
    return (
@@ -7353,15 +7520,15 @@ index e894544..ef65b37 100644
      !isGPTImage25ModelId(modelId)
    );
  }
-@@ -2142,6 +2166,7 @@ const GPT_IMAGE_MODEL_IDS = [
+@@ -2142,6 +2181,7 @@ const GPT_IMAGE_MODEL_IDS = [
    ...GPT_IMAGE_2_MODEL_IDS,
    ...GPT_IMAGE_1K_MODEL_IDS,
    ...GPT_IMAGE_25_MODEL_IDS,
-+  GPT_IMAGE_26_1K_MODEL_ID,
++  ...GPT_IMAGE_26_MODEL_IDS,
  ];
  const MJ_IMAGE_MODEL_IDS = ['mj-imagine'];
  const GEMINI_31_FLASH_IMAGE_MODEL_IDS = ['gemini-3.1-flash-image-preview'];
-@@ -3035,6 +3060,17 @@ export const IMAGE_PARAMS: ParamConfig[] = [
+@@ -3035,6 +3075,17 @@ export const IMAGE_PARAMS: ParamConfig[] = [
      compatibleModels: GPT_IMAGE_2_MODEL_IDS,
      modelType: 'image',
    },
@@ -7373,17 +7540,17 @@ index e894544..ef65b37 100644
 +    valueType: 'enum',
 +    options: GPT_IMAGE_26_SIZE_OPTIONS,
 +    defaultValue: 'auto',
-+    compatibleModels: [GPT_IMAGE_26_1K_MODEL_ID],
++    compatibleModels: GPT_IMAGE_26_MODEL_IDS,
 +    modelType: 'image',
 +  },
    // GPT Image 2.5 官方像素尺寸
    {
      id: 'size',
-@@ -3118,6 +3154,7 @@ export const IMAGE_PARAMS: ParamConfig[] = [
+@@ -3118,6 +3169,7 @@ export const IMAGE_PARAMS: ParamConfig[] = [
      defaultValue: 'auto',
      compatibleModels: GPT_IMAGE_MODEL_IDS.filter(
        (modelId) =>
-+        modelId !== GPT_IMAGE_26_1K_MODEL_ID &&
++        !isGPTImage26ModelId(modelId) &&
          modelId !== 'gpt-image-2.5' &&
          modelId !== 'gpt-image-2.5-vip' &&
          modelId !== 'gpt-image-2.5-sunburst' &&
@@ -7689,6 +7856,167 @@ index bc35282..894ee86 100644
              <Suspense fallback={null}>
                <SettingsDialog container={containerRef.current}></SettingsDialog>
              </Suspense>
+diff --git a/packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts b/packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts
+index 798bdac..1bca06f 100644
+--- a/packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts
++++ b/packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts
+@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react';
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ import type { PlaitBoard } from '@plait/core';
+ import { useImageGenerationAnchorSync } from '../useImageGenerationAnchorSync';
++import { useImageGenerationAnchorController } from '../useImageGenerationAnchorController';
++import { useImageTaskProgress } from '../useImageTaskProgress';
+ import { registerCanvasImage } from '../../services/canvas-image-readiness';
+ import {
+   TaskExecutionPhase,
+@@ -18,6 +20,7 @@ const taskListeners: Array<(event: { task: Task }) => void> = [];
+ const completionListeners: Array<(event: { taskId: string }) => void> = [];
+ const taskState = {
+   tasks: [] as Task[],
++  reads: 0,
+ };
+ const completionState = {
+   byTaskId: new Map<
+@@ -36,7 +39,7 @@ const completionState = {
+ 
+ vi.mock('../../services/task-queue', () => ({
+   taskQueueService: {
+-    getAllTasks: () => taskState.tasks,
++    getAllTasks: () => { taskState.reads++; return taskState.tasks; },
+     observeTaskUpdates: () => ({
+       subscribe: (listener: (event: { task: Task }) => void) => {
+         taskListeners.push(listener);
+@@ -244,6 +247,7 @@ describe('useImageGenerationAnchorSync', () => {
+     taskListeners.length = 0;
+     completionListeners.length = 0;
+     taskState.tasks = [];
++    taskState.reads = 0;
+     completionState.byTaskId.clear();
+     vi.useRealTimers();
+   });
+@@ -268,7 +272,7 @@ describe('useImageGenerationAnchorSync', () => {
+     expect(anchor.subtitle).toBe('请求已受理，等待执行');
+   });
+ 
+-  it('refreshes active anchor progress while the image task is processing', () => {
++  it('advances displayed progress without dirtying the board until a real task event', () => {
+     vi.useFakeTimers();
+     vi.setSystemTime(new Date('2026-08-15T08:00:00.000Z'));
+ 
+@@ -294,11 +298,18 @@ describe('useImageGenerationAnchorSync', () => {
+       children: PlaitImageGenerationAnchor[];
+     };
+     expect(boardState.children[0]?.progress).toBe(0);
+-
++    const persistedAnchor = boardState.children[0];
++    const controller = renderHook(() => useImageGenerationAnchorController({
++      board, anchor: boardState.children[0],
++    }));
+     act(() => {
+       vi.advanceTimersByTime(60_000);
+     });
++    expect(controller.result.current.viewModel.progress).toBe(43);
++    expect(boardState.children[0]).toBe(persistedAnchor);
++    expect(boardState.children[0]?.progress).toBe(0);
+ 
++    act(() => { emitTaskUpdate(taskState.tasks[0]); });
+     expect(boardState.children[0]?.progress).toBe(43);
+   });
+ 
+@@ -701,4 +712,93 @@ describe('useImageGenerationAnchorSync', () => {
+ 
+     dispatchSpy.mockRestore();
+   });
++  it('reads one fresh task snapshot for twenty anchors with a thousand historical tasks and skips empty sweeps', () => {
++    vi.useFakeTimers();
++    vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
++    const anchors = Array.from({ length: 20 }, (_, index) => createAnchor({
++      id: `anchor-${index}`, taskIds: [`task-${index}`], primaryTaskId: `task-${index}`,
++      workflowId: `wf-${index}`, phase: 'generating', progress: 0,
++    }));
++    const board = createBoard(anchors[0], anchors.slice(1));
++    taskState.tasks = anchors.map((anchor, index) => createTask({
++      id: `task-${index}`, status: TaskStatus.PROCESSING, startedAt: Date.now(),
++      params: { workflowId: anchor.workflowId },
++    }));
++    taskState.tasks.push(...Array.from({ length: 1000 }, (_, index) => createTask({
++      id: `historic-${index}`, status: TaskStatus.COMPLETED,
++      params: { workflowId: `historic-wf-${index}` },
++    })));
++    const hook = renderHook(() => useImageGenerationAnchorSync({ board }));
++    expect(taskState.reads).toBe(1);
++    taskState.reads = 0;
++    act(() => { vi.advanceTimersByTime(1000); });
++    expect(taskState.reads).toBe(1);
++
++    // A later sweep must see new immutable tasks, not retain the old snapshot.
++    taskState.tasks = taskState.tasks.map(task => ({ ...task, status: TaskStatus.FAILED,
++      error: { code: 'FAILED', message: 'synthetic failure' } }));
++    taskState.reads = 0;
++    act(() => { vi.advanceTimersByTime(1000); });
++    expect(taskState.reads).toBe(1);
++    expect(board.children.every(anchor => anchor.phase === 'failed')).toBe(true);
++    taskState.reads = 0;
++    act(() => { vi.advanceTimersByTime(1000); });
++    expect(taskState.reads).toBe(0);
++    hook.unmount();
++    vi.useRealTimers();
++  });
++
++  it('does not rerender capped estimated progress, but restarts for a new attempt', () => {
++    vi.useFakeTimers();
++    vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
++    let renders = 0;
++    const hook = renderHook(({ startedAt }) => {
++      renders++;
++      return useImageTaskProgress({ taskType: TaskType.IMAGE,
++        taskStatus: TaskStatus.PROCESSING, startedAt });
++    }, { initialProps: { startedAt: Date.now() - 300_000 } });
++    expect(hook.result.current.displayProgress).toBe(90);
++    renders = 0;
++    for (let second = 0; second < 60; second++) {
++      act(() => { vi.advanceTimersByTime(1000); });
++    }
++    expect(renders).toBe(0);
++    hook.rerender({ startedAt: Date.now() });
++    expect(hook.result.current.displayProgress).toBe(0);
++    act(() => { vi.advanceTimersByTime(60_000); });
++    expect(hook.result.current.displayProgress).toBe(43);
++    hook.unmount();
++    expect(vi.getTimerCount()).toBe(0);
++    vi.useRealTimers();
++  });
++
++  it('keeps the display clock quiet between integer changes and reacts to estimate/media changes', () => {
++    vi.useFakeTimers();
++    vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
++    const startedAt = Date.now() - 240_000;
++    let renders = 0;
++    const hook = renderHook(({ estimatedDuration, mediaUrl, isImageLoading }) => {
++      renders++;
++      return useImageTaskProgress({ taskType: TaskType.IMAGE,
++        taskStatus: TaskStatus.PROCESSING, startedAt,
++        estimatedDuration, mediaUrl, isImageLoading });
++    }, { initialProps: { estimatedDuration: 300_000, mediaUrl: '', isImageLoading: false } });
++    expect(hook.result.current.displayProgress).toBe(89);
++    renders = 0;
++    for (let second = 0; second < 10; second++) {
++      act(() => { vi.advanceTimersByTime(1000); });
++    }
++    expect(renders).toBe(0);
++    hook.rerender({ estimatedDuration: 600_000, mediaUrl: '', isImageLoading: false });
++    expect(hook.result.current.displayProgress).toBeLessThan(89);
++    hook.rerender({ estimatedDuration: 600_000, mediaUrl: 'synthetic.png', isImageLoading: true });
++    act(() => { vi.advanceTimersByTime(2500); });
++    expect(hook.result.current.displayProgress).toBe(95);
++    act(() => { vi.advanceTimersByTime(2500); });
++    expect(hook.result.current.displayProgress).toBe(100);
++    hook.unmount();
++    expect(vi.getTimerCount()).toBe(0);
++    vi.useRealTimers();
++  });
++
+ });
 diff --git a/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts b/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts
 index a0da80d..8cbac27 100644
 --- a/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts
@@ -7752,6 +8080,141 @@ index 796acdb..b7c6001 100644
      const container = PlaitBoard.getBoardContainer(board);
      const host = PlaitBoard.getHost(board);
      const viewport = PlaitBoard.getViewportContainer(board);
+diff --git a/packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts b/packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts
+index d96ddb3..30de43d 100644
+--- a/packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts
++++ b/packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts
+@@ -352,7 +352,11 @@ export function useImageGenerationAnchorSync({
+ 
+     const removalTimers = removalTimersRef.current;
+ 
+-    const reconcileAnchor = (anchorId: string) => {
++    const reconcileAnchor = (
++      anchorId: string,
++      displayOnlyTick = false,
++      taskSnapshot?: Task[]
++    ) => {
+       const anchor = ImageGenerationAnchorTransforms.getAnchorById(
+         board,
+         anchorId
+@@ -362,7 +366,7 @@ export function useImageGenerationAnchorSync({
+         return;
+       }
+ 
+-      const allTasks = taskQueueService.getAllTasks();
++      const allTasks = taskSnapshot ?? taskQueueService.getAllTasks();
+       const relatedTasks = getTasksForImageGenerationAnchor(anchor, allTasks);
+       const primaryTask = selectPrimaryImageGenerationAnchorTask(
+         anchor,
+@@ -527,7 +531,14 @@ export function useImageGenerationAnchorSync({
+         patch.transitionMode = anchor.anchorType === 'frame' ? 'hold' : 'morph';
+       }
+ 
+-      if (Object.keys(patch).length > 0) {
++      const changedKeys = Object.keys(patch);
++      // The display controller already advances estimated progress locally.
++      // A clock tick must not dirty/save the whole board just for that estimate.
++      // Real task events and lifecycle/binding/geometry repairs still persist.
++      const onlyDisplayChanged = changedKeys.every(
++        (key) => key === 'progress' || key === 'subtitle'
++      );
++      if (changedKeys.length > 0 && !(displayOnlyTick && onlyDisplayChanged)) {
+         ImageGenerationAnchorTransforms.updateAnchor(board, anchor.id, patch);
+       }
+ 
+@@ -538,10 +549,18 @@ export function useImageGenerationAnchorSync({
+       }
+     };
+ 
++    // Reuse only within this synchronous sweep. Each later event/clock tick
++    // gets fresh tasks, and an empty canvas does not scan task history at all.
++    const reconcileAnchors = (anchorIds: string[], displayOnlyTick = false) => {
++      if (anchorIds.length === 0) return;
++      const tasks = taskQueueService.getAllTasks();
++      anchorIds.forEach((id) => reconcileAnchor(id, displayOnlyTick, tasks));
++    };
++
+     const reconcileAllAnchors = () => {
+-      ImageGenerationAnchorTransforms.getAllAnchors(board).forEach((anchor) => {
+-        reconcileAnchor(anchor.id);
+-      });
++      reconcileAnchors(
++        ImageGenerationAnchorTransforms.getAllAnchors(board).map((anchor) => anchor.id)
++      );
+     };
+ 
+     const reconcileTaskRelatedAnchors = (task: Task) => {
+@@ -586,7 +605,7 @@ export function useImageGenerationAnchorSync({
+         return;
+       }
+ 
+-      candidateAnchorIds.forEach((anchorId) => reconcileAnchor(anchorId));
++      reconcileAnchors([...candidateAnchorIds]);
+     };
+ 
+     const unsubscribeImageReadiness = subscribeCanvasImageReadiness(
+@@ -622,11 +641,12 @@ export function useImageGenerationAnchorSync({
+       });
+ 
+     const progressTimer = setInterval(() => {
+-      ImageGenerationAnchorTransforms.getAllAnchors(board).forEach((anchor) => {
+-        if (isActiveAnchorPhase(anchor.phase)) {
+-          reconcileAnchor(anchor.id);
+-        }
+-      });
++      reconcileAnchors(
++        ImageGenerationAnchorTransforms.getAllAnchors(board)
++          .filter((anchor) => isActiveAnchorPhase(anchor.phase))
++          .map((anchor) => anchor.id),
++        true
++      );
+     }, ACTIVE_ANCHOR_PROGRESS_INTERVAL);
+ 
+     const stalePhaseTimestamps = new Map<string, number>();
+diff --git a/packages/drawnix/src/hooks/useImageTaskProgress.ts b/packages/drawnix/src/hooks/useImageTaskProgress.ts
+index 18b182b..a833935 100644
+--- a/packages/drawnix/src/hooks/useImageTaskProgress.ts
++++ b/packages/drawnix/src/hooks/useImageTaskProgress.ts
+@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
+ import { TaskStatus, TaskType } from '../types/task.types';
+ import {
+   IMAGE_GENERATION_ESTIMATE_MS,
++  IMAGE_GENERATION_MAX_PROGRESS,
++  calculateSimulatedImageProgress,
+   resolveImageTaskDisplayProgress,
+ } from '../utils/image-task-progress';
+ 
+@@ -48,17 +50,23 @@ export function useImageTaskProgress({
+       return;
+     }
+ 
+-    const tick = () => {
+-      setProgressTick((value) => value + 1);
+-    };
+-
+-    tick();
+-    const interval = setInterval(tick, PROGRESS_UPDATE_INTERVAL);
++    // Rendering already computes the current value. Wake React only when the
++    // displayed integer changes, and stop the clock once the estimate is capped.
++    let previous = calculateSimulatedImageProgress(startedAt, estimatedDuration);
++    if (previous >= IMAGE_GENERATION_MAX_PROGRESS) return;
++    const interval = setInterval(() => {
++      const next = calculateSimulatedImageProgress(startedAt, estimatedDuration);
++      if (next !== previous) {
++        previous = next;
++        setProgressTick((value) => value + 1);
++      }
++      if (next >= IMAGE_GENERATION_MAX_PROGRESS) clearInterval(interval);
++    }, PROGRESS_UPDATE_INTERVAL);
+ 
+     return () => {
+       clearInterval(interval);
+     };
+-  }, [mediaUrl, startedAt, taskStatus, taskType]);
++  }, [estimatedDuration, mediaUrl, startedAt, taskStatus, taskType]);
+ 
+   useEffect(() => {
+     if (!mediaUrl || !isImageLoading || taskType !== TaskType.IMAGE) {
 diff --git a/packages/drawnix/src/hooks/useTaskExecutor.ts b/packages/drawnix/src/hooks/useTaskExecutor.ts
 index a6e2bdd..c9f56d0 100644
 --- a/packages/drawnix/src/hooks/useTaskExecutor.ts
@@ -9038,7 +9501,7 @@ index da83d61..e77ac12 100644
      return element && isWorkZoneElement(element) ? element : null;
    },
 diff --git a/packages/drawnix/src/services/__tests__/default-image-adapter.test.ts b/packages/drawnix/src/services/__tests__/default-image-adapter.test.ts
-index bc9d61a..bab0ffb 100644
+index bc9d61a..228ec02 100644
 --- a/packages/drawnix/src/services/__tests__/default-image-adapter.test.ts
 +++ b/packages/drawnix/src/services/__tests__/default-image-adapter.test.ts
 @@ -1,4 +1,5 @@
@@ -9054,28 +9517,28 @@ index bc9d61a..bab0ffb 100644
 -import { geminiImageAdapter } from '../model-adapters/default-adapters';
 -
  describe('default image adapter compatibility', () => {
-+  it('forwards an explicit GPT Image 2.6 size in basic compatibility mode', async () => {
++  it.each(['gpt-image-2.6-1k', 'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'])('forwards an explicit %s size in basic compatibility mode', async (model) => {
 +    const gif = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 +    mocks.generateImage.mockResolvedValue({ data: [{ b64_json: gif, width: 1, height: 1 }] });
 +    await geminiImageAdapter.generateImage({ baseUrl: 'https://gateway.example.com/v1' }, {
-+      model: 'gpt-image-2.6-1k', prompt: '静态图', size: '4096x4096',
++      model, prompt: '静态图', size: '4096x4096',
 +      params: { size: '1536x1024', quality: 'high', resolution: '4k' },
 +    });
 +    expect(mocks.generateImage).toHaveBeenCalledWith('静态图', expect.objectContaining({
-+      model: 'gpt-image-2.6-1k', size: '1536x1024', quality: undefined,
++      model, size: '1536x1024', quality: undefined,
 +      count: 1, response_format: 'b64_json',
 +    }));
 +  });
 +
-+  it('keeps GPT Image 2.6 GIF bytes and batch URLs consistent in basic compatibility mode', async () => {
++  it.each(['gpt-image-2.6-1k', 'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'])('keeps %s GIF bytes and batch URLs consistent in basic compatibility mode', async (model) => {
 +    const gif = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 +    mocks.generateImage.mockResolvedValue({ data: [{ b64_json: gif, width: 1, height: 1 }] });
 +    const result = await geminiImageAdapter.generateImage({ baseUrl: 'https://gateway.example.com/v1' }, {
-+      model: 'gpt-image-2.6-1k', prompt: '生成 GIF 图', size: '16x9',
++      model, prompt: '生成 GIF 图', size: '16x9',
 +      params: { quality: '4k', resolution: '4k', response_format: 'url' },
 +    });
 +    expect(mocks.generateImage).toHaveBeenCalledWith('生成 GIF 图', expect.objectContaining({
-+      model: 'gpt-image-2.6-1k', size: '16x9', quality: undefined,
++      model, size: '16x9', quality: undefined,
 +      count: 1, response_format: 'b64_json',
 +    }));
 +    expect(result).toMatchObject({url: `data:image/gif;base64,${gif}`,
@@ -9086,13 +9549,14 @@ index bc9d61a..bab0ffb 100644
      mocks.generateWithPolling.mockReset();
 diff --git a/packages/drawnix/src/services/__tests__/gpt-image-26-integration.test.ts b/packages/drawnix/src/services/__tests__/gpt-image-26-integration.test.ts
 new file mode 100644
-index 0000000..f17fe05
+index 0000000..1b54389
 --- /dev/null
 +++ b/packages/drawnix/src/services/__tests__/gpt-image-26-integration.test.ts
-@@ -0,0 +1,359 @@
+@@ -0,0 +1,368 @@
 +import { describe, expect, it, vi } from 'vitest';
 +import {
 +  DEFAULT_IMAGE_MODEL_ID,
++  GPT_IMAGE_26_MODEL_IDS,
 +  getCompatibleParams,
 +  getStaticModelConfig,
 +  isGPTImage2ModelId,
@@ -9123,7 +9587,7 @@ index 0000000..f17fe05
 +const svg = btoa(
 +  '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><circle r="10"/></svg>'
 +);
-+const staleRequest: ImageGenerationRequest = {
++const baseRequest: ImageGenerationRequest = {
 +  model,
 +  prompt: '生成 GIF 图：小猫挥手',
 +  size: '4096x4096',
@@ -9145,7 +9609,8 @@ index 0000000..f17fe05
 +  },
 +};
 +
-+describe('GPT Image 2.6 1K integration', () => {
++describe.each(GPT_IMAGE_26_MODEL_IDS)('GPT Image basic integration: %s', (model) => {
++  const staleRequest = { ...baseRequest, model };
 +  it('keeps the chosen provider while aligning a stale model reference with the binding', () => {
 +    expect(
 +      normalizeGPTImage26Request(
@@ -9164,7 +9629,7 @@ index 0000000..f17fe05
 +    expect(getStaticModelConfig(model)).toMatchObject({
 +      id: model,
 +      label: model,
-+      shortCode: 'gpt261k',
++      shortCode: expect.stringMatching(/^gpt26/),
 +      type: 'image',
 +      vendor: 'GPT',
 +    });
@@ -9189,7 +9654,7 @@ index 0000000..f17fe05
 +    for (const unavailable of [
 +      'gpt-image-2.6',
 +      'gpt-image-2.6-exact',
-+      'gpt-image-2.6-flare',
++      'gpt-image-2.6-unknown',
 +    ]) {
 +      expect(getStaticModelConfig(unavailable)).toBeUndefined();
 +      expect(isGPTImage26ModelId(unavailable)).toBe(false);
@@ -9238,6 +9703,13 @@ index 0000000..f17fe05
 +    }
 +    expect(resolveOfficialGPTImageSize(model, size, { resolution: '4k' })).toBe(expected);
 +    expect(resolveOfficialGPTImageEditSize(model, size, { resolution: '4k' })).toBe(expected);
++  });
++
++  it.each(['gif', 'svg'])('rejects unsupported explicit %s instead of silently downgrading', (format) => {
++    for (const build of [buildGPTImageGenerationBody, buildTuziGPTImageRequestBody]) {
++      expect(() => build({ model, prompt: 'synthetic', params: { output_format: format } })).toThrow('基础接入');
++    }
++    expect(getStaticModelConfig(model)?.description).toContain('官方分组专用 GIF/SVG 参数暂未接入');
 +  });
 +
 +  it('uses the selected top-level size when no size parameter is provided', () => {
@@ -11408,10 +11880,10 @@ index 4760ff3..69809c3 100644
  
 diff --git a/packages/drawnix/src/services/model-adapters/gpt-image-26-request.ts b/packages/drawnix/src/services/model-adapters/gpt-image-26-request.ts
 new file mode 100644
-index 0000000..cf155d4
+index 0000000..718ecc4
 --- /dev/null
 +++ b/packages/drawnix/src/services/model-adapters/gpt-image-26-request.ts
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,59 @@
 +import {
 +  GPT_IMAGE_26_SIZE_OPTIONS,
 +  isGPTImage26ModelId,
@@ -11439,6 +11911,11 @@ index 0000000..cf155d4
 +  modelId = request.model
 +): ImageGenerationRequest {
 +  if (!modelId || !isGPTImage26ModelId(modelId)) return request;
++
++  const formats = [request.outputFormat, request.params?.output_format];
++  if (formats.some((value) => typeof value === 'string' && ['gif', 'svg'].includes(value.trim().toLowerCase()))) {
++    throw new Error('当前基础接入暂不支持 GIF/SVG 输出参数。default/Codex 分组生成 GIF 请移除格式参数，并在提示词写“生成 GIF 图”；官方分组专用格式暂未接入。');
++  }
 +
 +  const requestedSize = typeof request.params?.size === 'string' && request.params.size.trim()
 +    ? request.params.size
@@ -12189,10 +12666,15 @@ index cacf9e2..6443528 100644
    });
  });
 diff --git a/packages/drawnix/src/services/provider-model-catalog.ts b/packages/drawnix/src/services/provider-model-catalog.ts
-index fff1a5b..a5a0378 100644
+index fff1a5b..5c08ee9 100644
 --- a/packages/drawnix/src/services/provider-model-catalog.ts
 +++ b/packages/drawnix/src/services/provider-model-catalog.ts
-@@ -15,10 +15,35 @@ interface DiscoverProviderModelsOptions
+@@ -11,14 +11,39 @@ import {
+ import { isTuziCompatibleBaseUrl } from './provider-routing/tuzi-api-endpoints';
+ 
+ interface DiscoverProviderModelsOptions
+-  extends Pick<RuntimeModelDiscoveryOptions, 'selectAll' | 'signal'> {
++  extends Pick<RuntimeModelDiscoveryOptions, 'selectAll' | 'selectNew' | 'isCurrent' | 'signal'> {
    forceMarketplaceRefresh?: boolean;
  }
  
@@ -12293,8 +12775,12 @@ index fff1a5b..a5a0378 100644
    return runtimeModelDiscovery.discover(
      profile.id,
      baseUrl,
-@@ -71,6 +103,6 @@ export async function discoverProviderModels(
+@@ -69,8 +101,10 @@ export async function discoverProviderModels(
+     fallbackBaseUrls,
+     {
        selectAll: options.selectAll,
++      selectNew: options.selectNew,
++      isCurrent: options.isCurrent,
        signal: options.signal,
        modelMetadata,
 -    }
@@ -13959,6 +14445,58 @@ index 234c388..569aa35 100644
            url: `${requestBaseUrl}/v1/models`,
            authorization: 'Bearer invalid-key',
            googleApiKey: null,
+diff --git a/packages/drawnix/src/utils/__tests__/settings-manager.test.ts b/packages/drawnix/src/utils/__tests__/settings-manager.test.ts
+index dd394ef..14ff3f2 100644
+--- a/packages/drawnix/src/utils/__tests__/settings-manager.test.ts
++++ b/packages/drawnix/src/utils/__tests__/settings-manager.test.ts
+@@ -81,6 +81,47 @@ describe('settings-manager', () => {
+     localStorage.clear();
+   });
+ 
++  it('reports durable flush failure and recovers without losing in-memory settings', async () => {
++    mockSettingsManagerDeps();
++    const storage = createStorageMock();
++    const originalStorage = globalThis.localStorage;
++    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
++    try {
++      const { settingsManager } = await import('../settings-manager');
++      await settingsManager.waitForInitialization();
++      const write = vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new Error('synthetic disk full'); });
++      await settingsManager.updateSetting('gemini.imageModelName', 'gpt-image-2.6-flare');
++      await expect(settingsManager.flushStorage()).rejects.toThrow('无法保存创作配置');
++      expect(settingsManager.getSetting('gemini.imageModelName')).toBe('gpt-image-2.6-flare');
++      write.mockRestore();
++      await settingsManager.flushStorage();
++      expect(JSON.parse(storage.getItem(DRAWNIX_SETTINGS_KEY)!).gemini.imageModelName).toBe('gpt-image-2.6-flare');
++    } finally {
++      Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: originalStorage });
++    }
++  });
++
++  it('serializes asynchronous snapshots so an older save cannot overwrite the latest settings', async () => {
++    mockSettingsManagerDeps();
++    const { settingsManager } = await import('../settings-manager');
++    await settingsManager.waitForInitialization();
++    let release!: () => void;
++    const held = new Promise<void>((resolve) => { release = resolve; });
++    const internals = settingsManager as any;
++    const original = internals.encryptSensitiveDataForStorage.bind(settingsManager);
++    const encrypt = vi.spyOn(internals, 'encryptSensitiveDataForStorage')
++      .mockImplementationOnce(async () => { await held; })
++      .mockImplementation(original);
++    const first = settingsManager.updateSetting('gemini.imageModelName', 'gpt-image-2.6-flare');
++    await Promise.resolve();
++    const second = settingsManager.updateSetting('gemini.imageModelName', 'gpt-image-2.6-sunburst');
++    release();
++    await Promise.all([first, second]);
++    await settingsManager.flushStorage();
++    expect(JSON.parse(localStorage.getItem(DRAWNIX_SETTINGS_KEY)!).gemini.imageModelName).toBe('gpt-image-2.6-sunburst');
++    encrypt.mockRestore();
++  });
++
+   it('defaults missing compatibility while preserving managed profile details and explicit values', async () => {
+     mockSettingsManagerDeps();
+ 
 diff --git a/packages/drawnix/src/utils/__tests__/video-request-id.test.ts b/packages/drawnix/src/utils/__tests__/video-request-id.test.ts
 new file mode 100644
 index 0000000..46c738e
@@ -14994,6 +15532,26 @@ index 0000000..67b8ee2
 +      }
 +    : rect;
 +}
+diff --git a/packages/drawnix/src/utils/image-generation-anchor-task.ts b/packages/drawnix/src/utils/image-generation-anchor-task.ts
+index 8931989..728d157 100644
+--- a/packages/drawnix/src/utils/image-generation-anchor-task.ts
++++ b/packages/drawnix/src/utils/image-generation-anchor-task.ts
+@@ -114,12 +114,9 @@ export function doesTaskBelongToImageGenerationAnchor(
+     return false;
+   }
+ 
+-  const taskIdSet = new Set<string>(anchor.taskIds);
+-  if (anchor.primaryTaskId) {
+-    taskIdSet.add(anchor.primaryTaskId);
+-  }
+-
+-  if (taskIdSet.has(task.id)) {
++  // This predicate runs for every task in history on each anchor lookup.
++  // The binding list is small; avoid constructing the same Set per candidate.
++  if (anchor.primaryTaskId === task.id || anchor.taskIds.includes(task.id)) {
+     return true;
+   }
+ 
 diff --git a/packages/drawnix/src/utils/image-generation-anchor-view-model.ts b/packages/drawnix/src/utils/image-generation-anchor-view-model.ts
 index 3981228..e747f23 100644
 --- a/packages/drawnix/src/utils/image-generation-anchor-view-model.ts
@@ -15031,7 +15589,7 @@ index 66e74c8..f63f656 100644
        }
        const response = await fetch(options.requestUrl || normalizedPricingUrl, {
 diff --git a/packages/drawnix/src/utils/runtime-model-discovery.ts b/packages/drawnix/src/utils/runtime-model-discovery.ts
-index 314fa85..d70fb10 100644
+index 314fa85..1a76986 100644
 --- a/packages/drawnix/src/utils/runtime-model-discovery.ts
 +++ b/packages/drawnix/src/utils/runtime-model-discovery.ts
 @@ -1,3 +1,4 @@
@@ -15039,7 +15597,27 @@ index 314fa85..d70fb10 100644
  import { isSunoNativeModel } from '../services/suno-native';
  import {
    isCurrentTuziEndpoint,
-@@ -195,43 +196,51 @@ async function fetchRemoteModelList(
+@@ -18,6 +19,8 @@ import {
+   DEFAULT_VIDEO_MODEL_ID,
+   DEFAULT_TEXT_MODEL_ID,
+   GPT_IMAGE_25_MODEL_IDS,
++  GPT_IMAGE_26_BASIC_DESCRIPTION,
++  isGPTImage26ModelId,
+   GPT_IMAGE_1K_MODEL_IDS,
+   GPT_IMAGE_2_MODEL_IDS,
+   getStaticModelsByType,
+@@ -106,6 +109,10 @@ export interface ManualRuntimeModelInput {
+ 
+ export interface RuntimeModelDiscoveryOptions {
+   selectAll?: boolean;
++  /** Upgrade discovery enables only newly returned IDs, preserving deliberate deselections. */
++  selectNew?: boolean;
++  /** Rechecked just before committing a response from a background source. */
++  isCurrent?: () => boolean;
+   signal?: AbortSignal;
+   /** Supplements returned model IDs without adding models to the authenticated list. */
+   modelMetadata?: readonly RemoteModelListItem[];
+@@ -195,43 +202,51 @@ async function fetchRemoteModelList(
    signal?: AbortSignal,
    accountManaged = false
  ): Promise<string> {
@@ -15121,7 +15699,7 @@ index 314fa85..d70fb10 100644
      signal?.removeEventListener('abort', abortFromCaller);
    }
  }
-@@ -240,7 +249,7 @@ function getModelListRequestUrl(
+@@ -240,7 +255,7 @@ function getModelListRequestUrl(
    baseUrl: string,
    accountManaged: boolean
  ): string {
@@ -15130,7 +15708,7 @@ index 314fa85..d70fb10 100644
      return `${baseUrl}/models`;
    }
  
-@@ -292,7 +301,7 @@ async function fetchRemoteModelListWithFallback(
+@@ -292,7 +307,7 @@ async function fetchRemoteModelListWithFallback(
  ): Promise<string> {
    const baseUrls = buildModelDiscoveryBaseUrls(
      primaryBaseUrl,
@@ -15139,7 +15717,7 @@ index 314fa85..d70fb10 100644
    );
    let lastFetchError: unknown = null;
  
-@@ -305,6 +314,7 @@ async function fetchRemoteModelListWithFallback(
+@@ -305,6 +320,7 @@ async function fetchRemoteModelListWithFallback(
          accountManaged
        );
      } catch (error) {
@@ -15147,6 +15725,316 @@ index 314fa85..d70fb10 100644
        if (error instanceof Error && !/failed to fetch/i.test(error.message)) {
          throw error;
        }
+@@ -1456,6 +1472,12 @@ function decorateRuntimeModels(
+   const marketplaceMetadata = (Array.isArray(pricingCaches) ? pricingCaches : [])
+     .find((cache) => cache.profileId === profileId)?.modelCatalog;
+   return models.map((model) => {
++    if (isGPTImage26ModelId(model.id) && !(model.tags || []).includes('manual')) {
++      return attachRuntimeSource(profileId, {
++        ...refreshPersistedModelConfig(model, useRemoteDisplayName),
++        description: GPT_IMAGE_26_BASIC_DESCRIPTION,
++      });
++    }
+     if (
+       (model.tags || []).includes('manual') ||
+       discoverySource === 'models-endpoint'
+@@ -1608,6 +1630,7 @@ class RuntimeModelDiscoveryStore {
+   private listeners = new Set<() => void>();
+   private inFlightDiscoveries = new Map<string, Promise<ModelConfig[]>>();
+   private revision = 0;
++  private discoveryRequests = new Map<string, symbol>();
+ 
+   constructor() {
+     if (typeof window !== 'undefined') {
+@@ -2158,7 +2181,7 @@ class RuntimeModelDiscoveryStore {
+       ? { signal: optionsOrSignal }
+       : optionsOrSignal;
+ 
+-    if (options.signal) {
++    if (options.signal || options.selectNew || options.isCurrent) {
+       return this.discoverInternal(
+         profileId,
+         normalizedBaseUrl,
+@@ -2204,6 +2227,10 @@ class RuntimeModelDiscoveryStore {
+     return discovery;
+   }
+ 
++  isDiscovering(profileId: string): boolean {
++    return this.discoveryRequests.has(profileId);
++  }
++
+   private async discoverInternal(
+     profileId: string,
+     normalizedBaseUrl: string,
+@@ -2212,107 +2239,129 @@ class RuntimeModelDiscoveryStore {
+     fallbackBaseUrls: string[],
+     options: RuntimeModelDiscoveryOptions
+   ): Promise<ModelConfig[]> {
+-    const state = this.getCatalogState(profileId);
++    options.signal?.throwIfAborted();
++    const requestId = Symbol();
++    this.discoveryRequests.set(profileId, requestId);
++    try {
++      const state = this.getCatalogState(profileId);
+ 
+-    this.setCatalogState(
+-      profileId,
+-      {
+-        ...state,
+-        status: 'loading',
+-        sourceBaseUrl: normalizedBaseUrl,
+-        signature,
+-        error: null,
+-      },
+-      false
+-    );
++      this.setCatalogState(
++        profileId,
++        {
++          ...state,
++          status: 'loading',
++          sourceBaseUrl: normalizedBaseUrl,
++          signature,
++          error: null,
++        },
++        false
++      );
+ 
+-    const rawText = await fetchRemoteModelListWithFallback(
+-      normalizedBaseUrl,
+-      trimmedApiKey,
+-      fallbackBaseUrls,
+-      options.signal,
+-      profileId.startsWith('tuzi-managed-') ||
+-        profileId.startsWith('tuzi-token-')
+-    );
++      const rawText = await fetchRemoteModelListWithFallback(
++        normalizedBaseUrl,
++        trimmedApiKey,
++        fallbackBaseUrls,
++        options.signal,
++        profileId.startsWith('tuzi-managed-') ||
++          profileId.startsWith('tuzi-token-')
++      );
+ 
+-    let parsed: unknown;
+-    try {
+-      parsed = JSON.parse(rawText);
+-    } catch {
+-      throw new Error('模型列表接口未返回有效 JSON');
+-    }
++      let parsed: unknown;
++      try {
++        parsed = JSON.parse(rawText);
++      } catch {
++        throw new Error('模型列表接口未返回有效 JSON');
++      }
+ 
+-    const data = (parsed as { data?: unknown }).data;
+-    if (!Array.isArray(data)) {
+-      throw new Error('模型列表接口缺少 data 数组');
+-    }
+-    const metadataById = new Map(
+-      options.modelMetadata?.map((model) => [model.id, model])
+-    );
++      const data = (parsed as { data?: unknown }).data;
++      if (!Array.isArray(data)) {
++        throw new Error('模型列表接口缺少 data 数组');
++      }
++      const metadataById = new Map(
++        options.modelMetadata?.map((model) => [model.id, model])
++      );
+ 
+-    const adaptedModels: ModelConfig[] = [];
+-    const seen = new Set<string>();
+-    const useRemoteDisplayName = isTuziCompatibleBaseUrl(normalizedBaseUrl);
+-    for (const item of data) {
+-      const remoteModel = {
+-        ...metadataById.get(item?.id),
+-        ...item,
+-      } as RemoteModelListItem;
+-      const adapted = adaptRuntimeModel(remoteModel);
+-      if (!adapted || seen.has(adapted.id)) {
+-        continue;
++      const adaptedModels: ModelConfig[] = [];
++      const seen = new Set<string>();
++      const useRemoteDisplayName = isTuziCompatibleBaseUrl(normalizedBaseUrl);
++      for (const item of data) {
++        const remoteModel = {
++          ...metadataById.get(item?.id),
++          ...item,
++        } as RemoteModelListItem;
++        const adapted = adaptRuntimeModel(remoteModel);
++        if (!adapted || seen.has(adapted.id)) {
++          continue;
++        }
++        if (useRemoteDisplayName) {
++          adapted.label = remoteModel.id;
++          adapted.shortLabel = remoteModel.id;
++        }
++        if (remoteModel.description?.trim()) {
++          adapted.description = remoteModel.description.trim();
++        }
++        if (isGPTImage26ModelId(adapted.id)) {
++          adapted.description = GPT_IMAGE_26_BASIC_DESCRIPTION;
++        }
++        seen.add(adapted.id);
++        adaptedModels.push(attachRuntimeSource(profileId, adapted));
+       }
+-      if (useRemoteDisplayName) {
+-        adapted.label = remoteModel.id;
+-        adapted.shortLabel = remoteModel.id;
++
++      if (adaptedModels.length === 0) {
++        throw new Error('模型列表为空');
+       }
+-      if (remoteModel.description?.trim()) {
+-        adapted.description = remoteModel.description.trim();
++
++      options.signal?.throwIfAborted();
++      if (this.discoveryRequests.get(profileId) !== requestId || options.isCurrent?.() === false) {
++        throw new DOMException('Obsolete model discovery', 'AbortError');
+       }
+-      seen.add(adapted.id);
+-      adaptedModels.push(attachRuntimeSource(profileId, adapted));
+-    }
++      // A user may edit selections or bindings while the network request is pending.
++      const currentState = this.getCatalogState(profileId);
++      const discoveredModels = mergeDiscoveredWithManualModels(
++        adaptedModels,
++        currentState.discoveredModels
++      );
++      const manualModelIds = new Set(
++        discoveredModels
++          .filter((model) => (model.tags || []).includes('manual'))
++          .map((model) => model.id)
++      );
++      const previousIds = new Set(currentState.discoveredModels.map((model) => model.id));
++      const selectedModelIds = options.selectAll
++        ? discoveredModels.map((model) => model.id)
++        : options.selectNew
++        ? normalizeSelectedModelIds(discoveredModels, [
++            ...currentState.selectedModelIds,
++            ...adaptedModels.filter((model) => !previousIds.has(model.id)).map((model) => model.id),
++          ])
++        : state.signature === signature
++        ? normalizeSelectedModelIds(discoveredModels, currentState.selectedModelIds)
++        : normalizeSelectedModelIds(
++            discoveredModels,
++            currentState.selectedModelIds.filter((modelId) => manualModelIds.has(modelId))
++          );
++      const models = buildSelectedModels(discoveredModels, selectedModelIds);
++
++      this.setCatalogState(profileId, {
++        profileId,
++        status: 'ready',
++        discoverySource: 'models-endpoint',
++        sourceBaseUrl: normalizedBaseUrl,
++        signature,
++        discoveredAt: Date.now(),
++        discoveredModels,
++        selectedModelIds,
++        manualBindings: currentState.manualBindings,
++        models,
++        error: null,
++      });
+ 
+-    if (adaptedModels.length === 0) {
+-      throw new Error('模型列表为空');
++      return adaptedModels;
++    } finally {
++      if (this.discoveryRequests.get(profileId) === requestId) {
++        this.discoveryRequests.delete(profileId);
++      }
+     }
+-
+-    const discoveredModels = mergeDiscoveredWithManualModels(
+-      adaptedModels,
+-      state.discoveredModels
+-    );
+-    const manualModelIds = new Set(
+-      discoveredModels
+-        .filter((model) => (model.tags || []).includes('manual'))
+-        .map((model) => model.id)
+-    );
+-    const selectedModelIds = options.selectAll
+-      ? discoveredModels.map((model) => model.id)
+-      : state.signature === signature
+-      ? normalizeSelectedModelIds(discoveredModels, state.selectedModelIds)
+-      : normalizeSelectedModelIds(
+-          discoveredModels,
+-          state.selectedModelIds.filter((modelId) =>
+-            manualModelIds.has(modelId)
+-          )
+-        );
+-    const models = buildSelectedModels(discoveredModels, selectedModelIds);
+-
+-    this.setCatalogState(profileId, {
+-      profileId,
+-      status: 'ready',
+-      discoverySource: 'models-endpoint',
+-      sourceBaseUrl: normalizedBaseUrl,
+-      signature,
+-      discoveredAt: Date.now(),
+-      discoveredModels,
+-      selectedModelIds,
+-      manualBindings: state.manualBindings,
+-      models,
+-      error: null,
+-    });
+-
+-    return adaptedModels;
+   }
+ 
+   setError(
+diff --git a/packages/drawnix/src/utils/settings-manager.ts b/packages/drawnix/src/utils/settings-manager.ts
+index ac0f7fc..b51570b 100644
+--- a/packages/drawnix/src/utils/settings-manager.ts
++++ b/packages/drawnix/src/utils/settings-manager.ts
+@@ -981,8 +981,8 @@ class SettingsManager {
+         manualBindings: this.normalizeProviderCatalogManualBindings(
+           draft.manualBindings
+         ),
+-        discoverySource: draft.discoverySource === 'marketplace'
+-          ? 'marketplace'
++        discoverySource: draft.discoverySource === 'marketplace' || draft.discoverySource === 'models-endpoint'
++          ? draft.discoverySource
+           : undefined,
+         sourceBaseUrl:
+           typeof draft.sourceBaseUrl === 'string'
+@@ -1556,7 +1556,22 @@ class SettingsManager {
+   /**
+    * 保存设置到本地存储
+    */
+-  private async saveToStorage(): Promise<void> {
++  private storageWrites: Promise<void> = Promise.resolve();
++
++  /** Await a durable current snapshot; automatic refresh must not mark failed writes complete. */
++  public flushStorage(): Promise<void> {
++    return this.saveToStorage(true);
++  }
++
++  private saveToStorage(strict = false): Promise<void> {
++    const write = this.storageWrites.then(() => this.writeStorageSnapshot());
++    this.storageWrites = write.catch(() => undefined);
++    return strict ? write : write.catch(() => {
++      console.warn('Failed to save settings to localStorage');
++    });
++  }
++
++  private async writeStorageSnapshot(): Promise<void> {
+     if (typeof window === 'undefined') return;
+ 
+     try {
+@@ -1573,7 +1588,7 @@ class SettingsManager {
+       // 同步到 IndexedDB，供 SW 读取（必须等待完成，确保首次输入 API Key 后 SW 能立即拿到配置）
+       await this.syncToIndexedDB();
+     } catch (error) {
+-      console.warn('Failed to save settings to localStorage:', error);
++      throw new Error('无法保存创作配置，请检查本地存储空间。');
+     }
+   }
+ 
 diff --git a/packages/drawnix/src/utils/task-utils.ts b/packages/drawnix/src/utils/task-utils.ts
 index 1c0406c..d745069 100644
 --- a/packages/drawnix/src/utils/task-utils.ts

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_IMAGE_MODEL_ID,
+  GPT_IMAGE_26_MODEL_IDS,
   getCompatibleParams,
   getStaticModelConfig,
   isGPTImage2ModelId,
@@ -31,7 +32,7 @@ const gif = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 const svg = btoa(
   '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><circle r="10"/></svg>'
 );
-const staleRequest: ImageGenerationRequest = {
+const baseRequest: ImageGenerationRequest = {
   model,
   prompt: '生成 GIF 图：小猫挥手',
   size: '4096x4096',
@@ -53,7 +54,8 @@ const staleRequest: ImageGenerationRequest = {
   },
 };
 
-describe('GPT Image 2.6 1K integration', () => {
+describe.each(GPT_IMAGE_26_MODEL_IDS)('GPT Image basic integration: %s', (model) => {
+  const staleRequest = { ...baseRequest, model };
   it('keeps the chosen provider while aligning a stale model reference with the binding', () => {
     expect(
       normalizeGPTImage26Request(
@@ -72,7 +74,7 @@ describe('GPT Image 2.6 1K integration', () => {
     expect(getStaticModelConfig(model)).toMatchObject({
       id: model,
       label: model,
-      shortCode: 'gpt261k',
+      shortCode: expect.stringMatching(/^gpt26/),
       type: 'image',
       vendor: 'GPT',
     });
@@ -97,7 +99,7 @@ describe('GPT Image 2.6 1K integration', () => {
     for (const unavailable of [
       'gpt-image-2.6',
       'gpt-image-2.6-exact',
-      'gpt-image-2.6-flare',
+      'gpt-image-2.6-unknown',
     ]) {
       expect(getStaticModelConfig(unavailable)).toBeUndefined();
       expect(isGPTImage26ModelId(unavailable)).toBe(false);
@@ -146,6 +148,13 @@ describe('GPT Image 2.6 1K integration', () => {
     }
     expect(resolveOfficialGPTImageSize(model, size, { resolution: '4k' })).toBe(expected);
     expect(resolveOfficialGPTImageEditSize(model, size, { resolution: '4k' })).toBe(expected);
+  });
+
+  it.each(['gif', 'svg'])('rejects unsupported explicit %s instead of silently downgrading', (format) => {
+    for (const build of [buildGPTImageGenerationBody, buildTuziGPTImageRequestBody]) {
+      expect(() => build({ model, prompt: 'synthetic', params: { output_format: format } })).toThrow('基础接入');
+    }
+    expect(getStaticModelConfig(model)?.description).toContain('官方分组专用 GIF/SVG 参数暂未接入');
   });
 
   it('uses the selected top-level size when no size parameter is provided', () => {

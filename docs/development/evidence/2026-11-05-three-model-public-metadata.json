@@ -1,0 +1,176 @@
+{
+  "queriedAt": "2026-11-05T14:20:15.378835+00:00",
+  "source": "https://api.tu-zi.com/api/pricing",
+  "method": "anonymous GET; selected public model metadata only",
+  "evidenceStatus": "platform declaration, not current-task generation verification",
+  "models": [
+    {
+      "model_name": "gpt-image-2.6-flare",
+      "supported_endpoint_types": [
+        "edit",
+        "generate",
+        "openai-video"
+      ],
+      "endpoints": {
+        "edit": {
+          "path": "/v1/images/edits",
+          "method": "POST",
+          "docs": "https://tuzi-api.apifox.cn/343647072e0",
+          "scenario": "image",
+          "parameters": [
+            {
+              "name": "image",
+              "path": "image",
+              "type": "file",
+              "required": true,
+              "description": "需要编辑的图片文件。",
+              "ui_type": "image",
+              "accept": "image/png,image/jpeg,image/webp",
+              "part_name": "image"
+            },
+            {
+              "name": "mask",
+              "path": "mask",
+              "type": "file",
+              "required": false,
+              "description": "可选遮罩图片文件。",
+              "ui_type": "image",
+              "accept": "image/png",
+              "part_name": "mask"
+            }
+          ],
+          "transport": "multipart"
+        },
+        "generate": {
+          "path": "/v1/images/generations",
+          "method": "POST",
+          "docs": "https://tuzi-api.apifox.cn/343647071e0",
+          "scenario": "image"
+        },
+        "openai-video": {
+          "label": "Async Image Generation",
+          "path": "/v1/videos",
+          "method": "POST",
+          "description": "异步图片任务接口，提交后通过任务 ID 查询结果。",
+          "docs": "https://developers.openai.com/api/reference/resources/videos/methods/create",
+          "scenario": "async-image",
+          "async": true
+        }
+      },
+      "description": "**gpt-image-2.6-flare** 是本站提供的图像生成型号，支持文字生图、GIF 动图，以及指定分组下的 SVG 矢量图生成，适合日常创作、插画、图标、海报和创意素材制作。\n\n### 分组与能力\n\n| 能力 | 官方 / 官方优惠 | default / Codex |\n|---|---|---|\n| 文字生成图片 | 支持 | 支持 |\n| GIF 动图 | 使用 GIF 输出参数 | 通过提示词触发 |\n| SVG 矢量图 | 支持 | 不支持 |\n\n**需要 SVG 时，请使用「官方」或「官方优惠」分组，并确认调用令牌使用的是对应分组。**\n\n### 图片生成\n\n使用 `/v1/images/generations`，将 `model` 设置为 `gpt-image-2.6-flare`，在提示词中描述主体、构图、风格、配色和细节要求。\n\n图片尺寸以实际返回文件为准。\n\n### GIF 动图\n\n**官方 / 官方优惠分组：**\n\n需要设置 `output_format: \"gif\"`。仅在提示词中写「生成 GIF 图」，仍会按默认图片格式输出。\n\n调用示例：\n\n```json\n{\n  \"model\": \"gpt-image-2.6-flare\",\n  \"prompt\": \"一个蓝色小球在白色背景上轻轻弹跳，动作自然循环，不要文字\",\n  \"n\": 1,\n  \"output_format\": \"gif\",\n  \"frame_count\": 9\n}\n```\n\n**default / Codex 分组：**\n\n在提示词中明确指定「生成 GIF 图」，例如：\n\n「生成 GIF 图：一只小狐狸眨眼并轻轻摇动尾巴，动作自然循环，不要文字或 Logo。」\n\n使用这一方式时，无需添加 `output_format: \"gif\"` 或 `frame_count`。\n\nGIF 生成使用 `/v1/images/generations`。返回的 Base64 内容解码后保存为 `.gif` 文件，尺寸和播放时长以实际文件为准。\n\n### SVG 矢量图\n\n**仅限官方 / 官方优惠分组。** 适合需要继续编辑形状、路径和颜色的图标、Logo 或插画。\n\n调用示例：\n\n```json\n{\n  \"model\": \"gpt-image-2.6-flare\",\n  \"prompt\": \"生成一个简洁的蓝色圆形矢量图标，白色背景\",\n  \"n\": 1,\n  \"output_format\": \"svg\",\n  \"svg\": {\n    \"model\": \"gpt-5.5\"\n  }\n}\n```\n\n- 使用 `/v1/images/generations`，每次生成 1 张。\n- `svg.model` 用于指定 SVG 编写模型。\n- 使用非流式请求。\n- 将返回的 `data[0].b64_json` 解码后保存为 `.svg` 文件。\n\n### 计费说明\n\n具体价格以当前分组的模型价格详情为准。不同分组的价格和支持能力不同，请根据所需输出格式选择分组。",
+      "tags": "生图,图片编辑"
+    },
+    {
+      "model_name": "gpt-image-2.6-sunburst",
+      "supported_endpoint_types": [
+        "generate",
+        "edit",
+        "openai-video"
+      ],
+      "endpoints": {
+        "edit": {
+          "path": "/v1/images/edits",
+          "method": "POST",
+          "docs": "https://tuzi-api.apifox.cn/343647072e0",
+          "scenario": "image",
+          "parameters": [
+            {
+              "name": "image",
+              "path": "image",
+              "type": "file",
+              "required": true,
+              "description": "需要编辑的图片文件。",
+              "ui_type": "image",
+              "accept": "image/png,image/jpeg,image/webp",
+              "part_name": "image"
+            },
+            {
+              "name": "mask",
+              "path": "mask",
+              "type": "file",
+              "required": false,
+              "description": "可选遮罩图片文件。",
+              "ui_type": "image",
+              "accept": "image/png",
+              "part_name": "mask"
+            }
+          ],
+          "transport": "multipart"
+        },
+        "generate": {
+          "path": "/v1/images/generations",
+          "method": "POST",
+          "docs": "https://tuzi-api.apifox.cn/343647071e0",
+          "scenario": "image"
+        },
+        "openai-video": {
+          "label": "Async Image Generation",
+          "path": "/v1/videos",
+          "method": "POST",
+          "description": "异步图片任务接口，提交后通过任务 ID 查询结果。",
+          "docs": "https://developers.openai.com/api/reference/resources/videos/methods/create",
+          "scenario": "async-image",
+          "async": true
+        }
+      },
+      "description": "**gpt-image-2.6-sunburst** 是本站提供的图像生成型号，支持文字生图、GIF 动图，以及指定分组下的 SVG 矢量图生成，适合视觉设计、插画、海报和产品创意素材制作。\n\n### 分组与能力\n\n| 能力 | 官方 / 官方优惠 | default / Codex |\n|---|---|---|\n| 文字生成图片 | 支持 | 支持 |\n| GIF 动图 | 使用 GIF 输出参数 | 通过提示词触发 |\n| SVG 矢量图 | 支持 | 不支持 |\n\n**需要 SVG 时，请使用「官方」或「官方优惠」分组，并确认调用令牌使用的是对应分组。**\n\n### 图片生成\n\n使用 `/v1/images/generations`，将 `model` 设置为 `gpt-image-2.6-sunburst`，在提示词中描述主体、布局、光线、材质和细节要求。\n\n图片尺寸以实际返回文件为准。\n\n### GIF 动图\n\n**官方 / 官方优惠分组：**\n\n需要设置 `output_format: \"gif\"`。仅在提示词中写「生成 GIF 图」，仍会按默认图片格式输出。\n\n调用示例：\n\n```json\n{\n  \"model\": \"gpt-image-2.6-sunburst\",\n  \"prompt\": \"一个蓝色小球在白色背景上轻轻弹跳，动作自然循环，不要文字\",\n  \"n\": 1,\n  \"output_format\": \"gif\",\n  \"frame_count\": 9\n}\n```\n\n**default / Codex 分组：**\n\n在提示词中明确指定「生成 GIF 图」，例如：\n\n「生成 GIF 图：花瓣缓缓飘落，水面泛起轻微涟漪，画面自然循环，不要文字或 Logo。」\n\n使用这一方式时，无需添加 `output_format: \"gif\"` 或 `frame_count`。\n\nGIF 生成使用 `/v1/images/generations`。返回的 Base64 内容解码后保存为 `.gif` 文件，尺寸和播放时长以实际文件为准。\n\n### SVG 矢量图\n\n**仅限官方 / 官方优惠分组。** 适合需要继续编辑形状、路径和颜色的图标、Logo 或插画。\n\n调用示例：\n\n```json\n{\n  \"model\": \"gpt-image-2.6-sunburst\",\n  \"prompt\": \"生成一个简洁的花朵矢量图标，白色背景\",\n  \"n\": 1,\n  \"output_format\": \"svg\",\n  \"svg\": {\n    \"model\": \"gpt-5.5\"\n  }\n}\n```\n\n- 使用 `/v1/images/generations`，每次生成 1 张。\n- `svg.model` 用于指定 SVG 编写模型。\n- 使用非流式请求。\n- 将返回的 `data[0].b64_json` 解码后保存为 `.svg` 文件。\n\n### 计费说明\n\n具体价格以当前分组的模型价格详情为准。不同分组的价格和支持能力不同，请根据所需输出格式选择分组。",
+      "tags": "图片,图片编辑"
+    },
+    {
+      "model_name": "gpt-image-2.6-1k",
+      "supported_endpoint_types": [
+        "edit",
+        "generate",
+        "openai-video"
+      ],
+      "endpoints": {
+        "edit": {
+          "path": "/v1/images/edits",
+          "method": "POST",
+          "docs": "https://tuzi-api.apifox.cn/343647072e0",
+          "scenario": "image",
+          "parameters": [
+            {
+              "name": "image",
+              "path": "image",
+              "type": "file",
+              "required": true,
+              "description": "需要编辑的图片文件。",
+              "ui_type": "image",
+              "accept": "image/png,image/jpeg,image/webp",
+              "part_name": "image"
+            },
+            {
+              "name": "mask",
+              "path": "mask",
+              "type": "file",
+              "required": false,
+              "description": "可选遮罩图片文件。",
+              "ui_type": "image",
+              "accept": "image/png",
+              "part_name": "mask"
+            }
+          ],
+          "transport": "multipart"
+        },
+        "generate": {
+          "path": "/v1/images/generations",
+          "method": "POST",
+          "docs": "https://tuzi-api.apifox.cn/343647071e0",
+          "scenario": "image"
+        },
+        "openai-video": {
+          "label": "Async Image Generation",
+          "path": "/v1/videos",
+          "method": "POST",
+          "description": "异步图片任务接口，提交后通过任务 ID 查询结果。",
+          "docs": "https://developers.openai.com/api/reference/resources/videos/methods/create",
+          "scenario": "async-image",
+          "async": true
+        }
+      },
+      "description": "**gpt-image-2.6-1k** 是本站的按次计费图像路由别名，不是 OpenAI 官方模型 ID。支持文字生图、普通图片编辑和通过提示词生成 GIF 动图，适合日常创作与批量素材制作。\n\n### 分组与能力\n\n| 分组 | 可用情况 |\n|---|---|\n| default / Codex | 支持图片生成、普通图片编辑和提示词生成 GIF |\n\n**本型号不支持 SVG。** 需要 SVG 时，请使用「官方」或「官方优惠」分组中的 `gpt-image-2.6-flare` 或 `gpt-image-2.6-sunburst`。\n\n### 图片生成\n\n- 使用 `/v1/images/generations`。\n- 将 `model` 设置为 `gpt-image-2.6-1k`。\n- 在提示词中描述主体、风格、构图和配色。\n- 需要 Base64 返回内容时，可设置 `response_format: \"b64_json\"`。\n\n### 图片尺寸\n\n- `1k` 是型号名称的一部分，不代表固定输出 1024×1024。\n- 图片尺寸以实际返回文件为准，可能与请求中的 `size` 不同。\n\n### 普通图片编辑\n\n使用 `/v1/images/edits`，上传原图，并通过文字说明需要修改和保留的内容。\n\n例如：「把左侧蓝色圆形改成橙色，保持右侧圆形和白色背景不变。」\n\n### GIF 动图\n\n在提示词中明确指定「生成 GIF 图」，并描述主体动作和循环效果。\n\n调用示例：\n\n```json\n{\n  \"model\": \"gpt-image-2.6-1k\",\n  \"prompt\": \"生成 GIF 图：一只小熊猫坐在树枝上眨眼并轻轻摆动尾巴，动作自然循环，不要文字或 Logo\",\n  \"n\": 1,\n  \"response_format\": \"b64_json\"\n}\n```\n\n- 使用 `/v1/images/generations`。\n- 通过提示词触发，无需添加 `output_format: \"gif\"` 或 `frame_count`。\n- 将返回的 Base64 内容解码后保存为 `.gif` 文件。\n- GIF 的尺寸、帧数和播放时长以实际文件为准。\n\n### 计费说明\n\n按次结算，具体价格以当前分组的模型价格详情为准。大批量使用可联系平台管理员咨询专享优惠。",
+      "tags": "生图,图片编辑"
+    }
+  ]
+}

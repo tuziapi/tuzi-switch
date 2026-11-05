@@ -11,7 +11,7 @@ import {
 import { isTuziCompatibleBaseUrl } from './provider-routing/tuzi-api-endpoints';
 
 interface DiscoverProviderModelsOptions
-  extends Pick<RuntimeModelDiscoveryOptions, 'selectAll' | 'signal'> {
+  extends Pick<RuntimeModelDiscoveryOptions, 'selectAll' | 'selectNew' | 'isCurrent' | 'signal'> {
   forceMarketplaceRefresh?: boolean;
 }
 
@@ -101,6 +101,8 @@ export async function discoverProviderModels(
     fallbackBaseUrls,
     {
       selectAll: options.selectAll,
+      selectNew: options.selectNew,
+      isCurrent: options.isCurrent,
       signal: options.signal,
       modelMetadata,
     },

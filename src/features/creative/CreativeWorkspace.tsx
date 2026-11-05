@@ -14,6 +14,7 @@ import type { CreativePage } from "@tuzi/creative-workspace";
 import { cn } from "@/lib/utils";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 import { createCreativeAccountBridge } from "./accountBridge";
+import { useModelUpgradeSync } from "./useModelUpgradeSync";
 
 import { registerUpdateGuard } from "@/lib/updateSafety";
 
@@ -94,6 +95,7 @@ export function CreativeWorkspace({
       createCreativeAccountBridge(accountState, manageAccount, selectedKeyId),
     [accountState, manageAccount, selectedKeyId],
   );
+  useModelUpgradeSync(accountBridge);
   useEffect(() => {
     if (selectedKeyId) setSettingsOpen(true);
   }, [selectedKeyId]);

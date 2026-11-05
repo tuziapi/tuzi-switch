@@ -23,6 +23,10 @@ export type ModelType = 'image' | 'video' | 'text' | 'audio';
 
 export const FLUX_3_IMAGE_MODEL_ID = 'flux-3-image';
 export const GPT_IMAGE_26_1K_MODEL_ID = 'gpt-image-2.6-1k';
+export const GPT_IMAGE_26_MODEL_IDS = [
+  GPT_IMAGE_26_1K_MODEL_ID, 'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst',
+];
+export const GPT_IMAGE_26_BASIC_DESCRIPTION = '基础接入支持生图、普通图片编辑；default/Codex 分组可在提示词写“生成 GIF 图”。官方分组专用 GIF/SVG 参数暂未接入，尺寸以返回文件为准。';
 export const GPT_IMAGE_26_SIZE_OPTIONS = [
   { value: 'auto', label: '自动（原始尺寸）' },
   { value: '1024x1024', label: '1:1 方形' },
@@ -33,7 +37,7 @@ export const GPT_IMAGE_26_SIZE_OPTIONS = [
 ];
 
 export function isGPTImage26ModelId(modelId?: string | null): boolean {
-  return modelId?.trim().toLowerCase() === GPT_IMAGE_26_1K_MODEL_ID;
+  return GPT_IMAGE_26_MODEL_IDS.includes(modelId?.trim().toLowerCase() || '');
 }
 export const FLUX_3_IMAGE_ASPECT_RATIOS = [
   'auto', '21:9', '2:1', '16:9', '3:2', '7:5', '4:3', '5:4',
@@ -509,13 +513,24 @@ export const IMAGE_MODEL_MORE_OPTIONS: ModelConfig[] = [
     id: GPT_IMAGE_26_1K_MODEL_ID,
     label: GPT_IMAGE_26_1K_MODEL_ID,
     shortCode: 'gpt261k',
-    description: 'Tuzi 图像生成渠道；提示词写“生成 GIF 图”可生成动图。保留实际输出尺寸，1k 不代表固定 1024×1024。',
+    description: `${GPT_IMAGE_26_BASIC_DESCRIPTION} 1k 不代表固定 1024×1024。`,
     type: 'image',
     vendor: ModelVendor.GPT,
     supportsTools: true,
     imageDefaults: IMAGE_DEFAULT_PARAMS,
     tags: ['new'],
   },
+  ...['flare', 'sunburst'].map((variant): ModelConfig => ({
+    id: `gpt-image-2.6-${variant}`,
+    label: `gpt-image-2.6-${variant}`,
+    shortCode: `gpt26${variant === 'flare' ? 'f' : 's'}`,
+    description: GPT_IMAGE_26_BASIC_DESCRIPTION,
+    type: 'image',
+    vendor: ModelVendor.GPT,
+    supportsTools: true,
+    imageDefaults: IMAGE_DEFAULT_PARAMS,
+    tags: ['new'],
+  })),
   {
     id: 'gpt-image-2.5-1k',
     label: 'gpt-image-2.5-1k',
@@ -2166,7 +2181,7 @@ const GPT_IMAGE_MODEL_IDS = [
   ...GPT_IMAGE_2_MODEL_IDS,
   ...GPT_IMAGE_1K_MODEL_IDS,
   ...GPT_IMAGE_25_MODEL_IDS,
-  GPT_IMAGE_26_1K_MODEL_ID,
+  ...GPT_IMAGE_26_MODEL_IDS,
 ];
 const MJ_IMAGE_MODEL_IDS = ['mj-imagine'];
 const GEMINI_31_FLASH_IMAGE_MODEL_IDS = ['gemini-3.1-flash-image-preview'];
@@ -3068,7 +3083,7 @@ export const IMAGE_PARAMS: ParamConfig[] = [
     valueType: 'enum',
     options: GPT_IMAGE_26_SIZE_OPTIONS,
     defaultValue: 'auto',
-    compatibleModels: [GPT_IMAGE_26_1K_MODEL_ID],
+    compatibleModels: GPT_IMAGE_26_MODEL_IDS,
     modelType: 'image',
   },
   // GPT Image 2.5 官方像素尺寸
@@ -3154,7 +3169,7 @@ export const IMAGE_PARAMS: ParamConfig[] = [
     defaultValue: 'auto',
     compatibleModels: GPT_IMAGE_MODEL_IDS.filter(
       (modelId) =>
-        modelId !== GPT_IMAGE_26_1K_MODEL_ID &&
+        !isGPTImage26ModelId(modelId) &&
         modelId !== 'gpt-image-2.5' &&
         modelId !== 'gpt-image-2.5-vip' &&
         modelId !== 'gpt-image-2.5-sunburst' &&

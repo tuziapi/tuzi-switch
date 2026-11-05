@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlaitBoard } from '@plait/core';
 import { useImageGenerationAnchorSync } from '../useImageGenerationAnchorSync';
+import { useImageGenerationAnchorController } from '../useImageGenerationAnchorController';
+import { useImageTaskProgress } from '../useImageTaskProgress';
 import { registerCanvasImage } from '../../services/canvas-image-readiness';
 import {
   TaskExecutionPhase,
@@ -18,6 +20,7 @@ const taskListeners: Array<(event: { task: Task }) => void> = [];
 const completionListeners: Array<(event: { taskId: string }) => void> = [];
 const taskState = {
   tasks: [] as Task[],
+  reads: 0,
 };
 const completionState = {
   byTaskId: new Map<
@@ -36,7 +39,7 @@ const completionState = {
 
 vi.mock('../../services/task-queue', () => ({
   taskQueueService: {
-    getAllTasks: () => taskState.tasks,
+    getAllTasks: () => { taskState.reads++; return taskState.tasks; },
     observeTaskUpdates: () => ({
       subscribe: (listener: (event: { task: Task }) => void) => {
         taskListeners.push(listener);
@@ -244,6 +247,7 @@ describe('useImageGenerationAnchorSync', () => {
     taskListeners.length = 0;
     completionListeners.length = 0;
     taskState.tasks = [];
+    taskState.reads = 0;
     completionState.byTaskId.clear();
     vi.useRealTimers();
   });
@@ -268,7 +272,7 @@ describe('useImageGenerationAnchorSync', () => {
     expect(anchor.subtitle).toBe('请求已受理，等待执行');
   });
 
-  it('refreshes active anchor progress while the image task is processing', () => {
+  it('advances displayed progress without dirtying the board until a real task event', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-15T08:00:00.000Z'));
 
@@ -294,11 +298,18 @@ describe('useImageGenerationAnchorSync', () => {
       children: PlaitImageGenerationAnchor[];
     };
     expect(boardState.children[0]?.progress).toBe(0);
-
+    const persistedAnchor = boardState.children[0];
+    const controller = renderHook(() => useImageGenerationAnchorController({
+      board, anchor: boardState.children[0],
+    }));
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
+    expect(controller.result.current.viewModel.progress).toBe(43);
+    expect(boardState.children[0]).toBe(persistedAnchor);
+    expect(boardState.children[0]?.progress).toBe(0);
 
+    act(() => { emitTaskUpdate(taskState.tasks[0]); });
     expect(boardState.children[0]?.progress).toBe(43);
   });
 
@@ -701,4 +712,93 @@ describe('useImageGenerationAnchorSync', () => {
 
     dispatchSpy.mockRestore();
   });
+  it('reads one fresh task snapshot for twenty anchors with a thousand historical tasks and skips empty sweeps', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
+    const anchors = Array.from({ length: 20 }, (_, index) => createAnchor({
+      id: `anchor-${index}`, taskIds: [`task-${index}`], primaryTaskId: `task-${index}`,
+      workflowId: `wf-${index}`, phase: 'generating', progress: 0,
+    }));
+    const board = createBoard(anchors[0], anchors.slice(1));
+    taskState.tasks = anchors.map((anchor, index) => createTask({
+      id: `task-${index}`, status: TaskStatus.PROCESSING, startedAt: Date.now(),
+      params: { workflowId: anchor.workflowId },
+    }));
+    taskState.tasks.push(...Array.from({ length: 1000 }, (_, index) => createTask({
+      id: `historic-${index}`, status: TaskStatus.COMPLETED,
+      params: { workflowId: `historic-wf-${index}` },
+    })));
+    const hook = renderHook(() => useImageGenerationAnchorSync({ board }));
+    expect(taskState.reads).toBe(1);
+    taskState.reads = 0;
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(taskState.reads).toBe(1);
+
+    // A later sweep must see new immutable tasks, not retain the old snapshot.
+    taskState.tasks = taskState.tasks.map(task => ({ ...task, status: TaskStatus.FAILED,
+      error: { code: 'FAILED', message: 'synthetic failure' } }));
+    taskState.reads = 0;
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(taskState.reads).toBe(1);
+    expect(board.children.every(anchor => anchor.phase === 'failed')).toBe(true);
+    taskState.reads = 0;
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(taskState.reads).toBe(0);
+    hook.unmount();
+    vi.useRealTimers();
+  });
+
+  it('does not rerender capped estimated progress, but restarts for a new attempt', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
+    let renders = 0;
+    const hook = renderHook(({ startedAt }) => {
+      renders++;
+      return useImageTaskProgress({ taskType: TaskType.IMAGE,
+        taskStatus: TaskStatus.PROCESSING, startedAt });
+    }, { initialProps: { startedAt: Date.now() - 300_000 } });
+    expect(hook.result.current.displayProgress).toBe(90);
+    renders = 0;
+    for (let second = 0; second < 60; second++) {
+      act(() => { vi.advanceTimersByTime(1000); });
+    }
+    expect(renders).toBe(0);
+    hook.rerender({ startedAt: Date.now() });
+    expect(hook.result.current.displayProgress).toBe(0);
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(hook.result.current.displayProgress).toBe(43);
+    hook.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it('keeps the display clock quiet between integer changes and reacts to estimate/media changes', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-05T12:00:00Z'));
+    const startedAt = Date.now() - 240_000;
+    let renders = 0;
+    const hook = renderHook(({ estimatedDuration, mediaUrl, isImageLoading }) => {
+      renders++;
+      return useImageTaskProgress({ taskType: TaskType.IMAGE,
+        taskStatus: TaskStatus.PROCESSING, startedAt,
+        estimatedDuration, mediaUrl, isImageLoading });
+    }, { initialProps: { estimatedDuration: 300_000, mediaUrl: '', isImageLoading: false } });
+    expect(hook.result.current.displayProgress).toBe(89);
+    renders = 0;
+    for (let second = 0; second < 10; second++) {
+      act(() => { vi.advanceTimersByTime(1000); });
+    }
+    expect(renders).toBe(0);
+    hook.rerender({ estimatedDuration: 600_000, mediaUrl: '', isImageLoading: false });
+    expect(hook.result.current.displayProgress).toBeLessThan(89);
+    hook.rerender({ estimatedDuration: 600_000, mediaUrl: 'synthetic.png', isImageLoading: true });
+    act(() => { vi.advanceTimersByTime(2500); });
+    expect(hook.result.current.displayProgress).toBe(95);
+    act(() => { vi.advanceTimersByTime(2500); });
+    expect(hook.result.current.displayProgress).toBe(100);
+    hook.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
 });
