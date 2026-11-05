@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { FaApple, FaLinux, FaWindows } from "react-icons/fa6";
 import { isStableRelease, repository } from "./stableRelease";
+import { macosInstallCommand } from "./macosInstaller";
 import "./tuzi-download.css";
 
 const pageSource =
@@ -59,6 +60,10 @@ const platforms = [
   { id: "linux", label: "Linux", icon: FaLinux },
 ];
 const faqs = [
+  [
+    "Mac 提示无法验证开发者或应用打不开怎么办？",
+    "此版本未经 Apple 开发者签名或公证。可使用下方 macOS 安装脚本：自动识别芯片、校验正式安装包，在你确认后仅放行兔子助手。也可在确认来源可信后，通过系统设置 → 隐私与安全性 → 仍要打开。若提示恶意软件或启动后闪退，请保留报错信息进一步排查。",
+  ],
   [
     "现在下载的版本包含 opentu 吗？",
     "包含。下载兔子助手即可使用工具管理、兔子账户、opentu 项目与自由画布，无需再安装另一款创作客户端。",
@@ -144,13 +149,15 @@ export function TuziDownloadView({
   const [screen, setScreen] = useState(0);
   const [platform, setPlatform] = useState(detectPlatform);
   const [packageId, setPackageId] = useState("deb");
-  const [copied, setCopied] = useState("");
+  const [copied, setCopied] = useState({});
   const [dark, setDark] = useState(
     () =>
       typeof matchMedia !== "undefined" &&
       matchMedia("(prefers-color-scheme: dark)").matches,
   );
   const { release, loading, error, retry } = useRelease();
+  const installCommand = macosInstallCommand(release);
+  const pinnedInstallCommand = macosInstallCommand(release, { pinned: true });
   const tracker = useRef(null),
     trackerReady = useRef(false),
     events = useRef([]),
@@ -200,15 +207,15 @@ export function TuziDownloadView({
         tracker.current?.contentWindow?.postMessage(message, location.origin),
       );
   };
-  const copy = async () => {
+  const copy = async (key, command) => {
     try {
-      await navigator.clipboard.writeText(release.command);
-      setCopied(t("已复制"));
+      await navigator.clipboard.writeText(command);
+      setCopied({ key, message: t("已复制") });
     } catch {
-      setCopied(t("复制失败，请选中命令手动复制"));
+      setCopied({ key, message: t("复制失败，请手动复制") });
     }
     clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied(""), 3500);
+    copyTimer.current = setTimeout(() => setCopied({}), 3500);
   };
   const external = { target: "_blank", rel: "noopener noreferrer" };
   return (
@@ -495,7 +502,9 @@ export function TuziDownloadView({
               {platform === "macos" && (
                 <p className="td-preview-note">
                   {t(
-                    "macOS：下载后退出旧版，将 DMG 中的兔子助手拖入“应用程序”并替换，再从“应用程序”打开。仅下载或打开 DMG，不会升级正在运行的旧版。",
+                    installCommand
+                      ? "macOS：终端安装会自动识别芯片；也可选择下方安装包手动安装。"
+                      : "macOS：请先退出旧版，将 DMG 中的兔子助手拖入“应用程序”并替换，再从“应用程序”打开。",
                   )}
                 </p>
               )}
@@ -534,6 +543,55 @@ export function TuziDownloadView({
                   <span className="td-format">{selected.format}</span>
                 )}
               </div>
+              {platform === "macos" && installCommand && (
+                <div className="td-terminal">
+                  <div className="td-terminal-heading">
+                    <span className="td-terminal-title">
+                      <Terminal size={18} />
+                      {t("终端一键安装")}
+                    </span>
+                    <small>{t("自动识别 Apple 芯片 / Intel")}</small>
+                  </div>
+                  {[
+                    ["current", t("安装当前版本"), installCommand],
+                    [
+                      "pinned",
+                      `${t("指定版本")} ${release.tag}`,
+                      pinnedInstallCommand,
+                    ],
+                  ].map(([key, label, command]) => (
+                    <div className="td-terminal-command" key={key}>
+                      <div className="td-terminal-heading">
+                        <span>{label}</span>
+                        <button
+                          onClick={() => copy(key, command)}
+                          aria-label={`${t("复制")}${label}`}
+                        >
+                          <Copy size={14} />
+                          {copied.key === key ? copied.message : t("复制命令")}
+                        </button>
+                      </div>
+                      <pre tabIndex={0}>
+                        <code>{command}</code>
+                      </pre>
+                    </div>
+                  ))}
+                  <div className="td-terminal-footer">
+                    <p>
+                      {t("粘贴到终端，按提示确认。当前支持：")} {release.tag}
+                    </p>
+                    <a
+                      href={release.macosInstaller.href}
+                      download={`install-macos-${release.tag}.sh`}
+                    >
+                      {t("查看脚本")}
+                    </a>
+                  </div>
+                  <span className="td-copy-status" role="status">
+                    {copied.message}
+                  </span>
+                </div>
+              )}
               {choices.length > 1 && (
                 <label className="td-package-select">
                   {t(platform === "macos" ? "芯片类型" : "安装格式")}
@@ -589,13 +647,21 @@ export function TuziDownloadView({
                       )}
               </p>
               <p className="td-cache-notice">
-                {t(
-                  "安装包尚未进行开发者签名或 Apple 公证，系统可能提示无法验证发布者。",
-                )}
+                {platform === "macos"
+                  ? t(
+                      installCommand
+                        ? "Mac 版未经 Apple 开发者签名或公证。如被系统拦截，可使用上方终端安装，确认后仅放行兔子助手。"
+                        : "Mac 版未经 Apple 开发者签名或公证，系统可能提示无法验证发布者。",
+                    )
+                  : t("安装包尚未进行开发者签名，系统可能提示无法验证发布者。")}
               </p>
               {manualInstallOnly && (
                 <p className="td-cache-notice">
-                  {t("此版本请下载后手动安装；应用内自动更新暂不可用。")}
+                  {t(
+                    installCommand
+                      ? "此版本请下载安装包或使用 Mac 安装脚本；应用内自动更新暂不可用。"
+                      : "此版本请下载后手动安装；应用内自动更新暂不可用。",
+                  )}
                 </p>
               )}
               {release?.stale && (
@@ -612,26 +678,6 @@ export function TuziDownloadView({
                 <ArrowUpRight size={14} />
               </a>
             </div>
-            {release?.command && (
-              <details className="td-terminal">
-                <summary>
-                  <Terminal size={17} />
-                  {t("更习惯终端？使用一键安装")}
-                  <ChevronDown size={16} />
-                </summary>
-                <div>
-                  <span>macOS / Linux</span>
-                  <button onClick={copy}>
-                    <Copy size={14} />
-                    {t("复制命令")}
-                  </button>
-                </div>
-                <pre tabIndex={0}>
-                  <code>{release.command}</code>
-                </pre>
-                <p role="status">{copied}</p>
-              </details>
-            )}
           </section>
           <section
             className="td-faq"
