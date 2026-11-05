@@ -981,8 +981,8 @@ class SettingsManager {
         manualBindings: this.normalizeProviderCatalogManualBindings(
           draft.manualBindings
         ),
-        discoverySource: draft.discoverySource === 'marketplace'
-          ? 'marketplace'
+        discoverySource: draft.discoverySource === 'marketplace' || draft.discoverySource === 'models-endpoint'
+          ? draft.discoverySource
           : undefined,
         sourceBaseUrl:
           typeof draft.sourceBaseUrl === 'string'
@@ -1556,7 +1556,22 @@ class SettingsManager {
   /**
    * 保存设置到本地存储
    */
-  private async saveToStorage(): Promise<void> {
+  private storageWrites: Promise<void> = Promise.resolve();
+
+  /** Await a durable current snapshot; automatic refresh must not mark failed writes complete. */
+  public flushStorage(): Promise<void> {
+    return this.saveToStorage(true);
+  }
+
+  private saveToStorage(strict = false): Promise<void> {
+    const write = this.storageWrites.then(() => this.writeStorageSnapshot());
+    this.storageWrites = write.catch(() => undefined);
+    return strict ? write : write.catch(() => {
+      console.warn('Failed to save settings to localStorage');
+    });
+  }
+
+  private async writeStorageSnapshot(): Promise<void> {
     if (typeof window === 'undefined') return;
 
     try {
@@ -1573,7 +1588,7 @@ class SettingsManager {
       // 同步到 IndexedDB，供 SW 读取（必须等待完成，确保首次输入 API Key 后 SW 能立即拿到配置）
       await this.syncToIndexedDB();
     } catch (error) {
-      console.warn('Failed to save settings to localStorage:', error);
+      throw new Error('无法保存创作配置，请检查本地存储空间。');
     }
   }
 

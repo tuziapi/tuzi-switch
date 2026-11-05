@@ -3,8 +3,28 @@ import react from '@vitejs/plugin-react';
 import tailwind from '@tailwindcss/postcss';
 import selectorParser from 'postcss-selector-parser';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const source = path.resolve(__dirname, 'upstream');
+const hostVersion = JSON.parse(readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8')).version;
+// Stable across rebuilds of identical sources; changes even for same-version adaptations.
+const modelRevisionHash = createHash('sha256');
+function hashSources(directory: string) {
+  for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name === '__tests__') continue;
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) hashSources(file);
+    else if (/\.(ts|tsx)$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name)) {
+      modelRevisionHash.update(path.relative(__dirname, file)).update(readFileSync(file));
+    }
+  }
+}
+hashSources(path.resolve(__dirname, 'src'));
+hashSources(`${source}/packages/drawnix/src/constants`);
+hashSources(`${source}/packages/drawnix/src/services`);
+hashSources(`${source}/packages/drawnix/src/utils`);
+const modelRefreshRevision = `${hostVersion}:${modelRevisionHash.digest('hex').slice(0, 24)}`;
 // Keep all creative styles within the host workspace container.
 function scopeStyles() {
   return {
@@ -60,7 +80,8 @@ export default defineConfig({
   },
   define: {
     "import.meta.env.VITE_TUZI_ASSISTANT": JSON.stringify("true"),
-    __APP_VERSION__: JSON.stringify('1.4.2-creative-preview'),
+    __APP_VERSION__: JSON.stringify(hostVersion),
+    __CREATIVE_MODEL_REFRESH_REVISION__: JSON.stringify(modelRefreshRevision),
     __OPENTU_DESKTOP_CHANNEL_PROOF__: JSON.stringify('assistant-local-preview'),
     'import.meta.env.VITE_OPENTU_DESKTOP': JSON.stringify('false'),
     'import.meta.env.VITE_TUZI_EMBEDDED_MODE': JSON.stringify('false'),
@@ -69,7 +90,7 @@ export default defineConfig({
   },
   worker: { format: 'es' },
   build: {
-    lib: { entry: 'src/index.tsx', formats: ['es'], fileName: () => 'creative.js', cssFileName: 'creative-workspace' },
+    lib: { entry: { creative: 'src/index.tsx', 'model-sync': 'src/modelSync.ts' }, formats: ['es'], fileName: (_format, name) => `${name}.js`, cssFileName: 'creative-workspace' },
     rollupOptions: { external: [/^react(?:\/|$)/, /^react-dom(?:\/|$)/] },
     commonjsOptions: { transformMixedEsModules: true },
     sourcemap: true,

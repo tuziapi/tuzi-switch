@@ -28,7 +28,7 @@ const CreativeSettings = lazy(() => import('./CreativeSettings').then(module => 
 export function CreativeWorkspace({ active = true, page, onPageChange, settingsOpen = false, onSettingsOpenChange, accountBridge }: CreativeWorkspaceProps) {
   useEffect(() => {
     setAssistantAccount(accountBridge);
-    return () => setAssistantAccount(undefined);
+    // The host background model runtime owns bridge cleanup on application unmount.
   }, [accountBridge]);
   useEffect(() => {
     const open = () => onSettingsOpenChange?.(true);

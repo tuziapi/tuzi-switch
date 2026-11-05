@@ -6,7 +6,7 @@ const assert = require("assert/strict");
 const out = process.env.CREATIVE_QA_OUTPUT || "/tmp/opentu-sync-ui";
 fs.mkdirSync(out, { recursive: true });
 const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
-const model = "gpt-image-2.6-1k";
+const model = process.env.CREATIVE_QA_MODEL || "gpt-image-2.6-1k";
 const gif = fs
   .readFileSync(
     require("path").join(__dirname, "fixtures/synthetic-animation.gif"),
@@ -85,6 +85,7 @@ const gif = fs
           ? r.continue()
           : r.abort();
       });
+      await p.addInitScript(() => localStorage.setItem('aitu_hide_inspiration_board', 'true'));
       await p.goto(`${base}/ui04.html?canvas=1&page=creative&media-qa=1`);
       await p.evaluate(
         ({ model, outcome, gif }) => {
@@ -171,7 +172,7 @@ const gif = fs
             ).args,
         );
         assert(JSON.stringify(copied).includes("provider-126"));
-        assert(JSON.stringify(copied).includes("gpt-image-2.6-1k"));
+        assert(JSON.stringify(copied).includes(model));
         const hint = p.getByText("不再提示", { exact: true });
         if (await hint.isVisible()) await hint.click();
         await p.keyboard.press("Escape");

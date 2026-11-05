@@ -81,6 +81,47 @@ describe('settings-manager', () => {
     localStorage.clear();
   });
 
+  it('reports durable flush failure and recovers without losing in-memory settings', async () => {
+    mockSettingsManagerDeps();
+    const storage = createStorageMock();
+    const originalStorage = globalThis.localStorage;
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+    try {
+      const { settingsManager } = await import('../settings-manager');
+      await settingsManager.waitForInitialization();
+      const write = vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new Error('synthetic disk full'); });
+      await settingsManager.updateSetting('gemini.imageModelName', 'gpt-image-2.6-flare');
+      await expect(settingsManager.flushStorage()).rejects.toThrow('无法保存创作配置');
+      expect(settingsManager.getSetting('gemini.imageModelName')).toBe('gpt-image-2.6-flare');
+      write.mockRestore();
+      await settingsManager.flushStorage();
+      expect(JSON.parse(storage.getItem(DRAWNIX_SETTINGS_KEY)!).gemini.imageModelName).toBe('gpt-image-2.6-flare');
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: originalStorage });
+    }
+  });
+
+  it('serializes asynchronous snapshots so an older save cannot overwrite the latest settings', async () => {
+    mockSettingsManagerDeps();
+    const { settingsManager } = await import('../settings-manager');
+    await settingsManager.waitForInitialization();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const internals = settingsManager as any;
+    const original = internals.encryptSensitiveDataForStorage.bind(settingsManager);
+    const encrypt = vi.spyOn(internals, 'encryptSensitiveDataForStorage')
+      .mockImplementationOnce(async () => { await held; })
+      .mockImplementation(original);
+    const first = settingsManager.updateSetting('gemini.imageModelName', 'gpt-image-2.6-flare');
+    await Promise.resolve();
+    const second = settingsManager.updateSetting('gemini.imageModelName', 'gpt-image-2.6-sunburst');
+    release();
+    await Promise.all([first, second]);
+    await settingsManager.flushStorage();
+    expect(JSON.parse(localStorage.getItem(DRAWNIX_SETTINGS_KEY)!).gemini.imageModelName).toBe('gpt-image-2.6-sunburst');
+    encrypt.mockRestore();
+  });
+
   it('defaults missing compatibility while preserving managed profile details and explicit values', async () => {
     mockSettingsManagerDeps();
 
