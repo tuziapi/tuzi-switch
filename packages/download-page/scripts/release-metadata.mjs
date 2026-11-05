@@ -5,7 +5,11 @@ import {
   createStableRelease,
   isStableRelease,
 } from "../src/stableRelease.js";
-import { macosInstallerTag, macosInstallerUrl } from "../src/macosInstaller.js";
+import {
+  macosInstallerTag,
+  macosInstallerUrl,
+  macosInstallBootstrap,
+} from "../src/macosInstaller.js";
 const tag = process.env.RELEASE_TAG;
 if (tag && !/^v\d+\.\d+\.\d+$/.test(tag)) throw Error("Invalid release tag");
 const response = await fetch(
@@ -26,6 +30,7 @@ const metadata = createStableRelease(await response.json());
 const scriptTarget = "public/install-macos-v1.5.5.sh";
 // A later release must not accidentally advertise this older pinned installer.
 await rm(scriptTarget, { force: true });
+await rm("public/install.sh", { force: true });
 if (
   repository === "tuziapi/tuzi-switch" &&
   metadata.tag === macosInstallerTag
@@ -46,6 +51,7 @@ if (
     sha256: createHash("sha256").update(script).digest("hex"),
   };
   await writeFile(scriptTarget, script);
+  await writeFile("public/install.sh", macosInstallBootstrap(metadata));
 }
 if (!isStableRelease(metadata)) throw Error("Invalid installer metadata");
 await writeFile(
