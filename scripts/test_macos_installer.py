@@ -1,5 +1,5 @@
 """Isolated tests: official local DMGs, real macOS verification, no application launch.
-TUZI_TEST_DMG_DIR supplies original v1.5.5 DMGs. Only curl is mocked to copy these;
+TUZI_TEST_DMG_DIR supplies the matching release DMGs. Only curl is mocked to copy these;
 public-network tests separately run --verify-only. Failure tests mock one tool.
 """
 import os, pathlib, plistlib, pty, select, shlex, signal, subprocess, tempfile, time, unittest
@@ -38,7 +38,7 @@ cp """ + shlex.quote(FIXTURES) + '/"$(basename "$url")" "$out"\n')
         p.write_text("#!/bin/bash\nset -e\n" + body)
         p.chmod(0o755)
 
-    def old_app(self, version="1.5.4", identifier="com.tuziswitch.desktop"):
+    def old_app(self, version="1.5.5", identifier="com.tuziswitch.desktop"):
         (self.app / "Contents").mkdir(parents=True)
         with (self.app / "Contents/Info.plist").open("wb") as f:
             plistlib.dump({"CFBundleIdentifier": identifier, "CFBundleShortVersionString": version}, f)
