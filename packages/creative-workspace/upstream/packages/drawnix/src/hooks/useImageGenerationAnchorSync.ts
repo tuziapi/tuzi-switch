@@ -352,7 +352,7 @@ export function useImageGenerationAnchorSync({
 
     const removalTimers = removalTimersRef.current;
 
-    const reconcileAnchor = (anchorId: string) => {
+    const reconcileAnchor = (anchorId: string, displayOnlyTick = false) => {
       const anchor = ImageGenerationAnchorTransforms.getAnchorById(
         board,
         anchorId
@@ -527,7 +527,14 @@ export function useImageGenerationAnchorSync({
         patch.transitionMode = anchor.anchorType === 'frame' ? 'hold' : 'morph';
       }
 
-      if (Object.keys(patch).length > 0) {
+      const changedKeys = Object.keys(patch);
+      // The display controller already advances estimated progress locally.
+      // A clock tick must not dirty/save the whole board just for that estimate.
+      // Real task events and lifecycle/binding/geometry repairs still persist.
+      const onlyDisplayChanged = changedKeys.every(
+        (key) => key === 'progress' || key === 'subtitle'
+      );
+      if (changedKeys.length > 0 && !(displayOnlyTick && onlyDisplayChanged)) {
         ImageGenerationAnchorTransforms.updateAnchor(board, anchor.id, patch);
       }
 
@@ -624,7 +631,7 @@ export function useImageGenerationAnchorSync({
     const progressTimer = setInterval(() => {
       ImageGenerationAnchorTransforms.getAllAnchors(board).forEach((anchor) => {
         if (isActiveAnchorPhase(anchor.phase)) {
-          reconcileAnchor(anchor.id);
+          reconcileAnchor(anchor.id, true);
         }
       });
     }, ACTIVE_ANCHOR_PROGRESS_INTERVAL);

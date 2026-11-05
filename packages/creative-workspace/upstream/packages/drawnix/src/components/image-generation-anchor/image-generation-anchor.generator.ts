@@ -66,6 +66,9 @@ export class ImageGenerationAnchorGenerator {
   private reactRoot: Root | null = null;
   private desktopFallback: SVGGElement | null = null;
   private renderTimer: number | null = null;
+  private desktopLayout: readonly unknown[] | null = null;
+  private desktopProgressBar: SVGRectElement | null = null;
+  private desktopDescription: SVGTextElement | null = null;
   onSizeChange?: (size: { width: number; height: number }) => void;
 
   processDrawing(
@@ -139,9 +142,23 @@ export class ImageGenerationAnchorGenerator {
       return;
     }
 
-    host.replaceChildren();
     const rect = RectangleClient.getRectangleByPoints(element.points);
     const isFailed = element.phase === 'failed';
+    const layout = [
+      element.id, rect.x, rect.y, rect.width, rect.height, element.phase,
+      element.batchTotal || element.requestedCount || element.taskIds.length || 1,
+      element.previewImageUrl, typeof element.progress === 'number',
+    ];
+    // Progress arrives from both task/board updates and the display clock.
+    // Keep SVG animations and layout intact for these frequent, local changes.
+    if (!isFailed && this.desktopLayout?.every((value, index) => value === layout[index])) {
+      this.updateDesktopProgress(element, rect.width);
+      return;
+    }
+    this.desktopLayout = isFailed ? null : layout;
+    this.desktopProgressBar = null;
+    this.desktopDescription = null;
+    host.replaceChildren();
     if (isFailed) {
       const details = failure || getImageFailureDetails(undefined, element.error || '生成失败');
       const rows: FailureRows = [
@@ -383,6 +400,7 @@ export class ImageGenerationAnchorGenerator {
       );
       description.setAttribute('font-size', String(bodySize));
       description.textContent = truncateText(subtitle, maxChars);
+      this.desktopDescription = description;
       host.appendChild(description);
     }
 
@@ -408,6 +426,7 @@ export class ImageGenerationAnchorGenerator {
       progressBar.setAttribute('height', '3');
       progressBar.setAttribute('rx', '1.5');
       progressBar.setAttribute('fill', accent);
+      this.desktopProgressBar = progressBar;
       host.appendChild(progressBar);
     }
 
@@ -446,6 +465,28 @@ export class ImageGenerationAnchorGenerator {
         () => this.board.deleteFragment([element]),
         true
       );
+    }
+  }
+
+  private updateDesktopProgress(element: PlaitImageGenerationAnchor, width: number): void {
+    const subtitle = element.subtitle || DESKTOP_PHASE_SUBTITLES[element.phase];
+    const phaseLabel = DESKTOP_PHASE_LABELS[element.phase];
+    const loading = element.phase === 'developing' || element.phase === 'inserting';
+    const label = loading ? phaseLabel : `${phaseLabel}：${subtitle}`;
+    if (this.desktopFallback?.getAttribute('aria-label') !== label) {
+      this.desktopFallback?.setAttribute('aria-label', label);
+    }
+    if (this.desktopDescription) {
+      // A description exists only in the non-compact layout (20px padding).
+      const text = truncateText(subtitle, Math.max(12, Math.floor((width - 40) / 13)));
+      if (this.desktopDescription.textContent !== text) this.desktopDescription.textContent = text;
+    }
+    if (this.desktopProgressBar && typeof element.progress === 'number') {
+      const progress = Math.max(0, Math.min(100, Math.round(element.progress)));
+      const value = String((Math.min(180, width - 40) * progress) / 100);
+      if (this.desktopProgressBar.getAttribute('width') !== value) {
+        this.desktopProgressBar.setAttribute('width', value);
+      }
     }
   }
 
@@ -597,6 +638,9 @@ export class ImageGenerationAnchorGenerator {
       }, 0);
     }
 
+    this.desktopLayout = null;
+    this.desktopProgressBar = null;
+    this.desktopDescription = null;
     this.foreignObject = null;
     this.htmlContainer = null;
     this.desktopFallback = null;

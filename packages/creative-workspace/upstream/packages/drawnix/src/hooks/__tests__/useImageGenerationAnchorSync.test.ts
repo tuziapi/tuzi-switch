@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlaitBoard } from '@plait/core';
 import { useImageGenerationAnchorSync } from '../useImageGenerationAnchorSync';
+import { useImageGenerationAnchorController } from '../useImageGenerationAnchorController';
 import { registerCanvasImage } from '../../services/canvas-image-readiness';
 import {
   TaskExecutionPhase,
@@ -268,7 +269,7 @@ describe('useImageGenerationAnchorSync', () => {
     expect(anchor.subtitle).toBe('请求已受理，等待执行');
   });
 
-  it('refreshes active anchor progress while the image task is processing', () => {
+  it('advances displayed progress without dirtying the board until a real task event', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-15T08:00:00.000Z'));
 
@@ -294,11 +295,18 @@ describe('useImageGenerationAnchorSync', () => {
       children: PlaitImageGenerationAnchor[];
     };
     expect(boardState.children[0]?.progress).toBe(0);
-
+    const persistedAnchor = boardState.children[0];
+    const controller = renderHook(() => useImageGenerationAnchorController({
+      board, anchor: boardState.children[0],
+    }));
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
+    expect(controller.result.current.viewModel.progress).toBe(43);
+    expect(boardState.children[0]).toBe(persistedAnchor);
+    expect(boardState.children[0]?.progress).toBe(0);
 
+    act(() => { emitTaskUpdate(taskState.tasks[0]); });
     expect(boardState.children[0]?.progress).toBe(43);
   });
 
