@@ -19,7 +19,7 @@
 
 它适合同时使用多个 AI 工具、需要切换模型服务的开发者，也适合希望把生成素材与创作项目集中整理的用户。已有第三方模型服务时，可以保留手动配置；使用兔子账户时，可以从账户中选择模型 Key 配置到工具或创作工作区。
 
-> 当前正式版本：**v1.5.5**。正式仓库为 **tuziapi/tuzi-switch**，**AiW520/tuzi-switch** 为测试仓库。当前提供完整安装包，应用内自动更新暂不可用。Mac 版尚未进行 Apple 开发者签名或公证。
+> 当前正式版本：**v1.5.5**。正式仓库为 **tuziapi/tuzi-switch**，**AiW520/tuzi-switch** 为测试仓库。当前提供完整安装包；本次重建支持正式新版提醒和手动下载，应用内自动安装暂不可用。Mac 版尚未进行 Apple 开发者签名或公证。
 
 ## 阅读导航
 
@@ -127,11 +127,11 @@ Mac 最低系统版本在打包配置中设为 macOS 12.0。当前没有 Windows
 (s=$(curl -fsSL https://tuziapi.github.io/tuzi-switch/install.sh) && bash -c "$s" -- --version v1.5.5)
 ```
 
-目前两条命令都安装 **v1.5.5**。指定版本仅支持该版本，不能任意替换为旧版本；也兼容 `TUZI_SWITCH_TAG=v1.5.5`，显式 `--version` 优先。
+目前两条命令都安装 **v1.5.5**。本次为同版本重建，已安装旧 v1.5.5 的用户需重新下载安装才能获得新增修复。指定版本仅支持该版本，不能任意替换为旧版本；也兼容 `TUZI_SWITCH_TAG=v1.5.5`，显式 `--version` 优先。
 
 脚本会自动识别 Apple 芯片 / Intel，校验安装器及 DMG 的 SHA-256、应用身份和包内签名完整性，替换前备份旧应用。安装与放行分别需要用户确认，不需要 `sudo`，不修改账户和作品配置。实际安装目录以终端提示为准，应用名为 **兔子助手.app**。
 
-此脚本仅适用于 macOS。[查看安装器源码](scripts/install-macos.sh)。旧的 `scripts/install_tuzi_switch.sh` 入口尚未适配当前包名，请勿继续使用旧教程中的命令。
+此脚本仅适用于 macOS。[查看安装器源码](scripts/install-macos.sh)。兼容入口 `scripts/install_tuzi_switch.sh` 已接入正式下载：Mac 转入同一校验安装器，Linux x86_64 下载 AppImage 并核对 SHA256SUMS；可加 `--verify-only` 仅验证。
 
 ### 手动安装
 
