@@ -85,16 +85,21 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     useState<InstallState>(initialInstallState);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const session = useRef<UpdateSession | null>(null);
+  const manualDownloadInFlight = useRef(false);
   const openUpdateDialog = useCallback(() => setUpdateDialogOpen(true), []);
   const closeUpdateDialog = useCallback(() => setUpdateDialogOpen(false), []);
   const downloadUpdate = useCallback(async () => {
     if (!updateHandle) return;
     if (updateHandle.manual) {
+      if (manualDownloadInFlight.current) return;
+      manualDownloadInFlight.current = true;
       try {
         await updateHandle.downloadAndInstall();
         toast.success(t("settings.updatePageOpened"));
       } catch {
         toast.error(t("settings.updateDownloadFailed"));
+      } finally {
+        manualDownloadInFlight.current = false;
       }
       return;
     }
@@ -239,9 +244,14 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
             : "settings.inAppUpdateHint",
       ),
       action: {
-        label: t("settings.downloadUpdate"),
+        label:
+          updateHandle.manual && updateInfo.channel === "stable"
+            ? t("settings.viewUpdate")
+            : t("settings.downloadUpdate"),
         onClick: () => {
-          if (updateHandle.manual) void downloadUpdate();
+          if (updateHandle.manual && updateInfo.channel === "stable")
+            setUpdateDialogOpen(true);
+          else if (updateHandle.manual) void downloadUpdate();
           else {
             setUpdateDialogOpen(true);
             void downloadUpdate();

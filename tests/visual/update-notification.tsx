@@ -14,11 +14,13 @@ mockIPC((command, args) => {
   if (command === "get_update_build_info")
     return {
       channel,
-      repository: "AiW520/tuzi-switch",
+      repository:
+        channel === "stable" ? "tuziapi/tuzi-switch" : "AiW520/tuzi-switch",
       runNumber: 10,
       commit: "a".repeat(40),
       platform,
     };
+  if (command === "plugin:app|version") return "1.5.5";
   if (command === "open_external") {
     document.querySelector("output")!.textContent = String(
       (args as { url?: string } | undefined)?.url,
@@ -40,7 +42,9 @@ createRoot(document.getElementById("root")!).render(
           <UpdateBadge />
         </div>
         <p className="mt-8">
-          合成数据：当前构建 #10，新构建 #11。不会打开真实下载。
+          {channel === "stable"
+            ? "合成数据：当前版本 1.5.5，新版本 1.5.6。不会打开真实下载。"
+            : "合成数据：当前构建 #10，新构建 #11。不会打开真实下载。"}
         </p>
         <output className="block break-all mt-8" />
       </main>

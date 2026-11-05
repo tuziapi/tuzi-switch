@@ -760,6 +760,7 @@
     "browseDirectory": "浏览目录",
     "resetDefault": "恢复默认目录（需保存后生效）",
     "updateNoticeTitle": "兔子助手有新版本",
+    "viewUpdate": "查看更新",
     "acceptanceUpdateNotice": "含 opentu 的测试包，登录 GitHub 后下载。",
     "downloadUpdate": "下载更新",
     "updateLater": "稍后提醒",

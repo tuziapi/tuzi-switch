@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UpdateProvider, useUpdate } from "@/contexts/UpdateContext";
 const { check, info, download, open, success } = vi.hoisted(() => ({
@@ -132,5 +132,58 @@ describe("automatic update notifications", () => {
     });
     expect(info).not.toHaveBeenCalled();
     expect(screen.getByText("none")).toBeInTheDocument();
+  });
+});
+
+describe("official manual update presentation", () => {
+  it("shows release notes first and opens an installer only after an explicit download click", async () => {
+    check.mockResolvedValue({
+      status: "available",
+      info: {
+        currentVersion: "1.5.5",
+        availableVersion: "1.5.6",
+        channel: "stable",
+        notes: "合成更新说明 <script>synthetic</script>",
+      },
+      update: { manual: true, version: "1.5.6", downloadAndInstall: download },
+    });
+    render(
+      <UpdateProvider>
+        <Probe />
+      </UpdateProvider>,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(info.mock.calls[0][1].action.label).toBe("settings.viewUpdate");
+    await act(async () => {
+      info.mock.calls[0][1].action.onClick();
+    });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(
+      screen.getByText("合成更新说明 <script>synthetic</script>"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog").querySelector("script")).toBeNull();
+    expect(screen.getByText(/下载完成后请手动安装/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "重启并更新" })).toBeNull();
+    expect(download).not.toHaveBeenCalled();
+    let finish!: () => void;
+    download.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "下载安装包" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "下载安装包" }));
+    });
+    expect(download).toHaveBeenCalledOnce();
+    await act(async () => {
+      finish();
+    });
+    expect(success).toHaveBeenCalledWith("settings.updatePageOpened");
   });
 });

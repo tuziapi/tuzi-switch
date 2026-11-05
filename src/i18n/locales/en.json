@@ -760,6 +760,7 @@
     "browseDirectory": "Browse Directory",
     "resetDefault": "Reset to default directory (takes effect after saving)",
     "updateNoticeTitle": "Tuzi Assistant update available",
+    "viewUpdate": "View update",
     "acceptanceUpdateNotice": "Test build with opentu. Sign in to GitHub to download.",
     "downloadUpdate": "Download update",
     "updateLater": "Later",
