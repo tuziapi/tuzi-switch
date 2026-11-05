@@ -8,7 +8,7 @@
 - 正式公开 latest 为 v1.4.3；测试仓库 latest 为 v1.5.4。准备新版本 v1.5.5，不覆写任一已发布版本。
 - 独立分支 `codex/official-release-1.5.5`，保留原 gaizhao 工作区的未提交修改及附件。
 - 本次只涉及分发、下载页和更新渠道，不修改账户 API/契约、权限、凭证格式或数据库字段；有效业务基线继续为现行 PRD 和 system-token-v1。
-- 用户已批准方案 B 的实现及构建。当前未推送、未创建 PR、未发布/部署，也未修改仓库线上设置。
+- 用户已批准方案 B 的实现及构建，随后明确授权推送本分支并运行 publish=false 的四平台构建。分支已推送，构建请求已提交；未创建 PR、未合并、未创建版本标签、未公开发布/部署，也未修改仓库线上设置。
 
 ## 原问题与实现
 
@@ -25,10 +25,10 @@
 
 ## 环境阻塞与发布前置条件
 
-1. GitHub API 返回当前登录对正式仓库 `pull=true`、`push=false`、`admin=false`；Secrets 名称查询返回 403。不能启动正式仓库构建、推送分支、核实签名 secret 或调整 Pages。没有读取、生成、轮换、复制真实私钥。
+1. 初次核查只有读取权限；用户调整权限后，账号 AiW520 对正式仓库返回 `push=true`、`admin=false`。两个正式签名 Secret 名称均可列出，分支推送及 workflow_dispatch 均已成功。没有读取、生成、轮换、复制真实私钥。当前实际阻塞为 GitHub 返回账户因计费问题被锁定，详见下方远程执行记录。
 2. 正式 Pages 仍为 `build_type=legacy`、main 根目录。管理员需改为 GitHub Actions，并确认 github-pages 环境允许版本标签。发布步骤在公开安装文件前检查 Source，配置不符则阻断。
 3. 原生 Rust 1.95 工具链实际已安装，但未在默认 PATH；通过 rustup 确认路径。独立原生 target 未建立，本机磁盘空间起初不足 0.5 GiB，后回升约 3.6 GiB，未删除用户文件腾挪构建空间。不能认定足以完成四平台原生构建。
-4. 正式 `TAURI_SIGNING_PRIVATE_KEY` 必须对应原公钥，可选密码使用 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。测试的 `TUZI_UPDATER_PRIVATE_KEY` 不作为正式渠道兜底；实际 secret 是否存在及配对须在有权限后由流水线验证。
+4. 正式 `TAURI_SIGNING_PRIVATE_KEY` 必须对应原公钥，可选密码使用 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。测试的 `TUZI_UPDATER_PRIVATE_KEY` 不作为正式渠道兜底；Secret 名称已确认存在，真实密钥配对仍须由流水线验证。
 5. 已安装测试渠道 v1.5.x 仍指向测试仓库并信任测试公钥，需要手动安装正式版切换渠道；不声称现有测试二进制会自动迁移。
 
 ## 本地验证
@@ -57,3 +57,15 @@
 取得正式仓库适当权限后，先提交审查本分支并在该分支运行 Unified desktop release（publish=false）。四平台全部原生回归与安装包构建成功，下载 verified-release 核对后，再按发布授权创建对应版本标签/运行发布及 Pages。正式公开后必须再次核对 Release 的七种文件 URL/大小/摘要、latest.json 签名、网页实际链接及 macOS 包内版本/架构；Windows/Linux 实机安装升级另记，不能以 CI 构建代替。
 
 配置改动可用独立 commit revert 回退；已公开标签及安装包不覆写。安装回退保留用户数据，不删除配置或轮换账户令牌。更新签名不代表 Apple 公证或 Windows 开发者签名。
+
+
+## 远程构建尝试：2026-11-05
+
+- 用户明确授权：推送 `codex/official-release-1.5.5` 并启动 `publish=false` 四平台构建；授权范围未扩展到 PR、合并、标签、公开 Release 或 Pages 部署。
+- 正式仓库远程分支已推送，实际构建源码 SHA：`23f02222d5540e49a9c0d06f499cbd8d039282c9`。
+- 执行命令：`gh workflow run unified-release.yml -R tuziapi/tuzi-switch --ref codex/official-release-1.5.5 -f publish=false`。
+- Run：`41964518572`，首次尝试；创建于 2026-11-05 11:54:53 Asia/Shanghai。地址：https://github.com/tuziapi/tuzi-switch/actions/runs/41964518572 。
+- GitHub 接受 dispatch，但 `verify` job `127038320430` 在分配 runner 前失败：runner_name 为空、steps 为空。检查注释原文：**The job was not started because your account is locked due to a billing issue.**
+- 因此没有远程代码测试、签名配对验证或原生编译；installers、assemble 和 publish 全部 skipped，无新安装包产物，不认定下载页已部署。没有可下载的 job 日志，API 返回 log not found；诊断来自 check-run annotations。
+- 原因不是已观察到的代码/测试失败，也不是此前的仓库写权限不足。具体计费锁定原因未读取、未推断；须由有权限的组织/账单管理员检查和解除。没有尝试支付、提高预算、修改计费设置或改到测试仓库绕过。
+- 锁定解除后可重跑本次构建；在解除前不反复重试。真实 Secret 配对、四平台构建及产物核验仍待完成。
