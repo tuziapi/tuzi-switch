@@ -26,6 +26,7 @@ const pageSource =
   import.meta.env.VITE_DOWNLOAD_SOURCE_URL ||
   `https://github.com/${repository}/tree/main/packages/download-page`;
 const SOURCE = `https://github.com/${repository}`;
+const manualInstallOnly = import.meta.env.VITE_MANUAL_INSTALL_ONLY === "true";
 const screens = [
   {
     id: "tools",
@@ -592,6 +593,11 @@ export function TuziDownloadView({
                   "安装包尚未进行开发者签名或 Apple 公证，系统可能提示无法验证发布者。",
                 )}
               </p>
+              {manualInstallOnly && (
+                <p className="td-cache-notice">
+                  {t("此版本请下载后手动安装；应用内自动更新暂不可用。")}
+                </p>
+              )}
               {release?.stale && (
                 <p className="td-cache-notice" role="status">
                   {t("版本同步暂不可用，当前为上次确认的版本。")}
