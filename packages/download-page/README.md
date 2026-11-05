@@ -29,3 +29,23 @@ Umami `switch_download_click` 仅记录 platform/version，包含 MSI、Mac Inte
 用户随后明确要求“不需要签名，直接构建就好”。本次从正式源码构建未签名安装包，公开下载页设置 `VITE_MANUAL_INSTALL_ONLY=true`，显示手动安装说明；该变量省略时默认不显示此说明。客户端保留原正式公钥及验签，不生成 unsigned latest.json，也不复制测试密钥。标准签名流水线保留供后续版本使用，本次通过已验证产物手动发布。
 
 正式仓库 Pages 当前仍使用 main 根目录，因此本次将本地编译并核实真实 Release 元数据的静态页面提交至根目录，由现有 Pages 流程部署；不依赖已被计费锁定的自定义发布 runner。源码链接固定至对应页面源码提交，完整客户端源码附件保留于正式 Release。将来恢复 Actions 发布时应删除这份根目录快照，避免两种发布方式并行维护。
+
+### v1.5.5 Mac 安装脚本（2026-11-05）
+
+用户确认发布“校验下载、安装、明确确认后仅放行兔子助手”的方案，继续使用既有 v1.5.5 安装包。`scripts/install-macos.sh` 只从正式仓库获取固定版本，内置两种 DMG 的真实 SHA-256；支持 Apple Silicon、Intel 与 Rosetta 终端自动识别。不使用第三方镜像、不接受任意仓库覆盖。
+
+网页在 macOS 选项下展开安装命令和“下载 / 查看安装脚本”。命令先下载到私有临时文件，校验脚本自身 SHA-256，再执行；用户分别确认安装和仅移除此应用的隔离标记。拒绝第二次确认时原应用不变。脚本不需要 sudo，不关闭全局 Gatekeeper，不访问账户配置或作品；保留旧应用备份并在替换失败时恢复。脚本会拒绝运行中的应用、较新版本、符号链接目标、身份/架构/摘要或包内签名不匹配。安装完成后再次询问是否启动。
+
+`release-metadata.mjs` 仅对正式 v1.5.5 生成可选 `macosInstaller` 元数据（tag、固定 href、脚本 sha256），构建时交叉检查脚本内两种摘要与 GitHub Release 的文件摘要。后续版本或测试渠道不展示旧脚本；旧版没有该字段的元数据保持兼容。构建会将脚本复制至 `public/install-macos-v1.5.5.sh`，随页面发布。根目录 Pages 快照包含同一脚本，无需重建或替换 DMG。
+
+验证命令：
+
+```sh
+bash -n scripts/install-macos.sh
+bash scripts/install-macos.sh --verify-only --arch arm64
+bash scripts/install-macos.sh --verify-only --arch x64
+TUZI_TEST_DMG_DIR=/path/to/official-v1.5.5 python3 scripts/test_macos_installer.py
+RELEASE_TAG=v1.5.5 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm --filter @tuzi/download-page build
+```
+
+隔离安装测试只替换 curl 为本地正式 DMG 副本，真实执行 macOS 的 SHA-256、挂载、架构、codesign、复制和 xattr 检查；测试目标为临时目录，配置为合成哨兵，不启动客户端。`--verify-only` 则完成真实公网下载与验证，不安装、不放行。脚本不等于 Apple 签名/公证，不承诺修复恶意软件警告或运行崩溃。
