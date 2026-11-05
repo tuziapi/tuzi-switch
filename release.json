@@ -76,6 +76,6 @@
   "macosInstaller": {
     "tag": "v1.5.5",
     "href": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.5.sh",
-    "sha256": "8246d04a259a83a56286c528525a28f7f6b8c4bed88a63607d8278e854fcc1ed"
+    "sha256": "2728e17ac0fe4f307f8732a13f0843339d20f9bf18675b617646ce7fe228ea7a"
   }
 }

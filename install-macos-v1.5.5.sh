@@ -138,7 +138,8 @@ PLIST="$SOURCE_APP/Contents/Info.plist"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")" == "$VERSION" ]] || fail '应用版本不匹配。'
 EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$PLIST")
 [[ -n "$EXECUTABLE" && "$EXECUTABLE" != */* && "$EXECUTABLE" != .* ]] || fail '无效的应用可执行文件名。'
-lipo "$SOURCE_APP/Contents/MacOS/$EXECUTABLE" -verify_arch "$MACH_ARCH" || fail '应用架构不匹配。'
+# Use the built-in file utility; lipo can require Xcode Command Line Tools.
+file -b "$SOURCE_APP/Contents/MacOS/$EXECUTABLE" | grep -Eq "Mach-O.*(^|[^[:alnum:]_])$MACH_ARCH([^[:alnum:]_]|$)" || fail '应用架构不匹配。'
 codesign --verify --deep --strict "$SOURCE_APP" || fail '应用签名完整性校验失败，不能通过放行修复。'
 printf '下载、SHA-256、应用身份、版本、架构及包内完整性校验通过。\n'
 if $VERIFY_ONLY; then printf '仅校验完成：未安装、未移除隔离标记、未启动应用。\n'; exit 0; fi
