@@ -159,7 +159,7 @@ test("rejects substituted script host, hash, tag and channel", () => {
       r.repository = "AiW520/tuzi-switch";
     },
     (r) => {
-      r.tag = "v1.5.6";
+      r.tag = "v9.8.7";
     },
   ]) {
     const r = fixture();
@@ -217,21 +217,21 @@ cat "$BOOTSTRAP"
     };
     for (const [args, tag, ok] of [
       [["--help"], "", true],
-      [["--version", "v1.5.5", "--help"], "", true],
+      [["--version", "v1.5.6", "--help"], "", true],
       [
-        ["--no-open", "--version", "1.5.5", "--install-dir", "/tmp/tuzi test"],
+        ["--no-open", "--version", "1.5.6", "--install-dir", "/tmp/tuzi test"],
         "",
         true,
       ],
-      [["--help"], "v1.5.5", true],
+      [["--help"], "v1.5.6", true],
       [["--help"], "v1.3.1", false],
-      [["--version", "v1.5.5", "--help"], "v1.3.1", true],
+      [["--version", "v1.5.6", "--help"], "v1.3.1", true],
       [["--version", "v1.3.1"], "", false],
       [["--version", "$(touch /tmp/tuzi-injection)"], "", false],
       [["--version", ""], "", false],
       [["--version"], "", false],
       [["--version", "--help"], "", false],
-      [["--version", "v1.5.5", "--version", "v1.5.5"], "", false],
+      [["--version", "v1.5.6", "--version", "v1.5.6"], "", false],
     ]) {
       await rm(downloaded, { force: true });
       await rm(executed, { force: true });
@@ -268,7 +268,87 @@ cat "$BOOTSTRAP"
     }
     assert.match(
       macosInstallCommand(r, { pinned: true }),
-      /--version v1\.5\.5/,
+      /--version v1\.5\.6/,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("historical installer routes keep their own URL and checksum", async () => {
+  if (repository !== "tuziapi/tuzi-switch") return;
+  const { mkdtemp, writeFile, readFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { spawnSync } = await import("node:child_process");
+  const { createHash } = await import("node:crypto");
+  const dir = await mkdtemp(join(tmpdir(), "tuzi-historical-install-"));
+  try {
+    const current = fixture();
+    const legacy = {
+      tag: "v1.5.5",
+      href: "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.5.sh",
+    };
+    for (const entry of [current.macosInstaller, legacy]) {
+      const payload = `#!/bin/bash\nprintf '%s' '${entry.tag}' > "$EXECUTED"\n`;
+      entry.sha256 = createHash("sha256").update(payload).digest("hex");
+      await writeFile(join(dir, `install-macos-${entry.tag}.sh`), payload);
+    }
+    await writeFile(
+      join(dir, "bootstrap"),
+      macosInstallBootstrap(current, [legacy]),
+    );
+    await writeFile(
+      join(dir, "curl"),
+      `#!/bin/bash
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    https://*) url="$1"; shift ;;
+    -o) out="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+printf '%s' "$url" > "$REQUESTED"
+cp "$PAYLOAD_DIR/\${url##*/}" "$out"
+`,
+      { mode: 0o755 },
+    );
+    for (const [args, expectedTag] of [
+      [[], current.tag],
+      [["--version", "v1.5.5"], "v1.5.5"],
+      [["--version", "1.5.5"], "v1.5.5"],
+    ]) {
+      const result = spawnSync("/bin/bash", [join(dir, "bootstrap"), ...args], {
+        env: {
+          ...process.env,
+          TUZI_SWITCH_TAG: "",
+          PATH: `${dir}:/usr/bin:/bin`,
+          PAYLOAD_DIR: dir,
+          EXECUTED: join(dir, "executed"),
+          REQUESTED: join(dir, "requested"),
+        },
+      });
+      assert.equal(result.status, 0, result.stderr.toString());
+      assert.equal(await readFile(join(dir, "executed"), "utf8"), expectedTag);
+      assert.equal(
+        await readFile(join(dir, "requested"), "utf8"),
+        `https://tuziapi.github.io/tuzi-switch/install-macos-${expectedTag}.sh`,
+      );
+    }
+    assert.throws(
+      () => macosInstallBootstrap(current, [current.macosInstaller]),
+      /duplicate/,
+    );
+    assert.throws(
+      () =>
+        macosInstallBootstrap(current, [
+          { ...legacy, href: "https://bad.test/installer" },
+        ]),
+      /Invalid/,
+    );
+    assert.throws(
+      () => macosInstallBootstrap(current, [{ ...legacy, sha256: "invalid" }]),
+      /Invalid/,
     );
   } finally {
     await rm(dir, { recursive: true, force: true });

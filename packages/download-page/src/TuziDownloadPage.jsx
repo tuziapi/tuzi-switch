@@ -51,7 +51,7 @@ const screens = [
     image: "configuration.png",
     icon: Settings2,
     title: "沿用配置，也保留选择。",
-    text: "关联兔子账户中的模型 Key，或手动填写接口与 Key；创作配置统一放在左侧入口。",
+    text: "关联兔子账户模型 Key 或手动配置接口；升级后自动获取已启用来源的授权模型，保留原有选择。",
   },
 ];
 const platforms = [
@@ -60,6 +60,10 @@ const platforms = [
   { id: "linux", label: "Linux", icon: FaLinux },
 ];
 const faqs = [
+  [
+    "v1.5.6 更新了什么？",
+    "新增 gpt-image-2.6-1k、gpt-image-2.6-flare、gpt-image-2.6-sunburst 基础图片生成与编辑适配，优化批量生成期间的拖动和输入。已配置的模型来源会在升级后自动获取授权模型；网络失败会重试，原有选择与手动配置保留。",
+  ],
   [
     "Mac 提示无法验证开发者或应用打不开怎么办？",
     "此版本未经 Apple 开发者签名或公证。可使用下方 macOS 安装脚本：自动识别芯片、校验正式安装包，在你确认后仅放行兔子助手。也可在确认来源可信后，通过系统设置 → 隐私与安全性 → 仍要打开。若提示恶意软件或启动后闪退，请保留报错信息进一步排查。",
@@ -659,8 +663,8 @@ export function TuziDownloadView({
                 <p className="td-cache-notice">
                   {t(
                     installCommand
-                      ? "此版本请下载安装包或使用 Mac 安装脚本；应用内自动更新暂不可用。"
-                      : "此版本请下载后手动安装；应用内自动更新暂不可用。",
+                      ? "应用内会提醒新版并展示说明；请下载对应安装包或使用 Mac 安装脚本，手动完成安装。"
+                      : "应用内会提醒新版并展示说明；请下载对应系统的正式安装包，手动完成安装。",
                   )}
                 </p>
               )}

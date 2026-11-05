@@ -27,8 +27,8 @@ const response = await fetch(
 );
 if (!response.ok) throw Error(`Release lookup failed: ${response.status}`);
 const metadata = createStableRelease(await response.json());
-const scriptTarget = "public/install-macos-v1.5.5.sh";
-// A later release must not accidentally advertise this older pinned installer.
+const scriptTarget = `public/install-macos-${macosInstallerTag}.sh`;
+// Refresh only the current installer; preserve supported historical scripts.
 await rm(scriptTarget, { force: true });
 await rm("public/install.sh", { force: true });
 if (
@@ -51,7 +51,26 @@ if (
     sha256: createHash("sha256").update(script).digest("hex"),
   };
   await writeFile(scriptTarget, script);
-  await writeFile("public/install.sh", macosInstallBootstrap(metadata));
+  const previousInstallers = JSON.parse(
+    await readFile("scripts/previous-macos-installers.json", "utf8"),
+  );
+  for (const entry of previousInstallers) {
+    if (!/^v\d+\.\d+\.\d+$/.test(entry.tag))
+      throw Error("Invalid historical installer tag");
+    const previous = await readFile(
+      `scripts/macos-installers/install-macos-${entry.tag}.sh`,
+    );
+    if (
+      createHash("sha256").update(previous).digest("hex") !== entry.sha256 ||
+      !previous.toString().includes(`VERSION=${entry.tag.slice(1)}\n`)
+    )
+      throw Error(`Historical installer changed: ${entry.tag}`);
+    await writeFile(`public/install-macos-${entry.tag}.sh`, previous);
+  }
+  await writeFile(
+    "public/install.sh",
+    macosInstallBootstrap(metadata, previousInstallers),
+  );
 }
 if (!isStableRelease(metadata)) throw Error("Invalid installer metadata");
 await writeFile(

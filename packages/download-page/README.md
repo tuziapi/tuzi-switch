@@ -51,3 +51,11 @@ RELEASE_TAG=v1.5.5 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTA
 隔离安装测试只替换 curl 为本地正式 DMG 副本，真实执行 macOS 的 SHA-256、挂载、架构、codesign、复制和 xattr 检查；测试目标为临时目录，配置为合成哨兵，不启动客户端。`--verify-only` 则完成真实公网下载与验证，不安装、不放行。脚本不等于 Apple 签名/公证，不承诺修复恶意软件警告或运行崩溃。
 
 2026-11-05 MAC-INSTALL-02：按用户反馈压缩为一行命令和一句操作说明。`install.sh` 为构建时生成的加载入口，继续执行原安装器的摘要校验；安装器和 v1.5.5 DMG 不变。测试覆盖下载失败即使输出部分脚本也不会运行、篡改安装器摘要拒绝执行及有效摘要成功执行。
+
+## v1.5.6 发布（2026-11-05）
+
+v1.5.6 延续正式 Release 提醒、展示更新说明及手动安装。模型基础接入、升级增量获取与批量生成性能优化由正式 main 源码构建；AiW520 仅执行固定 SHA 的四平台构建，不作为正式下载目标。Pages 仍使用正式 main 根目录快照。
+
+`macosInstallerTag`、当前安装器版本和真实两种 DMG 摘要同步更新；`release-metadata.mjs` 校验实际正式 Release 后才生成网页清单。默认加载器安装 v1.5.6，`--version v1.5.5` 继续使用保留的旧脚本。历史注册表 `scripts/previous-macos-installers.json` 固定旧脚本摘要，旧脚本随源码存放于 `scripts/macos-installers/`，构建校验文件未变后复制到 public；不支持的版本会明确报错，不回退。不要将前述 v1.5.5 历史说明当作当前自动安装方式。
+
+当前版本核验：`RELEASE_TAG=v1.5.6 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm build:download`。完整发布证据见仓库 `docs/development/2026-11-05-v1.5.6-release.md`。
