@@ -75,10 +75,10 @@ fi
 case "$ARCH" in
   arm64|aarch64)
     ARCH=arm64; MACH_ARCH=arm64
-    SHA256=621c57fc05428447f5cb78d040e9fe08eac15ee819e0e3c8979984777eb21595 ;;
+    SHA256=54531432bde3ff059c09b34eaa03026c2d84f5c3313ebdff245eda7b35d336dc ;;
   x64|x86_64)
     ARCH=x64; MACH_ARCH=x86_64
-    SHA256=e3ac133770f54ac7537cab28cf955ba357a4d4c58897d9e430c5f5c11f740f62 ;;
+    SHA256=e0c84f7214286c2f971e76fe5d176140835e464d135520ed9c9328a5df7866a2 ;;
   *) fail "不支持的 Mac 架构：$ARCH" ;;
 esac
 FILE="tuzi-assistant-macos-$ARCH.dmg"
