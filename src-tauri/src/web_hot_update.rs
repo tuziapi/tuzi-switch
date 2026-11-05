@@ -114,7 +114,9 @@ pub async fn check_web_hot_update() -> Result<WebHotUpdateResult, String> {
     validate_manifest(&manifest)?;
 
     let current_app_version = env!("CARGO_PKG_VERSION");
-    if !is_app_version_compatible(current_app_version, &manifest.app_version_range) {
+    if compare_versions(&manifest.version, current_app_version) != 0
+        || !is_app_version_compatible(current_app_version, &manifest.app_version_range)
+    {
         return Ok(WebHotUpdateResult {
             updated: false,
             version: Some(manifest.version),
@@ -413,10 +415,17 @@ fn root_dir() -> PathBuf {
 }
 
 fn active_version() -> Option<String> {
-    fs::read_to_string(root_dir().join(ACTIVE_VERSION_FILE))
+    active_version_for_app(&root_dir(), env!("CARGO_PKG_VERSION"))
+}
+
+fn active_version_for_app(root: &Path, bundled_version: &str) -> Option<String> {
+    // An installer changes the renderer/native contract. Keep cached web revisions
+    // only for that same app version; never let an old UI hide newly bundled features
+    // or load a newer native contract after an installer rollback. Preserve the cache.
+    fs::read_to_string(root.join(ACTIVE_VERSION_FILE))
         .ok()
         .map(|s| s.trim().to_string())
-        .filter(|s| validate_version(s).is_ok())
+        .filter(|s| validate_version(s).is_ok() && compare_versions(s, bundled_version) == 0)
 }
 
 fn active_web_root() -> Option<PathBuf> {
@@ -551,6 +560,24 @@ fn text_response(status: http::StatusCode, message: &str) -> http::Response<Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cached_web_assets_follow_the_installed_native_version() {
+        let cache = tempfile::tempdir().unwrap();
+        let marker = cache.path().join(ACTIVE_VERSION_FILE);
+        for version in ["1.4.2-web.1", "1.5.3-web.2", "1.5.5-web.1", "1.6.0-web.1"] {
+            fs::write(&marker, version).unwrap();
+            assert_eq!(active_version_for_app(cache.path(), "1.5.4"), None);
+            assert_eq!(fs::read_to_string(&marker).unwrap(), version);
+        }
+        fs::write(&marker, "1.5.4-web.2\n").unwrap();
+        assert_eq!(
+            active_version_for_app(cache.path(), "1.5.4").as_deref(),
+            Some("1.5.4-web.2")
+        );
+        fs::write(&marker, "../1.5.4").unwrap();
+        assert_eq!(active_version_for_app(cache.path(), "1.5.4"), None);
+    }
 
     #[test]
     fn version_range_supports_basic_comparisons() {
