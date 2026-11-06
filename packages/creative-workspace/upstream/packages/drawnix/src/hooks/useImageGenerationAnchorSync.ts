@@ -25,6 +25,7 @@ import { parseSizeToPixels } from '../utils/size-ratio';
 import { hasResolvedImageGenerationBatchCount } from '../utils/image-generation-anchor-batch';
 import {
   areImageGenerationResultsReady,
+  isAnchorImageReadinessRelevant,
   getImageGenerationResultLoadError,
 } from '../utils/image-generation-anchor-readiness';
 import { subscribeCanvasImageReadiness } from '../services/canvas-image-readiness';
@@ -610,7 +611,11 @@ export function useImageGenerationAnchorSync({
 
     const unsubscribeImageReadiness = subscribeCanvasImageReadiness(
       board,
-      reconcileAllAnchors
+      (elementId) => {
+        const affected = ImageGenerationAnchorTransforms.getAllAnchors(board)
+          .filter((anchor) => isAnchorImageReadinessRelevant(board, anchor, elementId));
+        if (affected.length) reconcileAnchors(affected.map((anchor) => anchor.id));
+      }
     );
     reconcileAllAnchors();
 

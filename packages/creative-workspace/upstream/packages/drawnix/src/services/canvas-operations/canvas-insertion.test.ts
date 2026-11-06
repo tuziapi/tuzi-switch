@@ -1,3 +1,4 @@
+import { scrollToPointIfNeeded } from '../../utils/selection-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RectangleClient, type PlaitBoard } from '@plait/core';
 
@@ -179,6 +180,18 @@ describe('canvas insertion service metadata binding', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it.each([false, true, undefined])('honors optional scrollToResult=%s without dropping inserted results', async (scrollToResult) => {
+    const board = createBoard();
+    mocks.insertImageFromUrl.mockImplementation(async (target, url, point) => {
+      target.children.push({ id: 'new-image', type: 'image', url, points: [point, [point[0] + 400, point[1] + 400]] });
+      return 'new-image';
+    });
+    const result = await insertImageGroup(['/test.png'], [0, 0], { width: 400, height: 400 }, board, undefined, 'test', undefined, scrollToResult);
+    expect(result.success).toBe(true);
+    expect(board.children).toHaveLength(1);
+    expect(scrollToPointIfNeeded).toHaveBeenCalledTimes(scrollToResult === false ? 0 : 1);
   });
 
   it('places local outputs around images and active task cards without moving existing content', async () => {

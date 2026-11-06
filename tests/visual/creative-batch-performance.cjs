@@ -42,7 +42,7 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
           });
         }
         const errors = [];
-        p.on("pageerror", (e) => errors.push(e.message));
+        p.on("pageerror", (e) => { errors.push(e.message); console.error("Page error", e.message); });
         await c.route("**/*", (r) =>
           new URL(r.request().url()).hostname === "127.0.0.1" ||
           /^(data|blob):/.test(r.request().url())
@@ -56,6 +56,8 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
             frames: [],
             long: [],
             inputs: [],
+            startup: [],
+            submittedAt: null,
           };
           const original = Element.prototype.replaceChildren;
           Element.prototype.replaceChildren = function (...a) {
@@ -83,6 +85,11 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
           let prev = 0;
           function frame(t) {
             if (prev) window.__perf.frames.push(t - prev);
+            if (window.__perf.submittedAt !== null && window.__perf.startup.length < 120) {
+              const preparation = [...document.querySelectorAll('.batch-preparation-slot')];
+              const slots = preparation.length ? preparation : [...document.querySelectorAll('.image-generation-anchor-desktop-fallback')];
+              window.__perf.startup.push({ms: performance.now() - window.__perf.submittedAt, count: slots.length});
+            }
             prev = t;
             requestAnimationFrame(frame);
           }
@@ -118,6 +125,40 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
         await p.locator(".plait-board-container").waitFor();
         const intro = p.getByText("不再提示", { exact: true });
         if (await intro.isVisible()) await intro.click();
+        const existingCount = Number(process.env.PERF_EXISTING_COUNT || 0);
+        if (existingCount) {
+          // Seed only this fresh synthetic browser profile, never a user's board.
+          await p.waitForTimeout(1000);
+          console.log("Seeding existing images", existingCount);
+          await p.evaluate((count) => new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(Error("Synthetic seed timed out")), 15000);
+            const open = indexedDB.open('aitu-workspace');
+            open.onerror = () => reject(open.error);
+            open.onsuccess = () => {
+              const db = open.result;
+              const tx = db.transaction('boards', 'readwrite');
+              const store = tx.objectStore('boards');
+              const read = store.getAll();
+              read.onsuccess = () => {
+                const board = read.result[0];
+                if (!board) { reject(Error('Synthetic board missing')); return; }
+                const url = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#8ac"/></svg>');
+                board.elements = Array.from({ length: count }, (_, i) => {
+                  const x = (i % 6) * 240, y = Math.floor(i / 6) * 240;
+                  return { id: 'synthetic-existing-' + i, type: 'image', url, points: [[x,y],[x+200,y+200]], angle: 0 };
+                });
+                store.put(board, board.id);
+              };
+              tx.oncomplete = () => { clearTimeout(timer); db.close(); resolve(); };
+              tx.onabort = () => reject(tx.error || Error('Synthetic seed aborted'));
+              tx.onerror = () => reject(tx.error);
+            };
+          }), existingCount);
+          console.log("Seed saved; reloading");
+          await p.reload();
+          await p.locator('[plait-data-id="synthetic-existing-0"]').waitFor();
+          console.log("Existing canvas mounted");
+        }
         if (count !== 1) {
           await p.locator(".count-dropdown__trigger").first().click();
           await p
@@ -130,6 +171,7 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
           .first()
           .fill("SYNTHETIC performance " + count);
         await p.evaluate(() => (window.__creativeRequestFixture.hold = true));
+        await p.evaluate(() => { window.__perf.submittedAt = performance.now(); });
         await p.locator('[data-track="ai_input_click_send"]').first().click();
         await p.waitForFunction(() =>
           window.__creativeRequestFixture.requests.some(
@@ -140,6 +182,13 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
         const anchors = await p
           .locator(".image-generation-anchor-desktop-fallback")
           .count();
+        if (process.env.PERF_ASSERT_GRID === '1' && count > 1) {
+          const firstRow = await p.locator('.image-generation-anchor-desktop-fallback').evaluateAll(nodes => nodes.slice(0,3).map(node => {
+            const box = node.getBoundingClientRect(); return { x: box.x, right: box.right, y: box.y, bottom: box.bottom };
+          }));
+          assert(firstRow.every(box => box.x >= 0 && box.right <= 1360 && box.y >= 120 && box.bottom < 900), 'Initial first row must fit the synthetic 1360px viewport');
+          await p.screenshot({ path: output + '/initial-' + engine + '-' + count + '.png' });
+        }
         await p.evaluate(() => {
           window.__perf.replacements = 0;
           window.__perf.puts = {};
@@ -177,13 +226,20 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
           .boundingBox();
         await p.mouse.move(550, 350);
         await p.mouse.down();
-        await p.mouse.move(650, 450, { steps: 25 });
+        for (let step = 1; step <= 25; step++) {
+          await p.mouse.move(550 + step * 4, 350 + step * 4);
+          await p.waitForTimeout(16);
+        }
         await p.mouse.up();
         await p.waitForTimeout(Math.max(1, 8000 - (Date.now() - started)));
         const afterPan = await p
           .locator(".image-generation-anchor-desktop-fallback")
           .first()
           .boundingBox();
+        if (!beforePan || !afterPan || Math.max(Math.abs(afterPan.x - beforePan.x), Math.abs(afterPan.y - beforePan.y)) <= 20) {
+          await p.screenshot({ path: output + '/pan-failure-' + engine + '-' + count + '.png' });
+          console.error('Pan diagnostic', { beforePan, afterPan, hit: await p.evaluate(() => document.elementFromPoint(550,350)?.outerHTML.slice(0,600)) });
+        }
         assert(
           beforePan &&
             afterPan &&
@@ -200,6 +256,8 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
             : 0;
         const result = {
           count,
+          existingCount,
+          startup: raw.startup,
           anchors,
           inputVerified: true,
           panDisplacement: {
@@ -240,7 +298,17 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
           );
         }
         if (process.env.PERF_VERIFY_RESULTS === "1") {
-          await p.evaluate(() => window.__creativeRequestFixture.release());
+          const slotPositions = await p.locator('.image-generation-anchor-desktop-fallback').evaluateAll(nodes => nodes.map(node => {
+            const box = node.getBBox(); return { x: box.x, y: box.y };
+          }));
+          const firstSlotBox = await p.locator('.image-generation-anchor-desktop-fallback').first().boundingBox();
+          assert(firstSlotBox && firstSlotBox.x < 1360 && firstSlotBox.x + firstSlotBox.width > 0 && firstSlotBox.y < 900 && firstSlotBox.y + firstSlotBox.height > 120, 'First slot must be visible after submission and pan');
+          const viewport = await p.locator('.board-host-svg .element-host').first().evaluate(node => { const m = node.getScreenCTM(); return [m.a,m.b,m.c,m.d,m.e,m.f]; });
+          await p.screenshot({ path: output + '/pending-' + count + '.png' });
+          await p.evaluate(() => {
+            window.__perf.frames = []; window.__perf.long = [];
+            window.__creativeRequestFixture.release();
+          });
           await p.waitForFunction(
             async (count) => {
               const records = await new Promise((resolve, reject) => {
@@ -277,6 +345,34 @@ const base = process.env.CREATIVE_QA_BASE_URL || "http://127.0.0.1:5197";
             null,
             { timeout: 20000 },
           );
+          const completion = await p.evaluate(() => ({ frames: window.__perf.frames, long: window.__perf.long }));
+          result.completion = { frameP95: percentile(completion.frames, 0.95), longTasks: completion.long.length, longTaskMs: completion.long.reduce((a,b) => a+b,0) };
+          result.slotPositions = slotPositions;
+          if (process.env.PERF_ASSERT_GRID === '1' && count > 1) {
+            const first = slotPositions[0];
+            assert.equal(new Set(slotPositions.slice(0, Math.min(3,count)).map(pos => Math.round(pos.y))).size, 1);
+            if (count > 3) { assert.equal(Math.round(slotPositions[3].x), Math.round(first.x)); assert(slotPositions[3].y > first.y); }
+            const afterViewport = await p.locator('.board-host-svg .element-host').first().evaluate(node => { const m = node.getScreenCTM(); return [m.a,m.b,m.c,m.d,m.e,m.f]; });
+            assert.deepEqual(afterViewport, viewport, 'Batch completion must not take over the viewport');
+          }
+          const savedElements = await p.evaluate(() => new Promise((resolve, reject) => {
+            const open = indexedDB.open('aitu-workspace');
+            open.onerror = () => reject(open.error);
+            open.onsuccess = () => {
+              const db = open.result, read = db.transaction('boards').objectStore('boards').getAll();
+              read.onsuccess = () => { resolve(read.result.flatMap(board => board.elements)); db.close(); };
+              read.onerror = () => reject(read.error);
+            };
+          }));
+          if (process.env.PERF_ASSERT_GRID === '1' && count > 1) {
+            const actualPositions = savedElements.filter(el => el.type === 'image' && el.generationTaskId).map(el => el.points[0].map(Math.round).join(','));
+            assert.deepEqual(actualPositions.sort(), slotPositions.map(pos => [Math.round(pos.x),Math.round(pos.y)].join(',')).sort(), 'Every result must keep its reserved slot');
+          }
+          for (let i = 0; i < existingCount; i++) {
+            const existing = savedElements.find(el => el.id === 'synthetic-existing-' + i);
+            const x = (i % 6) * 240, y = Math.floor(i / 6) * 240;
+            assert.deepEqual(existing?.points, [[x,y],[x+200,y+200]], 'Existing content must not move');
+          }
           const requests = await p.evaluate(
             () =>
               window.__creativeRequestFixture.requests.filter(

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import type { PlaitBoard } from '@plait/core';
 import { taskQueueService } from '../services/task-queue';
 import { workflowCompletionService } from '../services/workflow-completion-service';
@@ -12,11 +12,12 @@ import {
   getTasksForImageGenerationAnchor,
   selectPrimaryImageGenerationAnchorTask,
 } from '../utils/image-generation-anchor-task';
-import { TaskStatus } from '../types/task.types';
+import { TaskStatus, type Task } from '../types/task.types';
 import { useImageTaskProgress } from './useImageTaskProgress';
 import { hasResolvedImageGenerationBatchCount } from '../utils/image-generation-anchor-batch';
 import {
   areImageGenerationResultsReady,
+  isAnchorImageReadinessRelevant,
   getImageGenerationResultLoadError,
 } from '../utils/image-generation-anchor-readiness';
 import { subscribeCanvasImageReadiness } from '../services/canvas-image-readiness';
@@ -33,42 +34,35 @@ export function useImageGenerationAnchorController(
   const [taskRevision, setTaskRevision] = useState(0);
   const taskIdsKey = anchor.taskIds.join('|');
 
+  const current = useRef({ anchor, providedTask, relatedTasks: [] as Task[] });
+  current.current.anchor = anchor;
+  current.current.providedTask = providedTask;
+
   useEffect(() => {
     const updateRevision = () => setTaskRevision((value) => value + 1);
-    const unsubscribe = subscribeCanvasImageReadiness(board, updateRevision);
-    const subscription = workflowCompletionService
-      .observeCompletionEvents()
-      .subscribe(updateRevision);
-    // Cached images can load between render and passive-effect subscription.
+    const unsubscribe = subscribeCanvasImageReadiness(board, (elementId) => {
+      const value = current.current;
+      if (isAnchorImageReadinessRelevant(board, value.anchor, elementId, value.relatedTasks)) updateRevision();
+    });
+    const completionSubscription = workflowCompletionService.observeCompletionEvents().subscribe((event) => {
+      const { anchor, relatedTasks } = current.current;
+      if (anchor.primaryTaskId === event.taskId || anchor.taskIds.includes(event.taskId) || relatedTasks.some((task) => task.id === event.taskId)) updateRevision();
+    });
+    const taskSubscription = taskQueueService.observeTaskUpdates().subscribe((event) => {
+      const { anchor, providedTask } = current.current;
+      if (!providedTask && doesTaskBelongToImageGenerationAnchor(anchor, event.task)) updateRevision();
+    });
+    // Catch cached readiness that changes between rendering and subscribing.
     updateRevision();
-    return () => {
-      unsubscribe();
-      subscription.unsubscribe();
-    };
+    return () => { unsubscribe(); completionSubscription.unsubscribe(); taskSubscription.unsubscribe(); };
   }, [board]);
-
-  useEffect(() => {
-    if (providedTask) {
-      return;
-    }
-
-    const subscription = taskQueueService
-      .observeTaskUpdates()
-      .subscribe((event) => {
-        if (doesTaskBelongToImageGenerationAnchor(anchor, event.task)) {
-          setTaskRevision((value) => value + 1);
-        }
-      });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [anchor, providedTask, taskIdsKey]);
 
   const relatedTasks = useMemo(() => {
     const allTasks = taskQueueService.getAllTasks();
     return getTasksForImageGenerationAnchor(anchor, allTasks);
   }, [anchor, taskIdsKey, taskRevision]);
+
+  current.current.relatedTasks = relatedTasks;
 
   const resolvedTask = useMemo(() => {
     if (providedTask) {

@@ -9,7 +9,7 @@ interface ImageRender {
 
 interface BoardImageReadiness {
   images: Map<string, ImageRender>;
-  listeners: Set<() => void>;
+  listeners: Set<(elementId: string) => void>;
 }
 
 const boards = new WeakMap<PlaitBoard, BoardImageReadiness>();
@@ -32,7 +32,7 @@ export function registerCanvasImage(
 ) {
   const state = getState(board);
   const render: ImageRender = { url, ready: false, retry };
-  const notify = () => state.listeners.forEach((listener) => listener());
+  const notify = () => state.listeners.forEach((listener) => listener(elementId));
   state.images.set(elementId, render);
   notify();
 
@@ -80,7 +80,7 @@ export function retryCanvasImage(
   if (render?.url !== url || !render.error || !render.retry) return false;
   render.error = undefined;
   render.retry();
-  state?.listeners.forEach((listener) => listener());
+  state?.listeners.forEach((listener) => listener(elementId));
   return true;
 }
 
@@ -95,7 +95,7 @@ export function isCanvasImageReady(
 
 export function subscribeCanvasImageReadiness(
   board: PlaitBoard,
-  listener: () => void
+  listener: (elementId: string) => void
 ): () => void {
   const { listeners } = getState(board);
   listeners.add(listener);

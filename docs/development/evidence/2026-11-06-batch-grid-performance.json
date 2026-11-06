@@ -1,0 +1,896 @@
+{
+  "task": "UC-PERF-02",
+  "date": "2026-11-06",
+  "sourceBase": "f91ebc43338765e2785f4765a31098bea4f83e28",
+  "branch": "codex/batch-grid-performance",
+  "syntheticOnly": true,
+  "productionNetworkBlocked": true,
+  "limitations": [
+    "Startup timings include Playwright click dispatch and count DOM placeholders, not the number inside the viewport.",
+    "Single samples, not statistically significant comparisons; earlier build/test processes overlapped.",
+    "Final mouse steps have a 16ms interval; baseline steps were dispatched without this pacing.",
+    "No old-version concentrated-completion baseline was captured.",
+    "WebKit has no Long Tasks API; zero long-task count is not evidence of no long tasks.",
+    "Installed native app and real user devices, large images and long-running complex projects not tested.",
+    "Initial grid visibility checked at 1360x900; smaller windows can require panning."
+  ],
+  "eventRegression": {
+    "unrelatedCompletionTaskReads": {
+      "baseline": 1,
+      "current": 0
+    },
+    "unrelatedReadinessTaskReads": {
+      "baseline": 2,
+      "current": 0
+    },
+    "baselineTestsFailedAsExpected": true
+  },
+  "verification": {
+    "creativeSuite": {
+      "files": 135,
+      "passed": 2269
+    },
+    "finalAlignmentTargetedPassed": 22,
+    "hostTypecheck": true,
+    "creativeAndHostBuild": true,
+    "provenanceReconstructedFiles": 1568,
+    "openspecStrict": true,
+    "nativePackageBuilt": false,
+    "pushed": false,
+    "released": false
+  },
+  "samples": {
+    "grid-before": [
+      {
+        "count": 20,
+        "anchors": 20,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 100,
+          "y": 100
+        },
+        "engine": "chromium",
+        "cpu": 6,
+        "longTasksSupported": true,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 24
+        },
+        "longTasks": 1,
+        "longTaskMs": 58,
+        "frameP95": 16.700000000000728,
+        "frameMax": 50,
+        "inputP95": 12.199999988079071,
+        "errors": [],
+        "resultsPersisted": 20,
+        "generationRequests": 20,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 229.69999998807907,
+            "count": 20
+          },
+          "firstFull": {
+            "ms": 229.69999998807907,
+            "count": 20
+          },
+          "observedCounts": [
+            0,
+            20
+          ],
+          "samples": 120
+        }
+      }
+    ],
+    "grid-chrome-verified": [
+      {
+        "count": 3,
+        "existingCount": 0,
+        "anchors": 3,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 100,
+          "y": 100
+        },
+        "engine": "chromium",
+        "cpu": 6,
+        "longTasksSupported": true,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 24
+        },
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "frameP95": 16.700000000000728,
+        "frameMax": 33.400000000001455,
+        "inputP95": 12.899999976158142,
+        "errors": [],
+        "completion": {
+          "frameP95": 16.799999999999272,
+          "longTasks": 0,
+          "longTaskMs": 0
+        },
+        "slotPositions": [
+          {
+            "x": -640,
+            "y": -300
+          },
+          {
+            "x": -200,
+            "y": -300
+          },
+          {
+            "x": 240,
+            "y": -300
+          }
+        ],
+        "resultsPersisted": 3,
+        "generationRequests": 3,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 126.5,
+            "count": 3
+          },
+          "firstFull": {
+            "ms": 126.5,
+            "count": 3
+          },
+          "observedCounts": [
+            0,
+            3
+          ],
+          "samples": 120
+        }
+      },
+      {
+        "count": 4,
+        "existingCount": 0,
+        "anchors": 4,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 100,
+          "y": 100
+        },
+        "engine": "chromium",
+        "cpu": 6,
+        "longTasksSupported": true,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 24
+        },
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "frameP95": 16.799999999999272,
+        "frameMax": 33.29999999999927,
+        "inputP95": 12,
+        "errors": [],
+        "completion": {
+          "frameP95": 16.799999999999272,
+          "longTasks": 0,
+          "longTaskMs": 0
+        },
+        "slotPositions": [
+          {
+            "x": -640,
+            "y": -300
+          },
+          {
+            "x": -200,
+            "y": -300
+          },
+          {
+            "x": 240,
+            "y": -300
+          },
+          {
+            "x": -640,
+            "y": 340
+          }
+        ],
+        "resultsPersisted": 4,
+        "generationRequests": 4,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 109.5,
+            "count": 4
+          },
+          "firstFull": {
+            "ms": 109.5,
+            "count": 4
+          },
+          "observedCounts": [
+            0,
+            4
+          ],
+          "samples": 120
+        }
+      },
+      {
+        "count": 20,
+        "existingCount": 0,
+        "anchors": 20,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 100,
+          "y": 100
+        },
+        "engine": "chromium",
+        "cpu": 6,
+        "longTasksSupported": true,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 23
+        },
+        "longTasks": 1,
+        "longTaskMs": 51,
+        "frameP95": 16.700000000000728,
+        "frameMax": 50,
+        "inputP95": 11.600000023841858,
+        "errors": [],
+        "completion": {
+          "frameP95": 33.39999999999782,
+          "longTasks": 0,
+          "longTaskMs": 0
+        },
+        "slotPositions": [
+          {
+            "x": -640,
+            "y": -300
+          },
+          {
+            "x": -200,
+            "y": -300
+          },
+          {
+            "x": 240,
+            "y": -300
+          },
+          {
+            "x": -640,
+            "y": 340
+          },
+          {
+            "x": -200,
+            "y": 340
+          },
+          {
+            "x": 240,
+            "y": 340
+          },
+          {
+            "x": -640,
+            "y": 980
+          },
+          {
+            "x": -200,
+            "y": 980
+          },
+          {
+            "x": 240,
+            "y": 980
+          },
+          {
+            "x": -640,
+            "y": 1620
+          },
+          {
+            "x": -200,
+            "y": 1620
+          },
+          {
+            "x": 240,
+            "y": 1620
+          },
+          {
+            "x": -640,
+            "y": 2260
+          },
+          {
+            "x": -200,
+            "y": 2260
+          },
+          {
+            "x": 240,
+            "y": 2260
+          },
+          {
+            "x": -640,
+            "y": 2900
+          },
+          {
+            "x": -200,
+            "y": 2900
+          },
+          {
+            "x": 240,
+            "y": 2900
+          },
+          {
+            "x": -640,
+            "y": 3540
+          },
+          {
+            "x": -200,
+            "y": 3540
+          }
+        ],
+        "resultsPersisted": 20,
+        "generationRequests": 20,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 114.60000002384186,
+            "count": 20
+          },
+          "firstFull": {
+            "ms": 114.60000002384186,
+            "count": 20
+          },
+          "observedCounts": [
+            0,
+            20
+          ],
+          "samples": 120
+        }
+      }
+    ],
+    "grid-webkit-final": [
+      {
+        "count": 1,
+        "anchors": 1,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 28,
+          "y": 28
+        },
+        "engine": "webkit",
+        "cpu": 1,
+        "longTasksSupported": false,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 2
+        },
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "frameP95": 19,
+        "frameMax": 24,
+        "inputP95": 14,
+        "errors": [],
+        "completion": {
+          "frameP95": 18,
+          "longTasks": 0,
+          "longTaskMs": 0
+        },
+        "slotPositions": [
+          {
+            "x": -200,
+            "y": 0
+          }
+        ],
+        "resultsPersisted": 1,
+        "generationRequests": 1,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 343,
+            "count": 1
+          },
+          "firstFull": {
+            "ms": 343,
+            "count": 1
+          },
+          "observedCounts": [
+            0,
+            1
+          ],
+          "samples": 120
+        }
+      }
+    ],
+    "grid-webkit-batches": [
+      {
+        "count": 10,
+        "anchors": 10,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 88,
+          "y": 88
+        },
+        "engine": "webkit",
+        "cpu": 1,
+        "longTasksSupported": false,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 21
+        },
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "frameP95": 19,
+        "frameMax": 26,
+        "inputP95": 14,
+        "errors": [],
+        "completion": {
+          "frameP95": 19,
+          "longTasks": 0,
+          "longTaskMs": 0
+        },
+        "slotPositions": [
+          {
+            "x": -640,
+            "y": -300
+          },
+          {
+            "x": -200,
+            "y": -300
+          },
+          {
+            "x": 240,
+            "y": -300
+          },
+          {
+            "x": -640,
+            "y": 340
+          },
+          {
+            "x": -200,
+            "y": 340
+          },
+          {
+            "x": 240,
+            "y": 340
+          },
+          {
+            "x": -640,
+            "y": 980
+          },
+          {
+            "x": -200,
+            "y": 980
+          },
+          {
+            "x": 240,
+            "y": 980
+          },
+          {
+            "x": -640,
+            "y": 1620
+          }
+        ],
+        "resultsPersisted": 10,
+        "generationRequests": 10,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 255,
+            "count": 10
+          },
+          "firstFull": {
+            "ms": 255,
+            "count": 10
+          },
+          "observedCounts": [
+            0,
+            10
+          ],
+          "samples": 120
+        }
+      },
+      {
+        "count": 20,
+        "anchors": 20,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 88,
+          "y": 88
+        },
+        "engine": "webkit",
+        "cpu": 1,
+        "longTasksSupported": false,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 21
+        },
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "frameP95": 19,
+        "frameMax": 29,
+        "inputP95": 14,
+        "errors": [],
+        "completion": {
+          "frameP95": 19,
+          "longTasks": 0,
+          "longTaskMs": 0
+        },
+        "slotPositions": [
+          {
+            "x": -640,
+            "y": -300
+          },
+          {
+            "x": -200,
+            "y": -300
+          },
+          {
+            "x": 240,
+            "y": -300
+          },
+          {
+            "x": -640,
+            "y": 340
+          },
+          {
+            "x": -200,
+            "y": 340
+          },
+          {
+            "x": 240,
+            "y": 340
+          },
+          {
+            "x": -640,
+            "y": 980
+          },
+          {
+            "x": -200,
+            "y": 980
+          },
+          {
+            "x": 240,
+            "y": 980
+          },
+          {
+            "x": -640,
+            "y": 1620
+          },
+          {
+            "x": -200,
+            "y": 1620
+          },
+          {
+            "x": 240,
+            "y": 1620
+          },
+          {
+            "x": -640,
+            "y": 2260
+          },
+          {
+            "x": -200,
+            "y": 2260
+          },
+          {
+            "x": 240,
+            "y": 2260
+          },
+          {
+            "x": -640,
+            "y": 2900
+          },
+          {
+            "x": -200,
+            "y": 2900
+          },
+          {
+            "x": 240,
+            "y": 2900
+          },
+          {
+            "x": -640,
+            "y": 3540
+          },
+          {
+            "x": -200,
+            "y": 3540
+          }
+        ],
+        "resultsPersisted": 20,
+        "generationRequests": 20,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 253,
+            "count": 20
+          },
+          "firstFull": {
+            "ms": 253,
+            "count": 20
+          },
+          "observedCounts": [
+            0,
+            20
+          ],
+          "samples": 120
+        }
+      }
+    ],
+    "grid-chrome-existing-aligned": [
+      {
+        "count": 20,
+        "existingCount": 30,
+        "anchors": 20,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 100,
+          "y": 100
+        },
+        "engine": "chromium",
+        "cpu": 6,
+        "longTasksSupported": true,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 23
+        },
+        "longTasks": 1,
+        "longTaskMs": 71,
+        "frameP95": 16.700000000000728,
+        "frameMax": 66.59999999999854,
+        "inputP95": 11.599999964237213,
+        "errors": [],
+        "completion": {
+          "frameP95": 33.39999999999782,
+          "longTasks": 1,
+          "longTaskMs": 63
+        },
+        "slotPositions": [
+          {
+            "x": 0,
+            "y": 1280
+          },
+          {
+            "x": 440,
+            "y": 1280
+          },
+          {
+            "x": 880,
+            "y": 1280
+          },
+          {
+            "x": 0,
+            "y": 1920
+          },
+          {
+            "x": 440,
+            "y": 1920
+          },
+          {
+            "x": 880,
+            "y": 1920
+          },
+          {
+            "x": 0,
+            "y": 2560
+          },
+          {
+            "x": 440,
+            "y": 2560
+          },
+          {
+            "x": 880,
+            "y": 2560
+          },
+          {
+            "x": 0,
+            "y": 3200
+          },
+          {
+            "x": 440,
+            "y": 3200
+          },
+          {
+            "x": 880,
+            "y": 3200
+          },
+          {
+            "x": 0,
+            "y": 3840
+          },
+          {
+            "x": 440,
+            "y": 3840
+          },
+          {
+            "x": 880,
+            "y": 3840
+          },
+          {
+            "x": 0,
+            "y": 4480
+          },
+          {
+            "x": 440,
+            "y": 4480
+          },
+          {
+            "x": 880,
+            "y": 4480
+          },
+          {
+            "x": 0,
+            "y": 5120
+          },
+          {
+            "x": 440,
+            "y": 5120
+          }
+        ],
+        "resultsPersisted": 20,
+        "generationRequests": 20,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 214.0999999642372,
+            "count": 20
+          },
+          "firstFull": {
+            "ms": 214.0999999642372,
+            "count": 20
+          },
+          "observedCounts": [
+            0,
+            20
+          ],
+          "samples": 120
+        }
+      }
+    ],
+    "grid-webkit-existing-aligned": [
+      {
+        "count": 20,
+        "existingCount": 30,
+        "anchors": 20,
+        "inputVerified": true,
+        "panDisplacement": {
+          "x": 88,
+          "y": 88
+        },
+        "engine": "webkit",
+        "cpu": 1,
+        "longTasksSupported": false,
+        "idle": {
+          "replacements": 0,
+          "puts": {}
+        },
+        "replacements": 0,
+        "puts": {
+          "aitu-workspace/boards": 21
+        },
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "frameP95": 18,
+        "frameMax": 30,
+        "inputP95": 14,
+        "errors": [],
+        "completion": {
+          "frameP95": 18,
+          "longTasks": 0,
+          "longTaskMs": 0
+        },
+        "slotPositions": [
+          {
+            "x": 0,
+            "y": 1280
+          },
+          {
+            "x": 440,
+            "y": 1280
+          },
+          {
+            "x": 880,
+            "y": 1280
+          },
+          {
+            "x": 0,
+            "y": 1920
+          },
+          {
+            "x": 440,
+            "y": 1920
+          },
+          {
+            "x": 880,
+            "y": 1920
+          },
+          {
+            "x": 0,
+            "y": 2560
+          },
+          {
+            "x": 440,
+            "y": 2560
+          },
+          {
+            "x": 880,
+            "y": 2560
+          },
+          {
+            "x": 0,
+            "y": 3200
+          },
+          {
+            "x": 440,
+            "y": 3200
+          },
+          {
+            "x": 880,
+            "y": 3200
+          },
+          {
+            "x": 0,
+            "y": 3840
+          },
+          {
+            "x": 440,
+            "y": 3840
+          },
+          {
+            "x": 880,
+            "y": 3840
+          },
+          {
+            "x": 0,
+            "y": 4480
+          },
+          {
+            "x": 440,
+            "y": 4480
+          },
+          {
+            "x": 880,
+            "y": 4480
+          },
+          {
+            "x": 0,
+            "y": 5120
+          },
+          {
+            "x": 440,
+            "y": 5120
+          }
+        ],
+        "resultsPersisted": 20,
+        "generationRequests": 20,
+        "startupSummary": {
+          "firstNonzero": {
+            "ms": 282,
+            "count": 20
+          },
+          "firstFull": {
+            "ms": 282,
+            "count": 20
+          },
+          "observedCounts": [
+            0,
+            20
+          ],
+          "samples": 120
+        }
+      }
+    ]
+  }
+}

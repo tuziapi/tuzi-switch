@@ -1,3 +1,4 @@
+import { createImageBatchPreparation, yieldBatchPreparationPaint } from '../../utils/image-batch-preparation';
 import type { TaskError } from '../../types/shared/core.types';
 import { toGenerationTaskError } from '../../utils/generation-error-details';
 import { isSunoNativeModel, getSunoNativeAction } from '../../services/suno-native';
@@ -312,9 +313,7 @@ import {
 import {
   CANVAS_VIEW_SETTINGS_CHANGE_EVENT,
   persistCenterImageOnClickEnabled,
-  persistHorizontalImageBatchEnabled,
   readCenterImageOnClickEnabled,
-  readHorizontalImageBatchEnabled,
 } from './canvas-view-settings';
 import {
   persistAutoInsertReferenceImagesEnabled,
@@ -2026,13 +2025,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     );
     const [centerImageOnClickEnabled, setCenterImageOnClickEnabled] =
       useState(() => readCenterImageOnClickEnabled());
-    const [horizontalImageBatchEnabled, setHorizontalImageBatchEnabled] =
-      useState(() => readHorizontalImageBatchEnabled());
-    const horizontalImageBatchHintId = useId();
     useEffect(() => {
       const sync = () => {
         setCenterImageOnClickEnabled(readCenterImageOnClickEnabled());
-        setHorizontalImageBatchEnabled(readHorizontalImageBatchEnabled());
       };
       window.addEventListener(CANVAS_VIEW_SETTINGS_CHANGE_EVENT, sync);
       return () =>
@@ -2075,6 +2070,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     >([]);
     const [canvasAssociationTrigger, setCanvasAssociationTrigger] =
       useState<CanvasAssociationTrigger | null>(null);
+    const batchPreparationRef = useRef<ReturnType<typeof createImageBatchPreparation> | null>(null);
+    useEffect(() => () => {
+      batchPreparationRef.current?.dispose();
+    }, []);
     const [isSubmitting, setIsSubmitting] = useState(false); // 防止快速重复点击（3秒防抖）
     const [pptExplainerDialogOpen, setPptExplainerDialogOpen] = useState(false);
     const [pptExplainerInitialSource, setPptExplainerInitialSource] =
@@ -5129,6 +5128,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         const trigger =
           typeof triggerOrOverride === 'string' ? triggerOrOverride : 'button';
         const effectivePrompt = override?.prompt ?? prompt;
+        const submittedFrameInfo = selectedFrameRef.current;
         const submittedBoard =
           (SelectionWatcherBoardRef.current as
             | (PlaitBoard & { host?: HTMLElement })
@@ -5430,6 +5430,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             ...extras,
           });
         };
+        let batchPreparation: ReturnType<typeof createImageBatchPreparation> | null = null;
+        const submittedAnchorIds: string[] = [];
+        let workflowSubmitted = false;
         const abortIfSubmittedBoardChanged = (stage: string): boolean => {
           if (
             override ||
@@ -5465,6 +5468,39 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         trackSubmitStatus('start');
 
         try {
+          if (effectiveGenerationType === 'image' && effectiveSelectedCount > 1 && submittedBoard) {
+            const previewParams = parseAIInput(effectivePrompt, {
+              texts: [], images: [], videos: [], graphics: [],
+            }, { modelId: effectiveSelectedModel, modelRef: effectiveSelectedModelRef,
+              params: effectiveSelectedParams, generationType: 'image', count: effectiveSelectedCount });
+            const zoom = submittedBoard.viewport?.zoom || 1;
+            const origin = getViewportOrigination(submittedBoard) || [0, 0];
+            const frame = submittedBoard.children.find((el) => el.id === submittedFrameInfo?.id);
+            const references = baseEffectiveContent.filter((item) => item.type === 'image' || item.type === 'graphics');
+            const sourceIds = [...new Set([
+              ...references.map((item) => item.sourceElementId).filter((id): id is string => Boolean(id)),
+              ...submittedCanvasAssociations.filter((ref) => ref.kind === 'image').map((ref) => ref.elementId),
+            ])];
+            batchPreparation = createImageBatchPreparation(submittedBoard, {
+              count: previewParams.count, requestedSize: previewParams.size, sourceIds,
+              emptyPosition: [origin[0] + 40 / zoom, origin[1] + 80 / zoom],
+              frameRect: frame && isFrameElement(frame) ? RectangleClient.getRectangleByPoints(frame.points) : undefined,
+              hasUnplacedReferences: references.some((item) => !item.sourceElementId),
+            });
+            batchPreparationRef.current = batchPreparation;
+            // Align the batch's top-left once, so centering slot 1 does not hide column 3.
+            // Later results must respect user panning and the existing zoom.
+            const firstPosition = batchPreparation.positions[0];
+            const batchOrigin: [number, number] = [
+              firstPosition[0] - 40 / zoom,
+              firstPosition[1] - 80 / zoom,
+            ];
+            if (Math.abs(batchOrigin[0] - origin[0]) > 1 || Math.abs(batchOrigin[1] - origin[1]) > 1) {
+              BoardTransforms.updateViewport(submittedBoard, batchOrigin, zoom);
+            }
+            await yieldBatchPreparationPaint();
+            if (abortIfSubmittedBoardChanged('batch_preview_ready')) return;
+          }
           if (submittedCanvasAssociations.length > 0) {
             const submissionBoardId = submittedDraftBoardId?.trim();
             if (!submittedBoard || !submissionBoardId) {
@@ -6061,7 +6097,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             let workzoneX: number = expectedInsertLeftX;
             let workzoneY: number = viewportCenterY - WORKZONE_HEIGHT / 2;
 
-            if (allElements.length > 0) {
+            if (!batchPreparation && allElements.length > 0) {
               const selectedElements = getSelectedElements(board);
               let positionCalculated = false;
 
@@ -6150,7 +6186,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
             // 如果选中了 Frame，将 Frame 信息传递给 WorkZone
             // 生成完成后媒体将插入到 Frame 内部并缩放到 Frame 尺寸
-            const frameInfo = selectedFrameRef.current;
+            const frameInfo = submittedFrameInfo;
             let targetFrameId: string | undefined;
             let targetFrameDimensions:
               | { width: number; height: number }
@@ -6206,13 +6242,15 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               // Results fit a 400px width / 600px height envelope. Reserve it
               // while auto aspect ratio is unknown, without stretching the card.
               const reservedInsertSize = { width: Math.max(400, anchorSize.width), height: Math.max(600, anchorSize.height) };
-              const plannedAnchorPositions = anchorTargetFrameId
+              const plannedAnchorPositions = batchPreparation?.count === requestedCount
+                ? batchPreparation.positions
+                : anchorTargetFrameId
                 ? null
                 : !targetFrameId && !replacementBoundImageTarget
                 ? resolveImageLineagePositions(
                     board, imageSourceIds, reservedInsertSize, requestedCount,
                     [viewportCenterX - 200, viewportCenterY],
-                    readHorizontalImageBatchEnabled() ? 'row' : 'column'
+                    'grid'
                   )
                 : resolveImageGenerationBatchAnchorPositions(
                     board, [expectedInsertLeftX, expectedInsertY], anchorSize,
@@ -6240,7 +6278,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                       ? targetFrameDimensions
                       : undefined,
                     requestedSize: parsedParams.size,
-                    reservedInsertSize: !targetFrameId && !replacementBoundImageTarget ? reservedInsertSize : undefined,
+                    size: batchPreparation?.size,
+                    reservedInsertSize: batchPreparation?.reservedSize ?? (!targetFrameId && !replacementBoundImageTarget ? reservedInsertSize : undefined),
                     requestedCount: shouldCreateIndependentBatchAnchors
                       ? 1
                       : requestedCount,
@@ -6280,18 +6319,23 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                     anchorCreateOptions
                   );
                 imageAnchorElements.push(anchorElement);
+                submittedAnchorIds.push(anchorElement.id);
               }
 
-              currentImageAnchorIdsRef.current = imageAnchorElements.map(
-                (anchor) => anchor.id
-              );
+              currentImageAnchorIdsRef.current = submittedAnchorIds;
+              // Let the real anchors mount before removing the lightweight preparation layer.
+              if (batchPreparation) {
+                await yieldBatchPreparationPaint();
+                batchPreparation.dispose();
+                if (abortIfSubmittedBoardChanged('batch_anchors_ready')) return;
+              }
               bindWorkflowImageStepsToAnchors(workflow, imageAnchorElements);
               workflowMessageData = toWorkflowMessageData(workflow);
               currentWorkZoneIdRef.current = null;
               const [firstAnchor] = imageAnchorElements;
               if (firstAnchor) {
                 publishedTaskTargetElementId = firstAnchor.id;
-                setTimeout(() => {
+                if (requestedCount === 1) setTimeout(() => {
                   const anchorRect = RectangleClient.getRectangleByPoints(
                     firstAnchor.points
                   );
@@ -6411,6 +6455,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               }
             );
             if (usedSW) {
+              workflowSubmitted = true;
               const submittedBoardStillCurrent = isSubmittedBoardCurrent(
                 submittedBoard,
                 submittedDraftBoardId,
@@ -6499,6 +6544,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               submittedDraftBoardId
             );
           }
+          workflowSubmitted = true;
           if (effectiveGenerationType === 'image') {
             applyCurrentImageAnchorPresentationState(board, 'handoff');
           }
@@ -6982,6 +7028,23 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           workflowControl.abortWorkflow();
           submitLockRef.current = false;
           setIsSubmitting(false);
+        } finally {
+          batchPreparation?.dispose();
+          if (batchPreparationRef.current === batchPreparation) {
+            batchPreparationRef.current = null;
+          }
+          if (!workflowSubmitted && submittedBoard && submittedAnchorIds.length) {
+            const tasks = taskQueueService.getAllTasks();
+            for (const id of submittedAnchorIds) {
+              const anchor = ImageGenerationAnchorTransforms.getAnchorById(submittedBoard, id);
+              const hasQueuedTask = anchor && tasks.some((task) =>
+                task.params?.anchorId === id || task.params?.workflowId === anchor.workflowId
+              );
+              if (anchor && !anchor.taskIds.length && !hasQueuedTask) {
+                ImageGenerationAnchorTransforms.removeAnchor(submittedBoard, id);
+              }
+            }
+          }
         }
       },
       [
@@ -8278,31 +8341,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 }
               />
             </div>
-            <div className="ai-input-bar__settings-row">
-              <span>
-                {language === 'zh' ? '多图横向排列' : 'Arrange batch in a row'}
-              </span>
-              <Switch
-                size="small"
-                value={horizontalImageBatchEnabled}
-                aria-label={
-                  language === 'zh' ? '多图横向排列' : 'Arrange batch in a row'
-                }
-                aria-describedby={horizontalImageBatchHintId}
-                onChange={(checked) =>
-                  setHorizontalImageBatchEnabled(
-                    persistHorizontalImageBatchEnabled(checked as boolean)
-                  )
-                }
-              />
-            </div>
-            <p
-              id={horizontalImageBatchHintId}
-              className="ai-input-bar__settings-hint"
-            >
+            <p className="ai-input-bar__settings-hint">
               {language === 'zh'
-                ? '普通生图一次多张时生效：开启横排，关闭竖排。只影响新任务。'
-                : 'For new multi-image requests: on for a row, off for a column.'}
+                ? '新批量图片按每行 3 张排列，生成结果保留在对应位置。'
+                : 'New image batches use three columns and keep each result in its assigned slot.'}
             </p>
             <div className="ai-input-bar__settings-row">
               <span>{language === 'zh' ? '保留原图' : 'Keep original image'}</span>

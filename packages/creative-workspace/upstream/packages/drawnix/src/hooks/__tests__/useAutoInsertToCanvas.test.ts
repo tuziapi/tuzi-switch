@@ -1919,6 +1919,20 @@ describe('useAutoInsertToCanvas', () => {
     }
   );
 
+  it.each([false, true])('keeps the viewport during batch auto-insertion, prompt metadata=%s', async (insertPrompt) => {
+    const task = createCompletedImageTask({
+      params: { prompt: 'batch viewport', size: '1:1', autoInsertToCanvas: true, batchTotal: 4 },
+    });
+    mocks.board = { children: [] };
+    mocks.taskState.tasks = [task];
+    renderHook(() => useAutoInsertToCanvas({ enabled: true, groupSimilarTasks: true, groupTimeWindow: 10, insertPrompt }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+    const calls = insertPrompt ? mocks.insertGeneratedImageFlow.mock.calls : mocks.quickInsert.mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][calls[0].length - 1]).toBe(false);
+    expect(mocks.markAsInserted).toHaveBeenCalledWith(task.id, 'auto_insert');
+  });
+
   it('binds every result from one multi-image task to that task', async () => {
     const task = createCompletedImageTask({
       id: 'task-multi-image',
