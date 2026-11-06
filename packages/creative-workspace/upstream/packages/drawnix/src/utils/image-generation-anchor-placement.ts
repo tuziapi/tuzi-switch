@@ -1,3 +1,4 @@
+import { getBatchReservations } from './image-batch-reservations';
 import {
   RectangleClient,
   type PlaitBoard,
@@ -51,7 +52,7 @@ export function resolveImageGenerationBatchAnchorSeedPosition(
   total: number,
   gap = 32
 ): Point {
-  const columns = total <= 2 ? total : total <= 4 ? 2 : 3;
+  const columns = Math.min(3, total);
   const row = Math.floor(index / columns);
   const column = index % columns;
 
@@ -87,6 +88,7 @@ function buildOccupiedRects(
         type: element.type,
       })),
     ...extraOccupiedRects,
+    ...getBatchReservations(board),
   ];
 }
 
@@ -298,6 +300,22 @@ export function resolveImageGenerationBatchAnchorPositions(
     ...restOptions
   } = options;
   const placementOptions = { ...restOptions, extraOccupiedRects };
+  if (total > 1) {
+    // Reserve the full grid once: individual collision searches scatter siblings.
+    const columns = Math.min(3, total);
+    const rows = Math.ceil(total / columns);
+    const gap = restOptions.gap ?? 40;
+    const start = resolveImageGenerationAnchorAvailablePosition(
+      board,
+      frameRect ? [frameRect.x + frameRect.width + gap, frameRect.y] : origin,
+      { width: columns * size.width + (columns - 1) * gap,
+        height: rows * size.height + (rows - 1) * gap },
+      placementOptions
+    );
+    return Array.from({ length: total }, (_, index) =>
+      resolveImageGenerationBatchAnchorSeedPosition(start, size, index, total, gap)
+    );
+  }
   const seedPositions = frameRect
     ? resolveFrameAdjacentBatchSeedPositions(
         board,

@@ -245,12 +245,11 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       ),
       action: {
         label:
-          updateHandle.manual && updateInfo.channel === "stable"
+          updateInfo.channel === "stable"
             ? t("settings.viewUpdate")
             : t("settings.downloadUpdate"),
         onClick: () => {
-          if (updateHandle.manual && updateInfo.channel === "stable")
-            setUpdateDialogOpen(true);
+          if (updateInfo.channel === "stable") setUpdateDialogOpen(true);
           else if (updateHandle.manual) void downloadUpdate();
           else {
             setUpdateDialogOpen(true);

@@ -145,7 +145,7 @@ export class ImageGenerationAnchorGenerator {
     const rect = RectangleClient.getRectangleByPoints(element.points);
     const isFailed = element.phase === 'failed';
     const layout = [
-      element.id, rect.x, rect.y, rect.width, rect.height, element.phase,
+      element.id, rect.x, rect.y, rect.width, rect.height, element.phase, element.batchIndex,
       element.batchTotal || element.requestedCount || element.taskIds.length || 1,
       element.previewImageUrl, typeof element.progress === 'number',
     ];
@@ -296,7 +296,8 @@ export class ImageGenerationAnchorGenerator {
       counter.setAttribute('text-anchor', 'end');
       counter.setAttribute('fill', '#777e88');
       counter.setAttribute('font-size', '11');
-      counter.textContent = `${count} 张`;
+      counter.textContent = element.batchIndex && element.batchTotal
+        ? `${element.batchIndex}/${element.batchTotal}` : `${count} 张`;
       host.appendChild(counter);
     }
 

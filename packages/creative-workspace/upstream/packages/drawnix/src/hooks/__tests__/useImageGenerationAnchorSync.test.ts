@@ -802,3 +802,37 @@ describe('useImageGenerationAnchorSync', () => {
   });
 
 });
+
+
+describe('batch display event isolation', () => {
+  it('does not rescan task history or render for unrelated completion/readiness events', () => {
+    const anchor = createAnchor({ taskIds: ['task-1'], primaryTaskId: 'task-1' });
+    const board = createBoard(anchor);
+    taskState.tasks = [createTask()];
+    let renders = 0;
+    const hook = renderHook(() => {
+      renders++;
+      return useImageGenerationAnchorController({ board, anchor });
+    });
+    const before = renders;
+    taskState.reads = 0;
+    act(() => {
+      completionListeners.forEach((listener) => listener({ taskId: 'unrelated' }));
+      registerCanvasImage(board, 'unrelated-image', '/unrelated.png').setReady(true);
+    });
+    expect(taskState.reads).toBe(0);
+    expect(renders).toBe(before);
+    act(() => completionListeners.forEach((listener) => listener({ taskId: 'task-1' })));
+    expect(renders).toBeGreaterThan(before);
+    hook.unmount();
+  });
+
+  it('does not reconcile all anchors when an unrelated reference image becomes ready', () => {
+    const board = createBoard(createAnchor());
+    const hook = renderHook(() => useImageGenerationAnchorSync({ board }));
+    taskState.reads = 0;
+    act(() => registerCanvasImage(board, 'reference-image', '/reference.png').setReady(true));
+    expect(taskState.reads).toBe(0);
+    hook.unmount();
+  });
+});

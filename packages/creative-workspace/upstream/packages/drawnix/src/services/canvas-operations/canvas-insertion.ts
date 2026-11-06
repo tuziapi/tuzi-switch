@@ -105,6 +105,8 @@ export interface InsertionItem {
  * 画布插入参数
  */
 export interface CanvasInsertionParams {
+  /** Automatic batch results must not take the viewport away from the user. Defaults to true. */
+  scrollToResult?: boolean;
   /** 要插入的内容列表 */
   items: InsertionItem[];
   /** 当前画布实例（组件内调用时优先使用，避免依赖全局引用初始化时序） */
@@ -943,7 +945,7 @@ async function executeCanvasInsertionInternal(
         item.metadata
       );
 
-      requestAnimationFrame(() => {
+      if (params.scrollToResult !== false) requestAnimationFrame(() => {
         if (!params.boardGuard || params.boardGuard()) {
           scrollToPointIfNeeded(board, point);
         }
@@ -1004,7 +1006,7 @@ async function executeCanvasInsertionInternal(
         centerPoint,
         bounds: flowState.bounds,
       });
-      requestAnimationFrame(() => {
+      if (params.scrollToResult !== false) requestAnimationFrame(() => {
         if (!params.boardGuard || params.boardGuard()) {
           scrollToPointIfNeeded(board, centerPoint);
         }
@@ -1051,7 +1053,8 @@ export async function quickInsert(
   dimensions?: { width: number; height: number },
   metadata?: Record<string, unknown>,
   board?: PlaitBoard,
-  boardGuard?: () => boolean
+  boardGuard?: () => boolean,
+  scrollToResult = true
 ): Promise<MCPResult> {
   return executeCanvasInsertion({
     board,
@@ -1066,6 +1069,7 @@ export async function quickInsert(
     ],
     startPoint: point,
     boardGuard,
+    scrollToResult,
   });
 }
 
@@ -1081,7 +1085,8 @@ export async function insertImageGroup(
   board?: PlaitBoard,
   boardGuard?: () => boolean,
   prompt?: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  scrollToResult = true
 ): Promise<MCPResult> {
   const groupId = `img-group-${Date.now()}`;
   const promptMetadata = {
@@ -1103,6 +1108,7 @@ export async function insertImageGroup(
     })),
     startPoint: point,
     boardGuard,
+    scrollToResult,
   });
 }
 
@@ -1114,7 +1120,8 @@ export async function insertGeneratedImageFlow(
   results: MediaFlowResult[],
   point?: Point,
   board?: PlaitBoard,
-  boardGuard?: () => boolean
+  boardGuard?: () => boolean,
+  scrollToResult = true
 ): Promise<MCPResult> {
   const normalizedPrompt = prompt?.trim() || '';
   const imageResults = results.filter((result) => result.type === 'image');
@@ -1161,6 +1168,7 @@ export async function insertGeneratedImageFlow(
         : [],
       startPoint: point,
       boardGuard,
+      scrollToResult,
     });
   }
 
@@ -1169,6 +1177,7 @@ export async function insertGeneratedImageFlow(
     items: imageItems,
     startPoint: point,
     boardGuard,
+    scrollToResult,
   });
 }
 

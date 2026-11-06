@@ -298,7 +298,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     }
     if (hasUpdate && updateHandle) {
       if (
-        (updateHandle.manual && updateInfo?.channel === "stable") ||
+        updateInfo?.channel === "stable" ||
         installState.phase === "ready" ||
         installState.phase === "installed"
       )

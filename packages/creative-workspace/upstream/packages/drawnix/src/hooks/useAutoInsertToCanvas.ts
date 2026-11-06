@@ -1700,6 +1700,7 @@ export function useAutoInsertToCanvas(
                 : generationMetadata;
             const targetImageDimensions =
               type === 'image' ? dimensions : undefined;
+            const scrollToImageResult = Number(imageAnchor?.batchTotal || task.params.batchTotal || 1) <= 1;
             let insertedPoint = resolvedInsertionPoint;
             let insertedElementId: string | undefined;
             let insertedSize =
@@ -1849,7 +1850,8 @@ export function useAutoInsertToCanvas(
                       resolvedInsertionPoint,
                       board,
                       () =>
-                        isCanvasInsertionBoardTokenCurrent(insertionBoardToken)
+                        isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
+                      ...(scrollToImageResult ? [] : [false] as const)
                     )
                   : await insertAIFlow(
                       task.params.prompt,
@@ -1889,7 +1891,8 @@ export function useAutoInsertToCanvas(
                 board,
                 () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
                 task.params.prompt,
-                buildTaskGenerationMetadata(task, imageAnchor)
+                buildTaskGenerationMetadata(task, imageAnchor),
+                ...(scrollToImageResult ? [] : [false] as const)
               );
               if (abortIfCanvasChanged()) {
                 continue promptGroupLoop;
@@ -2009,7 +2012,8 @@ export function useAutoInsertToCanvas(
                 dimensions,
                 metadata,
                 board,
-                () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken)
+                () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
+                ...(type !== 'image' || scrollToImageResult ? [] : [false] as const)
               );
               if (abortIfCanvasChanged()) {
                 continue promptGroupLoop;
@@ -2231,6 +2235,7 @@ export function useAutoInsertToCanvas(
                 : null;
             const groupImageDimensions =
               type === 'image' ? dimensions : undefined;
+            const scrollToImageResult = Number(groupImageAnchor?.batchTotal || firstInsertTask.params.batchTotal || 1) <= 1;
             let insertedPoint = resolvedInsertionPoint;
             let insertedElementId: string | undefined;
             let insertedSize = groupImageDimensions;
@@ -2354,7 +2359,8 @@ export function useAutoInsertToCanvas(
                       resolvedInsertionPoint,
                       board,
                       () =>
-                        isCanvasInsertionBoardTokenCurrent(insertionBoardToken)
+                        isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
+                      ...(scrollToImageResult ? [] : [false] as const)
                     )
                   : await insertAIFlow(
                       firstInsertTask.params.prompt,
@@ -2399,7 +2405,8 @@ export function useAutoInsertToCanvas(
                   imageGroupItems.map((item) => item.dimensions),
                   board,
                   () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
-                  firstInsertTask.params.prompt
+                  firstInsertTask.params.prompt,
+                  ...(scrollToImageResult ? [] : [undefined, false] as const)
                 );
                 if (abortIfCanvasChanged()) {
                   continue promptGroupLoop;
