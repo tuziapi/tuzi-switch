@@ -42,8 +42,24 @@
 
 ## v1.5.7 精确源码与构建
 
-版本提交 `cee88e61a2ddd5d85436aeed718c1abb9b273693`同步 package/Tauri/Cargo/lock，已推送正式与测试 main。构建执行器 `codex/build-official-v1.5.7` 固定检出正式提交；runner 改动不进入产品 main。
+版本提交 `cee88e61a2ddd5d85436aeed718c1abb9b273693` 同步 package/Tauri/Cargo/lock，已推送正式与测试 main。构建执行器 `codex/build-official-v1.5.7` 固定检出正式提交；runner 改动不进入产品 main。
 
 测试仓库 run `42168727030`、builder `056598fbfea44c89a5f1185eacc31f7b4ffe2e0c` 已通过前置门禁：宿主 96 文件 / 807 项、创作 135 文件 / 2269 项，类型、下载页、安装入口和产物校验通过。两种 Mac 包均使用 `macos-15-intel`；ARM 为交叉编译，不作为 ARM 实机业务验收。
 
 构建中，尚未发布新附件。页面准备保留 v1.5.5 / v1.5.6 历史脚本，其源码已与公网逐字节和固定 SHA256 核对。取得真实新版 DMG 后再更新当前安装器摘要，不改旧版本路由。
+
+## 产物与脚本验证
+
+四份 Actions ZIP 与 GitHub 记录的 SHA256 一致。七种安装文件的版本 1.5.7、来源、builder/run、目标与摘要均通过；源码归档与正式精确 Git 树逐文件、模式及符号链接一致。两种 Mac DMG 版本、架构、正式公钥/端点、来源标记和 ad-hoc 完整性检查通过，DMG 二进制与构建归档一致；Linux DEB 包内版本、amd64 ELF、正式渠道，以及 Windows MSI x64 标记通过。
+
+真实 DMG 的 13 项隔离安装器回归全部通过；仅在临时应用目录测试，无启动或替换用户当前应用。16 项下载页回归通过。安装器固定 ARM64 `8f70587af06b0cca3b64a8ca3144cee899826c6cdaa3242bb01b253b6c83770e`、Intel `aef2f216b970f1025ea06ba527bde0be30104b377ee4e6a6e17f6e57fa7d0bdd`。
+
+截至本段记录，原生安装包已取得并验证，云端缓存收尾与汇总尚未结束；正式 Release、Pages 和公网检查待完成。
+
+## 正式附件已发布
+
+run `42168727030` 的 verify、四个平台及 assemble 全部 success。云端原生回归：Linux 1493、Windows 1488、两组 Mac 主机各 1501 项通过，各有 4 项既有忽略；隔离配置和 Mac MCP 专项通过。
+
+正式 v1.5.7 标签精确指向 `cee88e61a2ddd5d85436aeed718c1abb9b273693`。14 个附件已公开，其大小及 GitHub SHA256 与本地验证产物一致，无 latest.json/.sig。正式标签另触发 run `42172992978`，因账户计费锁定在 runner 启动前失败，作业无 steps、无产物、无覆盖；实际产物来自上述成功测试仓库构建。
+
+页面源码 `a14e7a31f6bf227af3943c994a3bc8051b11997d` 从干净 Git 归档构建，元数据只读取实际公开 Release。16 项页面回归、七格式/两命令浏览器检查通过；用实际公开 v1.5.7 元数据验证四平台更新提醒与手动下载链接通过，原生 IPC 为合成，未执行真实应用内升级。页面部署及公网验证待完成。
