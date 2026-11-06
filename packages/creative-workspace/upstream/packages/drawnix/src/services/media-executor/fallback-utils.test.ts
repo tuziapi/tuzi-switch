@@ -207,6 +207,23 @@ describe('reference image transport fidelity', () => {
     }
   });
 
+  it('compresses a large inline reference locally when data URL fetch is blocked', async () => {
+    const content = 'texture'.repeat(900_000);
+    const value = `data:image/png;base64,${btoa(content)}`;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Load failed'));
+    fidelityMocks.compressImageBlob.mockResolvedValue(new Blob(['compressed'], { type: 'image/jpeg' }));
+    try {
+      const { ensureBase64ForAI } = await import('./fallback-utils');
+      expect(await ensureBase64ForAI({ type: 'base64', value })).toBe('data:image/jpeg;base64,Y29tcHJlc3NlZA==');
+      const original = fidelityMocks.compressImageBlob.mock.calls[0][0] as Blob;
+      expect(original.type).toBe('image/png');
+      expect(new TextDecoder().decode(await readBlobBytes(original))).toBe(content);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it('retains fetch failure behavior in original mode', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
     try {
@@ -431,11 +448,7 @@ describe('cacheRemoteUrl', () => {
   });
 
   it('caches raw base64 image payloads as content-addressed local URLs', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      mediaResponse(PNG_SIGNATURE, 'image/png', {
-        status: 200,
-      })
-    );
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Load failed'));
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -451,9 +464,7 @@ describe('cacheRemoteUrl', () => {
     expect(result).toMatch(
       /^\/__aitu_cache__\/image\/content-[0-9a-f]{64}\.png$/
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/^data:image\/png;base64,/)
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(cacheMediaFromBlob).toHaveBeenCalledWith(result, blobLike, 'image', {
       taskId: 'task-raw-b64',
     });
@@ -498,7 +509,7 @@ describe('cacheRemoteUrl', () => {
     const inlineUrl = 'data:image/jpeg;base64,/9j/2Q==';
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(mediaResponse(JPEG_SIGNATURE, 'image/jpeg'));
+      .mockRejectedValue(new TypeError('Load failed'));
     vi.stubGlobal('fetch', fetchMock);
     const { cacheRemoteUrl } = await import('./fallback-utils');
     const warning = vi.fn();
@@ -514,8 +525,7 @@ describe('cacheRemoteUrl', () => {
         onCacheWarning: warning,
       }
     );
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith(inlineUrl);
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(result).toMatch(/^\/__aitu_cache__\/image\/content-.*\.jpg$/);
     const blob = cacheMediaFromBlob.mock.calls[0][1] as Blob;
     expect(blob.type).toBe('image/jpeg');

@@ -276,7 +276,7 @@ class WorkspaceService {
           metadata.folderId = null;
           metadata.updatedAt = Date.now();
         }
-        await workspaceStorageService.saveBoard(board);
+        await this.persistBoardMetadata(board);
       }));
     }
 
@@ -495,6 +495,28 @@ class WorkspaceService {
     return { valid: true };
   }
 
+  /** Metadata-only entries deliberately have no elements; never persist them as boards. */
+  private async readFullBoard(id: string): Promise<Board> {
+    const loaded = this.loadedBoards.get(id);
+    if (loaded) return loaded;
+    const stored = await workspaceStorageService.loadBoard(id);
+    // An editor may have loaded/changed the board while the storage read was pending.
+    const current = this.loadedBoards.get(id) || stored;
+    if (!current) throw new Error(`Board ${id} not found in storage`);
+    return current;
+  }
+
+  private async persistBoardMetadata(board: Board): Promise<void> {
+    const full = await this.readFullBoard(board.id);
+    await workspaceStorageService.saveBoard({
+      ...full,
+      name: board.name,
+      folderId: board.folderId,
+      order: board.order,
+      updatedAt: board.updatedAt,
+    });
+  }
+
   async renameBoard(id: string, name: string): Promise<void> {
     const board = this.boards.get(id);
     if (!board) throw new Error(`Board ${id} not found`);
@@ -516,7 +538,7 @@ class WorkspaceService {
       metadata.name = trimmedName;
       metadata.updatedAt = board.updatedAt;
     }
-    await workspaceStorageService.saveBoard(board);
+    await this.persistBoardMetadata(board);
     this.emit('boardUpdated', board);
   }
 
@@ -627,7 +649,7 @@ class WorkspaceService {
             bMeta.folderId = b.folderId;
             bMeta.updatedAt = b.updatedAt;
           }
-          await workspaceStorageService.saveBoard(b);
+          await this.persistBoardMetadata(b);
         }
       } else {
         const f = this.folders.get(item.id);
@@ -737,7 +759,7 @@ class WorkspaceService {
             bMeta.folderId = b.folderId;
             bMeta.updatedAt = b.updatedAt;
           }
-          await workspaceStorageService.saveBoard(b);
+          await this.persistBoardMetadata(b);
         }
       } else {
         const f = this.folders.get(item.id);
@@ -774,7 +796,7 @@ class WorkspaceService {
             bMeta.order = item.order;
             bMeta.updatedAt = now;
           }
-          await workspaceStorageService.saveBoard(board);
+          await this.persistBoardMetadata(board);
         }
       } else {
         const folder = this.folders.get(item.id);
@@ -794,8 +816,7 @@ class WorkspaceService {
    * Copy a board with all its content
    */
   async copyBoard(id: string): Promise<Board> {
-    const sourceBoard = this.boards.get(id);
-    if (!sourceBoard) throw new Error(`Board ${id} not found`);
+    const sourceBoard = await this.readFullBoard(id);
 
     // Generate new name with "副本" suffix
     let newName = `${sourceBoard.name} 副本`;

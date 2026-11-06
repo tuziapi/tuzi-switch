@@ -11,6 +11,7 @@ import {
   withVideoRequestId,
 } from '../../utils/video-request-id';
 import {
+  base64ToBlob,
   calculateBlobChecksum,
   compressImageBlob,
   getFileExtension,
@@ -93,8 +94,8 @@ export async function ensureBase64ForAI(
     const base64Part = value.slice(value.indexOf(',') + 1);
     const estimatedBytes = (base64Part.length * 3) / 4;
     if (estimatedBytes <= MAX_REFERENCE_IMAGE_BYTES) return value;
-    const res = await fetch(value, { signal });
-    const blob = await res.blob();
+    signal?.throwIfAborted();
+    const blob = base64ToBlob(value);
     return blobToBase64ForAI(blob, keepOriginal);
   }
   if (
@@ -918,11 +919,9 @@ export async function cacheRemoteUrl(
   try {
     // data URL / 原始 base64：直接转 Blob 再缓存，避免把大串 base64 存进任务结果
     if (isDataURL(normalizedUrl)) {
-      const response = options?.signal
-        ? await fetch(normalizedUrl, { signal: options.signal })
-        : await fetch(normalizedUrl);
-      options?.signal?.throwIfAborted();
-      const blob = await response.blob();
+      // data: is allowed in img-src, not connect-src, in the assistant's CSP.
+      // Local decoding also keeps persistence independent of network policy.
+      const blob = base64ToBlob(normalizedUrl);
       options?.signal?.throwIfAborted();
       if (blob.size === 0) {
         console.warn(

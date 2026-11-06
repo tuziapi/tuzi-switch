@@ -6,6 +6,7 @@
     "windows": [
       {
         "label": "main",
+        "dragDropEnabled": false,
         "title": "兔子助手 · 集成测试",
         "width": 1200,
         "height": 800,

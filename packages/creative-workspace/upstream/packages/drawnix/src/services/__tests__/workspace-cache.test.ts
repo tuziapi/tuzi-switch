@@ -1,20 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceService } from '../workspace-service';
-import type { Board, BoardChangeData } from '../../types/workspace.types';
+import type { Board, BoardChangeData, Folder } from '../../types/workspace.types';
 
-const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn(), isWriteSuspended: vi.fn(() => false) }));
+const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn(), isWriteSuspended: vi.fn(() => false), saveFolder: vi.fn(), deleteFolder: vi.fn() }));
 vi.mock('../workspace-storage-service', () => ({ workspaceStorageService: storage }));
 vi.mock('../github-sync/sync-log-service', () => ({ logDebug: vi.fn(), logWarning: vi.fn(), logError: vi.fn() }));
 
 const runtime = workspaceService as unknown as {
-    initialized: boolean; loadedBoards: Map<string, Board>; boards: Map<string, Board>;
+    initialized: boolean; folders: Map<string, Folder>; loadedBoards: Map<string, Board>; boards: Map<string, Board>;
     boardMetadata: Map<string, Omit<Board, 'elements'>>; unsavedBoards: Map<string, object>;
     state: { currentBoardId: string | null };
 };
-const board = (id: string) => ({ id, name: id, elements: [{ id: `element-${id}` }], updatedAt: 1 } as unknown as Board);
+const board = (id: string) => ({ id, name: id, folderId: null, order: 0, viewport: { zoom: 0.5 }, elements: [{ id: `element-${id}` }], updatedAt: 1 } as unknown as Board);
 beforeEach(() => {
     vi.clearAllMocks();
-    runtime.initialized = true;
+    storage.loadBoard.mockReset(); storage.saveBoard.mockReset();
+    runtime.initialized = true; runtime.folders.clear();
     runtime.loadedBoards.clear(); runtime.boards.clear(); runtime.boardMetadata.clear(); runtime.unsavedBoards.clear();
     runtime.state.currentBoardId = 'current';
     for (const id of ['current', 'a', 'b', 'c', 'd']) {
@@ -132,5 +133,59 @@ describe('update persistence barrier', () => {
         expect(runtime.unsavedBoards.has('a')).toBe(true);
         storage.isWriteSuspended.mockReturnValueOnce(true);
         await expect(workspaceService.flushForAppUpdate()).rejects.toThrow('迁移');
+    });
+});
+
+
+describe('metadata operations on unopened or evicted boards', () => {
+    it('renaming from the project list preserves stored elements and viewport', async () => {
+        await workspaceService.renameBoard('a', 'Renamed');
+        expect(storage.saveBoard).toHaveBeenCalledWith(expect.objectContaining({
+            name: 'Renamed', elements: board('a').elements, viewport: board('a').viewport,
+        }));
+        expect(runtime.loadedBoards.size).toBe(0);
+    });
+
+    it('reordering and moving preserves every unopened sibling', async () => {
+        await workspaceService.reorderItems([{ id: 'a', type: 'board', order: 3 }]);
+        await workspaceService.moveBoard('b', null, 'a', 'after');
+        for (const [saved] of storage.saveBoard.mock.calls) {
+            expect(saved.elements).toEqual(board(saved.id).elements);
+        }
+        expect(storage.saveBoard.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('moving folders and removing a folder preserve its unopened boards', async () => {
+        runtime.folders.set('folder', { id: 'folder', name: 'Folder', parentId: null, order: 0 } as Folder);
+        await workspaceService.moveFolder('folder', null);
+        runtime.boards.get('a')!.folderId = 'folder';
+        runtime.boardMetadata.get('a')!.folderId = 'folder';
+        await workspaceService.deleteFolder('folder');
+        expect(storage.saveBoard.mock.lastCall?.[0]).toMatchObject({
+            id: 'a', folderId: null, elements: board('a').elements,
+        });
+        for (const [saved] of storage.saveBoard.mock.calls) expect(saved.elements).toHaveLength(1);
+    });
+
+    it('copying an unopened board copies its original content', async () => {
+        const copy = await workspaceService.copyBoard('a');
+        expect(copy.elements).toEqual(board('a').elements);
+        expect(copy.viewport).toEqual(board('a').viewport);
+        expect(copy.id).not.toBe('a');
+    });
+
+    it('does not persist a placeholder when the stored board cannot be read', async () => {
+        storage.loadBoard.mockResolvedValueOnce(null);
+        await expect(workspaceService.renameBoard('a', 'Renamed')).rejects.toThrow();
+        expect(storage.saveBoard).not.toHaveBeenCalled();
+    });
+
+    it('uses current unsaved content instead of an older stored copy', async () => {
+        await workspaceService.reloadBoard('a');
+        runtime.loadedBoards.get('a')!.elements = [{ id: 'new-unsaved' }] as Board['elements'];
+        storage.loadBoard.mockClear();
+        await workspaceService.renameBoard('a', 'Renamed');
+        expect(storage.loadBoard).not.toHaveBeenCalled();
+        expect(storage.saveBoard.mock.lastCall?.[0].elements).toEqual([{ id: 'new-unsaved' }]);
     });
 });
