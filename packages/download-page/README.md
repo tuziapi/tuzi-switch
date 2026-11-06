@@ -59,3 +59,10 @@ v1.5.6 延续正式 Release 提醒、展示更新说明及手动安装。模型�
 `macosInstallerTag`、当前安装器版本和真实两种 DMG 摘要同步更新；`release-metadata.mjs` 校验实际正式 Release 后才生成网页清单。默认加载器安装 v1.5.6，`--version v1.5.5` 继续使用保留的旧脚本。历史注册表 `scripts/previous-macos-installers.json` 固定旧脚本摘要，旧脚本随源码存放于 `scripts/macos-installers/`，构建校验文件未变后复制到 public；不支持的版本会明确报错，不回退。不要将前述 v1.5.5 历史说明当作当前自动安装方式。
 
 当前版本核验：`RELEASE_TAG=v1.5.6 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm build:download`。完整发布证据见仓库 `docs/development/2026-11-05-v1.5.6-release.md`。
+
+
+## v1.5.7 发布（2026-11-06）
+
+v1.5.7 改进三列批量布局、准备占位、结果固定位置与视口保持，并减少无关事件刷新。仍为未签名手动安装交付；不将未来签名升级实现视为本次已通过真实验收。正式源码、Release、下载 URL 均为 tuziapi/tuzi-switch，测试仓库仅执行构建。
+
+当前版本构建：`RELEASE_TAG=v1.5.7 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm build:download`。发布后默认加载器使用 v1.5.7；v1.5.6 和 v1.5.5 保留固定历史脚本/摘要。安装包和页面来源分别记录于 `download-SOURCE.json`，完整证据见 `docs/development/2026-11-06-batch-updater-release.md`。
