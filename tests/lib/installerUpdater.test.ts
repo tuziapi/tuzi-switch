@@ -50,11 +50,17 @@ describe.each(["tuziapi/tuzi-switch", "AiW520/tuzi-switch"])(
           (r.assets[0].browser_download_url = "https://untrusted.test/app.dmg"),
         (r: any) => (r.assets[0].digest = ""),
         (r: any) => (r.tag_name = "v1.5.1-beta"),
+        (r: any) => (r.body = { untrusted: true }),
       ]) {
         const r = fixture(repo);
         mutate(r);
         expect(() => validateInstallerRelease(r, repo)).toThrow();
       }
+    });
+    it("accepts GitHub releases with no notes", () => {
+      expect(
+        validateInstallerRelease({ ...fixture(repo), body: null }, repo).body,
+      ).toBeNull();
     });
     it.each([
       ["macos", "macos-arm64.dmg"],
