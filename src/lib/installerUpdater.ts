@@ -9,7 +9,7 @@ const installers: Record<string, string> = {
   windows: "tuzi-assistant-windows-x64.exe",
   linux: "tuzi-assistant-linux-x64.AppImage",
 };
-function versionParts(value: string): number[] {
+export function parseInstallerVersion(value: string): number[] {
   if (!/^v?\d+\.\d+\.\d+$/.test(value)) throw Error("Invalid release version");
   const parts = value.replace(/^v/, "").split(".").map(Number);
   if (!parts.every(Number.isSafeInteger))
@@ -20,16 +20,16 @@ export function isNewerInstallerVersion(
   remote: string,
   local: string,
 ): boolean {
-  const a = versionParts(remote),
-    b = versionParts(local);
+  const a = parseInstallerVersion(remote),
+    b = parseInstallerVersion(local);
   for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
   return false;
 }
-interface InstallerRelease {
+export interface InstallerRelease {
   tag_name: string;
   html_url: string;
   published_at: string;
-  body?: string;
+  body?: string | null;
   draft: boolean;
   prerelease: boolean;
   assets: {
@@ -54,10 +54,11 @@ export function validateInstallerRelease(
     r.html_url !==
       `https://github.com/${repository}/releases/tag/${r.tag_name}` ||
     !Number.isFinite(Date.parse(r.published_at)) ||
+    (r.body != null && typeof r.body !== "string") ||
     !Array.isArray(r.assets)
   )
     throw Error("Invalid installer release");
-  versionParts(r.tag_name);
+  parseInstallerVersion(r.tag_name);
   for (const name of Object.values(installers)) {
     const matches = r.assets.filter((a) => a?.name === name);
     const a = matches[0];
@@ -82,38 +83,51 @@ export async function checkInstallerUpdate(
   | { status: "up-to-date" }
   | { status: "available"; info: UpdateInfo; update: UpdateHandle }
 > {
-  versionParts(currentVersion);
+  parseInstallerVersion(currentVersion);
+  const release = await fetchInstallerRelease(build, timeout);
+  return installerUpdateFromRelease(build, currentVersion, release, timeout);
+}
+
+export async function fetchInstallerRelease(
+  build: UpdateBuildInfo,
+  timeout: number,
+): Promise<InstallerRelease> {
   if (
     !["tuziapi/tuzi-switch", "AiW520/tuzi-switch"].includes(build.repository) ||
     !installers[build.platform]
   )
     throw Error("Unsupported installer channel or platform");
-  const fetchRelease = async () => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), timeout);
-    try {
-      const response = await fetch(
-        `https://api.github.com/repos/${build.repository}/releases/latest`,
-        {
-          signal: controller.signal,
-          cache: "no-store",
-          credentials: "omit",
-          referrerPolicy: "no-referrer",
-          headers: { Accept: "application/vnd.github+json" },
-        },
-      );
-      if (!response.ok)
-        throw Error(`Release metadata unavailable: ${response.status}`);
-      return validateInstallerRelease(await response.json(), build.repository);
-    } finally {
-      window.clearTimeout(timer);
-    }
-  };
-  const release = await fetchRelease();
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${build.repository}/releases/latest`,
+      {
+        signal: controller.signal,
+        cache: "no-store",
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+        headers: { Accept: "application/vnd.github+json" },
+      },
+    );
+    if (!response.ok)
+      throw Error(`Release metadata unavailable: ${response.status}`);
+    return validateInstallerRelease(await response.json(), build.repository);
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+export function installerUpdateFromRelease(
+  build: UpdateBuildInfo,
+  currentVersion: string,
+  release: InstallerRelease,
+  timeout: number,
+): Awaited<ReturnType<typeof checkInstallerUpdate>> {
   if (!isNewerInstallerVersion(release.tag_name, currentVersion))
     return { status: "up-to-date" };
   const openDownload = async () => {
-    const current = await fetchRelease();
+    const current = await fetchInstallerRelease(build, timeout);
     if (!isNewerInstallerVersion(current.tag_name, currentVersion))
       throw Error("Update withdrawn; check again");
     if (current.tag_name !== release.tag_name)
@@ -128,14 +142,14 @@ export async function checkInstallerUpdate(
     info: {
       currentVersion,
       availableVersion: release.tag_name.slice(1),
-      notes: release.body,
+      notes: release.body ?? undefined,
       pubDate: release.published_at,
       channel: "stable",
       releaseUrl: release.html_url,
     },
     update: {
       version: release.tag_name.slice(1),
-      notes: release.body,
+      notes: release.body ?? undefined,
       date: release.published_at,
       manual: true,
       downloadAndInstall: openDownload,
