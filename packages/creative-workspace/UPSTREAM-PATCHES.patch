@@ -11054,19 +11054,37 @@ index 8113b07..ecd5920 100644
          { status: 200 }
        )
 diff --git a/packages/drawnix/src/services/__tests__/workspace-cache.test.ts b/packages/drawnix/src/services/__tests__/workspace-cache.test.ts
-index 55fbcd5..d4a9dc6 100644
+index 55fbcd5..21d654c 100644
 --- a/packages/drawnix/src/services/__tests__/workspace-cache.test.ts
 +++ b/packages/drawnix/src/services/__tests__/workspace-cache.test.ts
-@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
+@@ -1,20 +1,21 @@
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
  import { workspaceService } from '../workspace-service';
- import type { Board, BoardChangeData } from '../../types/workspace.types';
+-import type { Board, BoardChangeData } from '../../types/workspace.types';
++import type { Board, BoardChangeData, Folder } from '../../types/workspace.types';
  
 -const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn() }));
-+const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn(), isWriteSuspended: vi.fn(() => false) }));
++const storage = vi.hoisted(() => ({ loadBoard: vi.fn(), saveBoard: vi.fn(), isWriteSuspended: vi.fn(() => false), saveFolder: vi.fn(), deleteFolder: vi.fn() }));
  vi.mock('../workspace-storage-service', () => ({ workspaceStorageService: storage }));
  vi.mock('../github-sync/sync-log-service', () => ({ logDebug: vi.fn(), logWarning: vi.fn(), logError: vi.fn() }));
  
-@@ -112,3 +112,25 @@ describe('workspace full-board retention', () => {
+ const runtime = workspaceService as unknown as {
+-    initialized: boolean; loadedBoards: Map<string, Board>; boards: Map<string, Board>;
++    initialized: boolean; folders: Map<string, Folder>; loadedBoards: Map<string, Board>; boards: Map<string, Board>;
+     boardMetadata: Map<string, Omit<Board, 'elements'>>; unsavedBoards: Map<string, object>;
+     state: { currentBoardId: string | null };
+ };
+-const board = (id: string) => ({ id, name: id, elements: [{ id: `element-${id}` }], updatedAt: 1 } as unknown as Board);
++const board = (id: string) => ({ id, name: id, folderId: null, order: 0, viewport: { zoom: 0.5 }, elements: [{ id: `element-${id}` }], updatedAt: 1 } as unknown as Board);
+ beforeEach(() => {
+     vi.clearAllMocks();
+-    runtime.initialized = true;
++    storage.loadBoard.mockReset(); storage.saveBoard.mockReset();
++    runtime.initialized = true; runtime.folders.clear();
+     runtime.loadedBoards.clear(); runtime.boards.clear(); runtime.boardMetadata.clear(); runtime.unsavedBoards.clear();
+     runtime.state.currentBoardId = 'current';
+     for (const id of ['current', 'a', 'b', 'c', 'd']) {
+@@ -112,3 +113,79 @@ describe('workspace full-board retention', () => {
          expect(runtime.loadedBoards.size).toBeLessThanOrEqual(3);
      });
  });
@@ -11090,6 +11108,60 @@ index 55fbcd5..d4a9dc6 100644
 +        expect(runtime.unsavedBoards.has('a')).toBe(true);
 +        storage.isWriteSuspended.mockReturnValueOnce(true);
 +        await expect(workspaceService.flushForAppUpdate()).rejects.toThrow('迁移');
++    });
++});
++
++
++describe('metadata operations on unopened or evicted boards', () => {
++    it('renaming from the project list preserves stored elements and viewport', async () => {
++        await workspaceService.renameBoard('a', 'Renamed');
++        expect(storage.saveBoard).toHaveBeenCalledWith(expect.objectContaining({
++            name: 'Renamed', elements: board('a').elements, viewport: board('a').viewport,
++        }));
++        expect(runtime.loadedBoards.size).toBe(0);
++    });
++
++    it('reordering and moving preserves every unopened sibling', async () => {
++        await workspaceService.reorderItems([{ id: 'a', type: 'board', order: 3 }]);
++        await workspaceService.moveBoard('b', null, 'a', 'after');
++        for (const [saved] of storage.saveBoard.mock.calls) {
++            expect(saved.elements).toEqual(board(saved.id).elements);
++        }
++        expect(storage.saveBoard.mock.calls.length).toBeGreaterThan(1);
++    });
++
++    it('moving folders and removing a folder preserve its unopened boards', async () => {
++        runtime.folders.set('folder', { id: 'folder', name: 'Folder', parentId: null, order: 0 } as Folder);
++        await workspaceService.moveFolder('folder', null);
++        runtime.boards.get('a')!.folderId = 'folder';
++        runtime.boardMetadata.get('a')!.folderId = 'folder';
++        await workspaceService.deleteFolder('folder');
++        expect(storage.saveBoard.mock.lastCall?.[0]).toMatchObject({
++            id: 'a', folderId: null, elements: board('a').elements,
++        });
++        for (const [saved] of storage.saveBoard.mock.calls) expect(saved.elements).toHaveLength(1);
++    });
++
++    it('copying an unopened board copies its original content', async () => {
++        const copy = await workspaceService.copyBoard('a');
++        expect(copy.elements).toEqual(board('a').elements);
++        expect(copy.viewport).toEqual(board('a').viewport);
++        expect(copy.id).not.toBe('a');
++    });
++
++    it('does not persist a placeholder when the stored board cannot be read', async () => {
++        storage.loadBoard.mockResolvedValueOnce(null);
++        await expect(workspaceService.renameBoard('a', 'Renamed')).rejects.toThrow();
++        expect(storage.saveBoard).not.toHaveBeenCalled();
++    });
++
++    it('uses current unsaved content instead of an older stored copy', async () => {
++        await workspaceService.reloadBoard('a');
++        runtime.loadedBoards.get('a')!.elements = [{ id: 'new-unsaved' }] as Board['elements'];
++        storage.loadBoard.mockClear();
++        await workspaceService.renameBoard('a', 'Renamed');
++        expect(storage.loadBoard).not.toHaveBeenCalled();
++        expect(storage.saveBoard.mock.lastCall?.[0].elements).toEqual([{ id: 'new-unsaved' }]);
 +    });
 +});
 diff --git a/packages/drawnix/src/services/agent/agent-executor.ts b/packages/drawnix/src/services/agent/agent-executor.ts
@@ -12366,7 +12438,7 @@ index 0fefa27..6909c7c 100644
        if (onTaskUpdate) {
          onTaskUpdate(task.id, TaskStatus.FAILED, { error: errorInfo });
 diff --git a/packages/drawnix/src/services/media-executor/fallback-utils.test.ts b/packages/drawnix/src/services/media-executor/fallback-utils.test.ts
-index 3df57b2..51dacea 100644
+index 3df57b2..aaa8b5a 100644
 --- a/packages/drawnix/src/services/media-executor/fallback-utils.test.ts
 +++ b/packages/drawnix/src/services/media-executor/fallback-utils.test.ts
 @@ -36,6 +36,16 @@ function mediaBlob(signature: Uint8Array, type: string): Blob {
@@ -12386,7 +12458,31 @@ index 3df57b2..51dacea 100644
  function mediaResponse(
    signature: Uint8Array,
    type: string,
-@@ -213,6 +223,28 @@ describe('pollVideoStatus', () => {
+@@ -197,6 +207,23 @@ describe('reference image transport fidelity', () => {
+     }
+   });
+ 
++  it('compresses a large inline reference locally when data URL fetch is blocked', async () => {
++    const content = 'texture'.repeat(900_000);
++    const value = `data:image/png;base64,${btoa(content)}`;
++    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Load failed'));
++    fidelityMocks.compressImageBlob.mockResolvedValue(new Blob(['compressed'], { type: 'image/jpeg' }));
++    try {
++      const { ensureBase64ForAI } = await import('./fallback-utils');
++      expect(await ensureBase64ForAI({ type: 'base64', value })).toBe('data:image/jpeg;base64,Y29tcHJlc3NlZA==');
++      const original = fidelityMocks.compressImageBlob.mock.calls[0][0] as Blob;
++      expect(original.type).toBe('image/png');
++      expect(new TextDecoder().decode(await readBlobBytes(original))).toBe(content);
++      expect(fetchSpy).not.toHaveBeenCalled();
++    } finally {
++      fetchSpy.mockRestore();
++    }
++  });
++
+   it('retains fetch failure behavior in original mode', async () => {
+     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
+     try {
+@@ -213,6 +240,28 @@ describe('pollVideoStatus', () => {
      providerSend.mockReset();
    });
  
@@ -12415,7 +12511,46 @@ index 3df57b2..51dacea 100644
    it('stops polling after the execution attempt is replaced', async () => {
      vi.useFakeTimers();
      try {
-@@ -487,15 +519,30 @@ describe('cacheRemoteUrl', () => {
+@@ -399,11 +448,7 @@ describe('cacheRemoteUrl', () => {
+   });
+ 
+   it('caches raw base64 image payloads as content-addressed local URLs', async () => {
+-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+-      mediaResponse(PNG_SIGNATURE, 'image/png', {
+-        status: 200,
+-      })
+-    );
++    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Load failed'));
+ 
+     vi.stubGlobal('fetch', fetchMock);
+ 
+@@ -419,9 +464,7 @@ describe('cacheRemoteUrl', () => {
+     expect(result).toMatch(
+       /^\/__aitu_cache__\/image\/content-[0-9a-f]{64}\.png$/
+     );
+-    expect(fetchMock).toHaveBeenCalledWith(
+-      expect.stringMatching(/^data:image\/png;base64,/)
+-    );
++    expect(fetchMock).not.toHaveBeenCalled();
+     expect(cacheMediaFromBlob).toHaveBeenCalledWith(result, blobLike, 'image', {
+       taskId: 'task-raw-b64',
+     });
+@@ -466,7 +509,7 @@ describe('cacheRemoteUrl', () => {
+     const inlineUrl = 'data:image/jpeg;base64,/9j/2Q==';
+     const fetchMock = vi
+       .fn<typeof fetch>()
+-      .mockResolvedValue(mediaResponse(JPEG_SIGNATURE, 'image/jpeg'));
++      .mockRejectedValue(new TypeError('Load failed'));
+     vi.stubGlobal('fetch', fetchMock);
+     const { cacheRemoteUrl } = await import('./fallback-utils');
+     const warning = vi.fn();
+@@ -482,20 +525,34 @@ describe('cacheRemoteUrl', () => {
+         onCacheWarning: warning,
+       }
+     );
+-    expect(fetchMock).toHaveBeenCalledOnce();
+-    expect(fetchMock).toHaveBeenCalledWith(inlineUrl);
++    expect(fetchMock).not.toHaveBeenCalled();
      expect(result).toMatch(/^\/__aitu_cache__\/image\/content-.*\.jpg$/);
      const blob = cacheMediaFromBlob.mock.calls[0][1] as Blob;
      expect(blob.type).toBe('image/jpeg');
@@ -12453,21 +12588,33 @@ index 3df57b2..51dacea 100644
      const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () =>
        mediaResponse(PNG_SIGNATURE, 'image/png', {
 diff --git a/packages/drawnix/src/services/media-executor/fallback-utils.ts b/packages/drawnix/src/services/media-executor/fallback-utils.ts
-index 5cc60cb..581559b 100644
+index 5cc60cb..4ffc3ce 100644
 --- a/packages/drawnix/src/services/media-executor/fallback-utils.ts
 +++ b/packages/drawnix/src/services/media-executor/fallback-utils.ts
-@@ -6,6 +6,10 @@
-  */
+@@ -7,6 +7,11 @@
  
  import type { VideoAPIConfig, GeminiConfig } from './types';
-+import {
+ import {
 +  readVideoTaskRequestId,
 +  withVideoRequestId,
 +} from '../../utils/video-request-id';
- import {
++import {
++  base64ToBlob,
    calculateBlobChecksum,
    compressImageBlob,
-@@ -209,6 +213,7 @@ export async function pollVideoStatus(
+   getFileExtension,
+@@ -89,8 +94,8 @@ export async function ensureBase64ForAI(
+     const base64Part = value.slice(value.indexOf(',') + 1);
+     const estimatedBytes = (base64Part.length * 3) / 4;
+     if (estimatedBytes <= MAX_REFERENCE_IMAGE_BYTES) return value;
+-    const res = await fetch(value, { signal });
+-    const blob = await res.blob();
++    signal?.throwIfAborted();
++    const blob = base64ToBlob(value);
+     return blobToBase64ForAI(blob, keepOriginal);
+   }
+   if (
+@@ -209,6 +214,7 @@ export async function pollVideoStatus(
    for (let attempt = 0; attempt < maxAttempts; attempt++) {
      assertPollingActive();
      let data: any;
@@ -12475,7 +12622,7 @@ index 5cc60cb..581559b 100644
      try {
        const statusPath = resolveVideoPollPathForModel(
          videoId,
-@@ -253,6 +258,7 @@ export async function pollVideoStatus(
+@@ -253,6 +259,7 @@ export async function pollVideoStatus(
        }
  
        const rawData = await response.json();
@@ -12483,7 +12630,7 @@ index 5cc60cb..581559b 100644
        data = isMiniMaxH3
          ? normalizeMiniMaxH3VideoResponse(rawData, videoId)
          : rawData;
-@@ -323,7 +329,7 @@ export async function pollVideoStatus(
+@@ -323,7 +330,7 @@ export async function pollVideoStatus(
        if (errCode) {
          (error as any).code = errCode;
        }
@@ -12492,7 +12639,7 @@ index 5cc60cb..581559b 100644
      }
  
      // 等待下一次轮询
-@@ -578,7 +584,7 @@ function invokeTauriCommand<T>(
+@@ -578,7 +585,7 @@ function invokeTauriCommand<T>(
    command: string,
    args?: Record<string, unknown>
  ): Promise<T> {
@@ -12501,6 +12648,21 @@ index 5cc60cb..581559b 100644
  }
  
  async function cacheRemoteUrlToDesktopMedia(
+@@ -912,11 +919,9 @@ export async function cacheRemoteUrl(
+   try {
+     // data URL / 原始 base64：直接转 Blob 再缓存，避免把大串 base64 存进任务结果
+     if (isDataURL(normalizedUrl)) {
+-      const response = options?.signal
+-        ? await fetch(normalizedUrl, { signal: options.signal })
+-        : await fetch(normalizedUrl);
+-      options?.signal?.throwIfAborted();
+-      const blob = await response.blob();
++      // data: is allowed in img-src, not connect-src, in the assistant's CSP.
++      // Local decoding also keeps persistence independent of network policy.
++      const blob = base64ToBlob(normalizedUrl);
+       options?.signal?.throwIfAborted();
+       if (blob.size === 0) {
+         console.warn(
 diff --git a/packages/drawnix/src/services/media-executor/task-storage-writer.ts b/packages/drawnix/src/services/media-executor/task-storage-writer.ts
 index 8551041..4ed52dd 100644
 --- a/packages/drawnix/src/services/media-executor/task-storage-writer.ts
@@ -14479,10 +14641,94 @@ index 9d8240d..0ca9d03 100644
          // 更新本地缓存
          const failedWorkflow = this.workflows.get(event.workflowId);
 diff --git a/packages/drawnix/src/services/workspace-service.ts b/packages/drawnix/src/services/workspace-service.ts
-index 36a5ecd..e727d0c 100644
+index 36a5ecd..b9f51af 100644
 --- a/packages/drawnix/src/services/workspace-service.ts
 +++ b/packages/drawnix/src/services/workspace-service.ts
-@@ -975,6 +975,18 @@ class WorkspaceService {
+@@ -276,7 +276,7 @@ class WorkspaceService {
+           metadata.folderId = null;
+           metadata.updatedAt = Date.now();
+         }
+-        await workspaceStorageService.saveBoard(board);
++        await this.persistBoardMetadata(board);
+       }));
+     }
+ 
+@@ -495,6 +495,28 @@ class WorkspaceService {
+     return { valid: true };
+   }
+ 
++  /** Metadata-only entries deliberately have no elements; never persist them as boards. */
++  private async readFullBoard(id: string): Promise<Board> {
++    const loaded = this.loadedBoards.get(id);
++    if (loaded) return loaded;
++    const stored = await workspaceStorageService.loadBoard(id);
++    // An editor may have loaded/changed the board while the storage read was pending.
++    const current = this.loadedBoards.get(id) || stored;
++    if (!current) throw new Error(`Board ${id} not found in storage`);
++    return current;
++  }
++
++  private async persistBoardMetadata(board: Board): Promise<void> {
++    const full = await this.readFullBoard(board.id);
++    await workspaceStorageService.saveBoard({
++      ...full,
++      name: board.name,
++      folderId: board.folderId,
++      order: board.order,
++      updatedAt: board.updatedAt,
++    });
++  }
++
+   async renameBoard(id: string, name: string): Promise<void> {
+     const board = this.boards.get(id);
+     if (!board) throw new Error(`Board ${id} not found`);
+@@ -516,7 +538,7 @@ class WorkspaceService {
+       metadata.name = trimmedName;
+       metadata.updatedAt = board.updatedAt;
+     }
+-    await workspaceStorageService.saveBoard(board);
++    await this.persistBoardMetadata(board);
+     this.emit('boardUpdated', board);
+   }
+ 
+@@ -627,7 +649,7 @@ class WorkspaceService {
+             bMeta.folderId = b.folderId;
+             bMeta.updatedAt = b.updatedAt;
+           }
+-          await workspaceStorageService.saveBoard(b);
++          await this.persistBoardMetadata(b);
+         }
+       } else {
+         const f = this.folders.get(item.id);
+@@ -737,7 +759,7 @@ class WorkspaceService {
+             bMeta.folderId = b.folderId;
+             bMeta.updatedAt = b.updatedAt;
+           }
+-          await workspaceStorageService.saveBoard(b);
++          await this.persistBoardMetadata(b);
+         }
+       } else {
+         const f = this.folders.get(item.id);
+@@ -774,7 +796,7 @@ class WorkspaceService {
+             bMeta.order = item.order;
+             bMeta.updatedAt = now;
+           }
+-          await workspaceStorageService.saveBoard(board);
++          await this.persistBoardMetadata(board);
+         }
+       } else {
+         const folder = this.folders.get(item.id);
+@@ -794,8 +816,7 @@ class WorkspaceService {
+    * Copy a board with all its content
+    */
+   async copyBoard(id: string): Promise<Board> {
+-    const sourceBoard = this.boards.get(id);
+-    if (!sourceBoard) throw new Error(`Board ${id} not found`);
++    const sourceBoard = await this.readFullBoard(id);
+ 
+     // Generate new name with "副本" suffix
+     let newName = `${sourceBoard.name} 副本`;
+@@ -975,6 +996,18 @@ class WorkspaceService {
    /**
     * Save data to the current board (convenience method)
     */
@@ -15699,11 +15945,15 @@ index 0000000..eee09a1
 +}
 diff --git a/packages/drawnix/src/utils/canvas-image-actions.ts b/packages/drawnix/src/utils/canvas-image-actions.ts
 new file mode 100644
-index 0000000..9deb08d
+index 0000000..8ee9bbc
 --- /dev/null
 +++ b/packages/drawnix/src/utils/canvas-image-actions.ts
-@@ -0,0 +1,102 @@
-+import { normalizeImageDataUrl, downloadFromBlob } from "@aitu/utils";
+@@ -0,0 +1,128 @@
++import {
++  normalizeImageDataUrl,
++  downloadFromBlob,
++  base64ToBlob,
++} from "@aitu/utils";
 +import { getAssistantAccount } from "../services/assistant-account";
 +import { unifiedCacheService } from "../services/unified-cache-service";
 +import { isVirtualMediaUrl } from "./virtual-media-url";
@@ -15711,9 +15961,31 @@ index 0000000..9deb08d
 +
 +export type CanvasImageAction = "copy" | "save" | "reveal";
 +
++const MAX_IMAGE_BYTES = 64 * 1024 * 1024;
++
 +/** Always use the original; a thumbnail is not a successful image export. */
 +export async function readCanvasImage(url: string): Promise<Blob> {
 +  const source = normalizeImageDataUrl(url);
++  // Generated images can remain inline when persistence falls back to the
++  // board. Decode them locally: production CSP permits data: for images but
++  // deliberately not for fetch. Avoid using multi-MB data URLs as cache keys.
++  if (/^data:image\/[^;,]+;base64,/i.test(source)) {
++    const comma = source.indexOf(",");
++    const payload = source.slice(comma + 1).replace(/\s/g, "");
++    if (payload.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4)
++      throw new Error("图片超过 64 MB。");
++    let blob: Blob;
++    try {
++      blob = base64ToBlob(`${source.slice(0, comma + 1)}${payload}`);
++    } catch {
++      throw new Error(
++        "原图数据损坏，无法读取，请从任务列表找回已有结果后重试。",
++      );
++    }
++    if (!blob.size || blob.size > MAX_IMAGE_BYTES)
++      throw new Error("图片为空或超过 64 MB。");
++    return blob;
++  }
 +  const cached = await unifiedCacheService.getCachedBlob(source, {
 +    allowNetwork: false,
 +  });

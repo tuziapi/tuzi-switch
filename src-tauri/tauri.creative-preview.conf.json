@@ -1,7 +1,7 @@
 {
   "identifier": "com.tuziswitch.desktop.creative.preview",
   "app": {
-    "windows": [{ "label": "main", "title": "兔子助手 · 创作集成测试", "width": 1200, "height": 800, "visible": false }]
+    "windows": [{ "label": "main", "dragDropEnabled": false, "title": "兔子助手 · 创作集成测试", "width": 1200, "height": 800, "visible": false }]
   },
   "bundle": { "createUpdaterArtifacts": false }
 }
