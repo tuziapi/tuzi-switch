@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "main",
+        "dragDropEnabled": false,
         "title": "",
         "titleBarStyle": "Overlay",
         "width": 1000,

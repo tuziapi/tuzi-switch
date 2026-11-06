@@ -1,4 +1,8 @@
-import { normalizeImageDataUrl, downloadFromBlob } from "@aitu/utils";
+import {
+  normalizeImageDataUrl,
+  downloadFromBlob,
+  base64ToBlob,
+} from "@aitu/utils";
 import { getAssistantAccount } from "../services/assistant-account";
 import { unifiedCacheService } from "../services/unified-cache-service";
 import { isVirtualMediaUrl } from "./virtual-media-url";
@@ -6,9 +10,31 @@ import { copyToClipboard } from "./runtime-helpers";
 
 export type CanvasImageAction = "copy" | "save" | "reveal";
 
+const MAX_IMAGE_BYTES = 64 * 1024 * 1024;
+
 /** Always use the original; a thumbnail is not a successful image export. */
 export async function readCanvasImage(url: string): Promise<Blob> {
   const source = normalizeImageDataUrl(url);
+  // Generated images can remain inline when persistence falls back to the
+  // board. Decode them locally: production CSP permits data: for images but
+  // deliberately not for fetch. Avoid using multi-MB data URLs as cache keys.
+  if (/^data:image\/[^;,]+;base64,/i.test(source)) {
+    const comma = source.indexOf(",");
+    const payload = source.slice(comma + 1).replace(/\s/g, "");
+    if (payload.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4)
+      throw new Error("图片超过 64 MB。");
+    let blob: Blob;
+    try {
+      blob = base64ToBlob(`${source.slice(0, comma + 1)}${payload}`);
+    } catch {
+      throw new Error(
+        "原图数据损坏，无法读取，请从任务列表找回已有结果后重试。",
+      );
+    }
+    if (!blob.size || blob.size > MAX_IMAGE_BYTES)
+      throw new Error("图片为空或超过 64 MB。");
+    return blob;
+  }
   const cached = await unifiedCacheService.getCachedBlob(source, {
     allowNetwork: false,
   });

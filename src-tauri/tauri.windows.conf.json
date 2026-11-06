@@ -4,6 +4,7 @@
     "windows": [
       {
         "label": "main",
+        "dragDropEnabled": false,
         "title": "兔子助手",
         "titleBarStyle": "Visible",
         "visible": false,
