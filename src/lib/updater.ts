@@ -1,7 +1,13 @@
 import { checkAcceptanceUpdate, getUpdateBuildInfo } from "./acceptanceUpdater";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
-import { checkInstallerUpdate } from "./installerUpdater";
+import {
+  fetchInstallerRelease,
+  installerUpdateFromRelease,
+  isNewerInstallerVersion,
+  parseInstallerVersion,
+} from "./installerUpdater";
+import { hasSignedRelease, validateSignedRelease } from "./signedRelease";
 
 // 可选导入：在未注册插件或非 Tauri 环境下，调用时会抛错，外层需做兜底
 // 我们按需加载并在运行时捕获错误，避免构建期类型问题
@@ -227,10 +233,57 @@ export async function checkForUpdate(
     "Get current app version timed out",
   ).catch(() => "");
 
-  // Official unsigned releases advertise manual installers independently of
-  // the signed updater manifest. Opening a download still requires a click.
-  if (build.repository === "tuziapi/tuzi-switch")
-    return checkInstallerUpdate(build, currentVersion, timeout);
+  if (build.repository === "tuziapi/tuzi-switch") {
+    // Release discovery prevents stale manifests from silently hiding new versions.
+    parseInstallerVersion(currentVersion);
+    const release = await fetchInstallerRelease(build, timeout);
+    if (!isNewerInstallerVersion(release.tag_name, currentVersion))
+      return { status: "up-to-date" };
+    if (!hasSignedRelease(release))
+      return installerUpdateFromRelease(
+        build,
+        currentVersion,
+        release,
+        timeout,
+      );
+
+    const { check } = await import("@tauri-apps/plugin-updater");
+    let expired = false;
+    let native: Update | null = null;
+    try {
+      native = await withTimeout(
+        check({ timeout }).then((update) => {
+          if (expired) void update?.close().catch(() => {});
+          return update;
+        }),
+        timeout,
+        "正式更新检查超时，请重试。",
+      );
+      if (
+        !native ||
+        native.version !== release.tag_name.slice(1) ||
+        native.currentVersion !== currentVersion
+      )
+        throw Error("更新清单与正式版本不一致，请稍后重新检查更新。");
+      validateSignedRelease(native.rawJson, release);
+      return {
+        status: "available",
+        info: {
+          currentVersion,
+          availableVersion: native.version,
+          notes: release.body ?? undefined,
+          pubDate: release.published_at,
+          channel: "stable",
+          releaseUrl: release.html_url,
+        },
+        update: mapUpdateHandle(native),
+      };
+    } catch (error) {
+      expired = true;
+      await native?.close().catch(() => {});
+      throw error; // A declared signed release never falls back to unsigned installation.
+    }
+  }
 
   const integratedChannel = [
     "tuziapi/tuzi-switch",

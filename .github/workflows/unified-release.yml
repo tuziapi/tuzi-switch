@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      signing_preflight_only:
+        description: Only verify the official signing key; do not build or publish
+        type: boolean
+        default: false
       publish:
         description: Publish verified installers and deploy the download page (version tag only)
         type: boolean
@@ -25,8 +29,15 @@ env:
   VITE_RELEASE_REPOSITORY: ${{ github.repository }}
 
 jobs:
+  signing-preflight:
+    if: inputs.signing_preflight_only && github.repository == 'tuziapi/tuzi-switch'
+    uses: ./.github/workflows/official-updater-preflight.yml
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
   verify:
-    if: github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch'
+    if: ${{ !inputs.signing_preflight_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
     runs-on: ubuntu-22.04
     outputs:
       tag: ${{ steps.identity.outputs.tag }}
@@ -237,7 +248,7 @@ jobs:
 
   publish:
     needs: [verify, assemble]
-    if: github.event_name == 'push' || inputs.publish
+    if: ${{ !inputs.signing_preflight_only && (github.event_name == 'push' || inputs.publish) }}
     runs-on: ubuntu-22.04
     permissions:
       contents: write

@@ -352,6 +352,10 @@ describe('native SVG progress rendering', () => {
       expect(background.getAttribute('y')).toBe('200');
       expect(background.getAttribute('width')).toBe('400');
       expect(host.textContent).toContain('20 张');
+      anchor = { ...anchor, batchIndex: 4 };
+      await act(async () => { generator.updateDrawing(anchor, host, false); });
+      expect(host.textContent).toContain('4/20');
+      expect(host.textContent).not.toContain('20 张');
       mocks.tasks = [{ ...mocks.tasks[0], id: 'task-retry', status: TaskStatus.FAILED,
         error: { code: 'FAILED', message: 'synthetic new failure', details: { requestId: 'request-new' } } }];
       anchor = { ...anchor, phase: 'failed', taskIds: ['task-retry'], primaryTaskId: 'task-retry' };

@@ -6375,6 +6375,21 @@
       "sourceRepository": "ljquan/opentu",
       "sourceRevision": "b742f593bfee8b894afa8e59460f5c52b3e288d0",
       "sourceSha256": "297be496704e7322e422cf6164c64d94991deea4a4c503c8e66edab78732ae9e"
+    },
+    {
+      "path": "packages/drawnix/src/utils/image-batch-reservations.ts",
+      "origin": "assistant-local",
+      "reason": "UC-PERF-02 approved batch preparation, reserved grid and cancellation regression"
+    },
+    {
+      "path": "packages/drawnix/src/utils/image-batch-preparation.ts",
+      "origin": "assistant-local",
+      "reason": "UC-PERF-02 approved batch preparation, reserved grid and cancellation regression"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/image-batch-preparation.test.ts",
+      "origin": "assistant-local",
+      "reason": "UC-PERF-02 approved batch preparation, reserved grid and cancellation regression"
     }
   ],
   "integration": {

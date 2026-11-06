@@ -110,3 +110,17 @@ export function areImageGenerationResultsReady(
     isCanvasImageReady(board, image.id, image.url)
   );
 }
+
+/** Filter readiness notifications before scanning task history or deriving display state. */
+export function isAnchorImageReadinessRelevant(
+  board: PlaitBoard, anchor: PlaitImageGenerationAnchor, elementId: string, tasks: Task[] = []
+): boolean {
+  if (anchor.resultElementId === elementId) return true;
+  const taskIds = new Set([...anchor.taskIds, ...tasks.map((task) => task.id)]);
+  if (anchor.primaryTaskId) taskIds.add(anchor.primaryTaskId);
+  for (const taskId of taskIds) {
+    if (workflowCompletionService.getPostProcessingStatus(taskId)?.firstElementId === elementId) return true;
+  }
+  const image = board.children.find((element) => element.id === elementId);
+  return Boolean(image && (image.generationAnchorId === anchor.id || taskIds.has(image.generationTaskId)));
+}

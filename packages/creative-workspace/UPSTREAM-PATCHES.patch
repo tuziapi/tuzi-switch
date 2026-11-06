@@ -616,17 +616,374 @@ index 0000000..8ecf48c
 +    />
 +  );
 +}
+diff --git a/packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts b/packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts
+index 9081372..44efc61 100644
+--- a/packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts
++++ b/packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts
+@@ -1,8 +1,8 @@
+ import { readFileSync } from 'node:fs';
+ import { resolve } from 'node:path';
+ import { runInNewContext } from 'node:vm';
+-import { createBoard, RectangleClient, Transforms } from '@plait/core';
+-import { describe, expect, it } from 'vitest';
++import { createBoard, PlaitBoard, RectangleClient, Transforms } from '@plait/core';
++import { describe, expect, it, vi } from 'vitest';
+ import * as ts from 'typescript';
+ import {
+   createCanvasAssociationLines,
+@@ -16,6 +16,9 @@ import { prepareImageGenerationReferences, type GenerationReferenceImage } from
+ import { resolveImageLineagePositions } from '../../utils/image-generation-lineage-placement';
+ import { resolveImageAnchorInsertionPoint } from '../../utils/image-generation-anchor-insertion';
+ 
++import { createImageBatchPreparation, yieldBatchPreparationPaint } from '../../utils/image-batch-preparation';
++import { getBatchReservations } from '../../utils/image-batch-reservations';
++
+ // Reuse the existing AST harness convention to check actual submission wiring
+ // without starting providers, MCP initialization, or a real paid generation.
+ const source = readFileSync(resolve(__dirname, 'AIInputBar.tsx'), 'utf8');
+@@ -37,7 +40,16 @@ let selectionLoop = '';
+ let referencePreparation = '';
+ let requestReferences = '';
+ let plannedPositions = '';
++let submissionTry = '';
++let abortDeclaration = '';
++let submissionCleanup = '';
+ function visit(node: ts.Node) {
++  if (ts.isTryStatement(node) && node.finallyBlock && node.tryBlock.getText(tree).includes('batchPreparation = createImageBatchPreparation')) {
++    submissionTry = node.getText(tree);
++    submissionCleanup = node.finallyBlock.getText(tree);
++  }
++  if (ts.isVariableDeclaration(node) && node.name.getText(tree) === 'abortIfSubmittedBoardChanged')
++    abortDeclaration = `const ${node.getText(tree)};`;
+   if (ts.isForOfStatement(node) && node.expression.getText(tree) === 'processedContent.remainingImages') selectionLoop = node.getText(tree);
+   if (ts.isFunctionDeclaration(node) && node.name && names.has(node.name.text))
+     functions.push(node.getText(tree));
+@@ -85,6 +97,7 @@ exports.prepare = async function(submittedBoard, imageItems, enabled) {
+   return { ...referenceSources, referenceImages };
+ };
+ exports.plan = function(board, imageSourceIds, enabled, requestedCount) {
++  const batchPreparation = null;
+   const anchorTargetFrameId = undefined;
+   const targetFrameId = undefined;
+   const replacementBoundImageTarget = null;
+@@ -131,11 +144,11 @@ runInNewContext(compiled, {
+ });
+ 
+ describe('main image generation lineage wiring', () => {
+-  it.each([true, false])('passes the current batch layout into actual placeholder planning: horizontal=%s', (enabled) => {
++  it.each([true, false])('uses three columns regardless of the legacy preference: horizontal=%s', (enabled) => {
+     const current = createBoard([]);
+     const positions = callbacks.plan(current, [], enabled, 5);
+     expect(positions).toEqual(Array.from({ length: 5 }, (_, index) =>
+-      enabled ? [index * 440, 0] : [0, index * 640]
++      [(index % 3) * 440, Math.floor(index / 3) * 640]
+     ));
+   });
+ 
+@@ -304,3 +317,108 @@ describe('main image generation lineage wiring', () => {
+     expect(current.children.filter(isCanvasAssociationLine).map((line) => line.canvasAssociation.resultElementId).sort()).toEqual(['result-1', 'result-2']);
+   });
+ });
++
++
++describe('batch submission preparation lifecycle', () => {
++  it.each(['invalid-reference', 'throw', 'switch-before-preflight', 'switch-during-preflight'])(
++    'cleans actual submission preview on %s without persistent tasks', async (scenario) => {
++      expect(submissionTry).toBeTruthy();
++      expect(abortDeclaration).toBeTruthy();
++      const board = createBoard([]);
++      board.getRectangle = (el) => RectangleClient.getRectangleByPoints(el.points || []);
++      const host = document.createElementNS('http://www.w3.org/2000/svg', 'g');
++      const hostSpy = vi.spyOn(PlaitBoard, 'getElementHost').mockReturnValue(host);
++      const boardRef = { current: board };
++      const preparationRef = { current: null };
++      let resolvePreflight!: (value: unknown) => void;
++      let rejectPreflight!: (error: Error) => void;
++      const pending = new Promise((resolve, reject) => { resolvePreflight = resolve; rejectPreflight = reject; });
++      const resolveAssociations = vi.fn(() => pending);
++      const failed = vi.fn();
++      const abort = vi.fn();
++      const readTasks = vi.fn();
++      const exposed = {} as { submit: () => Promise<void> };
++      const compiledLifecycle = ts.transpileModule(`exports.submit = async function() {
++        let batchPreparation = null;
++        let submittedAnchorIds = [];
++        let workflowSubmitted = false;
++        ${abortDeclaration}
++        ${submissionTry}
++      };`, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText;
++      runInNewContext(compiledLifecycle, {
++        exports: exposed, createImageBatchPreparation,
++        yieldBatchPreparationPaint: async () => {
++          await yieldBatchPreparationPaint();
++          if (scenario === 'switch-before-preflight') boardRef.current = createBoard([]);
++        },
++        effectiveGenerationType: 'image', effectiveSelectedCount: 4, submittedBoard: board,
++        effectivePrompt: 'synthetic', effectiveSelectedModel: 'synthetic', effectiveSelectedModelRef: undefined,
++        effectiveSelectedParams: {}, submittedFrameInfo: null,
++        parseAIInput: () => ({ count: 4, size: '1024x1024' }),
++        getViewportOrigination: () => [0, 0], BoardTransforms: { updateViewport: vi.fn() },
++        baseEffectiveContent: [], submittedCanvasAssociations: [{ kind: 'image', elementId: 'synthetic-reference' }],
++        batchPreparationRef: preparationRef, submittedDraftBoardId: 'board',
++        SelectionWatcherBoardRef: boardRef, activeTaskbarBoardIdRef: { current: 'board' },
++        isSubmittedBoardCurrent: (a: unknown, b: unknown, c: unknown, d: unknown) => a === c && b === d,
++        override: undefined, language: 'zh', MessagePlugin: { error: vi.fn(), warning: vi.fn() },
++        trackSubmitStatus: vi.fn(), submitLockRef: { current: true }, setIsSubmitting: vi.fn(),
++        resolveCanvasAssociationsForSubmission: resolveAssociations,
++        applyCurrentImageAnchorPresentationState: failed, workflowControl: { abortWorkflow: abort },
++        taskQueueService: { getAllTasks: readTasks }, console: { error: vi.fn() },
++      });
++      try {
++        const submitting = exposed.submit();
++        expect(host.querySelectorAll('.batch-preparation-slot')).toHaveLength(4);
++        expect(board.children).toEqual([]);
++        if (scenario !== 'switch-before-preflight') {
++          await vi.waitFor(() => expect(resolveAssociations).toHaveBeenCalledOnce());
++          // Full placeholders survive an unresolved asynchronous reference operation.
++          expect(host.querySelectorAll('.batch-preparation-slot')).toHaveLength(4);
++          if (scenario === 'switch-during-preflight') boardRef.current = createBoard([]);
++          if (scenario === 'throw') rejectPreflight(new Error('synthetic reference failure'));
++          else resolvePreflight({ errors: [{ message: 'synthetic invalid reference' }] });
++        }
++        await submitting;
++        expect(host.children).toHaveLength(0);
++        expect(getBatchReservations(board)).toEqual([]);
++        expect(preparationRef.current).toBeNull();
++        expect(board.children).toEqual([]);
++        expect(readTasks).not.toHaveBeenCalled();
++        expect(abort).toHaveBeenCalledTimes(scenario === 'throw' ? 1 : 0);
++        expect(failed).toHaveBeenCalledTimes(scenario === 'throw' ? 1 : 0);
++        if (scenario === 'switch-before-preflight') expect(resolveAssociations).not.toHaveBeenCalled();
++      } finally { hostSpy.mockRestore(); }
++    }
++  );
++});
++
++
++it('cleans partially inserted unbound anchors while preserving tasks already handed to the queue', () => {
++  const anchors = [
++    { id: 'partial', workflowId: 'wf-partial', taskIds: [] },
++    { id: 'bound', workflowId: 'wf-bound', taskIds: ['task-bound'] },
++    { id: 'queued', workflowId: 'wf-queued', taskIds: [] },
++  ];
++  const removeAnchor = vi.fn();
++  const preparation = { dispose: vi.fn() };
++  const preparationRef = { current: preparation };
++  const exported = {} as { cleanup: () => void };
++  const compiledCleanup = ts.transpileModule(`exports.cleanup = function() ${submissionCleanup}`, {
++    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
++  }).outputText;
++  runInNewContext(compiledCleanup, {
++    exports: exported, workflowSubmitted: false, submittedBoard: {},
++    submittedAnchorIds: anchors.map(anchor => anchor.id),
++    batchPreparation: preparation, batchPreparationRef: preparationRef,
++    taskQueueService: { getAllTasks: () => [{ params: { workflowId: 'wf-queued' } }] },
++    ImageGenerationAnchorTransforms: {
++      getAnchorById: (_board: unknown, id: string) => anchors.find(anchor => anchor.id === id),
++      removeAnchor,
++    },
++  });
++  exported.cleanup();
++  expect(removeAnchor).toHaveBeenCalledTimes(1);
++  expect(removeAnchor).toHaveBeenCalledWith({}, 'partial');
++  expect(preparation.dispose).toHaveBeenCalledOnce();
++  expect(preparationRef.current).toBeNull();
++});
 diff --git a/packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx b/packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx
-index 0843160..bb60dcd 100644
+index 0843160..0a4984e 100644
 --- a/packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx
 +++ b/packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx
-@@ -1,3 +1,5 @@
+@@ -1,3 +1,6 @@
++import { createImageBatchPreparation, yieldBatchPreparationPaint } from '../../utils/image-batch-preparation';
 +import type { TaskError } from '../../types/shared/core.types';
 +import { toGenerationTaskError } from '../../utils/generation-error-details';
  import { isSunoNativeModel, getSunoNativeAction } from '../../services/suno-native';
  import { getSunoNativeParams, buildSunoNativeInputParams, collectSunoNativeResources } from '../../services/suno-native-params';
  /**
-@@ -6619,7 +6621,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -310,9 +313,7 @@ import {
+ import {
+   CANVAS_VIEW_SETTINGS_CHANGE_EVENT,
+   persistCenterImageOnClickEnabled,
+-  persistHorizontalImageBatchEnabled,
+   readCenterImageOnClickEnabled,
+-  readHorizontalImageBatchEnabled,
+ } from './canvas-view-settings';
+ import {
+   persistAutoInsertReferenceImagesEnabled,
+@@ -2024,13 +2025,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+     );
+     const [centerImageOnClickEnabled, setCenterImageOnClickEnabled] =
+       useState(() => readCenterImageOnClickEnabled());
+-    const [horizontalImageBatchEnabled, setHorizontalImageBatchEnabled] =
+-      useState(() => readHorizontalImageBatchEnabled());
+-    const horizontalImageBatchHintId = useId();
+     useEffect(() => {
+       const sync = () => {
+         setCenterImageOnClickEnabled(readCenterImageOnClickEnabled());
+-        setHorizontalImageBatchEnabled(readHorizontalImageBatchEnabled());
+       };
+       window.addEventListener(CANVAS_VIEW_SETTINGS_CHANGE_EVENT, sync);
+       return () =>
+@@ -2073,6 +2070,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+     >([]);
+     const [canvasAssociationTrigger, setCanvasAssociationTrigger] =
+       useState<CanvasAssociationTrigger | null>(null);
++    const batchPreparationRef = useRef<ReturnType<typeof createImageBatchPreparation> | null>(null);
++    useEffect(() => () => {
++      batchPreparationRef.current?.dispose();
++    }, []);
+     const [isSubmitting, setIsSubmitting] = useState(false); // 防止快速重复点击（3秒防抖）
+     const [pptExplainerDialogOpen, setPptExplainerDialogOpen] = useState(false);
+     const [pptExplainerInitialSource, setPptExplainerInitialSource] =
+@@ -5127,6 +5128,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+         const trigger =
+           typeof triggerOrOverride === 'string' ? triggerOrOverride : 'button';
+         const effectivePrompt = override?.prompt ?? prompt;
++        const submittedFrameInfo = selectedFrameRef.current;
+         const submittedBoard =
+           (SelectionWatcherBoardRef.current as
+             | (PlaitBoard & { host?: HTMLElement })
+@@ -5428,6 +5430,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+             ...extras,
+           });
+         };
++        let batchPreparation: ReturnType<typeof createImageBatchPreparation> | null = null;
++        const submittedAnchorIds: string[] = [];
++        let workflowSubmitted = false;
+         const abortIfSubmittedBoardChanged = (stage: string): boolean => {
+           if (
+             override ||
+@@ -5463,6 +5468,39 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+         trackSubmitStatus('start');
+ 
+         try {
++          if (effectiveGenerationType === 'image' && effectiveSelectedCount > 1 && submittedBoard) {
++            const previewParams = parseAIInput(effectivePrompt, {
++              texts: [], images: [], videos: [], graphics: [],
++            }, { modelId: effectiveSelectedModel, modelRef: effectiveSelectedModelRef,
++              params: effectiveSelectedParams, generationType: 'image', count: effectiveSelectedCount });
++            const zoom = submittedBoard.viewport?.zoom || 1;
++            const origin = getViewportOrigination(submittedBoard) || [0, 0];
++            const frame = submittedBoard.children.find((el) => el.id === submittedFrameInfo?.id);
++            const references = baseEffectiveContent.filter((item) => item.type === 'image' || item.type === 'graphics');
++            const sourceIds = [...new Set([
++              ...references.map((item) => item.sourceElementId).filter((id): id is string => Boolean(id)),
++              ...submittedCanvasAssociations.filter((ref) => ref.kind === 'image').map((ref) => ref.elementId),
++            ])];
++            batchPreparation = createImageBatchPreparation(submittedBoard, {
++              count: previewParams.count, requestedSize: previewParams.size, sourceIds,
++              emptyPosition: [origin[0] + 40 / zoom, origin[1] + 80 / zoom],
++              frameRect: frame && isFrameElement(frame) ? RectangleClient.getRectangleByPoints(frame.points) : undefined,
++              hasUnplacedReferences: references.some((item) => !item.sourceElementId),
++            });
++            batchPreparationRef.current = batchPreparation;
++            // Align the batch's top-left once, so centering slot 1 does not hide column 3.
++            // Later results must respect user panning and the existing zoom.
++            const firstPosition = batchPreparation.positions[0];
++            const batchOrigin: [number, number] = [
++              firstPosition[0] - 40 / zoom,
++              firstPosition[1] - 80 / zoom,
++            ];
++            if (Math.abs(batchOrigin[0] - origin[0]) > 1 || Math.abs(batchOrigin[1] - origin[1]) > 1) {
++              BoardTransforms.updateViewport(submittedBoard, batchOrigin, zoom);
++            }
++            await yieldBatchPreparationPaint();
++            if (abortIfSubmittedBoardChanged('batch_preview_ready')) return;
++          }
+           if (submittedCanvasAssociations.length > 0) {
+             const submissionBoardId = submittedDraftBoardId?.trim();
+             if (!submittedBoard || !submissionBoardId) {
+@@ -6059,7 +6097,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+             let workzoneX: number = expectedInsertLeftX;
+             let workzoneY: number = viewportCenterY - WORKZONE_HEIGHT / 2;
+ 
+-            if (allElements.length > 0) {
++            if (!batchPreparation && allElements.length > 0) {
+               const selectedElements = getSelectedElements(board);
+               let positionCalculated = false;
+ 
+@@ -6148,7 +6186,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+ 
+             // 如果选中了 Frame，将 Frame 信息传递给 WorkZone
+             // 生成完成后媒体将插入到 Frame 内部并缩放到 Frame 尺寸
+-            const frameInfo = selectedFrameRef.current;
++            const frameInfo = submittedFrameInfo;
+             let targetFrameId: string | undefined;
+             let targetFrameDimensions:
+               | { width: number; height: number }
+@@ -6204,13 +6242,15 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+               // Results fit a 400px width / 600px height envelope. Reserve it
+               // while auto aspect ratio is unknown, without stretching the card.
+               const reservedInsertSize = { width: Math.max(400, anchorSize.width), height: Math.max(600, anchorSize.height) };
+-              const plannedAnchorPositions = anchorTargetFrameId
++              const plannedAnchorPositions = batchPreparation?.count === requestedCount
++                ? batchPreparation.positions
++                : anchorTargetFrameId
+                 ? null
+                 : !targetFrameId && !replacementBoundImageTarget
+                 ? resolveImageLineagePositions(
+                     board, imageSourceIds, reservedInsertSize, requestedCount,
+                     [viewportCenterX - 200, viewportCenterY],
+-                    readHorizontalImageBatchEnabled() ? 'row' : 'column'
++                    'grid'
+                   )
+                 : resolveImageGenerationBatchAnchorPositions(
+                     board, [expectedInsertLeftX, expectedInsertY], anchorSize,
+@@ -6238,7 +6278,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+                       ? targetFrameDimensions
+                       : undefined,
+                     requestedSize: parsedParams.size,
+-                    reservedInsertSize: !targetFrameId && !replacementBoundImageTarget ? reservedInsertSize : undefined,
++                    size: batchPreparation?.size,
++                    reservedInsertSize: batchPreparation?.reservedSize ?? (!targetFrameId && !replacementBoundImageTarget ? reservedInsertSize : undefined),
+                     requestedCount: shouldCreateIndependentBatchAnchors
+                       ? 1
+                       : requestedCount,
+@@ -6278,18 +6319,23 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+                     anchorCreateOptions
+                   );
+                 imageAnchorElements.push(anchorElement);
++                submittedAnchorIds.push(anchorElement.id);
+               }
+ 
+-              currentImageAnchorIdsRef.current = imageAnchorElements.map(
+-                (anchor) => anchor.id
+-              );
++              currentImageAnchorIdsRef.current = submittedAnchorIds;
++              // Let the real anchors mount before removing the lightweight preparation layer.
++              if (batchPreparation) {
++                await yieldBatchPreparationPaint();
++                batchPreparation.dispose();
++                if (abortIfSubmittedBoardChanged('batch_anchors_ready')) return;
++              }
+               bindWorkflowImageStepsToAnchors(workflow, imageAnchorElements);
+               workflowMessageData = toWorkflowMessageData(workflow);
+               currentWorkZoneIdRef.current = null;
+               const [firstAnchor] = imageAnchorElements;
+               if (firstAnchor) {
+                 publishedTaskTargetElementId = firstAnchor.id;
+-                setTimeout(() => {
++                if (requestedCount === 1) setTimeout(() => {
+                   const anchorRect = RectangleClient.getRectangleByPoints(
+                     firstAnchor.points
+                   );
+@@ -6409,6 +6455,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+               }
+             );
+             if (usedSW) {
++              workflowSubmitted = true;
+               const submittedBoardStillCurrent = isSubmittedBoardCurrent(
+                 submittedBoard,
+                 submittedDraftBoardId,
+@@ -6497,6 +6544,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+               submittedDraftBoardId
+             );
+           }
++          workflowSubmitted = true;
+           if (effectiveGenerationType === 'image') {
+             applyCurrentImageAnchorPresentationState(board, 'handoff');
+           }
+@@ -6619,7 +6667,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                stepId: string,
                status: string,
                result?: unknown,
@@ -637,7 +994,7 @@ index 0843160..bb60dcd 100644
              ) => {
                workflowControl.updateStep(
                  stepId,
-@@ -6630,7 +6634,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6630,7 +6680,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                    | 'failed'
                    | 'skipped',
                  result,
@@ -648,7 +1005,7 @@ index 0843160..bb60dcd 100644
                );
  
                // 追加工具结果日志
-@@ -6733,7 +6739,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6733,7 +6785,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                    'failed',
                    undefined,
                    result.error || '执行失败',
@@ -658,7 +1015,7 @@ index 0843160..bb60dcd 100644
                  );
                  return false; // 返回失败
                } else if (result.taskId) {
-@@ -6810,7 +6817,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6810,7 +6863,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                  step.id,
                  'failed',
                  undefined,
@@ -669,7 +1026,31 @@ index 0843160..bb60dcd 100644
                );
                return false; // 返回失败
              } finally {
-@@ -7198,7 +7207,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6973,6 +7028,23 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+           workflowControl.abortWorkflow();
+           submitLockRef.current = false;
+           setIsSubmitting(false);
++        } finally {
++          batchPreparation?.dispose();
++          if (batchPreparationRef.current === batchPreparation) {
++            batchPreparationRef.current = null;
++          }
++          if (!workflowSubmitted && submittedBoard && submittedAnchorIds.length) {
++            const tasks = taskQueueService.getAllTasks();
++            for (const id of submittedAnchorIds) {
++              const anchor = ImageGenerationAnchorTransforms.getAnchorById(submittedBoard, id);
++              const hasQueuedTask = anchor && tasks.some((task) =>
++                task.params?.anchorId === id || task.params?.workflowId === anchor.workflowId
++              );
++              if (anchor && !anchor.taskIds.length && !hasQueuedTask) {
++                ImageGenerationAnchorTransforms.removeAnchor(submittedBoard, id);
++              }
++            }
++          }
+         }
+       },
+       [
+@@ -7198,7 +7270,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
              stepId: string,
              status: string,
              result?: unknown,
@@ -680,7 +1061,7 @@ index 0843160..bb60dcd 100644
            ) => {
              workflowControl.updateStep(
                stepId,
-@@ -7209,7 +7220,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7209,7 +7283,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                  | 'failed'
                  | 'skipped',
                result,
@@ -691,7 +1072,7 @@ index 0843160..bb60dcd 100644
              );
              appendAgentLogRef.current({
                type: 'tool_result',
-@@ -7302,7 +7315,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7302,7 +7378,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                  'failed',
                  undefined,
                  result.error || '执行失败',
@@ -701,7 +1082,7 @@ index 0843160..bb60dcd 100644
                );
                return false;
              } else if (result.taskId) {
-@@ -7374,7 +7388,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7374,7 +7451,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                step.id,
                'failed',
                undefined,
@@ -712,6 +1093,41 @@ index 0843160..bb60dcd 100644
              );
              return false;
            } finally {
+@@ -8262,31 +8341,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+                 }
+               />
+             </div>
+-            <div className="ai-input-bar__settings-row">
+-              <span>
+-                {language === 'zh' ? '多图横向排列' : 'Arrange batch in a row'}
+-              </span>
+-              <Switch
+-                size="small"
+-                value={horizontalImageBatchEnabled}
+-                aria-label={
+-                  language === 'zh' ? '多图横向排列' : 'Arrange batch in a row'
+-                }
+-                aria-describedby={horizontalImageBatchHintId}
+-                onChange={(checked) =>
+-                  setHorizontalImageBatchEnabled(
+-                    persistHorizontalImageBatchEnabled(checked as boolean)
+-                  )
+-                }
+-              />
+-            </div>
+-            <p
+-              id={horizontalImageBatchHintId}
+-              className="ai-input-bar__settings-hint"
+-            >
++            <p className="ai-input-bar__settings-hint">
+               {language === 'zh'
+-                ? '普通生图一次多张时生效：开启横排，关闭竖排。只影响新任务。'
+-                : 'For new multi-image requests: on for a row, off for a column.'}
++                ? '新批量图片按每行 3 张排列，生成结果保留在对应位置。'
++                : 'New image batches use three columns and keep each result in its assigned slot.'}
+             </p>
+             <div className="ai-input-bar__settings-row">
+               <span>{language === 'zh' ? '保留原图' : 'Keep original image'}</span>
 diff --git a/packages/drawnix/src/components/ai-input-bar/CountDropdown.tsx b/packages/drawnix/src/components/ai-input-bar/CountDropdown.tsx
 index ddbd256..140ffca 100644
 --- a/packages/drawnix/src/components/ai-input-bar/CountDropdown.tsx
@@ -1613,7 +2029,7 @@ index 30be31c..7ff5760 100644
            }
          }
 diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
-index 4ef1925..42252fb 100644
+index 4ef1925..b3888ad 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 +++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 @@ -1,3 +1,4 @@
@@ -1663,7 +2079,7 @@ index 4ef1925..42252fb 100644
    });
  
    it('shows successful generation and retries insertion without regenerating', async () => {
-@@ -215,12 +218,155 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+@@ -215,12 +218,159 @@ describe('ImageGenerationAnchorContent result recovery', () => {
        expect(mocks.retryTask).not.toHaveBeenCalled();
        expect(retryInsertion).not.toHaveBeenCalled();
        expect(board.children).toHaveLength(2);
@@ -1803,6 +2219,10 @@ index 4ef1925..42252fb 100644
 +      expect(background.getAttribute('y')).toBe('200');
 +      expect(background.getAttribute('width')).toBe('400');
 +      expect(host.textContent).toContain('20 张');
++      anchor = { ...anchor, batchIndex: 4 };
++      await act(async () => { generator.updateDrawing(anchor, host, false); });
++      expect(host.textContent).toContain('4/20');
++      expect(host.textContent).not.toContain('20 张');
 +      mocks.tasks = [{ ...mocks.tasks[0], id: 'task-retry', status: TaskStatus.FAILED,
 +        error: { code: 'FAILED', message: 'synthetic new failure', details: { requestId: 'request-new' } } }];
 +      anchor = { ...anchor, phase: 'failed', taskIds: ['task-retry'], primaryTaskId: 'task-retry' };
@@ -2432,7 +2852,7 @@ index 380b825..8a4c5a4 100644
  
      if (this.activeGenerator) {
 diff --git a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
-index d8018b2..4c5967c 100644
+index d8018b2..85522df 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 +++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 @@ -1,12 +1,15 @@
@@ -2547,7 +2967,7 @@ index d8018b2..4c5967c 100644
      const rect = RectangleClient.getRectangleByPoints(element.points);
      const isFailed = element.phase === 'failed';
 +    const layout = [
-+      element.id, rect.x, rect.y, rect.width, rect.height, element.phase,
++      element.id, rect.x, rect.y, rect.width, rect.height, element.phase, element.batchIndex,
 +      element.batchTotal || element.requestedCount || element.taskIds.length || 1,
 +      element.previewImageUrl, typeof element.progress === 'number',
 +    ];
@@ -2606,7 +3026,13 @@ index d8018b2..4c5967c 100644
      );
  
      const backgroundRect = createSvgElement('rect');
-@@ -223,7 +300,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -219,11 +296,12 @@ export class ImageGenerationAnchorGenerator {
+       counter.setAttribute('text-anchor', 'end');
+       counter.setAttribute('fill', '#777e88');
+       counter.setAttribute('font-size', '11');
+-      counter.textContent = `${count} 张`;
++      counter.textContent = element.batchIndex && element.batchTotal
++        ? `${element.batchIndex}/${element.batchTotal}` : `${count} 张`;
        host.appendChild(counter);
      }
  
@@ -2615,7 +3041,7 @@ index d8018b2..4c5967c 100644
        const preview = createSvgElement('image');
        preview.setAttribute('x', String(rect.x));
        preview.setAttribute('y', String(rect.y));
-@@ -235,7 +312,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -235,7 +313,7 @@ export class ImageGenerationAnchorGenerator {
      }
  
      const centerX = rect.x + rect.width / 2;
@@ -2624,7 +3050,7 @@ index d8018b2..4c5967c 100644
      const spinnerRadius = compact ? 10 : Math.min(28, minDimension * 0.1);
      const contentCenterY =
        rect.y +
-@@ -302,7 +379,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -302,7 +380,7 @@ export class ImageGenerationAnchorGenerator {
      title.textContent = phaseLabel;
      host.appendChild(title);
  
@@ -2633,7 +3059,7 @@ index d8018b2..4c5967c 100644
        const maxChars = Math.max(
          12,
          Math.floor((rect.width - padding * 2) / 13)
-@@ -323,6 +400,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -323,6 +401,7 @@ export class ImageGenerationAnchorGenerator {
        );
        description.setAttribute('font-size', String(bodySize));
        description.textContent = truncateText(subtitle, maxChars);
@@ -2641,7 +3067,7 @@ index d8018b2..4c5967c 100644
        host.appendChild(description);
      }
  
-@@ -348,6 +426,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -348,6 +427,7 @@ export class ImageGenerationAnchorGenerator {
        progressBar.setAttribute('height', '3');
        progressBar.setAttribute('rx', '1.5');
        progressBar.setAttribute('fill', accent);
@@ -2649,7 +3075,7 @@ index d8018b2..4c5967c 100644
        host.appendChild(progressBar);
      }
  
-@@ -389,6 +468,28 @@ export class ImageGenerationAnchorGenerator {
+@@ -389,6 +469,28 @@ export class ImageGenerationAnchorGenerator {
      }
    }
  
@@ -2678,7 +3104,7 @@ index d8018b2..4c5967c 100644
    private appendDesktopActionButton(
      host: SVGGElement,
      x: number,
-@@ -514,6 +615,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -514,6 +616,7 @@ export class ImageGenerationAnchorGenerator {
          board: this.board,
          element,
          selected,
@@ -2686,7 +3112,7 @@ index d8018b2..4c5967c 100644
        })
      );
    }
-@@ -536,6 +638,9 @@ export class ImageGenerationAnchorGenerator {
+@@ -536,6 +639,9 @@ export class ImageGenerationAnchorGenerator {
        }, 0);
      }
  
@@ -7856,8 +8282,33 @@ index bc35282..894ee86 100644
              <Suspense fallback={null}>
                <SettingsDialog container={containerRef.current}></SettingsDialog>
              </Suspense>
+diff --git a/packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts b/packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts
+index 994a7a8..e9077e9 100644
+--- a/packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts
++++ b/packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts
+@@ -1919,6 +1919,20 @@ describe('useAutoInsertToCanvas', () => {
+     }
+   );
+ 
++  it.each([false, true])('keeps the viewport during batch auto-insertion, prompt metadata=%s', async (insertPrompt) => {
++    const task = createCompletedImageTask({
++      params: { prompt: 'batch viewport', size: '1:1', autoInsertToCanvas: true, batchTotal: 4 },
++    });
++    mocks.board = { children: [] };
++    mocks.taskState.tasks = [task];
++    renderHook(() => useAutoInsertToCanvas({ enabled: true, groupSimilarTasks: true, groupTimeWindow: 10, insertPrompt }));
++    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
++    const calls = insertPrompt ? mocks.insertGeneratedImageFlow.mock.calls : mocks.quickInsert.mock.calls;
++    expect(calls).toHaveLength(1);
++    expect(calls[0][calls[0].length - 1]).toBe(false);
++    expect(mocks.markAsInserted).toHaveBeenCalledWith(task.id, 'auto_insert');
++  });
++
+   it('binds every result from one multi-image task to that task', async () => {
+     const task = createCompletedImageTask({
+       id: 'task-multi-image',
 diff --git a/packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts b/packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts
-index 798bdac..1bca06f 100644
+index 798bdac..7cd9c41 100644
 --- a/packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts
 +++ b/packages/drawnix/src/hooks/__tests__/useImageGenerationAnchorSync.test.ts
 @@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react';
@@ -7923,7 +8374,7 @@ index 798bdac..1bca06f 100644
      expect(boardState.children[0]?.progress).toBe(43);
    });
  
-@@ -701,4 +712,93 @@ describe('useImageGenerationAnchorSync', () => {
+@@ -701,4 +712,127 @@ describe('useImageGenerationAnchorSync', () => {
  
      dispatchSpy.mockRestore();
    });
@@ -8016,9 +8467,43 @@ index 798bdac..1bca06f 100644
 +    vi.useRealTimers();
 +  });
 +
++});
++
++
++describe('batch display event isolation', () => {
++  it('does not rescan task history or render for unrelated completion/readiness events', () => {
++    const anchor = createAnchor({ taskIds: ['task-1'], primaryTaskId: 'task-1' });
++    const board = createBoard(anchor);
++    taskState.tasks = [createTask()];
++    let renders = 0;
++    const hook = renderHook(() => {
++      renders++;
++      return useImageGenerationAnchorController({ board, anchor });
++    });
++    const before = renders;
++    taskState.reads = 0;
++    act(() => {
++      completionListeners.forEach((listener) => listener({ taskId: 'unrelated' }));
++      registerCanvasImage(board, 'unrelated-image', '/unrelated.png').setReady(true);
++    });
++    expect(taskState.reads).toBe(0);
++    expect(renders).toBe(before);
++    act(() => completionListeners.forEach((listener) => listener({ taskId: 'task-1' })));
++    expect(renders).toBeGreaterThan(before);
++    hook.unmount();
++  });
++
++  it('does not reconcile all anchors when an unrelated reference image becomes ready', () => {
++    const board = createBoard(createAnchor());
++    const hook = renderHook(() => useImageGenerationAnchorSync({ board }));
++    taskState.reads = 0;
++    act(() => registerCanvasImage(board, 'reference-image', '/reference.png').setReady(true));
++    expect(taskState.reads).toBe(0);
++    hook.unmount();
++  });
  });
 diff --git a/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts b/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts
-index a0da80d..8cbac27 100644
+index a0da80d..9d6ecaa 100644
 --- a/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts
 +++ b/packages/drawnix/src/hooks/useAutoInsertToCanvas.ts
 @@ -380,6 +380,12 @@ function canInsertTaskCanvasAssociationsOnCurrentBoard(
@@ -8034,7 +8519,73 @@ index a0da80d..8cbac27 100644
    if (associations.length === 0) return true;
  
    return Boolean(
-@@ -2822,6 +2828,7 @@ export function useAutoInsertToCanvas(
+@@ -1694,6 +1700,7 @@ export function useAutoInsertToCanvas(
+                 : generationMetadata;
+             const targetImageDimensions =
+               type === 'image' ? dimensions : undefined;
++            const scrollToImageResult = Number(imageAnchor?.batchTotal || task.params.batchTotal || 1) <= 1;
+             let insertedPoint = resolvedInsertionPoint;
+             let insertedElementId: string | undefined;
+             let insertedSize =
+@@ -1843,7 +1850,8 @@ export function useAutoInsertToCanvas(
+                       resolvedInsertionPoint,
+                       board,
+                       () =>
+-                        isCanvasInsertionBoardTokenCurrent(insertionBoardToken)
++                        isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
++                      ...(scrollToImageResult ? [] : [false] as const)
+                     )
+                   : await insertAIFlow(
+                       task.params.prompt,
+@@ -1883,7 +1891,8 @@ export function useAutoInsertToCanvas(
+                 board,
+                 () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
+                 task.params.prompt,
+-                buildTaskGenerationMetadata(task, imageAnchor)
++                buildTaskGenerationMetadata(task, imageAnchor),
++                ...(scrollToImageResult ? [] : [false] as const)
+               );
+               if (abortIfCanvasChanged()) {
+                 continue promptGroupLoop;
+@@ -2003,7 +2012,8 @@ export function useAutoInsertToCanvas(
+                 dimensions,
+                 metadata,
+                 board,
+-                () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken)
++                () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
++                ...(type !== 'image' || scrollToImageResult ? [] : [false] as const)
+               );
+               if (abortIfCanvasChanged()) {
+                 continue promptGroupLoop;
+@@ -2225,6 +2235,7 @@ export function useAutoInsertToCanvas(
+                 : null;
+             const groupImageDimensions =
+               type === 'image' ? dimensions : undefined;
++            const scrollToImageResult = Number(groupImageAnchor?.batchTotal || firstInsertTask.params.batchTotal || 1) <= 1;
+             let insertedPoint = resolvedInsertionPoint;
+             let insertedElementId: string | undefined;
+             let insertedSize = groupImageDimensions;
+@@ -2348,7 +2359,8 @@ export function useAutoInsertToCanvas(
+                       resolvedInsertionPoint,
+                       board,
+                       () =>
+-                        isCanvasInsertionBoardTokenCurrent(insertionBoardToken)
++                        isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
++                      ...(scrollToImageResult ? [] : [false] as const)
+                     )
+                   : await insertAIFlow(
+                       firstInsertTask.params.prompt,
+@@ -2393,7 +2405,8 @@ export function useAutoInsertToCanvas(
+                   imageGroupItems.map((item) => item.dimensions),
+                   board,
+                   () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
+-                  firstInsertTask.params.prompt
++                  firstInsertTask.params.prompt,
++                  ...(scrollToImageResult ? [] : [undefined, false] as const)
+                 );
+                 if (abortIfCanvasChanged()) {
+                   continue promptGroupLoop;
+@@ -2822,6 +2835,7 @@ export function useAutoInsertToCanvas(
      };
  
      const handleTaskCompleted = (task: Task) => {
@@ -8042,7 +8593,7 @@ index a0da80d..8cbac27 100644
        if (!isUserVisibleTaskResult(task.result)) {
          return;
        }
-@@ -3035,6 +3042,7 @@ export function useAutoInsertToCanvas(
+@@ -3035,6 +3049,7 @@ export function useAutoInsertToCanvas(
      };
  
      const recoverCompletedAutoInsertTasks = () => {
@@ -8080,11 +8631,107 @@ index 796acdb..b7c6001 100644
      const container = PlaitBoard.getBoardContainer(board);
      const host = PlaitBoard.getHost(board);
      const viewport = PlaitBoard.getViewportContainer(board);
+diff --git a/packages/drawnix/src/hooks/useImageGenerationAnchorController.ts b/packages/drawnix/src/hooks/useImageGenerationAnchorController.ts
+index 5778901..4aa1954 100644
+--- a/packages/drawnix/src/hooks/useImageGenerationAnchorController.ts
++++ b/packages/drawnix/src/hooks/useImageGenerationAnchorController.ts
+@@ -1,4 +1,4 @@
+-import { useEffect, useMemo, useState } from 'react';
++import { useEffect, useMemo, useState, useRef } from 'react';
+ import type { PlaitBoard } from '@plait/core';
+ import { taskQueueService } from '../services/task-queue';
+ import { workflowCompletionService } from '../services/workflow-completion-service';
+@@ -12,11 +12,12 @@ import {
+   getTasksForImageGenerationAnchor,
+   selectPrimaryImageGenerationAnchorTask,
+ } from '../utils/image-generation-anchor-task';
+-import { TaskStatus } from '../types/task.types';
++import { TaskStatus, type Task } from '../types/task.types';
+ import { useImageTaskProgress } from './useImageTaskProgress';
+ import { hasResolvedImageGenerationBatchCount } from '../utils/image-generation-anchor-batch';
+ import {
+   areImageGenerationResultsReady,
++  isAnchorImageReadinessRelevant,
+   getImageGenerationResultLoadError,
+ } from '../utils/image-generation-anchor-readiness';
+ import { subscribeCanvasImageReadiness } from '../services/canvas-image-readiness';
+@@ -33,43 +34,36 @@ export function useImageGenerationAnchorController(
+   const [taskRevision, setTaskRevision] = useState(0);
+   const taskIdsKey = anchor.taskIds.join('|');
+ 
++  const current = useRef({ anchor, providedTask, relatedTasks: [] as Task[] });
++  current.current.anchor = anchor;
++  current.current.providedTask = providedTask;
++
+   useEffect(() => {
+     const updateRevision = () => setTaskRevision((value) => value + 1);
+-    const unsubscribe = subscribeCanvasImageReadiness(board, updateRevision);
+-    const subscription = workflowCompletionService
+-      .observeCompletionEvents()
+-      .subscribe(updateRevision);
+-    // Cached images can load between render and passive-effect subscription.
++    const unsubscribe = subscribeCanvasImageReadiness(board, (elementId) => {
++      const value = current.current;
++      if (isAnchorImageReadinessRelevant(board, value.anchor, elementId, value.relatedTasks)) updateRevision();
++    });
++    const completionSubscription = workflowCompletionService.observeCompletionEvents().subscribe((event) => {
++      const { anchor, relatedTasks } = current.current;
++      if (anchor.primaryTaskId === event.taskId || anchor.taskIds.includes(event.taskId) || relatedTasks.some((task) => task.id === event.taskId)) updateRevision();
++    });
++    const taskSubscription = taskQueueService.observeTaskUpdates().subscribe((event) => {
++      const { anchor, providedTask } = current.current;
++      if (!providedTask && doesTaskBelongToImageGenerationAnchor(anchor, event.task)) updateRevision();
++    });
++    // Catch cached readiness that changes between rendering and subscribing.
+     updateRevision();
+-    return () => {
+-      unsubscribe();
+-      subscription.unsubscribe();
+-    };
++    return () => { unsubscribe(); completionSubscription.unsubscribe(); taskSubscription.unsubscribe(); };
+   }, [board]);
+ 
+-  useEffect(() => {
+-    if (providedTask) {
+-      return;
+-    }
+-
+-    const subscription = taskQueueService
+-      .observeTaskUpdates()
+-      .subscribe((event) => {
+-        if (doesTaskBelongToImageGenerationAnchor(anchor, event.task)) {
+-          setTaskRevision((value) => value + 1);
+-        }
+-      });
+-
+-    return () => {
+-      subscription.unsubscribe();
+-    };
+-  }, [anchor, providedTask, taskIdsKey]);
+-
+   const relatedTasks = useMemo(() => {
+     const allTasks = taskQueueService.getAllTasks();
+     return getTasksForImageGenerationAnchor(anchor, allTasks);
+   }, [anchor, taskIdsKey, taskRevision]);
+ 
++  current.current.relatedTasks = relatedTasks;
++
+   const resolvedTask = useMemo(() => {
+     if (providedTask) {
+       return providedTask;
 diff --git a/packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts b/packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts
-index d96ddb3..30de43d 100644
+index d96ddb3..240cbf6 100644
 --- a/packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts
 +++ b/packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts
-@@ -352,7 +352,11 @@ export function useImageGenerationAnchorSync({
+@@ -25,6 +25,7 @@ import { parseSizeToPixels } from '../utils/size-ratio';
+ import { hasResolvedImageGenerationBatchCount } from '../utils/image-generation-anchor-batch';
+ import {
+   areImageGenerationResultsReady,
++  isAnchorImageReadinessRelevant,
+   getImageGenerationResultLoadError,
+ } from '../utils/image-generation-anchor-readiness';
+ import { subscribeCanvasImageReadiness } from '../services/canvas-image-readiness';
+@@ -352,7 +353,11 @@ export function useImageGenerationAnchorSync({
  
      const removalTimers = removalTimersRef.current;
  
@@ -8097,7 +8744,7 @@ index d96ddb3..30de43d 100644
        const anchor = ImageGenerationAnchorTransforms.getAnchorById(
          board,
          anchorId
-@@ -362,7 +366,7 @@ export function useImageGenerationAnchorSync({
+@@ -362,7 +367,7 @@ export function useImageGenerationAnchorSync({
          return;
        }
  
@@ -8106,7 +8753,7 @@ index d96ddb3..30de43d 100644
        const relatedTasks = getTasksForImageGenerationAnchor(anchor, allTasks);
        const primaryTask = selectPrimaryImageGenerationAnchorTask(
          anchor,
-@@ -527,7 +531,14 @@ export function useImageGenerationAnchorSync({
+@@ -527,7 +532,14 @@ export function useImageGenerationAnchorSync({
          patch.transitionMode = anchor.anchorType === 'frame' ? 'hold' : 'morph';
        }
  
@@ -8122,7 +8769,7 @@ index d96ddb3..30de43d 100644
          ImageGenerationAnchorTransforms.updateAnchor(board, anchor.id, patch);
        }
  
-@@ -538,10 +549,18 @@ export function useImageGenerationAnchorSync({
+@@ -538,10 +550,18 @@ export function useImageGenerationAnchorSync({
        }
      };
  
@@ -8144,7 +8791,7 @@ index d96ddb3..30de43d 100644
      };
  
      const reconcileTaskRelatedAnchors = (task: Task) => {
-@@ -586,7 +605,7 @@ export function useImageGenerationAnchorSync({
+@@ -586,12 +606,16 @@ export function useImageGenerationAnchorSync({
          return;
        }
  
@@ -8153,7 +8800,17 @@ index d96ddb3..30de43d 100644
      };
  
      const unsubscribeImageReadiness = subscribeCanvasImageReadiness(
-@@ -622,11 +641,12 @@ export function useImageGenerationAnchorSync({
+       board,
+-      reconcileAllAnchors
++      (elementId) => {
++        const affected = ImageGenerationAnchorTransforms.getAllAnchors(board)
++          .filter((anchor) => isAnchorImageReadinessRelevant(board, anchor, elementId));
++        if (affected.length) reconcileAnchors(affected.map((anchor) => anchor.id));
++      }
+     );
+     reconcileAllAnchors();
+ 
+@@ -622,11 +646,12 @@ export function useImageGenerationAnchorSync({
        });
  
      const progressTimer = setInterval(() => {
@@ -10731,6 +11388,46 @@ index 2a102cd..9ae2c2c 100644
            extraHeaders: secret.extraHeaders,
          }
        : profile;
+diff --git a/packages/drawnix/src/services/canvas-image-readiness.ts b/packages/drawnix/src/services/canvas-image-readiness.ts
+index 729d761..842220d 100644
+--- a/packages/drawnix/src/services/canvas-image-readiness.ts
++++ b/packages/drawnix/src/services/canvas-image-readiness.ts
+@@ -9,7 +9,7 @@ interface ImageRender {
+ 
+ interface BoardImageReadiness {
+   images: Map<string, ImageRender>;
+-  listeners: Set<() => void>;
++  listeners: Set<(elementId: string) => void>;
+ }
+ 
+ const boards = new WeakMap<PlaitBoard, BoardImageReadiness>();
+@@ -32,7 +32,7 @@ export function registerCanvasImage(
+ ) {
+   const state = getState(board);
+   const render: ImageRender = { url, ready: false, retry };
+-  const notify = () => state.listeners.forEach((listener) => listener());
++  const notify = () => state.listeners.forEach((listener) => listener(elementId));
+   state.images.set(elementId, render);
+   notify();
+ 
+@@ -80,7 +80,7 @@ export function retryCanvasImage(
+   if (render?.url !== url || !render.error || !render.retry) return false;
+   render.error = undefined;
+   render.retry();
+-  state?.listeners.forEach((listener) => listener());
++  state?.listeners.forEach((listener) => listener(elementId));
+   return true;
+ }
+ 
+@@ -95,7 +95,7 @@ export function isCanvasImageReady(
+ 
+ export function subscribeCanvasImageReadiness(
+   board: PlaitBoard,
+-  listener: () => void
++  listener: (elementId: string) => void
+ ): () => void {
+   const { listeners } = getState(board);
+   listeners.add(listener);
 diff --git a/packages/drawnix/src/services/canvas-operations/ai-analyze.ts b/packages/drawnix/src/services/canvas-operations/ai-analyze.ts
 index 278e820..920d764 100644
 --- a/packages/drawnix/src/services/canvas-operations/ai-analyze.ts
@@ -10756,11 +11453,48 @@ index 278e820..920d764 100644
          generatedSteps,
        };
      }
+diff --git a/packages/drawnix/src/services/canvas-operations/canvas-insertion.test.ts b/packages/drawnix/src/services/canvas-operations/canvas-insertion.test.ts
+index 8208293..778d029 100644
+--- a/packages/drawnix/src/services/canvas-operations/canvas-insertion.test.ts
++++ b/packages/drawnix/src/services/canvas-operations/canvas-insertion.test.ts
+@@ -1,3 +1,4 @@
++import { scrollToPointIfNeeded } from '../../utils/selection-utils';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import { RectangleClient, type PlaitBoard } from '@plait/core';
+ 
+@@ -181,6 +182,18 @@ describe('canvas insertion service metadata binding', () => {
+     vi.unstubAllGlobals();
+   });
+ 
++  it.each([false, true, undefined])('honors optional scrollToResult=%s without dropping inserted results', async (scrollToResult) => {
++    const board = createBoard();
++    mocks.insertImageFromUrl.mockImplementation(async (target, url, point) => {
++      target.children.push({ id: 'new-image', type: 'image', url, points: [point, [point[0] + 400, point[1] + 400]] });
++      return 'new-image';
++    });
++    const result = await insertImageGroup(['/test.png'], [0, 0], { width: 400, height: 400 }, board, undefined, 'test', undefined, scrollToResult);
++    expect(result.success).toBe(true);
++    expect(board.children).toHaveLength(1);
++    expect(scrollToPointIfNeeded).toHaveBeenCalledTimes(scrollToResult === false ? 0 : 1);
++  });
++
+   it('places local outputs around images and active task cards without moving existing content', async () => {
+     const board = createBoard();
+     board.getRectangle = (element) =>
 diff --git a/packages/drawnix/src/services/canvas-operations/canvas-insertion.ts b/packages/drawnix/src/services/canvas-operations/canvas-insertion.ts
-index a77a441..6231aa2 100644
+index a77a441..a23d57a 100644
 --- a/packages/drawnix/src/services/canvas-operations/canvas-insertion.ts
 +++ b/packages/drawnix/src/services/canvas-operations/canvas-insertion.ts
-@@ -891,7 +891,7 @@ async function executeCanvasInsertionInternal(
+@@ -105,6 +105,8 @@ export interface InsertionItem {
+  * 画布插入参数
+  */
+ export interface CanvasInsertionParams {
++  /** Automatic batch results must not take the viewport away from the user. Defaults to true. */
++  scrollToResult?: boolean;
+   /** 要插入的内容列表 */
+   items: InsertionItem[];
+   /** 当前画布实例（组件内调用时优先使用，避免依赖全局引用初始化时序） */
+@@ -891,7 +893,7 @@ async function executeCanvasInsertionInternal(
          : startPoint;
        const taskRectangles = board.children
          .filter(isWorkZoneElement)
@@ -10769,6 +11503,86 @@ index a77a441..6231aa2 100644
          .filter(
            (rect) =>
              [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) &&
+@@ -943,7 +945,7 @@ async function executeCanvasInsertionInternal(
+         item.metadata
+       );
+ 
+-      requestAnimationFrame(() => {
++      if (params.scrollToResult !== false) requestAnimationFrame(() => {
+         if (!params.boardGuard || params.boardGuard()) {
+           scrollToPointIfNeeded(board, point);
+         }
+@@ -1004,7 +1006,7 @@ async function executeCanvasInsertionInternal(
+         centerPoint,
+         bounds: flowState.bounds,
+       });
+-      requestAnimationFrame(() => {
++      if (params.scrollToResult !== false) requestAnimationFrame(() => {
+         if (!params.boardGuard || params.boardGuard()) {
+           scrollToPointIfNeeded(board, centerPoint);
+         }
+@@ -1051,7 +1053,8 @@ export async function quickInsert(
+   dimensions?: { width: number; height: number },
+   metadata?: Record<string, unknown>,
+   board?: PlaitBoard,
+-  boardGuard?: () => boolean
++  boardGuard?: () => boolean,
++  scrollToResult = true
+ ): Promise<MCPResult> {
+   return executeCanvasInsertion({
+     board,
+@@ -1066,6 +1069,7 @@ export async function quickInsert(
+     ],
+     startPoint: point,
+     boardGuard,
++    scrollToResult,
+   });
+ }
+ 
+@@ -1081,7 +1085,8 @@ export async function insertImageGroup(
+   board?: PlaitBoard,
+   boardGuard?: () => boolean,
+   prompt?: string,
+-  metadata?: Record<string, unknown>
++  metadata?: Record<string, unknown>,
++  scrollToResult = true
+ ): Promise<MCPResult> {
+   const groupId = `img-group-${Date.now()}`;
+   const promptMetadata = {
+@@ -1103,6 +1108,7 @@ export async function insertImageGroup(
+     })),
+     startPoint: point,
+     boardGuard,
++    scrollToResult,
+   });
+ }
+ 
+@@ -1114,7 +1120,8 @@ export async function insertGeneratedImageFlow(
+   results: MediaFlowResult[],
+   point?: Point,
+   board?: PlaitBoard,
+-  boardGuard?: () => boolean
++  boardGuard?: () => boolean,
++  scrollToResult = true
+ ): Promise<MCPResult> {
+   const normalizedPrompt = prompt?.trim() || '';
+   const imageResults = results.filter((result) => result.type === 'image');
+@@ -1161,6 +1168,7 @@ export async function insertGeneratedImageFlow(
+         : [],
+       startPoint: point,
+       boardGuard,
++      scrollToResult,
+     });
+   }
+ 
+@@ -1169,6 +1177,7 @@ export async function insertGeneratedImageFlow(
+     items: imageItems,
+     startPoint: point,
+     boardGuard,
++    scrollToResult,
+   });
+ }
+ 
 diff --git a/packages/drawnix/src/services/desktop-storage-cleanup-service.ts b/packages/drawnix/src/services/desktop-storage-cleanup-service.ts
 index 10397de..9101802 100644
 --- a/packages/drawnix/src/services/desktop-storage-cleanup-service.ts
@@ -14051,6 +14865,143 @@ index 571a4f2..8d53ca6 100644
  
      expect(downloadFromBlobMock).not.toHaveBeenCalled();
      expect(downloadFileMock).not.toHaveBeenCalled();
+diff --git a/packages/drawnix/src/utils/__tests__/image-batch-preparation.test.ts b/packages/drawnix/src/utils/__tests__/image-batch-preparation.test.ts
+new file mode 100644
+index 0000000..bcb61bd
+--- /dev/null
++++ b/packages/drawnix/src/utils/__tests__/image-batch-preparation.test.ts
+@@ -0,0 +1,131 @@
++import { describe, it, expect, vi, afterEach } from "vitest";
++import { PlaitBoard, createBoard, RectangleClient } from "@plait/core";
++import {
++  createImageBatchPreparation,
++  yieldBatchPreparationPaint,
++} from "../image-batch-preparation";
++import { getBatchReservations } from "../image-batch-reservations";
++import {
++  resolveImageLineagePositions,
++  placeImageColumn,
++} from "../image-generation-lineage-placement";
++import { resolveImageGenerationBatchAnchorPositions } from "../image-generation-anchor-placement";
++
++afterEach(() => {
++  vi.restoreAllMocks();
++  vi.useRealTimers();
++});
++function setup() {
++  const board = createBoard([]);
++  board.getRectangle = (el) =>
++    RectangleClient.getRectangleByPoints(el.points || []);
++  const host = document.createElementNS("http://www.w3.org/2000/svg", "g");
++  vi.spyOn(PlaitBoard, "getElementHost").mockReturnValue(host);
++  return { board, host };
++}
++
++describe("batch preparation without speculative canvas records", () => {
++  it.each([1, 3, 4, 10, 20])(
++    "shows all %i slots synchronously and cleans up without saving or changing existing content",
++    (count) => {
++      const { board, host } = setup();
++      const snapshot = board.children;
++      const preview = createImageBatchPreparation(board, {
++        count,
++        sourceIds: [],
++        emptyPosition: [0, 0],
++      });
++      expect(host.querySelectorAll(".batch-preparation-slot")).toHaveLength(
++        count,
++      );
++      expect(preview.positions).toEqual(
++        Array.from({ length: count }, (_, i) => [
++          (i % 3) * 440,
++          Math.floor(i / 3) * 640,
++        ]),
++      );
++      expect(board.children).toBe(snapshot);
++      expect(getBatchReservations(board)).toHaveLength(1);
++      preview.dispose();
++      preview.dispose();
++      expect(host.children).toHaveLength(0);
++      expect(getBatchReservations(board)).toEqual([]);
++      expect(board.children).toBe(snapshot);
++    },
++  );
++
++  it("reserves the entire region against asynchronously inserted reference images", () => {
++    const { board } = setup();
++    const preview = createImageBatchPreparation(board, {
++      count: 4,
++      sourceIds: [],
++      emptyPosition: [0, 0],
++    });
++    const [reference] = placeImageColumn(
++      board,
++      [0, 0],
++      [{ width: 400, height: 400 }],
++    );
++    expect(reference[1]).toBeGreaterThanOrEqual(1240);
++    preview.dispose();
++    expect(
++      placeImageColumn(board, [0, 0], [{ width: 400, height: 400 }])[0],
++    ).toEqual([0, 0]);
++  });
++
++  it("moves a three-column group together around existing content including frame-adjacent batches", () => {
++    const { board } = setup();
++    board.children.push({
++      id: "obstacle",
++      type: "image",
++      points: [
++        [440, 0],
++        [840, 400],
++      ],
++    });
++    const positions = resolveImageLineagePositions(
++      board,
++      [],
++      { width: 400, height: 600 },
++      4,
++      [0, 0],
++      "grid",
++    );
++    expect(positions[1]).toEqual([positions[0][0] + 440, positions[0][1]]);
++    expect(positions[3]).toEqual([positions[0][0], positions[0][1] + 640]);
++    const frame = resolveImageGenerationBatchAnchorPositions(
++      board,
++      [0, 0],
++      { width: 400, height: 600 },
++      4,
++      { frameRect: { x: 0, y: 0, width: 400, height: 400 } },
++    );
++    expect(frame[2]).toEqual([frame[0][0] + 880, frame[0][1]]);
++    expect(frame[3]).toEqual([frame[0][0], frame[0][1] + 640]);
++  });
++
++  it("releases the reservation if its host is unavailable", () => {
++    const { board } = setup();
++    vi.spyOn(PlaitBoard, "getElementHost").mockImplementation(() => {
++      throw Error("unmounted");
++    });
++    expect(() =>
++      createImageBatchPreparation(board, {
++        count: 3,
++        sourceIds: [],
++        emptyPosition: [0, 0],
++      }),
++    ).toThrow("unmounted");
++    expect(getBatchReservations(board)).toEqual([]);
++  });
++
++  it("does not hang preparation in a hidden window with suspended animation frames", async () => {
++    vi.useFakeTimers();
++    vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
++    const ready = vi.fn();
++    const painting = yieldBatchPreparationPaint().then(ready);
++    await vi.advanceTimersByTimeAsync(100);
++    await painting;
++    expect(ready).toHaveBeenCalledOnce();
++  });
++});
 diff --git a/packages/drawnix/src/utils/__tests__/image-error-details.test.ts b/packages/drawnix/src/utils/__tests__/image-error-details.test.ts
 new file mode 100644
 index 0000000..8cff5c1
@@ -15246,6 +16197,165 @@ index 0000000..7995b0d
 +    )
 +    .join('\n');
 +}
+diff --git a/packages/drawnix/src/utils/image-batch-preparation.ts b/packages/drawnix/src/utils/image-batch-preparation.ts
+new file mode 100644
+index 0000000..6e8de87
+--- /dev/null
++++ b/packages/drawnix/src/utils/image-batch-preparation.ts
+@@ -0,0 +1,122 @@
++import { PlaitBoard, type Point } from "@plait/core";
++import { parseSizeToPixels } from "./size-ratio";
++import { resolveImageLineagePositions } from "./image-generation-lineage-placement";
++import { resolveImageGenerationBatchAnchorPositions } from "./image-generation-anchor-placement";
++import {
++  reserveImageBatch,
++  type BatchReservation,
++} from "./image-batch-reservations";
++
++// Preparation is visual only: never save speculative tasks or React roots to the board.
++export function createImageBatchPreparation(
++  board: PlaitBoard,
++  options: {
++    count: number;
++    requestedSize?: string;
++    sourceIds: string[];
++    emptyPosition: Point;
++    frameRect?: BatchReservation;
++    hasUnplacedReferences?: boolean;
++  },
++) {
++  const size = parseSizeToPixels(options.requestedSize);
++  const reservedSize = {
++    width: Math.max(400, size.width),
++    height: Math.max(600, size.height),
++  };
++  const origin: Point =
++    options.hasUnplacedReferences && !options.sourceIds.length
++      ? [options.emptyPosition[0] + 520, options.emptyPosition[1]]
++      : options.emptyPosition;
++  const positions = options.frameRect
++    ? resolveImageGenerationBatchAnchorPositions(
++        board,
++        origin,
++        reservedSize,
++        options.count,
++        { frameRect: options.frameRect },
++      )
++    : resolveImageLineagePositions(
++        board,
++        options.sourceIds,
++        reservedSize,
++        options.count,
++        origin,
++        "grid",
++      );
++  const columns = Math.min(3, options.count);
++  const rows = Math.ceil(options.count / columns);
++  const release = reserveImageBatch(board, {
++    x: positions[0][0],
++    y: positions[0][1],
++    width: columns * reservedSize.width + (columns - 1) * 40,
++    height: rows * reservedSize.height + (rows - 1) * 40,
++  });
++  const ns = "http://www.w3.org/2000/svg";
++  const layer = document.createElementNS(ns, "g");
++  layer.classList.add("image-batch-preparation");
++  layer.setAttribute("pointer-events", "none");
++  for (const [index, [x, y]] of positions.entries()) {
++    const slot = document.createElementNS(ns, "g");
++    slot.classList.add("batch-preparation-slot");
++    slot.setAttribute("aria-label", `准备生成 ${index + 1}/${options.count}`);
++    const rect = document.createElementNS(ns, "rect");
++    for (const [key, value] of Object.entries({
++      x,
++      y,
++      width: size.width,
++      height: size.height,
++      rx: 16,
++      fill: "#f8fafc",
++      stroke: "#cbd5e1",
++      "stroke-width": 1,
++    }))
++      rect.setAttribute(key, String(value));
++    const label = document.createElementNS(ns, "text");
++    label.setAttribute("x", String(x + size.width / 2));
++    label.setAttribute("y", String(y + size.height / 2));
++    label.setAttribute("text-anchor", "middle");
++    label.setAttribute("fill", "#64748b");
++    label.setAttribute("font-size", "16");
++    label.textContent = `准备生成 · ${index + 1}/${options.count}`;
++    slot.append(rect, label);
++    layer.append(slot);
++  }
++  try {
++    PlaitBoard.getElementHost(board).append(layer);
++  } catch (error) {
++    release();
++    throw error;
++  }
++  let disposed = false;
++  return {
++    count: options.count,
++    positions,
++    size,
++    reservedSize,
++    dispose() {
++      if (!disposed) {
++        disposed = true;
++        layer.remove();
++        release();
++      }
++    },
++  };
++}
++
++// Two frames allow a complete SVG preview to be painted before async preparation.
++// Hidden windows use a bounded timer so background submission cannot hang.
++export function yieldBatchPreparationPaint(): Promise<void> {
++  return new Promise((resolve) => {
++    let frame = 0;
++    const finish = () => {
++      clearTimeout(timer);
++      cancelAnimationFrame(frame);
++      resolve();
++    };
++    const timer = setTimeout(finish, 100);
++    frame = requestAnimationFrame(() => {
++      frame = requestAnimationFrame(finish);
++    });
++  });
++}
+diff --git a/packages/drawnix/src/utils/image-batch-reservations.ts b/packages/drawnix/src/utils/image-batch-reservations.ts
+new file mode 100644
+index 0000000..0127b4a
+--- /dev/null
++++ b/packages/drawnix/src/utils/image-batch-reservations.ts
+@@ -0,0 +1,25 @@
++import type { PlaitBoard } from "@plait/core";
++export type BatchReservation = {
++  x: number;
++  y: number;
++  width: number;
++  height: number;
++};
++const reservations = new WeakMap<PlaitBoard, Set<BatchReservation>>();
++export function getBatchReservations(board: PlaitBoard): BatchReservation[] {
++  return [...(reservations.get(board) ?? [])];
++}
++export function reserveImageBatch(
++  board: PlaitBoard,
++  rect: BatchReservation,
++): () => void {
++  let entries = reservations.get(board);
++  if (!entries) {
++    entries = new Set();
++    reservations.set(board, entries);
++  }
++  entries.add(rect);
++  return () => {
++    entries.delete(rect);
++  };
++}
 diff --git a/packages/drawnix/src/utils/image-error-details.ts b/packages/drawnix/src/utils/image-error-details.ts
 new file mode 100644
 index 0000000..49b6968
@@ -15532,6 +16642,77 @@ index 0000000..67b8ee2
 +      }
 +    : rect;
 +}
+diff --git a/packages/drawnix/src/utils/image-generation-anchor-placement.ts b/packages/drawnix/src/utils/image-generation-anchor-placement.ts
+index fa8e10a..3860d22 100644
+--- a/packages/drawnix/src/utils/image-generation-anchor-placement.ts
++++ b/packages/drawnix/src/utils/image-generation-anchor-placement.ts
+@@ -1,3 +1,4 @@
++import { getBatchReservations } from './image-batch-reservations';
+ import {
+   RectangleClient,
+   type PlaitBoard,
+@@ -51,7 +52,7 @@ export function resolveImageGenerationBatchAnchorSeedPosition(
+   total: number,
+   gap = 32
+ ): Point {
+-  const columns = total <= 2 ? total : total <= 4 ? 2 : 3;
++  const columns = Math.min(3, total);
+   const row = Math.floor(index / columns);
+   const column = index % columns;
+ 
+@@ -87,6 +88,7 @@ function buildOccupiedRects(
+         type: element.type,
+       })),
+     ...extraOccupiedRects,
++    ...getBatchReservations(board),
+   ];
+ }
+ 
+@@ -298,6 +300,22 @@ export function resolveImageGenerationBatchAnchorPositions(
+     ...restOptions
+   } = options;
+   const placementOptions = { ...restOptions, extraOccupiedRects };
++  if (total > 1) {
++    // Reserve the full grid once: individual collision searches scatter siblings.
++    const columns = Math.min(3, total);
++    const rows = Math.ceil(total / columns);
++    const gap = restOptions.gap ?? 40;
++    const start = resolveImageGenerationAnchorAvailablePosition(
++      board,
++      frameRect ? [frameRect.x + frameRect.width + gap, frameRect.y] : origin,
++      { width: columns * size.width + (columns - 1) * gap,
++        height: rows * size.height + (rows - 1) * gap },
++      placementOptions
++    );
++    return Array.from({ length: total }, (_, index) =>
++      resolveImageGenerationBatchAnchorSeedPosition(start, size, index, total, gap)
++    );
++  }
+   const seedPositions = frameRect
+     ? resolveFrameAdjacentBatchSeedPositions(
+         board,
+diff --git a/packages/drawnix/src/utils/image-generation-anchor-readiness.ts b/packages/drawnix/src/utils/image-generation-anchor-readiness.ts
+index 1a33420..b23ddbf 100644
+--- a/packages/drawnix/src/utils/image-generation-anchor-readiness.ts
++++ b/packages/drawnix/src/utils/image-generation-anchor-readiness.ts
+@@ -110,3 +110,17 @@ export function areImageGenerationResultsReady(
+     isCanvasImageReady(board, image.id, image.url)
+   );
+ }
++
++/** Filter readiness notifications before scanning task history or deriving display state. */
++export function isAnchorImageReadinessRelevant(
++  board: PlaitBoard, anchor: PlaitImageGenerationAnchor, elementId: string, tasks: Task[] = []
++): boolean {
++  if (anchor.resultElementId === elementId) return true;
++  const taskIds = new Set([...anchor.taskIds, ...tasks.map((task) => task.id)]);
++  if (anchor.primaryTaskId) taskIds.add(anchor.primaryTaskId);
++  for (const taskId of taskIds) {
++    if (workflowCompletionService.getPostProcessingStatus(taskId)?.firstElementId === elementId) return true;
++  }
++  const image = board.children.find((element) => element.id === elementId);
++  return Boolean(image && (image.generationAnchorId === anchor.id || taskIds.has(image.generationTaskId)));
++}
 diff --git a/packages/drawnix/src/utils/image-generation-anchor-task.ts b/packages/drawnix/src/utils/image-generation-anchor-task.ts
 index 8931989..728d157 100644
 --- a/packages/drawnix/src/utils/image-generation-anchor-task.ts
@@ -15570,6 +16751,66 @@ index 3981228..e747f23 100644
      isTerminal: phase === 'completed' || phase === 'failed',
    };
  }
+diff --git a/packages/drawnix/src/utils/image-generation-lineage-placement.ts b/packages/drawnix/src/utils/image-generation-lineage-placement.ts
+index 74aab05..4c01e2d 100644
+--- a/packages/drawnix/src/utils/image-generation-lineage-placement.ts
++++ b/packages/drawnix/src/utils/image-generation-lineage-placement.ts
+@@ -1,3 +1,4 @@
++import { getBatchReservations } from './image-batch-reservations';
+ import {
+   getRectangleByElements,
+   type PlaitBoard,
+@@ -46,7 +47,7 @@ function occupied(board: PlaitBoard): Rect[] {
+       const rect = rectangle(board, element);
+       return rect ? [rect] : [];
+     })
+-    .concat(getRetainedTaskCardRectangles(board));
++    .concat(getRetainedTaskCardRectangles(board), getBatchReservations(board));
+ }
+ 
+ export function getImageReferenceBounds(
+@@ -136,13 +137,12 @@ export function resolveImageLineagePositions(
+   size: { width: number; height: number },
+   count: number,
+   emptyPosition: Point,
+-  layout: 'row' | 'column' = 'column'
++  layout: 'row' | 'column' | 'grid' = 'column'
+ ): Point[] {
+   const bounds = getImageReferenceBounds(board, sourceIds);
+-  const horizontal = layout === 'row' && count > 1;
+-  const totalHeight = horizontal
+-    ? size.height
+-    : count * size.height + Math.max(0, count - 1) * SLOT_GAP;
++  const columns = layout === 'grid' ? Math.min(3, count) : layout === 'row' ? count : 1;
++  const rows = Math.ceil(count / columns);
++  const totalHeight = rows * size.height + Math.max(0, rows - 1) * SLOT_GAP;
+   const origin: Point = bounds
+     ? [
+         bounds.x + bounds.width + IMAGE_LINEAGE_GAP,
+@@ -165,17 +165,17 @@ export function resolveImageLineagePositions(
+         origin[1] = Math.max(origin[1], rect.y + rect.height + SLOT_GAP);
+     }
+   }
+-  if (horizontal) {
+-    // Reserve the entire row so collision avoidance never splits a batch.
++  if (layout !== 'column') {
++    // Reserve the entire batch so collision avoidance never splits its slots.
+     const [start] = placeImageColumn(board, origin, [
+       {
+-        width: count * size.width + (count - 1) * SLOT_GAP,
+-        height: size.height,
++        width: columns * size.width + (columns - 1) * SLOT_GAP,
++        height: totalHeight,
+       },
+     ]);
+     return Array.from({ length: count }, (_, index) => [
+-      start[0] + index * (size.width + SLOT_GAP),
+-      start[1],
++      start[0] + (index % columns) * (size.width + SLOT_GAP),
++      start[1] + Math.floor(index / columns) * (size.height + SLOT_GAP),
+     ]);
+   }
+   return placeImageColumn(
 diff --git a/packages/drawnix/src/utils/model-pricing-service.ts b/packages/drawnix/src/utils/model-pricing-service.ts
 index 66e74c8..f63f656 100644
 --- a/packages/drawnix/src/utils/model-pricing-service.ts

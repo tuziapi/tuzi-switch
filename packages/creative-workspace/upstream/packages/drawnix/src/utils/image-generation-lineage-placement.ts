@@ -1,3 +1,4 @@
+import { getBatchReservations } from './image-batch-reservations';
 import {
   getRectangleByElements,
   type PlaitBoard,
@@ -46,7 +47,7 @@ function occupied(board: PlaitBoard): Rect[] {
       const rect = rectangle(board, element);
       return rect ? [rect] : [];
     })
-    .concat(getRetainedTaskCardRectangles(board));
+    .concat(getRetainedTaskCardRectangles(board), getBatchReservations(board));
 }
 
 export function getImageReferenceBounds(
@@ -136,13 +137,12 @@ export function resolveImageLineagePositions(
   size: { width: number; height: number },
   count: number,
   emptyPosition: Point,
-  layout: 'row' | 'column' = 'column'
+  layout: 'row' | 'column' | 'grid' = 'column'
 ): Point[] {
   const bounds = getImageReferenceBounds(board, sourceIds);
-  const horizontal = layout === 'row' && count > 1;
-  const totalHeight = horizontal
-    ? size.height
-    : count * size.height + Math.max(0, count - 1) * SLOT_GAP;
+  const columns = layout === 'grid' ? Math.min(3, count) : layout === 'row' ? count : 1;
+  const rows = Math.ceil(count / columns);
+  const totalHeight = rows * size.height + Math.max(0, rows - 1) * SLOT_GAP;
   const origin: Point = bounds
     ? [
         bounds.x + bounds.width + IMAGE_LINEAGE_GAP,
@@ -165,17 +165,17 @@ export function resolveImageLineagePositions(
         origin[1] = Math.max(origin[1], rect.y + rect.height + SLOT_GAP);
     }
   }
-  if (horizontal) {
-    // Reserve the entire row so collision avoidance never splits a batch.
+  if (layout !== 'column') {
+    // Reserve the entire batch so collision avoidance never splits its slots.
     const [start] = placeImageColumn(board, origin, [
       {
-        width: count * size.width + (count - 1) * SLOT_GAP,
-        height: size.height,
+        width: columns * size.width + (columns - 1) * SLOT_GAP,
+        height: totalHeight,
       },
     ]);
     return Array.from({ length: count }, (_, index) => [
-      start[0] + index * (size.width + SLOT_GAP),
-      start[1],
+      start[0] + (index % columns) * (size.width + SLOT_GAP),
+      start[1] + Math.floor(index / columns) * (size.height + SLOT_GAP),
     ]);
   }
   return placeImageColumn(
