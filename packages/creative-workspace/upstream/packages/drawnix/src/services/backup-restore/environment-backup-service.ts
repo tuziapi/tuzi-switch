@@ -1,3 +1,4 @@
+import { textChatRuntime } from '../text-chat/runtime';
 import { isAccountReference } from '../assistant-account';
 import localforage from 'localforage';
 import { LS_KEYS, LS_KEYS_TO_MIGRATE } from '../../constants/storage-keys';
@@ -172,6 +173,7 @@ export async function exportEnvironmentData(
 ): Promise<EnvironmentExportResult> {
   await Promise.all([
     settingsManager.waitForInitialization(),
+    textChatRuntime.flush(),
     audioPlaylistService.initialize().catch(() => undefined),
     characterStorageService.init().catch(() => undefined),
   ]);
@@ -220,6 +222,9 @@ export async function importEnvironmentData(
     return { imported: 0, skipped: 1, warnings: ['环境数据缺失或格式无效，已跳过'] };
   }
 
+  if (textChatRuntime.getSnapshot().running.size) throw new Error('请先停止文本回复，再恢复会话备份。');
+  await textChatRuntime.flush();
+
   if (options.mode === 'replace') {
     await clearEnvironmentData(Boolean(options.secrets));
   }
@@ -231,6 +236,7 @@ export async function importEnvironmentData(
   imported += await restoreAppDb(data.appDb, options.secrets);
   imported += await restoreEnvironmentSecrets(options.secrets, warnings);
   imported += await restoreChat(data.localForage);
+  await textChatRuntime.reload();
   imported += await restoreAudio(data.localForage);
   imported += await restoreCharacters(data.localForage);
 

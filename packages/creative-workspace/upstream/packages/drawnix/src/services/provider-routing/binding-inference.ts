@@ -391,6 +391,17 @@ function inferTextBindings(
     );
   }
 
+  // Explicit configured native endpoint; never infer Anthropic from model names.
+  try {
+    if (new URL(profile.baseUrl).hostname === 'api.anthropic.com') {
+      bindings.push(buildBinding(profile, model, {
+        protocol: 'anthropic.messages', requestSchema: 'anthropic.messages',
+        responseSchema: 'anthropic.messages.events', submitPath: '/messages',
+        baseUrlStrategy: 'ensure-v1', priority: 110, confidence: 'high', source: 'template',
+      }));
+    }
+  } catch { /* Invalid URLs are rejected at request time. */ }
+
   return bindings;
 }
 
@@ -860,6 +871,7 @@ function shouldUseDiscoveredEndpointHintForModel(
   profile: ProviderProfileSnapshot,
   model: ModelConfig
 ): boolean {
+  if (['anthropic.messages', 'openai.responses'].includes(hint.protocol)) return model.type === 'text';
   if (isSunoNativeModel(model.id)) return false;
   if (isSunoV2Model(model.id)) {
     const action = getSunoV2Action(model.id);

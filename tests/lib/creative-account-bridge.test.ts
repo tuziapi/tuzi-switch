@@ -78,6 +78,18 @@ describe("creative account native boundary", () => {
       data: [{ id: "synthetic-model" }],
     });
   });
+  it.each([["/v1/messages", "anthropic.messages"], ["/v1/responses", "responses"], ["/v1/chat/completions", "chat"]])("maps configured text endpoint %s through the restricted native bridge", async (path, action) => {
+    mocks.invoke.mockImplementation(async (_command, args) => {
+      expect(args.request.action).toBe(action);
+      expect(args.request.body).toMatchObject({ model: "synthetic", stream: true });
+      expect(args.request).not.toHaveProperty("url");
+      expect(args.request).not.toHaveProperty("headers");
+      args.onChunk.onmessage({ type: "start", status: 200, content_type: "application/json" });
+      args.onChunk.onmessage({ type: "data", data: btoa('{}') });
+      args.onChunk.onmessage({ type: "end" });
+    });
+    await (await send(path, { method: "POST", body: JSON.stringify({ model: "synthetic", stream: true }) })).text();
+  });
   it.each([
     "https://attacker.invalid/v1/models",
     "https://user@api.tu-zi.com/v1/models",

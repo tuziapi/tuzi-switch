@@ -14,6 +14,7 @@ import React, {
   useRef,
   Suspense,
 } from 'react';
+import { Maximize2, Columns2, MessagesSquare, WandSparkles } from 'lucide-react';
 import { CloseIcon, AddIcon, ViewListIcon } from 'tdesign-icons-react';
 import { ATTACHED_ELEMENT_CLASS_NAME } from '@plait/core';
 import { SessionList } from './SessionList';
@@ -63,6 +64,7 @@ import { resolveDrawerGenerationRoute } from './drawer-generation-route';
 import { HoverTip } from '../shared';
 import './chat-drawer.scss';
 
+const TextChatWorkspace = React.lazy(() => import('../text-chat/TextChatWorkspace'));
 const ChatMessagesArea = React.lazy(() => import('./ChatMessagesArea'));
 
 // 工作流消息的特殊标记前缀
@@ -217,6 +219,10 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
       const cached = chatStorageService.getDrawerState();
       return cached.isOpen ?? defaultOpen;
     });
+    const [chatMode, setChatMode] = useState<'text' | 'creative'>(() => chatStorageService.getDrawerState().mode || 'text');
+    const [textFocus, setTextFocus] = useState(() => chatStorageService.getDrawerState().textFocus ?? true);
+    const exitTextFocus = useCallback(() => setTextFocus(false), []);
+    useEffect(() => { chatStorageService.setDrawerState({ mode: chatMode, textFocus }); }, [chatMode, textFocus]);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const activeSessionIdRef = useRef<string | null>(null);
@@ -542,11 +548,11 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
     useEffect(() => {
       const init = async () => {
         const drawerState = chatStorageService.getDrawerState();
-        const loadedSessions = await chatStorageService.getAllSessions();
+        const loadedSessions = (await chatStorageService.getAllSessions()).filter(session => session.kind !== 'text');
         setSessions(loadedSessions);
 
         let activeId: string | null = null;
-        if (drawerState.activeSessionId) {
+        if (drawerState.activeSessionId && loadedSessions.some(session => session.id === drawerState.activeSessionId)) {
           activeId = drawerState.activeSessionId;
           updateActiveSessionId(drawerState.activeSessionId);
         } else if (loadedSessions.length > 0) {
@@ -1113,6 +1119,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
     // 发送工作流消息
     const handleSendWorkflowMessage = useCallback(
       async (params: WorkflowMessageParams) => {
+        setChatMode('creative');
         const {
           context,
           workflow,
@@ -1736,6 +1743,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
         },
         toggle: handleToggle,
         sendMessage: async (content: string) => {
+          setChatMode('creative');
           // Open drawer first
           setIsOpen(true);
           onOpenChange?.(true);
@@ -1941,16 +1949,16 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
 
     return (
       <>
-        <ChatDrawerTrigger
+        {!(isOpen && chatMode === 'text' && textFocus) && <ChatDrawerTrigger
           isOpen={isOpen}
           onClick={handleToggle}
           drawerWidth={drawerWidth}
-        />
+        />}
 
         <div
           className={`chat-drawer ${ATTACHED_ELEMENT_CLASS_NAME} ${
             isOpen ? 'chat-drawer--open' : ''
-          } ${isDragging ? 'chat-drawer--dragging' : ''}`}
+          } ${isDragging ? 'chat-drawer--dragging' : ''} ${chatMode === 'text' ? 'chat-drawer--text' : ''} ${chatMode === 'text' && textFocus ? 'chat-drawer--text-focus' : ''}`}
           style={{ width: drawerWidth }}
           data-testid="chat-drawer"
         >
@@ -1961,6 +1969,17 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
             onMouseDown={handleResizeStart}
           />
           <div ref={domRef} className="chat-drawer__body">
+            <div className="text-chat-modebar">
+              <div role="group" aria-label="对话模式">
+                <button type="button" aria-pressed={chatMode === 'text'} onClick={() => setChatMode('text')}><MessagesSquare size={15} />文本对话</button>
+                <button type="button" aria-pressed={chatMode === 'creative'} onClick={() => setChatMode('creative')}><WandSparkles size={15} />创作助手</button>
+              </div>
+              {chatMode === 'text' && <button type="button" aria-label={textFocus ? '画布并排' : '专注对话'} onClick={() => setTextFocus(v => !v)}>{textFocus ? <Columns2 size={15} /> : <Maximize2 size={15} />}{textFocus ? '画布并排' : '专注对话'}</button>}
+              <button type="button" aria-label="关闭对话面板" onClick={handleClose}><CloseIcon size={16} /></button>
+            </div>
+            {chatMode === 'text' && shouldRenderChat && <Suspense fallback={<div className="chat-loading">加载文本对话…</div>}><TextChatWorkspace focused={textFocus} selectedText={selectedContent.filter(item => item.type === 'text').map(item => item.text || '').join('\n\n')} onExitFocus={exitTextFocus} /></Suspense>}
+            <div className="text-chat-creative-body" style={{ display: chatMode === 'creative' ? 'flex' : 'none' }}>
+
             <div className="chat-drawer__header">
               <div className="chat-drawer__header-top">
                 <HoverTip content="关闭">
@@ -2083,6 +2102,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
                 onGenerationSubmit={handleGenerationSubmit}
                 placeholder="继续描述要修改的内容..."
               />
+            </div>
             </div>
           </div>
         </div>

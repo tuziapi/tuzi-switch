@@ -13,6 +13,7 @@ import { RetryImage } from '../retry-image';
 import './MarkdownReadonly.css';
 
 export interface MarkdownReadonlyProps {
+  renderMath?: (value: string, display: boolean, key: string) => React.ReactNode;
   markdown: string;
   className?: string;
   preserveSoftLineBreaks?: boolean;
@@ -24,6 +25,7 @@ export interface MarkdownReadonlyProps {
 }
 
 interface RenderOptions {
+  renderMath?: MarkdownReadonlyProps["renderMath"];
   preserveSoftLineBreaks: boolean;
   renderCodeBlock?: MarkdownReadonlyProps['renderCodeBlock'];
 }
@@ -660,6 +662,19 @@ function renderInline(
   while (cursor < text.length) {
     const char = text[cursor];
 
+    if (options.renderMath && !isEscaped(text, cursor) && (char === '$' || (char === '\\' && ['(', '['].includes(text[cursor + 1])))) {
+      const display = text.startsWith('$$', cursor) || text.startsWith('\\[', cursor);
+      const opening = char === '$' ? (display ? '$$' : '$') : text.slice(cursor, cursor + 2);
+      const closing = char === '$' ? opening : display ? '\\]' : '\\)';
+      const end = text.indexOf(closing, cursor + opening.length);
+      const value = text.slice(cursor + opening.length, end);
+      if (end > cursor + opening.length && (display || !value.includes('\n')) && value.length <= 12000) {
+        flushText(cursor);
+        nodes.push(options.renderMath(value, display, `${keyPrefix}-math-${nodeIndex++}`));
+        cursor = end + closing.length; textStart = cursor; continue;
+      }
+    }
+
     if (char === '`') {
       const close = findClosingDelimiter(text, '`', cursor + 1);
       if (close !== -1) {
@@ -1145,14 +1160,16 @@ export const MarkdownReadonly = memo(function MarkdownReadonly({
   className,
   preserveSoftLineBreaks = true,
   renderCodeBlock: customCodeBlock,
+  renderMath,
 }: MarkdownReadonlyProps) {
   const rendered = useMemo(
     () =>
       renderBlocks(markdown || '', {
         preserveSoftLineBreaks,
         renderCodeBlock: customCodeBlock,
+        renderMath,
       }),
-    [customCodeBlock, markdown, preserveSoftLineBreaks]
+    [customCodeBlock, renderMath, markdown, preserveSoftLineBreaks]
   );
 
   return (

@@ -616,6 +616,64 @@ index 0000000..8ecf48c
 +    />
 +  );
 +}
+diff --git a/packages/drawnix/src/components/MarkdownReadonly/index.tsx b/packages/drawnix/src/components/MarkdownReadonly/index.tsx
+index b036854..26eedfd 100644
+--- a/packages/drawnix/src/components/MarkdownReadonly/index.tsx
++++ b/packages/drawnix/src/components/MarkdownReadonly/index.tsx
+@@ -13,6 +13,7 @@ import { RetryImage } from '../retry-image';
+ import './MarkdownReadonly.css';
+ 
+ export interface MarkdownReadonlyProps {
++  renderMath?: (value: string, display: boolean, key: string) => React.ReactNode;
+   markdown: string;
+   className?: string;
+   preserveSoftLineBreaks?: boolean;
+@@ -24,6 +25,7 @@ export interface MarkdownReadonlyProps {
+ }
+ 
+ interface RenderOptions {
++  renderMath?: MarkdownReadonlyProps["renderMath"];
+   preserveSoftLineBreaks: boolean;
+   renderCodeBlock?: MarkdownReadonlyProps['renderCodeBlock'];
+ }
+@@ -660,6 +662,19 @@ function renderInline(
+   while (cursor < text.length) {
+     const char = text[cursor];
+ 
++    if (options.renderMath && !isEscaped(text, cursor) && (char === '$' || (char === '\\' && ['(', '['].includes(text[cursor + 1])))) {
++      const display = text.startsWith('$$', cursor) || text.startsWith('\\[', cursor);
++      const opening = char === '$' ? (display ? '$$' : '$') : text.slice(cursor, cursor + 2);
++      const closing = char === '$' ? opening : display ? '\\]' : '\\)';
++      const end = text.indexOf(closing, cursor + opening.length);
++      const value = text.slice(cursor + opening.length, end);
++      if (end > cursor + opening.length && (display || !value.includes('\n')) && value.length <= 12000) {
++        flushText(cursor);
++        nodes.push(options.renderMath(value, display, `${keyPrefix}-math-${nodeIndex++}`));
++        cursor = end + closing.length; textStart = cursor; continue;
++      }
++    }
++
+     if (char === '`') {
+       const close = findClosingDelimiter(text, '`', cursor + 1);
+       if (close !== -1) {
+@@ -1145,14 +1160,16 @@ export const MarkdownReadonly = memo(function MarkdownReadonly({
+   className,
+   preserveSoftLineBreaks = true,
+   renderCodeBlock: customCodeBlock,
++  renderMath,
+ }: MarkdownReadonlyProps) {
+   const rendered = useMemo(
+     () =>
+       renderBlocks(markdown || '', {
+         preserveSoftLineBreaks,
+         renderCodeBlock: customCodeBlock,
++        renderMath,
+       }),
+-    [customCodeBlock, markdown, preserveSoftLineBreaks]
++    [customCodeBlock, renderMath, markdown, preserveSoftLineBreaks]
+   );
+ 
+   return (
 diff --git a/packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts b/packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts
 index 9081372..44efc61 100644
 --- a/packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts
@@ -1471,8 +1529,115 @@ index 0000000..3e6ab61
 +    background: #444b57;
 +  }
 +}
+diff --git a/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx b/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
+index dc68803..60b21d3 100644
+--- a/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
++++ b/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
+@@ -14,6 +14,7 @@ import React, {
+   useRef,
+   Suspense,
+ } from 'react';
++import { Maximize2, Columns2, MessagesSquare, WandSparkles } from 'lucide-react';
+ import { CloseIcon, AddIcon, ViewListIcon } from 'tdesign-icons-react';
+ import { ATTACHED_ELEMENT_CLASS_NAME } from '@plait/core';
+ import { SessionList } from './SessionList';
+@@ -63,6 +64,7 @@ import { resolveDrawerGenerationRoute } from './drawer-generation-route';
+ import { HoverTip } from '../shared';
+ import './chat-drawer.scss';
+ 
++const TextChatWorkspace = React.lazy(() => import('../text-chat/TextChatWorkspace'));
+ const ChatMessagesArea = React.lazy(() => import('./ChatMessagesArea'));
+ 
+ // 工作流消息的特殊标记前缀
+@@ -217,6 +219,10 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+       const cached = chatStorageService.getDrawerState();
+       return cached.isOpen ?? defaultOpen;
+     });
++    const [chatMode, setChatMode] = useState<'text' | 'creative'>(() => chatStorageService.getDrawerState().mode || 'text');
++    const [textFocus, setTextFocus] = useState(() => chatStorageService.getDrawerState().textFocus ?? true);
++    const exitTextFocus = useCallback(() => setTextFocus(false), []);
++    useEffect(() => { chatStorageService.setDrawerState({ mode: chatMode, textFocus }); }, [chatMode, textFocus]);
+     const [sessions, setSessions] = useState<ChatSession[]>([]);
+     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+     const activeSessionIdRef = useRef<string | null>(null);
+@@ -542,11 +548,11 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+     useEffect(() => {
+       const init = async () => {
+         const drawerState = chatStorageService.getDrawerState();
+-        const loadedSessions = await chatStorageService.getAllSessions();
++        const loadedSessions = (await chatStorageService.getAllSessions()).filter(session => session.kind !== 'text');
+         setSessions(loadedSessions);
+ 
+         let activeId: string | null = null;
+-        if (drawerState.activeSessionId) {
++        if (drawerState.activeSessionId && loadedSessions.some(session => session.id === drawerState.activeSessionId)) {
+           activeId = drawerState.activeSessionId;
+           updateActiveSessionId(drawerState.activeSessionId);
+         } else if (loadedSessions.length > 0) {
+@@ -1113,6 +1119,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+     // 发送工作流消息
+     const handleSendWorkflowMessage = useCallback(
+       async (params: WorkflowMessageParams) => {
++        setChatMode('creative');
+         const {
+           context,
+           workflow,
+@@ -1736,6 +1743,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+         },
+         toggle: handleToggle,
+         sendMessage: async (content: string) => {
++          setChatMode('creative');
+           // Open drawer first
+           setIsOpen(true);
+           onOpenChange?.(true);
+@@ -1941,16 +1949,16 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+ 
+     return (
+       <>
+-        <ChatDrawerTrigger
++        {!(isOpen && chatMode === 'text' && textFocus) && <ChatDrawerTrigger
+           isOpen={isOpen}
+           onClick={handleToggle}
+           drawerWidth={drawerWidth}
+-        />
++        />}
+ 
+         <div
+           className={`chat-drawer ${ATTACHED_ELEMENT_CLASS_NAME} ${
+             isOpen ? 'chat-drawer--open' : ''
+-          } ${isDragging ? 'chat-drawer--dragging' : ''}`}
++          } ${isDragging ? 'chat-drawer--dragging' : ''} ${chatMode === 'text' ? 'chat-drawer--text' : ''} ${chatMode === 'text' && textFocus ? 'chat-drawer--text-focus' : ''}`}
+           style={{ width: drawerWidth }}
+           data-testid="chat-drawer"
+         >
+@@ -1961,6 +1969,17 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+             onMouseDown={handleResizeStart}
+           />
+           <div ref={domRef} className="chat-drawer__body">
++            <div className="text-chat-modebar">
++              <div role="group" aria-label="对话模式">
++                <button type="button" aria-pressed={chatMode === 'text'} onClick={() => setChatMode('text')}><MessagesSquare size={15} />文本对话</button>
++                <button type="button" aria-pressed={chatMode === 'creative'} onClick={() => setChatMode('creative')}><WandSparkles size={15} />创作助手</button>
++              </div>
++              {chatMode === 'text' && <button type="button" aria-label={textFocus ? '画布并排' : '专注对话'} onClick={() => setTextFocus(v => !v)}>{textFocus ? <Columns2 size={15} /> : <Maximize2 size={15} />}{textFocus ? '画布并排' : '专注对话'}</button>}
++              <button type="button" aria-label="关闭对话面板" onClick={handleClose}><CloseIcon size={16} /></button>
++            </div>
++            {chatMode === 'text' && shouldRenderChat && <Suspense fallback={<div className="chat-loading">加载文本对话…</div>}><TextChatWorkspace focused={textFocus} selectedText={selectedContent.filter(item => item.type === 'text').map(item => item.text || '').join('\n\n')} onExitFocus={exitTextFocus} /></Suspense>}
++            <div className="text-chat-creative-body" style={{ display: chatMode === 'creative' ? 'flex' : 'none' }}>
++
+             <div className="chat-drawer__header">
+               <div className="chat-drawer__header-top">
+                 <HoverTip content="关闭">
+@@ -2084,6 +2103,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+                 placeholder="继续描述要修改的内容..."
+               />
+             </div>
++            </div>
+           </div>
+         </div>
+       </>
 diff --git a/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx b/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx
-index f032b56..3f1177d 100644
+index f032b56..8e3d418 100644
 --- a/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx
 +++ b/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx
 @@ -434,7 +434,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
@@ -1484,6 +1649,15 @@ index f032b56..3f1177d 100644
      };
  
      return (
+@@ -460,7 +460,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
+               className="model-selector__trigger-health"
+             />
+             <span className="model-selector__trigger-text">
+-              {currentModel?.shortLabel || currentModel?.label || '选择模型'}
++              {currentModel?.shortLabel || currentModel?.label || selectedModel || '选择模型'}
+             </span>
+           </div>
+           <ChevronDownIcon
 diff --git a/packages/drawnix/src/components/comic-creator/ComicCreator.scss b/packages/drawnix/src/components/comic-creator/ComicCreator.scss
 index e05911f..fc36ccf 100644
 --- a/packages/drawnix/src/components/comic-creator/ComicCreator.scss
@@ -5922,6 +6096,1664 @@ index ecd1fb1..c9c74c6 100644
        if (result.openedCount > 0 && result.downloadedCount === 0) {
          MessagePlugin.success(
            result.openedCount > 1
+diff --git a/packages/drawnix/src/components/text-chat/TextChatWorkspace.tsx b/packages/drawnix/src/components/text-chat/TextChatWorkspace.tsx
+new file mode 100644
+index 0000000..fa37e42
+--- /dev/null
++++ b/packages/drawnix/src/components/text-chat/TextChatWorkspace.tsx
+@@ -0,0 +1,813 @@
++import React, {
++  memo,
++  useCallback,
++  useEffect,
++  useMemo,
++  useRef,
++  useState,
++  useSyncExternalStore,
++} from "react";
++import {
++  ArrowUp,
++  Check,
++  ChevronDown,
++  Copy,
++  History,
++  ListChecks,
++  Loader2,
++  MessageCircle,
++  PanelLeftClose,
++  PencilLine,
++  Plus,
++  Rabbit,
++  RotateCcw,
++  ScanText,
++  Search,
++  SlidersHorizontal,
++  Square,
++  Trash2,
++  X,
++  Code2,
++  Feather,
++  Lightbulb,
++} from "lucide-react";
++import { ModelSelector } from "../chat-drawer/ModelSelector";
++import { ConfirmDialog } from "../dialog/ConfirmDialog";
++import { useDrawnix } from "../../hooks/use-drawnix";
++import { chatStorageService } from "../../services/chat-storage-service";
++import { textChatRuntime as runtime } from "../../services/text-chat/runtime";
++import {
++  newTextState,
++  type TextMessage,
++} from "../../services/text-chat/conversation";
++import {
++  settingsManager,
++  resolveInvocationRoute,
++  createModelRef,
++  type ModelRef,
++} from "../../utils/settings-manager";
++import { quickInsert } from "../../services/canvas-operations/canvas-insertion";
++import { TextMarkdown, copyChatText } from "./TextMarkdown";
++import "./text-chat.scss";
++
++const completedReasons = new Set(["stop", "end_turn", "STOP", "stop_sequence"]);
++const MessageView = memo(function MessageView({
++  message,
++  retryPrompt,
++  busy,
++  onRetry,
++  onInsert,
++}: {
++  message: TextMessage;
++  retryPrompt?: string;
++  busy: boolean;
++  onRetry: (userId: string) => void;
++  onInsert: (text: string) => void;
++}) {
++  const [copied, setCopied] = useState(false);
++  const [copyError, setCopyError] = useState("");
++  const copying = async () => {
++    try {
++      await copyChatText(message.content);
++      setCopied(true);
++      setCopyError("");
++    } catch (e) {
++      setCopyError((e as Error).message);
++    }
++  };
++  if (message.role === "user")
++    return (
++      <div className="text-chat-user" data-message-id={message.id}>
++        {message.content}
++      </div>
++    );
++  const generating = ["pending", "streaming"].includes(message.status);
++  return (
++    <article
++      className="text-chat-answer"
++      data-message-id={message.id}
++      data-status={message.status}
++    >
++      <div className="text-chat-author">
++        <MessageCircle size={16} />
++        <strong>{message.model || "AI 助手"}</strong>
++        {generating && (
++          <span>
++            <Loader2 size={13} className="text-chat-spin" />
++            {message.reasoning && !message.content
++              ? "正在思考"
++              : message.content
++                ? "正在回复"
++                : "等待回复"}
++          </span>
++        )}
++      </div>
++      {retryPrompt && (
++        <div className="text-chat-status">重新回复：{retryPrompt}</div>
++      )}
++      {message.reasoning && (
++        <details className="text-chat-reasoning">
++          <summary>
++            模型推理内容 <ChevronDown size={12} />
++          </summary>
++          <div>
++            <TextMarkdown content={message.reasoning} />
++          </div>
++        </details>
++      )}
++      {message.content && <TextMarkdown content={message.content} />}
++      {message.status === "stopped" && (
++        <div className="text-chat-status">已停止 · 已保留收到的内容</div>
++      )}
++      {message.error && (
++        <div className="text-chat-error" role="status">
++          {message.error}
++        </div>
++      )}
++      {message.status === "complete" &&
++        message.finishReason &&
++        !completedReasons.has(message.finishReason) && (
++          <div className="text-chat-status">
++            本次回复结束：
++            {[
++              "length",
++              "max_tokens",
++              "max_output_tokens",
++              "MAX_TOKENS",
++            ].includes(message.finishReason)
++              ? "达到输出长度上限"
++              : message.finishReason}
++          </div>
++        )}
++      {!generating && (
++        <div className="text-chat-message-actions">
++          <button type="button" onClick={copying} disabled={!message.content}>
++            {copied ? <Check /> : <Copy />}
++            {copied ? "已复制" : "复制"}
++          </button>
++          <button
++            type="button"
++            disabled={busy || !message.replyTo}
++            onClick={() => message.replyTo && onRetry(message.replyTo)}
++          >
++            <RotateCcw />
++            {message.status === "error" || message.status === "interrupted"
++              ? "重试"
++              : "重新生成"}
++          </button>
++          <button
++            type="button"
++            disabled={!message.content}
++            onClick={() => onInsert(message.content)}
++          >
++            <PanelLeftClose />
++            插入画布
++          </button>
++          {message.usage?.output !== undefined && (
++            <span>{message.usage.output.toLocaleString()} 输出 tokens</span>
++          )}
++        </div>
++      )}
++      {copyError && (
++        <div role="status" className="text-chat-error">
++          {copyError}
++        </div>
++      )}
++    </article>
++  );
++});
++
++export default function TextChatWorkspace({
++  focused,
++  selectedText,
++  onExitFocus,
++}: {
++  focused: boolean;
++  selectedText: string;
++  onExitFocus: () => void;
++}) {
++  const snapshot = useSyncExternalStore(runtime.subscribe, runtime.getSnapshot);
++  const [activeId, setActiveId] = useState<string | null>(
++    () => chatStorageService.getDrawerState().textActiveSessionId || null,
++  );
++  const [defaultModel, setDefaultModel] = useState<ModelRef | null>(null);
++  const [emptyState, setEmptyState] = useState(newTextState);
++  const [search, setSearch] = useState("");
++  const [historyOpen, setHistoryOpen] = useState(false);
++  const [settingsOpen, setSettingsOpen] = useState(false);
++  const [deleteId, setDeleteId] = useState<string | null>(null);
++  const [rename, setRename] = useState<string | null>(null);
++  const [notice, setNotice] = useState("");
++  const [submitting, setSubmitting] = useState(false);
++  const creatingInitial = useRef(false);
++  const [quote, setQuote] = useState("");
++  const [atBottom, setAtBottom] = useState(true);
++  const scrollRef = useRef<HTMLDivElement>(null),
++    inputRef = useRef<HTMLTextAreaElement>(null);
++  const followRef = useRef(true),
++    submitLock = useRef(false);
++  const { board, setAppState } = useDrawnix();
++  const boardRef = useRef(board);
++  boardRef.current = board;
++  const session = snapshot.sessions.find((s) => s.id === activeId);
++  const state = session?.textChat || emptyState;
++  const retryPrompts = useMemo(() => {
++    const users = new Map(
++      state.messages
++        .filter((m) => m.role === "user")
++        .map((m) => [m.id, m.content]),
++    );
++    const seen = new Set<string>(),
++      labels = new Map<string, string>();
++    for (const m of state.messages) {
++      if (m.role !== "assistant" || !m.replyTo) continue;
++      if (seen.has(m.replyTo))
++        labels.set(m.id, (users.get(m.replyTo) || "原问题").slice(0, 100));
++      seen.add(m.replyTo);
++    }
++    return labels;
++  }, [state.messages]);
++  const busy = submitting || snapshot.running.has(activeId || "");
++  const model = session?.sessionModelRef || defaultModel;
++  const sessions = useMemo(
++    () =>
++      snapshot.sessions
++        .filter((s) =>
++          s.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
++        )
++        .sort((a, b) => b.updatedAt - a.updatedAt),
++    [snapshot.sessions, search],
++  );
++  useEffect(() => {
++    void runtime.initialize();
++    let mounted = true;
++    const refresh = () => {
++      if (mounted) {
++        const route = resolveInvocationRoute("text");
++        setDefaultModel(createModelRef(route.profileId, route.modelId));
++      }
++    };
++    const paths = [
++      "gemini",
++      "providerProfiles",
++      "providerCatalogs",
++      "invocationPresets",
++      "activePresetId",
++    ];
++    void settingsManager.waitForInitialization().then(refresh);
++    paths.forEach((path) => settingsManager.addListener(path, refresh));
++    return () => {
++      mounted = false;
++      paths.forEach((path) => settingsManager.removeListener(path, refresh));
++      void runtime.flush().catch(() => {});
++    };
++  }, []);
++  const select = useCallback((id: string | null) => {
++    setActiveId(id);
++    chatStorageService.setDrawerState({ textActiveSessionId: id });
++    setHistoryOpen(false);
++    setQuote("");
++    setRename(null);
++    setNotice("");
++    followRef.current = true;
++    setAtBottom(true);
++  }, []);
++  useEffect(() => {
++    if (snapshot.ready && activeId && !session && !snapshot.error) select(null);
++  }, [snapshot.ready, activeId, session, snapshot.error, select]);
++  // Allocate the draft's durable conversation before editing, including the first visit.
++  useEffect(() => {
++    if (
++      !snapshot.ready ||
++      snapshot.error ||
++      activeId ||
++      creatingInitial.current
++    )
++      return;
++    const existing = snapshot.sessions[0];
++    if (existing) {
++      select(existing.id);
++      return;
++    }
++    creatingInitial.current = true;
++    void settingsManager
++      .waitForInitialization()
++      .then(() => {
++        const route = resolveInvocationRoute("text");
++        return runtime.create(createModelRef(route.profileId, route.modelId));
++      })
++      .then(select)
++      .catch((e) => setNotice(e.message))
++      .finally(() => {
++        creatingInitial.current = false;
++      });
++  }, [snapshot.ready, snapshot.error, activeId, snapshot.sessions, select]);
++  const patch = (values: Partial<typeof emptyState>) => {
++    if (session) runtime.configure(session.id, {}, values);
++    else setEmptyState((old) => ({ ...old, ...values }));
++  };
++  const onModel = (modelId: string, ref?: ModelRef | null) => {
++    const next = ref || createModelRef(null, modelId);
++    if (session)
++      runtime.configure(session.id, {
++        sessionModel: modelId,
++        sessionModelRef: next,
++      });
++    else setDefaultModel(next);
++  };
++  const newSession = async () => {
++    try {
++      const id = await runtime.create(defaultModel);
++      select(id);
++      inputRef.current?.focus();
++    } catch (e) {
++      setNotice((e as Error).message);
++    }
++  };
++  const send = async () => {
++    if (submitLock.current || busy || !state.draft.trim()) return;
++    submitLock.current = true;
++    setSubmitting(true);
++    setNotice("");
++    try {
++      let id = session?.id;
++      if (!id) {
++        id = await runtime.create(defaultModel);
++        runtime.configure(id, {}, emptyState);
++        select(id);
++      }
++      const content = quote
++        ? `引用的画布文字：\n${quote}\n\n${state.draft}`
++        : state.draft;
++      setEmptyState(newTextState());
++      setQuote("");
++      followRef.current = true;
++      void runtime.send(id, content).catch((e) => setNotice(e.message));
++    } catch (e) {
++      setNotice((e as Error).message);
++    } finally {
++      submitLock.current = false;
++      setSubmitting(false);
++      inputRef.current?.focus();
++    }
++  };
++  const retry = useCallback(
++    (userId: string) => {
++      if (activeId) {
++        followRef.current = true;
++        void runtime
++          .send(activeId, "", userId)
++          .catch((e) => setNotice(e.message));
++      }
++    },
++    [activeId],
++  );
++  const insert = useCallback(
++    async (text: string) => {
++      const target = boardRef.current;
++      if (!target) {
++        setNotice("画布尚未就绪，请稍后再试。");
++        return;
++      }
++      try {
++        const result = await quickInsert(
++          "text",
++          text,
++          undefined,
++          undefined,
++          undefined,
++          target,
++          () => boardRef.current === target,
++          false,
++        );
++        if (!result.success) throw new Error(result.error || "插入失败");
++        onExitFocus();
++        setNotice("已将回复插入当前画布。");
++      } catch (e) {
++        setNotice((e as Error).message);
++      }
++    },
++    [onExitFocus],
++  );
++  const last = state.messages.at(-1);
++  useEffect(() => {
++    if (followRef.current && scrollRef.current)
++      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
++  }, [
++    last?.content,
++    last?.reasoning,
++    last?.status,
++    state.messages.length,
++    activeId,
++    focused,
++  ]);
++  useEffect(() => {
++    const el = scrollRef.current;
++    if (!el?.firstElementChild || typeof ResizeObserver === "undefined") return;
++    const observer = new ResizeObserver(() => {
++      if (followRef.current) el.scrollTop = el.scrollHeight;
++    });
++    observer.observe(el.firstElementChild);
++    return () => observer.disconnect();
++  }, [activeId, !!state.messages.length]);
++  const scroll = () => {
++    const el = scrollRef.current;
++    if (!el) return;
++    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 70;
++    followRef.current = near;
++    setAtBottom(near);
++  };
++  const titleSave = () => {
++    if (session && rename?.trim())
++      runtime.configure(session.id, { title: rename.trim().slice(0, 80) });
++    setRename(null);
++  };
++
++  return (
++    <div
++      className={`text-chat-workspace ${focused ? "is-focused" : ""}`}
++      data-testid="text-chat-workspace"
++    >
++      <aside
++        className={`text-chat-history ${historyOpen ? "is-open" : ""}`}
++        aria-label="文本历史会话"
++      >
++        <button
++          type="button"
++          className="text-chat-new"
++          onClick={newSession}
++          disabled={!snapshot.ready}
++        >
++          <Plus />
++          新建对话
++        </button>
++        <label className="text-chat-search">
++          <Search />
++          <input
++            value={search}
++            onChange={(e) => setSearch(e.target.value)}
++            placeholder="搜索对话"
++            aria-label="搜索文本对话"
++          />
++        </label>
++        <div className="text-chat-session-list">
++          {sessions.map((s) => (
++            <div
++              key={s.id}
++              className={`text-chat-session ${s.id === activeId ? "is-active" : ""}`}
++            >
++              <button
++                type="button"
++                onClick={() => select(s.id)}
++                title={s.title}
++              >
++                {snapshot.running.has(s.id) ? (
++                  <Loader2 className="text-chat-spin" />
++                ) : (
++                  <MessageCircle />
++                )}
++                <span>{s.title}</span>
++              </button>
++              <button
++                type="button"
++                className="text-chat-delete"
++                aria-label={`删除 ${s.title}`}
++                onClick={() => setDeleteId(s.id)}
++                disabled={snapshot.running.has(s.id)}
++              >
++                <Trash2 />
++              </button>
++            </div>
++          ))}
++          {!sessions.length && (
++            <p className="text-chat-muted">
++              {search ? "没有匹配的对话" : "还没有文本对话"}
++            </p>
++          )}
++        </div>
++        <div className="text-chat-history-footer">对话保存在本机</div>
++      </aside>
++      <section className="text-chat-main">
++        <header className="text-chat-header">
++          <button
++            type="button"
++            aria-label="文本会话列表"
++            aria-expanded={historyOpen}
++            onClick={() => setHistoryOpen((v) => !v)}
++          >
++            <History />
++          </button>
++          <ModelSelector
++            value={model?.modelId || undefined}
++            valueRef={model}
++            onChange={onModel}
++          />
++          <span className="text-chat-spacer" />
++          <button
++            type="button"
++            aria-label="配置文本模型"
++            title="打开现有创作配置"
++            onClick={() => setAppState((s) => ({ ...s, openSettings: true }))}
++          >
++            <SlidersHorizontal />
++          </button>
++          <button
++            type="button"
++            aria-label="新建文本对话"
++            onClick={newSession}
++            disabled={!snapshot.ready}
++          >
++            <Plus />
++          </button>
++        </header>
++        {session && (
++          <div className="text-chat-title">
++            {rename !== null ? (
++              <input
++                aria-label="会话名称"
++                autoFocus
++                value={rename}
++                maxLength={80}
++                onChange={(e) => setRename(e.target.value)}
++                onBlur={titleSave}
++                onKeyDown={(e) => {
++                  if (
++                    e.key === "Enter" &&
++                    !e.nativeEvent.isComposing &&
++                    e.nativeEvent.keyCode !== 229
++                  )
++                    titleSave();
++                  if (e.key === "Escape") setRename(null);
++                }}
++              />
++            ) : (
++              <button type="button" onClick={() => setRename(session.title)}>
++                {session.title}
++                <PencilLine />
++              </button>
++            )}
++          </div>
++        )}
++        {snapshot.error && (
++          <div className="text-chat-error" role="alert">
++            {snapshot.error}
++            <button type="button" onClick={() => void runtime.initialize()}>
++              重新读取
++            </button>
++          </div>
++        )}
++        {session && snapshot.saveErrors.has(session.id) && (
++          <div className="text-chat-error" role="alert">
++            保存失败，请保留当前窗口。
++            <button
++              type="button"
++              onClick={() =>
++                void runtime.save(session.id).catch((e) => setNotice(e.message))
++              }
++            >
++              重试保存
++            </button>
++          </div>
++        )}
++        <div className="text-chat-scroll" ref={scrollRef} onScroll={scroll}>
++          {!snapshot.ready ? (
++            <div className="text-chat-empty">
++              <Loader2 className="text-chat-spin" />
++              正在读取会话
++            </div>
++          ) : !state.messages.length ? (
++            <div className="text-chat-empty">
++              <div className="text-chat-emblem">
++                <Rabbit />
++              </div>
++              <h2>从一个想法开始</h2>
++              <p>写点什么，理清思路，或者聊聊你的下一个作品。</p>
++              <div className="text-chat-starters">
++                {[
++                  [Feather, "打磨一段文字", "帮我把下面这段文字写得更自然：\n"],
++                  [
++                    ListChecks,
++                    "梳理一个计划",
++                    "帮我把这个想法整理成可执行的计划：\n",
++                  ],
++                  [
++                    Code2,
++                    "读懂一段代码",
++                    "请解释下面的代码，并给出改进建议：\n",
++                  ],
++                  [Lightbulb, "聊聊创作灵感", "请帮我想三个不同的创作方向：\n"],
++                ].map(([Icon, title, prompt]) => {
++                  const Symbol = Icon as typeof Feather;
++                  return (
++                    <button
++                      type="button"
++                      key={String(title)}
++                      onClick={() => {
++                        patch({ draft: String(prompt) });
++                        inputRef.current?.focus();
++                      }}
++                    >
++                      <Symbol />
++                      {String(title)}
++                    </button>
++                  );
++                })}
++              </div>
++            </div>
++          ) : (
++            <div className="text-chat-messages">
++              {state.messages.map((message) => (
++                <MessageView
++                  key={message.id}
++                  message={message}
++                  retryPrompt={retryPrompts.get(message.id)}
++                  busy={busy}
++                  onRetry={retry}
++                  onInsert={insert}
++                />
++              ))}
++            </div>
++          )}
++        </div>
++        {!atBottom && (
++          <button
++            type="button"
++            className="text-chat-latest"
++            onClick={() => {
++              followRef.current = true;
++              setAtBottom(true);
++              scrollRef.current?.scrollTo({
++                top: scrollRef.current.scrollHeight,
++                behavior: "smooth",
++              });
++            }}
++          >
++            <ChevronDown />
++            回到最新回复
++          </button>
++        )}
++        {notice && (
++          <div className="text-chat-notice" role="status">
++            {notice}
++            <button
++              type="button"
++              aria-label="关闭提示"
++              onClick={() => setNotice("")}
++            >
++              <X />
++            </button>
++          </div>
++        )}
++        <div className="text-chat-composer-wrap">
++          {settingsOpen && (
++            <div className="text-chat-settings">
++              <div>
++                <strong>当前对话设置</strong>
++                <button
++                  type="button"
++                  aria-label="关闭对话设置"
++                  onClick={() => setSettingsOpen(false)}
++                >
++                  <X />
++                </button>
++              </div>
++              <label>
++                系统提示词
++                <textarea
++                  rows={3}
++                  value={state.systemPrompt}
++                  maxLength={20000}
++                  onChange={(e) => patch({ systemPrompt: e.target.value })}
++                  placeholder="例如：用简洁、自然的中文回答。"
++                />
++              </label>
++              <label>
++                最大输出长度
++                <input
++                  type="number"
++                  min={1}
++                  max={131072}
++                  aria-label="最大输出长度"
++                  placeholder="跟随模型默认"
++                  value={state.maxOutput ?? ""}
++                  onChange={(e) => {
++                    const v =
++                      e.target.value === ""
++                        ? undefined
++                        : Number(e.target.value);
++                    patch({ maxOutput: v });
++                  }}
++                />
++              </label>
++              <small>仅影响后续消息；实际上限取决于所选模型。</small>
++            </div>
++          )}
++          <div className="text-chat-composer">
++            {quote && (
++              <div className="text-chat-quote">
++                <ScanText />
++                <span>{quote.slice(0, 100)}</span>
++                <button
++                  type="button"
++                  aria-label="移除画布引用"
++                  onClick={() => setQuote("")}
++                >
++                  <X />
++                </button>
++              </div>
++            )}
++            <textarea
++              ref={inputRef}
++              aria-label="文本消息"
++              disabled={!session || !snapshot.ready}
++              rows={3}
++              value={state.draft}
++              maxLength={200000}
++              onChange={(e) => patch({ draft: e.target.value })}
++              onKeyDown={(e) => {
++                if (
++                  e.key === "Enter" &&
++                  !e.shiftKey &&
++                  !e.nativeEvent.isComposing &&
++                  e.nativeEvent.keyCode !== 229
++                ) {
++                  e.preventDefault();
++                  void send();
++                }
++              }}
++              placeholder="输入消息，让想法继续…"
++            />
++            <div className="text-chat-composer-actions">
++              <button
++                type="button"
++                aria-label="引用画布文字"
++                title={selectedText ? "引用当前选中文字" : "请先在画布选择文字"}
++                disabled={!selectedText}
++                onClick={() => {
++                  setQuote(selectedText.slice(0, 20000));
++                  inputRef.current?.focus();
++                }}
++              >
++                <ScanText />
++              </button>
++              <button
++                type="button"
++                aria-label="当前对话设置"
++                aria-expanded={settingsOpen}
++                onClick={() => setSettingsOpen((v) => !v)}
++              >
++                <SlidersHorizontal />
++              </button>
++              <span className="text-chat-spacer" />
++              {busy ? (
++                <button
++                  type="button"
++                  className="text-chat-send"
++                  aria-label="停止回复"
++                  onClick={() => activeId && runtime.stop(activeId)}
++                >
++                  <Square />
++                </button>
++              ) : (
++                <button
++                  type="button"
++                  className="text-chat-send"
++                  aria-label="发送文本消息"
++                  disabled={
++                    !state.draft.trim() || !snapshot.ready || !!snapshot.error
++                  }
++                  onClick={() => void send()}
++                >
++                  <ArrowUp />
++                </button>
++              )}
++            </div>
++          </div>
++          <div className="text-chat-footer">
++            Enter 发送 · Shift + Enter 换行
++          </div>
++        </div>
++      </section>
++      <ConfirmDialog
++        open={!!deleteId}
++        title="删除文本会话"
++        description="确定删除这条会话及其中所有回复吗？此操作无法撤销。"
++        confirmText="删除"
++        cancelText="取消"
++        danger
++        onOpenChange={(open) => !open && setDeleteId(null)}
++        onConfirm={async () => {
++          if (!deleteId) return;
++          try {
++            await runtime.remove(deleteId);
++            if (activeId === deleteId) select(null);
++            setDeleteId(null);
++          } catch (e) {
++            setNotice((e as Error).message);
++            setDeleteId(null);
++          }
++        }}
++      />
++    </div>
++  );
++}
+diff --git a/packages/drawnix/src/components/text-chat/TextMarkdown.test.tsx b/packages/drawnix/src/components/text-chat/TextMarkdown.test.tsx
+new file mode 100644
+index 0000000..0bc1494
+--- /dev/null
++++ b/packages/drawnix/src/components/text-chat/TextMarkdown.test.tsx
+@@ -0,0 +1,55 @@
++import React from "react";
++import {
++  cleanup,
++  fireEvent,
++  render,
++  screen,
++  waitFor,
++} from "@testing-library/react";
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { TextMarkdown } from "./TextMarkdown";
++afterEach(cleanup);
++describe("text message rendering", () => {
++  it("renders headings, tables and math without treating code as formulas", () => {
++    const view = render(
++      <TextMarkdown
++        content={
++          '## Plan\n\n| Task | Status |\n| --- | --- |\n| Build | Done |\n\n$E=mc^2$\n\n```js\nconst value = "$x$";\n```'
++        }
++      />,
++    );
++    expect(screen.getByRole("heading", { name: "Plan" })).toBeTruthy();
++    expect(view.container.querySelector("table")).toBeTruthy();
++    expect(view.container.querySelectorAll(".katex")).toHaveLength(1);
++    expect(view.container.querySelector("pre")?.textContent).toContain("$x$");
++  });
++  it("copies the original code without markup", async () => {
++    const write = vi.fn(async () => {});
++    Object.defineProperty(navigator, "clipboard", {
++      configurable: true,
++      value: { writeText: write },
++    });
++    render(
++      <TextMarkdown
++        content={'```typescript\nconst text = "<b>safe</b>";\n```'}
++      />,
++    );
++    fireEvent.click(screen.getByRole("button", { name: "复制代码" }));
++    await waitFor(() =>
++      expect(write).toHaveBeenCalledWith('const text = "<b>safe</b>";\n'),
++    );
++    expect(screen.getByRole("button", { name: "已复制" })).toBeTruthy();
++  });
++  it("does not execute raw HTML, javascript links or trusted math HTML commands", () => {
++    const view = render(
++      <TextMarkdown
++        content={
++          '<script>window.hacked=true</script>\n\n[bad](javascript:alert(1))\n\n$\\href{javascript:alert(1)}{bad}$\n\n```html\n<img onerror="alert(1)">\n```'
++        }
++      />,
++    );
++    expect(view.container.querySelector("script")).toBeNull();
++    expect(view.container.querySelector("[onerror]")).toBeNull();
++    expect(view.container.querySelector('a[href^="javascript:"]')).toBeNull();
++  });
++});
+diff --git a/packages/drawnix/src/components/text-chat/TextMarkdown.tsx b/packages/drawnix/src/components/text-chat/TextMarkdown.tsx
+new file mode 100644
+index 0000000..f5fa252
+--- /dev/null
++++ b/packages/drawnix/src/components/text-chat/TextMarkdown.tsx
+@@ -0,0 +1,117 @@
++import React, { memo, useCallback } from "react";
++import katex from "katex";
++import "katex/dist/katex.min.css";
++import MarkdownReadonly from "../MarkdownReadonly";
++import copy from "copy-to-clipboard";
++
++export async function copyChatText(text: string): Promise<void> {
++  try {
++    await navigator.clipboard.writeText(text);
++  } catch {
++    if (!copy(text)) throw new Error("复制失败，请选择文字后复制。");
++  }
++}
++
++function CodeBlock({ code, language }: { code: string; language: string }) {
++  const [feedback, setFeedback] = React.useState("复制代码");
++  const copyCode = async () => {
++    try {
++      await copyChatText(code);
++      setFeedback("已复制");
++    } catch {
++      setFeedback("复制失败");
++    }
++  };
++  // Conservative highlighting; React text nodes always escape model-provided HTML.
++  const parts =
++    /^(js|javascript|ts|typescript|json|python|py|bash|sh|css|html)$/i.test(
++      language,
++    )
++      ? code.split(
++          /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b(?:const|let|return|function|async|await|import|from|export|if|else|class|def|for|in|True|False|None|true|false|null)\b)/g,
++        )
++      : [code];
++  return (
++    <div className="text-chat-code">
++      <div>
++        <span>{language || "text"}</span>
++        <button type="button" onClick={copyCode}>
++          {feedback}
++        </button>
++      </div>
++      <pre>
++        <code>
++          {parts.map((part, i) => (
++            <span
++              key={i}
++              className={
++                i % 2 ? (/^["']/.test(part) ? "string" : "keyword") : undefined
++              }
++            >
++              {part}
++            </span>
++          ))}
++        </code>
++      </pre>
++    </div>
++  );
++}
++
++function MathText({
++  value,
++  display = false,
++}: {
++  value: string;
++  display?: boolean;
++}) {
++  const html = React.useMemo(() => {
++    try {
++      return katex.renderToString(value, {
++        displayMode: display,
++        throwOnError: false,
++        trust: false,
++        strict: "ignore",
++        maxExpand: 500,
++        maxSize: 20,
++      });
++    } catch {
++      return null;
++    }
++  }, [value, display]);
++  return html ? (
++    <span
++      className="text-chat-math"
++      dangerouslySetInnerHTML={{ __html: html }}
++    />
++  ) : (
++    <code>{value}</code>
++  );
++}
++export const TextMarkdown = memo(function TextMarkdown({
++  content,
++}: {
++  content: string;
++}) {
++  const codeBlock = useCallback(
++    (code: string, language: string, key: string) =>
++      language === "math" || language === "latex" ? (
++        <MathText key={key} value={code} display />
++      ) : (
++        <CodeBlock key={key} code={code} language={language} />
++      ),
++    [],
++  );
++  const math = useCallback(
++    (value: string, display: boolean, key: string) => (
++      <MathText key={key} value={value} display={display} />
++    ),
++    [],
++  );
++  return (
++    <MarkdownReadonly
++      markdown={content}
++      renderCodeBlock={codeBlock}
++      renderMath={math}
++    />
++  );
++});
+diff --git a/packages/drawnix/src/components/text-chat/text-chat.scss b/packages/drawnix/src/components/text-chat/text-chat.scss
+new file mode 100644
+index 0000000..01ec2f0
+--- /dev/null
++++ b/packages/drawnix/src/components/text-chat/text-chat.scss
+@@ -0,0 +1,649 @@
++.chat-drawer--text {
++  background: #fffefa;
++  color: #292d29;
++  color-scheme: light;
++}
++.chat-drawer--text-focus {
++  left: 0;
++  width: 100% !important;
++  max-width: 100%;
++  border-left: 0;
++}
++.chat-drawer--text-focus .chat-drawer__resize-handle {
++  display: none;
++}
++.text-chat-creative-body {
++  flex: 1;
++  min-height: 0;
++  flex-direction: column;
++}
++.text-chat-modebar {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  border-bottom: 1px solid #e8e9e2;
++  padding: 10px 14px;
++  flex-shrink: 0;
++  > div {
++    display: flex;
++    margin-right: auto;
++    background: #f6f5f1;
++    border-radius: 8px;
++    padding: 3px;
++  }
++  button {
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    gap: 6px;
++    border: 0;
++    background: transparent;
++    border-radius: 7px;
++    padding: 6px 9px;
++    font-size: 12px;
++    cursor: pointer;
++    color: inherit;
++  }
++  button[aria-pressed="true"] {
++    background: #fff;
++    box-shadow: 0 1px 3px #242b2010;
++  }
++  button:focus-visible {
++    outline: 2px solid #337fca;
++    outline-offset: 2px;
++  }
++}
++.text-chat-workspace {
++  --tc-paper: #fffefa;
++  --tc-panel: #f6f5f1;
++  --tc-surface: #fff;
++  --tc-ink: #292d29;
++  --tc-soft: #747a71;
++  --tc-line: #e8e9e2;
++  --tc-selected: #e8eee1;
++  --tc-accent: #516647;
++  --tc-accent-ink: #fff;
++  display: flex;
++  flex: 1;
++  min-height: 0;
++  color: var(--tc-ink);
++  background: var(--tc-paper);
++  font-size: 13px;
++  line-height: 1.7;
++  position: relative;
++  * {
++    box-sizing: border-box;
++  }
++  button {
++    font: inherit;
++    color: inherit;
++    background: transparent;
++    border: 0;
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    gap: 7px;
++    min-height: 30px;
++    border-radius: 8px;
++    padding: 5px 8px;
++    cursor: pointer;
++  }
++  button:hover {
++    background: var(--tc-selected);
++  }
++  button:disabled {
++    opacity: 0.45;
++    cursor: default;
++  }
++  button:focus-visible,
++  input:focus-visible,
++  textarea:focus-visible {
++    outline: 2px solid #337fca;
++    outline-offset: 2px;
++  }
++  svg {
++    width: 16px;
++    height: 16px;
++    flex-shrink: 0;
++  }
++  input,
++  textarea {
++    font: inherit;
++    color: inherit;
++    background: transparent;
++    border: 0;
++    min-width: 0;
++  }
++  textarea {
++    width: 100%;
++    resize: vertical;
++    line-height: 1.7;
++  }
++  input::placeholder,
++  textarea::placeholder {
++    color: var(--tc-soft);
++  }
++}
++.text-chat-history {
++  display: none;
++  width: 186px;
++  flex-shrink: 0;
++  background: var(--tc-panel);
++  padding: 17px 10px;
++  border-right: 1px solid var(--tc-line);
++  flex-direction: column;
++  gap: 15px;
++  min-height: 0;
++}
++.is-focused > .text-chat-history {
++  display: flex;
++}
++.text-chat-history.is-open {
++  display: flex;
++  position: absolute;
++  top: 0;
++  left: 0;
++  bottom: 0;
++  z-index: 4;
++  box-shadow: 8px 0 24px #0001;
++}
++.text-chat-new {
++  border: 1px solid var(--tc-line) !important;
++  background: var(--tc-surface) !important;
++  justify-content: flex-start !important;
++  padding: 9px 12px !important;
++}
++.text-chat-search {
++  display: flex;
++  gap: 8px;
++  align-items: center;
++  color: var(--tc-soft);
++  padding: 7px 4px;
++  border-bottom: 1px solid var(--tc-line);
++  input {
++    width: 100%;
++  }
++}
++.text-chat-session-list {
++  min-height: 0;
++  overflow: auto;
++  flex: 1;
++}
++.text-chat-session {
++  display: flex;
++  border-radius: 8px;
++  margin-bottom: 3px;
++  &.is-active {
++    background: var(--tc-selected);
++  }
++  > button:first-child {
++    min-width: 0;
++    flex: 1;
++    justify-content: flex-start;
++    text-align: left;
++    padding: 9px 8px;
++    font-size: 12px;
++    span {
++      overflow: hidden;
++      text-overflow: ellipsis;
++      white-space: nowrap;
++    }
++  }
++  .text-chat-delete {
++    padding: 3px;
++    width: 24px;
++    svg {
++      width: 13px;
++    }
++  }
++}
++.text-chat-history-footer,
++.text-chat-muted {
++  font-size: 11px;
++  color: var(--tc-soft);
++  padding: 8px;
++}
++.text-chat-main {
++  display: flex;
++  flex-direction: column;
++  min-height: 0;
++  flex: 1;
++  min-width: 0;
++  position: relative;
++}
++.text-chat-spacer {
++  flex: 1;
++}
++.text-chat-header {
++  display: flex;
++  align-items: center;
++  gap: 5px;
++  padding: 12px 16px;
++  flex-shrink: 0;
++  .model-selector {
++    min-width: 0;
++    max-width: min(65%, 320px);
++  }
++}
++.text-chat-title {
++  padding: 0 22px 8px;
++  color: var(--tc-soft);
++  font-size: 12px;
++  min-width: 0;
++  button {
++    max-width: 100%;
++    text-align: left;
++    overflow-wrap: anywhere;
++  }
++  svg {
++    width: 12px;
++  }
++  input {
++    width: 100%;
++    padding: 4px;
++    border-bottom: 1px solid var(--tc-line);
++  }
++}
++.text-chat-scroll {
++  flex: 1;
++  min-height: 0;
++  overflow: auto;
++  overscroll-behavior: contain;
++  scrollbar-gutter: stable;
++}
++.text-chat-messages {
++  max-width: 730px;
++  margin: 0 auto;
++  padding: 18px 28px 30px;
++  display: flex;
++  flex-direction: column;
++  gap: 28px;
++}
++.text-chat-user {
++  align-self: flex-end;
++  max-width: 90%;
++  padding: 12px 17px;
++  border: 1px solid var(--tc-line);
++  border-radius: 16px 16px 4px 16px;
++  background: var(--tc-panel);
++  white-space: pre-wrap;
++  overflow-wrap: anywhere;
++}
++.text-chat-answer {
++  min-width: 0;
++  overflow-wrap: anywhere;
++  content-visibility: auto;
++  contain-intrinsic-size: auto 180px;
++  .markdown-readonly {
++    font-size: 14px;
++    line-height: 1.85;
++  }
++  .markdown-readonly table {
++    display: block;
++    max-width: 100%;
++    overflow-x: auto;
++  }
++}
++.text-chat-author {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  color: var(--tc-soft);
++  font-size: 12px;
++  margin-bottom: 13px;
++  strong {
++    font-weight: 500;
++    color: var(--tc-ink);
++  }
++  > span {
++    display: flex;
++    align-items: center;
++    gap: 5px;
++  }
++}
++.text-chat-reasoning {
++  margin: 10px 0 15px;
++  color: var(--tc-soft);
++  font-size: 12px;
++  summary {
++    display: flex;
++    align-items: center;
++    gap: 6px;
++    cursor: pointer;
++  }
++  > div {
++    border-left: 2px solid var(--tc-line);
++    padding: 8px 14px;
++    margin-top: 8px;
++  }
++  .markdown-readonly {
++    font-size: 12px;
++  }
++}
++.text-chat-message-actions {
++  display: flex;
++  align-items: center;
++  flex-wrap: wrap;
++  gap: 3px;
++  margin-top: 13px;
++  color: var(--tc-soft);
++  button,
++  > span {
++    font-size: 11px;
++  }
++  svg {
++    width: 14px;
++  }
++}
++.text-chat-status {
++  font-size: 12px;
++  color: var(--tc-soft);
++  margin-top: 10px;
++}
++.text-chat-error {
++  color: #b14438;
++  padding: 9px 16px;
++  font-size: 12px;
++  overflow-wrap: anywhere;
++}
++.text-chat-notice {
++  display: flex;
++  gap: 8px;
++  align-items: center;
++  padding: 7px 20px;
++  font-size: 12px;
++  color: var(--tc-soft);
++  > button {
++    margin-left: auto;
++  }
++}
++.text-chat-latest {
++  position: absolute;
++  bottom: 190px;
++  left: 50%;
++  transform: translateX(-50%);
++  background: var(--tc-surface) !important;
++  border: 1px solid var(--tc-line) !important;
++  box-shadow: 0 2px 8px #0001;
++  font-size: 12px !important;
++}
++.text-chat-composer-wrap {
++  max-width: 730px;
++  width: 100%;
++  margin: 0 auto;
++  padding: 10px 22px 12px;
++  position: relative;
++  flex-shrink: 0;
++}
++.text-chat-composer {
++  border: 1px solid var(--tc-line);
++  border-radius: 16px;
++  padding: 13px 14px 9px;
++  background: var(--tc-surface);
++  box-shadow: 0 4px 18px #26351d05;
++  > textarea {
++    max-height: 180px;
++    min-height: 62px;
++    display: block;
++    outline: none;
++  }
++  &:focus-within {
++    border-color: var(--tc-accent);
++  }
++}
++.text-chat-composer-actions {
++  display: flex;
++  align-items: center;
++  gap: 3px;
++  margin-top: 6px;
++  color: var(--tc-soft);
++  .text-chat-send {
++    background: var(--tc-accent);
++    color: var(--tc-accent-ink);
++    width: 34px;
++    min-height: 34px;
++  }
++}
++.text-chat-quote {
++  background: var(--tc-panel);
++  border-radius: 7px;
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  font-size: 11px;
++  padding: 3px 6px;
++  margin-bottom: 10px;
++  > span {
++    overflow: hidden;
++    white-space: nowrap;
++    text-overflow: ellipsis;
++    flex: 1;
++  }
++}
++.text-chat-footer {
++  text-align: center;
++  font-size: 11px;
++  color: var(--tc-soft);
++  padding-top: 7px;
++}
++.text-chat-settings {
++  position: absolute;
++  bottom: calc(100% - 5px);
++  left: 22px;
++  right: 22px;
++  max-height: 55vh;
++  overflow: auto;
++  background: var(--tc-surface);
++  border: 1px solid var(--tc-line);
++  border-radius: 12px;
++  box-shadow: 0 8px 24px #0002;
++  padding: 15px;
++  z-index: 5;
++  > div {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++  }
++  label {
++    display: flex;
++    flex-direction: column;
++    gap: 7px;
++    margin-top: 12px;
++  }
++  textarea,
++  input {
++    border: 1px solid var(--tc-line);
++    border-radius: 7px;
++    padding: 8px;
++    width: 100%;
++  }
++  small {
++    display: block;
++    color: var(--tc-soft);
++    margin-top: 9px;
++  }
++}
++.text-chat-empty {
++  min-height: 100%;
++  display: flex;
++  flex-direction: column;
++  justify-content: center;
++  align-items: center;
++  padding: 35px 24px;
++  gap: 14px;
++  text-align: center;
++  h2 {
++    margin: 0;
++    font-size: 24px;
++    font-weight: 500;
++    letter-spacing: 0.03em;
++  }
++  > p {
++    color: var(--tc-soft);
++    margin: 0;
++  }
++}
++.text-chat-emblem {
++  width: 49px;
++  height: 49px;
++  border-radius: 17px;
++  background: var(--tc-selected);
++  color: var(--tc-accent);
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  margin-bottom: 7px;
++  svg {
++    width: 26px;
++    height: 26px;
++  }
++}
++.text-chat-starters {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: 9px;
++  width: min(420px, 100%);
++  margin-top: 16px;
++  button {
++    border: 1px solid var(--tc-line);
++    padding: 12px;
++    background: var(--tc-surface);
++    justify-content: flex-start;
++    font-size: 12px;
++  }
++  svg {
++    color: var(--tc-soft);
++  }
++}
++.text-chat-code {
++  border: 1px solid var(--tc-line);
++  border-radius: 9px;
++  overflow: hidden;
++  background: var(--tc-panel);
++  margin: 10px 0;
++  > div {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    padding: 5px 12px;
++    border-bottom: 1px solid var(--tc-line);
++    font-size: 11px;
++    color: var(--tc-soft);
++  }
++  pre {
++    overflow: auto;
++    margin: 0;
++    padding: 12px 15px;
++    background: transparent;
++    font-size: 12px;
++    line-height: 1.8;
++  }
++  .string {
++    color: var(--tc-accent);
++  }
++  .keyword {
++    color: #8b65b1;
++  }
++}
++.text-chat-math {
++  max-width: 100%;
++  overflow-x: auto;
++  display: inline-block;
++  vertical-align: middle;
++}
++.text-chat-spin {
++  animation: text-chat-spin 1.2s linear infinite;
++}
++@keyframes text-chat-spin {
++  to {
++    transform: rotate(360deg);
++  }
++}
++.creative-root[data-theme="dark"] {
++  .text-chat-workspace {
++    --tc-paper: #23251f;
++    --tc-panel: #2b2e27;
++    --tc-surface: #30352d;
++    --tc-ink: #e6e9e0;
++    --tc-soft: #a4ad9d;
++    --tc-line: #434a3c;
++    --tc-selected: #3c4934;
++    --tc-accent: #bdd0aa;
++    --tc-accent-ink: #232a1e;
++    color-scheme: dark;
++  }
++  .text-chat-modebar {
++    color: #e6e9e0;
++    border-color: #434a3c;
++    background: #23251f;
++    > div {
++      background: #2b2e27;
++    }
++    button[aria-pressed="true"] {
++      background: #3c4934;
++    }
++  }
++  .text-chat-error {
++    color: #f2a89d;
++  }
++}
++@media (max-width: 760px) {
++  .is-focused > .text-chat-history {
++    display: none;
++  }
++  .is-focused > .text-chat-history.is-open {
++    display: flex;
++  }
++  .text-chat-messages {
++    padding: 16px 18px 25px;
++  }
++  .text-chat-composer-wrap {
++    padding: 10px 13px 12px;
++  }
++}
++@media (max-width: 440px) {
++  .text-chat-modebar {
++    gap: 3px;
++    padding: 7px;
++    button {
++      padding: 5px;
++      font-size: 11px;
++    }
++  }
++  .text-chat-starters {
++    grid-template-columns: 1fr;
++  }
++  .text-chat-header {
++    padding: 10px 8px;
++    gap: 2px;
++  }
++}
++@media (prefers-reduced-motion: reduce) {
++  .text-chat-spin {
++    animation: none;
++  }
++}
++
++.drawnix:has(.chat-drawer--open.chat-drawer--text-focus) .unified-toolbar {
++  display: none !important;
++}
++.text-chat-answer .markdown-readonly {
++  ul {
++    list-style: disc;
++  }
++  ol {
++    list-style: decimal;
++  }
++}
++.text-chat-composer > textarea:focus-visible {
++  outline: none;
++}
++
++.text-chat-workspace .model-selector--variant-capsule .model-selector__trigger {
++  color: var(--tc-ink);
++  background: var(--tc-panel);
++  max-width: 100%;
++}
++.text-chat-workspace .model-selector__trigger-icon {
++  color: var(--tc-soft);
++}
 diff --git a/packages/drawnix/src/components/tool-element/tool.generator.ts b/packages/drawnix/src/components/tool-element/tool.generator.ts
 index 3276811..10c83bd 100644
 --- a/packages/drawnix/src/components/tool-element/tool.generator.ts
@@ -8618,6 +10450,19 @@ index 38d414d..c1ee140 100644
      };
    }, []);
  }
+diff --git a/packages/drawnix/src/hooks/useChatSessions.ts b/packages/drawnix/src/hooks/useChatSessions.ts
+index 6e18b86..5a8c8d3 100644
+--- a/packages/drawnix/src/hooks/useChatSessions.ts
++++ b/packages/drawnix/src/hooks/useChatSessions.ts
+@@ -19,7 +19,7 @@ export function useChatSessions(): UseChatSessionsReturn {
+     const loadSessions = async () => {
+       setIsLoading(true);
+       try {
+-        const loadedSessions = await chatStorageService.getAllSessions();
++        const loadedSessions = (await chatStorageService.getAllSessions()).filter(s => s.kind !== 'text');
+         setSessions(loadedSessions);
+ 
+         // Load drawer state to get active session
 diff --git a/packages/drawnix/src/hooks/useDesktopCanvasBackground.ts b/packages/drawnix/src/hooks/useDesktopCanvasBackground.ts
 index 796acdb..b7c6001 100644
 --- a/packages/drawnix/src/hooks/useDesktopCanvasBackground.ts
@@ -11412,15 +13257,42 @@ index 0000000..740f1ae
 +  }
 +}
 diff --git a/packages/drawnix/src/services/backup-restore/environment-backup-service.ts b/packages/drawnix/src/services/backup-restore/environment-backup-service.ts
-index 2a102cd..9ae2c2c 100644
+index 2a102cd..4831f4e 100644
 --- a/packages/drawnix/src/services/backup-restore/environment-backup-service.ts
 +++ b/packages/drawnix/src/services/backup-restore/environment-backup-service.ts
-@@ -1,3 +1,4 @@
+@@ -1,3 +1,5 @@
++import { textChatRuntime } from '../text-chat/runtime';
 +import { isAccountReference } from '../assistant-account';
  import localforage from 'localforage';
  import { LS_KEYS, LS_KEYS_TO_MIGRATE } from '../../constants/storage-keys';
  import {
-@@ -440,6 +441,8 @@ async function restoreSettings(
+@@ -171,6 +173,7 @@ export async function exportEnvironmentData(
+ ): Promise<EnvironmentExportResult> {
+   await Promise.all([
+     settingsManager.waitForInitialization(),
++    textChatRuntime.flush(),
+     audioPlaylistService.initialize().catch(() => undefined),
+     characterStorageService.init().catch(() => undefined),
+   ]);
+@@ -219,6 +222,9 @@ export async function importEnvironmentData(
+     return { imported: 0, skipped: 1, warnings: ['环境数据缺失或格式无效，已跳过'] };
+   }
+ 
++  if (textChatRuntime.getSnapshot().running.size) throw new Error('请先停止文本回复，再恢复会话备份。');
++  await textChatRuntime.flush();
++
+   if (options.mode === 'replace') {
+     await clearEnvironmentData(Boolean(options.secrets));
+   }
+@@ -230,6 +236,7 @@ export async function importEnvironmentData(
+   imported += await restoreAppDb(data.appDb, options.secrets);
+   imported += await restoreEnvironmentSecrets(options.secrets, warnings);
+   imported += await restoreChat(data.localForage);
++  await textChatRuntime.reload();
+   imported += await restoreAudio(data.localForage);
+   imported += await restoreCharacters(data.localForage);
+ 
+@@ -440,6 +447,8 @@ async function restoreSettings(
      );
    }
  
@@ -11429,7 +13301,7 @@ index 2a102cd..9ae2c2c 100644
    await settingsManager.updateSettings(nextSettings);
    return 1;
  }
-@@ -585,10 +588,10 @@ function sanitizeSettings(settings: AppSettings): Partial<AppSettings> {
+@@ -585,10 +594,10 @@ function sanitizeSettings(settings: AppSettings): Partial<AppSettings> {
  
  function extractSettingsSecrets(settings: AppSettings): SettingsSecrets {
    return {
@@ -11442,7 +13314,7 @@ index 2a102cd..9ae2c2c 100644
        extraHeaders: profile.extraHeaders,
      })),
    };
-@@ -599,7 +602,7 @@ function applySettingsSecrets(
+@@ -599,7 +608,7 @@ function applySettingsSecrets(
    secrets: SettingsSecrets
  ): void {
    if (settings.gemini && typeof secrets.geminiApiKey === 'string') {
@@ -11451,7 +13323,7 @@ index 2a102cd..9ae2c2c 100644
    }
  
    if (!Array.isArray(settings.providerProfiles)) {
-@@ -613,7 +616,7 @@ function applySettingsSecrets(
+@@ -613,7 +622,7 @@ function applySettingsSecrets(
      return secret
        ? {
            ...profile,
@@ -11655,6 +13527,46 @@ index a77a441..a23d57a 100644
    });
  }
  
+diff --git a/packages/drawnix/src/services/chat-storage-service.ts b/packages/drawnix/src/services/chat-storage-service.ts
+index 15c5f42..84d7384 100644
+--- a/packages/drawnix/src/services/chat-storage-service.ts
++++ b/packages/drawnix/src/services/chat-storage-service.ts
+@@ -60,6 +60,12 @@ export async function getSession(id: string): Promise<ChatSession | null> {
+   return sessionsStore.getItem<ChatSession>(id);
+ }
+ 
++/** A text conversation is one IndexedDB record: messages/metadata commit together. */
++export async function saveTextSession(session: ChatSession): Promise<void> {
++  if (session.kind !== 'text' || session.textChat?.version !== 1) throw new Error('无效的文本会话');
++  await sessionsStore.setItem(session.id, session);
++}
++
+ export async function getAllSessions(): Promise<ChatSession[]> {
+   const sessions: ChatSession[] = [];
+   await sessionsStore.iterate<ChatSession, void>((value) => {
+@@ -234,12 +240,14 @@ export function setDrawerState(state: Partial<DrawerState>): void {
+ // ============================================================================
+ 
+ export async function clearAllData(): Promise<void> {
++  window.dispatchEvent(new Event('aitu-chat-cleared'));
+   await sessionsStore.clear();
+   await messagesStore.clear();
+   localStorage.removeItem(CHAT_STORAGE_KEYS.DRAWER_STATE);
+ }
+ 
+ export async function clearConversationHistory(): Promise<void> {
++  window.dispatchEvent(new Event('aitu-chat-cleared'));
+   await sessionsStore.clear();
+   await messagesStore.clear();
+   setDrawerState({ activeSessionId: null });
+@@ -253,6 +261,7 @@ export { generateId, generateTitle };
+ 
+ // Export as service object for easier mocking
+ export const chatStorageService = {
++  saveTextSession,
+   createSession,
+   getSession,
+   getAllSessions,
 diff --git a/packages/drawnix/src/services/desktop-storage-cleanup-service.ts b/packages/drawnix/src/services/desktop-storage-cleanup-service.ts
 index 10397de..9101802 100644
 --- a/packages/drawnix/src/services/desktop-storage-cleanup-service.ts
@@ -13763,6 +15675,56 @@ index fff1a5b..5c08ee9 100644
 +    },
    );
  }
+diff --git a/packages/drawnix/src/services/provider-routing/binding-inference.ts b/packages/drawnix/src/services/provider-routing/binding-inference.ts
+index 5c4fa46..1089ef7 100644
+--- a/packages/drawnix/src/services/provider-routing/binding-inference.ts
++++ b/packages/drawnix/src/services/provider-routing/binding-inference.ts
+@@ -391,6 +391,17 @@ function inferTextBindings(
+     );
+   }
+ 
++  // Explicit configured native endpoint; never infer Anthropic from model names.
++  try {
++    if (new URL(profile.baseUrl).hostname === 'api.anthropic.com') {
++      bindings.push(buildBinding(profile, model, {
++        protocol: 'anthropic.messages', requestSchema: 'anthropic.messages',
++        responseSchema: 'anthropic.messages.events', submitPath: '/messages',
++        baseUrlStrategy: 'ensure-v1', priority: 110, confidence: 'high', source: 'template',
++      }));
++    }
++  } catch { /* Invalid URLs are rejected at request time. */ }
++
+   return bindings;
+ }
+ 
+@@ -860,6 +871,7 @@ function shouldUseDiscoveredEndpointHintForModel(
+   profile: ProviderProfileSnapshot,
+   model: ModelConfig
+ ): boolean {
++  if (['anthropic.messages', 'openai.responses'].includes(hint.protocol)) return model.type === 'text';
+   if (isSunoNativeModel(model.id)) return false;
+   if (isSunoV2Model(model.id)) {
+     const action = getSunoV2Action(model.id);
+diff --git a/packages/drawnix/src/services/provider-routing/endpoint-binding-inference.ts b/packages/drawnix/src/services/provider-routing/endpoint-binding-inference.ts
+index 436cccb..95cdd0d 100644
+--- a/packages/drawnix/src/services/provider-routing/endpoint-binding-inference.ts
++++ b/packages/drawnix/src/services/provider-routing/endpoint-binding-inference.ts
+@@ -177,6 +177,15 @@ const PATH_PATTERNS: PathPattern[] = [
+       pollPathTemplate: '/videos/{taskId}',
+     }),
+   },
++  // Native text protocols must retain their request/stream formats.
++  {
++    test: (p, ep) => /\/responses\/?$/.test(p) && isPostEndpoint(ep),
++    hint: (p) => ({ protocol: 'openai.responses', requestSchema: 'openai.responses.input', responseSchema: 'openai.responses.events', submitPath: p, baseUrlStrategy: /^\/(?:v1\/)?responses$/.test(p) ? 'ensure-v1' : 'preserve' }),
++  },
++  {
++    test: (p, ep) => /\/messages\/?$/.test(p) && isPostEndpoint(ep),
++    hint: (p) => ({ protocol: 'anthropic.messages', requestSchema: 'anthropic.messages', responseSchema: 'anthropic.messages.events', submitPath: p, baseUrlStrategy: /^\/(?:v1\/)?messages$/.test(p) ? 'ensure-v1' : 'preserve' }),
++  },
+   // OpenAI chat completions
+   {
+     test: (p) => /\/chat\/completions/i.test(p),
 diff --git a/packages/drawnix/src/services/provider-routing/provider-transport.ts b/packages/drawnix/src/services/provider-routing/provider-transport.ts
 index 12d1f35..0223231 100644
 --- a/packages/drawnix/src/services/provider-routing/provider-transport.ts
@@ -14011,6 +15973,1784 @@ index f3721c5..e3af6cf 100644
      invocationRoute: swTask.invocationRoute,
      executionPhase: swTask.executionPhase as Task['executionPhase'],
      imageRecovery: swTask.imageRecovery,
+diff --git a/packages/drawnix/src/services/text-chat/backup.test.ts b/packages/drawnix/src/services/text-chat/backup.test.ts
+new file mode 100644
+index 0000000..26743e1
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/backup.test.ts
+@@ -0,0 +1,145 @@
++import { beforeEach, expect, it, vi } from "vitest";
++const state = vi.hoisted(() => ({
++  stores: new Map<string, Map<string, unknown>>(),
++  flush: vi.fn(async () => {}),
++  reload: vi.fn(async () => {}),
++  running: new Set<string>(),
++}));
++vi.mock("localforage", () => ({
++  default: {
++    createInstance: ({ name, storeName }: any) => {
++      const id = `${name}/${storeName}`;
++      if (!state.stores.has(id)) state.stores.set(id, new Map());
++      const data = state.stores.get(id)!;
++      return {
++        iterate: async (f: any) => {
++          for (const [key, value] of data) f(value, key);
++        },
++        setItem: async (key: string, value: unknown) =>
++          data.set(key, structuredClone(value)),
++        clear: async () => data.clear(),
++      };
++    },
++  },
++}));
++vi.mock("./runtime", () => ({
++  textChatRuntime: {
++    flush: state.flush,
++    reload: state.reload,
++    getSnapshot: () => ({ running: state.running }),
++  },
++}));
++vi.mock("../../utils/settings-manager", () => ({
++  settingsManager: {
++    waitForInitialization: async () => {},
++    getSettings: () => ({ gemini: {}, providerProfiles: [] }),
++    updateSettings: async () => {},
++  },
++}));
++vi.mock("../kv-storage-service", () => ({
++  kvStorageService: {
++    keys: async () => [],
++    getMany: async () => new Map(),
++    setMany: async () => {},
++    remove: async () => {},
++  },
++}));
++vi.mock("../app-database", () => ({
++  APP_DB_NAME: "synthetic",
++  APP_DB_STORES: { CONFIG: "config", WORKFLOWS: "workflows" },
++}));
++vi.mock("../backup-restore/idb-store-backup", () => ({
++  readStoreRecords: async () => [],
++  writeStoreRecords: async () => 0,
++  clearStore: async () => {},
++  deleteStoreRecord: async () => {},
++}));
++vi.mock("../backup-restore/backup-checksum", () => ({
++  checksumJson: async () => "synthetic-checksum",
++}));
++vi.mock("../audio-playlist-service", () => ({
++  audioPlaylistService: { initialize: async () => {} },
++}));
++vi.mock("../character-storage-service", () => ({
++  characterStorageService: {
++    init: async () => {},
++    getCharacters: () => [],
++    clearAll: async () => {},
++  },
++}));
++vi.mock("../character-avatar-cache-service", () => ({
++  characterAvatarCacheService: { clearAll: async () => {} },
++}));
++vi.mock("../github-sync/token-service", () => ({ tokenService: {} }));
++vi.mock("../github-sync/sync-password-service", () => ({
++  syncPasswordService: {},
++}));
++import {
++  exportEnvironmentData,
++  importEnvironmentData,
++} from "../backup-restore/environment-backup-service";
++beforeEach(() => {
++  state.stores.clear();
++  state.running.clear();
++  vi.clearAllMocks();
++});
++it("round-trips every text field in the existing environment backup, retaining old sessions", async () => {
++  const session = {
++    id: "text",
++    kind: "text",
++    title: "Synthetic",
++    sessionModel: "synthetic",
++    sessionModelRef: { profileId: "synthetic", modelId: "synthetic" },
++    createdAt: 1,
++    updatedAt: 2,
++    messageCount: 1,
++    textChat: {
++      version: 1,
++      draft: "unsent",
++      systemPrompt: "system",
++      maxOutput: 512,
++      messages: [
++        {
++          id: "answer",
++          role: "assistant",
++          content: "partial",
++          reasoning: "thinking",
++          status: "stopped",
++          replyTo: "user",
++          createdAt: 2,
++          model: "synthetic",
++          finishReason: "length",
++          usage: { input: 10, output: 20 },
++        },
++      ],
++    },
++  };
++  const old = { id: "legacy", title: "Creative" };
++  state.stores.set(
++    "aitu-chat/sessions",
++    new Map([
++      ["text", session],
++      ["legacy", old],
++    ]),
++  );
++  state.flush.mockImplementationOnce(async () => {
++    session.textChat.draft = "latest unsent";
++  });
++  const exported = await exportEnvironmentData(false);
++  expect(state.flush).toHaveBeenCalledOnce();
++  state.stores.clear();
++  await importEnvironmentData(JSON.parse(JSON.stringify(exported.data)), {
++    mode: "replace",
++  });
++  expect(state.stores.get("aitu-chat/sessions")?.get("text")).toEqual(session);
++  expect(state.stores.get("aitu-chat/sessions")?.get("legacy")).toEqual(old);
++  expect(state.reload).toHaveBeenCalledOnce();
++});
++it("refuses restore while a conversation is still generating", async () => {
++  const exported = await exportEnvironmentData(false);
++  state.running.add("synthetic");
++  await expect(
++    importEnvironmentData(exported.data, { mode: "replace" }),
++  ).rejects.toThrow("停止文本回复");
++  expect(state.reload).not.toHaveBeenCalled();
++});
+diff --git a/packages/drawnix/src/services/text-chat/conversation.ts b/packages/drawnix/src/services/text-chat/conversation.ts
+new file mode 100644
+index 0000000..c9248d3
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/conversation.ts
+@@ -0,0 +1,104 @@
++import type { ChatSession } from "../../types/chat.types";
++import type { TextSnapshot, TextTurn } from "./protocol";
++
++export interface TextMessage extends TextSnapshot {
++  id: string;
++  role: "user" | "assistant";
++  createdAt: number;
++  status:
++    | "pending"
++    | "streaming"
++    | "complete"
++    | "stopped"
++    | "interrupted"
++    | "error";
++  model?: string;
++  replyTo?: string;
++  error?: string;
++}
++export interface TextConversationState {
++  version: 1;
++  messages: TextMessage[];
++  draft: string;
++  systemPrompt: string;
++  maxOutput?: number;
++}
++export interface TextConversation extends ChatSession {
++  kind: "text";
++  textChat: TextConversationState;
++}
++export function newTextState(): TextConversationState {
++  return { version: 1, messages: [], draft: "", systemPrompt: "" };
++}
++export function restoreTextConversation(
++  session: ChatSession,
++): TextConversation {
++  if (
++    session.kind !== "text" ||
++    session.textChat?.version !== 1 ||
++    !Array.isArray(session.textChat.messages) ||
++    typeof session.id !== "string" ||
++    typeof session.title !== "string" ||
++    typeof (session.textChat.draft ?? "") !== "string" ||
++    typeof (session.textChat.systemPrompt ?? "") !== "string" ||
++    session.textChat.messages.some(
++      (m) =>
++        !m ||
++        typeof m.id !== "string" ||
++        !["user", "assistant"].includes(m.role) ||
++        typeof m.content !== "string" ||
++        ![
++          "pending",
++          "streaming",
++          "complete",
++          "stopped",
++          "interrupted",
++          "error",
++        ].includes(m.status),
++    )
++  )
++    throw new Error("文本会话格式或版本不受支持，请保留原数据并更新客户端。");
++  return {
++    ...session,
++    kind: "text",
++    textChat: {
++      ...newTextState(),
++      ...session.textChat,
++      draft: session.textChat.draft ?? "",
++      systemPrompt: session.textChat.systemPrompt ?? "",
++      messages: session.textChat.messages.map((m) => ({
++        ...m,
++        reasoning: m.reasoning || "",
++        ...(["pending", "streaming"].includes(m.status)
++          ? {
++              status: "interrupted" as const,
++              error: "上次回复未完成，已恢复收到的内容。",
++            }
++          : {}),
++      })),
++    },
++  };
++}
++/** One latest usable answer per user turn. Regeneration never deletes prior answers. */
++export function conversationContext(
++  messages: TextMessage[],
++  userId: string,
++): TextTurn[] {
++  const turns: TextTurn[] = [];
++  for (const message of messages) {
++    if (message.role !== "user") continue;
++    turns.push({ role: "user", content: message.content });
++    if (message.id === userId) return turns;
++    const answer = messages
++      .filter(
++        (m) =>
++          m.role === "assistant" &&
++          m.replyTo === message.id &&
++          m.status === "complete" &&
++          m.content.trim(),
++      )
++      .at(-1);
++    if (answer) turns.push({ role: "assistant", content: answer.content });
++  }
++  throw new Error("没有找到要回复的原始消息。");
++}
+diff --git a/packages/drawnix/src/services/text-chat/protocol.test.ts b/packages/drawnix/src/services/text-chat/protocol.test.ts
+new file mode 100644
+index 0000000..d2513fd
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/protocol.test.ts
+@@ -0,0 +1,286 @@
++import { describe, expect, it } from "vitest";
++import { readTextStream, textBody, textProtocol } from "./protocol";
++
++function sse(text: string, split = 3) {
++  const bytes = new TextEncoder().encode(text);
++  return new Response(
++    new ReadableStream({
++      start(c) {
++        for (let i = 0; i < bytes.length; i += split)
++          c.enqueue(bytes.slice(i, i + split));
++        c.close();
++      },
++    }),
++    { headers: { "content-type": "text/event-stream" } },
++  );
++}
++const event = (v: unknown) => `data: ${JSON.stringify(v)}\r\n\r\n`;
++describe("text protocol decoding", () => {
++  it("preserves split Chinese and handles optional spaces, CRLF and final unterminated data", async () => {
++    const text =
++      "data:" +
++      JSON.stringify({ choices: [{ delta: { content: "你好 🌿" } }] }) +
++      "\r\n\r\ndata: [DONE]";
++    expect((await readTextStream(sse(text, 1), "chat", () => {})).content).toBe(
++      "你好 🌿",
++    );
++  });
++  it("separates DeepSeek reasoning from the answer and captures usage", async () => {
++    const result = await readTextStream(
++      sse(
++        event({ choices: [{ delta: { reasoning_content: "分析" } }] }) +
++          event({
++            choices: [{ delta: { content: "答案" } }],
++            usage: { prompt_tokens: 12, completion_tokens: 9 },
++          }) +
++          event({ choices: [{ delta: {}, finish_reason: "length" }] }),
++      ),
++      "chat",
++      () => {},
++    );
++    expect(result).toMatchObject({
++      content: "答案",
++      reasoning: "分析",
++      finishReason: "length",
++      usage: { input: 12, output: 9 },
++    });
++  });
++  it("reads usage arriving in a separate chunk after finish_reason", async () => {
++    const result = await readTextStream(
++      sse(
++        event({
++          choices: [{ delta: { content: "done" }, finish_reason: "stop" }],
++        }) +
++          event({
++            choices: [],
++            usage: { prompt_tokens: 14, completion_tokens: 7 },
++          }) +
++          "data: [DONE]\n\n",
++        1,
++      ),
++      "chat",
++      () => {},
++    );
++    expect(result.usage).toEqual({ input: 14, output: 7 });
++  });
++  it("decodes Responses deltas and incomplete token limit", async () => {
++    const result = await readTextStream(
++      sse(
++        event({
++          type: "response.reasoning_summary_text.delta",
++          delta: "摘要",
++        }) +
++          event({ type: "response.output_text.delta", delta: "正文" }) +
++          event({
++            type: "response.incomplete",
++            response: {
++              status: "incomplete",
++              incomplete_details: { reason: "max_output_tokens" },
++              usage: { output_tokens: 20 },
++            },
++          }),
++      ),
++      "responses",
++      () => {},
++    );
++    expect(result).toMatchObject({
++      content: "正文",
++      reasoning: "摘要",
++      finishReason: "max_output_tokens",
++      usage: { output: 20 },
++    });
++  });
++  it("decodes Anthropic thinking, text and message_stop", async () => {
++    const text =
++      event({
++        type: "content_block_delta",
++        delta: { type: "thinking_delta", thinking: "思考" },
++      }) +
++      event({
++        type: "content_block_delta",
++        delta: { type: "text_delta", text: "完成" },
++      }) +
++      event({
++        type: "message_delta",
++        delta: { stop_reason: "end_turn" },
++        usage: { output_tokens: 3 },
++      }) +
++      event({ type: "message_stop" });
++    expect(
++      await readTextStream(sse(text), "anthropic", () => {}),
++    ).toMatchObject({
++      content: "完成",
++      reasoning: "思考",
++      finishReason: "end_turn",
++    });
++  });
++  it("decodes Gemini thought parts independently", async () => {
++    const result = await readTextStream(
++      sse(
++        event({
++          candidates: [
++            {
++              content: {
++                parts: [{ text: "摘要", thought: true }, { text: "结果" }],
++              },
++              finishReason: "STOP",
++            },
++          ],
++        }),
++      ),
++      "gemini",
++      () => {},
++    );
++    expect(result).toMatchObject({ content: "结果", reasoning: "摘要" });
++  });
++  it("accepts multiline SSE data", async () => {
++    expect(
++      (
++        await readTextStream(
++          sse(
++            'data: {"choices":\ndata: [{"delta":{"content":"yes"},"finish_reason":"stop"}]}\n\n',
++          ),
++          "chat",
++          () => {},
++        )
++      ).content,
++    ).toBe("yes");
++  });
++  it("accepts a non-stream JSON reply when a provider ignores stream=true", async () => {
++    expect(
++      (
++        await readTextStream(
++          new Response(
++            JSON.stringify({
++              content: [{ type: "text", text: "你好" }],
++              stop_reason: "end_turn",
++            }),
++            { headers: { "content-type": "application/json" } },
++          ),
++          "anthropic",
++          () => {},
++        )
++      ).content,
++    ).toBe("你好");
++  });
++  it("rejects EOF without a completion signal while preserving updates", async () => {
++    let partial = "";
++    await expect(
++      readTextStream(
++        sse(event({ choices: [{ delta: { content: "partial" } }] })),
++        "chat",
++        (s) => {
++          partial = s.content;
++        },
++      ),
++    ).rejects.toThrow("完成标记");
++    expect(partial).toBe("partial");
++  });
++  it("reports stream errors and malformed data", async () => {
++    await expect(
++      readTextStream(
++        sse(event({ error: { message: "quota unavailable" } })),
++        "chat",
++        () => {},
++      ),
++    ).rejects.toThrow("quota");
++    await expect(
++      readTextStream(sse("data: {bad}\n\n"), "chat", () => {}),
++    ).rejects.toThrow("格式错误");
++  });
++  it("reports failed Responses and Gemini blocked requests", async () => {
++    await expect(
++      readTextStream(
++        sse(
++          event({
++            type: "response.failed",
++            response: { error: { message: "failed" } },
++          }),
++        ),
++        "responses",
++        () => {},
++      ),
++    ).rejects.toThrow("failed");
++    await expect(
++      readTextStream(
++        sse(event({ promptFeedback: { blockReason: "SAFETY" } })),
++        "gemini",
++        () => {},
++      ),
++    ).rejects.toThrow("SAFETY");
++  });
++  it("cancels an idle stream promptly", async () => {
++    const controller = new AbortController();
++    const promise = readTextStream(
++      new Response(new ReadableStream({ start() {} })),
++      "chat",
++      () => {},
++      controller.signal,
++    );
++    controller.abort();
++    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
++  });
++  it("rejects empty completion instead of claiming success", async () => {
++    await expect(
++      readTextStream(sse("data: [DONE]\n\n"), "chat", () => {}),
++    ).rejects.toThrow("可显示");
++  });
++});
++describe("text request formats", () => {
++  const turns = [
++    { role: "system" as const, content: "系统" },
++    { role: "user" as const, content: "问题" },
++    { role: "assistant" as const, content: "回答" },
++  ];
++  it("does not inject unsupported sampling parameters", () => {
++    const body = textBody("chat", "synthetic-model", turns);
++    expect(body).not.toHaveProperty("temperature");
++    expect(body).not.toHaveProperty("top_p");
++    expect(body.messages).toEqual(turns);
++  });
++  it("uses compatible output limits for DeepSeek and OpenAI reasoning models", () => {
++    expect(textBody("chat", "deepseek-chat", turns, 100)).toHaveProperty(
++      "max_tokens",
++      100,
++    );
++    expect(textBody("chat", "gpt-5", turns, 100)).toHaveProperty(
++      "max_completion_tokens",
++      100,
++    );
++    expect(textBody("chat", "o3-mini", turns, 100)).toHaveProperty(
++      "max_completion_tokens",
++      100,
++    );
++  });
++  it("maps Responses system, assistant history and output length", () => {
++    expect(textBody("responses", "synthetic-model", turns, 800)).toMatchObject({
++      instructions: "系统",
++      max_output_tokens: 800,
++      store: false,
++      input: [
++        { role: "user", content: "问题" },
++        { role: "assistant", content: "回答" },
++      ],
++    });
++  });
++  it("uses required Anthropic max_tokens and top-level system", () => {
++    expect(textBody("anthropic", "synthetic-model", turns)).toMatchObject({
++      system: "系统",
++      max_tokens: 4096,
++      messages: turns.slice(1),
++    });
++  });
++  it("maps Gemini roles", () => {
++    expect(textBody("gemini", "synthetic-model", turns)).toMatchObject({
++      systemInstruction: { parts: [{ text: "系统" }] },
++      contents: [{ role: "user" }, { role: "model" }],
++    });
++  });
++  it("rejects invalid output lengths and unknown protocols", () => {
++    for (const max of [0, -1, NaN, 3.5, 200000])
++      expect(() => textBody("chat", "m", turns, max)).toThrow();
++    expect(() => textProtocol("unknown", "/custom")).toThrow("协议");
++    expect(textProtocol("openai.responses", "/responses")).toBe("responses");
++    expect(textProtocol("anthropic.messages", "/messages")).toBe("anthropic");
++  });
++});
+diff --git a/packages/drawnix/src/services/text-chat/protocol.ts b/packages/drawnix/src/services/text-chat/protocol.ts
+new file mode 100644
+index 0000000..8b9fa62
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/protocol.ts
+@@ -0,0 +1,324 @@
++/** Pure text protocol adapters. Never execute tool calls returned in a reply. */
++export type TextProtocol = "chat" | "responses" | "anthropic" | "gemini";
++export interface TextTurn {
++  role: "user" | "assistant" | "system";
++  content: string;
++}
++export interface TextUsage {
++  input?: number;
++  output?: number;
++}
++export interface TextSnapshot {
++  content: string;
++  reasoning: string;
++  finishReason?: string;
++  usage?: TextUsage;
++}
++
++export function textProtocol(protocol: string, path: string): TextProtocol {
++  if (protocol === "anthropic.messages" || /\/messages\/?$/.test(path))
++    return "anthropic";
++  if (protocol === "openai.responses" || /\/responses\/?$/.test(path))
++    return "responses";
++  if (protocol === "google.generateContent") return "gemini";
++  if (protocol === "openai.chat.completions") return "chat";
++  throw new Error(
++    "该文本模型尚未声明可用的对话协议，请检查创作配置中的文本模型。",
++  );
++}
++
++export function textBody(
++  protocol: TextProtocol,
++  model: string,
++  turns: TextTurn[],
++  maxOutput?: number,
++): Record<string, unknown> {
++  if (
++    maxOutput !== undefined &&
++    (!Number.isInteger(maxOutput) || maxOutput < 1 || maxOutput > 131072)
++  ) {
++    throw new Error("最大输出长度应为 1–131072 的整数。");
++  }
++  const system = turns
++    .filter((t) => t.role === "system")
++    .map((t) => t.content)
++    .join("\n\n");
++  const messages = turns.filter((t) => t.role !== "system");
++  if (protocol === "anthropic")
++    return {
++      model,
++      stream: true,
++      max_tokens: maxOutput ?? 4096,
++      ...(system ? { system } : {}),
++      messages: messages.map((t) => ({ ...t })),
++    };
++  if (protocol === "responses")
++    return {
++      model,
++      stream: true,
++      store: false,
++      ...(maxOutput ? { max_output_tokens: maxOutput } : {}),
++      ...(system ? { instructions: system } : {}),
++      input: messages.map((t) => ({ role: t.role, content: t.content })),
++    };
++  if (protocol === "gemini")
++    return {
++      ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
++      contents: messages.map((t) => ({
++        role: t.role === "assistant" ? "model" : "user",
++        parts: [{ text: t.content }],
++      })),
++      ...(maxOutput
++        ? { generationConfig: { maxOutputTokens: maxOutput } }
++        : {}),
++    };
++  // Omit sampling parameters: some reasoning models reject temperature/top_p.
++  const outputField = /^(o[1-9](?:-|$)|gpt-[5-9](?:[.-]|$))/i.test(model)
++    ? "max_completion_tokens"
++    : "max_tokens";
++  return {
++    model,
++    messages: turns,
++    stream: true,
++    ...(maxOutput ? { [outputField]: maxOutput } : {}),
++  };
++}
++
++function numeric(value: unknown): number | undefined {
++  return typeof value === "number" && Number.isFinite(value) && value >= 0
++    ? value
++    : undefined;
++}
++
++/** SSE parsing includes split UTF-8, CRLF, multi-line data and final unterminated records. */
++export async function readTextStream(
++  response: Response,
++  protocol: TextProtocol,
++  onUpdate: (snapshot: TextSnapshot) => void,
++  signal?: AbortSignal,
++): Promise<TextSnapshot> {
++  const state: TextSnapshot = { content: "", reasoning: "" };
++  let terminal = false;
++  const update = () =>
++    onUpdate({ ...state, usage: state.usage && { ...state.usage } });
++  const usage = (value: any) => {
++    if (!value) return;
++    state.usage = {
++      input:
++        numeric(
++          value.prompt_tokens ?? value.input_tokens ?? value.promptTokenCount,
++        ) ?? state.usage?.input,
++      output:
++        numeric(
++          value.completion_tokens ??
++            value.output_tokens ??
++            value.candidatesTokenCount,
++        ) ?? state.usage?.output,
++    };
++  };
++  const finish = (reason?: string) => {
++    state.finishReason = reason || "stop";
++    terminal = true;
++  };
++  const accept = (data: any, nonStream = false) => {
++    if (!data || typeof data !== "object")
++      throw new Error("文本接口返回了无效数据。");
++    if (data.error || data.type === "error")
++      throw new Error(
++        typeof data.error === "string"
++          ? data.error
++          : data.error?.message || data.message || "模型服务返回错误。",
++      );
++    usage(data.usage ?? data.usageMetadata ?? data.message?.usage);
++    if (protocol === "chat") {
++      const choice = data.choices?.[0];
++      const part = choice?.delta ?? choice?.message;
++      if (typeof part?.content === "string") state.content += part.content;
++      if (typeof part?.refusal === "string") state.content += part.refusal;
++      if (typeof part?.reasoning_content === "string")
++        state.reasoning += part.reasoning_content;
++      if (typeof part?.reasoning === "string")
++        state.reasoning += part.reasoning;
++      if (choice?.finish_reason) state.finishReason = choice.finish_reason;
++      if (nonStream && part) finish(choice.finish_reason);
++    } else if (protocol === "responses") {
++      if (
++        data.type === "response.output_text.delta" ||
++        data.type === "response.refusal.delta"
++      )
++        state.content += data.delta || "";
++      if (data.type === "response.reasoning_summary_text.delta")
++        state.reasoning += data.delta || "";
++      const result = data.response ?? data;
++      if (
++        ["response.failed", "response.cancelled"].includes(data.type) ||
++        ["failed", "cancelled"].includes(result.status)
++      )
++        throw new Error(result.error?.message || "模型未能完成此次回复。");
++      if (
++        ["response.completed", "response.incomplete"].includes(data.type) ||
++        nonStream
++      ) {
++        if (!state.content)
++          state.content =
++            result.output_text ||
++            (result.output || [])
++              .filter((v: any) => v.type === "message")
++              .flatMap((v: any) => v.content || [])
++              .map((v: any) => v.text || v.refusal || "")
++              .join("");
++        usage(result.usage);
++        finish(
++          result.status === "incomplete"
++            ? result.incomplete_details?.reason || "incomplete"
++            : "stop",
++        );
++      }
++    } else if (protocol === "anthropic") {
++      if (data.type === "content_block_delta") {
++        if (data.delta?.type === "text_delta")
++          state.content += data.delta.text || "";
++        if (data.delta?.type === "thinking_delta")
++          state.reasoning += data.delta.thinking || "";
++      }
++      if (
++        data.type === "content_block_start" &&
++        data.content_block?.type === "text"
++      )
++        state.content += data.content_block.text || "";
++      if (data.type === "message_delta" && data.delta?.stop_reason)
++        state.finishReason = data.delta.stop_reason;
++      if (data.type === "message_stop") finish(state.finishReason);
++      if (nonStream) {
++        state.content = (data.content || [])
++          .filter((v: any) => v.type === "text")
++          .map((v: any) => v.text || "")
++          .join("");
++        state.reasoning = (data.content || [])
++          .filter((v: any) => v.type === "thinking")
++          .map((v: any) => v.thinking || "")
++          .join("");
++        finish(data.stop_reason);
++      }
++    } else {
++      const candidate = data.candidates?.[0];
++      for (const part of candidate?.content?.parts || []) {
++        if (typeof part.text !== "string") continue;
++        if (part.thought) state.reasoning += part.text;
++        else state.content += part.text;
++      }
++      if (data.promptFeedback?.blockReason)
++        throw new Error(`模型拒绝此请求：${data.promptFeedback.blockReason}`);
++      if (candidate?.finishReason) finish(candidate.finishReason);
++      if (nonStream) finish(candidate?.finishReason);
++    }
++    update();
++  };
++  signal?.throwIfAborted();
++  const type = response.headers.get("content-type") || "";
++  if (type.includes("application/json")) {
++    const reader = response.body?.getReader();
++    if (!reader) throw new Error("文本接口没有返回响应。");
++    const abort = () => {
++      void reader.cancel().catch(() => {});
++    };
++    signal?.addEventListener("abort", abort, { once: true });
++    try {
++      const decoder = new TextDecoder();
++      let text = "",
++        bytes = 0;
++      while (true) {
++        const { done, value } = await reader.read();
++        signal?.throwIfAborted();
++        bytes += value?.byteLength || 0;
++        if (bytes > 32 * 1024 * 1024)
++          throw new Error("文本回复超过 32 MiB，请缩小本次请求。");
++        text += done
++          ? decoder.decode()
++          : decoder.decode(value, { stream: true });
++        if (done) break;
++      }
++      accept(JSON.parse(text), true);
++    } finally {
++      signal?.removeEventListener("abort", abort);
++      await reader.cancel().catch(() => {});
++      reader.releaseLock();
++    }
++  } else {
++    const reader = response.body?.getReader();
++    if (!reader) throw new Error("文本接口没有返回响应流。");
++    const decoder = new TextDecoder();
++    let buffer = "",
++      fields: string[] = [],
++      bytes = 0;
++    const flush = () => {
++      if (!fields.length) return;
++      const value = fields.join("\n");
++      fields = [];
++      if (value.trim() === "[DONE]") {
++        finish(state.finishReason);
++        return;
++      }
++      let json: unknown;
++      try {
++        json = JSON.parse(value);
++      } catch {
++        throw new Error("文本流数据不完整或格式错误，已保留收到的内容。");
++      }
++      accept(json);
++    };
++    const line = (value: string) => {
++      if (!value) {
++        flush();
++        return;
++      }
++      if (value.startsWith("data:"))
++        fields.push(value.slice(5).replace(/^ /, ""));
++    };
++    const abort = () => {
++      void reader.cancel().catch(() => {});
++    };
++    signal?.addEventListener("abort", abort, { once: true });
++    try {
++      while (true) {
++        signal?.throwIfAborted();
++        const { done, value } = await reader.read();
++        signal?.throwIfAborted();
++        bytes += value?.byteLength || 0;
++        if (bytes > 32 * 1024 * 1024)
++          throw new Error("文本回复超过 32 MiB，请缩小本次请求。");
++        buffer += done
++          ? decoder.decode()
++          : decoder.decode(value, { stream: true });
++        let boundary: number;
++        while ((boundary = buffer.indexOf("\n")) !== -1) {
++          line(buffer.slice(0, boundary).replace(/\r$/, ""));
++          buffer = buffer.slice(boundary + 1);
++        }
++        if (done) {
++          if (buffer) line(buffer.replace(/\r$/, ""));
++          flush();
++          if (protocol === "chat" && state.finishReason) terminal = true;
++          break;
++        }
++        // Terminal events end consumption even if the provider keeps the connection open.
++        if (terminal) {
++          await reader.cancel().catch(() => {});
++          break;
++        }
++      }
++    } finally {
++      signal?.removeEventListener("abort", abort);
++      await reader.cancel().catch(() => {});
++      reader.releaseLock();
++    }
++  }
++  if (!terminal)
++    throw new Error(
++      "连接已结束，但未收到完成标记。已保留部分回复，可手动重试。",
++    );
++  if (!state.content.trim() && !state.reasoning.trim())
++    throw new Error("模型未返回可显示的文本，请检查所选模型及接口。");
++  update();
++  return { ...state };
++}
+diff --git a/packages/drawnix/src/services/text-chat/request.test.ts b/packages/drawnix/src/services/text-chat/request.test.ts
+new file mode 100644
+index 0000000..ceb4ddb
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/request.test.ts
+@@ -0,0 +1,116 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++const mocks = vi.hoisted(() => ({
++  route: vi.fn(),
++  plan: vi.fn(),
++  send: vi.fn(),
++}));
++vi.mock("../../utils/settings-manager", () => ({
++  settingsManager: { waitForInitialization: async () => {} },
++  resolveInvocationRoute: mocks.route,
++}));
++vi.mock("../provider-routing", () => ({
++  resolveInvocationPlanFromRoute: mocks.plan,
++  providerTransport: { send: mocks.send },
++}));
++import { requestTextChat } from "./request";
++const ref = { profileId: "synthetic", modelId: "synthetic-text" };
++const plan = (
++  protocol = "openai.chat.completions",
++  path = "/chat/completions",
++) => ({
++  modelRef: ref,
++  provider: { apiKey: "sk-SYNTHETIC-SECRET", authType: "bearer" },
++  binding: { protocol, submitPath: path, baseUrlStrategy: "ensure-v1" },
++});
++const send = () =>
++  requestTextChat({
++    model: ref,
++    turns: [{ role: "user", content: "hello" }],
++    signal: new AbortController().signal,
++    onUpdate: () => {},
++  });
++beforeEach(() => {
++  vi.resetAllMocks();
++  mocks.route.mockReturnValue({ apiKey: "sk-SYNTHETIC-SECRET" });
++  mocks.plan.mockReturnValue(plan());
++});
++describe("configured text requests", () => {
++  it("uses the existing exact profile/model and pure user turns", async () => {
++    mocks.send.mockResolvedValue(
++      new Response(
++        '{"choices":[{"message":{"content":"answer"},"finish_reason":"stop"}]}',
++        { headers: { "content-type": "application/json" } },
++      ),
++    );
++    expect((await send()).content).toBe("answer");
++    expect(mocks.route).toHaveBeenCalledWith("text", ref);
++    expect(mocks.plan).toHaveBeenCalledWith("text", ref, {
++      preferredRequestSchema: ["anthropic.messages", "openai.responses.input"],
++    });
++    expect(JSON.parse(mocks.send.mock.calls[0][1].body)).toEqual({
++      model: ref.modelId,
++      stream: true,
++      messages: [{ role: "user", content: "hello" }],
++    });
++  });
++  it("maps native Claude auth, system format and version header", async () => {
++    mocks.plan.mockReturnValue(plan("anthropic.messages", "/v1/messages"));
++    mocks.send.mockResolvedValue(
++      new Response(
++        '{"content":[{"type":"text","text":"answer"}],"stop_reason":"end_turn"}',
++        { headers: { "content-type": "application/json" } },
++      ),
++    );
++    await send();
++    expect(mocks.send.mock.calls[0][0].authType).toBe("header");
++    expect(mocks.send.mock.calls[0][1].headers["anthropic-version"]).toBe(
++      "2023-06-01",
++    );
++    expect(JSON.parse(mocks.send.mock.calls[0][1].body)).toMatchObject({
++      max_tokens: 4096,
++    });
++  });
++  it("keeps account references opaque", async () => {
++    const p = plan("anthropic.messages", "/messages");
++    p.provider.apiKey = "tuzi-account:synthetic";
++    mocks.plan.mockReturnValue(p);
++    mocks.send.mockResolvedValue(
++      new Response('{"content":[{"type":"text","text":"answer"}]}', {
++        headers: { "content-type": "application/json" },
++      }),
++    );
++    await send();
++    expect(mocks.send.mock.calls[0][0]).toMatchObject({
++      apiKey: "tuzi-account:synthetic",
++      authType: "bearer",
++    });
++  });
++  it("preserves configured Gemini paths and maps streaming", async () => {
++    mocks.plan.mockReturnValue(
++      plan("google.generateContent", "/proxy/models/{model}:generateContent"),
++    );
++    mocks.send.mockResolvedValue(
++      new Response(
++        '{"candidates":[{"content":{"parts":[{"text":"answer"}]},"finishReason":"STOP"}]}',
++        { headers: { "content-type": "application/json" } },
++      ),
++    );
++    await send();
++    expect(mocks.send.mock.calls[0][1].path).toBe(
++      "/proxy/models/synthetic-text:streamGenerateContent?alt=sse",
++    );
++  });
++  it("rejects fallback to a different provider before submission", async () => {
++    mocks.plan.mockReturnValue({
++      ...plan(),
++      modelRef: { ...ref, profileId: "other" },
++    });
++    await expect(send()).rejects.toThrow("供应商");
++    expect(mocks.send).not.toHaveBeenCalled();
++  });
++  it("redacts errors without automatically replaying a paid request", async () => {
++    mocks.send.mockRejectedValue(Error("failed sk-SYNTHETIC-SECRET"));
++    await expect(send()).rejects.not.toThrow("sk-SYNTHETIC-SECRET");
++    expect(mocks.send).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/packages/drawnix/src/services/text-chat/request.ts b/packages/drawnix/src/services/text-chat/request.ts
+new file mode 100644
+index 0000000..8e9d421
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/request.ts
+@@ -0,0 +1,112 @@
++import {
++  settingsManager,
++  resolveInvocationRoute,
++  type ModelRef,
++} from "../../utils/settings-manager";
++import {
++  providerTransport,
++  resolveInvocationPlanFromRoute,
++} from "../provider-routing";
++import { safeTextError } from "../media-executor/text-response";
++import { readGenerationApiError } from "../../utils/generation-error-details";
++import {
++  readTextStream,
++  textBody,
++  textProtocol,
++  type TextSnapshot,
++  type TextTurn,
++} from "./protocol";
++
++export interface TextChatRequest {
++  model: ModelRef | null;
++  turns: TextTurn[];
++  maxOutput?: number;
++  signal: AbortSignal;
++  onUpdate: (snapshot: TextSnapshot) => void;
++}
++
++/** Uses exactly the existing configured text route; no new credential/config store. */
++export async function requestTextChat(
++  request: TextChatRequest,
++): Promise<TextSnapshot> {
++  await settingsManager.waitForInitialization();
++  request.signal.throwIfAborted();
++  const route = resolveInvocationRoute("text", request.model);
++  const plan = resolveInvocationPlanFromRoute("text", request.model, {
++    preferredRequestSchema: ["anthropic.messages", "openai.responses.input"],
++  });
++  if (!route.apiKey || !plan)
++    throw new Error("请先在创作配置中选择可用的文本模型和供应商。");
++  if (
++    request.model?.profileId &&
++    plan.modelRef.profileId !== request.model.profileId
++  )
++    throw new Error("所选模型的供应商已不可用，请重新选择文本模型。");
++  const protocol = textProtocol(plan.binding.protocol, plan.binding.submitPath);
++  let path = plan.binding.submitPath;
++  if (protocol === "gemini") {
++    path = path
++      .replace(/\{model\}/g, encodeURIComponent(plan.modelRef.modelId))
++      .replace(/:generateContent(?=\?|$)/, ":streamGenerateContent");
++    path += `${path.includes("?") ? "&" : "?"}alt=sse`;
++  }
++  const provider = { ...plan.provider };
++  // Anthropic native auth differs from OpenAI-compatible Claude routes.
++  if (
++    protocol === "anthropic" &&
++    provider.authType === "bearer" &&
++    !provider.apiKey.startsWith("tuzi-account:")
++  )
++    provider.authType = "header";
++  const controller = new AbortController();
++  let timedOut = false;
++  const cancel = () => controller.abort();
++  request.signal.addEventListener("abort", cancel, { once: true });
++  if (request.signal.aborted) cancel();
++  const timeout = setTimeout(() => {
++    timedOut = true;
++    controller.abort();
++  }, 600000);
++  try {
++    const response = await providerTransport.send(provider, {
++      path,
++      baseUrlStrategy: plan.binding.baseUrlStrategy,
++      method: "POST",
++      headers: {
++        "Content-Type": "application/json",
++        ...(protocol === "anthropic"
++          ? { "anthropic-version": "2023-06-01" }
++          : {}),
++      },
++      body: JSON.stringify(
++        textBody(
++          protocol,
++          plan.modelRef.modelId,
++          request.turns,
++          request.maxOutput,
++        ),
++      ),
++      signal: controller.signal,
++    });
++    if (!response.ok)
++      throw await readGenerationApiError(
++        response,
++        `模型请求失败（${response.status}）`,
++        { modelId: plan.modelRef.modelId },
++      );
++    return await readTextStream(
++      response,
++      protocol,
++      request.onUpdate,
++      controller.signal,
++    );
++  } catch (error) {
++    if (timedOut) throw new Error("本次回复等待超过 10 分钟，已保留部分内容。");
++    if (request.signal.aborted)
++      throw new DOMException("已停止生成", "AbortError");
++    throw safeTextError(error, [route.apiKey]);
++  } finally {
++    clearTimeout(timeout);
++    request.signal.removeEventListener("abort", cancel);
++  }
++}
+diff --git a/packages/drawnix/src/services/text-chat/routing.test.ts b/packages/drawnix/src/services/text-chat/routing.test.ts
+new file mode 100644
+index 0000000..600f166
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/routing.test.ts
+@@ -0,0 +1,78 @@
++import { describe, expect, it } from "vitest";
++import {
++  inferBindingsForProviderModel,
++  InvocationPlanner,
++} from "../provider-routing";
++import { ModelVendor } from "../../constants/model-config";
++const profile = {
++  id: "synthetic",
++  name: "Synthetic",
++  providerType: "openai-compatible" as const,
++  baseUrl: "https://synthetic.invalid/v1",
++  apiKey: "sk-SYNTHETIC",
++  authType: "bearer" as const,
++};
++const model = {
++  id: "claude-sonnet",
++  label: "Synthetic",
++  type: "text" as const,
++  vendor: ModelVendor.OTHER,
++};
++describe("text protocols reuse existing provider catalogue", () => {
++  it.each([
++    ["/v1/messages", "anthropic.messages"],
++    ["/v1/responses", "openai.responses"],
++    ["/proxy/messages", "anthropic.messages"],
++  ])("preserves explicit endpoint %s", (path, protocol) => {
++    const bindings = inferBindingsForProviderModel(profile, model, {
++      text: { path, method: "POST" },
++    });
++    expect(bindings.find((b) => b.protocol === protocol)?.submitPath).toBe(
++      path,
++    );
++    const planner = new InvocationPlanner({
++      getProviderProfile: () => profile,
++      getModelBindings: () => bindings,
++    });
++    expect(
++      planner.plan({
++        operation: "text",
++        modelRef: { profileId: profile.id, modelId: model.id },
++        preferredRequestSchema: [
++          "anthropic.messages",
++          "openai.responses.input",
++        ],
++      }).binding.protocol,
++    ).toBe(protocol);
++  });
++  it("does not choose native Claude based on model name alone", () => {
++    const bindings = inferBindingsForProviderModel(profile, model);
++    expect(bindings.some((b) => b.protocol === "anthropic.messages")).toBe(
++      false,
++    );
++  });
++  it("recognizes a configured official Claude endpoint without changing the old default binding", () => {
++    const bindings = inferBindingsForProviderModel(
++      { ...profile, baseUrl: "https://api.anthropic.com" },
++      model,
++    );
++    expect(bindings.some((b) => b.protocol === "anthropic.messages")).toBe(
++      true,
++    );
++    expect(bindings[0].protocol).toBe("openai.chat.completions");
++  });
++  it("does not infer text protocol for images or GET endpoints", () => {
++    expect(
++      inferBindingsForProviderModel(
++        profile,
++        { ...model, type: "image" },
++        { text: { path: "/v1/messages", method: "POST" } },
++      ).some((b) => b.protocol === "anthropic.messages"),
++    ).toBe(false);
++    expect(
++      inferBindingsForProviderModel(profile, model, {
++        text: { path: "/v1/messages", method: "GET" },
++      }).some((b) => b.protocol === "anthropic.messages"),
++    ).toBe(false);
++  });
++});
+diff --git a/packages/drawnix/src/services/text-chat/runtime.test.ts b/packages/drawnix/src/services/text-chat/runtime.test.ts
+new file mode 100644
+index 0000000..484738d
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/runtime.test.ts
+@@ -0,0 +1,215 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++vi.mock("../chat-storage-service", () => ({ chatStorageService: {} }));
++vi.mock("./request", () => ({ requestTextChat: vi.fn() }));
++import { TextChatRuntime } from "./runtime";
++import { conversationContext, restoreTextConversation } from "./conversation";
++import type { TextChatRequest } from "./request";
++
++function setup(
++  request = vi.fn(async (_r: TextChatRequest) => ({
++    content: "answer",
++    reasoning: "",
++  })),
++) {
++  const records = new Map<string, any>();
++  let seq = 0;
++  const db = {
++    getAllSessions: vi.fn(async () => [...records.values()]),
++    saveTextSession: vi.fn(async (s: any) => {
++      records.set(s.id, structuredClone(s));
++    }),
++    deleteSession: vi.fn(async (id: string) => {
++      records.delete(id);
++    }),
++    generateId: () => `test-${++seq}`,
++    generateTitle: (s: string) => s.slice(0, 40),
++  };
++  return { runtime: new TextChatRuntime(db, request), db, records, request };
++}
++const model = { profileId: "synthetic", modelId: "synthetic-text" };
++afterEach(() => vi.useRealTimers());
++describe("isolated text conversations", () => {
++  it("saves one atomic session with draft and replies, recoverable on restart", async () => {
++    const { runtime, db } = setup();
++    const id = await runtime.create(model);
++    runtime.configure(id, {}, { draft: "draft", systemPrompt: "system" });
++    await runtime.save(id);
++    await runtime.send(id, "hello");
++    const recovered = new TextChatRuntime(db);
++    await recovered.initialize();
++    expect(recovered.getSnapshot().sessions[0].textChat).toMatchObject({
++      version: 1,
++      draft: "",
++      systemPrompt: "system",
++      messages: [
++        { content: "hello" },
++        { content: "answer", status: "complete" },
++      ],
++    });
++  });
++  it("regenerates using only preceding context and retains old answers", async () => {
++    const { runtime, request } = setup();
++    const id = await runtime.create(model);
++    await runtime.send(id, "first");
++    await runtime.send(id, "second");
++    const first = runtime.getSnapshot().sessions[0].textChat.messages[0];
++    await runtime.send(id, "", first.id);
++    expect(request.mock.calls[2][0].turns).toEqual([
++      { role: "user", content: "first" },
++    ]);
++    expect(runtime.getSnapshot().sessions[0].textChat.messages).toHaveLength(5);
++  });
++  it("isolates cancellation and keeps partial output in the original session", async () => {
++    const request = vi.fn(
++      (r: TextChatRequest) =>
++        new Promise<{ content: string; reasoning: string }>(
++          (resolve, reject) => {
++            r.onUpdate({ content: r.turns.at(-1)!.content, reasoning: "" });
++            r.signal.addEventListener("abort", () =>
++              reject(new DOMException("stop", "AbortError")),
++            );
++            if (r.turns.at(-1)!.content === "second")
++              resolve({ content: "second complete", reasoning: "" });
++          },
++        ),
++    );
++    const { runtime } = setup(request);
++    const a = await runtime.create(model),
++      b = await runtime.create(model);
++    const first = runtime.send(a, "first");
++    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1));
++    await runtime.send(b, "second");
++    runtime.stop(a);
++    await first;
++    expect(
++      runtime.getSnapshot().sessions.find((s) => s.id === a)!.textChat
++        .messages[1],
++    ).toMatchObject({ content: "first", status: "stopped" });
++    expect(
++      runtime.getSnapshot().sessions.find((s) => s.id === b)!.textChat
++        .messages[1],
++    ).toMatchObject({ content: "second complete", status: "complete" });
++  });
++  it("never submits when the first durable write fails", async () => {
++    const { runtime, db, request } = setup();
++    const id = await runtime.create(model);
++    db.saveTextSession.mockRejectedValue(new Error("disk full"));
++    await runtime.send(id, "keep me");
++    expect(request).not.toHaveBeenCalled();
++    expect(runtime.getSnapshot().saveErrors.has(id)).toBe(true);
++    expect(runtime.getSnapshot().sessions[0].textChat.messages[0].content).toBe(
++      "keep me",
++    );
++  });
++  it("keeps final save errors visible and retries without another request", async () => {
++    const { runtime, db, request } = setup();
++    const id = await runtime.create(model);
++    db.saveTextSession
++      .mockResolvedValueOnce(undefined)
++      .mockRejectedValueOnce(new Error("disk full"));
++    await runtime.send(id, "hello");
++    expect(runtime.getSnapshot().saveErrors.has(id)).toBe(true);
++    db.saveTextSession.mockImplementation(async () => {});
++    await runtime.save(id);
++    expect(runtime.getSnapshot().saveErrors.size).toBe(0);
++    expect(request).toHaveBeenCalledTimes(1);
++  });
++  it("recovers in-progress messages as interrupted and ignores legacy creative sessions", async () => {
++    const { runtime, db, records } = setup();
++    const id = await runtime.create(model);
++    const saved = records.get(id);
++    saved.textChat.messages.push({
++      id: "partial",
++      role: "assistant",
++      content: "partial",
++      status: "streaming",
++      createdAt: 1,
++    });
++    records.set("old", { id: "old", title: "creative" });
++    const recovered = new TextChatRuntime(db);
++    await recovered.initialize();
++    expect(recovered.getSnapshot().sessions).toHaveLength(1);
++    expect(
++      recovered.getSnapshot().sessions[0].textChat.messages[0],
++    ).toMatchObject({
++      content: "partial",
++      reasoning: "",
++      status: "interrupted",
++    });
++  });
++  it("does not replay failed/partial assistant text into future context", async () => {
++    const { runtime } = setup();
++    const id = await runtime.create(model);
++    await runtime.send(id, "a");
++    await runtime.send(id, "b");
++    const messages = runtime.getSnapshot().sessions[0].textChat.messages;
++    const input = messages.map((m) =>
++      m.role === "assistant" ? { ...m, status: "stopped" as const } : m,
++    );
++    expect(conversationContext(input, messages[2].id)).toEqual([
++      { role: "user", content: "a" },
++      { role: "user", content: "b" },
++    ]);
++  });
++  it("rejects unknown schema instead of deleting it", () => {
++    expect(() =>
++      restoreTextConversation({
++        kind: "text",
++        textChat: { version: 99 },
++      } as any),
++    ).toThrow("版本");
++  });
++  it("flush retries failed writes even when there are no timers or active requests", async () => {
++    const { runtime, db } = setup();
++    const id = await runtime.create(model);
++    db.saveTextSession.mockRejectedValue(new Error("disk full"));
++    await runtime.send(id, "retain");
++    await expect(runtime.flush()).rejects.toThrow("保存失败");
++    db.saveTextSession.mockResolvedValue(undefined);
++    await runtime.flush();
++    expect(runtime.getSnapshot().saveErrors.size).toBe(0);
++  });
++  it("reset during loading cannot resurrect cleared history", async () => {
++    const { runtime, db } = setup();
++    await runtime.create(model);
++    let resolve!: (sessions: any[]) => void;
++    db.getAllSessions.mockImplementationOnce(
++      () =>
++        new Promise((r) => {
++          resolve = r;
++        }),
++    );
++    const recovered = new TextChatRuntime(db);
++    const pending = recovered.initialize();
++    recovered.reset();
++    resolve(runtime.getSnapshot().sessions);
++    await pending;
++    expect(recovered.getSnapshot().sessions).toEqual([]);
++  });
++  it("reset cancels active replies and prevents delayed persistence", async () => {
++    const request = vi.fn(
++      (r: TextChatRequest) =>
++        new Promise<any>((_, reject) => {
++          r.onUpdate({ content: "partial", reasoning: "" });
++          r.signal.addEventListener("abort", () => reject(Error("cancel")));
++        }),
++    );
++    const { runtime, db } = setup(request);
++    const id = await runtime.create(model);
++    const running = runtime.send(id, "hello");
++    await vi.waitFor(() => expect(request).toHaveBeenCalled());
++    const writes = db.saveTextSession.mock.calls.length;
++    runtime.reset();
++    await running;
++    expect(runtime.getSnapshot().sessions).toEqual([]);
++    expect(db.saveTextSession).toHaveBeenCalledTimes(writes);
++  });
++  it("deletes the full text session snapshot", async () => {
++    const { runtime, records } = setup();
++    const id = await runtime.create(model);
++    await runtime.send(id, "a");
++    await runtime.remove(id);
++    expect(records.has(id)).toBe(false);
++    expect(runtime.getSnapshot().sessions).toHaveLength(0);
++  });
++});
+diff --git a/packages/drawnix/src/services/text-chat/runtime.ts b/packages/drawnix/src/services/text-chat/runtime.ts
+new file mode 100644
+index 0000000..3ed35f1
+--- /dev/null
++++ b/packages/drawnix/src/services/text-chat/runtime.ts
+@@ -0,0 +1,344 @@
++import { chatStorageService as storage } from "../chat-storage-service";
++import { requestTextChat, type TextChatRequest } from "./request";
++import {
++  conversationContext,
++  newTextState,
++  restoreTextConversation,
++  type TextConversation,
++  type TextMessage,
++} from "./conversation";
++import type { ModelRef } from "../../utils/settings-manager";
++
++interface Snapshot {
++  sessions: TextConversation[];
++  ready: boolean;
++  error: string | null;
++  running: ReadonlySet<string>;
++  saveErrors: ReadonlySet<string>;
++}
++type Storage = Pick<
++  typeof storage,
++  | "getAllSessions"
++  | "saveTextSession"
++  | "deleteSession"
++  | "generateId"
++  | "generateTitle"
++>;
++export class TextChatRuntime {
++  private snapshot: Snapshot = {
++    sessions: [],
++    ready: false,
++    error: null,
++    running: new Set(),
++    saveErrors: new Set(),
++  };
++  private listeners = new Set<() => void>();
++  private init?: Promise<void>;
++  private requests = new Map<string, AbortController>();
++  private saves = new Map<string, Promise<void>>();
++  private timers = new Map<string, ReturnType<typeof setTimeout>>();
++  private epoch = 0;
++  constructor(
++    private db: Storage = storage,
++    private request: (
++      r: TextChatRequest,
++    ) => ReturnType<typeof requestTextChat> = requestTextChat,
++  ) {}
++  getSnapshot = () => this.snapshot;
++  subscribe = (listener: () => void) => {
++    this.listeners.add(listener);
++    return () => this.listeners.delete(listener);
++  };
++  private emit(patch: Partial<Snapshot>) {
++    this.snapshot = { ...this.snapshot, ...patch };
++    this.listeners.forEach((fn) => fn());
++  }
++  initialize = () => (this.init ??= this.load());
++  private async load() {
++    const epoch = this.epoch;
++    try {
++      const sessions = (await this.db.getAllSessions())
++        .filter((s) => s.kind === "text")
++        .map(restoreTextConversation);
++      if (epoch === this.epoch)
++        this.emit({ sessions, ready: true, error: null });
++    } catch (error) {
++      if (epoch !== this.epoch) return;
++      this.emit({
++        ready: true,
++        error:
++          error instanceof Error ? error.message : "读取会话失败，请重试。",
++      });
++      this.init = undefined;
++    }
++  }
++  private get(id: string) {
++    const session = this.snapshot.sessions.find((s) => s.id === id);
++    if (!session) throw new Error("会话已不存在。");
++    return session;
++  }
++  private replace(session: TextConversation) {
++    this.emit({
++      sessions: this.snapshot.sessions.map((s) =>
++        s.id === session.id ? session : s,
++      ),
++    });
++  }
++  private updateMessage(
++    id: string,
++    messageId: string,
++    patch: Partial<TextMessage>,
++  ) {
++    const session = this.get(id);
++    this.replace({
++      ...session,
++      textChat: {
++        ...session.textChat,
++        messages: session.textChat.messages.map((m) =>
++          m.id === messageId ? { ...m, ...patch } : m,
++        ),
++      },
++    });
++  }
++  save = async (id: string): Promise<void> => {
++    clearTimeout(this.timers.get(id));
++    this.timers.delete(id);
++    const session = this.get(id),
++      epoch = this.epoch;
++    const prior = this.saves.get(id) ?? Promise.resolve();
++    const next = prior
++      .catch(() => {})
++      .then(async () => {
++        if (epoch !== this.epoch) return;
++        await this.db.saveTextSession(session);
++      });
++    this.saves.set(id, next);
++    try {
++      await next;
++      if (epoch !== this.epoch) return;
++      const saveErrors = new Set(this.snapshot.saveErrors);
++      saveErrors.delete(id);
++      this.emit({ saveErrors });
++    } catch {
++      if (epoch !== this.epoch) return;
++      const saveErrors = new Set(this.snapshot.saveErrors);
++      saveErrors.add(id);
++      this.emit({ saveErrors });
++      throw new Error(
++        "会话保存失败。内容仍保留在当前窗口，请重试保存后再关闭。",
++      );
++    } finally {
++      if (this.saves.get(id) === next) this.saves.delete(id);
++    }
++  };
++  private scheduleSave(id: string) {
++    if (this.timers.has(id)) return;
++    this.timers.set(
++      id,
++      setTimeout(() => {
++        this.timers.delete(id);
++        void this.save(id).catch(() => {});
++      }, 700),
++    );
++  }
++  create = async (model: ModelRef | null): Promise<string> => {
++    await this.initialize();
++    if (this.snapshot.error) throw new Error(this.snapshot.error);
++    const now = Date.now();
++    const session: TextConversation = {
++      id: this.db.generateId(),
++      title: "新对话",
++      kind: "text",
++      createdAt: now,
++      updatedAt: now,
++      messageCount: 0,
++      sessionModel: model?.modelId || undefined,
++      sessionModelRef: model,
++      textChat: newTextState(),
++    };
++    this.emit({ sessions: [session, ...this.snapshot.sessions] });
++    await this.save(session.id);
++    return session.id;
++  };
++  configure = (
++    id: string,
++    patch: Partial<
++      Pick<TextConversation, "title" | "sessionModel" | "sessionModelRef">
++    >,
++    textPatch: Partial<
++      Omit<TextConversation["textChat"], "messages" | "version">
++    > = {},
++  ) => {
++    const current = this.get(id);
++    this.replace({
++      ...current,
++      ...patch,
++      textChat: { ...current.textChat, ...textPatch },
++    });
++    this.scheduleSave(id);
++  };
++  remove = async (id: string) => {
++    if (this.requests.has(id))
++      throw new Error("请先停止当前会话的生成，再删除会话。");
++    clearTimeout(this.timers.get(id));
++    this.timers.delete(id);
++    await this.saves.get(id)?.catch(() => {});
++    await this.db.deleteSession(id);
++    const saveErrors = new Set(this.snapshot.saveErrors);
++    saveErrors.delete(id);
++    this.emit({
++      sessions: this.snapshot.sessions.filter((s) => s.id !== id),
++      saveErrors,
++    });
++  };
++  stop = (id: string) => this.requests.get(id)?.abort();
++  send = async (id: string, content: string, regenerateUserId?: string) => {
++    if (this.requests.has(id)) return;
++    const session = this.get(id);
++    const text = content.trim();
++    if (!regenerateUserId && !text) return;
++    if (text.length > 200000) throw new Error("单条消息过长，请分段发送。");
++    const now = Date.now();
++    const user: TextMessage = regenerateUserId
++      ? session.textChat.messages.find(
++          (m) => m.id === regenerateUserId && m.role === "user",
++        )!
++      : {
++          id: this.db.generateId(),
++          role: "user",
++          content: text,
++          reasoning: "",
++          createdAt: now,
++          status: "complete",
++        };
++    if (!user) throw new Error("原始消息不存在。");
++    const messages = regenerateUserId
++      ? [...session.textChat.messages]
++      : [...session.textChat.messages, user];
++    const turns = conversationContext(messages, user.id);
++    if (session.textChat.systemPrompt.trim())
++      turns.unshift({ role: "system", content: session.textChat.systemPrompt });
++    if (turns.reduce((n, t) => n + t.content.length, 0) > 800000)
++      throw new Error("当前对话上下文较长，请新建对话或缩短内容。");
++    const assistant: TextMessage = {
++      id: this.db.generateId(),
++      role: "assistant",
++      content: "",
++      reasoning: "",
++      createdAt: now + 1,
++      status: "pending",
++      replyTo: user.id,
++      model: session.sessionModel,
++    };
++    messages.push(assistant);
++    const controller = new AbortController();
++    this.requests.set(id, controller);
++    this.emit({ running: new Set(this.requests.keys()) });
++    this.replace({
++      ...session,
++      updatedAt: now,
++      title: session.textChat.messages.length
++        ? session.title
++        : this.db.generateTitle(user.content),
++      messageCount: messages.length,
++      textChat: { ...session.textChat, draft: "", messages },
++    });
++    const epoch = this.epoch;
++    let pending: Partial<TextMessage> | undefined,
++      renderTimer: ReturnType<typeof setTimeout> | undefined;
++    const flush = () => {
++      clearTimeout(renderTimer);
++      renderTimer = undefined;
++      if (pending && epoch === this.epoch) {
++        this.updateMessage(id, assistant.id, pending);
++        pending = undefined;
++        this.scheduleSave(id);
++      }
++    };
++    try {
++      // Never submit a paid request before the user turn is durably saved.
++      await this.save(id);
++      controller.signal.throwIfAborted();
++      const result = await this.request({
++        model:
++          session.sessionModelRef ||
++          (session.sessionModel
++            ? { profileId: null, modelId: session.sessionModel }
++            : null),
++        turns,
++        maxOutput: session.textChat.maxOutput,
++        signal: controller.signal,
++        onUpdate: (data) => {
++          if (epoch !== this.epoch || controller.signal.aborted) return;
++          pending = { ...data, status: "streaming" };
++          if (!renderTimer) renderTimer = setTimeout(flush, 40);
++        },
++      });
++      flush();
++      if (epoch === this.epoch)
++        this.updateMessage(id, assistant.id, {
++          ...result,
++          status: controller.signal.aborted ? "stopped" : "complete",
++        });
++    } catch (error) {
++      flush();
++      if (epoch === this.epoch)
++        this.updateMessage(id, assistant.id, {
++          status: controller.signal.aborted ? "stopped" : "error",
++          error: controller.signal.aborted
++            ? undefined
++            : error instanceof Error
++              ? error.message
++              : "回复失败，请重试。",
++        });
++    } finally {
++      clearTimeout(renderTimer);
++      if (epoch === this.epoch) {
++        this.requests.delete(id);
++        this.emit({ running: new Set(this.requests.keys()) });
++        await this.save(id).catch(() => {});
++      }
++    }
++  };
++  flush = async () => {
++    await Promise.all(
++      [
++        ...new Set([
++          ...this.timers.keys(),
++          ...this.requests.keys(),
++          ...this.saves.keys(),
++          ...this.snapshot.saveErrors,
++        ]),
++      ].map((id) => this.save(id)),
++    );
++  };
++  reload = async () => {
++    if (this.requests.size)
++      throw new Error("请先停止文本回复，再恢复会话备份。");
++    this.reset();
++    this.init = undefined;
++    this.emit({ ready: false });
++    await this.initialize();
++  };
++  reset = () => {
++    this.epoch++;
++    this.requests.forEach((c) => c.abort());
++    this.requests.clear();
++    this.timers.forEach(clearTimeout);
++    this.timers.clear();
++    this.emit({
++      sessions: [],
++      ready: true,
++      running: new Set(),
++      saveErrors: new Set(),
++      error: null,
++    });
++  };
++}
++export const textChatRuntime = new TextChatRuntime();
++if (typeof window !== "undefined") {
++  window.addEventListener("aitu-chat-cleared", textChatRuntime.reset);
++  window.addEventListener("pagehide", () => {
++    void textChatRuntime.flush().catch(() => {});
++  });
++}
 diff --git a/packages/drawnix/src/services/tuzi-client-attribution.ts b/packages/drawnix/src/services/tuzi-client-attribution.ts
 index 23b3af2..f679dde 100644
 --- a/packages/drawnix/src/services/tuzi-client-attribution.ts
@@ -14916,7 +18656,7 @@ index d2cd042..6e03be5 100644
  
    &:disabled {
 diff --git a/packages/drawnix/src/types/chat.types.ts b/packages/drawnix/src/types/chat.types.ts
-index cfe86b8..121de0a 100644
+index cfe86b8..9a99acd 100644
 --- a/packages/drawnix/src/types/chat.types.ts
 +++ b/packages/drawnix/src/types/chat.types.ts
 @@ -1,3 +1,4 @@
@@ -14956,7 +18696,28 @@ index cfe86b8..121de0a 100644
    /** 工作流数据（当消息包含工作流时） */
    workflow?: WorkflowMessageData;
    /** AI 输入上下文（用于用户消息展示） */
-@@ -227,6 +232,7 @@ export interface StreamEvent {
+@@ -187,6 +192,10 @@ export interface ChatSessionGenerationState {
+ 
+ /** 对话会话接口 */
+ export interface ChatSession {
++  /** Missing kind denotes the original creative/Agent conversation. */
++  kind?: 'text';
++  /** Atomic text conversation snapshot; included in existing session backups. */
++  textChat?: import('../services/text-chat/conversation').TextConversationState;
+   id: string;
+   title: string;
+   createdAt: number;
+@@ -206,6 +215,9 @@ export interface ChatSession {
+ 
+ /** 抽屉状态接口 */
+ export interface DrawerState {
++  mode?: 'text' | 'creative';
++  textActiveSessionId?: string | null;
++  textFocus?: boolean;
+   isOpen: boolean;
+   width: number;
+   activeSessionId: string | null;
+@@ -227,6 +239,7 @@ export interface StreamEvent {
    type: 'content' | 'done' | 'error';
    content?: string;
    error?: string;

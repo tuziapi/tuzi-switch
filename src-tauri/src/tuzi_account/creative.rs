@@ -281,6 +281,7 @@ fn target(request: &ModelRequest) -> Result<(&'static str, String), String> {
         "image.edit" => "/v1/images/edits",
         "chat" => "/v1/chat/completions",
         "responses" => "/v1/responses",
+        "anthropic.messages" => "/v1/messages",
         "video.create" => "/v1/videos",
         "audio.speech" => "/v1/audio/speech",
         "audio.transcribe" => "/v1/audio/transcriptions",
@@ -438,6 +439,7 @@ fn supports_action(model: &Value, action: &str) -> bool {
                 "openai_completions",
             ],
         ),
+        "anthropic.messages" => ("/v1/messages", &["anthropic", "anthropic-messages", "claude", "claude code", "claude_code"]),
         "responses" => (
             "/v1/responses",
             &[
@@ -685,6 +687,9 @@ async fn execute(
                 .bearer_auth(secret.as_str())
                 .header("X-Request-Id", upstream_id)
                 .timeout(Duration::from_secs(600));
+            if request.action == "anthropic.messages" {
+                builder = builder.header("anthropic-version", "2023-06-01");
+            }
             if let Some((body, content_type)) = payload {
                 builder = builder.header("Content-Type", content_type).body(body);
             }
@@ -891,6 +896,18 @@ mod tests {
             &json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/images/generations","method":"GET"}}}),
             "image.generate"
         ));
+    }
+    #[test]
+    fn text_messages_require_catalog_membership_and_post_endpoint() {
+        assert_eq!(target(&request("anthropic.messages")).unwrap(), ("POST", "/v1/messages".into()));
+        for label in ["anthropic", "anthropic-messages", "claude", "claude code", "claude_code"] {
+            let catalog = json!({"items":[{"model_name":"synthetic","supported_endpoint_types":[label]}]});
+            assert!(validate_model(&request("anthropic.messages"), &catalog).is_ok());
+        }
+        assert!(validate_model(&request("anthropic.messages"), &json!({"items":[]})).is_err());
+        assert!(!supports_action(&json!({"model_name":"claude-sonnet"}), "anthropic.messages"));
+        assert!(!supports_action(&json!({"supported_endpoint_types":["claude"],"endpoints":{"claude":{"path":"/v1/messages","method":"GET"}}}), "anthropic.messages"));
+        assert!(!supports_action(&json!({"supported_endpoint_types":["claude"],"endpoints":{"claude":{"path":"/api/token/","method":"POST"}}}), "anthropic.messages"));
     }
     #[test]
     fn multipart_is_encoded_natively_and_rejects_header_injection() {

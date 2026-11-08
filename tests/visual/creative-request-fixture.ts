@@ -4,10 +4,10 @@ interface SyntheticRequestState {
   hold: boolean;
   holdPoll: boolean;
   fail: boolean;
-  requests: Array<{ id: string; method: string; path: string }>;
+  requests: Array<{ id: string; method: string; path: string; body?: string }>;
   responses: Record<
     string,
-    { body: unknown; status?: number; contentType?: string }
+    { body: unknown; status?: number; contentType?: string; chunks?: string[]; delayMs?: number }
   >;
   release: () => void;
 }
@@ -36,7 +36,7 @@ const png =
 export async function creativeManualPreviewIPC(command: string, args: unknown) {
   const payload = args as {
     requestId?: string;
-    request: { requestId: string; url: string; method: string };
+    request: { requestId: string; url: string; method: string; body?: string };
     onChunk: { onmessage: (value: unknown) => void };
   };
   if (command === "creative_manual_cancel") {
@@ -52,6 +52,7 @@ export async function creativeManualPreviewIPC(command: string, args: unknown) {
     id: request.requestId,
     method: request.method,
     path: url.pathname,
+    body: request.body,
   });
   onChunk.onmessage({ type: "ready" });
   if (
@@ -99,14 +100,11 @@ export async function creativeManualPreviewIPC(command: string, args: unknown) {
     override?.contentType === "text/event-stream"
       ? String(body)
       : JSON.stringify(body);
-  onChunk.onmessage({
-    type: "data",
-    data: btoa(
-      Array.from(new TextEncoder().encode(text), (b) =>
-        String.fromCharCode(b),
-      ).join(""),
-    ),
-  });
+  for (const chunk of override?.chunks || [text]) {
+    if (override?.delayMs) await new Promise(resolve => setTimeout(resolve, override.delayMs));
+    if (cancelled.delete(request.requestId)) throw new Error("creative_cancelled_outcome_unknown");
+    onChunk.onmessage({ type: "data", data: btoa(Array.from(new TextEncoder().encode(chunk), b => String.fromCharCode(b)).join("")) });
+  }
   onChunk.onmessage({ type: "end" });
 }
 

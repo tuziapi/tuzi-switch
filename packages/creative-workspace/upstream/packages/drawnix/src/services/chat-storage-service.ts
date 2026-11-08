@@ -60,6 +60,12 @@ export async function getSession(id: string): Promise<ChatSession | null> {
   return sessionsStore.getItem<ChatSession>(id);
 }
 
+/** A text conversation is one IndexedDB record: messages/metadata commit together. */
+export async function saveTextSession(session: ChatSession): Promise<void> {
+  if (session.kind !== 'text' || session.textChat?.version !== 1) throw new Error('无效的文本会话');
+  await sessionsStore.setItem(session.id, session);
+}
+
 export async function getAllSessions(): Promise<ChatSession[]> {
   const sessions: ChatSession[] = [];
   await sessionsStore.iterate<ChatSession, void>((value) => {
@@ -234,12 +240,14 @@ export function setDrawerState(state: Partial<DrawerState>): void {
 // ============================================================================
 
 export async function clearAllData(): Promise<void> {
+  window.dispatchEvent(new Event('aitu-chat-cleared'));
   await sessionsStore.clear();
   await messagesStore.clear();
   localStorage.removeItem(CHAT_STORAGE_KEYS.DRAWER_STATE);
 }
 
 export async function clearConversationHistory(): Promise<void> {
+  window.dispatchEvent(new Event('aitu-chat-cleared'));
   await sessionsStore.clear();
   await messagesStore.clear();
   setDrawerState({ activeSessionId: null });
@@ -253,6 +261,7 @@ export { generateId, generateTitle };
 
 // Export as service object for easier mocking
 export const chatStorageService = {
+  saveTextSession,
   createSession,
   getSession,
   getAllSessions,

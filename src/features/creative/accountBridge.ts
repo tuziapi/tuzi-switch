@@ -77,6 +77,7 @@ function actionFor(url: string, method: string) {
     "POST /v1/images/edits": "image.edit",
     "POST /v1/chat/completions": "chat",
     "POST /v1/responses": "responses",
+    "POST /v1/messages": "anthropic.messages",
     "POST /v1/videos": "video.create",
     "POST /v1/audio/speech": "audio.speech",
     "POST /v1/audio/transcriptions": "audio.transcribe",

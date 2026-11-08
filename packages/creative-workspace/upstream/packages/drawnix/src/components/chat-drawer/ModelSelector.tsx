@@ -460,7 +460,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
               className="model-selector__trigger-health"
             />
             <span className="model-selector__trigger-text">
-              {currentModel?.shortLabel || currentModel?.label || '选择模型'}
+              {currentModel?.shortLabel || currentModel?.label || selectedModel || '选择模型'}
             </span>
           </div>
           <ChevronDownIcon

@@ -6390,6 +6390,71 @@
       "path": "packages/drawnix/src/utils/__tests__/image-batch-preparation.test.ts",
       "origin": "assistant-local",
       "reason": "UC-PERF-02 approved batch preparation, reserved grid and cancellation regression"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/backup.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/conversation.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/protocol.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/protocol.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/request.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/request.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/routing.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/runtime.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/runtime.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/TextChatWorkspace.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/TextMarkdown.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/TextMarkdown.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/text-chat.scss",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
     }
   ],
   "integration": {
