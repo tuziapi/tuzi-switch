@@ -179,20 +179,20 @@ index b1fcad1..13df234 100644
            value={value.children}
 diff --git a/openspec/changes/add-canvas-browse-edit/proposal.md b/openspec/changes/add-canvas-browse-edit/proposal.md
 new file mode 100644
-index 0000000..b1b3259
+index 0000000..998e8e9
 --- /dev/null
 +++ b/openspec/changes/add-canvas-browse-edit/proposal.md
 @@ -0,0 +1,15 @@
-+# Change: 桌面画布明确浏览与编辑
++# Change: 桌面画布默认浏览与平移修复
 +
-+用户于 2026-11-08 选择方案 B：默认浏览，顶部明确区分“浏览／编辑”，记住上次模式。该选择为本提案实施授权，仅本地修改、验证及构建。
++用户于 2026-11-08 选择方案 B：默认浏览，顶部明确区分“浏览／编辑”，记住上次模式。随后用户明确要求移除顶部额外按钮，只保留平移改善；此反馈覆盖顶部按钮要求。仅本地修改、验证及构建。
 +
 +## Why
 +选择模式下拖动图片会移动元素，用户希望平移画布时容易误操作。已有手形工具可正确平移，但入口及默认行为不符合浏览优先的使用方式。
 +
 +## What Changes
 +- 桌面集成首次进入使用手形浏览；后续恢复本机浏览/编辑选择。
-+- 顶部可访问的浏览/编辑按钮与现有工具、H/V 快捷键同步；其他绘制工具归入编辑。
++- 不增加顶部浏览/编辑按钮；使用已有左侧手形/选择工具及 H/V 快捷键，保留工具记忆和 Space 临时平移。
 +- 复用原有平移与选择，不增加逐帧计算或惯性动画；不改模型或画板内容格式。
 +- 新增本地偏好 `tuzi-canvas-interaction-mode-v1`，仅接受 browse/edit，缺失或损坏回退 browse，存储不可用不阻塞操作。
 +
@@ -200,13 +200,13 @@ index 0000000..b1b3259
 +宿主创作工具栏、Drawnix 初始工具、局部模式控制和本地偏好。需要验证图片区域拖动、编辑移动、快捷键/输入隔离、窄窗口和重启恢复。不改变非集成上游的默认行为，不新增网络调用。
 diff --git a/openspec/changes/add-canvas-browse-edit/specs/canvas-interaction/spec.md b/openspec/changes/add-canvas-browse-edit/specs/canvas-interaction/spec.md
 new file mode 100644
-index 0000000..8ce92fc
+index 0000000..41ed32b
 --- /dev/null
 +++ b/openspec/changes/add-canvas-browse-edit/specs/canvas-interaction/spec.md
 @@ -0,0 +1,23 @@
 +## ADDED Requirements
-+### Requirement: Explicit desktop browse and edit modes
-+The integrated desktop canvas SHALL default to browse mode, expose a labeled browse/edit control, and restore the last local mode without modifying project content.
++### Requirement: Desktop canvas browsing and panning
++The integrated desktop canvas SHALL default to browse mode, use existing hand/selection tools without additional browse/edit controls, and restore the last local mode without modifying project content.
 +
 +#### Scenario: Browse an image
 +- **WHEN** the user drags over an image in browse mode
@@ -214,7 +214,7 @@ index 0000000..8ce92fc
 +
 +#### Scenario: Edit and return to browsing
 +- **WHEN** the user selects edit and drags an image
-+- **THEN** the existing selection/movement behavior applies; returning to browse clears active selection and restores panning.
++- **THEN** the existing selection/movement behavior applies; the existing hand tool restores panning.
 +
 +#### Scenario: Restore and recover preference
 +- **WHEN** the workspace restarts
@@ -222,22 +222,26 @@ index 0000000..8ce92fc
 +
 +#### Scenario: Existing tools and typing
 +- **WHEN** the user selects H/V or an editing tool outside text entry
-+- **THEN** the mode control reflects the tool; typing those characters in chat or other inputs does not change the mode.
++- **THEN** the actual pointer follows the existing tool; typing those characters in chat or other inputs does not change the mode.
 +
 +#### Scenario: Temporary pan
 +- **WHEN** the user temporarily pans with Space or the middle button in edit mode
 +- **THEN** the persisted edit preference is unchanged.
 diff --git a/openspec/changes/add-canvas-browse-edit/tasks.md b/openspec/changes/add-canvas-browse-edit/tasks.md
 new file mode 100644
-index 0000000..6d0e066
+index 0000000..d3feabf
 --- /dev/null
 +++ b/openspec/changes/add-canvas-browse-edit/tasks.md
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,9 @@
 +## 1. Implementation
-+- [x] 1.1 顶部模式切换及实际画布指针初始化一致
++- [x] 1.1 实际画布指针初始化一致（后续用户取消顶部模式切换）
 +- [x] 1.2 本机记忆、缺失/非法值/存储失败兼容
 +- [x] 1.3 双浏览器图像平移/编辑/快捷键和布局回归
 +- [x] 1.4 原生构建、实机复验、来源重建及交付记录
++
++## 2. 用户反馈简化
++- [x] 2.1 移除顶部浏览/编辑入口及样式，保留默认手形、工具记忆与临时平移
++- [x] 2.2 双浏览器平移回归及 Release 原生复验
 diff --git a/openspec/changes/add-canvas-image-menu/proposal.md b/openspec/changes/add-canvas-image-menu/proposal.md
 new file mode 100644
 index 0000000..07fc3b4
@@ -1592,47 +1596,26 @@ index 0000000..3e6ab61
 +}
 diff --git a/packages/drawnix/src/components/canvas-interaction-mode.tsx b/packages/drawnix/src/components/canvas-interaction-mode.tsx
 new file mode 100644
-index 0000000..6c992d5
+index 0000000..34c2333
 --- /dev/null
 +++ b/packages/drawnix/src/components/canvas-interaction-mode.tsx
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,17 @@
 +import { useEffect } from 'react';
-+import { createPortal } from 'react-dom';
-+import { BoardTransforms, clearSelectedElement, PlaitPointerType } from '@plait/core';
-+import { Hand, MousePointer2 } from 'lucide-react';
++import { PlaitPointerType } from '@plait/core';
 +import { useDrawnix } from '../hooks/use-drawnix';
 +import { useCanvasTemporaryPan } from '../hooks/use-canvas-temporary-pan';
-+import { canvasModePointer, saveCanvasInteractionMode, type CanvasInteractionMode } from '../utils/canvas-interaction-mode';
++import { saveCanvasInteractionMode, type CanvasInteractionMode } from '../utils/canvas-interaction-mode';
 +
 +/** Uses the existing tools. No pointer-move listeners or per-frame state. */
-+export function CanvasInteractionModeControl() {
-+  const { board, appState, setAppState } = useDrawnix();
++export function CanvasInteractionModeSync() {
++  const { board, appState } = useDrawnix();
 +  useCanvasTemporaryPan(board, appState.pointer);
 +  const mode: CanvasInteractionMode = appState.pointer === PlaitPointerType.hand ? 'browse' : 'edit';
 +  useEffect(() => {
 +    if (board) saveCanvasInteractionMode(mode);
 +  }, [board, mode]);
 +
-+  const target = document.getElementById('creative-canvas-mode-entry');
-+  if (!target || !board) return null;
-+
-+  const choose = (next: CanvasInteractionMode) => {
-+    const pointer = canvasModePointer(next);
-+    if (next === 'browse') clearSelectedElement(board);
-+    BoardTransforms.updatePointerType(board, pointer);
-+    setAppState(previous => ({ ...previous, pointer }));
-+  };
-+
-+  return createPortal(
-+    <div className="creative-canvas-mode" role="group" aria-label="画布操作模式">
-+      <button type="button" aria-label="浏览画布" aria-pressed={mode === 'browse'} title="浏览：拖动任意画布区域平移（H）" onClick={() => choose('browse')}>
-+        <Hand size={14} /><span>浏览</span><kbd>H</kbd>
-+      </button>
-+      <button type="button" aria-label="编辑画布" aria-pressed={mode === 'edit'} title="编辑：选择、移动图片和排版（V）；按住空格可临时平移" onClick={() => choose('edit')}>
-+        <MousePointer2 size={14} /><span>编辑</span><kbd>V</kbd>
-+      </button>
-+    </div>, target
-+  );
++  return null;
 +}
 diff --git a/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx b/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
 index dc68803..a1133b4 100644
@@ -10821,14 +10804,14 @@ index 17820fe..3dcc116 100644
    ) {
      const cachedBlob = await unifiedCacheService.getCachedBlob(resolvedUrl);
 diff --git a/packages/drawnix/src/drawnix.tsx b/packages/drawnix/src/drawnix.tsx
-index bc35282..ecea091 100644
+index bc35282..790b283 100644
 --- a/packages/drawnix/src/drawnix.tsx
 +++ b/packages/drawnix/src/drawnix.tsx
 @@ -34,6 +34,8 @@ import { withDraw, BasicShapes, DrawTransforms } from '@plait/draw';
  import { MindThemeColors, withMind } from '@plait/mind';
  import { withMindExtend } from './plugins/with-mind-extend';
  import { withCommonPlugin } from './plugins/with-common';
-+import { CanvasInteractionModeControl } from './components/canvas-interaction-mode';
++import { CanvasInteractionModeSync } from './components/canvas-interaction-mode';
 +import { canvasModePointer, readCanvasInteractionMode } from './utils/canvas-interaction-mode';
  import { UnifiedToolbar } from './components/toolbar/unified-toolbar';
  import classNames from 'classnames';
@@ -11061,7 +11044,7 @@ index bc35282..ecea091 100644
                }
              }}
            ></Board>
-+          {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <CanvasInteractionModeControl />}
++          {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <CanvasInteractionModeSync />}
            {/* 多选时的缩放控制点 */}
            <MultiSelectionHandles />
 +          <CanvasImageContextMenu board={board} onPreview={openMediaPreview} />

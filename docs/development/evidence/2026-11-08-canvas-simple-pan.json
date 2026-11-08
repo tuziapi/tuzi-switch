@@ -1,0 +1,55 @@
+{
+  "task": "UC-CANVAS-MODE-02",
+  "baseCommit": "450bd67dcf165e792cd01377f216f1276ca1d1ec",
+  "hostTypecheck": "passed",
+  "unitTestsPassed": 9,
+  "hostTestsPassed": 2,
+  "modelCalls": 0,
+  "published": false,
+  "browserResults": [
+    {
+      "engine": "chromium",
+      "status": "passed",
+      "checks": [
+        "no extra browse/edit controls; actual canvas defaults to hand",
+        "dragging directly over an image pans viewport without changing image coordinates",
+        "vertical wheel and two-axis trackpad-like deltas pan without moving image",
+        "edit dragging moves image while viewport remains fixed",
+        "edit preference and edited image restore after reload",
+        "browse preference restores after reload",
+        "existing hand/selection tools and H/V stay synchronized",
+        "temporary Space pan does not move image or overwrite edit preference",
+        "typing H/V/Space in chat leaves browse mode intact",
+        "700px toolbar controls fit; dark appearance captured"
+      ],
+      "errors": [],
+      "realProvider": false
+    },
+    {
+      "engine": "webkit",
+      "status": "passed",
+      "checks": [
+        "no extra browse/edit controls; actual canvas defaults to hand",
+        "dragging directly over an image pans viewport without changing image coordinates",
+        "vertical wheel and two-axis trackpad-like deltas pan without moving image",
+        "edit dragging moves image while viewport remains fixed",
+        "edit preference and edited image restore after reload",
+        "browse preference restores after reload",
+        "existing hand/selection tools and H/V stay synchronized",
+        "temporary Space pan does not move image or overwrite edit preference",
+        "typing H/V/Space in chat leaves browse mode intact",
+        "700px toolbar controls fit; dark appearance captured"
+      ],
+      "errors": [],
+      "realProvider": false
+    }
+  ],
+  "releaseBuild": "passed",
+  "nativeChecks": {
+    "noExtraButtons": true,
+    "handToolRestored": true,
+    "dragOnImagePans": true,
+    "verticalScrollPans": true
+  },
+  "binarySha256": "a0a7c6ebec1a650abeb18e43b8f352eb5a185e3f06ed69284c955f7ad73dc5c5"
+}

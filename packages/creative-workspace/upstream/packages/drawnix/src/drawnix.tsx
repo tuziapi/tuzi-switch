@@ -34,7 +34,7 @@ import { withDraw, BasicShapes, DrawTransforms } from '@plait/draw';
 import { MindThemeColors, withMind } from '@plait/mind';
 import { withMindExtend } from './plugins/with-mind-extend';
 import { withCommonPlugin } from './plugins/with-common';
-import { CanvasInteractionModeControl } from './components/canvas-interaction-mode';
+import { CanvasInteractionModeSync } from './components/canvas-interaction-mode';
 import { canvasModePointer, readCanvasInteractionMode } from './utils/canvas-interaction-mode';
 import { UnifiedToolbar } from './components/toolbar/unified-toolbar';
 import classNames from 'classnames';
@@ -1819,7 +1819,7 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
               }
             }}
           ></Board>
-          {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <CanvasInteractionModeControl />}
+          {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <CanvasInteractionModeSync />}
           {/* 多选时的缩放控制点 */}
           <MultiSelectionHandles />
           <CanvasImageContextMenu board={board} onPreview={openMediaPreview} />

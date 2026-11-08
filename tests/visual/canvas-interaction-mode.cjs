@@ -15,15 +15,15 @@ const preference = 'tuzi-canvas-interaction-mode-v1';
   const errors=[], checks=[];
   p.on('pageerror', e => errors.push(e.message));
   await c.route('**/*', r => new URL(r.request().url()).hostname === '127.0.0.1' || /^(blob:|data:)/.test(r.request().url()) ? r.continue() : r.abort());
-  const browse = () => p.getByRole('button',{name:'浏览画布',exact:true});
-  const edit = () => p.getByRole('button',{name:'编辑画布',exact:true});
+  const browse = () => p.getByRole('radio',{name:/手形工具 — H/}).locator('..');
+  const edit = () => p.getByRole('radio',{name:/选择 — V/}).locator('..');
   const image = () => p.locator('[plait-data-id="SYNTHETIC-pan-image"]');
   const snapshot = () => p.evaluate(() => {
     const b=window.__drawnixBoard;
     return {pointer:b.pointer, points:b.children.find(e=>e.id==='SYNTHETIC-pan-image').points, viewport:JSON.stringify(b.viewport), stored:localStorage.getItem('tuzi-canvas-interaction-mode-v1')};
   });
   async function mode(name) {
-    await p.waitForFunction(name => document.querySelector(`[aria-label="${name}画布"]`)?.getAttribute('aria-pressed') === 'true',name);
+    await p.waitForFunction(pointer => window.__drawnixBoard?.pointer === pointer, name === '浏览' ? 'hand' : 'selection');
   }
   async function dragImage(dx=100,dy=60) {
     const b=await image().boundingBox(); assert(b,'image visible');
@@ -40,7 +40,9 @@ const preference = 'tuzi-canvas-interaction-mode-v1';
     const intro=p.getByText('不再提示',{exact:true});if(await intro.isVisible())await intro.click();
     await mode('浏览');
     assert.equal(await p.evaluate(()=>window.__drawnixBoard.pointer),'hand');
-    checks.push('missing preference defaults actual board and visible control to browse');
+    assert.equal(await p.getByRole('group',{name:'画布操作模式'}).count(),0);
+    assert.equal(await p.locator('#creative-canvas-mode-entry').count(),0);
+    checks.push('no extra browse/edit controls; actual canvas defaults to hand');
     await p.waitForTimeout(1000);
     await p.evaluate(()=>new Promise((resolve,reject)=>{
       const o=indexedDB.open('aitu-workspace');o.onerror=()=>reject(o.error);o.onsuccess=()=>{
@@ -56,6 +58,12 @@ const preference = 'tuzi-canvas-interaction-mode-v1';
     let before=await snapshot();await dragImage();let after=await snapshot();
     assert.deepEqual(after.points,before.points);assert.notEqual(after.viewport,before.viewport);
     checks.push('dragging directly over an image pans viewport without changing image coordinates');
+    for (const [dx,dy] of [[0,100],[80,40]]) {
+      before=await snapshot();await p.mouse.move(200,350);await p.mouse.wheel(dx,dy);await p.waitForTimeout(250);after=await snapshot();
+      assert.deepEqual(after.points,before.points);assert.notEqual(after.viewport,before.viewport);
+      await p.mouse.wheel(-dx,-dy);await p.waitForTimeout(250);
+    }
+    checks.push('vertical wheel and two-axis trackpad-like deltas pan without moving image');
     await edit().click();await mode('编辑');
     before=await snapshot();await dragImage(70,40);after=await snapshot();
     assert.notDeepEqual(after.points,before.points);assert.equal(after.viewport,before.viewport);
@@ -86,7 +94,7 @@ const preference = 'tuzi-canvas-interaction-mode-v1';
     checks.push('typing H/V/Space in chat leaves browse mode intact');
     await p.screenshot({path:output+'/wide.png'});
     await p.setViewportSize({width:700,height:650});
-    for(const label of ['浏览画布','编辑画布','对话']){
+    for(const label of ['对话']){
       const b=await p.getByRole('button',{name:label,exact:true}).boundingBox();assert(b && b.x>=0 && b.x+b.width<=700,label+' must fit');
     }
     await p.screenshot({path:output+'/narrow.png'});

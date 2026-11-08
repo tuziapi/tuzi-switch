@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 import { createCreativeAccountBridge } from "./accountBridge";
 import { useModelUpgradeSync } from "./useModelUpgradeSync";
-import "./canvasInteractionMode.css";
 
 import { registerUpdateGuard } from "@/lib/updateSafety";
 
@@ -140,10 +139,7 @@ export function CreativeWorkspace({
           <Settings2 size={15} />
           创作配置
         </button>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <div id="creative-canvas-mode-entry" />
-          <div id="creative-chat-entry" />
-        </div>
+        <div id="creative-chat-entry" className="ml-auto shrink-0" />
       </div>
       <div className="relative min-h-0 flex-1">
         <CreativeErrorBoundary>
