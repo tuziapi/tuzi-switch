@@ -15,3 +15,9 @@ The desktop renderer SHALL retain an anchor's SVG structure when only its progre
 - **WHEN** displayed estimated progress does not change or reaches its cap
 - **THEN** no clock-driven React render is requested until the displayed value changes or a new attempt starts
 - **AND** a reconciliation sweep reads task history once and the next sweep observes fresh tasks
+
+#### Scenario: Activate a native failure card
+- **WHEN** a user presses and releases Retry or Close while selection/controller updates occur
+- **THEN** unchanged failure diagnostics preserve the button DOM, and pointer/mouse events do not trigger canvas interaction
+- **AND** Close resolves the current board node by ID before deletion; retries target only the selected card's task
+- **AND** ordinary details use readable neutral text, only error information receives danger emphasis, and both desktop themes remain legible

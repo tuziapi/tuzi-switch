@@ -1,0 +1,80 @@
+{
+  "task": "UC-CANVAS-ERR-01",
+  "date": "2026-11-08",
+  "baseCommit": "1b0fde0de4d04f71131a4012912a86ce8f2990ea",
+  "baselineReproduction": {
+    "retryRequestCountBefore": 2,
+    "retryRequestCountAfter": 2,
+    "closeCardCountAfter": 1,
+    "runtimeError": "Unable to find the path for Plait node",
+    "retryEvents": [
+      "pointerdown",
+      "mousedown",
+      "pointerup"
+    ],
+    "source": "actual compiled canvas, synthetic HTTP"
+  },
+  "fixedSingleCard": {
+    "retryRequestCountBefore": 2,
+    "retryRequestCountAfter": 3,
+    "closeCardCountAfter": 0,
+    "runtimeErrors": []
+  },
+  "browsers": [
+    {
+      "engine": "chromium",
+      "checks": [
+        "three real canvas failures, light/dark neutral card colors",
+        "copy report remains available",
+        "pointer and keyboard retry each issue one synthetic request and preserve other slots",
+        "close removes the current live node only, without node-path errors",
+        "closed card remains removed after save and reload",
+        "keyboard Space closes a restored card",
+        "no runtime exceptions"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    {
+      "engine": "webkit",
+      "checks": [
+        "three real canvas failures, light/dark neutral card colors",
+        "copy report remains available",
+        "pointer and keyboard retry each issue one synthetic request and preserve other slots",
+        "close removes the current live node only, without node-path errors",
+        "closed card remains removed after save and reload",
+        "keyboard Space closes a restored card",
+        "no runtime exceptions"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    }
+  ],
+  "unitTests": {
+    "files": 3,
+    "passed": 16
+  },
+  "typecheck": {
+    "entry": "image-generation-anchor.generator.ts + text-chat entry dependencies",
+    "modifiedFilesErrors": 0,
+    "unchangedDependencyErrors": 7
+  },
+  "provenance": {
+    "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+    "originalFiles": 1522,
+    "localFiles": 59,
+    "reconstructedFiles": 1581,
+    "patchBytes": 856076
+  },
+  "openSpec": "strict passed",
+  "nativeBuild": "passed: renderer + isolated macOS debug app",
+  "nativeGui": "not revalidated; previous ScreenCaptureKit -3811",
+  "realProviders": "not called",
+  "published": false,
+  "compatibility": "no new persisted fields, dependencies or protocol changes; existing canvas deletion history retained",
+  "knownBoundary": "network/model permission failure still needs connection/account recovery; button repair does not bypass checks",
+  "performanceIncludedCommit": "1b0fde0de4d04f71131a4012912a86ce8f2990ea",
+  "binarySha256": "a4c7adb2f0f864f92a09d102caf8b7c1c46ba8c85acec52bc4edffa62abc511c",
+  "bundleId": "com.tuziswitch.desktop.textchatqa",
+  "delivery": "/Users/sdy09/Documents/tuzi-switch-artifacts/text-chat-2026-11-08/性能与错误卡片修复版"
+}

@@ -2355,7 +2355,7 @@ index 30be31c..7ff5760 100644
            }
          }
 diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
-index 4ef1925..b3888ad 100644
+index 4ef1925..8bd4926 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 +++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 @@ -1,3 +1,4 @@
@@ -2405,7 +2405,7 @@ index 4ef1925..b3888ad 100644
    });
  
    it('shows successful generation and retries insertion without regenerating', async () => {
-@@ -215,12 +218,159 @@ describe('ImageGenerationAnchorContent result recovery', () => {
+@@ -215,12 +218,176 @@ describe('ImageGenerationAnchorContent result recovery', () => {
        expect(mocks.retryTask).not.toHaveBeenCalled();
        expect(retryInsertion).not.toHaveBeenCalled();
        expect(board.children).toHaveLength(2);
@@ -2461,7 +2461,7 @@ index 4ef1925..b3888ad 100644
 +      error: { code: 'FAILED', message: '合成失败', details: { requestId: 'provider-126', modelId: 'gpt-image-2.6-1k', httpStatus: 400 } },
 +    } as Task];
 +    const anchor = createAnchor();
-+    const board = { children: [], deleteFragment: vi.fn() } as unknown as PlaitBoard;
++    const board = { children: [anchor], deleteFragment: vi.fn() } as unknown as PlaitBoard;
 +    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 +    const host = document.createElementNS(svg.namespaceURI, 'g') as SVGGElement;
 +    svg.appendChild(host); document.body.appendChild(svg);
@@ -2476,8 +2476,24 @@ index 4ef1925..b3888ad 100644
 +      await waitFor(() => expect(copyText).toHaveBeenCalledWith(expect.stringContaining('Request ID：provider-126')));
 +      expect(copyText.mock.calls[0][0]).toContain('本地任务：task-1');
 +      expect(onSizeChange.mock.lastCall?.[0].height).toBeGreaterThan(320);
-+      fireEvent.click(screen.getByRole('button', { name: '关闭' }));
-+      expect(board.deleteFragment).toHaveBeenCalledWith([expect.objectContaining({ id: anchor.id, taskIds: anchor.taskIds })]);
++      const close = screen.getByRole('button', { name: '关闭' });
++      const bubbled = vi.fn();
++      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) host.addEventListener(type, bubbled);
++      fireEvent.pointerDown(close);
++      fireEvent.mouseDown(close);
++      const current = { ...anchor, title: 'updated live node' };
++      board.children = [current];
++      await act(async () => { generator.updateDrawing(current, host, true); });
++      expect(screen.getByRole('button', { name: '关闭' })).toBe(close);
++      expect(host.textContent).toContain('已复制');
++      fireEvent.pointerUp(close);
++      fireEvent.mouseUp(close);
++      expect(bubbled).not.toHaveBeenCalled();
++      fireEvent.click(close);
++      expect(vi.mocked(board.deleteFragment).mock.lastCall?.[0][0]).toBe(current);
++      board.children = [];
++      fireEvent.click(close);
++      expect(board.deleteFragment).toHaveBeenCalledTimes(1);
 +    } finally {
 +      generator.destroy();
 +      await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
@@ -2529,7 +2545,7 @@ index 4ef1925..b3888ad 100644
 +    mocks.tasks = [{ id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.PROCESSING,
 +      params: {}, createdAt: 1, progress: 40 } as Task];
 +    let anchor: PlaitImageGenerationAnchor = { ...createAnchor(), phase: 'generating', error: undefined, progress: 40 };
-+    const board = { children: [], deleteFragment: vi.fn() } as unknown as PlaitBoard;
++    const board = { children: [anchor], deleteFragment: vi.fn() } as unknown as PlaitBoard;
 +    const host = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 +    document.body.appendChild(host);
 +    const generator = new ImageGenerationAnchorGenerator(board);
@@ -2552,13 +2568,14 @@ index 4ef1925..b3888ad 100644
 +      mocks.tasks = [{ ...mocks.tasks[0], id: 'task-retry', status: TaskStatus.FAILED,
 +        error: { code: 'FAILED', message: 'synthetic new failure', details: { requestId: 'request-new' } } }];
 +      anchor = { ...anchor, phase: 'failed', taskIds: ['task-retry'], primaryTaskId: 'task-retry' };
++      board.children = [anchor];
 +      await act(async () => { generator.updateDrawing(anchor, host, false); });
 +      expect(host.textContent).toContain('request-new');
 +      expect(host.querySelector('animateTransform')).toBeNull();
 +      fireEvent.click(host.querySelector('[aria-label="重试"]')!);
 +      expect(onRetry.mock.lastCall?.[0].detail).toEqual({ taskId: 'task-retry', anchorId: anchor.id });
 +      fireEvent.click(host.querySelector('[aria-label="关闭"]')!);
-+      expect(board.deleteFragment).toHaveBeenCalledWith([expect.objectContaining({ primaryTaskId: 'task-retry', points: anchor.points })]);
++      expect(vi.mocked(board.deleteFragment).mock.lastCall?.[0][0]).toBe(anchor);
 +    } finally {
 +      window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, onRetry);
 +      generator.destroy();
@@ -2568,7 +2585,7 @@ index 4ef1925..b3888ad 100644
 +  });
 +});
 diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
-index b20cedc..204d46f 100644
+index b20cedc..cb3f633 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
 +++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
 @@ -1,8 +1,14 @@
@@ -2723,7 +2740,17 @@ index b20cedc..204d46f 100644
    const handleAction = useCallback(
      (actionType: ImageGenerationAnchorActionType) => {
        if (actionType === 'none') {
-@@ -270,7 +243,7 @@ export const ImageGenerationAnchorContent: React.FC<
+@@ -246,7 +219,8 @@ export const ImageGenerationAnchorContent: React.FC<
+       }
+ 
+       if (actionType === 'dismiss') {
+-        board.deleteFragment([element]);
++        const current = board.children.find((node) => node.id === element.id);
++        if (current) board.deleteFragment([current]);
+       }
+     },
+     [board, element, relatedTasks]
+@@ -270,7 +244,7 @@ export const ImageGenerationAnchorContent: React.FC<
              tone={progressTone}
              statusText={centerLabel}
              compact
@@ -2732,7 +2759,7 @@ index b20cedc..204d46f 100644
              className="image-generation-anchor__progress-display"
            />
          ) : null}
-@@ -284,21 +257,10 @@ export const ImageGenerationAnchorContent: React.FC<
+@@ -284,21 +258,10 @@ export const ImageGenerationAnchorContent: React.FC<
                  <span className="image-generation-anchor__error-id-text">
                    ID: {failureIdentifier}
                  </span>
@@ -2758,7 +2785,7 @@ index b20cedc..204d46f 100644
                </span>
              ) : null}
              <button
-@@ -430,6 +392,7 @@ export const ImageGenerationAnchorContent: React.FC<
+@@ -430,6 +393,7 @@ export const ImageGenerationAnchorContent: React.FC<
  
    return (
      <div
@@ -2766,7 +2793,7 @@ index b20cedc..204d46f 100644
        className={classNames(
          'image-generation-anchor',
          `image-generation-anchor--${viewModel.anchorType}`,
-@@ -474,40 +437,14 @@ export const ImageGenerationAnchorContent: React.FC<
+@@ -474,40 +438,14 @@ export const ImageGenerationAnchorContent: React.FC<
        </div>
  
        {detailsOpen ? (
@@ -3178,10 +3205,10 @@ index 380b825..8a4c5a4 100644
  
      if (this.activeGenerator) {
 diff --git a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
-index d8018b2..85522df 100644
+index d8018b2..82493b0 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 +++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
-@@ -1,12 +1,15 @@
+@@ -1,12 +1,16 @@
 +import { createNativeFailureDetails, getNativeFailureLayout, type FailureRows } from '../shared/NativeGenerationFailureDetails';
 +import { getImageFailureDetails } from '../../utils/image-error-details';
  import { RectangleClient, type PlaitBoard } from '@plait/core';
@@ -3192,6 +3219,7 @@ index d8018b2..85522df 100644
  import {
    IMAGE_GENERATION_ANCHOR_RETRY_EVENT,
    type ImageGenerationAnchorPhase,
++  type ImageGenerationAnchorViewModel,
    type PlaitImageGenerationAnchor,
  } from '../../types/image-generation-anchor.types';
 -import { isTauriEnvironment } from '../../utils/tauri-env';
@@ -3199,7 +3227,7 @@ index d8018b2..85522df 100644
  import { ImageGenerationAnchorContent } from './ImageGenerationAnchorContent';
  
  const SVG_NS = 'http://www.w3.org/2000/svg';
-@@ -15,8 +18,8 @@ const DESKTOP_PHASE_LABELS: Record<ImageGenerationAnchorPhase, string> = {
+@@ -15,8 +19,8 @@ const DESKTOP_PHASE_LABELS: Record<ImageGenerationAnchorPhase, string> = {
    submitted: '准备生成',
    queued: '等待执行',
    generating: '生成中',
@@ -3210,14 +3238,14 @@ index d8018b2..85522df 100644
    completed: '已完成',
    failed: '生成失败',
  };
-@@ -45,6 +48,16 @@ function truncateText(value: string, maxLength: number): string {
+@@ -45,6 +49,16 @@ function truncateText(value: string, maxLength: number): string {
    return `${value.slice(0, Math.max(1, maxLength - 1))}…`;
  }
  
 +function NativeAnchorState({ board, element, render }: {
 +  board: PlaitBoard;
 +  element: PlaitImageGenerationAnchor;
-+  render: (element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>) => void;
++  render: (element: PlaitImageGenerationAnchor, failure?: ImageGenerationAnchorViewModel['failureDetails']) => void;
 +}) {
 +  const { nextPatch, viewModel } = useImageGenerationAnchorController({ board, anchor: element });
 +  useEffect(() => { render({ ...element, ...nextPatch }, viewModel.failureDetails); }, [element, nextPatch, viewModel.failureDetails, render]);
@@ -3227,18 +3255,19 @@ index d8018b2..85522df 100644
  export class ImageGenerationAnchorGenerator {
    constructor(private board: PlaitBoard) {}
  
-@@ -53,6 +66,10 @@ export class ImageGenerationAnchorGenerator {
+@@ -53,6 +67,11 @@ export class ImageGenerationAnchorGenerator {
    private reactRoot: Root | null = null;
    private desktopFallback: SVGGElement | null = null;
    private renderTimer: number | null = null;
 +  private desktopLayout: readonly unknown[] | null = null;
++  private desktopFailureSignature: string | null = null;
 +  private desktopProgressBar: SVGRectElement | null = null;
 +  private desktopDescription: SVGTextElement | null = null;
 +  onSizeChange?: (size: { width: number; height: number }) => void;
  
    processDrawing(
      element: PlaitImageGenerationAnchor,
-@@ -63,8 +80,9 @@ export class ImageGenerationAnchorGenerator {
+@@ -63,8 +82,9 @@ export class ImageGenerationAnchorGenerator {
      g.setAttribute('class', 'image-generation-anchor-element');
      parentG.appendChild(g);
  
@@ -3249,7 +3278,7 @@ index d8018b2..85522df 100644
      } else {
        this.createForeignObject(element, g);
        // WebKit is sensitive to mounting a React root before foreignObject is
-@@ -83,7 +101,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -83,7 +103,7 @@ export class ImageGenerationAnchorGenerator {
      selected: boolean
    ): void {
      if (this.desktopFallback) {
@@ -3258,7 +3287,7 @@ index d8018b2..85522df 100644
        return;
      }
  
-@@ -91,6 +109,19 @@ export class ImageGenerationAnchorGenerator {
+@@ -91,6 +111,19 @@ export class ImageGenerationAnchorGenerator {
      this.renderReact(element, selected);
    }
  
@@ -3271,19 +3300,19 @@ index d8018b2..85522df 100644
 +    }));
 +  }
 +
-+  private renderNativeState = (element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>): void => {
++  private renderNativeState = (element: PlaitImageGenerationAnchor, failure?: ImageGenerationAnchorViewModel['failureDetails']): void => {
 +    this.renderDesktopFallback(element, failure);
 +  };
 +
    private createDesktopFallback(
      element: PlaitImageGenerationAnchor,
      g: SVGGElement
-@@ -105,16 +136,62 @@ export class ImageGenerationAnchorGenerator {
+@@ -105,16 +138,69 @@ export class ImageGenerationAnchorGenerator {
      this.renderDesktopFallback(element);
    }
  
 -  private renderDesktopFallback(element: PlaitImageGenerationAnchor): void {
-+  private renderDesktopFallback(element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>): void {
++  private renderDesktopFallback(element: PlaitImageGenerationAnchor, failure?: ImageGenerationAnchorViewModel['failureDetails']): void {
      const host = this.desktopFallback;
      if (!host) {
        return;
@@ -3306,7 +3335,6 @@ index d8018b2..85522df 100644
 +    this.desktopLayout = isFailed ? null : layout;
 +    this.desktopProgressBar = null;
 +    this.desktopDescription = null;
-+    host.replaceChildren();
 +    if (isFailed) {
 +      const details = failure || getImageFailureDetails(undefined, element.error || '生成失败');
 +      const rows: FailureRows = [
@@ -3320,30 +3348,38 @@ index d8018b2..85522df 100644
 +        ['形态', element.anchorType || '—'],
 +        ['过渡', element.transitionMode || '—'],
 +      ];
++      // Selection and controller ticks must not replace a button between
++      // pointerdown and click, or reset successful copy feedback.
++      const failureSignature = JSON.stringify([layout, rows]);
++      if (this.desktopFailureSignature === failureSignature) return;
++      this.desktopFailureSignature = failureSignature;
++      host.replaceChildren();
 +      const width = Math.max(320, rect.width);
 +      const height = Math.max(rect.height, getNativeFailureLayout(rows, width).height + 60);
 +      host.setAttribute('aria-label', '生成失败');
 +      const background = createSvgElement('rect');
-+      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 10, fill: '#fffafa', stroke: '#e5caca' })) background.setAttribute(key, String(value));
++      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 14, fill: 'var(--failure-surface, #ffffff)', stroke: 'var(--failure-border, #dde2e5)' })) background.setAttribute(key, String(value));
 +      host.appendChild(background);
 +      const content = createNativeFailureDetails(rows, width);
 +      content.setAttribute('transform', `translate(${rect.x} ${rect.y + 12})`);
 +      host.appendChild(content);
-+      this.appendDesktopActionButton(host, rect.x + 16, rect.y + height - 40, 92, 28, '重试', '#9c4b4b', () => {
++      this.appendDesktopActionButton(host, rect.x + 16, rect.y + height - 40, 92, 28, '重试', 'var(--failure-action, #356859)', () => {
 +        const taskId = element.primaryTaskId || element.taskIds[0];
 +        window.dispatchEvent(new CustomEvent(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, { detail: { taskId, anchorId: element.id } }));
 +      });
-+      this.appendDesktopActionButton(host, rect.x + 120, rect.y + height - 40, 92, 28, '关闭', '#7f1d1d', () => this.board.deleteFragment([element]), true);
++      this.appendDesktopActionButton(host, rect.x + 120, rect.y + height - 40, 92, 28, '关闭', 'var(--failure-muted, #68747b)', () => this.dismissAnchor(element.id), true);
 +      this.onSizeChange?.({ width, height });
 +      return;
 +    }
++    this.desktopFailureSignature = null;
++    host.replaceChildren();
 +    this.onSizeChange?.({ width: rect.width, height: rect.height });
      const isCompleted = element.phase === 'completed';
 +    const isLoadingImage = element.phase === 'developing' || element.phase === 'inserting';
      const accent = isFailed ? '#c15a5a' : '#25755e';
      const background = isFailed
        ? '#fffafa'
-@@ -138,7 +215,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -138,7 +224,7 @@ export class ImageGenerationAnchorGenerator {
  
      host.setAttribute(
        'aria-label',
@@ -3352,7 +3388,7 @@ index d8018b2..85522df 100644
      );
  
      const backgroundRect = createSvgElement('rect');
-@@ -219,11 +296,12 @@ export class ImageGenerationAnchorGenerator {
+@@ -219,11 +305,12 @@ export class ImageGenerationAnchorGenerator {
        counter.setAttribute('text-anchor', 'end');
        counter.setAttribute('fill', '#777e88');
        counter.setAttribute('font-size', '11');
@@ -3367,7 +3403,7 @@ index d8018b2..85522df 100644
        const preview = createSvgElement('image');
        preview.setAttribute('x', String(rect.x));
        preview.setAttribute('y', String(rect.y));
-@@ -235,7 +313,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -235,7 +322,7 @@ export class ImageGenerationAnchorGenerator {
      }
  
      const centerX = rect.x + rect.width / 2;
@@ -3376,7 +3412,7 @@ index d8018b2..85522df 100644
      const spinnerRadius = compact ? 10 : Math.min(28, minDimension * 0.1);
      const contentCenterY =
        rect.y +
-@@ -302,7 +380,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -302,7 +389,7 @@ export class ImageGenerationAnchorGenerator {
      title.textContent = phaseLabel;
      host.appendChild(title);
  
@@ -3385,7 +3421,7 @@ index d8018b2..85522df 100644
        const maxChars = Math.max(
          12,
          Math.floor((rect.width - padding * 2) / 13)
-@@ -323,6 +401,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -323,6 +410,7 @@ export class ImageGenerationAnchorGenerator {
        );
        description.setAttribute('font-size', String(bodySize));
        description.textContent = truncateText(subtitle, maxChars);
@@ -3393,18 +3429,57 @@ index d8018b2..85522df 100644
        host.appendChild(description);
      }
  
-@@ -348,6 +427,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -348,44 +436,37 @@ export class ImageGenerationAnchorGenerator {
        progressBar.setAttribute('height', '3');
        progressBar.setAttribute('rx', '1.5');
        progressBar.setAttribute('fill', accent);
 +      this.desktopProgressBar = progressBar;
        host.appendChild(progressBar);
      }
++  }
  
-@@ -389,6 +469,28 @@ export class ImageGenerationAnchorGenerator {
-     }
-   }
- 
+-    if (isFailed && rect.width >= 180 && rect.height >= 120) {
+-      const buttonWidth = Math.min(92, (rect.width - padding * 2 - 10) / 2);
+-      const buttonHeight = 32;
+-      const buttonY = rect.y + rect.height - padding - buttonHeight;
+-      const retryX = centerX - buttonWidth - 5;
+-      const closeX = centerX + 5;
+-
+-      this.appendDesktopActionButton(
+-        host,
+-        retryX,
+-        buttonY,
+-        buttonWidth,
+-        buttonHeight,
+-        '重试',
+-        accent,
+-        () => {
+-          const taskId = element.primaryTaskId || element.taskIds[0];
+-          window.dispatchEvent(
+-            new CustomEvent(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, {
+-              detail: { taskId, anchorId: element.id },
+-            })
+-          );
+-        }
+-      );
+-      this.appendDesktopActionButton(
+-        host,
+-        closeX,
+-        buttonY,
+-        buttonWidth,
+-        buttonHeight,
+-        '关闭',
+-        '#7f1d1d',
+-        () => this.board.deleteFragment([element]),
+-        true
+-      );
++  private dismissAnchor(id: string): void {
++    // The native controller renders a presentation copy. Plait paths are keyed
++    // by the live node identity, so resolve it again at the time of activation.
++    const current = this.board.children.find((node) => node.id === id);
++    if (current) this.board.deleteFragment([current]);
++  }
++
 +  private updateDesktopProgress(element: PlaitImageGenerationAnchor, width: number): void {
 +    const subtitle = element.subtitle || DESKTOP_PHASE_SUBTITLES[element.phase];
 +    const phaseLabel = DESKTOP_PHASE_LABELS[element.phase];
@@ -3424,13 +3499,43 @@ index d8018b2..85522df 100644
 +      if (this.desktopProgressBar.getAttribute('width') !== value) {
 +        this.desktopProgressBar.setAttribute('width', value);
 +      }
+     }
+   }
+ 
+@@ -413,8 +494,8 @@ export class ImageGenerationAnchorGenerator {
+     buttonRect.setAttribute('width', String(width));
+     buttonRect.setAttribute('height', String(height));
+     buttonRect.setAttribute('rx', '7');
+-    buttonRect.setAttribute('fill', secondary ? '#ffffff' : color);
+-    buttonRect.setAttribute('stroke', color);
++    buttonRect.setAttribute('fill', secondary ? 'var(--failure-surface, #ffffff)' : color);
++    buttonRect.setAttribute('stroke', secondary ? 'var(--failure-border, #dde2e5)' : color);
+     buttonRect.setAttribute('stroke-width', '1');
+     button.appendChild(buttonRect);
+ 
+@@ -423,7 +504,7 @@ export class ImageGenerationAnchorGenerator {
+     buttonText.setAttribute('y', String(y + height / 2));
+     buttonText.setAttribute('text-anchor', 'middle');
+     buttonText.setAttribute('dominant-baseline', 'middle');
+-    buttonText.setAttribute('fill', secondary ? color : '#ffffff');
++    buttonText.setAttribute('fill', secondary ? color : 'var(--failure-action-text, #ffffff)');
+     buttonText.setAttribute(
+       'font-family',
+       '-apple-system, BlinkMacSystemFont, sans-serif'
+@@ -433,9 +514,9 @@ export class ImageGenerationAnchorGenerator {
+     buttonText.textContent = label;
+     button.appendChild(buttonText);
+ 
+-    button.addEventListener('pointerdown', (event) => {
+-      event.stopPropagation();
+-    });
++    for (const name of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
++      button.addEventListener(name, (event) => event.stopPropagation());
 +    }
-+  }
-+
-   private appendDesktopActionButton(
-     host: SVGGElement,
-     x: number,
-@@ -514,6 +616,7 @@ export class ImageGenerationAnchorGenerator {
+     button.addEventListener('click', (event) => {
+       event.preventDefault();
+       event.stopPropagation();
+@@ -514,6 +595,7 @@ export class ImageGenerationAnchorGenerator {
          board: this.board,
          element,
          selected,
@@ -3438,11 +3543,12 @@ index d8018b2..85522df 100644
        })
      );
    }
-@@ -536,6 +639,9 @@ export class ImageGenerationAnchorGenerator {
+@@ -536,6 +618,10 @@ export class ImageGenerationAnchorGenerator {
        }, 0);
      }
  
 +    this.desktopLayout = null;
++    this.desktopFailureSignature = null;
 +    this.desktopProgressBar = null;
 +    this.desktopDescription = null;
      this.foreignObject = null;
@@ -5893,11 +5999,12 @@ index 4ae65f1..6c99666 100644
  function getAvatarLabel(name?: string | null): string {
 diff --git a/packages/drawnix/src/components/shared/NativeGenerationFailureDetails.tsx b/packages/drawnix/src/components/shared/NativeGenerationFailureDetails.tsx
 new file mode 100644
-index 0000000..2a03836
+index 0000000..6ab6a6d
 --- /dev/null
 +++ b/packages/drawnix/src/components/shared/NativeGenerationFailureDetails.tsx
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,89 @@
 +import React, { useLayoutEffect, useRef } from 'react';
++import './generation-failure-details.scss';
 +import { getAssistantAccount } from '../../services/assistant-account';
 +import { formatGenerationErrorReport } from '../../utils/generation-error-details';
 +
@@ -5906,7 +6013,7 @@ index 0000000..2a03836
 +
 +/** SVG text remains visible in native WebKit, where foreignObject can disappear. */
 +export function getNativeFailureLayout(rows: FailureRows, width: number) {
-+  const lines: { text: string; y: number; label: boolean }[] = [];
++  const lines: { text: string; y: number; label: boolean; error?: boolean }[] = [];
 +  const available = Math.max(100, width - 32);
 +  let y = 44;
 +  for (const [label, value] of rows) {
@@ -5917,14 +6024,14 @@ index 0000000..2a03836
 +    for (const char of value.replace(/\r\n?/g, '\n')) {
 +      const size = /[^\x00-\x7f]/.test(char) ? 12 : 7.5;
 +      if (char === '\n' || pixels + size > available) {
-+        lines.push({ text: line, y, label: false });
++        lines.push({ text: line, y, label: false, error: label === '错误' });
 +        y += 18;
 +        line = '';
 +        pixels = 0;
 +      }
 +      if (char !== '\n') { line += char; pixels += size; }
 +    }
-+    lines.push({ text: line, y, label: false });
++    lines.push({ text: line, y, label: false, error: label === '错误' });
 +    y += 26;
 +  }
 +  return { lines, height: y };
@@ -5940,7 +6047,7 @@ index 0000000..2a03836
 +    text.setAttribute('x', '16');
 +    text.setAttribute('y', String(line.y));
 +    text.setAttribute('font-size', line.label ? '10' : '12');
-+    text.setAttribute('fill', line.label ? '#64748b' : '#9c3b30');
++    text.setAttribute('fill', line.label ? 'var(--failure-muted, #68747b)' : line.error ? 'var(--failure-danger, #b34d42)' : 'var(--failure-text, #34434a)');
 +    text.textContent = line.text;
 +    group.appendChild(text);
 +  }
@@ -5950,9 +6057,9 @@ index 0000000..2a03836
 +  button.setAttribute('tabindex', '0');
 +  button.style.cursor = 'pointer';
 +  const rect = document.createElementNS(NS, 'rect');
-+  for (const [key, value] of Object.entries({ x: '16', y: '0', width: '112', height: '26', rx: '5', fill: '#ffffff', stroke: '#e5caca' })) rect.setAttribute(key, value);
++  for (const [key, value] of Object.entries({ x: '16', y: '0', width: '112', height: '26', rx: '5', fill: 'var(--failure-surface, #ffffff)', stroke: 'var(--failure-border, #dde2e5)' })) rect.setAttribute(key, value);
 +  const label = document.createElementNS(NS, 'text');
-+  for (const [key, value] of Object.entries({ x: '72', y: '17', 'text-anchor': 'middle', 'font-size': '11', fill: '#9c3b30' })) label.setAttribute(key, value);
++  for (const [key, value] of Object.entries({ x: '72', y: '17', 'text-anchor': 'middle', 'font-size': '11', fill: 'var(--failure-muted, #68747b)' })) label.setAttribute(key, value);
 +  label.textContent = '复制错误信息';
 +  button.append(rect, label);
 +  const copy = async () => {
@@ -6000,10 +6107,10 @@ index c35d04f..e9010bd 100644
        {/* Content preview grid */}
 diff --git a/packages/drawnix/src/components/shared/generation-failure-details.scss b/packages/drawnix/src/components/shared/generation-failure-details.scss
 new file mode 100644
-index 0000000..19895aa
+index 0000000..b87d5c3
 --- /dev/null
 +++ b/packages/drawnix/src/components/shared/generation-failure-details.scss
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,94 @@
 +.generation-failure-details {
 +  display: grid;
 +  gap: 8px;
@@ -6062,6 +6169,40 @@ index 0000000..19895aa
 +      outline: 2px solid #ef4444;
 +      outline-offset: 2px;
 +    }
++  }
++}
++
++// Native SVG cards inherit the same restrained palette in either desktop theme.
++.image-generation-anchor-desktop-fallback,
++.native-generation-failure-details {
++  --failure-surface: #ffffff;
++  --failure-border: #dde2e5;
++  --failure-text: #34434a;
++  --failure-muted: #68747b;
++  --failure-danger: #b34d42;
++  --failure-action: #356859;
++  --failure-action-text: #ffffff;
++
++  [role='button']:hover > rect {
++    filter: brightness(0.96);
++  }
++  [role='button']:focus-visible {
++    outline: 2px solid var(--failure-action);
++    outline-offset: 3px;
++    border-radius: 7px;
++  }
++}
++
++.creative-root[data-theme='dark'] {
++  .image-generation-anchor-desktop-fallback,
++  .native-generation-failure-details {
++    --failure-surface: #292d2b;
++    --failure-border: #474f4b;
++    --failure-text: #e0e6e2;
++    --failure-muted: #acb6b0;
++    --failure-danger: #efa99e;
++    --failure-action: #a6c8b8;
++    --failure-action-text: #20382d;
 +  }
 +}
 diff --git a/packages/drawnix/src/components/shared/media-preview/MediaViewport.tsx b/packages/drawnix/src/components/shared/media-preview/MediaViewport.tsx
