@@ -6455,6 +6455,11 @@
       "path": "packages/drawnix/src/components/text-chat/text-chat.scss",
       "origin": "assistant-integration",
       "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/chat-drawer/WorkflowResultImage.tsx",
+      "origin": "assistant-integration",
+      "reason": "Resolve creative assistant result images through desktop cache with display-only retry"
     }
   ],
   "integration": {

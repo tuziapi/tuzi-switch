@@ -24,6 +24,7 @@ import {
   normalizeWorkflowStepsForDisplay,
 } from '../../utils/workflow-bubble-status';
 import { collectWorkflowMediaResults } from './workflow-media-results';
+import { WorkflowResultImage } from './WorkflowResultImage';
 import './workflow-message-bubble.scss';
 
 const MermaidRenderer = lazy(() =>
@@ -630,7 +631,16 @@ export const WorkflowMessageBubble: React.FC<WorkflowMessageBubbleProps> = ({
             )}`}
             aria-label="生成结果"
           >
-            {mediaResults.map((item, index) => (
+            {mediaResults.map((item, index) => item.type === 'image' ? (
+              <WorkflowResultImage
+                key={`${item.url}-${item.thumbnailUrl || ''}-${index}`}
+                url={item.url}
+                thumbnailUrl={item.thumbnailUrl}
+                title={item.title}
+                index={index}
+                onPreview={() => handleMediaPreview(index)}
+              />
+            ) : (
               <button
                 key={`${item.url}-${index}`}
                 type="button"
