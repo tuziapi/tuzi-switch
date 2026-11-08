@@ -757,6 +757,10 @@ function App() {
 
       const view = currentViewRef.current;
       if (view === "providers") return;
+      // The embedded workspace owns Escape (viewer, dialogs, chat, canvas).
+      // Its window listeners run after this host listener; do not navigate away
+      // before the active inner surface has a chance to consume the key.
+      if (view === "creative") return;
 
       if (isTextEditableTarget(event.target)) return;
 

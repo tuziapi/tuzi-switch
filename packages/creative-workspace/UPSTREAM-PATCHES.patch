@@ -1530,7 +1530,7 @@ index 0000000..3e6ab61
 +  }
 +}
 diff --git a/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx b/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
-index dc68803..0044179 100644
+index dc68803..a1133b4 100644
 --- a/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
 +++ b/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
 @@ -14,6 +14,8 @@ import React, {
@@ -1575,7 +1575,20 @@ index dc68803..0044179 100644
            activeId = drawerState.activeSessionId;
            updateActiveSessionId(drawerState.activeSessionId);
          } else if (loadedSessions.length > 0) {
-@@ -1113,6 +1120,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -628,7 +635,11 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+     // Handle Escape key to close drawer
+     useEffect(() => {
+       const handleKeyDown = (e: KeyboardEvent) => {
+-        if (e.key === 'Escape' && isOpen) {
++        if (
++          e.key === 'Escape' && isOpen && !e.defaultPrevented &&
++          !document.querySelector('.unified-viewer')
++        ) {
++          e.preventDefault();
+           setIsOpen(false);
+           onOpenChange?.(false);
+         }
+@@ -1113,6 +1124,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
      // 发送工作流消息
      const handleSendWorkflowMessage = useCallback(
        async (params: WorkflowMessageParams) => {
@@ -1583,7 +1596,7 @@ index dc68803..0044179 100644
          const {
            context,
            workflow,
-@@ -1736,6 +1744,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -1736,6 +1748,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
          },
          toggle: handleToggle,
          sendMessage: async (content: string) => {
@@ -1591,7 +1604,7 @@ index dc68803..0044179 100644
            // Open drawer first
            setIsOpen(true);
            onOpenChange?.(true);
-@@ -1938,19 +1947,27 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -1938,19 +1951,27 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
        enableCopy: true,
        stopPropagation: true,
      });
@@ -1622,7 +1635,7 @@ index dc68803..0044179 100644
            style={{ width: drawerWidth }}
            data-testid="chat-drawer"
          >
-@@ -1961,6 +1978,17 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -1961,6 +1982,17 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
              onMouseDown={handleResizeStart}
            />
            <div ref={domRef} className="chat-drawer__body">
@@ -1640,7 +1653,7 @@ index dc68803..0044179 100644
              <div className="chat-drawer__header">
                <div className="chat-drawer__header-top">
                  <HoverTip content="关闭">
-@@ -2084,6 +2112,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -2084,6 +2116,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
                  placeholder="继续描述要修改的内容..."
                />
              </div>
@@ -6370,7 +6383,7 @@ index 332ef6b..4ec8e67 100644
                      e.stopPropagation();
                      e.preventDefault();
 diff --git a/packages/drawnix/src/components/shared/media-preview/UnifiedMediaViewer.tsx b/packages/drawnix/src/components/shared/media-preview/UnifiedMediaViewer.tsx
-index ffb29af..8f48d24 100644
+index ffb29af..ff99a90 100644
 --- a/packages/drawnix/src/components/shared/media-preview/UnifiedMediaViewer.tsx
 +++ b/packages/drawnix/src/components/shared/media-preview/UnifiedMediaViewer.tsx
 @@ -1,3 +1,6 @@
@@ -6380,7 +6393,47 @@ index ffb29af..8f48d24 100644
  /**
   * 统一媒体预览系统 - 主组件
   * 支持单图预览、对比预览和编辑模式，可相互切换
-@@ -418,9 +421,18 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
+@@ -206,6 +209,15 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
+   useEffect(() => {
+     if (!visible) return;
+ 
++    // Toolbar/tooltips can stop bubbling key events. Capture only Escape so
++    // closing the preview cannot also dismiss the underlying workspace/chat.
++    const handleEscape = (e: KeyboardEvent) => {
++      if (e.key === 'Escape') {
++        e.preventDefault();
++        e.stopPropagation();
++        onClose();
++      }
++    };
+     const handleKeyDown = (e: KeyboardEvent) => {
+       const target = e.target instanceof HTMLElement ? e.target : null;
+       if (
+@@ -224,10 +236,6 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
+           : viewportRefs.current[focusedSlot] || null;
+ 
+       switch (e.key) {
+-        case 'Escape':
+-          e.preventDefault();
+-          onClose();
+-          break;
+         case 'ArrowLeft':
+         case 'ArrowUp':
+           e.preventDefault();
+@@ -315,7 +323,11 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
+     };
+ 
+     window.addEventListener('keydown', handleKeyDown);
+-    return () => window.removeEventListener('keydown', handleKeyDown);
++    window.addEventListener('keydown', handleEscape, true);
++    return () => {
++      window.removeEventListener('keydown', handleKeyDown);
++      window.removeEventListener('keydown', handleEscape, true);
++    };
+   }, [
+     visible,
+     mode,
+@@ -418,9 +430,18 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
        currentItem.type === 'image'
          ? normalizeImageDataUrl(currentItem.url)
          : currentItem.url;
@@ -6400,7 +6453,7 @@ index ffb29af..8f48d24 100644
  
      if (isDesktopDownload) {
        const { smartDownload, buildDownloadFilename } = await import(
-@@ -845,7 +857,7 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
+@@ -845,7 +866,7 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
    );
  
    // 使用 Portal 渲染到 body

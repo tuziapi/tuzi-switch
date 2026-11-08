@@ -50,6 +50,16 @@ const messages: Record<string, string> = {
   creative_outcome_unknown: "请求结果待确认，请先查询任务结果，避免重复提交。",
   creative_cancelled_outcome_unknown:
     "请求已停止等待；已提交的任务可能仍在运行，请先查询结果。",
+  creative_upstream_429:
+    "模型服务请求过于频繁（HTTP 429），请稍后重试。未自动重新提交生成请求。",
+  creative_upstream_500:
+    "模型服务发生内部错误（HTTP 500），请稍后重试。",
+  creative_upstream_502:
+    "模型服务网关暂时不可用（HTTP 502），请稍后重试。",
+  creative_upstream_503:
+    "模型服务暂时不可用（HTTP 503），请稍后重试或切换模型。",
+  creative_upstream_504:
+    "模型服务响应超时（HTTP 504），请先检查已有任务结果，避免重复提交。",
 };
 export function creativeError(error: unknown): Error {
   const code =

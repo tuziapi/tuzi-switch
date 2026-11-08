@@ -171,6 +171,13 @@ print(json.dumps({'red':r,'cyan':c,'area':len(px)}))
       ),
     );
     await p.keyboard.press("Escape");
+    assert.equal(await p.getByRole('button', {name:'对话',exact:true}).getAttribute('aria-expanded'), 'true', 'Escape must preserve the underlying chat');
+    assert.equal(await p.locator('.unified-viewer').count(), 0, 'Escape closes only the viewer');
+    await card.click();
+    await p.locator('.unified-viewer').getByRole('button', {name:'放大', exact:true}).click();
+    await p.keyboard.press('Escape');
+    assert.equal(await p.locator('.unified-viewer').count(), 0, 'Escape closes the viewer with toolbar focus');
+    assert.equal(await p.getByRole('button', {name:'对话',exact:true}).getAttribute('aria-expanded'), 'true', 'Toolbar Escape preserves chat');
     checks.push({
       name: "single click opens loaded full preview",
       status: "passed",

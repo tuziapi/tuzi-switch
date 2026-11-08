@@ -39,6 +39,11 @@ describe("creative account native boundary", () => {
     ["rate_limited", "校验请求过于频繁"],
     ["invalid_model", "未包含有效模型"],
     ["invalid_token", "系统令牌已失效"],
+    ["creative_upstream_429", "HTTP 429"],
+    ["creative_upstream_500", "HTTP 500"],
+    ["creative_upstream_502", "HTTP 502"],
+    ["creative_upstream_503", "HTTP 503"],
+    ["creative_upstream_504", "避免重复提交"],
   ])(
     "explains safe native failure %s without raw diagnostics",
     (code, message) => {
@@ -48,6 +53,14 @@ describe("creative account native boundary", () => {
       ).not.toContain("SYNTHETIC");
     },
   );
+  it("surfaces an upstream rate limit without blaming credentials or resubmitting", async () => {
+    mocks.invoke.mockRejectedValue("creative_upstream_429");
+    await expect(send("/v1/images/generations", {
+      method: "POST", body: JSON.stringify({ model: "synthetic", prompt: "SYNTHETIC", n: 1 }),
+    })).rejects.toThrow("HTTP 429");
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(creativeError("creative_upstream_429").message).not.toContain("Key");
+  });
   it("passes source references and generation without renderer credentials", async () => {
     mocks.invoke.mockImplementation(async (command, args) => {
       expect(command).toBe("creative_account_request");

@@ -635,7 +635,11 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
     // Handle Escape key to close drawer
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && isOpen) {
+        if (
+          e.key === 'Escape' && isOpen && !e.defaultPrevented &&
+          !document.querySelector('.unified-viewer')
+        ) {
+          e.preventDefault();
           setIsOpen(false);
           onOpenChange?.(false);
         }
