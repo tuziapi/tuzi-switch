@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -31,6 +32,8 @@ import {
   Feather,
   Lightbulb,
 } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import type { TextConversation } from "../../services/text-chat/conversation";
 import { ModelSelector } from "../chat-drawer/ModelSelector";
 import { ConfirmDialog } from "../dialog/ConfirmDialog";
 import { useDrawnix } from "../../hooks/use-drawnix";
@@ -177,16 +180,84 @@ const MessageView = memo(function MessageView({
   );
 });
 
+const SessionRow = memo(function SessionRow({
+  s,
+  active,
+  running,
+  onSelect,
+  onRename,
+  onDelete,
+}: {
+  s: TextConversation;
+  active: boolean;
+  running: boolean;
+  onSelect: (id: string) => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className={`text-chat-session ${active ? "is-active" : ""}`}>
+      <button
+        type="button"
+        onClick={() => onSelect(s.id)}
+        title={s.title}
+        aria-label={s.title}
+        aria-current={active ? "true" : undefined}
+      >
+        {running ? <Loader2 className="text-chat-spin" /> : <MessageCircle />}
+        <span className="text-chat-session-copy">
+          <span>{s.title}</span>
+          <small>
+            {running
+              ? "正在回复…"
+              : s.textChat?.draft
+                ? `草稿 · ${s.textChat.draft.slice(0, 100)}`
+                : s.textChat?.messages.at(-1)?.content.slice(0, 100) ||
+                  "开始新的对话"}
+          </small>
+        </span>
+      </button>
+      <div className="text-chat-session-actions">
+        <button
+          type="button"
+          aria-label={`重命名 ${s.title}`}
+          title="重命名"
+          onClick={() => {
+            onRename(s.id, s.title);
+          }}
+        >
+          <PencilLine />
+        </button>
+        <button
+          type="button"
+          className="text-chat-delete"
+          aria-label={`删除 ${s.title}`}
+          onClick={() => onDelete(s.id)}
+          disabled={running}
+        >
+          <Trash2 />
+        </button>
+      </div>
+    </div>
+  );
+});
+const noSubscription = () => () => {};
+
 export default function TextChatWorkspace({
   focused,
+  visible = true,
   selectedText,
   onExitFocus,
 }: {
   focused: boolean;
+  visible?: boolean;
   selectedText: string;
   onExitFocus: () => void;
 }) {
-  const snapshot = useSyncExternalStore(runtime.subscribe, runtime.getSnapshot);
+  const snapshot = useSyncExternalStore(
+    visible ? runtime.subscribe : noSubscription,
+    runtime.getSnapshot,
+  );
   const [activeId, setActiveId] = useState<string | null>(
     () => chatStorageService.getDrawerState().textActiveSessionId || null,
   );
@@ -221,6 +292,8 @@ export default function TextChatWorkspace({
   const [rename, setRename] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [creatingSession, setCreatingSession] = useState(false);
+  const creatingSessionRef = useRef(false);
   const creatingInitial = useRef(false);
   const [quote, setQuote] = useState("");
   const [atBottom, setAtBottom] = useState(true);
@@ -363,12 +436,19 @@ export default function TextChatWorkspace({
     else setDefaultModel(next);
   };
   const newSession = async () => {
+    if (creatingSessionRef.current) return;
+    creatingSessionRef.current = true;
+    setCreatingSession(true);
     try {
       const id = await runtime.create(defaultModel);
       select(id);
       inputRef.current?.focus();
     } catch (e) {
       setNotice((e as Error).message);
+    } finally {
+      creatingSessionRef.current = false;
+      setCreatingSession(false);
+      requestAnimationFrame(() => inputRef.current?.focus());
     }
   };
   const send = async () => {
@@ -398,6 +478,13 @@ export default function TextChatWorkspace({
       inputRef.current?.focus();
     }
   };
+  const renameSession = useCallback(
+    (id: string, title: string) => {
+      select(id);
+      setRename(title);
+    },
+    [select],
+  );
   const retry = useCallback(
     (userId: string) => {
       if (activeId) {
@@ -436,11 +523,36 @@ export default function TextChatWorkspace({
     },
     [onExitFocus],
   );
-  const last = state.messages.at(-1);
-  useEffect(() => {
-    if (followRef.current && scrollRef.current)
+  const virtualMessages = state.messages.length > 60;
+  const messageKey = useCallback(
+    (index: number) => state.messages[index].id,
+    [state.messages],
+  );
+  const messageVirtualizer = useVirtualizer({
+    count: virtualMessages ? state.messages.length : 0,
+    enabled: visible && virtualMessages,
+    getScrollElement: () => scrollRef.current,
+    getItemKey: messageKey,
+    estimateSize: (index) => (state.messages[index].role === "user" ? 70 : 360),
+    overscan: 4,
+    paddingStart: 18,
+    paddingEnd: 30,
+    gap: 28,
+  });
+  const scrollToLatest = useCallback(() => {
+    if (virtualMessages)
+      // ResizeObserver follows measured height changes. Avoid scrollToIndex's
+      // deferred retries, which can override a subsequent user scroll upward.
+      messageVirtualizer.scrollToOffset(messageVirtualizer.getTotalSize());
+    else if (scrollRef.current)
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [virtualMessages, messageVirtualizer, state.messages.length]);
+  const last = state.messages.at(-1);
+  useLayoutEffect(() => {
+    if (visible && followRef.current) scrollToLatest();
   }, [
+    visible,
+    scrollToLatest,
     last?.content,
     last?.reasoning,
     last?.status,
@@ -450,13 +562,25 @@ export default function TextChatWorkspace({
   ]);
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el?.firstElementChild || typeof ResizeObserver === "undefined") return;
+    if (
+      !visible ||
+      !el?.firstElementChild ||
+      typeof ResizeObserver === "undefined"
+    )
+      return;
+    let frame = 0;
     const observer = new ResizeObserver(() => {
-      if (followRef.current) el.scrollTop = el.scrollHeight;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (followRef.current) scrollToLatest();
+      });
     });
     observer.observe(el.firstElementChild);
-    return () => observer.disconnect();
-  }, [activeId, !!state.messages.length]);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [visible, activeId, !!state.messages.length, scrollToLatest]);
   const scroll = () => {
     const el = scrollRef.current;
     if (!el) return;
@@ -470,6 +594,7 @@ export default function TextChatWorkspace({
     setRename(null);
   };
 
+  if (!visible) return null;
   return (
     <div
       className={`text-chat-workspace ${focused ? "is-focused" : ""}`}
@@ -512,7 +637,7 @@ export default function TextChatWorkspace({
           type="button"
           className="text-chat-new"
           onClick={newSession}
-          disabled={!snapshot.ready}
+          disabled={!snapshot.ready || creatingSession}
         >
           <Plus />
           新建对话
@@ -528,65 +653,23 @@ export default function TextChatWorkspace({
           />
         </label>
         <div className="text-chat-session-list">
-          {sessionGroups.map(([label, items]) => (
-            <section key={label} className="text-chat-session-group">
-              <h3>{label}</h3>
-              {items.map((s) => (
-                <div
-                  key={s.id}
-                  className={`text-chat-session ${s.id === activeId ? "is-active" : ""}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => select(s.id)}
-                    title={s.title}
-                    aria-label={s.title}
-                    aria-current={s.id === activeId ? "true" : undefined}
-                  >
-                    {snapshot.running.has(s.id) ? (
-                      <Loader2 className="text-chat-spin" />
-                    ) : (
-                      <MessageCircle />
-                    )}
-                    <span className="text-chat-session-copy">
-                      <span>{s.title}</span>
-                      <small>
-                        {snapshot.running.has(s.id)
-                          ? "正在回复…"
-                          : s.textChat?.draft
-                            ? `草稿 · ${s.textChat.draft.slice(0, 100)}`
-                            : s.textChat?.messages
-                                .at(-1)
-                                ?.content.slice(0, 100) || "开始新的对话"}
-                      </small>
-                    </span>
-                  </button>
-                  <div className="text-chat-session-actions">
-                    <button
-                      type="button"
-                      aria-label={`重命名 ${s.title}`}
-                      title="重命名"
-                      onClick={() => {
-                        select(s.id);
-                        setRename(s.title);
-                      }}
-                    >
-                      <PencilLine />
-                    </button>
-                    <button
-                      type="button"
-                      className="text-chat-delete"
-                      aria-label={`删除 ${s.title}`}
-                      onClick={() => setDeleteId(s.id)}
-                      disabled={snapshot.running.has(s.id)}
-                    >
-                      <Trash2 />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </section>
-          ))}
+          {historyOpen &&
+            sessionGroups.map(([label, items]) => (
+              <section key={label} className="text-chat-session-group">
+                <h3>{label}</h3>
+                {items.map((s) => (
+                  <SessionRow
+                    key={s.id}
+                    s={s}
+                    active={s.id === activeId}
+                    running={snapshot.running.has(s.id)}
+                    onSelect={select}
+                    onRename={renameSession}
+                    onDelete={setDeleteId}
+                  />
+                ))}
+              </section>
+            ))}
           {!sessions.length && (
             <p className="text-chat-muted">
               {search ? "没有匹配的对话" : "还没有文本对话"}
@@ -626,7 +709,7 @@ export default function TextChatWorkspace({
             type="button"
             aria-label="新建文本对话"
             onClick={newSession}
-            disabled={!snapshot.ready}
+            disabled={!snapshot.ready || creatingSession}
           >
             <Plus />
           </button>
@@ -725,6 +808,32 @@ export default function TextChatWorkspace({
                 })}
               </div>
             </div>
+          ) : virtualMessages ? (
+            <div
+              className="text-chat-messages text-chat-messages--virtual"
+              style={{ height: messageVirtualizer.getTotalSize() }}
+            >
+              {messageVirtualizer.getVirtualItems().map((item) => {
+                const message = state.messages[item.index];
+                return (
+                  <div
+                    key={message.id}
+                    data-index={item.index}
+                    ref={messageVirtualizer.measureElement}
+                    className="text-chat-virtual-row"
+                    style={{ transform: `translateY(${item.start}px)` }}
+                  >
+                    <MessageView
+                      message={message}
+                      retryPrompt={retryPrompts.get(message.id)}
+                      busy={busy}
+                      onRetry={retry}
+                      onInsert={insert}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           ) : (
             <div className="text-chat-messages">
               {state.messages.map((message) => (
@@ -747,10 +856,7 @@ export default function TextChatWorkspace({
             onClick={() => {
               followRef.current = true;
               setAtBottom(true);
-              scrollRef.current?.scrollTo({
-                top: scrollRef.current.scrollHeight,
-                behavior: "smooth",
-              });
+              scrollToLatest();
             }}
           >
             <ChevronDown />
@@ -830,7 +936,7 @@ export default function TextChatWorkspace({
             <textarea
               ref={inputRef}
               aria-label="文本消息"
-              disabled={!session || !snapshot.ready}
+              disabled={!session || !snapshot.ready || creatingSession}
               rows={3}
               value={state.draft}
               maxLength={200000}
@@ -885,7 +991,10 @@ export default function TextChatWorkspace({
                   className="text-chat-send"
                   aria-label="发送文本消息"
                   disabled={
-                    !state.draft.trim() || !snapshot.ready || !!snapshot.error
+                    !state.draft.trim() ||
+                    !snapshot.ready ||
+                    creatingSession ||
+                    !!snapshot.error
                   }
                   onClick={() => void send()}
                 >

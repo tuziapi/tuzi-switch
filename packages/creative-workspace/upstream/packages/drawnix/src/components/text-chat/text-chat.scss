@@ -740,3 +740,28 @@
 .text-chat-workspace .model-selector__trigger-icon {
   color: var(--tc-soft);
 }
+
+.text-chat-messages--virtual {
+  display: block;
+  position: relative;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.text-chat-virtual-row {
+  position: absolute;
+  top: 0;
+  left: 28px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  .text-chat-answer {
+    content-visibility: visible;
+    contain-intrinsic-size: none;
+  }
+}
+@media (max-width: 760px) {
+  .text-chat-virtual-row {
+    left: 18px;
+    right: 18px;
+  }
+}

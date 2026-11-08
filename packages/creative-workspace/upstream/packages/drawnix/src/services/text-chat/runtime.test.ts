@@ -114,6 +114,24 @@ describe("isolated text conversations", () => {
     expect(runtime.getSnapshot().saveErrors.size).toBe(0);
     expect(request).toHaveBeenCalledTimes(1);
   });
+  it("persists unchanged successful snapshots without notifying UI subscribers", async () => {
+    const { runtime, db } = setup();
+    const id = await runtime.create(model);
+    const listener = vi.fn();
+    const unsubscribe = runtime.subscribe(listener);
+    const snapshot = runtime.getSnapshot();
+    await runtime.save(id);
+    expect(db.saveTextSession).toHaveBeenCalledTimes(2);
+    expect(runtime.getSnapshot()).toBe(snapshot);
+    expect(listener).not.toHaveBeenCalled();
+    db.saveTextSession.mockRejectedValueOnce(new Error("disk full"));
+    await expect(runtime.save(id)).rejects.toThrow();
+    expect(listener).toHaveBeenCalledTimes(1);
+    await runtime.save(id);
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(runtime.getSnapshot().saveErrors.has(id)).toBe(false);
+    unsubscribe();
+  });
   it("recovers in-progress messages as interrupted and ignores legacy creative sessions", async () => {
     const { runtime, db, records } = setup();
     const id = await runtime.create(model);

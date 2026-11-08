@@ -25,3 +25,15 @@ The client SHALL support copy, explicit regeneration, title search, rename and r
 #### Scenario: Model menu inside the desktop workspace
 - **WHEN** the text model selector opens in focus or canvas layouts
 - **THEN** its menu remains anchored to the trigger within the embedded viewport, scrolls overflowing models, and Escape dismisses the menu before the drawer
+
+### Requirement: Bounded long-conversation rendering
+The client SHALL limit mounted messages to the visible region and a small overscan for long conversations, without truncating persisted messages or provider context. Hidden chat SHALL stop its UI subscription while background requests and durable saves continue.
+#### Scenario: Browse long history while receiving a reply
+- **WHEN** a conversation contains 800 messages and the user scrolls upward during a reply
+- **THEN** the first message remains reachable without a delayed jump to the bottom, and the explicit latest action restores the live reply
+#### Scenario: Close during generation
+- **WHEN** the user hides the chat while a reply is streaming
+- **THEN** the chat message DOM is unmounted, and reopening or reloading after completion restores the full reply and earlier messages
+#### Scenario: Wait for durable new conversation
+- **WHEN** creation of a new conversation is waiting for its local write
+- **THEN** duplicate creation and message input are disabled until the new session is selected, preventing input from accidentally modifying the prior draft

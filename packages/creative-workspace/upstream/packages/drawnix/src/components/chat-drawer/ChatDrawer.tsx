@@ -1986,7 +1986,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
               {chatMode === 'text' && <button type="button" aria-label={textFocus ? '画布并排' : '专注对话'} onClick={() => setTextFocus(v => !v)}>{textFocus ? <Columns2 size={15} /> : <Maximize2 size={15} />}{textFocus ? '画布并排' : '专注对话'}</button>}
               <button type="button" aria-label="关闭对话面板" onClick={handleClose}><CloseIcon size={16} /></button>
             </div>
-            {chatMode === 'text' && shouldRenderChat && <Suspense fallback={<div className="chat-loading">加载文本对话…</div>}><TextChatWorkspace focused={textFocus} selectedText={selectedContent.filter(item => item.type === 'text').map(item => item.text || '').join('\n\n')} onExitFocus={exitTextFocus} /></Suspense>}
+            {chatMode === 'text' && shouldRenderChat && <Suspense fallback={<div className="chat-loading">加载文本对话…</div>}><TextChatWorkspace visible={isOpen} focused={textFocus} selectedText={selectedContent.filter(item => item.type === 'text').map(item => item.text || '').join('\n\n')} onExitFocus={exitTextFocus} /></Suspense>}
             <div className="text-chat-creative-body" style={{ display: chatMode === 'creative' ? 'flex' : 'none' }}>
 
             <div className="chat-drawer__header">

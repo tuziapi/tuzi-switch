@@ -116,9 +116,11 @@ export class TextChatRuntime {
     try {
       await next;
       if (epoch !== this.epoch) return;
-      const saveErrors = new Set(this.snapshot.saveErrors);
-      saveErrors.delete(id);
-      this.emit({ saveErrors });
+      if (this.snapshot.saveErrors.has(id)) {
+        const saveErrors = new Set(this.snapshot.saveErrors);
+        saveErrors.delete(id);
+        this.emit({ saveErrors });
+      }
     } catch {
       if (epoch !== this.epoch) return;
       const saveErrors = new Set(this.snapshot.saveErrors);
