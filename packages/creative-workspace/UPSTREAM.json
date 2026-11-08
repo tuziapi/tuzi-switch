@@ -6460,6 +6460,46 @@
       "path": "packages/drawnix/src/components/chat-drawer/WorkflowResultImage.tsx",
       "origin": "assistant-integration",
       "reason": "Resolve creative assistant result images through desktop cache with display-only retry"
+    },
+    {
+      "path": "packages/drawnix/src/components/canvas-interaction-mode.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "packages/drawnix/src/utils/canvas-interaction-mode.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "packages/drawnix/src/utils/canvas-interaction-mode.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/use-canvas-temporary-pan.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/use-canvas-temporary-pan.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "openspec/changes/add-canvas-browse-edit/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "openspec/changes/add-canvas-browse-edit/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "openspec/changes/add-canvas-browse-edit/specs/canvas-interaction/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
     }
   ],
   "integration": {
