@@ -179,34 +179,36 @@ index b1fcad1..13df234 100644
            value={value.children}
 diff --git a/openspec/changes/add-canvas-browse-edit/proposal.md b/openspec/changes/add-canvas-browse-edit/proposal.md
 new file mode 100644
-index 0000000..998e8e9
+index 0000000..2842f61
 --- /dev/null
 +++ b/openspec/changes/add-canvas-browse-edit/proposal.md
-@@ -0,0 +1,15 @@
-+# Change: 桌面画布默认浏览与平移修复
+@@ -0,0 +1,17 @@
++# Change: 桌面画布默认选择与平移修复
 +
 +用户于 2026-11-08 选择方案 B：默认浏览，顶部明确区分“浏览／编辑”，记住上次模式。随后用户明确要求移除顶部额外按钮，只保留平移改善；此反馈覆盖顶部按钮要求。仅本地修改、验证及构建。
 +
++最新反馈明确要求默认工具为“选择”，覆盖默认浏览和模式记忆要求。每次进入使用选择，保留滚轮和 Space 临时平移。
++
 +## Why
-+选择模式下拖动图片会移动元素，用户希望平移画布时容易误操作。已有手形工具可正确平移，但入口及默认行为不符合浏览优先的使用方式。
++选择模式下拖动图片用于移动元素；用户要求默认选择，并可通过滚动、手形工具或 Space 临时拖动平移画布，避免额外模式按钮。
 +
 +## What Changes
-+- 桌面集成首次进入使用手形浏览；后续恢复本机浏览/编辑选择。
-+- 不增加顶部浏览/编辑按钮；使用已有左侧手形/选择工具及 H/V 快捷键，保留工具记忆和 Space 临时平移。
++- 桌面集成每次进入使用选择工具，实际画布指针和工具栏保持一致。
++- 不增加顶部浏览/编辑按钮；使用已有左侧手形/选择工具及 H/V 快捷键，保留 Space 临时平移。
 +- 复用原有平移与选择，不增加逐帧计算或惯性动画；不改模型或画板内容格式。
-+- 新增本地偏好 `tuzi-canvas-interaction-mode-v1`，仅接受 browse/edit，缺失或损坏回退 browse，存储不可用不阻塞操作。
++- 不再读写 `tuzi-canvas-interaction-mode-v1`；旧值保留但不影响初始工具，无需数据迁移。
 +
 +## Impact
-+宿主创作工具栏、Drawnix 初始工具、局部模式控制和本地偏好。需要验证图片区域拖动、编辑移动、快捷键/输入隔离、窄窗口和重启恢复。不改变非集成上游的默认行为，不新增网络调用。
++Drawnix 初始工具和临时平移支持。需要验证默认选择、手形/滚轮/Space 平移、图片移动、快捷键/输入隔离及重启。不改变非集成上游的默认行为，不新增网络调用。
 diff --git a/openspec/changes/add-canvas-browse-edit/specs/canvas-interaction/spec.md b/openspec/changes/add-canvas-browse-edit/specs/canvas-interaction/spec.md
 new file mode 100644
-index 0000000..41ed32b
+index 0000000..d4635e1
 --- /dev/null
 +++ b/openspec/changes/add-canvas-browse-edit/specs/canvas-interaction/spec.md
 @@ -0,0 +1,23 @@
 +## ADDED Requirements
 +### Requirement: Desktop canvas browsing and panning
-+The integrated desktop canvas SHALL default to browse mode, use existing hand/selection tools without additional browse/edit controls, and restore the last local mode without modifying project content.
++The integrated desktop canvas SHALL start with the selection tool on each workspace mount, use existing hand/selection tools without additional browse/edit controls, and support panning without modifying project content.
 +
 +#### Scenario: Browse an image
 +- **WHEN** the user drags over an image in browse mode
@@ -216,9 +218,9 @@ index 0000000..41ed32b
 +- **WHEN** the user selects edit and drags an image
 +- **THEN** the existing selection/movement behavior applies; the existing hand tool restores panning.
 +
-+#### Scenario: Restore and recover preference
++#### Scenario: Reopen with selection
 +- **WHEN** the workspace restarts
-+- **THEN** browse/edit is restored; missing or invalid preference defaults to browse, and unavailable storage does not block current interaction.
++- **THEN** the actual pointer and toolbar both start in selection, even if the previous tool was hand or an obsolete local browse preference exists; no tool preference is read or written.
 +
 +#### Scenario: Existing tools and typing
 +- **WHEN** the user selects H/V or an editing tool outside text entry
@@ -226,13 +228,13 @@ index 0000000..41ed32b
 +
 +#### Scenario: Temporary pan
 +- **WHEN** the user temporarily pans with Space or the middle button in edit mode
-+- **THEN** the persisted edit preference is unchanged.
++- **THEN** image world coordinates remain unchanged and the selection tool is restored when temporary panning ends.
 diff --git a/openspec/changes/add-canvas-browse-edit/tasks.md b/openspec/changes/add-canvas-browse-edit/tasks.md
 new file mode 100644
-index 0000000..d3feabf
+index 0000000..33f161c
 --- /dev/null
 +++ b/openspec/changes/add-canvas-browse-edit/tasks.md
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,13 @@
 +## 1. Implementation
 +- [x] 1.1 实际画布指针初始化一致（后续用户取消顶部模式切换）
 +- [x] 1.2 本机记忆、缺失/非法值/存储失败兼容
@@ -242,6 +244,10 @@ index 0000000..d3feabf
 +## 2. 用户反馈简化
 +- [x] 2.1 移除顶部浏览/编辑入口及样式，保留默认手形、工具记忆与临时平移
 +- [x] 2.2 双浏览器平移回归及 Release 原生复验
++
++## 3. 默认选择
++- [x] 3.1 按最新反馈每次进入默认选择，不再读取或写入旧模式偏好
++- [x] 3.2 回归滚轮/Space 平移及重启默认选择，重建原生体验包
 diff --git a/openspec/changes/add-canvas-image-menu/proposal.md b/openspec/changes/add-canvas-image-menu/proposal.md
 new file mode 100644
 index 0000000..07fc3b4
@@ -1596,25 +1602,17 @@ index 0000000..3e6ab61
 +}
 diff --git a/packages/drawnix/src/components/canvas-interaction-mode.tsx b/packages/drawnix/src/components/canvas-interaction-mode.tsx
 new file mode 100644
-index 0000000..34c2333
+index 0000000..2bda58c
 --- /dev/null
 +++ b/packages/drawnix/src/components/canvas-interaction-mode.tsx
-@@ -0,0 +1,17 @@
-+import { useEffect } from 'react';
-+import { PlaitPointerType } from '@plait/core';
+@@ -0,0 +1,9 @@
 +import { useDrawnix } from '../hooks/use-drawnix';
 +import { useCanvasTemporaryPan } from '../hooks/use-canvas-temporary-pan';
-+import { saveCanvasInteractionMode, type CanvasInteractionMode } from '../utils/canvas-interaction-mode';
 +
 +/** Uses the existing tools. No pointer-move listeners or per-frame state. */
-+export function CanvasInteractionModeSync() {
++export function CanvasTemporaryPanSupport() {
 +  const { board, appState } = useDrawnix();
 +  useCanvasTemporaryPan(board, appState.pointer);
-+  const mode: CanvasInteractionMode = appState.pointer === PlaitPointerType.hand ? 'browse' : 'edit';
-+  useEffect(() => {
-+    if (board) saveCanvasInteractionMode(mode);
-+  }, [board, mode]);
-+
 +  return null;
 +}
 diff --git a/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx b/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
@@ -10804,19 +10802,18 @@ index 17820fe..3dcc116 100644
    ) {
      const cachedBlob = await unifiedCacheService.getCachedBlob(resolvedUrl);
 diff --git a/packages/drawnix/src/drawnix.tsx b/packages/drawnix/src/drawnix.tsx
-index bc35282..790b283 100644
+index bc35282..c8de573 100644
 --- a/packages/drawnix/src/drawnix.tsx
 +++ b/packages/drawnix/src/drawnix.tsx
-@@ -34,6 +34,8 @@ import { withDraw, BasicShapes, DrawTransforms } from '@plait/draw';
+@@ -34,6 +34,7 @@ import { withDraw, BasicShapes, DrawTransforms } from '@plait/draw';
  import { MindThemeColors, withMind } from '@plait/mind';
  import { withMindExtend } from './plugins/with-mind-extend';
  import { withCommonPlugin } from './plugins/with-common';
-+import { CanvasInteractionModeSync } from './components/canvas-interaction-mode';
-+import { canvasModePointer, readCanvasInteractionMode } from './utils/canvas-interaction-mode';
++import { CanvasTemporaryPanSupport } from './components/canvas-interaction-mode';
  import { UnifiedToolbar } from './components/toolbar/unified-toolbar';
  import classNames from 'classnames';
  import './styles/index.scss';
-@@ -114,6 +116,7 @@ import {
+@@ -114,6 +115,7 @@ import {
    classifyApiCredentialError,
  } from './utils/api-auth-error-event';
  import { MessagePlugin } from './utils/message-plugin';
@@ -10824,7 +10821,7 @@ index bc35282..790b283 100644
  import { calculateEditedImagePoints } from './utils/image';
  import { isCardElement } from './types/card.types';
  import { isFrameElement } from './types/frame.types';
-@@ -136,10 +139,7 @@ import {
+@@ -136,10 +138,7 @@ import {
  import { syncEditedPPTSlideImage } from './utils/frame-insertion-utils';
  import type { MediaLibraryModalProps } from './types/asset.types';
  import { SelectionMode } from './types/asset.types';
@@ -10836,7 +10833,7 @@ index bc35282..790b283 100644
  const PopupToolbar = lazy(() =>
    import('./components/toolbar/popup-toolbar/popup-toolbar').then((module) => ({
      default: module.PopupToolbar,
-@@ -335,9 +335,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -335,9 +334,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
    isDataReady = false,
    currentBoardId,
  }) => {
@@ -10846,7 +10843,7 @@ index bc35282..790b283 100644
    const options: PlaitBoardOptions = {
      readonly: false,
      hideScrollbar: false,
-@@ -346,9 +343,10 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -346,9 +342,10 @@ export const Drawnix: React.FC<DrawnixProps> = ({
    };
  
    const [appState, setAppState] = useState<DrawnixState>(() => {
@@ -10854,12 +10851,12 @@ index bc35282..790b283 100644
      return {
 -      pointer: PlaitPointerType.hand,
 +      pointer: import.meta.env.VITE_TUZI_ASSISTANT === 'true'
-+        ? canvasModePointer(readCanvasInteractionMode())
++        ? PlaitPointerType.selection
 +        : PlaitPointerType.hand,
        isMobile: detectMobileViewport(),
        isPencilMode: false,
        openDialogTypes: new Set(),
-@@ -359,6 +357,12 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -359,6 +356,12 @@ export const Drawnix: React.FC<DrawnixProps> = ({
      };
    });
  
@@ -10872,7 +10869,7 @@ index bc35282..790b283 100644
    const [board, setBoard] = useState<DrawnixBoard | null>(null);
    const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
    const [toolboxDrawerOpen, setToolboxDrawerOpen] = useState(false);
-@@ -370,7 +374,9 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -370,7 +373,9 @@ export const Drawnix: React.FC<DrawnixProps> = ({
      });
    const [backupRestoreOpen, setBackupRestoreOpen] = useState(false);
    const [cloudSyncOpen, setCloudSyncOpen] = useState(false);
@@ -10883,7 +10880,7 @@ index bc35282..790b283 100644
    const [versionUpdateEnabled, setVersionUpdateEnabled] = useState(false);
    const [imageRecoveryOpen, setImageRecoveryOpen] = useState(false);
    useEffect(() => {
-@@ -386,26 +392,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -386,26 +391,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
  
    // 使用 ref 来保存 board 的最新引用,避免 useCallback 依赖问题
    const boardRef = useRef<DrawnixBoard | null>(null);
@@ -10910,7 +10907,7 @@ index bc35282..790b283 100644
    // 关闭所有抄屉
    const closeAllDrawers = useCallback(() => {
      if (shouldAutoCloseProjectDrawer()) {
-@@ -868,24 +854,13 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -868,24 +853,13 @@ export const Drawnix: React.FC<DrawnixProps> = ({
    }, [onChange, saveBoard]);
  
    const prepareDesktopUpdate = useCallback(async () => {
@@ -10936,7 +10933,7 @@ index bc35282..790b283 100644
      if (await hasActiveTasks()) throw new Error('请等待正在进行的生成任务完成后再更新');
    }, [saveBoard]);
  
-@@ -897,22 +872,19 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -897,22 +871,19 @@ export const Drawnix: React.FC<DrawnixProps> = ({
    }, [prepareDesktopUpdate]);
  
    const insertRecoveredImage = useCallback(async (url: string) => {
@@ -10961,7 +10958,7 @@ index bc35282..790b283 100644
  
    // 创建新项目并刷新页面（用于释放内存）
    const handleCreateProjectForMemory = useCallback(async () => {
-@@ -998,22 +970,13 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -998,22 +969,13 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                      {imageRecoveryOpen && <Suspense fallback={null}><ManualImageRecovery onInsert={insertRecoveredImage} onClose={() => setImageRecoveryOpen(false)} /></Suspense>}
                      {versionUpdateEnabled && (
                        <Suspense fallback={null}>
@@ -10989,7 +10986,7 @@ index bc35282..790b283 100644
                        options={options}
                        plugins={plugins}
                        containerRef={containerRef}
-@@ -1031,10 +994,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -1031,10 +993,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                        onViewportChange={onViewportChange}
                        onThemeChange={onThemeChange}
                        onValueChange={onValueChange}
@@ -11001,7 +10998,7 @@ index bc35282..790b283 100644
                        onBoardSwitch={onBoardSwitch}
                        onTabSyncNeeded={onTabSyncNeeded}
                        handleProjectDrawerToggle={handleProjectDrawerToggle}
-@@ -1064,7 +1024,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -1064,7 +1023,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
                        minimizedToolsBarEnabled={minimizedToolsBarEnabled}
                        enableToolWindows={enableToolWindows}
                        enableGenerationRuntime={enableGenerationRuntime}
@@ -11010,7 +11007,7 @@ index bc35282..790b283 100644
                    </DrawnixContext.Provider>
                  </ChatDrawerProvider>
                </CacheQuotaProvider>
-@@ -1078,7 +1038,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
+@@ -1078,7 +1037,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
  
  // Internal component that uses ChatDrawer context
  interface DrawnixContentProps {
@@ -11018,7 +11015,7 @@ index bc35282..790b283 100644
    value: PlaitElement[];
    viewport?: Viewport;
    theme?: PlaitTheme;
-@@ -1130,7 +1089,6 @@ interface DrawnixContentProps {
+@@ -1130,7 +1088,6 @@ interface DrawnixContentProps {
  }
  
  const DrawnixContent: React.FC<DrawnixContentProps> = ({
@@ -11026,7 +11023,7 @@ index bc35282..790b283 100644
    value,
    viewport,
    theme,
-@@ -1837,8 +1795,12 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
+@@ -1837,8 +1794,12 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
            onValueChange={onValueChange}
          >
            <Board
@@ -11040,18 +11037,18 @@ index bc35282..790b283 100644
                setBoard(board as DrawnixBoard);
                // 挂载 board 实例到 window，供知识库等外部模块访问
                (window as any).__drawnixBoard = board;
-@@ -1857,8 +1819,10 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
+@@ -1857,8 +1818,10 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
                }
              }}
            ></Board>
-+          {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <CanvasInteractionModeSync />}
++          {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <CanvasTemporaryPanSupport />}
            {/* 多选时的缩放控制点 */}
            <MultiSelectionHandles />
 +          <CanvasImageContextMenu board={board} onPreview={openMediaPreview} />
            {/* 统一左侧工具栏 (桌面端和移动端一致) */}
            <UnifiedToolbar
              projectDrawerOpen={projectDrawerOpen}
-@@ -1869,7 +1833,6 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
+@@ -1869,7 +1832,6 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
              onTaskPanelToggle={handleTaskPanelToggle}
              onOpenBackupRestore={handleOpenBackupRestore}
              onOpenCloudSync={handleOpenCloudSync}
@@ -11059,7 +11056,7 @@ index bc35282..790b283 100644
              onKnowledgeBaseToggle={handleKnowledgeBaseToggle}
              onOpenMediaLibrary={handleOpenMediaLibrary}
              deferredFeaturesEnabled={toolWindowManagerEnabled}
-@@ -1904,7 +1867,7 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
+@@ -1904,7 +1866,7 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
                <TTDDialog container={containerRef.current}></TTDDialog>
              </Suspense>
            )}
@@ -20930,83 +20927,6 @@ index 0000000..8ee9bbc
 +  const native = getAssistantAccount()?.copyText;
 +  if (native) await native(prompt);
 +  else await copyToClipboard(prompt);
-+}
-diff --git a/packages/drawnix/src/utils/canvas-interaction-mode.test.ts b/packages/drawnix/src/utils/canvas-interaction-mode.test.ts
-new file mode 100644
-index 0000000..a85e4d9
---- /dev/null
-+++ b/packages/drawnix/src/utils/canvas-interaction-mode.test.ts
-@@ -0,0 +1,38 @@
-+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-+import { CANVAS_INTERACTION_MODE_KEY, readCanvasInteractionMode, saveCanvasInteractionMode } from './canvas-interaction-mode';
-+
-+describe('device canvas mode preference', () => {
-+  const values = new Map<string, string>();
-+  const setItem = vi.fn((key: string, value: string) => values.set(key, value));
-+  beforeEach(() => {
-+    values.clear();
-+    setItem.mockClear();
-+    vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem });
-+  });
-+  afterEach(() => vi.unstubAllGlobals());
-+  it('defaults old profiles and invalid values to browse', () => {
-+    expect(readCanvasInteractionMode()).toBe('browse');
-+    values.set(CANVAS_INTERACTION_MODE_KEY, '{"unexpected":true}');
-+    expect(readCanvasInteractionMode()).toBe('browse');
-+  });
-+  it('restores both modes without touching unrelated preferences', () => {
-+    values.set('unrelated', 'keep');
-+    saveCanvasInteractionMode('edit');
-+    expect(readCanvasInteractionMode()).toBe('edit');
-+    saveCanvasInteractionMode('browse');
-+    expect(readCanvasInteractionMode()).toBe('browse');
-+    expect(values.get('unrelated')).toBe('keep');
-+  });
-+  it('does not repeatedly write an unchanged mode', () => {
-+    saveCanvasInteractionMode('edit');
-+    saveCanvasInteractionMode('edit');
-+    expect(setItem).toHaveBeenCalledTimes(1);
-+  });
-+  it('survives unavailable reads and failed writes', () => {
-+    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('unavailable'); }, setItem });
-+    expect(readCanvasInteractionMode()).toBe('browse');
-+    expect(() => saveCanvasInteractionMode('edit')).not.toThrow();
-+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => { throw new Error('quota'); } });
-+    expect(() => saveCanvasInteractionMode('edit')).not.toThrow();
-+  });
-+});
-diff --git a/packages/drawnix/src/utils/canvas-interaction-mode.ts b/packages/drawnix/src/utils/canvas-interaction-mode.ts
-new file mode 100644
-index 0000000..7eb7689
---- /dev/null
-+++ b/packages/drawnix/src/utils/canvas-interaction-mode.ts
-@@ -0,0 +1,27 @@
-+import { PlaitPointerType } from '@plait/core';
-+
-+export type CanvasInteractionMode = 'browse' | 'edit';
-+// Device preference only: excluded from project documents, exports and sync.
-+export const CANVAS_INTERACTION_MODE_KEY = 'tuzi-canvas-interaction-mode-v1';
-+
-+export function readCanvasInteractionMode(): CanvasInteractionMode {
-+  try {
-+    return localStorage.getItem(CANVAS_INTERACTION_MODE_KEY) === 'edit' ? 'edit' : 'browse';
-+  } catch {
-+    return 'browse';
-+  }
-+}
-+
-+export function saveCanvasInteractionMode(mode: CanvasInteractionMode): void {
-+  try {
-+    if (localStorage.getItem(CANVAS_INTERACTION_MODE_KEY) !== mode) {
-+      localStorage.setItem(CANVAS_INTERACTION_MODE_KEY, mode);
-+    }
-+  } catch {
-+    // Storage can be unavailable; the current canvas remains usable.
-+  }
-+}
-+
-+export function canvasModePointer(mode: CanvasInteractionMode): PlaitPointerType {
-+  return mode === 'browse' ? PlaitPointerType.hand : PlaitPointerType.selection;
 +}
 diff --git a/packages/drawnix/src/utils/desktop-asset-url.ts b/packages/drawnix/src/utils/desktop-asset-url.ts
 index 42c7c72..a7734ec 100644

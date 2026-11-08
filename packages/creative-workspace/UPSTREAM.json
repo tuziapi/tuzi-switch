@@ -6467,16 +6467,6 @@
       "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
     },
     {
-      "path": "packages/drawnix/src/utils/canvas-interaction-mode.ts",
-      "origin": "assistant-integration",
-      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
-    },
-    {
-      "path": "packages/drawnix/src/utils/canvas-interaction-mode.test.ts",
-      "origin": "assistant-integration",
-      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
-    },
-    {
       "path": "packages/drawnix/src/hooks/use-canvas-temporary-pan.ts",
       "origin": "assistant-integration",
       "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
