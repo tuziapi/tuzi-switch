@@ -1,0 +1,74 @@
+{
+  "task": "UC-TEXT-02",
+  "date": "2026-11-08",
+  "baseCommit": "5b0a25bfeb42a5b329256445a879f1362b44e988",
+  "browsers": [
+    {
+      "engine": "chromium",
+      "checks": [
+        "header toggle opens/closes the same drawer; focus history collapses in one click",
+        "model menu anchors to its trigger, stays in workspace bounds and scrolls; compact overlay dismisses",
+        "focus hides canvas toolbar and handle",
+        "configured model catalogue and search reused",
+        "initial unsent draft survives reload; IME confirmation does not submit",
+        "streaming, reasoning, Markdown, code, math, final usage",
+        "conversation, model and draft restored after reload",
+        "follow-up carries complete history",
+        "regeneration retains replies and excludes later user turns",
+        "explicit insertion persists text in canvas and exits focus",
+        "grouped history supports previews, inline selection, rename and search",
+        "concurrent sessions stay independent; stop retains partial output",
+        "HTTP failure preserved; retry only on explicit click",
+        "legacy creative mode retained, text draft restored",
+        "dark and 1000×700 layouts",
+        "no browser runtime exceptions"
+      ],
+      "requests": "synthetic only",
+      "errors": []
+    },
+    {
+      "engine": "webkit",
+      "checks": [
+        "header toggle opens/closes the same drawer; focus history collapses in one click",
+        "model menu anchors to its trigger, stays in workspace bounds and scrolls; compact overlay dismisses",
+        "focus hides canvas toolbar and handle",
+        "configured model catalogue and search reused",
+        "initial unsent draft survives reload; IME confirmation does not submit",
+        "streaming, reasoning, Markdown, code, math, final usage",
+        "conversation, model and draft restored after reload",
+        "follow-up carries complete history",
+        "regeneration retains replies and excludes later user turns",
+        "explicit insertion persists text in canvas and exits focus",
+        "grouped history supports previews, inline selection, rename and search",
+        "concurrent sessions stay independent; stop retains partial output",
+        "HTTP failure preserved; retry only on explicit click",
+        "legacy creative mode retained, text draft restored",
+        "dark and 1000×700 layouts",
+        "no browser runtime exceptions"
+      ],
+      "requests": "synthetic only",
+      "errors": []
+    }
+  ],
+  "hostTests": {
+    "passed": 2,
+    "scope": "CreativeWorkspace navigation"
+  },
+  "rootTypecheck": "passed",
+  "upstreamEntryTypecheck": {
+    "modifiedFilesErrors": 0,
+    "unchangedDependencyErrors": 7
+  },
+  "nativeBuild": "passed",
+  "nativeGui": "not revalidated; previous ScreenCaptureKit -3811",
+  "realProviders": "not called",
+  "published": false,
+  "binarySha256": "d294fd8d7d411fd7aabb7807a22216930dab32223f0b28c527da8b3c9d245ffa",
+  "provenance": {
+    "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+    "originalFiles": 1522,
+    "localFiles": 59,
+    "reconstructedFiles": 1581,
+    "patchBytes": 845798
+  }
+}

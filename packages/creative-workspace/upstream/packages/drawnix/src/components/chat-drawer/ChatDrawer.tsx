@@ -14,6 +14,7 @@ import React, {
   useRef,
   Suspense,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Maximize2, Columns2, MessagesSquare, WandSparkles } from 'lucide-react';
 import { CloseIcon, AddIcon, ViewListIcon } from 'tdesign-icons-react';
 import { ATTACHED_ELEMENT_CLASS_NAME } from '@plait/core';
@@ -1946,9 +1947,16 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
       enableCopy: true,
       stopPropagation: true,
     });
+    // The host owns the toolbar placement; this drawer owns its single toggle state.
+    const headerEntry = document.getElementById('creative-chat-entry');
 
     return (
       <>
+        {headerEntry && createPortal(
+          <button type="button" className="creative-chat-entry" aria-label="对话" aria-expanded={isOpen} aria-controls="creative-chat-panel" onClick={handleToggle} title={isOpen ? '收起对话' : '展开对话'}>
+            <MessagesSquare size={15} />对话
+          </button>, headerEntry
+        )}
         {!(isOpen && chatMode === 'text' && textFocus) && <ChatDrawerTrigger
           isOpen={isOpen}
           onClick={handleToggle}
@@ -1956,6 +1964,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
         />}
 
         <div
+          id="creative-chat-panel"
           className={`chat-drawer ${ATTACHED_ELEMENT_CLASS_NAME} ${
             isOpen ? 'chat-drawer--open' : ''
           } ${isDragging ? 'chat-drawer--dragging' : ''} ${chatMode === 'text' ? 'chat-drawer--text' : ''} ${chatMode === 'text' && textFocus ? 'chat-drawer--text-focus' : ''}`}

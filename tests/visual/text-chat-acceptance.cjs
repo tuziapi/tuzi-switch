@@ -66,6 +66,15 @@ async function until(fn, label) {
   const shot = async (name) => {
     await p.screenshot({ path: path.join(output, `${engine}-${name}.png`) });
   };
+  async function checkModelMenu() {
+    await until(async () => p.evaluate(() => {
+      const trigger = document.querySelector('.text-chat-header .model-selector__trigger').getBoundingClientRect();
+      const menu = document.querySelector('.model-selector__dropdown').getBoundingClientRect();
+      const root = document.querySelector('.creative-root').getBoundingClientRect();
+      const gap = Math.min(Math.abs(menu.top - trigger.bottom - 8), Math.abs(trigger.top - menu.bottom - 8));
+      return gap < 2 && menu.left >= root.left && menu.right <= root.right && menu.top >= root.top && menu.bottom <= root.bottom;
+    }), 'model menu must stay anchored inside embedded bounds');
+  }
   async function choose(model) {
     await p.locator(".text-chat-header .model-selector__trigger").click();
     await p.locator(".model-selector__dropdown input").fill(model);
@@ -130,6 +139,7 @@ async function until(fn, label) {
             "claude-sonnet-4-5",
             "deepseek-chat",
             "gemini-2.5-flash",
+            ...Array.from({length: 14}, (_, index) => `gpt-5-qa-${index + 1}`),
           ].map((id) => ({
             id,
             object: "model",
@@ -163,9 +173,44 @@ async function until(fn, label) {
     await p.locator(".plait-board-container").waitFor();
     if (await p.getByText("不再提示", { exact: true }).isVisible())
       await p.getByText("不再提示", { exact: true }).click();
-    await p.getByRole("button", { name: "展开对话", exact: true }).click();
+    await p.getByRole("button", { name: "对话", exact: true }).click();
+    assert.equal(await p.getByRole('button', {name:'对话', exact:true}).getAttribute('aria-expanded'), 'true');
     await p.getByLabel("文本消息", { exact: true }).waitFor();
     await choose("gpt-4o");
+    const history = p.getByRole('complementary', {name:'文本历史会话'});
+    assert.equal(await history.isVisible(), true);
+    await p.getByLabel('文本会话列表', {exact:true}).click();
+    assert.equal(await history.isVisible(), false);
+    assert.equal(await p.getByLabel('文本会话列表', {exact:true}).getAttribute('aria-expanded'), 'false');
+    await shot('history-collapsed');
+    await p.getByLabel('文本会话列表', {exact:true}).click();
+    assert.equal(await history.isVisible(), true);
+    await p.getByLabel('收起会话侧栏', {exact:true}).click();
+    assert.equal(await history.isVisible(), false);
+    await p.getByLabel('文本会话列表', {exact:true}).click();
+    await p.getByRole('button', {name:'对话', exact:true}).click();
+    await p.getByTestId('text-chat-workspace').waitFor({state:'hidden'});
+    await p.getByRole('button', {name:'对话', exact:true}).click();
+    await p.getByLabel('文本消息', {exact:true}).waitFor();
+    checks.push('header toggle opens/closes the same drawer; focus history collapses in one click');
+    await p.locator('.text-chat-header .model-selector__trigger').click();
+    await checkModelMenu();
+    await shot('model-anchored');
+    await p.locator('.model-selector__item').last().scrollIntoViewIfNeeded();
+    await p.locator('.model-selector__item').last().click();
+    await choose('gpt-4o');
+    await p.setViewportSize({width:700,height:600});
+    await p.locator('.text-chat-header .model-selector__trigger').click();
+    await checkModelMenu();
+    await shot('model-compact');
+    await p.keyboard.press('Escape');
+    assert.equal(await p.locator('.model-selector__dropdown').count(),0);
+    await p.getByLabel('文本会话列表', {exact:true}).click();
+    assert.equal(await history.isVisible(),true);
+    await p.keyboard.press('Escape');
+    await history.waitFor({state:'hidden'});
+    await p.setViewportSize({width:1360,height:900});
+    checks.push('model menu anchors to its trigger, stays in workspace bounds and scrolls; compact overlay dismisses');
     await shot("empty");
     assert.equal(await p.locator(".unified-toolbar").isVisible(), false);
     checks.push("focus hides canvas toolbar and handle");
@@ -310,6 +355,17 @@ async function until(fn, label) {
         ),
       "canvas insertion not persisted",
     );
+    await p.locator('.text-chat-header .model-selector__trigger').click();
+    await checkModelMenu();
+    await shot('model-side');
+    await p.keyboard.press('Escape');
+    await p.getByLabel('文本会话列表', {exact:true}).click();
+    await history.getByRole('button', {name:await p.locator('.text-chat-title button').innerText(),exact:true}).click();
+    assert.equal(await history.isVisible(),false);
+    await p.getByRole('button', {name:'对话',exact:true}).click();
+    await p.getByTestId('text-chat-workspace').waitFor({state:'hidden'});
+    await p.getByRole('button', {name:'对话',exact:true}).click();
+    await p.getByLabel('文本消息',{exact:true}).waitFor();
     await shot("side");
     checks.push("explicit insertion persists text in canvas and exits focus");
     await p.getByLabel("专注对话", { exact: true }).click();
@@ -330,6 +386,18 @@ async function until(fn, label) {
     await mock("B 会话完整回复");
     await send("并发会话 B");
     await complete(1);
+    await shot('history');
+    await history.getByLabel('重命名 并发会话 B', {exact:true}).click();
+    await p.getByLabel('会话名称',{exact:true}).fill('整理产品计划');
+    await p.getByLabel('会话名称',{exact:true}).press('Enter');
+    await history.getByLabel('搜索文本对话',{exact:true}).fill('整理产品');
+    assert.equal(await history.locator('.text-chat-session').count(),1);
+    assert.equal(await history.getByRole('button',{name:'整理产品计划',exact:true}).count(),1);
+    await history.getByLabel('搜索文本对话',{exact:true}).fill('');
+    await history.getByLabel('重命名 整理产品计划',{exact:true}).click();
+    await p.getByLabel('会话名称',{exact:true}).fill('并发会话 B');
+    await p.getByLabel('会话名称',{exact:true}).press('Enter');
+    checks.push('grouped history supports previews, inline selection, rename and search');
     await p
       .locator(".text-chat-session-list button")
       .filter({ hasText: "并发会话 A" })

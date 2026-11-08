@@ -19,3 +19,9 @@ The client SHALL support copy, explicit regeneration, title search, rename and r
 #### Scenario: Regenerate a reply
 - **WHEN** the user requests another answer
 - **THEN** the original user prompt is sent with only its preceding context and prior answers remain available
+#### Scenario: Discover and collapse chat
+- **WHEN** the user clicks the top-right chat entry in the creative canvas
+- **THEN** the existing drawer toggles with synchronized expanded state, and the text history can independently collapse in a single click
+#### Scenario: Model menu inside the desktop workspace
+- **WHEN** the text model selector opens in focus or canvas layouts
+- **THEN** its menu remains anchored to the trigger within the embedded viewport, scrolls overflowing models, and Escape dismisses the menu before the drawer

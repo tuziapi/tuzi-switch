@@ -127,6 +127,18 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
     useEffect(() => {
       if (!isOpen) return;
 
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key !== 'Escape') return;
+        // The canvas may still own keyboard focus, especially in WebKit.
+        // Dismiss this popover before the drawer's window-level Escape handler.
+        e.preventDefault();
+        e.stopPropagation();
+        setIsOpen(false);
+        setSearchQuery('');
+        triggerRef.current?.focus();
+      };
+      window.addEventListener('keydown', handleEscape, true);
+
       const handleClickOutside = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (
@@ -147,6 +159,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
       return () => {
         clearTimeout(timer);
         document.removeEventListener('mousedown', handleClickOutside);
+        window.removeEventListener('keydown', handleEscape, true);
       };
     }, [isOpen]);
 
@@ -265,6 +278,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
       left: 0,
       width: 0,
       bottom: 0,
+      containerHeight: 0,
       placement: 'bottom' as 'top' | 'bottom',
       maxHeight: 480,
     });
@@ -277,35 +291,49 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
       const updatePosition = () => {
         if (!triggerRef.current) return;
         const rect = triggerRef.current.getBoundingClientRect();
-        const windowHeight = window.innerHeight;
-        const spaceBelow = windowHeight - rect.bottom;
-        const spaceAbove = rect.top;
+        // contain: layout paint makes the embedded root the fixed containing block.
+        // Keep both the anchor and bounds in that coordinate system.
+        const root = document.getElementById('creative-portals')?.closest('.creative-root');
+        const bounds = root?.getBoundingClientRect();
+        const height = bounds?.height ?? window.innerHeight;
+        const availableWidth = bounds?.width ?? window.innerWidth;
+        const top = rect.top - (bounds?.top ?? 0);
+        const bottom = rect.bottom - (bounds?.top ?? 0);
+        const width = Math.min(variant === 'form' ? Math.max(360, rect.width) : 440, Math.max(0, availableWidth - 24));
+        const spaceBelow = height - bottom;
+        const spaceAbove = top;
         const placement =
           spaceBelow < 400 && spaceAbove > spaceBelow ? 'top' : 'bottom';
         const availableHeight =
           placement === 'top'
             ? spaceAbove - 16
-            : windowHeight - rect.bottom - 16;
+            : spaceBelow - 16;
 
         setPortalPosition({
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          bottom: rect.bottom,
+          top,
+          left: Math.max(12, Math.min(rect.left - (bounds?.left ?? 0), availableWidth - width - 12)),
+          width,
+          bottom,
+          containerHeight: height,
           placement,
-          maxHeight: Math.min(Math.max(availableHeight, 200), 600),
+          maxHeight: Math.min(Math.max(availableHeight, 0), 600),
         });
       };
 
       updatePosition();
       window.addEventListener('resize', updatePosition);
       window.addEventListener('scroll', updatePosition, true);
+      const observer = new ResizeObserver(updatePosition);
+      if (triggerRef.current) observer.observe(triggerRef.current);
+      const root = document.querySelector('.creative-root');
+      if (root) observer.observe(root);
 
       return () => {
         window.removeEventListener('resize', updatePosition);
         window.removeEventListener('scroll', updatePosition, true);
+        observer.disconnect();
       };
-    }, [isOpen]);
+    }, [isOpen, variant]);
 
     const renderMenu = () => {
       if (!isOpen) return null;
@@ -324,10 +352,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
                 : 'auto',
             bottom:
               portalPosition.placement === 'top'
-                ? window.innerHeight - portalPosition.top + 8
+                ? portalPosition.containerHeight - portalPosition.top + 8
                 : 'auto',
-            minWidth: 360,
-            width: variant === 'form' ? portalPosition.width : 'auto',
+            minWidth: 0,
+            width: portalPosition.width,
             maxHeight: portalPosition.maxHeight,
             visibility: portalPosition.width === 0 ? 'hidden' : 'visible',
             transformOrigin:

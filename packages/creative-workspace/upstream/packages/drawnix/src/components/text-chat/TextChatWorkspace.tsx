@@ -12,11 +12,11 @@ import {
   Check,
   ChevronDown,
   Copy,
-  History,
   ListChecks,
   Loader2,
   MessageCircle,
   PanelLeftClose,
+  PanelLeftOpen,
   PencilLine,
   Plus,
   Rabbit,
@@ -193,7 +193,29 @@ export default function TextChatWorkspace({
   const [defaultModel, setDefaultModel] = useState<ModelRef | null>(null);
   const [emptyState, setEmptyState] = useState(newTextState);
   const [search, setSearch] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [wide, setWide] = useState(
+    () => window.matchMedia("(min-width: 761px)").matches,
+  );
+  const inlineHistory = focused && wide;
+  const [historyOpen, setHistoryOpen] = useState(
+    () => focused && window.matchMedia("(min-width: 761px)").matches,
+  );
+  const historyToggleRef = useRef<HTMLButtonElement>(null);
+  const historySearchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 761px)");
+    const resize = () => setWide(media.matches);
+    media.addEventListener("change", resize);
+    return () => media.removeEventListener("change", resize);
+  }, []);
+  useEffect(() => setHistoryOpen(inlineHistory), [inlineHistory]);
+  useEffect(() => {
+    if (historyOpen && !inlineHistory) historySearchRef.current?.focus();
+  }, [historyOpen, inlineHistory]);
+  const closeHistory = () => {
+    setHistoryOpen(false);
+    historyToggleRef.current?.focus();
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [rename, setRename] = useState<string | null>(null);
@@ -238,6 +260,28 @@ export default function TextChatWorkspace({
         .sort((a, b) => b.updatedAt - a.updatedAt),
     [snapshot.sessions, search],
   );
+  const sessionGroups = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const week = new Date(today);
+    week.setDate(week.getDate() - 7);
+    const groups = new Map<string, typeof sessions>();
+    for (const item of sessions) {
+      const label =
+        item.updatedAt >= +today
+          ? "今天"
+          : item.updatedAt >= +yesterday
+            ? "昨天"
+            : item.updatedAt >= +week
+              ? "近 7 天"
+              : "更早";
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label)!.push(item);
+    }
+    return [...groups];
+  }, [sessions]);
   useEffect(() => {
     void runtime.initialize();
     let mounted = true;
@@ -262,16 +306,19 @@ export default function TextChatWorkspace({
       void runtime.flush().catch(() => {});
     };
   }, []);
-  const select = useCallback((id: string | null) => {
-    setActiveId(id);
-    chatStorageService.setDrawerState({ textActiveSessionId: id });
-    setHistoryOpen(false);
-    setQuote("");
-    setRename(null);
-    setNotice("");
-    followRef.current = true;
-    setAtBottom(true);
-  }, []);
+  const select = useCallback(
+    (id: string | null) => {
+      setActiveId(id);
+      chatStorageService.setDrawerState({ textActiveSessionId: id });
+      if (!inlineHistory) setHistoryOpen(false);
+      setQuote("");
+      setRename(null);
+      setNotice("");
+      followRef.current = true;
+      setAtBottom(true);
+    },
+    [inlineHistory],
+  );
   useEffect(() => {
     if (snapshot.ready && activeId && !session && !snapshot.error) select(null);
   }, [snapshot.ready, activeId, session, snapshot.error, select]);
@@ -427,11 +474,40 @@ export default function TextChatWorkspace({
     <div
       className={`text-chat-workspace ${focused ? "is-focused" : ""}`}
       data-testid="text-chat-workspace"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && historyOpen && !inlineHistory) {
+          e.stopPropagation();
+          closeHistory();
+        }
+      }}
     >
+      {historyOpen && !inlineHistory && (
+        <button
+          type="button"
+          className="text-chat-history-backdrop"
+          aria-label="关闭会话侧栏"
+          onClick={closeHistory}
+        />
+      )}
       <aside
-        className={`text-chat-history ${historyOpen ? "is-open" : ""}`}
+        id="text-chat-history"
+        hidden={!historyOpen}
+        className={`text-chat-history ${!inlineHistory ? "is-overlay" : ""}`}
         aria-label="文本历史会话"
       >
+        <div className="text-chat-history-heading">
+          <strong>
+            会话 <span>{snapshot.sessions.length}</span>
+          </strong>
+          <button
+            type="button"
+            aria-label="收起会话侧栏"
+            title="收起会话侧栏"
+            onClick={closeHistory}
+          >
+            <PanelLeftClose />
+          </button>
+        </div>
         <button
           type="button"
           className="text-chat-new"
@@ -444,6 +520,7 @@ export default function TextChatWorkspace({
         <label className="text-chat-search">
           <Search />
           <input
+            ref={historySearchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索对话"
@@ -451,33 +528,64 @@ export default function TextChatWorkspace({
           />
         </label>
         <div className="text-chat-session-list">
-          {sessions.map((s) => (
-            <div
-              key={s.id}
-              className={`text-chat-session ${s.id === activeId ? "is-active" : ""}`}
-            >
-              <button
-                type="button"
-                onClick={() => select(s.id)}
-                title={s.title}
-              >
-                {snapshot.running.has(s.id) ? (
-                  <Loader2 className="text-chat-spin" />
-                ) : (
-                  <MessageCircle />
-                )}
-                <span>{s.title}</span>
-              </button>
-              <button
-                type="button"
-                className="text-chat-delete"
-                aria-label={`删除 ${s.title}`}
-                onClick={() => setDeleteId(s.id)}
-                disabled={snapshot.running.has(s.id)}
-              >
-                <Trash2 />
-              </button>
-            </div>
+          {sessionGroups.map(([label, items]) => (
+            <section key={label} className="text-chat-session-group">
+              <h3>{label}</h3>
+              {items.map((s) => (
+                <div
+                  key={s.id}
+                  className={`text-chat-session ${s.id === activeId ? "is-active" : ""}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => select(s.id)}
+                    title={s.title}
+                    aria-label={s.title}
+                    aria-current={s.id === activeId ? "true" : undefined}
+                  >
+                    {snapshot.running.has(s.id) ? (
+                      <Loader2 className="text-chat-spin" />
+                    ) : (
+                      <MessageCircle />
+                    )}
+                    <span className="text-chat-session-copy">
+                      <span>{s.title}</span>
+                      <small>
+                        {snapshot.running.has(s.id)
+                          ? "正在回复…"
+                          : s.textChat?.draft
+                            ? `草稿 · ${s.textChat.draft.slice(0, 100)}`
+                            : s.textChat?.messages
+                                .at(-1)
+                                ?.content.slice(0, 100) || "开始新的对话"}
+                      </small>
+                    </span>
+                  </button>
+                  <div className="text-chat-session-actions">
+                    <button
+                      type="button"
+                      aria-label={`重命名 ${s.title}`}
+                      title="重命名"
+                      onClick={() => {
+                        select(s.id);
+                        setRename(s.title);
+                      }}
+                    >
+                      <PencilLine />
+                    </button>
+                    <button
+                      type="button"
+                      className="text-chat-delete"
+                      aria-label={`删除 ${s.title}`}
+                      onClick={() => setDeleteId(s.id)}
+                      disabled={snapshot.running.has(s.id)}
+                    >
+                      <Trash2 />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </section>
           ))}
           {!sessions.length && (
             <p className="text-chat-muted">
@@ -490,12 +598,15 @@ export default function TextChatWorkspace({
       <section className="text-chat-main">
         <header className="text-chat-header">
           <button
+            ref={historyToggleRef}
             type="button"
             aria-label="文本会话列表"
+            title={historyOpen ? "收起会话侧栏" : "展开会话侧栏"}
             aria-expanded={historyOpen}
+            aria-controls="text-chat-history"
             onClick={() => setHistoryOpen((v) => !v)}
           >
-            <History />
+            {historyOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
           </button>
           <ModelSelector
             value={model?.modelId || undefined}

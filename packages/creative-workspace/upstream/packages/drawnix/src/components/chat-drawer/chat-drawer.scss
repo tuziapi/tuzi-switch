@@ -1804,6 +1804,7 @@ $drawer-input-max-height: 280px;
 
   // Search section
   &__search {
+    flex-shrink: 0;
     padding: 12px 12px 8px;
     background: #ffffff;
 
@@ -2068,5 +2069,20 @@ $drawer-input-max-height: 280px;
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+// Keep both columns scrollable inside the available embedded viewport height.
+.model-selector__dropdown .vendor-tab-panel {
+  min-height: 0;
+  overflow: hidden;
+}
+.model-selector__dropdown .model-selector__list {
+  max-height: none;
+  overflow: visible;
+}
+@media (max-width: 480px) {
+  .model-selector__dropdown .vendor-tab-panel--compact .vendor-tab-panel__tabs {
+    width: 106px;
   }
 }

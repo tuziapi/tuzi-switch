@@ -1530,18 +1530,19 @@ index 0000000..3e6ab61
 +  }
 +}
 diff --git a/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx b/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
-index dc68803..60b21d3 100644
+index dc68803..0915438 100644
 --- a/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
 +++ b/packages/drawnix/src/components/chat-drawer/ChatDrawer.tsx
-@@ -14,6 +14,7 @@ import React, {
+@@ -14,6 +14,8 @@ import React, {
    useRef,
    Suspense,
  } from 'react';
++import { createPortal } from 'react-dom';
 +import { Maximize2, Columns2, MessagesSquare, WandSparkles } from 'lucide-react';
  import { CloseIcon, AddIcon, ViewListIcon } from 'tdesign-icons-react';
  import { ATTACHED_ELEMENT_CLASS_NAME } from '@plait/core';
  import { SessionList } from './SessionList';
-@@ -63,6 +64,7 @@ import { resolveDrawerGenerationRoute } from './drawer-generation-route';
+@@ -63,6 +65,7 @@ import { resolveDrawerGenerationRoute } from './drawer-generation-route';
  import { HoverTip } from '../shared';
  import './chat-drawer.scss';
  
@@ -1549,7 +1550,7 @@ index dc68803..60b21d3 100644
  const ChatMessagesArea = React.lazy(() => import('./ChatMessagesArea'));
  
  // 工作流消息的特殊标记前缀
-@@ -217,6 +219,10 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -217,6 +220,10 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
        const cached = chatStorageService.getDrawerState();
        return cached.isOpen ?? defaultOpen;
      });
@@ -1560,7 +1561,7 @@ index dc68803..60b21d3 100644
      const [sessions, setSessions] = useState<ChatSession[]>([]);
      const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
      const activeSessionIdRef = useRef<string | null>(null);
-@@ -542,11 +548,11 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -542,11 +549,11 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
      useEffect(() => {
        const init = async () => {
          const drawerState = chatStorageService.getDrawerState();
@@ -1574,7 +1575,7 @@ index dc68803..60b21d3 100644
            activeId = drawerState.activeSessionId;
            updateActiveSessionId(drawerState.activeSessionId);
          } else if (loadedSessions.length > 0) {
-@@ -1113,6 +1119,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -1113,6 +1120,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
      // 发送工作流消息
      const handleSendWorkflowMessage = useCallback(
        async (params: WorkflowMessageParams) => {
@@ -1582,7 +1583,7 @@ index dc68803..60b21d3 100644
          const {
            context,
            workflow,
-@@ -1736,6 +1743,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -1736,6 +1744,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
          },
          toggle: handleToggle,
          sendMessage: async (content: string) => {
@@ -1590,11 +1591,21 @@ index dc68803..60b21d3 100644
            // Open drawer first
            setIsOpen(true);
            onOpenChange?.(true);
-@@ -1941,16 +1949,16 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -1938,19 +1947,27 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+       enableCopy: true,
+       stopPropagation: true,
+     });
++    // The host owns the toolbar placement; this drawer owns its single toggle state.
++    const headerEntry = document.getElementById('creative-chat-entry');
  
      return (
        <>
 -        <ChatDrawerTrigger
++        {headerEntry && createPortal(
++          <button type="button" className="creative-chat-entry" aria-label="对话" aria-expanded={isOpen} aria-controls="creative-chat-panel" onClick={handleToggle} title={isOpen ? '收起对话' : '展开对话'}>
++            <MessagesSquare size={15} />对话
++          </button>, headerEntry
++        )}
 +        {!(isOpen && chatMode === 'text' && textFocus) && <ChatDrawerTrigger
            isOpen={isOpen}
            onClick={handleToggle}
@@ -1603,6 +1614,7 @@ index dc68803..60b21d3 100644
 +        />}
  
          <div
++          id="creative-chat-panel"
            className={`chat-drawer ${ATTACHED_ELEMENT_CLASS_NAME} ${
              isOpen ? 'chat-drawer--open' : ''
 -          } ${isDragging ? 'chat-drawer--dragging' : ''}`}
@@ -1610,7 +1622,7 @@ index dc68803..60b21d3 100644
            style={{ width: drawerWidth }}
            data-testid="chat-drawer"
          >
-@@ -1961,6 +1969,17 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -1961,6 +1978,17 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
              onMouseDown={handleResizeStart}
            />
            <div ref={domRef} className="chat-drawer__body">
@@ -1628,7 +1640,7 @@ index dc68803..60b21d3 100644
              <div className="chat-drawer__header">
                <div className="chat-drawer__header-top">
                  <HoverTip content="关闭">
-@@ -2084,6 +2103,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
+@@ -2084,6 +2112,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
                  placeholder="继续描述要修改的内容..."
                />
              </div>
@@ -1637,10 +1649,119 @@ index dc68803..60b21d3 100644
          </div>
        </>
 diff --git a/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx b/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx
-index f032b56..8e3d418 100644
+index f032b56..b80292a 100644
 --- a/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx
 +++ b/packages/drawnix/src/components/chat-drawer/ModelSelector.tsx
-@@ -434,7 +434,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
+@@ -127,6 +127,18 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
+     useEffect(() => {
+       if (!isOpen) return;
+ 
++      const handleEscape = (e: KeyboardEvent) => {
++        if (e.key !== 'Escape') return;
++        // The canvas may still own keyboard focus, especially in WebKit.
++        // Dismiss this popover before the drawer's window-level Escape handler.
++        e.preventDefault();
++        e.stopPropagation();
++        setIsOpen(false);
++        setSearchQuery('');
++        triggerRef.current?.focus();
++      };
++      window.addEventListener('keydown', handleEscape, true);
++
+       const handleClickOutside = (e: MouseEvent) => {
+         const target = e.target as HTMLElement;
+         if (
+@@ -147,6 +159,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
+       return () => {
+         clearTimeout(timer);
+         document.removeEventListener('mousedown', handleClickOutside);
++        window.removeEventListener('keydown', handleEscape, true);
+       };
+     }, [isOpen]);
+ 
+@@ -265,6 +278,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
+       left: 0,
+       width: 0,
+       bottom: 0,
++      containerHeight: 0,
+       placement: 'bottom' as 'top' | 'bottom',
+       maxHeight: 480,
+     });
+@@ -277,35 +291,49 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
+       const updatePosition = () => {
+         if (!triggerRef.current) return;
+         const rect = triggerRef.current.getBoundingClientRect();
+-        const windowHeight = window.innerHeight;
+-        const spaceBelow = windowHeight - rect.bottom;
+-        const spaceAbove = rect.top;
++        // contain: layout paint makes the embedded root the fixed containing block.
++        // Keep both the anchor and bounds in that coordinate system.
++        const root = document.getElementById('creative-portals')?.closest('.creative-root');
++        const bounds = root?.getBoundingClientRect();
++        const height = bounds?.height ?? window.innerHeight;
++        const availableWidth = bounds?.width ?? window.innerWidth;
++        const top = rect.top - (bounds?.top ?? 0);
++        const bottom = rect.bottom - (bounds?.top ?? 0);
++        const width = Math.min(variant === 'form' ? Math.max(360, rect.width) : 440, Math.max(0, availableWidth - 24));
++        const spaceBelow = height - bottom;
++        const spaceAbove = top;
+         const placement =
+           spaceBelow < 400 && spaceAbove > spaceBelow ? 'top' : 'bottom';
+         const availableHeight =
+           placement === 'top'
+             ? spaceAbove - 16
+-            : windowHeight - rect.bottom - 16;
++            : spaceBelow - 16;
+ 
+         setPortalPosition({
+-          top: rect.top,
+-          left: rect.left,
+-          width: rect.width,
+-          bottom: rect.bottom,
++          top,
++          left: Math.max(12, Math.min(rect.left - (bounds?.left ?? 0), availableWidth - width - 12)),
++          width,
++          bottom,
++          containerHeight: height,
+           placement,
+-          maxHeight: Math.min(Math.max(availableHeight, 200), 600),
++          maxHeight: Math.min(Math.max(availableHeight, 0), 600),
+         });
+       };
+ 
+       updatePosition();
+       window.addEventListener('resize', updatePosition);
+       window.addEventListener('scroll', updatePosition, true);
++      const observer = new ResizeObserver(updatePosition);
++      if (triggerRef.current) observer.observe(triggerRef.current);
++      const root = document.querySelector('.creative-root');
++      if (root) observer.observe(root);
+ 
+       return () => {
+         window.removeEventListener('resize', updatePosition);
+         window.removeEventListener('scroll', updatePosition, true);
++        observer.disconnect();
+       };
+-    }, [isOpen]);
++    }, [isOpen, variant]);
+ 
+     const renderMenu = () => {
+       if (!isOpen) return null;
+@@ -324,10 +352,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
+                 : 'auto',
+             bottom:
+               portalPosition.placement === 'top'
+-                ? window.innerHeight - portalPosition.top + 8
++                ? portalPosition.containerHeight - portalPosition.top + 8
+                 : 'auto',
+-            minWidth: 360,
+-            width: variant === 'form' ? portalPosition.width : 'auto',
++            minWidth: 0,
++            width: portalPosition.width,
+             maxHeight: portalPosition.maxHeight,
+             visibility: portalPosition.width === 0 ? 'hidden' : 'visible',
+             transformOrigin:
+@@ -434,7 +462,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
          </div>
        );
  
@@ -1649,7 +1770,7 @@ index f032b56..8e3d418 100644
      };
  
      return (
-@@ -460,7 +460,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
+@@ -460,7 +488,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
                className="model-selector__trigger-health"
              />
              <span className="model-selector__trigger-text">
@@ -1658,6 +1779,37 @@ index f032b56..8e3d418 100644
              </span>
            </div>
            <ChevronDownIcon
+diff --git a/packages/drawnix/src/components/chat-drawer/chat-drawer.scss b/packages/drawnix/src/components/chat-drawer/chat-drawer.scss
+index 74d1145..09d3c89 100644
+--- a/packages/drawnix/src/components/chat-drawer/chat-drawer.scss
++++ b/packages/drawnix/src/components/chat-drawer/chat-drawer.scss
+@@ -1804,6 +1804,7 @@ $drawer-input-max-height: 280px;
+ 
+   // Search section
+   &__search {
++    flex-shrink: 0;
+     padding: 12px 12px 8px;
+     background: #ffffff;
+ 
+@@ -2070,3 +2071,18 @@ $drawer-input-max-height: 280px;
+     transform: translateY(0);
+   }
+ }
++
++// Keep both columns scrollable inside the available embedded viewport height.
++.model-selector__dropdown .vendor-tab-panel {
++  min-height: 0;
++  overflow: hidden;
++}
++.model-selector__dropdown .model-selector__list {
++  max-height: none;
++  overflow: visible;
++}
++@media (max-width: 480px) {
++  .model-selector__dropdown .vendor-tab-panel--compact .vendor-tab-panel__tabs {
++    width: 106px;
++  }
++}
 diff --git a/packages/drawnix/src/components/comic-creator/ComicCreator.scss b/packages/drawnix/src/components/comic-creator/ComicCreator.scss
 index e05911f..fc36ccf 100644
 --- a/packages/drawnix/src/components/comic-creator/ComicCreator.scss
@@ -6098,10 +6250,10 @@ index ecd1fb1..c9c74c6 100644
            result.openedCount > 1
 diff --git a/packages/drawnix/src/components/text-chat/TextChatWorkspace.tsx b/packages/drawnix/src/components/text-chat/TextChatWorkspace.tsx
 new file mode 100644
-index 0000000..fa37e42
+index 0000000..c779df9
 --- /dev/null
 +++ b/packages/drawnix/src/components/text-chat/TextChatWorkspace.tsx
-@@ -0,0 +1,813 @@
+@@ -0,0 +1,924 @@
 +import React, {
 +  memo,
 +  useCallback,
@@ -6116,11 +6268,11 @@ index 0000000..fa37e42
 +  Check,
 +  ChevronDown,
 +  Copy,
-+  History,
 +  ListChecks,
 +  Loader2,
 +  MessageCircle,
 +  PanelLeftClose,
++  PanelLeftOpen,
 +  PencilLine,
 +  Plus,
 +  Rabbit,
@@ -6297,7 +6449,29 @@ index 0000000..fa37e42
 +  const [defaultModel, setDefaultModel] = useState<ModelRef | null>(null);
 +  const [emptyState, setEmptyState] = useState(newTextState);
 +  const [search, setSearch] = useState("");
-+  const [historyOpen, setHistoryOpen] = useState(false);
++  const [wide, setWide] = useState(
++    () => window.matchMedia("(min-width: 761px)").matches,
++  );
++  const inlineHistory = focused && wide;
++  const [historyOpen, setHistoryOpen] = useState(
++    () => focused && window.matchMedia("(min-width: 761px)").matches,
++  );
++  const historyToggleRef = useRef<HTMLButtonElement>(null);
++  const historySearchRef = useRef<HTMLInputElement>(null);
++  useEffect(() => {
++    const media = window.matchMedia("(min-width: 761px)");
++    const resize = () => setWide(media.matches);
++    media.addEventListener("change", resize);
++    return () => media.removeEventListener("change", resize);
++  }, []);
++  useEffect(() => setHistoryOpen(inlineHistory), [inlineHistory]);
++  useEffect(() => {
++    if (historyOpen && !inlineHistory) historySearchRef.current?.focus();
++  }, [historyOpen, inlineHistory]);
++  const closeHistory = () => {
++    setHistoryOpen(false);
++    historyToggleRef.current?.focus();
++  };
 +  const [settingsOpen, setSettingsOpen] = useState(false);
 +  const [deleteId, setDeleteId] = useState<string | null>(null);
 +  const [rename, setRename] = useState<string | null>(null);
@@ -6342,6 +6516,28 @@ index 0000000..fa37e42
 +        .sort((a, b) => b.updatedAt - a.updatedAt),
 +    [snapshot.sessions, search],
 +  );
++  const sessionGroups = useMemo(() => {
++    const today = new Date();
++    today.setHours(0, 0, 0, 0);
++    const yesterday = new Date(today);
++    yesterday.setDate(yesterday.getDate() - 1);
++    const week = new Date(today);
++    week.setDate(week.getDate() - 7);
++    const groups = new Map<string, typeof sessions>();
++    for (const item of sessions) {
++      const label =
++        item.updatedAt >= +today
++          ? "今天"
++          : item.updatedAt >= +yesterday
++            ? "昨天"
++            : item.updatedAt >= +week
++              ? "近 7 天"
++              : "更早";
++      if (!groups.has(label)) groups.set(label, []);
++      groups.get(label)!.push(item);
++    }
++    return [...groups];
++  }, [sessions]);
 +  useEffect(() => {
 +    void runtime.initialize();
 +    let mounted = true;
@@ -6366,16 +6562,19 @@ index 0000000..fa37e42
 +      void runtime.flush().catch(() => {});
 +    };
 +  }, []);
-+  const select = useCallback((id: string | null) => {
-+    setActiveId(id);
-+    chatStorageService.setDrawerState({ textActiveSessionId: id });
-+    setHistoryOpen(false);
-+    setQuote("");
-+    setRename(null);
-+    setNotice("");
-+    followRef.current = true;
-+    setAtBottom(true);
-+  }, []);
++  const select = useCallback(
++    (id: string | null) => {
++      setActiveId(id);
++      chatStorageService.setDrawerState({ textActiveSessionId: id });
++      if (!inlineHistory) setHistoryOpen(false);
++      setQuote("");
++      setRename(null);
++      setNotice("");
++      followRef.current = true;
++      setAtBottom(true);
++    },
++    [inlineHistory],
++  );
 +  useEffect(() => {
 +    if (snapshot.ready && activeId && !session && !snapshot.error) select(null);
 +  }, [snapshot.ready, activeId, session, snapshot.error, select]);
@@ -6531,11 +6730,40 @@ index 0000000..fa37e42
 +    <div
 +      className={`text-chat-workspace ${focused ? "is-focused" : ""}`}
 +      data-testid="text-chat-workspace"
++      onKeyDown={(e) => {
++        if (e.key === "Escape" && historyOpen && !inlineHistory) {
++          e.stopPropagation();
++          closeHistory();
++        }
++      }}
 +    >
++      {historyOpen && !inlineHistory && (
++        <button
++          type="button"
++          className="text-chat-history-backdrop"
++          aria-label="关闭会话侧栏"
++          onClick={closeHistory}
++        />
++      )}
 +      <aside
-+        className={`text-chat-history ${historyOpen ? "is-open" : ""}`}
++        id="text-chat-history"
++        hidden={!historyOpen}
++        className={`text-chat-history ${!inlineHistory ? "is-overlay" : ""}`}
 +        aria-label="文本历史会话"
 +      >
++        <div className="text-chat-history-heading">
++          <strong>
++            会话 <span>{snapshot.sessions.length}</span>
++          </strong>
++          <button
++            type="button"
++            aria-label="收起会话侧栏"
++            title="收起会话侧栏"
++            onClick={closeHistory}
++          >
++            <PanelLeftClose />
++          </button>
++        </div>
 +        <button
 +          type="button"
 +          className="text-chat-new"
@@ -6548,6 +6776,7 @@ index 0000000..fa37e42
 +        <label className="text-chat-search">
 +          <Search />
 +          <input
++            ref={historySearchRef}
 +            value={search}
 +            onChange={(e) => setSearch(e.target.value)}
 +            placeholder="搜索对话"
@@ -6555,33 +6784,64 @@ index 0000000..fa37e42
 +          />
 +        </label>
 +        <div className="text-chat-session-list">
-+          {sessions.map((s) => (
-+            <div
-+              key={s.id}
-+              className={`text-chat-session ${s.id === activeId ? "is-active" : ""}`}
-+            >
-+              <button
-+                type="button"
-+                onClick={() => select(s.id)}
-+                title={s.title}
-+              >
-+                {snapshot.running.has(s.id) ? (
-+                  <Loader2 className="text-chat-spin" />
-+                ) : (
-+                  <MessageCircle />
-+                )}
-+                <span>{s.title}</span>
-+              </button>
-+              <button
-+                type="button"
-+                className="text-chat-delete"
-+                aria-label={`删除 ${s.title}`}
-+                onClick={() => setDeleteId(s.id)}
-+                disabled={snapshot.running.has(s.id)}
-+              >
-+                <Trash2 />
-+              </button>
-+            </div>
++          {sessionGroups.map(([label, items]) => (
++            <section key={label} className="text-chat-session-group">
++              <h3>{label}</h3>
++              {items.map((s) => (
++                <div
++                  key={s.id}
++                  className={`text-chat-session ${s.id === activeId ? "is-active" : ""}`}
++                >
++                  <button
++                    type="button"
++                    onClick={() => select(s.id)}
++                    title={s.title}
++                    aria-label={s.title}
++                    aria-current={s.id === activeId ? "true" : undefined}
++                  >
++                    {snapshot.running.has(s.id) ? (
++                      <Loader2 className="text-chat-spin" />
++                    ) : (
++                      <MessageCircle />
++                    )}
++                    <span className="text-chat-session-copy">
++                      <span>{s.title}</span>
++                      <small>
++                        {snapshot.running.has(s.id)
++                          ? "正在回复…"
++                          : s.textChat?.draft
++                            ? `草稿 · ${s.textChat.draft.slice(0, 100)}`
++                            : s.textChat?.messages
++                                .at(-1)
++                                ?.content.slice(0, 100) || "开始新的对话"}
++                      </small>
++                    </span>
++                  </button>
++                  <div className="text-chat-session-actions">
++                    <button
++                      type="button"
++                      aria-label={`重命名 ${s.title}`}
++                      title="重命名"
++                      onClick={() => {
++                        select(s.id);
++                        setRename(s.title);
++                      }}
++                    >
++                      <PencilLine />
++                    </button>
++                    <button
++                      type="button"
++                      className="text-chat-delete"
++                      aria-label={`删除 ${s.title}`}
++                      onClick={() => setDeleteId(s.id)}
++                      disabled={snapshot.running.has(s.id)}
++                    >
++                      <Trash2 />
++                    </button>
++                  </div>
++                </div>
++              ))}
++            </section>
 +          ))}
 +          {!sessions.length && (
 +            <p className="text-chat-muted">
@@ -6594,12 +6854,15 @@ index 0000000..fa37e42
 +      <section className="text-chat-main">
 +        <header className="text-chat-header">
 +          <button
++            ref={historyToggleRef}
 +            type="button"
 +            aria-label="文本会话列表"
++            title={historyOpen ? "收起会话侧栏" : "展开会话侧栏"}
 +            aria-expanded={historyOpen}
++            aria-controls="text-chat-history"
 +            onClick={() => setHistoryOpen((v) => !v)}
 +          >
-+            <History />
++            {historyOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
 +          </button>
 +          <ModelSelector
 +            value={model?.modelId || undefined}
@@ -7101,10 +7364,10 @@ index 0000000..f5fa252
 +});
 diff --git a/packages/drawnix/src/components/text-chat/text-chat.scss b/packages/drawnix/src/components/text-chat/text-chat.scss
 new file mode 100644
-index 0000000..01ec2f0
+index 0000000..e1270e3
 --- /dev/null
 +++ b/packages/drawnix/src/components/text-chat/text-chat.scss
-@@ -0,0 +1,649 @@
+@@ -0,0 +1,742 @@
 +.chat-drawer--text {
 +  background: #fffefa;
 +  color: #292d29;
@@ -7232,27 +7495,55 @@ index 0000000..01ec2f0
 +  }
 +}
 +.text-chat-history {
-+  display: none;
-+  width: 186px;
++  display: flex;
++  width: 244px;
++  max-width: calc(100% - 48px);
 +  flex-shrink: 0;
 +  background: var(--tc-panel);
-+  padding: 17px 10px;
++  padding: 14px 12px 8px;
 +  border-right: 1px solid var(--tc-line);
 +  flex-direction: column;
-+  gap: 15px;
++  gap: 12px;
 +  min-height: 0;
++  &[hidden] {
++    display: none;
++  }
++  &.is-overlay {
++    position: absolute;
++    inset: 0 auto 0 0;
++    z-index: 4;
++    box-shadow: 8px 0 24px #0001;
++  }
 +}
-+.is-focused > .text-chat-history {
-+  display: flex;
-+}
-+.text-chat-history.is-open {
-+  display: flex;
++.text-chat-workspace .text-chat-history-backdrop {
 +  position: absolute;
-+  top: 0;
-+  left: 0;
-+  bottom: 0;
-+  z-index: 4;
-+  box-shadow: 8px 0 24px #0001;
++  inset: 0;
++  z-index: 3;
++  border-radius: 0;
++  background: #1a241824;
++  cursor: default;
++  &:hover {
++    background: #1a241824;
++  }
++}
++.text-chat-history-heading {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  padding-left: 6px;
++  strong {
++    font-size: 13px;
++    font-weight: 600;
++  }
++  strong span {
++    color: var(--tc-soft);
++    font-size: 11px;
++    font-weight: 400;
++    margin-left: 5px;
++  }
++  button {
++    color: var(--tc-soft);
++  }
 +}
 +.text-chat-new {
 +  border: 1px solid var(--tc-line) !important;
@@ -7265,43 +7556,114 @@ index 0000000..01ec2f0
 +  gap: 8px;
 +  align-items: center;
 +  color: var(--tc-soft);
-+  padding: 7px 4px;
-+  border-bottom: 1px solid var(--tc-line);
++  padding: 7px 9px;
++  border: 1px solid var(--tc-line);
++  border-radius: 8px;
++  background: var(--tc-surface);
 +  input {
 +    width: 100%;
++    font-size: 12px;
++  }
++  svg {
++    width: 14px;
 +  }
 +}
 +.text-chat-session-list {
 +  min-height: 0;
 +  overflow: auto;
 +  flex: 1;
++  scrollbar-width: thin;
++}
++.text-chat-session-group {
++  margin-bottom: 14px;
++  h3 {
++    margin: 0 0 5px;
++    padding: 0 8px;
++    font-size: 10px;
++    font-weight: 500;
++    color: var(--tc-soft);
++  }
 +}
 +.text-chat-session {
++  position: relative;
 +  display: flex;
-+  border-radius: 8px;
-+  margin-bottom: 3px;
-+  &.is-active {
++  border: 1px solid transparent;
++  border-radius: 10px;
++  margin-bottom: 4px;
++  &:hover {
 +    background: var(--tc-selected);
 +  }
++  &.is-active {
++    background: var(--tc-selected);
++    border-color: var(--tc-line);
++  }
 +  > button:first-child {
++    width: 100%;
 +    min-width: 0;
-+    flex: 1;
 +    justify-content: flex-start;
 +    text-align: left;
 +    padding: 9px 8px;
 +    font-size: 12px;
-+    span {
++    gap: 8px;
++    > svg {
++      align-self: flex-start;
++      margin-top: 3px;
++      width: 14px;
++      color: var(--tc-soft);
++    }
++  }
++  .text-chat-session-copy {
++    display: flex;
++    flex-direction: column;
++    min-width: 0;
++    flex: 1;
++    gap: 2px;
++    > span,
++    small {
++      display: block;
 +      overflow: hidden;
 +      text-overflow: ellipsis;
 +      white-space: nowrap;
 +    }
-+  }
-+  .text-chat-delete {
-+    padding: 3px;
-+    width: 24px;
-+    svg {
-+      width: 13px;
++    > span {
++      font-weight: 500;
 +    }
++    small {
++      font-size: 10px;
++      color: var(--tc-soft);
++      padding-right: 49px;
++    }
++  }
++  .text-chat-session-actions {
++    display: flex;
++    position: absolute;
++    right: 5px;
++    bottom: 5px;
++    opacity: 0;
++    background: var(--tc-selected);
++    border-radius: 5px;
++    button {
++      padding: 3px;
++      min-height: 24px;
++      width: 24px;
++      border-radius: 5px;
++    }
++    svg {
++      width: 12px;
++      height: 12px;
++    }
++    .text-chat-delete:hover {
++      color: #b14438;
++    }
++  }
++  &:hover .text-chat-session-actions,
++  &:focus-within .text-chat-session-actions {
++    opacity: 1;
++  }
++}
++@media (hover: none) {
++  .text-chat-session .text-chat-session-actions {
++    opacity: 1;
 +  }
 +}
 +.text-chat-history-footer,
@@ -7695,12 +8057,6 @@ index 0000000..01ec2f0
 +  }
 +}
 +@media (max-width: 760px) {
-+  .is-focused > .text-chat-history {
-+    display: none;
-+  }
-+  .is-focused > .text-chat-history.is-open {
-+    display: flex;
-+  }
 +  .text-chat-messages {
 +    padding: 16px 18px 25px;
 +  }

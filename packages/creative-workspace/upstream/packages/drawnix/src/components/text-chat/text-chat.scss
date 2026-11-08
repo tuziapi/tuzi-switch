@@ -125,27 +125,55 @@
   }
 }
 .text-chat-history {
-  display: none;
-  width: 186px;
+  display: flex;
+  width: 244px;
+  max-width: calc(100% - 48px);
   flex-shrink: 0;
   background: var(--tc-panel);
-  padding: 17px 10px;
+  padding: 14px 12px 8px;
   border-right: 1px solid var(--tc-line);
   flex-direction: column;
-  gap: 15px;
+  gap: 12px;
   min-height: 0;
+  &[hidden] {
+    display: none;
+  }
+  &.is-overlay {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 4;
+    box-shadow: 8px 0 24px #0001;
+  }
 }
-.is-focused > .text-chat-history {
-  display: flex;
-}
-.text-chat-history.is-open {
-  display: flex;
+.text-chat-workspace .text-chat-history-backdrop {
   position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  z-index: 4;
-  box-shadow: 8px 0 24px #0001;
+  inset: 0;
+  z-index: 3;
+  border-radius: 0;
+  background: #1a241824;
+  cursor: default;
+  &:hover {
+    background: #1a241824;
+  }
+}
+.text-chat-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 6px;
+  strong {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  strong span {
+    color: var(--tc-soft);
+    font-size: 11px;
+    font-weight: 400;
+    margin-left: 5px;
+  }
+  button {
+    color: var(--tc-soft);
+  }
 }
 .text-chat-new {
   border: 1px solid var(--tc-line) !important;
@@ -158,43 +186,114 @@
   gap: 8px;
   align-items: center;
   color: var(--tc-soft);
-  padding: 7px 4px;
-  border-bottom: 1px solid var(--tc-line);
+  padding: 7px 9px;
+  border: 1px solid var(--tc-line);
+  border-radius: 8px;
+  background: var(--tc-surface);
   input {
     width: 100%;
+    font-size: 12px;
+  }
+  svg {
+    width: 14px;
   }
 }
 .text-chat-session-list {
   min-height: 0;
   overflow: auto;
   flex: 1;
+  scrollbar-width: thin;
+}
+.text-chat-session-group {
+  margin-bottom: 14px;
+  h3 {
+    margin: 0 0 5px;
+    padding: 0 8px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--tc-soft);
+  }
 }
 .text-chat-session {
+  position: relative;
   display: flex;
-  border-radius: 8px;
-  margin-bottom: 3px;
-  &.is-active {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  &:hover {
     background: var(--tc-selected);
   }
+  &.is-active {
+    background: var(--tc-selected);
+    border-color: var(--tc-line);
+  }
   > button:first-child {
+    width: 100%;
     min-width: 0;
-    flex: 1;
     justify-content: flex-start;
     text-align: left;
     padding: 9px 8px;
     font-size: 12px;
-    span {
+    gap: 8px;
+    > svg {
+      align-self: flex-start;
+      margin-top: 3px;
+      width: 14px;
+      color: var(--tc-soft);
+    }
+  }
+  .text-chat-session-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    gap: 2px;
+    > span,
+    small {
+      display: block;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-  }
-  .text-chat-delete {
-    padding: 3px;
-    width: 24px;
-    svg {
-      width: 13px;
+    > span {
+      font-weight: 500;
     }
+    small {
+      font-size: 10px;
+      color: var(--tc-soft);
+      padding-right: 49px;
+    }
+  }
+  .text-chat-session-actions {
+    display: flex;
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    opacity: 0;
+    background: var(--tc-selected);
+    border-radius: 5px;
+    button {
+      padding: 3px;
+      min-height: 24px;
+      width: 24px;
+      border-radius: 5px;
+    }
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+    .text-chat-delete:hover {
+      color: #b14438;
+    }
+  }
+  &:hover .text-chat-session-actions,
+  &:focus-within .text-chat-session-actions {
+    opacity: 1;
+  }
+}
+@media (hover: none) {
+  .text-chat-session .text-chat-session-actions {
+    opacity: 1;
   }
 }
 .text-chat-history-footer,
@@ -588,12 +687,6 @@
   }
 }
 @media (max-width: 760px) {
-  .is-focused > .text-chat-history {
-    display: none;
-  }
-  .is-focused > .text-chat-history.is-open {
-    display: flex;
-  }
   .text-chat-messages {
     padding: 16px 18px 25px;
   }
