@@ -124,3 +124,15 @@ Business 提供商使用独立账户，不能用兔子主站账户明细替代�
 - 两种 Mac DMG 均实际只读挂载；包内版本 1.6.0，正式源码完整 SHA、正式仓库/公钥存在，测试公钥不存在。DMG 与归档可执行文件逐字节一致，codesign 完整性通过；仍为 ad-hoc，非 Apple 开发者签名或公证。
 - 安装脚本使用最终正式 DMG 摘要。真实 DMG 的 13 项隔离安装、取消、篡改拒绝、替换失败恢复与两架构验证全部通过，未触碰用户正常安装或数据；页面与版本路由 16 项、兼容入口 4 项通过。历史 1.5.7 脚本保持公网原字节与原摘要，1.5.6/1.5.5 保留。
 - 七种安装包、四份 manifest、源码归档、SHA256SUMS 和 BUILD-INFO 共 14 个附件已上传；GitHub 返回的摘要、大小与本地完全一致。不包含 `.app.tar.gz`、`.sig` 或 `latest.json`。下载页随后从真实公开 Release 生成。
+
+### 正式发布与公网验收完成
+
+- 2026-11-11 15:36:27（Asia/Shanghai），正式 `v1.6.0` 已公开并设为 latest，非预发布；标签精确指向 `21cad50c7f5b916b94bccf39c6d594724241bfb1`。14 个公开附件的服务端大小、SHA-256 再次与本地一致。没有替换已有旧版本附件。
+- 页面源码 `52b0a725654187998a7bc3080b62db58a037db96` 使用真实公开 Release 生成；部署提交 `c1e641666b9e9134df6baa9908914e911fec2f82` 正常快进同步正式与测试 main，保留两仓此前合并历史。正式 Pages run `42981107005` 成功，Pages 实际构建提交与该部署提交一致。
+- 公网 17 个文件逐字节一致，包括 HTML、JS/CSS、版本清单、来源信息、新旧安装脚本及静态资源；七种安装包直链均 HTTP 200，响应大小符合正式附件。浏览器实际切换 macOS ARM/Intel、Windows EXE/MSI、Linux DEB/RPM/AppImage，均指向正式 v1.6.0 对应文件。
+- 公网加载器实际执行 `--help` 验证默认 1.6.0、明确 1.6.0/1.5.7/1.5.6/1.5.5、环境变量指定旧版与显式参数覆盖环境变量七组路径；均通过下载脚本摘要验证并显示预期版本。兼容入口 `scripts/install_tuzi_switch.sh --help` 默认 1.6.0。没有因此安装或覆盖用户应用。
+- 公开安装包未额外全量重下载；使用四组构建 artifact 整包下载摘要、七包 manifest 校验、GitHub 发布附件摘要与公网 HEAD 共同核对，不能写成公开直链全量重下载通过。
+- 创建标签触发的正式标准流水线 run `42980729704` 因既有计费限制在 verify 执行前失败，其打包/发布步骤均 skipped；实际交付来自已成功的固定正式源码构建 run `42974374413`，不是该失败流水线。当前仍无签名自动安装，未修改客户端验签。
+- 本轮按用户确认范围完成正式仓库、公开 Pages、安装脚本对齐；主站 API 下载弹窗未修改。正常 `/Applications/兔子助手.app` 仍为此前已验收的测试渠道 1.6.0，本次未替换本机应用。音频、Codex 真实推理、跨平台实机等原验收限制继续保留，发布完成不代表全部功能无缺陷。
+
+证据目录：`~/Documents/tuzi-switch-artifacts/official-release-1.6.0-2026-11-11`；包括 `verification.json`、`installer-tests.log`、`draft-upload-verified.json`、`published-release-verified.json`、`download-build.log`、`public-verification.json` 与对应正式安装包。公开入口为 `https://tuziapi.github.io/tuzi-switch/`，正式 Release 为 `https://github.com/tuziapi/tuzi-switch/releases/tag/v1.6.0`。
