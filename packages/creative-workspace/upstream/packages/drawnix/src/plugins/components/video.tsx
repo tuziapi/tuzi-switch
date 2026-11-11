@@ -61,6 +61,8 @@ const VideoPlayer: React.FC<VideoProps & {
   const [videoError, setVideoError] = useState(false);
   const [isLoading, setIsLoading] = useState(Boolean(url));
   const [playbackUrl, setPlaybackUrl] = useState(url);
+  const [playing, setPlaying] = useState(false);
+  const [playFailed, setPlayFailed] = useState(false);
 
   useEffect(() => {
     if (videoRef.current && !videoRef.current.getAttribute('src')) videoRef.current.src = url;
@@ -157,7 +159,8 @@ const VideoPlayer: React.FC<VideoProps & {
           style={{ position: 'absolute', inset: 0, cursor: 'move', touchAction: 'none' }} />}
         <button type="button" aria-label="播放视频" data-slideshow-media-control="true"
           onPointerDown={event => event.stopPropagation()}
-          onClick={() => {
+          onClick={(event) => {
+            event.stopPropagation();
             if (readonly) window.open(url, '_blank');
             else { playOnLoad.current = true; props.onActivated(true); setActivated(true); }
           }}
@@ -269,12 +272,36 @@ const VideoPlayer: React.FC<VideoProps & {
           }
         }}
         onLoadedMetadata={() => setIsLoading(false)}
-        onPlay={() => props.onPlaybackChange(true)}
-        onPause={() => props.onPlaybackChange(false)}
-        onEnded={() => props.onPlaybackChange(false)}
+        onPlay={() => { setPlaying(true); setPlayFailed(false); props.onPlaybackChange(true); }}
+        onPause={() => { setPlaying(false); props.onPlaybackChange(false); }}
+        onEnded={() => { setPlaying(false); props.onPlaybackChange(false); }}
         onError={handleVideoError}
       />
       {dragSurface}
+      {!readonly && !playing && (
+        <button type="button" aria-label={playFailed ? '重试播放视频' : '播放视频'}
+          data-slideshow-media-control="true"
+          onPointerDown={event => event.stopPropagation()}
+          onPointerUp={event => event.stopPropagation()}
+          onDoubleClick={event => event.stopPropagation()}
+          onClick={event => {
+            event.stopPropagation();
+            playOnLoad.current = true;
+            props.onActivated(true);
+            setPlayFailed(false);
+            const attempt = loadAttemptRef.current;
+            void videoRef.current?.play().then(() => {
+              if (attempt === loadAttemptRef.current) playOnLoad.current = false;
+            }).catch(() => {
+              if (attempt === loadAttemptRef.current) setPlayFailed(true);
+            });
+          }}
+          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            zIndex: 3, width: 52, height: 52, borderRadius: '50%', border: 0,
+            background: 'rgba(0,0,0,.65)', display: 'grid', placeItems: 'center', color: '#fff', cursor: 'pointer' }}>
+          <Play size={27} aria-hidden="true" />
+        </button>
+      )}
       {readonly && (
         <div style={{
           position: 'absolute',
