@@ -119,6 +119,11 @@ mockWindows("main");
 mockIPC(
   async (command, args) => {
     if (command.startsWith("creative_codex_")) return localCodexPreviewIPC(command, args);
+    if (command === "creative_save_media") {
+      const state = window as unknown as { __creativeMediaFixture?: { sizes: number[] } };
+      (state.__creativeMediaFixture ??= { sizes: [] }).sizes.push((args as ArrayBuffer).byteLength);
+      return "saved";
+    }
     if (command === "creative_image_action" || command === "copy_text_to_clipboard") {
       const state = window as unknown as { __creativeImageFixture?: {
         calls: unknown[]; next?: string; error?: string;

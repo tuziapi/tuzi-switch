@@ -2024,6 +2024,7 @@ export const PopupToolbar = () => {
                     if (
                       PlaitDrawElement.isDrawElement(element) &&
                       PlaitDrawElement.isImage(element) &&
+                      !isVideoElement(element) &&
                       element.url
                     ) {
                       downloadItems.push({ url: element.url, type: 'image' });
@@ -2091,7 +2092,7 @@ export const PopupToolbar = () => {
                       Boolean((window as any).__TUZI_CREATIVE_NATIVE__);
 
                     for (const item of downloadItems) {
-                      if (isDesktopDownload || (item.type === 'image' && getAssistantAccount()?.imageAction)) {
+                      if (isDesktopDownload || getAssistantAccount()?.saveMedia || (item.type === 'image' && getAssistantAccount()?.imageAction)) {
                         processedItems.push(item);
                         continue;
                       }

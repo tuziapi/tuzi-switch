@@ -40,6 +40,12 @@ export interface CreativeAccountBridge {
     name?: string,
   ) => Promise<"copied" | "saved" | "revealed" | "cancelled">;
   copyText?: (text: string) => Promise<void>;
+  /** Save original media through a native dialog; no caller-controlled path. */
+  saveMedia?: (
+    blob: Blob,
+    name: string,
+    kind: "video" | "audio" | "archive",
+  ) => Promise<"saved" | "cancelled">;
   listKeys: (
     page: number,
     search: string,

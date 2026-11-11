@@ -66,7 +66,7 @@ fn decode(data: &str) -> Result<(Vec<u8>, DynamicImage, &'static str), String> {
     Ok((bytes, decoded, extension))
 }
 
-fn export_name(name: Option<&str>, extension: &str) -> String {
+pub(crate) fn export_name(name: Option<&str>, extension: &str) -> String {
     let name = name.unwrap_or("opentu-image");
     let cleaned: String = name
         .chars()
@@ -103,7 +103,10 @@ fn picture_root() -> Result<PathBuf, String> {
 
 // Keep the saved extension truthful. A dialog-approved overwrite applies only to
 // the exact selected path; adding an omitted suffix must never overwrite silently.
-fn save_destination(mut path: PathBuf, extension: &str) -> Result<(PathBuf, bool), String> {
+pub(crate) fn save_destination(
+    mut path: PathBuf,
+    extension: &str,
+) -> Result<(PathBuf, bool), String> {
     match path.extension().and_then(|s| s.to_str()) {
         None => {
             path.set_extension(extension);
@@ -119,7 +122,7 @@ fn save_destination(mut path: PathBuf, extension: &str) -> Result<(PathBuf, bool
     }
 }
 
-fn write_atomic(path: &Path, bytes: &[u8], replace: bool) -> Result<(), String> {
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8], replace: bool) -> Result<(), String> {
     let parent = path.parent().ok_or("保存位置无效")?;
     if std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
         return Err("目标是链接文件，请选择普通文件位置".into());

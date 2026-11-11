@@ -147,6 +147,11 @@ assert(await detailPanel.evaluate(el=>!!el.closest('.creative-root')));
 assert(await detailPanel.evaluate(el=>parseFloat(getComputedStyle(el).paddingTop)>=12&&getComputedStyle(el).backgroundColor!=='rgba(0, 0, 0, 0)'));
 await p.getByRole('button',{name:'关闭视频详情',exact:true}).click();
 checks.push('video details retain creative styles inside the desktop portal');
+await p.getByRole('button',{name:'下载',exact:true}).click();
+await until(async()=>p.evaluate(()=>window.__creativeMediaFixture?.sizes.length===1),'video uses native media export');
+assert.equal(await p.evaluate(()=>window.__creativeMediaFixture.sizes[0]),fs.statSync(require('node:path').join(__dirname,'fixtures/synthetic-video.mp4')).size);
+assert.equal(await p.evaluate(()=>window.__creativeImageFixture?.calls?.filter(c=>c.command==='creative_image_action').length||0),0);
+checks.push('canvas download exports original MP4 bytes through native media capability instead of image decoder');
 await shot('video-dragged');
 
 await p.mouse.click(1100,260);
