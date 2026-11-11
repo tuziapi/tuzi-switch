@@ -59,6 +59,29 @@ async fn run_windows_shell(
         .map_err(|_| "系统浏览器任务中断".to_string())?
 }
 
+#[cfg(target_os = "windows")]
+async fn open_windows_url(url: String) -> Result<(), String> {
+    run_windows_shell(move || {
+        use windows_sys::Win32::UI::Shell::{
+            ShellExecuteExW, SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
+        };
+        use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        let url: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+        info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+        // This thread has no message loop and ends after the launch. Ask the
+        // shell to finish activation before returning; report errors in our UI.
+        info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+        info.lpFile = url.as_ptr();
+        info.nShow = SW_SHOWNORMAL;
+        if unsafe { ShellExecuteExW(&mut info) } == 0 {
+            return Err(format!("打开链接失败: {}", std::io::Error::last_os_error()));
+        }
+        Ok(())
+    })
+    .await
+}
+
 /// 打开外部链接
 #[tauri::command]
 pub async fn open_external(app: AppHandle, url: String) -> Result<bool, String> {
@@ -69,12 +92,10 @@ pub async fn open_external(app: AppHandle, url: String) -> Result<bool, String> 
     };
 
     #[cfg(target_os = "windows")]
-    run_windows_shell(move || {
-        app.opener()
-            .open_url(&url, None::<String>)
-            .map_err(|e| format!("打开链接失败: {e}"))
-    })
-    .await?;
+    {
+        let _ = app;
+        open_windows_url(url).await?;
+    }
 
     #[cfg(not(target_os = "windows"))]
     app.opener()
@@ -115,10 +136,7 @@ mod external_browser_tests {
         let url = "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.6.0";
         let original = tauri_plugin_opener::open_url(url, None::<String>);
         println!("Original worker-thread browser activation: {original:?}");
-        let fixed = super::run_windows_shell(move || {
-            tauri_plugin_opener::open_url(url, None::<String>).map_err(|error| error.to_string())
-        })
-        .await;
+        let fixed = super::open_windows_url(url.to_string()).await;
         println!("Initialized STA browser activation: {fixed:?}");
         fixed.unwrap();
     }

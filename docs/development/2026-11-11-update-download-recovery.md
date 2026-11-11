@@ -1,4 +1,4 @@
-# UPDATE-DOWNLOAD-01：Windows 手动更新入口恢复
+# UPDATE-DOWNLOAD-01：跨平台手动更新入口恢复
 
 用户报告 1.5.7 检测到 1.6.0 后，Windows 点击“下载安装包”立即出现通用错误。本轮继续已授权的更新交付，修复入口、验证 Windows 原生行为并构建 1.6.1；不操作主站 API、不调用付费模型、不修改用户默认浏览器/账户数据。
 
@@ -6,7 +6,8 @@
 
 - 旧代码点击时再次查询 GitHub `/releases/latest`，网络失败、版本变化和原生打开失败均被 Context 吞成同一个 toast。已有测试只模拟成功打开，未验证失败后的恢复入口。
 - 已用测试复现二次查询失败导致已校验下载无法打开；这证明一个确定的代码缺陷，不证明用户这次 Windows 错误的唯一原因。当前旧版未显示原始系统错误，截图无法区分网络和浏览器调用失败。
-- Windows opener 依赖 `open` 的 ShellExecuteExW 分支。旧 async command 在未保证 COM 初始化的工作线程直接调用；现在改为短生命周期 STA 线程，避免影响共享运行时/UI，不绕过系统浏览器设置。仍须 Windows 原生测试，不能用 Mac 编译冒充。
+- Windows opener 依赖 `open` 的 ShellExecuteExW 分支。旧 async command 在未保证 COM 初始化的工作线程直接调用；现在改为短生命周期 STA 线程，避免影响共享运行时/UI，不绕过系统浏览器设置。同时直接调用系统 ShellExecuteExW，设置 SEE_MASK_NOASYNC，遵守无消息循环、短生命周期线程的启动要求；SEE_MASK_FLAG_NO_UI 避免系统错误弹窗与应用内恢复提示重复。仍须 Windows 原生测试，不能用 Mac 编译冒充。
+- 底层依据：Microsoft SHELLEXECUTEINFOW 文档关于无消息循环/即将退出线程的说明，以及 open 5.3.3 Windows 实现（URL 路径不初始化 COM，fMask 为默认值）。NOASYNC 对 URI 有平台限制，不把它宣称为所有浏览器启动问题的保证。首轮构建 42993155544 在发布前主动取消，补齐此项后重新锁定源码构建。
 
 ## 实现
 
