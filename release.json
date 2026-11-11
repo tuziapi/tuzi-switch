@@ -3,9 +3,9 @@
   "repository": "tuziapi/tuzi-switch",
   "channel": "stable",
   "success": true,
-  "tag": "v1.5.7",
-  "sourceUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.5.7",
-  "publishedAt": "2026-11-06T06:14:36Z",
+  "tag": "v1.6.0",
+  "sourceUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.6.0",
+  "publishedAt": "2026-11-11T07:36:27Z",
   "command": "",
   "stale": false,
   "downloads": [
@@ -14,68 +14,68 @@
       "title": "macOS",
       "subtitle": "Apple Silicon · ARM64",
       "format": "DMG",
-      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-macos-arm64.dmg",
-      "bytes": 24710081,
-      "sha256": "971cd34ca4dcd5da2cf32167db40785792c36fa3960b8e28c96ba4065292b4b0"
+      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.0/tuzi-assistant-macos-arm64.dmg",
+      "bytes": 26747375,
+      "sha256": "0498106e784096f4ee77d38f0b15fb36b28a5931efc0016c93cdb96050f1ff97"
     },
     {
       "id": "macos-intel",
       "title": "macOS",
       "subtitle": "Intel · x86_64",
       "format": "DMG",
-      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-macos-x64.dmg",
-      "bytes": 25334431,
-      "sha256": "25bc94ec4a466149f9c10dad2a0d6e9b42b2b20b9cb17fb3e1f0dfca48ecb5d2"
+      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.0/tuzi-assistant-macos-x64.dmg",
+      "bytes": 27786660,
+      "sha256": "5ed7e04d87b79469cd6a4c1c395550eaa853b9cc9d76adb59c53fbd4528f9389"
     },
     {
       "id": "windows",
       "title": "Windows",
       "subtitle": "Intel / AMD · x86_64",
       "format": "EXE",
-      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-windows-x64.exe",
-      "bytes": 20344632,
-      "sha256": "7571dc6c1f1b2acfe59bd264cb95f31c36499cf1c8836d72e592e9e3fd5ba838"
+      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.0/tuzi-assistant-windows-x64.exe",
+      "bytes": 22673572,
+      "sha256": "0495fe632dd23d9afb134e59d12db52fe071e23d2cfde3f716e82caa05a1dd1a"
     },
     {
       "id": "msi",
       "title": "Windows",
       "subtitle": "Intel / AMD · x86_64",
       "format": "MSI",
-      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-windows-x64.msi",
-      "bytes": 23650304,
-      "sha256": "ed988c2a6f6c4795a4752f5c3354dc6e9b277c5f02deaa174bda678aa0d89bcc"
+      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.0/tuzi-assistant-windows-x64.msi",
+      "bytes": 25993216,
+      "sha256": "2cf974ecbb3620b7b3a2d151ded64eeb81c19156bb910874a0b96bf5be5f30f6"
     },
     {
       "id": "deb",
       "title": "Linux",
       "subtitle": "Debian / Ubuntu · x86_64",
       "format": "DEB",
-      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.deb",
-      "bytes": 23743968,
-      "sha256": "962b6e5674f1aaf3a9e8ab957ab1948417b1ab99d64cdfc6d6d95ac53daea26b"
+      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.0/tuzi-assistant-linux-x64.deb",
+      "bytes": 26074618,
+      "sha256": "17ec20c8a738ef7541b2be48285be0bc0a4e691a65cf970d71f9699bcab97f75"
     },
     {
       "id": "rpm",
       "title": "Linux",
       "subtitle": "Fedora / RHEL · x86_64",
       "format": "RPM",
-      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.rpm",
-      "bytes": 23743721,
-      "sha256": "b81cf2fb5b4f6c6c5a18cfd5d7738258bd5cbe3a6084300549764c5c2f6fd990"
+      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.0/tuzi-assistant-linux-x64.rpm",
+      "bytes": 26076185,
+      "sha256": "90b7cef9ad7ad256dd6b2872c79e28bd7bb02a4817973e033a36f458f0f0deec"
     },
     {
       "id": "appimage",
       "title": "Linux",
       "subtitle": "AppImage · x86_64",
       "format": "AppImage",
-      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.AppImage",
-      "bytes": 102914552,
-      "sha256": "eaa64b49d59224e0b42824b0abc5a8365f2bf2281318c6bf419d2102152d0b63"
+      "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.0/tuzi-assistant-linux-x64.AppImage",
+      "bytes": 105261560,
+      "sha256": "8458f0ece093cb47b0550b8e80e0725401ac22cc2e54d51915fbb030f54ff0d6"
     }
   ],
   "macosInstaller": {
-    "tag": "v1.5.7",
-    "href": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.7.sh",
-    "sha256": "d961d779546e20aa088f0b8b505c1c2b617a1357007dacbb60ae2f4d839a95d8"
+    "tag": "v1.6.0",
+    "href": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.0.sh",
+    "sha256": "8b815171738be8417163a50cc85e59d59c959275ccc86779b7631e746fe625c3"
   }
 }

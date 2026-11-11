@@ -57,14 +57,14 @@
   },
   "currentDistribution": {
     "repository": "tuziapi/tuzi-switch",
-    "pageSourceCommit": "6d4c6bf5c509c11b2057c4730bf9e45ddeaeaa15",
-    "clientSourceCommit": "95896b53e16e0021bb1e4062c122c6a0668175dd",
-    "release": "v1.5.7",
+    "pageSourceCommit": "52b0a725654187998a7bc3080b62db58a037db96",
+    "clientSourceCommit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+    "release": "v1.6.0",
     "manualInstallOnly": true,
     "macosInstaller": {
-      "version": "1.5.7",
-      "path": "install-macos-v1.5.7.sh",
-      "sha256": "d961d779546e20aa088f0b8b505c1c2b617a1357007dacbb60ae2f4d839a95d8"
+      "version": "1.6.0",
+      "path": "install-macos-v1.6.0.sh",
+      "sha256": "8b815171738be8417163a50cc85e59d59c959275ccc86779b7631e746fe625c3"
     }
   }
 }
