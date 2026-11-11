@@ -44,6 +44,12 @@ function removePreference(key: string): void {
 
 interface UpdateContextValue {
   installState: InstallState;
+  manualDownloadState: {
+    phase: "idle" | "opening" | "opened" | "error";
+    error: string | null;
+  };
+  openManualDownloadPage: () => Promise<void>;
+  copyManualDownloadLink: () => Promise<void>;
   updateDialogOpen: boolean;
   openUpdateDialog: () => void;
   closeUpdateDialog: () => void;
@@ -86,21 +92,65 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const session = useRef<UpdateSession | null>(null);
   const manualDownloadInFlight = useRef(false);
+  const [manualDownloadState, setManualDownloadState] = useState<
+    UpdateContextValue["manualDownloadState"]
+  >({ phase: "idle", error: null });
   const openUpdateDialog = useCallback(() => setUpdateDialogOpen(true), []);
   const closeUpdateDialog = useCallback(() => setUpdateDialogOpen(false), []);
-  const downloadUpdate = useCallback(async () => {
-    if (!updateHandle) return;
-    if (updateHandle.manual) {
+  const runManualDownload = useCallback(
+    async (page = false) => {
+      if (!updateHandle?.manual || (page && !updateHandle.openDownloadPage))
+        return;
       if (manualDownloadInFlight.current) return;
       manualDownloadInFlight.current = true;
+      setManualDownloadState({ phase: "opening", error: null });
       try {
-        await updateHandle.downloadAndInstall();
+        if (page) {
+          if (!updateHandle.openDownloadPage) return;
+          await updateHandle.openDownloadPage();
+        } else await updateHandle.downloadAndInstall();
+        setManualDownloadState({ phase: "opened", error: null });
         toast.success(t("settings.updatePageOpened"));
-      } catch {
-        toast.error(t("settings.updateDownloadFailed"));
+      } catch (cause) {
+        setUpdateDialogOpen(true);
+        setManualDownloadState({
+          phase: "error",
+          error:
+            cause instanceof Error
+              ? cause.message
+              : "系统未能打开下载。请复制下载链接，在浏览器中粘贴打开。",
+        });
       } finally {
         manualDownloadInFlight.current = false;
       }
+    },
+    [updateHandle, t],
+  );
+  const openManualDownloadPage = useCallback(
+    () => runManualDownload(true),
+    [runManualDownload],
+  );
+  const copyManualDownloadLink = useCallback(async () => {
+    if (!updateHandle?.manual || !updateHandle.downloadUrl) return;
+    try {
+      await invoke("copy_text_to_clipboard", {
+        text: updateHandle.downloadUrl,
+      });
+      toast.success("下载链接已复制");
+    } catch {
+      setManualDownloadState({
+        phase: "error",
+        error: "无法访问剪贴板，请选中下方下载链接手动复制。",
+      });
+    }
+  }, [updateHandle]);
+  useEffect(() => {
+    setManualDownloadState({ phase: "idle", error: null });
+  }, [updateHandle]);
+  const downloadUpdate = useCallback(async () => {
+    if (!updateHandle) return;
+    if (updateHandle.manual) {
+      await runManualDownload();
       return;
     }
     setUpdateDialogOpen(true);
@@ -115,7 +165,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
         relaunchApp,
       );
     await session.current.download();
-  }, [updateHandle, t]);
+  }, [updateHandle, runManualDownload]);
   const installUpdate = useCallback(async () => {
     await session.current?.installAndRestart();
   }, []);
@@ -123,7 +173,8 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   const inFlight = useRef<Promise<boolean> | null>(null);
 
   const checkUpdate = useCallback((): Promise<boolean> => {
-    if (session.current) return Promise.resolve(true); // Keep downloaded bytes and the selected version pinned.
+    if (session.current || manualDownloadInFlight.current)
+      return Promise.resolve(true); // Keep downloaded bytes and the selected version pinned.
     if (inFlight.current) return inFlight.current;
     lastCheckAt.current = Date.now();
     const operation = (async () => {
@@ -132,7 +183,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const result = await checkForUpdate({ timeout: 30000 });
-        if (session.current) {
+        if (session.current || manualDownloadInFlight.current) {
           if (result.status === "available")
             void result.update.close?.().catch(() => {});
           return true;
@@ -282,6 +333,9 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
 
   const value: UpdateContextValue = {
     installState,
+    manualDownloadState,
+    openManualDownloadPage,
+    copyManualDownloadLink,
     updateDialogOpen,
     openUpdateDialog,
     closeUpdateDialog,
