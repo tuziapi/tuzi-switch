@@ -68,6 +68,10 @@ import './chat-drawer.scss';
 const TextChatWorkspace = React.lazy(() => import('../text-chat/TextChatWorkspace'));
 const ChatMessagesArea = React.lazy(() => import('./ChatMessagesArea'));
 
+// UC-TEXT-04: temporarily hide the legacy creative conversation. Keep its
+// workflow persistence/credential bridge for canvas generation and later work.
+const LEGACY_CREATIVE_CHAT_ENABLED = false;
+
 // 工作流消息的特殊标记前缀
 const WORKFLOW_MESSAGE_PREFIX = '[[WORKFLOW_MESSAGE]]';
 
@@ -118,7 +122,7 @@ function getToolDescription(
 // 抽屉宽度缓存 key
 const DRAWER_WIDTH_CACHE_KEY = 'chat-drawer-width';
 // 默认宽度（与 SCSS 中的 50vw 对应）
-const DEFAULT_DRAWER_WIDTH = Math.max(375, window.innerWidth * 0.5);
+const DEFAULT_DRAWER_WIDTH = Math.min(440, Math.max(375, window.innerWidth * 0.34));
 // 最小宽度
 const MIN_DRAWER_WIDTH = 375;
 const MAX_DRAFT_CONTENT_ITEMS = 8;
@@ -218,10 +222,17 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
     // Initialize state from cache synchronously to prevent flash
     const [isOpen, setIsOpen] = useState(() => {
       const cached = chatStorageService.getDrawerState();
-      return cached.isOpen ?? defaultOpen;
+      return cached.mode === 'text' ? false : cached.isOpen ?? defaultOpen;
     });
-    const [chatMode, setChatMode] = useState<'text' | 'creative'>(() => chatStorageService.getDrawerState().mode || 'text');
+    const [chatMode, setChatMode] = useState<'text' | 'creative'>(() =>
+      LEGACY_CREATIVE_CHAT_ENABLED ? chatStorageService.getDrawerState().mode || 'text' : 'text'
+    );
     const [textFocus, setTextFocus] = useState(() => chatStorageService.getDrawerState().textFocus ?? true);
+    useEffect(() => {
+      const openDiscussion = () => { setIsOpen(false); onOpenChange?.(false); };
+      window.addEventListener('aitu:open-discussion', openDiscussion);
+      return () => window.removeEventListener('aitu:open-discussion', openDiscussion);
+    }, [onOpenChange]);
     const exitTextFocus = useCallback(() => setTextFocus(false), []);
     useEffect(() => { chatStorageService.setDrawerState({ mode: chatMode, textFocus }); }, [chatMode, textFocus]);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -1124,7 +1135,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
     // 发送工作流消息
     const handleSendWorkflowMessage = useCallback(
       async (params: WorkflowMessageParams) => {
-        setChatMode('creative');
+        if (LEGACY_CREATIVE_CHAT_ENABLED) setChatMode('creative');
         const {
           context,
           workflow,
@@ -1134,7 +1145,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
           appendToSessionId,
         } = params;
         // 根据 autoOpen 参数决定是否打开抽屉
-        if (autoOpen) {
+        if (LEGACY_CREATIVE_CHAT_ENABLED && autoOpen) {
           setIsOpen(true);
           onOpenChange?.(true);
         }
@@ -1748,6 +1759,9 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
         },
         toggle: handleToggle,
         sendMessage: async (content: string) => {
+          if (!LEGACY_CREATIVE_CHAT_ENABLED) {
+            throw new Error('创作助手对话已暂时隐藏，请使用侧边文本聊天。');
+          }
           setChatMode('creative');
           // Open drawer first
           setIsOpen(true);
@@ -1961,10 +1975,11 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
             <MessagesSquare size={15} />对话
           </button>, headerEntry
         )}
-        {!(isOpen && chatMode === 'text' && textFocus) && <ChatDrawerTrigger
+        {isOpen && !(chatMode === 'text' && textFocus) && <ChatDrawerTrigger
           isOpen={isOpen}
           onClick={handleToggle}
           drawerWidth={drawerWidth}
+          maxWidth={chatMode === 'text' ? '50vw' : undefined}
         />}
 
         <div
@@ -1985,13 +2000,13 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
             <div className="text-chat-modebar">
               <div role="group" aria-label="对话模式">
                 <button type="button" aria-pressed={chatMode === 'text'} onClick={() => setChatMode('text')}><MessagesSquare size={15} />文本对话</button>
-                <button type="button" aria-pressed={chatMode === 'creative'} onClick={() => setChatMode('creative')}><WandSparkles size={15} />创作助手</button>
+                {LEGACY_CREATIVE_CHAT_ENABLED && <button type="button" aria-pressed={chatMode === 'creative'} onClick={() => setChatMode('creative')}><WandSparkles size={15} />创作助手</button>}
               </div>
               {chatMode === 'text' && <button type="button" aria-label={textFocus ? '画布并排' : '专注对话'} onClick={() => setTextFocus(v => !v)}>{textFocus ? <Columns2 size={15} /> : <Maximize2 size={15} />}{textFocus ? '画布并排' : '专注对话'}</button>}
               <button type="button" aria-label="关闭对话面板" onClick={handleClose}><CloseIcon size={16} /></button>
             </div>
             {chatMode === 'text' && shouldRenderChat && <Suspense fallback={<div className="chat-loading">加载文本对话…</div>}><TextChatWorkspace visible={isOpen} focused={textFocus} selectedText={selectedContent.filter(item => item.type === 'text').map(item => item.text || '').join('\n\n')} onExitFocus={exitTextFocus} /></Suspense>}
-            <div className="text-chat-creative-body" style={{ display: chatMode === 'creative' ? 'flex' : 'none' }}>
+            {LEGACY_CREATIVE_CHAT_ENABLED && <div className="text-chat-creative-body" style={{ display: chatMode === 'creative' ? 'flex' : 'none' }}>
 
             <div className="chat-drawer__header">
               <div className="chat-drawer__header-top">
@@ -2116,7 +2131,7 @@ export const ChatDrawer = forwardRef<ChatDrawerRef, ChatDrawerProps>(
                 placeholder="继续描述要修改的内容..."
               />
             </div>
-            </div>
+            </div>}
           </div>
         </div>
       </>

@@ -1,3 +1,4 @@
+import { TEXT_ATTACHMENT_STORE, validateAttachmentRecord } from '../text-chat/attachments';
 import { textChatRuntime } from '../text-chat/runtime';
 import { isAccountReference } from '../assistant-account';
 import localforage from 'localforage';
@@ -40,6 +41,7 @@ export interface EnvironmentBackupData {
   localForage: {
     chatSessions: LocalForageRecord[];
     chatMessages: LocalForageRecord[];
+    textAttachments?: LocalForageRecord[];
     audioPlaylists: LocalForageRecord[];
     audioPlaylistItems: LocalForageRecord[];
     characters: unknown[];
@@ -192,6 +194,7 @@ export async function exportEnvironmentData(
     localForage: {
       chatSessions: await readLocalForageRecords(CHAT_DB_NAME, 'sessions'),
       chatMessages: await readLocalForageRecords(CHAT_DB_NAME, 'messages'),
+      textAttachments: await readLocalForageRecords(CHAT_DB_NAME, TEXT_ATTACHMENT_STORE),
       audioPlaylists: await readLocalForageRecords(AUDIO_PLAYLIST_DB_NAME, 'audio_playlists'),
       audioPlaylistItems: await readLocalForageRecords(AUDIO_PLAYLIST_DB_NAME, 'audio_playlist_items'),
       characters: characterStorageService.getCharacters(),
@@ -220,6 +223,18 @@ export async function importEnvironmentData(
   const warnings: string[] = [];
   if (!isEnvironmentBackupData(data)) {
     return { imported: 0, skipped: 1, warnings: ['环境数据缺失或格式无效，已跳过'] };
+  }
+
+  if (data.localForage.textAttachments !== undefined) {
+    if (!Array.isArray(data.localForage.textAttachments))
+      throw new Error("备份附件列表无效。");
+    const ids = new Set<string>();
+    for (const record of data.localForage.textAttachments) {
+      validateAttachmentRecord(record?.value);
+      if (record.key !== record.value.ref.id || ids.has(record.key))
+        throw new Error("备份附件标识不一致或重复。");
+      ids.add(record.key);
+    }
   }
 
   if (textChatRuntime.getSnapshot().running.size) throw new Error('请先停止文本回复，再恢复会话备份。');
@@ -421,6 +436,7 @@ async function clearEnvironmentData(includeSecretConfig: boolean): Promise<void>
   await Promise.all([
     clearLocalForageStore(CHAT_DB_NAME, 'sessions'),
     clearLocalForageStore(CHAT_DB_NAME, 'messages'),
+    clearLocalForageStore(CHAT_DB_NAME, TEXT_ATTACHMENT_STORE),
     clearLocalForageStore(AUDIO_PLAYLIST_DB_NAME, 'audio_playlists'),
     clearLocalForageStore(AUDIO_PLAYLIST_DB_NAME, 'audio_playlist_items'),
     characterStorageService.clearAll(),
@@ -538,6 +554,8 @@ async function restoreChat(
     await writeLocalForageRecords(CHAT_DB_NAME, 'sessions', stores.chatSessions || [])
   ) + (
     await writeLocalForageRecords(CHAT_DB_NAME, 'messages', stores.chatMessages || [])
+  ) + (
+    await writeLocalForageRecords(CHAT_DB_NAME, TEXT_ATTACHMENT_STORE, stores.textAttachments || [])
   );
 }
 
@@ -667,6 +685,7 @@ function countEnvironmentItems(data: EnvironmentBackupData): number {
     (data.appDb?.workflows?.length || 0) +
     (data.localForage?.chatSessions?.length || 0) +
     (data.localForage?.chatMessages?.length || 0) +
+    (data.localForage?.textAttachments?.length || 0) +
     (data.localForage?.audioPlaylists?.length || 0) +
     (data.localForage?.audioPlaylistItems?.length || 0) +
     (data.localForage?.characters?.length || 0) +

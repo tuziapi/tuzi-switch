@@ -130,6 +130,11 @@ async function until(fn, label) {
     );
   }
   try {
+    await p.addInitScript(() => {
+      if (!localStorage.getItem('aitu:chat:drawer-state')) {
+        localStorage.setItem('aitu:chat:drawer-state', JSON.stringify({ mode: 'creative', isOpen: false, textFocus: true }));
+      }
+    });
     await p.goto(base);
     await p.evaluate(() => {
       window.__creativeRequestFixture.responses["GET /v1/models"] = {
@@ -452,14 +457,15 @@ async function until(fn, label) {
     await p.getByLabel("最大输出长度", { exact: true }).fill("512");
     await p.getByLabel("关闭对话设置", { exact: true }).click();
     await p.getByLabel("文本消息", { exact: true }).fill("独立草稿");
-    await p.getByRole("button", { name: "创作助手", exact: true }).click();
-    assert.equal(await p.getByTestId("text-chat-workspace").count(), 0);
-    await p.getByRole("button", { name: "文本对话", exact: true }).click();
+    assert.equal(await p.getByRole("button", { name: "创作助手", exact: true }).count(), 0);
+    assert.equal(await p.locator('.text-chat-creative-body').count(), 0);
+    await p.getByRole("button", { name: "关闭对话面板", exact: true }).click();
+    await p.getByRole("button", { name: "对话", exact: true }).click();
     assert.equal(
       await p.getByLabel("文本消息", { exact: true }).inputValue(),
       "独立草稿",
     );
-    checks.push("legacy creative mode retained, text draft restored");
+    checks.push("legacy creative conversation unmounted; side chat and draft retained");
     await p.evaluate(() =>
       document
         .querySelector(".creative-root")

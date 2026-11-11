@@ -411,14 +411,15 @@ export function buildImageGenerationAnchorViewModel(
       ? batchPreview?.progress ?? taskDisplayProgress ?? resolvedProgress
       : taskDisplayProgress ?? resolvedProgress
   );
-  const subtitle =
+  const mediaLabel = task?.type === TaskType.VIDEO ? "视频" : task?.type === TaskType.AUDIO ? "音频" : "图片";
+  const subtitle = (
     options.canvasError
       ? '图片已生成，画布加载失败，可直接重试加载已有结果'
       : failedAfterGeneration
       ? '图片已生成，加载或插入失败，可重试插入已有结果'
       : anchor.subtitle && anchor.phase === phase
       ? anchor.subtitle
-      : PHASE_SUBTITLES[phase];
+      : PHASE_SUBTITLES[phase]).replaceAll("图片", mediaLabel);
 
   const tone: ImageGenerationAnchorViewModel['tone'] =
     phase === 'failed'

@@ -31,10 +31,10 @@ export async function requestCreativeManual(
     },
     init.signal,
     (error) =>
-      new Error(
+      Object.assign(new Error(
         error === "creative_redirect_rejected"
           ? "接口发生重定向，请在配置中填写最终接口地址。"
           : "请求未完成，请检查配置或查询任务结果，避免重复提交。",
-      ),
+      ), { code: typeof error === "string" && /^creative_(outcome_unknown|stream_interrupted|connection_failed|request_timeout)$/.test(error) ? error : undefined }),
   );
 }

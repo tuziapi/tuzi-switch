@@ -6,6 +6,7 @@
 
 // Known built-in video generation models
 export type KnownVideoModel =
+  | 'gemini-omni-1.1-flash'
   | 'sora-2'
   | 'sora-2-pro'
   | 'sora-2-4s'
@@ -41,6 +42,7 @@ export type VideoModel = KnownVideoModel | string;
 
 // Video model provider
 export type VideoProvider =
+  | 'gemini-omni'
   | 'sora'
   | 'veo'
   | 'kling'

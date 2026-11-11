@@ -1,4 +1,5 @@
 import { creativeManualPreviewIPC, creativeAccountMediaPreviewIPC } from "./creative-request-fixture";
+import { localCodexPreviewIPC } from "./local-codex-fixture";
 import { CreativeWorkspace } from "@/features/creative/CreativeWorkspace";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 import { nativePreviewIPC } from "./native-tool-fixture";
@@ -117,6 +118,7 @@ const agentBackups: Partial<Record<AgentTool, AgentSnapshot>> = {};
 mockWindows("main");
 mockIPC(
   async (command, args) => {
+    if (command.startsWith("creative_codex_")) return localCodexPreviewIPC(command, args);
     if (command === "creative_image_action" || command === "copy_text_to_clipboard") {
       const state = window as unknown as { __creativeImageFixture?: {
         calls: unknown[]; next?: string; error?: string;
@@ -456,18 +458,17 @@ function Canvas() {
   return (
     <div
       className="tuzi-shell h-screen flex flex-col bg-background text-foreground"
-      style={{ paddingTop: 52 }}
+      style={{ paddingTop: page === "creative" ? 0 : 52 }}
     >
       <Toaster />
       <TuziSidebarTransition visible={page !== "creative"}>
         {assistantNavigation}
       </TuziSidebarTransition>
-      <header
+      {page !== "creative" && <header
         className="workspace-header tuzi-workspace-layout fixed top-0 z-30 h-[52px] border-b border-border bg-background flex items-center justify-between px-6"
         style={{ left, width: `calc(100% - ${left}px)` }}
       >
         <div className="flex items-center gap-3">
-          {page === "creative" && assistantNavigation}
           {page === "providers" && app === "codex" && (
             <ProviderIcon icon="openai" name="Codex" size={20} />
           )}
@@ -477,7 +478,7 @@ function Canvas() {
               : (titles[page] ?? page)}
           </strong>
           <span className="text-xs text-muted-foreground">
-            {page === "creative" ? "本地预览 · 项目真实保存" : "合成预览"}
+            合成预览
           </span>
         </div>
         {page === "providers" && (
@@ -490,13 +491,13 @@ function Canvas() {
             <Plus className="h-4 w-4" />
           </Button>
         )}
-      </header>
+      </header>}
       <main
         className="workspace-view tuzi-workspace-layout flex flex-1 flex-col min-h-0"
         data-view={page}
         style={{ marginLeft: left }}
       >
-        <CreativeWorkspace active={page === "creative"} accountState={creativeAccountState} selectedKeyId={creativeKeyId} onManageAccount={()=>setPage("account")}/>
+        <CreativeWorkspace active={page === "creative"} accountState={creativeAccountState} selectedKeyId={creativeKeyId} onManageAccount={()=>setPage("account")} navigation={page === "creative" ? assistantNavigation : undefined} reserveMacControls={params.get("native-titlebar") === "mac"}/>
         {native ? (
           <NativeToolPage
             key={page}

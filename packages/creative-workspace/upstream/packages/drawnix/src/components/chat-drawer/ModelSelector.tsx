@@ -1,3 +1,4 @@
+import { getComposerPortalContainer } from '../dialog/dialog';
 /**
  * ModelSelector Component
  *
@@ -462,7 +463,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
         </div>
       );
 
-      return createPortal(menu, (document.getElementById('creative-portals') || document.body));
+      return createPortal(menu, getComposerPortalContainer());
     };
 
     return (

@@ -143,27 +143,30 @@ const VideoPlayer: React.FC<VideoProps & {
     overflow: 'hidden',
   };
 
+  const dragSurface = !readonly && (
+    <div data-canvas-media-drag="true" title="拖动画面移动视频，下方控件播放"
+      style={{ position: 'absolute', inset: '0 0 44px', zIndex: 2, cursor: 'move', touchAction: 'none' }} />
+  );
+
   if (!activated && poster) {
     return (
-      <button type="button" aria-label="播放视频" data-slideshow-media-control="true"
-        onPointerDown={stopCanvasPropagation} onPointerUp={stopCanvasPropagation}
-        onClick={() => {
-          if (readonly) window.open(url, '_blank');
-          else {
-            playOnLoad.current = true;
-            props.onActivated(true);
-            setActivated(true);
-          }
-        }}
-        style={{ ...containerStyle, display: 'block', padding: 0, border: 0, cursor: 'pointer' }}
-      >
+      <div style={containerStyle}>
         <RetryImage src={poster} alt="" showSkeleton={false}
-          style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-        <Play size={32} aria-hidden="true" style={{
-          position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%, -50%)', color: '#fff',
-        }} />
-      </button>
+          style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
+        {!readonly && <div data-canvas-media-drag="true" title="拖动画面移动视频"
+          style={{ position: 'absolute', inset: 0, cursor: 'move', touchAction: 'none' }} />}
+        <button type="button" aria-label="播放视频" data-slideshow-media-control="true"
+          onPointerDown={event => event.stopPropagation()}
+          onClick={() => {
+            if (readonly) window.open(url, '_blank');
+            else { playOnLoad.current = true; props.onActivated(true); setActivated(true); }
+          }}
+          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            width: 48, height: 48, borderRadius: '50%', border: 0, background: 'rgba(0,0,0,.55)',
+            display: 'grid', placeItems: 'center', color: '#fff', cursor: 'pointer' }}>
+          <Play size={25} aria-hidden="true" />
+        </button>
+      </div>
     );
   }
 
@@ -196,6 +199,7 @@ const VideoPlayer: React.FC<VideoProps & {
             </div>
           )}
         </div>
+        {dragSurface}
       </div>
     );
   }
@@ -270,6 +274,7 @@ const VideoPlayer: React.FC<VideoProps & {
         onEnded={() => props.onPlaybackChange(false)}
         onError={handleVideoError}
       />
+      {dragSurface}
       {readonly && (
         <div style={{
           position: 'absolute',

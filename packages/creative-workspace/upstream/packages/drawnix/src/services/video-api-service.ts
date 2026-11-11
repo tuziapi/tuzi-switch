@@ -37,6 +37,8 @@ import {
 } from './video-binding-utils';
 import { prepareVideoReferenceImageBlob } from './video-reference-image-utils';
 import { appendVeoAdvancedMetadata } from '../utils/veo-parameters';
+import { isGeminiOmniModel } from '../utils/gemini-omni-model';
+import { buildGeminiOmniVideoBody } from './gemini-omni-video';
 import {
   isMiniMaxH3RegenerationRequest,
   prepareMiniMaxH3Submission,
@@ -173,6 +175,8 @@ class VideoAPIService {
     const referenceCount =
       params.inputReferences?.length || (params.inputReference ? 1 : 0);
     const isMiniMaxH3 = isMiniMaxH3Model(params.model);
+    const isOmni = isGeminiOmniModel(params.model);
+    if (isOmni && referenceCount > 10) throw new Error('Gemini Omni 最多支持 10 张参考图');
     const submitPath = isMiniMaxH3
       ? resolveMiniMaxH3InitialSubmitPath(params.params)
       : binding?.submitPath || '/videos';
@@ -239,7 +243,7 @@ class VideoAPIService {
           const response = await fetch(processedUrl);
           const blob = await prepareVideoReferenceImageBlob(
             await response.blob(),
-            params.size
+            isOmni ? undefined : params.size
           );
           // console.log('[VideoAPI] Appending blob:', { fieldName, blobSize: blob.size, fileName: imageRef.name || 'image.png' });
           formData.append(fieldName, blob, imageRef.name || 'image.png');
@@ -248,7 +252,7 @@ class VideoAPIService {
           const response = await fetch(processedUrl);
           const blob = await prepareVideoReferenceImageBlob(
             await response.blob(),
-            params.size
+            isOmni ? undefined : params.size
           );
           // console.log('[VideoAPI] Appending blob:', { fieldName, blobSize: blob.size, fileName: imageRef.name || 'image.png' });
           formData.append(fieldName, blob, imageRef.name || 'image.png');
@@ -274,14 +278,14 @@ class VideoAPIService {
         const response = await fetch(processedUrl);
         const blob = await prepareVideoReferenceImageBlob(
           await response.blob(),
-          params.size
+          isOmni ? undefined : params.size
         );
         formData.append('input_reference', blob, 'reference.png');
       } else if (processedUrl.startsWith('http')) {
         const response = await fetch(processedUrl);
         const blob = await prepareVideoReferenceImageBlob(
           await response.blob(),
-          params.size
+          isOmni ? undefined : params.size
         );
         formData.append('input_reference', blob, 'reference.png');
       } else {
@@ -344,10 +348,10 @@ class VideoAPIService {
 
     const response = await providerTransport.send(providerContext, {
       path: miniMaxSubmission?.path || submitPath,
-      baseUrlStrategy: isMiniMaxH3 ? 'trim-v1' : binding?.baseUrlStrategy,
+      baseUrlStrategy: isOmni ? 'ensure-v1' : isMiniMaxH3 ? 'trim-v1' : binding?.baseUrlStrategy,
       method: 'POST',
-      headers: isMiniMaxH3 ? { 'Content-Type': 'application/json' } : undefined,
-      body: isMiniMaxH3
+      headers: isMiniMaxH3 || isOmni ? { 'Content-Type': 'application/json' } : undefined,
+      body: isOmni ? await buildGeminiOmniVideoBody(formData) : isMiniMaxH3
         ? JSON.stringify(miniMaxSubmission!.body)
         : formData,
     });

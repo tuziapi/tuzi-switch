@@ -427,6 +427,11 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   }, [enableDeferredRuntime]);
 
   useEffect(() => {
+    window.addEventListener('aitu:open-discussion', enableGenerationRuntime);
+    return () => window.removeEventListener('aitu:open-discussion', enableGenerationRuntime);
+  }, [enableGenerationRuntime]);
+
+  useEffect(() => {
     let active = true;
 
     hasPersistedRecoverableTasks()

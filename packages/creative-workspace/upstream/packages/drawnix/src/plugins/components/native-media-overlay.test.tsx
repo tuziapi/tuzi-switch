@@ -1,5 +1,5 @@
 import React from "react";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NativeMediaOverlay } from "./native-media-overlay";
 vi.mock("../../utils/tauri-env", () => ({
@@ -12,6 +12,7 @@ afterEach(() => {
 });
 describe("native media overlay", () => {
   it("keeps interactive media outside foreignObject, follows geometry and releases its layer", async () => {
+    vi.stubGlobal("PointerEvent", class extends MouseEvent { pointerId: number; constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 7; } });
     vi.stubGlobal(
       "ResizeObserver",
       class {
@@ -53,7 +54,7 @@ describe("native media overlay", () => {
     const click = vi.fn();
     const view = render(
       <NativeMediaOverlay>
-        <button onClick={click}>Play</button>
+        <><button onClick={click}>Play</button><div data-canvas-media-drag="true">Drag</div></>
       </NativeMediaOverlay>,
       { container: target },
     );
@@ -64,6 +65,17 @@ describe("native media overlay", () => {
     expect(fo.querySelector("button")).toBeNull();
     layer.querySelector("button")!.click();
     expect(click).toHaveBeenCalledOnce();
+    const down = vi.fn();
+    svg.addEventListener('pointerdown', down);
+    fireEvent.pointerDown(layer.querySelector('button')!);
+    expect(down).not.toHaveBeenCalled();
+    fireEvent.pointerDown(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 120, clientY: 80, buttons: 1, pointerId: 7 });
+    expect(down).toHaveBeenCalledOnce();
+    const move = vi.fn(); const up = vi.fn();
+    svg.addEventListener('pointermove', move); svg.addEventListener('pointerup', up);
+    fireEvent.pointerMove(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 150, clientY: 90, buttons: 1 });
+    fireEvent.pointerUp(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 150, clientY: 90 });
+    expect(move).toHaveBeenCalledOnce(); expect(up).toHaveBeenCalledOnce();
     fo.x.baseVal.value = 50;
     fo.setAttribute("x", "50");
     await act(async () => {});

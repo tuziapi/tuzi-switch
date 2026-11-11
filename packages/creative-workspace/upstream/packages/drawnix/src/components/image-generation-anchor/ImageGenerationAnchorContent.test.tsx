@@ -244,7 +244,7 @@ describe('native SVG anchor readiness', () => {
     const generator = new ImageGenerationAnchorGenerator(board);
     try {
       await act(async () => { generator.processDrawing(anchor, host, false); });
-      expect(host.textContent).toContain('正在加载图片');
+      expect(host.textContent).toContain('正在加载结果');
       expect(host.querySelector('image')).toBeNull();
       await act(async () => { registerCanvasImage(board, 'image-1', task.result!.url).setReady(true); });
       expect(host.textContent).toContain('已完成');

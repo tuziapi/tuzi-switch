@@ -24,6 +24,8 @@ export interface CreativeAccountBinding {
   updatedAt: number;
 }
 export interface CreativeAccountBridge {
+  /** Optional native discussion backend; independent of Rabbit account login. */
+  localCodex?: CreativeCodexBridge;
   state: CreativeAccountState;
   selectedKeyId?: string;
   manageAccount: () => void;
@@ -49,4 +51,23 @@ export interface CreativeAccountBridge {
     url: string,
     init: RequestInit,
   ) => Promise<Response>;
+}
+
+export interface CreativeCodexModel {
+  id: string;
+  name: string;
+  efforts: string[];
+  defaultEffort: string | null;
+  supportsImages: boolean;
+}
+export interface CreativeCodexBridge {
+  probe: () => Promise<{ models: CreativeCodexModel[]; defaultModel: string }>;
+  request: (input: {
+    model: string;
+    effort?: string;
+    prompt: string;
+    images: string[];
+    signal: AbortSignal;
+    onUpdate: (value: { content: string; reasoning: string }) => void;
+  }) => Promise<{ content: string; reasoning: string }>;
 }

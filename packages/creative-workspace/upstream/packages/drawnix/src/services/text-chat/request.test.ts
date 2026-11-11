@@ -3,6 +3,7 @@ const mocks = vi.hoisted(() => ({
   route: vi.fn(),
   plan: vi.fn(),
   send: vi.fn(),
+  attachment: vi.fn(),
 }));
 vi.mock("../../utils/settings-manager", () => ({
   settingsManager: { waitForInitialization: async () => {} },
@@ -11,6 +12,10 @@ vi.mock("../../utils/settings-manager", () => ({
 vi.mock("../provider-routing", () => ({
   resolveInvocationPlanFromRoute: mocks.plan,
   providerTransport: { send: mocks.send },
+}));
+vi.mock("./attachments", async (original) => ({
+  ...(await original<typeof import("./attachments")>()),
+  readTextAttachment: mocks.attachment,
 }));
 import { requestTextChat } from "./request";
 const ref = { profileId: "synthetic", modelId: "synthetic-text" };
@@ -113,4 +118,85 @@ describe("configured text requests", () => {
     await expect(send()).rejects.not.toThrow("sk-SYNTHETIC-SECRET");
     expect(mocks.send).toHaveBeenCalledTimes(1);
   });
+});
+
+const docRef = {
+  id: "doc",
+  name: "notes.pdf",
+  kind: "document" as const,
+  mimeType: "application/pdf",
+  size: 10,
+};
+const imageRef = {
+  ...docRef,
+  id: "img",
+  name: "photo.jpg",
+  kind: "image" as const,
+  mimeType: "image/jpeg",
+};
+const sendAttachments = (attachments = [docRef, imageRef]) =>
+  requestTextChat({
+    sessionId: "s",
+    model: ref,
+    turns: [{ role: "user", content: "read", attachments }],
+    signal: new AbortController().signal,
+    onUpdate: () => {},
+  });
+it("hydrates extracted documents and images only when constructing a request", async () => {
+  mocks.attachment.mockImplementation(async (r) => ({
+    ref: r,
+    sessionId: "s",
+    ...(r.kind === "image"
+      ? { dataUrl: "data:image/jpeg;base64,YWJj" }
+      : { text: "PDF synthetic text" }),
+  }));
+  mocks.send.mockResolvedValue(
+    new Response('{"choices":[{"message":{"content":"ok"}}]}', {
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  await sendAttachments();
+  const body = JSON.parse(mocks.send.mock.calls[0][1].body);
+  expect(body.messages[0].content[0].text).toContain(
+    "[附件：notes.pdf]\nPDF synthetic text",
+  );
+  expect(body.messages[0].content[1]).toEqual({
+    type: "image_url",
+    image_url: { url: "data:image/jpeg;base64,YWJj" },
+  });
+  expect(body.messages[0]).not.toHaveProperty("attachments");
+});
+it("rejects missing and cross-session payloads before transport", async () => {
+  mocks.attachment.mockRejectedValueOnce(new Error("附件丢失"));
+  await expect(sendAttachments()).rejects.toThrow("丢失");
+  mocks.attachment.mockResolvedValue({
+    ref: docRef,
+    sessionId: "other",
+    text: "private",
+  });
+  await expect(sendAttachments()).rejects.toThrow("不属于");
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+it("rejects explicitly unsupported vision and excessive image context without paying for a request", async () => {
+  mocks.attachment.mockImplementation(async (r) => ({
+    ref: r,
+    sessionId: "s",
+    dataUrl: "data:image/jpeg;base64,YWJj",
+  }));
+  mocks.plan.mockReturnValue({
+    ...plan(),
+    binding: {
+      ...plan().binding,
+      metadata: { text: { supportsImageInput: false } },
+    },
+  });
+  await expect(sendAttachments([imageRef])).rejects.toThrow("不支持图片");
+  mocks.plan.mockReturnValue({
+    ...plan(),
+    binding: { ...plan().binding, metadata: { text: { maxImageCount: 1 } } },
+  });
+  await expect(
+    sendAttachments([imageRef, { ...imageRef, id: "two" }]),
+  ).rejects.toThrow("图片上下文过多");
+  expect(mocks.send).not.toHaveBeenCalled();
 });

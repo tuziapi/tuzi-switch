@@ -68,6 +68,7 @@ pub enum CreativeChunk {
         data: String,
     },
     End,
+    Error { code: String },
 }
 
 fn binding_id(origin: &str, user: &str, token: &str) -> String {
@@ -600,7 +601,26 @@ pub async fn creative_account_request(
     request: ModelRequest,
     on_chunk: tauri::ipc::Channel<CreativeChunk>,
 ) -> Result<(), String> {
-    execute(&service, request, &binding_path(), on_chunk).await
+    let result = execute(&service, request, &binding_path(), on_chunk.clone()).await;
+    deliver_creative_result(result, |chunk| on_chunk.send(chunk).map_err(|_| "consumer_closed".into()))
+}
+
+/// Deliver errors on the same ordered Channel as bytes; invoke rejection can
+/// overtake asynchronously fetched Channel payloads and discard complete output.
+pub(crate) fn deliver_creative_result(
+    result: Result<(), String>,
+    send: impl FnOnce(CreativeChunk) -> Result<(), String>,
+) -> Result<(), String> {
+    match result {
+        Ok(()) => Ok(()),
+        Err(code) => send(CreativeChunk::Error { code }),
+    }
+}
+
+pub(crate) fn creative_send_error(error: &reqwest::Error) -> &'static str {
+    if error.is_connect() { "creative_connection_failed" }
+    else if error.is_timeout() { "creative_request_timeout" }
+    else { "creative_outcome_unknown" }
 }
 
 async fn execute(
@@ -696,7 +716,7 @@ async fn execute(
             let response = builder
                 .send()
                 .await
-                .map_err(|_| "creative_outcome_unknown")?;
+                .map_err(|error| creative_send_error(&error))?;
             account(&service, request.generation)?;
             let status = response.status();
             if status.is_redirection() {
@@ -739,7 +759,7 @@ async fn execute(
             let mut stream = response.bytes_stream();
             while let Some(chunk) = stream.next().await {
                 account(&service, request.generation)?;
-                let bytes = chunk.map_err(|_| "creative_outcome_unknown")?;
+                let bytes = chunk.map_err(|_| "creative_stream_interrupted")?;
                 total += bytes.len();
                 if total > MAX_BODY {
                     return Err("response_too_large".into());

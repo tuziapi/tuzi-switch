@@ -21,6 +21,28 @@ export function NativeMediaOverlay({
     layer.style.cssText =
       "position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:auto;";
     board.appendChild(layer);
+    // The HTML media layer is a sibling of the SVG host. Forward only the
+    // dedicated drag surface; playback controls keep their native events.
+    let draggingPointer: number | undefined;
+    const forwardDrag = (event: PointerEvent) => {
+      if (event.type === 'pointerdown') {
+        if (!(event.target instanceof Element) || !event.target.closest('[data-canvas-media-drag]')) return;
+        draggingPointer = event.pointerId;
+      } else if (draggingPointer === undefined || draggingPointer !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      foreignObject.dispatchEvent(new PointerEvent(event.type, {
+        bubbles: true, cancelable: true, composed: true,
+        pointerId: event.pointerId, pointerType: event.pointerType, isPrimary: event.isPrimary,
+        clientX: event.clientX, clientY: event.clientY, button: event.button, buttons: event.buttons,
+        ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey,
+        pressure: event.pressure,
+      }));
+    };
+    const endDrag = () => { draggingPointer = undefined; };
+    for (const type of ['pointerdown', 'pointermove', 'pointerup']) layer.addEventListener(type, forwardDrag as EventListener);
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
     let frame = 0;
     const sync = () => {
       frame = 0;
@@ -50,6 +72,9 @@ export function NativeMediaOverlay({
     sync();
     setHost(layer);
     return () => {
+      for (const type of ['pointerdown', 'pointermove', 'pointerup']) layer.removeEventListener(type, forwardDrag as EventListener);
+      window.removeEventListener('pointerup', endDrag);
+      window.removeEventListener('pointercancel', endDrag);
       observer.disconnect();
       resize.disconnect();
       cancelAnimationFrame(frame);

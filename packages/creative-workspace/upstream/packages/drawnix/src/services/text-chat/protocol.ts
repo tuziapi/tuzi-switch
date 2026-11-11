@@ -1,8 +1,11 @@
-/** Pure text protocol adapters. Never execute tool calls returned in a reply. */
+import type { TextAttachmentRef } from "./attachments";
+/** Conversation protocol adapters. Never execute tool calls returned in a reply. */
 export type TextProtocol = "chat" | "responses" | "anthropic" | "gemini";
 export interface TextTurn {
   role: "user" | "assistant" | "system";
   content: string;
+  attachments?: TextAttachmentRef[];
+  images?: string[];
 }
 export interface TextUsage {
   input?: number;
@@ -44,13 +47,39 @@ export function textBody(
     .map((t) => t.content)
     .join("\n\n");
   const messages = turns.filter((t) => t.role !== "system");
+  const imageData = (url: string) => {
+    const match =
+      /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(
+        url,
+      );
+    if (!match) throw new Error("图片内容无效，请重新添加。");
+    return { mimeType: match[1], data: match[2] };
+  };
   if (protocol === "anthropic")
     return {
       model,
       stream: true,
       max_tokens: maxOutput ?? 4096,
       ...(system ? { system } : {}),
-      messages: messages.map((t) => ({ ...t })),
+      messages: messages.map((t) => ({
+        role: t.role,
+        content: t.images?.length
+          ? [
+              ...t.images.map((url) => {
+                const image = imageData(url);
+                return {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: image.mimeType,
+                    data: image.data,
+                  },
+                };
+              }),
+              ...(t.content ? [{ type: "text", text: t.content }] : []),
+            ]
+          : t.content,
+      })),
     };
   if (protocol === "responses")
     return {
@@ -59,14 +88,29 @@ export function textBody(
       store: false,
       ...(maxOutput ? { max_output_tokens: maxOutput } : {}),
       ...(system ? { instructions: system } : {}),
-      input: messages.map((t) => ({ role: t.role, content: t.content })),
+      input: messages.map((t) => ({
+        role: t.role,
+        content: t.images?.length
+          ? [
+              ...(t.content ? [{ type: "input_text", text: t.content }] : []),
+              ...t.images.map((url) => ({
+                type: "input_image",
+                image_url: url,
+                detail: "auto",
+              })),
+            ]
+          : t.content,
+      })),
     };
   if (protocol === "gemini")
     return {
       ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
       contents: messages.map((t) => ({
         role: t.role === "assistant" ? "model" : "user",
-        parts: [{ text: t.content }],
+        parts: [
+          ...(t.content ? [{ text: t.content }] : []),
+          ...(t.images || []).map((url) => ({ inlineData: imageData(url) })),
+        ],
       })),
       ...(maxOutput
         ? { generationConfig: { maxOutputTokens: maxOutput } }
@@ -78,7 +122,18 @@ export function textBody(
     : "max_tokens";
   return {
     model,
-    messages: turns,
+    messages: turns.map((t) => ({
+      role: t.role,
+      content: t.images?.length
+        ? [
+            ...(t.content ? [{ type: "text", text: t.content }] : []),
+            ...t.images.map((url) => ({
+              type: "image_url",
+              image_url: { url },
+            })),
+          ]
+        : t.content,
+    })),
     stream: true,
     ...(maxOutput ? { [outputField]: maxOutput } : {}),
   };

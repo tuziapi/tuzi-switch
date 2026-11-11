@@ -13,6 +13,7 @@ import {
 } from "./nativeStream";
 import { requestCreativeManual } from "./manualTransport";
 import { nativeImageAction } from "./imageActions";
+import { nativeLocalCodex } from "./localCodex";
 import { selectCreativeMediaAction } from "./mediaActions";
 
 const PREFIX = "tuzi-account:";
@@ -47,6 +48,9 @@ const messages: Record<string, string> = {
   body_too_large: "上传内容超过 64 MB，请缩小文件后重试。",
   response_too_large:
     "模型响应超过 64 MB，无法在客户端接收；请先查询已有任务结果。",
+  creative_connection_failed: "无法连接模型服务，请检查网络连接后重试。",
+  creative_request_timeout: "模型请求超时，结果尚未确认；请检查任务状态。",
+  creative_stream_interrupted: "接收模型响应时连接中断，已提交任务请先检查结果。",
   creative_outcome_unknown: "请求结果待确认，请先查询任务结果，避免重复提交。",
   creative_cancelled_outcome_unknown:
     "请求已停止等待；已提交的任务可能仍在运行，请先查询结果。",
@@ -69,7 +73,7 @@ export function creativeError(error: unknown): Error {
     (code?.startsWith("creative_upstream_")
       ? "模型服务拒绝了请求，请检查 Key 状态、模型权限或额度。"
       : "配置操作失败，请稍后重试。");
-  return new Error(errorMessage);
+  return Object.assign(new Error(errorMessage), { code: messages[code || ""] ? code : undefined });
 }
 function actionFor(url: string, method: string) {
   const parsed = new URL(url);
@@ -166,6 +170,7 @@ export function createCreativeAccountBridge(
     state,
     manageAccount,
     selectedKeyId,
+    localCodex: typeof window !== "undefined" && "__TAURI_INTERNALS__" in window ? nativeLocalCodex : undefined,
     imageAction:
       typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
         ? nativeImageAction

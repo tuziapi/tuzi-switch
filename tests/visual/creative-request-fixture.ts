@@ -7,7 +7,7 @@ interface SyntheticRequestState {
   requests: Array<{ id: string; method: string; path: string; body?: string }>;
   responses: Record<
     string,
-    { body: unknown; status?: number; contentType?: string; chunks?: string[]; delayMs?: number }
+    { body: unknown; bodyBase64?: string; status?: number; contentType?: string; chunks?: string[]; delayMs?: number; errorCode?: string }
   >;
   release: () => void;
 }
@@ -68,6 +68,10 @@ export async function creativeManualPreviewIPC(command: string, args: unknown) {
   let body: unknown;
   const override =
     creativeRequestFixture.responses[request.method + " " + url.pathname];
+  if (override?.errorCode) {
+    onChunk.onmessage({ type: "error", code: override.errorCode });
+    return;
+  }
   if (override) {
     body = override.body;
   } else if (url.pathname === "/v1/models") {
@@ -96,6 +100,11 @@ export async function creativeManualPreviewIPC(command: string, args: unknown) {
     status: override?.status || 200,
     content_type: override?.contentType || "application/json",
   });
+  if (override?.bodyBase64) {
+    onChunk.onmessage({ type: 'data', data: override.bodyBase64 });
+    onChunk.onmessage({ type: 'end' });
+    return;
+  }
   const text =
     override?.contentType === "text/event-stream"
       ? String(body)
@@ -126,6 +135,7 @@ export async function creativeAccountMediaPreviewIPC(
     responses: { method: "POST", path: "/v1/responses" },
     "video.create": { method: "POST", path: "/v1/videos" },
     "video.poll": { method: "GET", path: "/v1/videos/{taskId}" },
+    "video.content": { method: "GET", path: "/v1/videos/{taskId}/content" },
   };
   const route =
     mediaActions.find((a) => a.action === r.action) || classics[r.action];

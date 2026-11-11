@@ -16,8 +16,12 @@ import {
   type TextSnapshot,
   type TextTurn,
 } from "./protocol";
+import { normalizeImageUrlForMultimodalInput } from "../../utils/gemini-api/message-utils";
+import { readTextAttachment, validateAttachmentRefs } from "./attachments";
 
 export interface TextChatRequest {
+  codex?: import("./local-codex").CodexSelection;
+  sessionId?: string;
   model: ModelRef | null;
   turns: TextTurn[];
   maxOutput?: number;
@@ -43,6 +47,53 @@ export async function requestTextChat(
   )
     throw new Error("所选模型的供应商已不可用，请重新选择文本模型。");
   const protocol = textProtocol(plan.binding.protocol, plan.binding.submitPath);
+  const turns: TextTurn[] = [];
+  let imageCount = 0,
+    imageBytes = 0,
+    textChars = 0;
+  for (const turn of request.turns) {
+    request.signal.throwIfAborted();
+    const refs = turn.attachments || [];
+    validateAttachmentRefs(refs);
+    const images: string[] = [],
+      documents: string[] = [];
+    for (const ref of refs) {
+      const record = await readTextAttachment(ref);
+      request.signal.throwIfAborted();
+      if (request.sessionId && record.sessionId !== request.sessionId)
+        throw new Error("附件不属于当前会话，请重新添加。");
+      if (ref.kind === "image") {
+        if (plan.binding.metadata?.text?.supportsImageInput === false)
+          throw new Error(
+            "当前模型配置不支持图片输入，请切换支持图片的文本模型后重试。",
+          );
+        imageCount++;
+        imageBytes += record.dataUrl!.length;
+        if (
+          imageCount > (plan.binding.metadata?.text?.maxImageCount ?? 6) ||
+          imageBytes > 12 * 1024 ** 2
+        )
+          throw new Error("当前对话的图片上下文过多，请新建对话后再发送。");
+        images.push(record.dataUrl!);
+      } else documents.push(`[附件：${ref.name}]\n${record.text}\n[附件结束]`);
+    }
+    if (turn.images?.length) {
+      for (const url of turn.images) images.push(await normalizeImageUrlForMultimodalInput(url));
+      if (plan.binding.metadata?.text?.supportsImageInput === false) throw new Error("当前文本模型不支持画布图片引用，请切换模型。");
+      imageCount += turn.images.length;
+      imageBytes += images.slice(-turn.images.length).reduce((n, url) => n + url.length, 0);
+      if (imageCount > (plan.binding.metadata?.text?.maxImageCount ?? 6) || imageBytes > 12 * 1024 ** 2) throw new Error("图片上下文过多，请减少参考图。");
+    }
+    const content = [turn.content, ...documents].filter(Boolean).join("\n\n");
+    textChars += content.length;
+    if (textChars > 800000)
+      throw new Error("包含附件的对话内容过长，请新建对话或拆分文档。");
+    turns.push({
+      role: turn.role,
+      content,
+      ...(images.length ? { images } : {}),
+    });
+  }
   let path = plan.binding.submitPath;
   if (protocol === "gemini") {
     path = path
@@ -79,12 +130,7 @@ export async function requestTextChat(
           : {}),
       },
       body: JSON.stringify(
-        textBody(
-          protocol,
-          plan.modelRef.modelId,
-          request.turns,
-          request.maxOutput,
-        ),
+        textBody(protocol, plan.modelRef.modelId, turns, request.maxOutput),
       ),
       signal: controller.signal,
     });
@@ -104,6 +150,13 @@ export async function requestTextChat(
     if (timedOut) throw new Error("本次回复等待超过 10 分钟，已保留部分内容。");
     if (request.signal.aborted)
       throw new DOMException("已停止生成", "AbortError");
+    const code = (error as { code?: string })?.code;
+    if (code === "creative_outcome_unknown" || code === "creative_stream_interrupted")
+      throw new Error("文本模型连接中断，未收到完整回复。请稍后手动重试或切换文本模型。");
+    if (code === "creative_connection_failed")
+      throw new Error("无法连接文本模型服务，请检查网络后手动重试。");
+    if (code === "creative_request_timeout")
+      throw new Error("文本模型请求超时，请稍后手动重试或切换文本模型。");
     throw safeTextError(error, [route.apiKey]);
   } finally {
     clearTimeout(timeout);

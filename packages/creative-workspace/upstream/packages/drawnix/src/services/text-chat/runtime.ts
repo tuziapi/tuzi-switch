@@ -1,5 +1,8 @@
+import { canRetryDiscussion } from "./conversation";
+import { ensureAssistantCreationConfigured } from '../assistant-creation-setup';
 import { chatStorageService as storage } from "../chat-storage-service";
 import { requestTextChat, type TextChatRequest } from "./request";
+import { localCodex } from "./local-codex";
 import {
   conversationContext,
   newTextState,
@@ -7,10 +10,17 @@ import {
   type TextConversation,
   type TextMessage,
 } from "./conversation";
+import type { DiscussionSubmission } from "./discussion";
 import type { ModelRef } from "../../utils/settings-manager";
+import {
+  validateAttachmentRefs,
+  removeTextAttachment,
+  type TextAttachmentRef,
+} from "./attachments";
 
 interface Snapshot {
   sessions: TextConversation[];
+  activeId?: string | null;
   ready: boolean;
   error: string | null;
   running: ReadonlySet<string>;
@@ -38,6 +48,33 @@ export class TextChatRuntime {
   private saves = new Map<string, Promise<void>>();
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private epoch = 0;
+  private discussionCreation = new Map<string, Promise<string>>();
+  select = (id: string | null) => {
+    if (id) this.get(id);
+    this.emit({ activeId: id });
+    storage.setDrawerState?.({ textActiveSessionId: id });
+  };
+  ensureDiscussion = (boardId: string, model: ModelRef | null): Promise<string> => {
+    if (!boardId) return Promise.reject(new Error("请先打开画板。"));
+    const pending = this.discussionCreation.get(boardId);
+    if (pending) return pending;
+    const epoch = this.epoch;
+    const create = (async () => {
+      await this.initialize();
+      if (epoch !== this.epoch) throw new Error("会话已重置。");
+      const active = this.snapshot.sessions.find(s => s.id === this.snapshot.activeId && s.textChat.linkedBoardId === boardId && s.textChat.executionMode === "agent");
+      const existing = active || this.snapshot.sessions.find(s => s.textChat.linkedBoardId === boardId && s.textChat.executionMode === "agent");
+      if (existing) return existing.id;
+      const id = await this.create(model);
+      if (epoch !== this.epoch) throw new Error("会话已重置。");
+      this.configure(id, {}, { executionMode: "agent", linkedBoardId: boardId });
+      await this.save(id);
+      return id;
+    })();
+    this.discussionCreation.set(boardId, create);
+    void create.finally(() => { if (this.discussionCreation.get(boardId) === create) this.discussionCreation.delete(boardId); }).catch(() => {});
+    return create;
+  };
   constructor(
     private db: Storage = storage,
     private request: (
@@ -194,11 +231,54 @@ export class TextChatRuntime {
     });
   };
   stop = (id: string) => this.requests.get(id)?.abort();
-  send = async (id: string, content: string, regenerateUserId?: string) => {
-    if (this.requests.has(id)) return;
+  addDraftAttachment = async (id: string, ref: TextAttachmentRef) => {
+    const refs = [...(this.get(id).textChat.draftAttachments || []), ref];
+    validateAttachmentRefs(refs);
+    this.configure(id, {}, { draftAttachments: refs });
+    await this.save(id);
+  };
+  removeDraftAttachment = async (id: string, attachmentId: string) => {
+    const current = this.get(id);
+    this.configure(
+      id,
+      {},
+      {
+        draftAttachments: (current.textChat.draftAttachments || []).filter(
+          (a) => a.id !== attachmentId,
+        ),
+      },
+    );
+    // Keep the payload if durable removal fails, so the previous saved draft is recoverable.
+    await this.save(id);
+    if (
+      !this.get(id).textChat.messages.some((m) =>
+        m.attachments?.some((a) => a.id === attachmentId),
+      )
+    )
+      await removeTextAttachment(attachmentId);
+  };
+  canSend = (id: string): boolean => {
     const session = this.get(id);
+    const discussion = session.textChat.executionMode === 'agent' && session.textChat.linkedBoardId;
+    return ensureAssistantCreationConfigured('text', session.sessionModelRef || session.sessionModel,
+      Boolean(discussion && localCodex.selection()));
+  };
+  send = async (id: string, content: string, regenerateUserId?: string, submission: DiscussionSubmission = {}) => {
+    if (this.requests.has(id)) return;
+    if (!this.canSend(id)) return;
+    const session = this.get(id);
+    const discussion = session.textChat.executionMode === "agent" && session.textChat.linkedBoardId;
+    const codex = discussion ? localCodex.selection() : undefined;
+    if (discussion && regenerateUserId) {
+      const previous = session.textChat.messages.filter(m => m.replyTo === regenerateUserId).at(-1);
+      const original = session.textChat.messages.find(m => m.id === regenerateUserId);
+      if (!previous || !canRetryDiscussion(previous) || original?.origin === "canvas")
+        throw new Error("此讨论不能直接重试，请发送新消息并重新选择画布引用，避免重复提交生成任务。");
+    }
     const text = content.trim();
-    if (!regenerateUserId && !text) return;
+    const attachments = submission.origin === "canvas" ? [] : session.textChat.draftAttachments || [];
+    validateAttachmentRefs(attachments);
+    if (!regenerateUserId && !text && !attachments.length) return;
     if (text.length > 200000) throw new Error("单条消息过长，请分段发送。");
     const now = Date.now();
     const user: TextMessage = regenerateUserId
@@ -208,10 +288,12 @@ export class TextChatRuntime {
       : {
           id: this.db.generateId(),
           role: "user",
+          ...(discussion ? { origin: submission.origin || "sidebar" } : {}),
           content: text,
           reasoning: "",
           createdAt: now,
           status: "complete",
+          ...(attachments.length ? { attachments } : {}),
         };
     if (!user) throw new Error("原始消息不存在。");
     const messages = regenerateUserId
@@ -230,7 +312,8 @@ export class TextChatRuntime {
       createdAt: now + 1,
       status: "pending",
       replyTo: user.id,
-      model: session.sessionModel,
+      model: codex ? `Codex · ${codex.model}` : session.sessionModel,
+      ...(discussion ? { discussion: { boardId: discussion, runId: this.db.generateId(), taskIds: [], submission: "not_started" } } : {}),
     };
     messages.push(assistant);
     const controller = new AbortController();
@@ -241,9 +324,18 @@ export class TextChatRuntime {
       updatedAt: now,
       title: session.textChat.messages.length
         ? session.title
-        : this.db.generateTitle(user.content),
+        : this.db.generateTitle(
+            user.content || user.attachments?.[0]?.name || "附件对话",
+          ),
       messageCount: messages.length,
-      textChat: { ...session.textChat, draft: "", messages },
+      textChat: {
+        ...session.textChat,
+        draft: regenerateUserId || submission.origin === "canvas" ? session.textChat.draft : "",
+        draftAttachments: regenerateUserId || submission.origin === "canvas"
+          ? session.textChat.draftAttachments
+          : [],
+        messages,
+      },
     });
     const epoch = this.epoch;
     let pending: Partial<TextMessage> | undefined,
@@ -261,7 +353,9 @@ export class TextChatRuntime {
       // Never submit a paid request before the user turn is durably saved.
       await this.save(id);
       controller.signal.throwIfAborted();
-      const result = await this.request({
+      const request: TextChatRequest = {
+        codex,
+        sessionId: id,
         model:
           session.sessionModelRef ||
           (session.sessionModel
@@ -275,7 +369,30 @@ export class TextChatRuntime {
           pending = { ...data, status: "streaming" };
           if (!renderTimer) renderTimer = setTimeout(flush, 40);
         },
-      });
+      };
+      const result = assistant.discussion
+        ? await (await import("./discussion")).requestDiscussion({
+            ...request, link: assistant.discussion, messageId: assistant.id, context: submission.context,
+            onPlan: async (plan) => {
+              controller.signal.throwIfAborted();
+              if (epoch !== this.epoch) throw new DOMException("讨论已切换", "AbortError");
+              this.updateMessage(id, assistant.id, { discussion: { ...assistant.discussion!, plan } });
+              await this.save(id);
+            },
+            onBeforeSubmit: async () => {
+              controller.signal.throwIfAborted();
+              if (epoch !== this.epoch) throw new DOMException("讨论已切换", "AbortError");
+              this.updateMessage(id, assistant.id, { discussion: { ...assistant.discussion!, submission: "started" } });
+              await this.save(id);
+              controller.signal.throwIfAborted();
+            },
+            onTasks: async (taskIds) => {
+              if (epoch !== this.epoch) return;
+              this.updateMessage(id, assistant.id, { discussion: { ...assistant.discussion!, taskIds, submission: "started" } });
+              await this.save(id);
+            },
+          })
+        : await this.request(request);
       flush();
       if (epoch === this.epoch)
         this.updateMessage(id, assistant.id, {
@@ -295,6 +412,54 @@ export class TextChatRuntime {
         });
     } finally {
       clearTimeout(renderTimer);
+      if (epoch === this.epoch) {
+        this.requests.delete(id);
+        this.emit({ running: new Set(this.requests.keys()) });
+        await this.save(id).catch(() => {});
+      }
+    }
+  };
+  decidePlan = async (id: string, messageId: string, execute: boolean) => {
+    if (this.requests.has(id)) return;
+    const message = this.get(id).textChat.messages.find(m => m.id === messageId);
+    const link = message?.discussion;
+    if (!link?.plan || link.plan.status !== "ready" || link.submission !== "not_started" || link.taskIds.length)
+      throw new Error("此计划已经提交或不可执行。");
+    if (!execute) {
+      this.updateMessage(id, messageId, { discussion: { ...link, plan: { ...link.plan, status: "cancelled" } } });
+      await this.save(id);
+      return;
+    }
+    const controller = new AbortController();
+    this.requests.set(id, controller);
+    this.emit({ running: new Set(this.requests.keys()) });
+    const epoch = this.epoch;
+    let currentLink = link;
+    try {
+      const { workspaceService } = await import('../workspace-service');
+      if (workspaceService.getState().currentBoardId !== link.boardId) throw new Error("请先返回这段讨论所属的画板再执行。");
+      const { executeDiscussionPlan } = await import('./discussion');
+      await executeDiscussionPlan({
+        sessionId: id, messageId, link, signal: controller.signal,
+        onBeforeSubmit: async () => {
+          controller.signal.throwIfAborted();
+          if (epoch !== this.epoch) throw new DOMException("讨论已切换", "AbortError");
+          currentLink = { ...currentLink, submission: "started", plan: { ...link.plan!, status: "started" } };
+          this.updateMessage(id, messageId, { discussion: currentLink, status: "streaming", error: undefined });
+          await this.save(id);
+          controller.signal.throwIfAborted();
+        },
+        onTasks: async (taskIds) => {
+          if (epoch !== this.epoch) return;
+          currentLink = { ...currentLink, taskIds };
+          this.updateMessage(id, messageId, { discussion: currentLink });
+          await this.save(id);
+        },
+      }, link.plan);
+      if (epoch === this.epoch) this.updateMessage(id, messageId, { status: "complete" });
+    } catch (e) {
+      if (epoch === this.epoch) this.updateMessage(id, messageId, { status: controller.signal.aborted ? "stopped" : "error", error: controller.signal.aborted ? undefined : (e as Error).message });
+    } finally {
       if (epoch === this.epoch) {
         this.requests.delete(id);
         this.emit({ running: new Set(this.requests.keys()) });
@@ -324,12 +489,14 @@ export class TextChatRuntime {
   };
   reset = () => {
     this.epoch++;
+    this.discussionCreation.clear();
     this.requests.forEach((c) => c.abort());
     this.requests.clear();
     this.timers.forEach(clearTimeout);
     this.timers.clear();
     this.emit({
       sessions: [],
+      activeId: null,
       ready: true,
       running: new Set(),
       saveErrors: new Set(),

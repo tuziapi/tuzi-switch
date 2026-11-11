@@ -1,3 +1,4 @@
+import { resolveBuiltinAssetUrl } from "../../utils/bundled-assets";
 import React, {
   memo,
   useCallback,
@@ -31,6 +32,9 @@ import {
   Code2,
   Feather,
   Lightbulb,
+  Paperclip,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { TextConversation } from "../../services/text-chat/conversation";
@@ -41,6 +45,7 @@ import { chatStorageService } from "../../services/chat-storage-service";
 import { textChatRuntime as runtime } from "../../services/text-chat/runtime";
 import {
   newTextState,
+  canRetryDiscussion,
   type TextMessage,
 } from "../../services/text-chat/conversation";
 import {
@@ -51,21 +56,39 @@ import {
 } from "../../utils/settings-manager";
 import { quickInsert } from "../../services/canvas-operations/canvas-insertion";
 import { TextMarkdown, copyChatText } from "./TextMarkdown";
+import { TextAttachments } from "./TextAttachments";
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_LIMITS,
+  attachmentFileKind,
+  saveTextAttachment,
+  removeTextAttachment,
+} from "../../services/text-chat/attachments";
+import { DiscussionResults } from "./DiscussionResults";
+import { DiscussionBackend } from "./DiscussionBackend";
+import { openDiscussion } from "../../services/text-chat/discussion-ui";
+import { workspaceService } from "../../services/workspace-service";
 import "./text-chat.scss";
 
 const completedReasons = new Set(["stop", "end_turn", "STOP", "stop_sequence"]);
 const MessageView = memo(function MessageView({
   message,
   retryPrompt,
+  retryBlocked,
   busy,
   onRetry,
   onInsert,
+  onLocate,
+  sessionId,
 }: {
+  sessionId?: string;
   message: TextMessage;
   retryPrompt?: string;
+  retryBlocked?: boolean;
   busy: boolean;
   onRetry: (userId: string) => void;
   onInsert: (text: string) => void;
+  onLocate?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
@@ -81,6 +104,8 @@ const MessageView = memo(function MessageView({
   if (message.role === "user")
     return (
       <div className="text-chat-user" data-message-id={message.id}>
+        {message.origin === "canvas" && <small className="text-chat-status">来自画布主输入框</small>}
+        <TextAttachments attachments={message.attachments} />
         {message.content}
       </div>
     );
@@ -92,8 +117,9 @@ const MessageView = memo(function MessageView({
       data-status={message.status}
     >
       <div className="text-chat-author">
-        <MessageCircle size={16} />
-        <strong>{message.model || "AI 助手"}</strong>
+        <img className="text-chat-avatar" src={resolveBuiltinAssetUrl("/logo-tuzi.png")} alt="" width={28} height={28} />
+        <strong>兔子助手</strong>
+        {message.model && <small className="text-chat-author-model">{message.model}</small>}
         {generating && (
           <span>
             <Loader2 size={13} className="text-chat-spin" />
@@ -111,7 +137,7 @@ const MessageView = memo(function MessageView({
       {message.reasoning && (
         <details className="text-chat-reasoning">
           <summary>
-            模型推理内容 <ChevronDown size={12} />
+            模型思考摘要 <ChevronDown size={12} />
           </summary>
           <div>
             <TextMarkdown content={message.reasoning} />
@@ -119,6 +145,7 @@ const MessageView = memo(function MessageView({
         </details>
       )}
       {message.content && <TextMarkdown content={message.content} />}
+      {message.discussion && <DiscussionResults link={message.discussion} sessionId={sessionId} messageId={message.id} busy={busy} onLocate={onLocate} />}
       {message.status === "stopped" && (
         <div className="text-chat-status">已停止 · 已保留收到的内容</div>
       )}
@@ -150,7 +177,7 @@ const MessageView = memo(function MessageView({
           </button>
           <button
             type="button"
-            disabled={busy || !message.replyTo}
+            disabled={busy || retryBlocked || !message.replyTo || Boolean(message.discussion && !canRetryDiscussion(message))}
             onClick={() => message.replyTo && onRetry(message.replyTo)}
           >
             <RotateCcw />
@@ -248,11 +275,20 @@ export default function TextChatWorkspace({
   visible = true,
   selectedText,
   onExitFocus,
+  attached,
 }: {
   focused: boolean;
   visible?: boolean;
   selectedText: string;
   onExitFocus: () => void;
+  attached?: {
+    boardId: string;
+    targetLabel: string;
+    reading: boolean;
+    onToggleReading: () => void;
+    onClose: () => void;
+    onPrompt: (value: string) => void;
+  };
 }) {
   const snapshot = useSyncExternalStore(
     visible ? runtime.subscribe : noSubscription,
@@ -261,13 +297,16 @@ export default function TextChatWorkspace({
   const [activeId, setActiveId] = useState<string | null>(
     () => chatStorageService.getDrawerState().textActiveSessionId || null,
   );
+  useEffect(() => {
+    if (snapshot.activeId !== undefined) setActiveId(snapshot.activeId);
+  }, [snapshot.activeId]);
   const [defaultModel, setDefaultModel] = useState<ModelRef | null>(null);
   const [emptyState, setEmptyState] = useState(newTextState);
   const [search, setSearch] = useState("");
   const [wide, setWide] = useState(
     () => window.matchMedia("(min-width: 761px)").matches,
   );
-  const inlineHistory = focused && wide;
+  const inlineHistory = !attached && focused && wide;
   const [historyOpen, setHistoryOpen] = useState(
     () => focused && window.matchMedia("(min-width: 761px)").matches,
   );
@@ -292,6 +331,21 @@ export default function TextChatWorkspace({
   const [rename, setRename] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [preparingAttachments, setPreparingAttachments] = useState(false);
+  const [draggingFiles, setDraggingFiles] = useState(false);
+  const attachmentInput = useRef<HTMLInputElement>(null);
+  const preparation = useRef<AbortController | null>(null);
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+  useEffect(() => {
+    preparation.current?.abort();
+    preparation.current = null;
+    setPreparingAttachments(false);
+    setDraggingFiles(false);
+    return () => {
+      preparation.current?.abort();
+    };
+  }, [activeId, visible]);
   const [creatingSession, setCreatingSession] = useState(false);
   const creatingSessionRef = useRef(false);
   const creatingInitial = useRef(false);
@@ -304,7 +358,8 @@ export default function TextChatWorkspace({
   const { board, setAppState } = useDrawnix();
   const boardRef = useRef(board);
   boardRef.current = board;
-  const session = snapshot.sessions.find((s) => s.id === activeId);
+  const session = snapshot.sessions.find((s) => s.id === activeId && (!attached ||
+    (s.textChat.executionMode === "agent" && s.textChat.linkedBoardId === attached.boardId)));
   const state = session?.textChat || emptyState;
   const retryPrompts = useMemo(() => {
     const users = new Map(
@@ -322,16 +377,24 @@ export default function TextChatWorkspace({
     }
     return labels;
   }, [state.messages]);
+  const blockedRetries = useMemo(() => {
+    const latest = new Map<string, TextMessage>();
+    const canvasUsers = new Set(state.messages.filter(m => m.role === "user" && m.origin === "canvas").map(m => m.id));
+    for (const m of state.messages) if (m.replyTo) latest.set(m.replyTo, m);
+    return new Set(state.messages.filter(m => m.discussion && m.replyTo &&
+      (canvasUsers.has(m.replyTo) || latest.get(m.replyTo)?.id !== m.id)).map(m => m.id));
+  }, [state.messages]);
   const busy = submitting || snapshot.running.has(activeId || "");
   const model = session?.sessionModelRef || defaultModel;
   const sessions = useMemo(
     () =>
       snapshot.sessions
+        .filter(s => !attached || (s.textChat.executionMode === "agent" && s.textChat.linkedBoardId === attached.boardId))
         .filter((s) =>
           s.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
         )
         .sort((a, b) => b.updatedAt - a.updatedAt),
-    [snapshot.sessions, search],
+    [snapshot.sessions, search, attached?.boardId],
   );
   const sessionGroups = useMemo(() => {
     const today = new Date();
@@ -382,6 +445,7 @@ export default function TextChatWorkspace({
   const select = useCallback(
     (id: string | null) => {
       setActiveId(id);
+      runtime.select(id);
       chatStorageService.setDrawerState({ textActiveSessionId: id });
       if (!inlineHistory) setHistoryOpen(false);
       setQuote("");
@@ -404,7 +468,7 @@ export default function TextChatWorkspace({
       creatingInitial.current
     )
       return;
-    const existing = snapshot.sessions[0];
+    const existing = snapshot.sessions.find(s => !attached || (s.textChat.executionMode === "agent" && s.textChat.linkedBoardId === attached.boardId));
     if (existing) {
       select(existing.id);
       return;
@@ -414,14 +478,14 @@ export default function TextChatWorkspace({
       .waitForInitialization()
       .then(() => {
         const route = resolveInvocationRoute("text");
-        return runtime.create(createModelRef(route.profileId, route.modelId));
+        return attached ? runtime.ensureDiscussion(attached.boardId, defaultModel) : runtime.create(createModelRef(route.profileId, route.modelId));
       })
       .then(select)
       .catch((e) => setNotice(e.message))
       .finally(() => {
         creatingInitial.current = false;
       });
-  }, [snapshot.ready, snapshot.error, activeId, snapshot.sessions, select]);
+  }, [snapshot.ready, snapshot.error, activeId, snapshot.sessions, select, attached?.boardId]);
   const patch = (values: Partial<typeof emptyState>) => {
     if (session) runtime.configure(session.id, {}, values);
     else setEmptyState((old) => ({ ...old, ...values }));
@@ -440,7 +504,11 @@ export default function TextChatWorkspace({
     creatingSessionRef.current = true;
     setCreatingSession(true);
     try {
-      const id = await runtime.create(defaultModel);
+      const id = await runtime.create(model);
+      if (attached) {
+        runtime.configure(id, {}, { executionMode: "agent", linkedBoardId: attached.boardId });
+        await runtime.save(id);
+      }
       select(id);
       inputRef.current?.focus();
     } catch (e) {
@@ -452,17 +520,25 @@ export default function TextChatWorkspace({
     }
   };
   const send = async () => {
-    if (submitLock.current || busy || !state.draft.trim()) return;
+    if (
+      submitLock.current ||
+      busy ||
+      preparingAttachments ||
+      (!state.draft.trim() && !state.draftAttachments?.length)
+    )
+      return;
     submitLock.current = true;
     setSubmitting(true);
     setNotice("");
     try {
+      await settingsManager.waitForInitialization();
       let id = session?.id;
       if (!id) {
         id = await runtime.create(defaultModel);
         runtime.configure(id, {}, emptyState);
         select(id);
       }
+      if (!runtime.canSend(id)) return;
       const content = quote
         ? `引用的画布文字：\n${quote}\n\n${state.draft}`
         : state.draft;
@@ -476,6 +552,78 @@ export default function TextChatWorkspace({
       submitLock.current = false;
       setSubmitting(false);
       inputRef.current?.focus();
+    }
+  };
+  const addFiles = async (files: File[]) => {
+    const id = activeId;
+    if (!id || !files.length || preparation.current || busy || !snapshot.ready)
+      return;
+    const current =
+      runtime.getSnapshot().sessions.find((s) => s.id === id)?.textChat
+        .draftAttachments || [];
+    if (
+      current.length + files.length > ATTACHMENT_LIMITS.count ||
+      current.reduce((n, a) => n + a.size, 0) +
+        files.reduce((n, f) => n + f.size, 0) >
+        ATTACHMENT_LIMITS.totalBytes
+    ) {
+      setNotice("每条最多 6 个附件，原文件合计不超过 20 MB。");
+      return;
+    }
+    const controller = new AbortController();
+    preparation.current = controller;
+    setPreparingAttachments(true);
+    setNotice("");
+    const timer = setTimeout(() => controller.abort(), 60000);
+    const errors: string[] = [];
+    try {
+      const { prepareTextAttachment } = await import(
+        "../../services/text-chat/attachment-prepare"
+      );
+      for (const file of files) {
+        controller.signal.throwIfAborted();
+        let storedId: string | undefined;
+        try {
+          attachmentFileKind(file);
+          const record = await prepareTextAttachment(
+            file,
+            id,
+            controller.signal,
+          );
+          controller.signal.throwIfAborted();
+          await saveTextAttachment(record);
+          storedId = record.ref.id;
+          controller.signal.throwIfAborted();
+          if (activeIdRef.current !== id)
+            throw new DOMException("已取消", "AbortError");
+          await runtime.addDraftAttachment(id, record.ref);
+        } catch (e) {
+          // A failed session save leaves the ref in memory; keep its payload recoverable.
+          if (
+            storedId &&
+            !runtime
+              .getSnapshot()
+              .sessions.find((s) => s.id === id)
+              ?.textChat.draftAttachments?.some((a) => a.id === storedId)
+          )
+            await removeTextAttachment(storedId);
+          controller.signal.throwIfAborted();
+          errors.push(`${file.name}：${(e as Error).message}`);
+        }
+      }
+    } catch (e) {
+      errors.push(
+        controller.signal.aborted
+          ? "附件处理已取消或超时，已完成的附件仍保留。"
+          : (e as Error).message,
+      );
+    } finally {
+      clearTimeout(timer);
+      if (preparation.current === controller) {
+        preparation.current = null;
+        setPreparingAttachments(false);
+        if (activeIdRef.current === id) setNotice(errors.join("\n"));
+      }
     }
   };
   const renameSession = useCallback(
@@ -597,7 +745,7 @@ export default function TextChatWorkspace({
   if (!visible) return null;
   return (
     <div
-      className={`text-chat-workspace ${focused ? "is-focused" : ""}`}
+      className={`text-chat-workspace ${focused ? "is-focused" : ""} ${attached ? "text-chat-workspace--attached" : ""}`}
       data-testid="text-chat-workspace"
       onKeyDown={(e) => {
         if (e.key === "Escape" && historyOpen && !inlineHistory) {
@@ -622,7 +770,7 @@ export default function TextChatWorkspace({
       >
         <div className="text-chat-history-heading">
           <strong>
-            会话 <span>{snapshot.sessions.length}</span>
+            {attached ? "本画板讨论" : "会话"} <span>{sessions.length}</span>
           </strong>
           <button
             type="button"
@@ -678,8 +826,36 @@ export default function TextChatWorkspace({
         </div>
         <div className="text-chat-history-footer">对话保存在本机</div>
       </aside>
-      <section className="text-chat-main">
-        <header className="text-chat-header">
+      <section
+        className={`text-chat-main ${draggingFiles ? "text-chat-file-drag" : ""}`}
+        onDragOver={(e) => {
+          if (!attached && e.dataTransfer.types.includes("Files")) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "copy";
+            setDraggingFiles(true);
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+            setDraggingFiles(false);
+        }}
+        onDrop={(e) => {
+          if (!attached && e.dataTransfer.files.length) {
+            e.preventDefault();
+            e.stopPropagation();
+            setDraggingFiles(false);
+            void addFiles(Array.from(e.dataTransfer.files));
+          }
+        }}
+      >
+        {draggingFiles && (
+          <div className="text-chat-drop-hint">松开以添加到当前对话</div>
+        )}
+        <header className="text-chat-header" onMouseDown={attached ? (event) => {
+          // Keep an attached composer's height stable until the action fires.
+          if (event.button === 0 && (event.target as Element).closest('button')) event.preventDefault();
+        } : undefined}>
           <button
             ref={historyToggleRef}
             type="button"
@@ -691,29 +867,29 @@ export default function TextChatWorkspace({
           >
             {historyOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
           </button>
-          <ModelSelector
-            value={model?.modelId || undefined}
-            valueRef={model}
-            onChange={onModel}
-          />
-          <span className="text-chat-spacer" />
-          <button
-            type="button"
-            aria-label="配置文本模型"
-            title="打开现有创作配置"
-            onClick={() => setAppState((s) => ({ ...s, openSettings: true }))}
-          >
-            <SlidersHorizontal />
-          </button>
-          <button
-            type="button"
-            aria-label="新建文本对话"
-            onClick={newSession}
-            disabled={!snapshot.ready || creatingSession}
-          >
-            <Plus />
-          </button>
+          {attached ? <>
+            <div className="attached-discussion-heading"><strong>创作讨论</strong><span>与当前画板同步</span></div>
+            <span className="text-chat-spacer" />
+            {attached.reading && busy && <button type="button" aria-label="停止讨论任务" title="停止讨论任务" onClick={() => activeId && runtime.stop(activeId)}><Square /></button>}
+            <button type="button" aria-label="新建画板讨论" title="新建画板讨论" onClick={newSession} disabled={!snapshot.ready || creatingSession}><Plus /></button>
+            <button type="button" aria-label={attached.reading ? "缩小讨论" : "展开阅读"} title={attached.reading ? "缩小讨论" : "展开阅读"} onClick={attached.onToggleReading}>{attached.reading ? <Minimize2 /> : <Maximize2 />}</button>
+            <button type="button" aria-label="收起讨论" title="收起讨论" onClick={attached.onClose}><X /></button>
+          </> : <>
+            <button type="button" className="text-chat-discussion-mode" aria-pressed={state.executionMode === "agent"}
+              title="使用当前画板的讨论 Agent"
+              onClick={() => void openDiscussion(workspaceService.getState().currentBoardId, model).catch(e => setNotice(e.message))}>
+              {state.executionMode === "agent" ? "创作讨论" : "讨论"}
+            </button>
+            <ModelSelector value={model?.modelId || undefined} valueRef={model} onChange={onModel} />
+            <span className="text-chat-spacer" />
+            <button type="button" aria-label="配置文本模型" title="打开现有创作配置" onClick={() => setAppState((s) => ({ ...s, openSettings: true }))}><SlidersHorizontal /></button>
+            <button type="button" aria-label="新建文本对话" onClick={newSession} disabled={!snapshot.ready || creatingSession}><Plus /></button>
+          </>}
         </header>
+        {attached && <div className="discussion-routing" data-testid="discussion-routing">
+          <DiscussionBackend busy={busy}><ModelSelector value={model?.modelId || undefined} valueRef={model} onChange={onModel} /></DiscussionBackend>
+          <div className="discussion-routing__target"><span>执行模型</span><strong title={attached.targetLabel}>{attached.targetLabel}</strong></div>
+        </div>}
         {session && (
           <div className="text-chat-title">
             {rename !== null ? (
@@ -775,9 +951,14 @@ export default function TextChatWorkspace({
                 <Rabbit />
               </div>
               <h2>从一个想法开始</h2>
-              <p>写点什么，理清思路，或者聊聊你的下一个作品。</p>
+              <p>{attached ? "在下方主输入框讨论想法，或粘贴多条提示词。先预览计划，再一键执行。" : "写点什么，理清思路，或者聊聊你的下一个作品。"}</p>
               <div className="text-chat-starters">
-                {[
+                {(attached ? [
+                  [Lightbulb, "讨论创作方向", "先帮我想三个不同的创作方向，暂时不要生成：\n"],
+                  [Feather, "设计一张海报", "帮我设计一张海报，先讨论主题和构图：\n"],
+                  [ListChecks, "规划一组图片", "我想批量生成一组风格一致的图片，先帮我规划：\n"],
+                  [ScanText, "调整画布作品", "结合我选中的画布作品，聊聊可以怎样优化。"],
+                ] : [
                   [Feather, "打磨一段文字", "帮我把下面这段文字写得更自然：\n"],
                   [
                     ListChecks,
@@ -790,15 +971,15 @@ export default function TextChatWorkspace({
                     "请解释下面的代码，并给出改进建议：\n",
                   ],
                   [Lightbulb, "聊聊创作灵感", "请帮我想三个不同的创作方向：\n"],
-                ].map(([Icon, title, prompt]) => {
+                ]).map(([Icon, title, prompt]) => {
                   const Symbol = Icon as typeof Feather;
                   return (
                     <button
                       type="button"
                       key={String(title)}
                       onClick={() => {
-                        patch({ draft: String(prompt) });
-                        inputRef.current?.focus();
+                        if (attached) attached.onPrompt(String(prompt));
+                        else { patch({ draft: String(prompt) }); inputRef.current?.focus(); }
                       }}
                     >
                       <Symbol />
@@ -824,11 +1005,14 @@ export default function TextChatWorkspace({
                     style={{ transform: `translateY(${item.start}px)` }}
                   >
                     <MessageView
-                      message={message}
+                      sessionId={session?.id}
+                  message={message}
                       retryPrompt={retryPrompts.get(message.id)}
+                      retryBlocked={blockedRetries.has(message.id)}
                       busy={busy}
                       onRetry={retry}
                       onInsert={insert}
+                      onLocate={attached?.onClose}
                     />
                   </div>
                 );
@@ -839,11 +1023,14 @@ export default function TextChatWorkspace({
               {state.messages.map((message) => (
                 <MessageView
                   key={message.id}
+                  sessionId={session?.id}
                   message={message}
                   retryPrompt={retryPrompts.get(message.id)}
+                      retryBlocked={blockedRetries.has(message.id)}
                   busy={busy}
                   onRetry={retry}
                   onInsert={insert}
+                      onLocate={attached?.onClose}
                 />
               ))}
             </div>
@@ -875,7 +1062,7 @@ export default function TextChatWorkspace({
             </button>
           </div>
         )}
-        <div className="text-chat-composer-wrap">
+        {!attached && <div className="text-chat-composer-wrap">
           {settingsOpen && (
             <div className="text-chat-settings">
               <div>
@@ -920,6 +1107,31 @@ export default function TextChatWorkspace({
             </div>
           )}
           <div className="text-chat-composer">
+            <TextAttachments
+              attachments={state.draftAttachments}
+              onRemove={
+                preparingAttachments
+                  ? undefined
+                  : (id) => {
+                      if (activeId)
+                        void runtime
+                          .removeDraftAttachment(activeId, id)
+                          .catch((e) => setNotice(e.message));
+                    }
+              }
+            />
+            {preparingAttachments && (
+              <div className="text-chat-attachment-progress" role="status">
+                <Loader2 className="text-chat-spin" size={14} />
+                正在处理附件…
+                <button
+                  type="button"
+                  onClick={() => preparation.current?.abort()}
+                >
+                  取消
+                </button>
+              </div>
+            )}
             {quote && (
               <div className="text-chat-quote">
                 <ScanText />
@@ -940,6 +1152,14 @@ export default function TextChatWorkspace({
               rows={3}
               value={state.draft}
               maxLength={200000}
+              onPaste={(e) => {
+                const files = Array.from(e.clipboardData.files);
+                if (files.length) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void addFiles(files);
+                }
+              }}
               onChange={(e) => patch({ draft: e.target.value })}
               onKeyDown={(e) => {
                 if (
@@ -955,6 +1175,30 @@ export default function TextChatWorkspace({
               placeholder="输入消息，让想法继续…"
             />
             <div className="text-chat-composer-actions">
+              <input
+                ref={attachmentInput}
+                type="file"
+                multiple
+                accept={ATTACHMENT_ACCEPT}
+                hidden
+                aria-label="选择聊天附件"
+                onChange={(e) => {
+                  const files = Array.from(e.currentTarget.files || []);
+                  e.currentTarget.value = "";
+                  void addFiles(files);
+                }}
+              />
+              <button
+                type="button"
+                aria-label="添加附件"
+                title="图片、PDF、文本和代码文件；也可拖入或粘贴图片"
+                disabled={
+                  !session || !snapshot.ready || busy || preparingAttachments
+                }
+                onClick={() => attachmentInput.current?.click()}
+              >
+                <Paperclip />
+              </button>
               <button
                 type="button"
                 aria-label="引用画布文字"
@@ -991,7 +1235,8 @@ export default function TextChatWorkspace({
                   className="text-chat-send"
                   aria-label="发送文本消息"
                   disabled={
-                    !state.draft.trim() ||
+                    (!state.draft.trim() && !state.draftAttachments?.length) ||
+                    preparingAttachments ||
                     !snapshot.ready ||
                     creatingSession ||
                     !!snapshot.error
@@ -1004,9 +1249,9 @@ export default function TextChatWorkspace({
             </div>
           </div>
           <div className="text-chat-footer">
-            Enter 发送 · Shift + Enter 换行
+            Enter 发送 · Shift + Enter 换行 · PDF 读取文字，图片识别取决于模型
           </div>
-        </div>
+        </div>}
       </section>
       <ConfirmDialog
         open={!!deleteId}

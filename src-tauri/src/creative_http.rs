@@ -1,6 +1,6 @@
 //! Manual creative providers use native HTTP without WebView CORS. This module
 //! has no access to the account store and never follows credentialed redirects.
-use crate::tuzi_account::creative::CreativeChunk;
+use crate::tuzi_account::creative::{CreativeChunk, creative_send_error, deliver_creative_result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use futures::StreamExt;
 use serde::Deserialize;
@@ -122,7 +122,7 @@ async fn execute(
         let response = builder
             .send()
             .await
-            .map_err(|_| "creative_outcome_unknown")?;
+            .map_err(|error| creative_send_error(&error))?;
         if response.status().is_redirection() {
             return Err("creative_redirect_rejected".into());
         }
@@ -166,7 +166,7 @@ async fn execute(
             let mut stream = response.bytes_stream();
             let mut total = 0usize;
             while let Some(chunk) = stream.next().await {
-                let bytes = chunk.map_err(|_| "creative_outcome_unknown")?;
+                let bytes = chunk.map_err(|_| "creative_stream_interrupted")?;
                 total += bytes.len();
                 if total > MAX_BYTES {
                     return Err("response_too_large".into());
@@ -192,10 +192,10 @@ pub async fn creative_manual_request(
     request: ManualRequest,
     on_chunk: tauri::ipc::Channel<CreativeChunk>,
 ) -> Result<(), String> {
-    execute(request, |chunk| {
+    let result = execute(request, |chunk| {
         on_chunk.send(chunk).map_err(|_| "consumer_closed".into())
-    })
-    .await
+    }).await;
+    deliver_creative_result(result, |chunk| on_chunk.send(chunk).map_err(|_| "consumer_closed".into()))
 }
 
 #[tauri::command]

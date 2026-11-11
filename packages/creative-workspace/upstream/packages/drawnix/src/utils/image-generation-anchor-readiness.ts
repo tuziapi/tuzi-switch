@@ -1,3 +1,4 @@
+import { isVideoElement } from '../plugins/with-video';
 import type { PlaitBoard } from '@plait/core';
 import {
   getCanvasImageError,
@@ -6,7 +7,7 @@ import {
 } from '../services/canvas-image-readiness';
 import { workflowCompletionService } from '../services/workflow-completion-service';
 import type { PlaitImageGenerationAnchor } from '../types/image-generation-anchor.types';
-import type { Task } from '../types/task.types';
+import { TaskType, type Task } from '../types/task.types';
 
 function getImageGenerationResultImages(
   board: PlaitBoard,
@@ -84,6 +85,10 @@ export function areImageGenerationResultsReady(
   anchor: PlaitImageGenerationAnchor,
   tasks: Task[]
 ): boolean {
+  if (tasks.length && tasks.every(task => task.type === TaskType.VIDEO || task.type === TaskType.AUDIO)) {
+    return tasks.every(task => board.children.some(element => (task.type === TaskType.VIDEO ? isVideoElement(element) : element.type === task.type) &&
+      (element.generationTaskId === task.id || element.id === workflowCompletionService.getPostProcessingStatus(task.id)?.firstElementId)));
+  }
   const images = getImageGenerationResultImages(board, anchor, tasks);
   if (images.length === 0) {
     return false;

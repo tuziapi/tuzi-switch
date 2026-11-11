@@ -18,6 +18,7 @@ import {
 import { isTuziCompatibleBaseUrl } from './tuzi-api-endpoints';
 import { inferAllBindingHintsFromEndpoints } from './endpoint-binding-inference';
 import { getSunoV2Action, isSunoV2Model } from '../suno-v2';
+import { isGeminiOmniModel, GEMINI_OMNI_VIDEO_METADATA } from '../../utils/gemini-omni-model';
 import type { ProviderModelBinding, ProviderProfileSnapshot } from './types';
 
 function buildBindingId(
@@ -622,6 +623,16 @@ function inferVideoBindings(
 ): ProviderModelBinding[] {
   const bindings: ProviderModelBinding[] = [];
 
+  if (isGeminiOmniModel(model.id)) {
+    return [buildBinding(profile, model, {
+      protocol: 'openai.async.video', requestSchema: 'gemini.omni.video.json',
+      responseSchema: 'openai.async.task', submitPath: '/videos',
+      pollPathTemplate: '/videos/{taskId}', baseUrlStrategy: 'ensure-v1',
+      metadata: { video: GEMINI_OMNI_VIDEO_METADATA },
+      priority: 700, confidence: 'high', source: 'template',
+    })];
+  }
+
   if (isStandardKlingVideoModel(model)) {
     bindings.push(
       buildBinding(profile, model, {
@@ -916,6 +927,10 @@ export function inferBindingsForProviderModel(
   model: ModelConfig,
   endpointHints?: Record<string, PricingEndpointInfo> | null
 ): ProviderModelBinding[] {
+  // Older cached catalogues may have classified this Gemini ID as text.
+  // Preserve explicitly authored manual models/bindings.
+  if (isGeminiOmniModel(model.id) && !model.tags?.includes('manual'))
+    model = { ...model, type: 'video' };
   let bindings: ProviderModelBinding[];
   // Native Suno IDs remain audio even in stale catalogs marked as chat models.
   if (isSunoNativeModel(model.id) || isSunoV2Model(model.id)) model = { ...model, type: 'audio' };

@@ -359,3 +359,36 @@ describe("external creative tool boundary", () => {
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
 });
+
+
+describe("ordered native transport failures", () => {
+  it.each(["account", "manual"])("preserves queued %s response chunks before the error", async transport => {
+    mocks.invoke.mockImplementation(async (_command,args) => {
+      args.onChunk.onmessage({type:"start",status:200,content_type:"text/event-stream"});
+      args.onChunk.onmessage({type:"data",data:btoa("first")});
+      args.onChunk.onmessage({type:"data",data:btoa("second")});
+      args.onChunk.onmessage({type:"error",code:"creative_stream_interrupted"});
+    });
+    const response=await (transport==="account" ? send("/v1/chat/completions",{method:"POST",body:JSON.stringify({model:"synthetic",stream:true})}) : requestCreativeManual("https://example.invalid/v1/chat/completions",{method:"POST",body:"{}"}));
+    const reader=response.body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe("first");
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe("second");
+    await expect(reader.read()).rejects.toMatchObject({code:"creative_stream_interrupted"});
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+  });
+  it("accepts a complete terminal response even when the socket errors immediately afterwards", async () => {
+    const {readTextStream}=await import("../../packages/creative-workspace/upstream/packages/drawnix/src/services/text-chat/protocol");
+    mocks.invoke.mockImplementation(async (_command,args)=>{
+      args.onChunk.onmessage({type:"start",status:200,content_type:"text/event-stream"});
+      const payload='data: '+JSON.stringify({choices:[{delta:{content:'{"content":"ready","next":[]}'},finish_reason:"stop"}]})+'\n\ndata: [DONE]\n\n';
+      args.onChunk.onmessage({type:"data",data:btoa(payload)});
+      args.onChunk.onmessage({type:"error",code:"creative_stream_interrupted"});
+    });
+    const response=await send("/v1/chat/completions",{method:"POST",body:'{"model":"synthetic","stream":true}'});
+    await expect(readTextStream(response,"chat",()=>{})).resolves.toMatchObject({content:'{"content":"ready","next":[]}',finishReason:"stop"});
+  });
+  it("rejects an ordered pre-header failure without exposing raw diagnostics",async()=>{
+    mocks.invoke.mockImplementation(async (_command,args)=>args.onChunk.onmessage({type:"error",code:"creative_connection_failed"}));
+    await expect(send()).rejects.toMatchObject({code:"creative_connection_failed",message:expect.stringContaining("无法连接")});
+  });
+});

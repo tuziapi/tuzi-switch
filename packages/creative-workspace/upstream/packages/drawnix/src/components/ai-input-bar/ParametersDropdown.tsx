@@ -1,3 +1,4 @@
+import { getComposerPortalContainer } from '../dialog/dialog';
 import { SunoFileInput } from '../shared/SunoFileInput';
 /**
  * 参数下拉选择器组件
@@ -602,7 +603,7 @@ export const ParametersDropdown: React.FC<ParametersDropdownProps> = ({
                     {hasAdvancedParams && !advancedOpen && advancedToggle}
                   </div>
                 </div>,
-                (document.getElementById('creative-portals') || document.body)
+                getComposerPortalContainer()
               )}
           </div>
         );

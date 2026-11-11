@@ -116,6 +116,7 @@ function harness(initialPrompt = '', approved = true) {
   runInNewContext(compiled, {
     ...taskbar,
     exports: callbacks,
+    discussionEnabled: false,
     useCallback: (fn: unknown) => fn,
     promptRef,
     uploadedContentRef,

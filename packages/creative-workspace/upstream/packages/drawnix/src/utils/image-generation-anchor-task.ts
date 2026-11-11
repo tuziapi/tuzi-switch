@@ -69,6 +69,8 @@ export function getImageGenerationTaskInsertGroupKey(
     return `replace-media:${task.params.replaceElementId}:${task.id}`;
   }
 
+  if (task.params.conversationLink && task.params.anchorId) return `discussion-slot:${task.params.anchorId}`;
+
   if (task.type !== TaskType.IMAGE) {
     const taskGroupType =
       task.type === TaskType.AUDIO && isLyricsTask(task) ? 'lyrics' : task.type;
@@ -102,15 +104,16 @@ export function getImageGenerationTaskInsertGroupKey(
   return fallbackGroupKey;
 }
 
-function isImageTask(task: Task): boolean {
-  return task.type === TaskType.IMAGE;
+export function isGenerationAnchorTask(task: Task): boolean {
+  return task.type === TaskType.IMAGE || Boolean(task.params.conversationLink && task.params.anchorId &&
+    (task.type === TaskType.VIDEO || task.type === TaskType.AUDIO));
 }
 
 export function doesTaskBelongToImageGenerationAnchor(
   anchor: PlaitImageGenerationAnchor,
   task: Task
 ): boolean {
-  if (!isImageTask(task)) {
+  if (!isGenerationAnchorTask(task)) {
     return false;
   }
 

@@ -42,6 +42,8 @@ import { prepareReferenceImageForMultipart } from '../reference-image-form-data'
 import { mapWithConcurrency } from '../../utils/map-with-concurrency';
 import { appendVeoAdvancedMetadata } from '../../utils/veo-parameters';
 import { prepareMiniMaxH3Submission } from '../minimax-h3-video-workflow';
+import { isGeminiOmniModel } from '../../utils/gemini-omni-model';
+import { buildGeminiOmniVideoBody } from '../gemini-omni-video';
 
 const DURATION_IN_MODEL_PREFIX = 'sora-2-';
 const PROVIDER_ERROR_PREVIEW_LIMIT = 1000;
@@ -209,6 +211,9 @@ export async function submitVideoGeneration(
     params.params as Record<string, string> | undefined
   );
   const isMiniMaxH3 = isMiniMaxH3Model(model);
+  const isOmni = isGeminiOmniModel(model);
+  if (isOmni && (params.referenceImages?.length || 0) > 10)
+    throw new Error('Gemini Omni 最多支持 10 张参考图');
 
   // 构建 FormData
   const formData = new FormData();
@@ -243,7 +248,7 @@ export async function submitVideoGeneration(
         });
         return {
           ...prepared,
-          blob: await prepareVideoReferenceImageBlob(prepared.blob, params.size),
+          blob: isOmni ? prepared.blob : await prepareVideoReferenceImageBlob(prepared.blob, params.size),
         };
       }
     );
@@ -275,10 +280,10 @@ export async function submitVideoGeneration(
 
   const response = await providerTransport.send(providerContext, {
     path: submitPath,
-    baseUrlStrategy: isMiniMaxH3 ? 'trim-v1' : config.binding?.baseUrlStrategy,
+    baseUrlStrategy: isOmni ? 'ensure-v1' : isMiniMaxH3 ? 'trim-v1' : config.binding?.baseUrlStrategy,
     method: 'POST',
-    headers: isMiniMaxH3 ? { 'Content-Type': 'application/json' } : undefined,
-    body: isMiniMaxH3 ? JSON.stringify(miniMaxSubmission!.body) : formData,
+    headers: isMiniMaxH3 || isOmni ? { 'Content-Type': 'application/json' } : undefined,
+    body: isOmni ? await buildGeminiOmniVideoBody(formData, signal) : isMiniMaxH3 ? JSON.stringify(miniMaxSubmission!.body) : formData,
     signal,
     fetcher: fetchFn,
   });
@@ -551,9 +556,9 @@ export async function generateVideo(
     throw error instanceof Error ? withVideoRequestId(error, apiRequestId) : error;
   });
   const videoUrl =
-    extractInlineVideoUrl(result as Record<string, any>) ||
+    (!isGeminiOmniModel(result.model || params.model || config.defaultModel) && extractInlineVideoUrl(result as Record<string, any>)) ||
     (shouldDownloadVideoContent(
-      result.model || params.model,
+      result.model || params.model || config.defaultModel,
       config.binding,
       result as Record<string, any>
     )
@@ -564,8 +569,10 @@ export async function generateVideo(
             normalizeApiBase(config.baseUrl)
           ),
           binding: config.binding,
-          modelId: result.model || params.model,
+          modelId: result.model || params.model || config.defaultModel,
           cacheKey: remoteId,
+          signal,
+          fetcher: config.fetchImpl,
         })
       : undefined);
   if (!videoUrl) {
@@ -597,7 +604,7 @@ export async function resumeVideoPolling(
 ): Promise<VideoGenerationResult> {
   const result = await pollVideoUntilComplete(remoteId, config, options);
   const videoUrl =
-    extractInlineVideoUrl(result as Record<string, any>) ||
+    (!isGeminiOmniModel(result.model || config.defaultModel) && extractInlineVideoUrl(result as Record<string, any>)) ||
     (shouldDownloadVideoContent(
       result.model || config.defaultModel,
       config.binding,
@@ -612,6 +619,8 @@ export async function resumeVideoPolling(
           binding: config.binding,
           modelId: result.model || config.defaultModel,
           cacheKey: remoteId,
+          signal: options.signal,
+          fetcher: config.fetchImpl,
         })
       : undefined);
   if (!videoUrl) {

@@ -19,8 +19,8 @@ const DESKTOP_PHASE_LABELS: Record<ImageGenerationAnchorPhase, string> = {
   submitted: '准备生成',
   queued: '等待执行',
   generating: '生成中',
-  developing: '正在加载图片',
-  inserting: '正在加载图片',
+  developing: '正在加载结果',
+  inserting: '正在加载结果',
   completed: '已完成',
   failed: '生成失败',
 };

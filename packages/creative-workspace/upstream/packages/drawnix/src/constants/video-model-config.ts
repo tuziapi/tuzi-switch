@@ -14,6 +14,7 @@ import type {
 } from '../types/video.types';
 import { getModelConfig, ModelVendor } from './model-config';
 import { SEEDANCE_25_MODEL_ID } from '../utils/seedance-model';
+import { GEMINI_OMNI_MODEL_ID, GEMINI_OMNI_DURATIONS, GEMINI_OMNI_SIZES } from '../utils/gemini-omni-model';
 
 const SEEDANCE_ASPECT_RATIO_OPTIONS = [
   { label: '横屏 16:9', aspectRatio: '16:9' },
@@ -110,6 +111,14 @@ const MINIMAX_H3_SIZE_OPTIONS: SizeOption[] = [
  * Each model has specific duration, size, and image upload options
  */
 export const VIDEO_MODEL_CONFIGS: Record<string, VideoModelConfig> = {
+  [GEMINI_OMNI_MODEL_ID]: {
+    id: GEMINI_OMNI_MODEL_ID,
+    label: 'Gemini Omni 1.1 Flash', provider: 'gemini-omni',
+    description: '3–10秒视频，支持横竖屏与最多10张参考图',
+    durationOptions: GEMINI_OMNI_DURATIONS.map(value => ({ label: `${value}秒`, value })),
+    defaultDuration: '4', sizeOptions: GEMINI_OMNI_SIZES, defaultSize: '1280x720',
+    imageUpload: { maxCount: 10, mode: 'reference', labels: Array.from({ length: 10 }, (_, i) => `参考图${i + 1}`) },
+  },
   kling_video: {
     id: 'kling_video',
     label: 'Kling',

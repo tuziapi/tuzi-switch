@@ -96,11 +96,14 @@ it("round-trips every text field in the existing environment backup, retaining o
     textChat: {
       version: 1,
       draft: "unsent",
+      executionMode: "agent",
+      linkedBoardId: "synthetic-board",
       systemPrompt: "system",
       maxOutput: 512,
       messages: [
         {
           id: "answer",
+          discussion: { boardId: "synthetic-board", runId: "synthetic-run", taskIds: ["synthetic-task"], submission: "started", plan: {version:1,status:"started",steps:[{type:"text",prompt:"synthetic",count:1,model:"synthetic",modelRef:{profileId:"synthetic",modelId:"synthetic"}}]} },
           role: "assistant",
           content: "partial",
           reasoning: "thinking",
@@ -141,5 +144,62 @@ it("refuses restore while a conversation is still generating", async () => {
   await expect(
     importEnvironmentData(exported.data, { mode: "replace" }),
   ).rejects.toThrow("停止文本回复");
+  expect(state.reload).not.toHaveBeenCalled();
+});
+
+it("round-trips image and extracted PDF payloads in the optional backup store", async () => {
+  const image = {
+    ref: {
+      id: "image",
+      name: "photo.jpg",
+      kind: "image",
+      mimeType: "image/jpeg",
+      size: 4,
+    },
+    sessionId: "text",
+    dataUrl: "data:image/jpeg;base64,YWJj",
+  };
+  const pdf = {
+    ref: {
+      id: "pdf",
+      name: "notes.pdf",
+      kind: "document",
+      mimeType: "application/pdf",
+      size: 4,
+      pages: 1,
+    },
+    sessionId: "text",
+    text: "Synthetic PDF",
+  };
+  state.stores.set(
+    "aitu-chat/text_attachments",
+    new Map([
+      ["image", image],
+      ["pdf", pdf],
+    ]),
+  );
+  const { data } = await exportEnvironmentData(false);
+  state.stores.clear();
+  await importEnvironmentData(JSON.parse(JSON.stringify(data)), {
+    mode: "replace",
+  });
+  expect(state.stores.get("aitu-chat/text_attachments")?.get("image")).toEqual(
+    image,
+  );
+  expect(state.stores.get("aitu-chat/text_attachments")?.get("pdf")).toEqual(
+    pdf,
+  );
+  delete data.localForage.textAttachments;
+  await importEnvironmentData(data, { mode: "replace" });
+  expect(state.stores.get("aitu-chat/text_attachments")?.size).toBe(0);
+});
+it("preflights malformed attachment backups before clearing existing data", async () => {
+  state.stores.set("aitu-chat/sessions", new Map([["keep", { id: "keep" }]]));
+  const { data } = await exportEnvironmentData(false);
+  data.localForage.textAttachments = [{ key: "bad", value: {} }];
+  await expect(
+    importEnvironmentData(data, { mode: "replace" }),
+  ).rejects.toThrow("附件");
+  expect(state.stores.get("aitu-chat/sessions")?.has("keep")).toBe(true);
   expect(state.reload).not.toHaveBeenCalled();
 });

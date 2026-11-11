@@ -13,6 +13,14 @@ import {
 } from '@floating-ui/react';
 import './dialog.scss';
 
+// Composer dropdowns must remain inside its expanded dialog for outside-click
+// dismissal, accessibility and keyboard focus. Fixed positioning still uses
+// the creative root as its containing block.
+export function getComposerPortalContainer(): HTMLElement {
+  return document.querySelector<HTMLElement>('[data-composer-dialog]') ??
+    document.getElementById('creative-portals') ?? document.body;
+}
+
 interface DialogOptions {
   initialOpen?: boolean;
   open?: boolean;
@@ -136,8 +144,11 @@ export const DialogTrigger = React.forwardRef<
 
 export const DialogContent = React.forwardRef<
   HTMLDivElement,
-  React.HTMLProps<HTMLDivElement> & { container?: HTMLElement | null }
->(function DialogContent({ container, ...props }, propRef) {
+  React.HTMLProps<HTMLDivElement> & {
+    container?: HTMLElement | null;
+    initialFocus?: number | React.MutableRefObject<HTMLElement | null>;
+  }
+>(function DialogContent({ container, initialFocus, ...props }, propRef) {
   const { context: floatingContext, ...context } = useDialogContext();
   const ref = useMergeRefs([context.refs.setFloating, propRef]);
 
@@ -146,7 +157,7 @@ export const DialogContent = React.forwardRef<
   return (
     <FloatingPortal root={container ?? document.getElementById('creative-portals') ?? undefined}>
       <FloatingOverlay className="Dialog-overlay" lockScroll>
-        <FloatingFocusManager context={floatingContext}>
+        <FloatingFocusManager context={floatingContext} initialFocus={initialFocus}>
           <div
             ref={ref}
             aria-labelledby={context.labelId}

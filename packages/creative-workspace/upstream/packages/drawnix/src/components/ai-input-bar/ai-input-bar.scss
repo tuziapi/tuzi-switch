@@ -3116,3 +3116,208 @@ $ai-input-small-expanded-max-height: $ai-input-small-line-height * 6 +
     background: rgba($orange-primary, 0.2);
   }
 }
+
+// The discussion strip is part of the same rounded composer (column-reverse).
+.ai-input-composer-shell--discussion {
+  padding-top: 0;
+  .discussion-strip { margin: 0 -10px 5px; padding: 0 10px; }
+  &.ai-input-composer-shell--expanded .discussion-strip { margin: 0 -12px 5px; padding: 0 12px; }
+}
+.discussion-strip {
+  --discussion-ink: #41454d;
+  --discussion-muted: #727781;
+  --discussion-accent: #68717e;
+  --discussion-hover: #f3f4f6;
+  display: flex; align-items: center; gap: 14px;
+  box-sizing: border-box; height: 30px; min-height: 30px; flex-shrink: 0;
+  background: transparent;
+  border-radius: 16px 16px 0 0; color: var(--discussion-ink);
+  button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--discussion-accent); outline-offset: -2px; }
+  // Decorative SVGs must target their button, including the text-selection guard.
+  svg { pointer-events: none; }
+  &__open {
+    display: flex; align-items: center; gap: 8px; height: 28px; padding: 0;
+    min-width: 0; flex: 1; font-size: 12px; text-align: left; border-radius: 5px;
+    &:hover .discussion-strip__toggle { color: var(--discussion-ink); }
+  }
+  &__icon {
+    display: grid; place-items: center; flex: 0 0 16px; height: 20px;
+    color: var(--discussion-accent);
+  }
+  &[data-phase='complete'] { --discussion-accent: #52745d; }
+  &[data-phase='error'] { --discussion-accent: #b04d3e; }
+  &__label { flex-shrink: 0; margin-right: 5px; font-weight: 500; font-size: 12px; }
+  &__status { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; flex: 1; color: var(--discussion-muted); }
+  &__toggle {
+    display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+    height: 26px; padding: 0 2px; font-size: 11px; color: var(--discussion-muted);
+  }
+  &__direct {
+    flex-shrink: 0; font-size: 11px; height: 26px; padding: 0 2px;
+    color: var(--discussion-muted); border-radius: 4px;
+    &:hover { color: var(--discussion-ink); text-decoration: underline; text-underline-offset: 3px; }
+  }
+  &__stop {
+    display: grid; place-items: center; flex-shrink: 0; height: 24px; width: 24px;
+    border-radius: 6px;
+    &:hover { background: var(--discussion-hover); }
+  }
+  &__spin { animation: discussion-spin 1.5s linear infinite; }
+}
+:root[data-theme='dark'] .discussion-strip {
+  --discussion-ink: #e2e3e7;
+  --discussion-muted: #b8bbc3;
+  --discussion-accent: #a9afbb;
+  --discussion-hover: #ffffff0f;
+  &[data-phase='complete'] { --discussion-accent: #a1bca8; }
+  &[data-phase='error'] { --discussion-accent: #efa698; }
+}
+.ai-input-bar__discuss { display: inline-flex; align-items: center; gap: 4px; border: 0; padding: 5px 8px; border-radius: 8px; color: inherit; background: transparent; white-space: nowrap; cursor: pointer; }
+.ai-input-bar__discuss[aria-pressed=true] { background: var(--color-surface-light, rgba(128,128,128,.1)); }
+@keyframes discussion-spin { to { transform: rotate(360deg); } }
+@media(prefers-reduced-motion: reduce) { .discussion-strip__spin { animation: none; } }
+
+// Respond to the space left beside the discussion, not the whole window width.
+.ai-input-composer-shell--canvas {
+  container: canvas-composer / inline-size;
+}
+@container canvas-composer (max-width: 540px) {
+  .discussion-strip { gap: 5px; }
+  .discussion-strip__open { gap: 6px; }
+  .discussion-strip__toggle > span { display: none; }
+  .ai-input-composer-shell__bottom-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+  .ai-input-composer-shell__bottom-controls {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    > * { flex-shrink: 0; }
+    &::-webkit-scrollbar { display: none; }
+  }
+  .ai-input-composer-shell__bottom-start { grid-column: 1; grid-row: 2; }
+  .ai-input-composer-shell__bottom-bar > .ai-input-bar__send-btn { grid-column: 2; grid-row: 2; }
+}
+
+// Shared composer: the transcript opens above it, without a canvas-wide overlay.
+.ai-input-composer-shell--discussion {
+  .attached-discussion { position: relative; margin: 0 -10px 5px; flex-shrink: 0; }
+  &.ai-input-composer-shell--expanded .attached-discussion { margin: 0 -12px 5px; }
+  .attached-discussion .discussion-strip { margin: 0; padding: 0 12px; }
+  &:has(.attached-discussion.is-open) { border-top-left-radius: 0; border-top-right-radius: 0; transition: none; }
+  .attached-discussion.is-open .discussion-strip { border-radius: 0; }
+}
+.attached-discussion {
+  pointer-events: auto;
+  &__panel {
+    position: absolute; bottom: 100%; left: 0; width: 100%;
+    display: flex; flex-direction: column; overflow: hidden;
+    border: 1px solid var(--color-border, #e3e5df); border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+    background: var(--island-bg-color, #fffefa);
+    box-sizing: border-box;
+    box-shadow: 0 -10px 32px #2833250d;
+    user-select: text; -webkit-user-select: text;
+    overscroll-behavior: contain;
+  }
+  &__loading { padding: 24px; font-size: 13px; color: var(--text-color, #555); }
+  button:focus-visible { outline: 2px solid #638059; outline-offset: -2px; }
+}
+.ai-input-composer-slot,
+.ai-input-composer-mount {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  pointer-events: auto;
+}
+.ai-input-composer-slot { max-height: 100%; }
+.ai-input-composer-mount { flex: 1; max-height: 100%; }
+.attached-discussion .text-chat-header svg { pointer-events: none; }
+.Dialog-overlay:has(.attached-discussion-modal) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+.ai-input-bar.attached-discussion-modal {
+  position: relative;
+  inset: auto;
+  transform: none;
+  z-index: auto;
+  width: min(1000px, calc(100% - 48px));
+  height: min(820px, calc(100% - 48px));
+  max-width: none;
+  padding: 0;
+  gap: 0;
+  border: 1px solid var(--color-border, #e3e5df);
+  border-radius: 20px;
+  background: var(--island-bg-color, #fff);
+  box-shadow: 0 24px 80px #0003;
+  pointer-events: auto;
+  .attached-discussion-modal__panel {
+    display: flex; flex: 1; flex-direction: column; min-height: 0; width: 100%;
+  }
+  .ai-input-composer-shell--canvas {
+    flex: 1;
+    border-radius: 20px;
+    box-shadow: none;
+    overflow: hidden;
+    padding: 0 20px 16px;
+    transition: none;
+    background: var(--island-bg-color, #fff);
+  }
+  .ai-input-composer-shell__input-area {
+    flex-shrink: 0;
+    max-height: 32%;
+    border: 1px solid var(--color-border, #e3e5df);
+    border-radius: 14px;
+    margin-top: 12px;
+    margin-bottom: 10px;
+  }
+  .attached-discussion {
+    flex: 1; min-height: 0; margin: 0 -20px;
+    display: flex; flex-direction: column;
+  }
+  .attached-discussion__panel {
+    position: relative; inset: auto; flex: 1; min-height: 0;
+    border: 0; border-bottom: 1px solid var(--color-border, #e3e5df);
+    border-radius: 20px 20px 0 0; box-shadow: none;
+  }
+  .discussion-strip { display: none; }
+  .text-chat-header { padding: 16px 20px; }
+  .text-chat-workspace { font-size: 14px; }
+  .text-chat-messages {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    box-sizing: border-box;
+    padding: 20px 24px 28px;
+    &--virtual { padding-block: 0; }
+  }
+  .text-chat-virtual-row { left: 24px; right: 24px; }
+}
+:root[data-theme='dark'] .ai-input-bar.attached-discussion-modal,
+.creative-root[data-theme='dark'] .ai-input-bar.attached-discussion-modal {
+  background: var(--color-surface-high, #2a2a2a);
+  .ai-input-composer-shell--canvas { background: var(--color-surface-high, #2a2a2a); }
+}
+@media (max-width: 760px), (max-height: 600px) {
+  .ai-input-bar.attached-discussion-modal {
+    width: calc(100% - 24px);
+    height: calc(100% - 24px);
+    border-radius: 14px;
+    .ai-input-composer-shell--canvas { border-radius: 14px; padding: 0 12px 10px; }
+    .attached-discussion { margin: 0 -12px; }
+    .attached-discussion__panel { border-radius: 14px 14px 0 0; }
+    .text-chat-header { padding: 10px 12px; }
+    .text-chat-messages { padding: 12px 18px 18px; }
+    .text-chat-messages--virtual { padding-block: 0; }
+    .text-chat-virtual-row { left: 18px; right: 18px; }
+    .discussion-routing { padding-top: 4px; padding-bottom: 4px; }
+  }
+}

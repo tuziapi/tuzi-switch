@@ -9,12 +9,11 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { LayoutGrid, Pencil, Settings2 } from "lucide-react";
 import type { CreativePage } from "@tuzi/creative-workspace";
-import { cn } from "@/lib/utils";
 import { disconnectedAccount, type AccountState } from "@/lib/api/account";
 import { createCreativeAccountBridge } from "./accountBridge";
 import { useModelUpgradeSync } from "./useModelUpgradeSync";
+import { CreativeTopBar } from "./CreativeTopBar";
 
 import { registerUpdateGuard } from "@/lib/updateSafety";
 
@@ -54,11 +53,6 @@ class CreativeErrorBoundary extends Component<
 
 const noAccountAction = () => {};
 
-const pages = [
-  { id: "projects", label: "我的项目", icon: LayoutGrid },
-  { id: "canvas", label: "自由画布", icon: Pencil },
-] as const;
-
 function initialCreativePage(): CreativePage {
   const saved = sessionStorage.getItem("tuzi-creative-page");
   return saved === "canvas" ? saved : "projects";
@@ -69,11 +63,17 @@ export function CreativeWorkspace({
   accountState = disconnectedAccount,
   onManageAccount = noAccountAction,
   selectedKeyId,
+  navigation,
+  reserveMacControls,
+  reserveWindowControls,
 }: {
   active?: boolean;
   accountState?: AccountState;
   onManageAccount?: () => void;
   selectedKeyId?: string;
+  navigation?: ReactNode;
+  reserveMacControls?: boolean;
+  reserveWindowControls?: boolean;
 }) {
   const [hasOpened, setHasOpened] = useState(active);
   useEffect(() => {
@@ -111,36 +111,14 @@ export function CreativeWorkspace({
       aria-label="opentu 创作工作区"
       className="tuzi-creative-arrival flex min-h-0 flex-1 flex-col overflow-hidden"
     >
-      <div className="flex h-12 shrink-0 items-center justify-start gap-3 border-b border-border bg-background px-5">
-        <nav className="flex items-center gap-1" aria-label="创作导航">
-          {pages.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setPage(id)}
-              aria-current={page === id ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3 py-2 text-xs",
-                page === id
-                  ? "bg-muted text-foreground font-medium"
-                  : "text-muted-foreground hover:bg-muted/60",
-              )}
-            >
-              <Icon size={14} />
-              {label}
-            </button>
-          ))}
-        </nav>
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"
-          aria-label="创作配置"
-        >
-          <Settings2 size={15} />
-          创作配置
-        </button>
-        <div id="creative-chat-entry" className="ml-auto shrink-0" />
-      </div>
+      <CreativeTopBar
+        page={page}
+        onPageChange={setPage}
+        onOpenSettings={() => setSettingsOpen(true)}
+        navigation={navigation}
+        reserveMacControls={reserveMacControls}
+        reserveWindowControls={reserveWindowControls}
+      />
       <div className="relative min-h-0 flex-1">
         <CreativeErrorBoundary>
           <Suspense
