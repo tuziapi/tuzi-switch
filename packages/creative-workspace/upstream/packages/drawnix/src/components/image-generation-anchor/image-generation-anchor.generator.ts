@@ -7,6 +7,7 @@ import { useImageGenerationAnchorController } from '../../hooks/useImageGenerati
 import {
   IMAGE_GENERATION_ANCHOR_RETRY_EVENT,
   type ImageGenerationAnchorPhase,
+  type ImageGenerationAnchorViewModel,
   type PlaitImageGenerationAnchor,
 } from '../../types/image-generation-anchor.types';
 import { isNativeRenderEnvironment } from '../../utils/tauri-env';
@@ -18,8 +19,8 @@ const DESKTOP_PHASE_LABELS: Record<ImageGenerationAnchorPhase, string> = {
   submitted: '准备生成',
   queued: '等待执行',
   generating: '生成中',
-  developing: '正在加载图片',
-  inserting: '正在加载图片',
+  developing: '正在加载结果',
+  inserting: '正在加载结果',
   completed: '已完成',
   failed: '生成失败',
 };
@@ -51,7 +52,7 @@ function truncateText(value: string, maxLength: number): string {
 function NativeAnchorState({ board, element, render }: {
   board: PlaitBoard;
   element: PlaitImageGenerationAnchor;
-  render: (element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>) => void;
+  render: (element: PlaitImageGenerationAnchor, failure?: ImageGenerationAnchorViewModel['failureDetails']) => void;
 }) {
   const { nextPatch, viewModel } = useImageGenerationAnchorController({ board, anchor: element });
   useEffect(() => { render({ ...element, ...nextPatch }, viewModel.failureDetails); }, [element, nextPatch, viewModel.failureDetails, render]);
@@ -67,6 +68,7 @@ export class ImageGenerationAnchorGenerator {
   private desktopFallback: SVGGElement | null = null;
   private renderTimer: number | null = null;
   private desktopLayout: readonly unknown[] | null = null;
+  private desktopFailureSignature: string | null = null;
   private desktopProgressBar: SVGRectElement | null = null;
   private desktopDescription: SVGTextElement | null = null;
   onSizeChange?: (size: { width: number; height: number }) => void;
@@ -118,7 +120,7 @@ export class ImageGenerationAnchorGenerator {
     }));
   }
 
-  private renderNativeState = (element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>): void => {
+  private renderNativeState = (element: PlaitImageGenerationAnchor, failure?: ImageGenerationAnchorViewModel['failureDetails']): void => {
     this.renderDesktopFallback(element, failure);
   };
 
@@ -136,7 +138,7 @@ export class ImageGenerationAnchorGenerator {
     this.renderDesktopFallback(element);
   }
 
-  private renderDesktopFallback(element: PlaitImageGenerationAnchor, failure?: ReturnType<typeof getImageFailureDetails>): void {
+  private renderDesktopFallback(element: PlaitImageGenerationAnchor, failure?: ImageGenerationAnchorViewModel['failureDetails']): void {
     const host = this.desktopFallback;
     if (!host) {
       return;
@@ -158,7 +160,6 @@ export class ImageGenerationAnchorGenerator {
     this.desktopLayout = isFailed ? null : layout;
     this.desktopProgressBar = null;
     this.desktopDescription = null;
-    host.replaceChildren();
     if (isFailed) {
       const details = failure || getImageFailureDetails(undefined, element.error || '生成失败');
       const rows: FailureRows = [
@@ -172,23 +173,31 @@ export class ImageGenerationAnchorGenerator {
         ['形态', element.anchorType || '—'],
         ['过渡', element.transitionMode || '—'],
       ];
+      // Selection and controller ticks must not replace a button between
+      // pointerdown and click, or reset successful copy feedback.
+      const failureSignature = JSON.stringify([layout, rows]);
+      if (this.desktopFailureSignature === failureSignature) return;
+      this.desktopFailureSignature = failureSignature;
+      host.replaceChildren();
       const width = Math.max(320, rect.width);
       const height = Math.max(rect.height, getNativeFailureLayout(rows, width).height + 60);
       host.setAttribute('aria-label', '生成失败');
       const background = createSvgElement('rect');
-      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 10, fill: '#fffafa', stroke: '#e5caca' })) background.setAttribute(key, String(value));
+      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 14, fill: 'var(--failure-surface, #ffffff)', stroke: 'var(--failure-border, #dde2e5)' })) background.setAttribute(key, String(value));
       host.appendChild(background);
       const content = createNativeFailureDetails(rows, width);
       content.setAttribute('transform', `translate(${rect.x} ${rect.y + 12})`);
       host.appendChild(content);
-      this.appendDesktopActionButton(host, rect.x + 16, rect.y + height - 40, 92, 28, '重试', '#9c4b4b', () => {
+      this.appendDesktopActionButton(host, rect.x + 16, rect.y + height - 40, 92, 28, '重试', 'var(--failure-action, #356859)', () => {
         const taskId = element.primaryTaskId || element.taskIds[0];
         window.dispatchEvent(new CustomEvent(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, { detail: { taskId, anchorId: element.id } }));
       });
-      this.appendDesktopActionButton(host, rect.x + 120, rect.y + height - 40, 92, 28, '关闭', '#7f1d1d', () => this.board.deleteFragment([element]), true);
+      this.appendDesktopActionButton(host, rect.x + 120, rect.y + height - 40, 92, 28, '关闭', 'var(--failure-muted, #68747b)', () => this.dismissAnchor(element.id), true);
       this.onSizeChange?.({ width, height });
       return;
     }
+    this.desktopFailureSignature = null;
+    host.replaceChildren();
     this.onSizeChange?.({ width: rect.width, height: rect.height });
     const isCompleted = element.phase === 'completed';
     const isLoadingImage = element.phase === 'developing' || element.phase === 'inserting';
@@ -430,43 +439,13 @@ export class ImageGenerationAnchorGenerator {
       this.desktopProgressBar = progressBar;
       host.appendChild(progressBar);
     }
+  }
 
-    if (isFailed && rect.width >= 180 && rect.height >= 120) {
-      const buttonWidth = Math.min(92, (rect.width - padding * 2 - 10) / 2);
-      const buttonHeight = 32;
-      const buttonY = rect.y + rect.height - padding - buttonHeight;
-      const retryX = centerX - buttonWidth - 5;
-      const closeX = centerX + 5;
-
-      this.appendDesktopActionButton(
-        host,
-        retryX,
-        buttonY,
-        buttonWidth,
-        buttonHeight,
-        '重试',
-        accent,
-        () => {
-          const taskId = element.primaryTaskId || element.taskIds[0];
-          window.dispatchEvent(
-            new CustomEvent(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, {
-              detail: { taskId, anchorId: element.id },
-            })
-          );
-        }
-      );
-      this.appendDesktopActionButton(
-        host,
-        closeX,
-        buttonY,
-        buttonWidth,
-        buttonHeight,
-        '关闭',
-        '#7f1d1d',
-        () => this.board.deleteFragment([element]),
-        true
-      );
-    }
+  private dismissAnchor(id: string): void {
+    // The native controller renders a presentation copy. Plait paths are keyed
+    // by the live node identity, so resolve it again at the time of activation.
+    const current = this.board.children.find((node) => node.id === id);
+    if (current) this.board.deleteFragment([current]);
   }
 
   private updateDesktopProgress(element: PlaitImageGenerationAnchor, width: number): void {
@@ -515,8 +494,8 @@ export class ImageGenerationAnchorGenerator {
     buttonRect.setAttribute('width', String(width));
     buttonRect.setAttribute('height', String(height));
     buttonRect.setAttribute('rx', '7');
-    buttonRect.setAttribute('fill', secondary ? '#ffffff' : color);
-    buttonRect.setAttribute('stroke', color);
+    buttonRect.setAttribute('fill', secondary ? 'var(--failure-surface, #ffffff)' : color);
+    buttonRect.setAttribute('stroke', secondary ? 'var(--failure-border, #dde2e5)' : color);
     buttonRect.setAttribute('stroke-width', '1');
     button.appendChild(buttonRect);
 
@@ -525,7 +504,7 @@ export class ImageGenerationAnchorGenerator {
     buttonText.setAttribute('y', String(y + height / 2));
     buttonText.setAttribute('text-anchor', 'middle');
     buttonText.setAttribute('dominant-baseline', 'middle');
-    buttonText.setAttribute('fill', secondary ? color : '#ffffff');
+    buttonText.setAttribute('fill', secondary ? color : 'var(--failure-action-text, #ffffff)');
     buttonText.setAttribute(
       'font-family',
       '-apple-system, BlinkMacSystemFont, sans-serif'
@@ -535,9 +514,9 @@ export class ImageGenerationAnchorGenerator {
     buttonText.textContent = label;
     button.appendChild(buttonText);
 
-    button.addEventListener('pointerdown', (event) => {
-      event.stopPropagation();
-    });
+    for (const name of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
+      button.addEventListener(name, (event) => event.stopPropagation());
+    }
     button.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -640,6 +619,7 @@ export class ImageGenerationAnchorGenerator {
     }
 
     this.desktopLayout = null;
+    this.desktopFailureSignature = null;
     this.desktopProgressBar = null;
     this.desktopDescription = null;
     this.foreignObject = null;

@@ -24,6 +24,8 @@ export interface CreativeAccountBinding {
   updatedAt: number;
 }
 export interface CreativeAccountBridge {
+  /** Optional native discussion backend; independent of Rabbit account login. */
+  localCodex?: CreativeCodexBridge;
   state: CreativeAccountState;
   selectedKeyId?: string;
   manageAccount: () => void;
@@ -38,6 +40,12 @@ export interface CreativeAccountBridge {
     name?: string,
   ) => Promise<"copied" | "saved" | "revealed" | "cancelled">;
   copyText?: (text: string) => Promise<void>;
+  /** Save original media through a native dialog; no caller-controlled path. */
+  saveMedia?: (
+    blob: Blob,
+    name: string,
+    kind: "video" | "audio" | "archive",
+  ) => Promise<"saved" | "cancelled">;
   listKeys: (
     page: number,
     search: string,
@@ -49,4 +57,23 @@ export interface CreativeAccountBridge {
     url: string,
     init: RequestInit,
   ) => Promise<Response>;
+}
+
+export interface CreativeCodexModel {
+  id: string;
+  name: string;
+  efforts: string[];
+  defaultEffort: string | null;
+  supportsImages: boolean;
+}
+export interface CreativeCodexBridge {
+  probe: () => Promise<{ models: CreativeCodexModel[]; defaultModel: string }>;
+  request: (input: {
+    model: string;
+    effort?: string;
+    prompt: string;
+    images: string[];
+    signal: AbortSignal;
+    onUpdate: (value: { content: string; reasoning: string }) => void;
+  }) => Promise<{ content: string; reasoning: string }>;
 }

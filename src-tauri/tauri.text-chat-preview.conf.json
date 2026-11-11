@@ -1,0 +1,25 @@
+{
+  "productName": "Tuzi Text Chat QA",
+  "identifier": "com.tuziswitch.desktop.textchatqa",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "dragDropEnabled": false,
+        "title": "兔子助手 · 本地体验",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "width": 1360,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "visible": false
+      }
+    ]
+  },
+  "bundle": { "createUpdaterArtifacts": false },
+  "plugins": {
+    "deep-link": { "desktop": { "schemes": ["tuziswitch-textchatqa"] } },
+    "updater": { "endpoints": [] }
+  }
+}

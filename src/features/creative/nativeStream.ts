@@ -9,7 +9,8 @@ export type CreativeChunk =
       headers?: Record<string, string>;
     }
   | { type: "data"; data: string }
-  | { type: "end" };
+  | { type: "end" }
+  | { type: "error"; code: string };
 
 /** Keep cancellation attached until the response body has finished streaming. */
 export function nativeCreativeResponse(
@@ -25,6 +26,7 @@ export function nativeCreativeResponse(
     let finished = false;
     let started = false;
     let cancelled = false;
+    let pendingError: Error | undefined;
     let drainTimeout: ReturnType<typeof setTimeout> | undefined;
     const cleanup = () => {
       signal?.removeEventListener("abort", abort);
@@ -55,6 +57,9 @@ export function nativeCreativeResponse(
     const stream = new ReadableStream<Uint8Array>({
       start(c) {
         controller = c;
+      },
+      pull(c) {
+        if (pendingError) c.error(pendingError);
       },
       cancel() {
         finished = true;
@@ -91,6 +96,14 @@ export function nativeCreativeResponse(
           controller.enqueue(
             Uint8Array.from(atob(message.data), (c) => c.charCodeAt(0)),
           );
+        } else if (message.type === "error") {
+          // Keep buffered response data readable before surfacing the transport
+          // failure on the next read. controller.error discards queued bytes.
+          if (!started) { fail(message.code); return; }
+          pendingError = errorFor(message.code);
+          finished = true;
+          cleanup();
+          if ((controller.desiredSize ?? 0) > 0) controller.error(pendingError);
         } else {
           if (!started) throw new Error("missing_headers");
           finished = true;

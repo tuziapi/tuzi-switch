@@ -15,6 +15,7 @@ import { isSunoV2Model, isUnavailableSunoModel } from '../services/suno-v2';
 import { isSunoNativeModel } from '../services/suno-native';
 import { getSunoNativeParams } from '../services/suno-native-params';
 import { getSunoV2Params } from '../services/suno-v2-params';
+import { GEMINI_OMNI_MODEL_ID, GEMINI_OMNI_DURATIONS, GEMINI_OMNI_SIZES } from '../utils/gemini-omni-model';
 
 /**
  * 模型类型
@@ -283,6 +284,7 @@ const BUILT_IN_MODEL_RECOMMENDATION_SCORES: Readonly<Record<string, number>> = {
   'happyhorse-1.0-t2v': 87,
   'happyhorse-1.0-video-edit': 86,
   'veo3.1': 93,
+  [GEMINI_OMNI_MODEL_ID]: 94,
   'omni-flash': 93,
   'omni-flash-components': 48,
   'veo3-fast-frames': 92,
@@ -1032,6 +1034,16 @@ const BUILT_IN_VIDEO_MODELS: ModelConfig[] = [
       size: '1080P',
     },
     tags: ['happyhorse'],
+  },
+  {
+    id: GEMINI_OMNI_MODEL_ID,
+    label: 'Gemini Omni 1.1 Flash',
+    shortCode: 'omni11',
+    description: '3–10秒视频，360P/720P/1080P/4K 横竖屏，支持文本与参考图生成视频',
+    type: 'video',
+    vendor: ModelVendor.GEMINI,
+    supportsTools: true,
+    videoDefaults: { duration: '4', size: '1280x720', aspectRatio: '16:9' },
   },
   {
     id: 'veo3.1',
@@ -2248,6 +2260,18 @@ export const VIDEO_PARAMS: ParamConfig[] = [
     modelType: 'video' as const,
   })),
   // Veo 系列时长参数（只有 8 秒，包括标清和 4K）
+  {
+    id: 'duration', label: '视频时长', shortLabel: '时长',
+    description: 'Gemini Omni 视频时长（3–10秒）', valueType: 'enum',
+    options: GEMINI_OMNI_DURATIONS.map(value => ({ value, label: `${value}秒` })),
+    defaultValue: '4', compatibleModels: [GEMINI_OMNI_MODEL_ID], modelType: 'video',
+  },
+  {
+    id: 'size', label: '视频尺寸', shortLabel: '尺寸',
+    description: 'Gemini Omni 分辨率与画面比例', valueType: 'enum',
+    options: GEMINI_OMNI_SIZES, defaultValue: '1280x720',
+    compatibleModels: [GEMINI_OMNI_MODEL_ID], modelType: 'video',
+  },
   {
     id: 'duration',
     label: '视频时长',

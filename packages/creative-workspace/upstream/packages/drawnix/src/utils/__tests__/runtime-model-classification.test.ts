@@ -81,6 +81,7 @@ describe('marketplace output classification', () => {
         type: 'image',
       },
       { id: 'mixed-video-generator', category: '文本,视频生成', type: 'video' },
+      { id: 'gemini-omni-1.1-flash', category: '文本,图像,视频', type: 'video', endpoints: ['openai-video'] },
       {
         id: 'english-video-generator',
         category: 'text,video_generation',

@@ -68,6 +68,7 @@ pub enum CreativeChunk {
         data: String,
     },
     End,
+    Error { code: String },
 }
 
 fn binding_id(origin: &str, user: &str, token: &str) -> String {
@@ -281,6 +282,7 @@ fn target(request: &ModelRequest) -> Result<(&'static str, String), String> {
         "image.edit" => "/v1/images/edits",
         "chat" => "/v1/chat/completions",
         "responses" => "/v1/responses",
+        "anthropic.messages" => "/v1/messages",
         "video.create" => "/v1/videos",
         "audio.speech" => "/v1/audio/speech",
         "audio.transcribe" => "/v1/audio/transcriptions",
@@ -438,6 +440,7 @@ fn supports_action(model: &Value, action: &str) -> bool {
                 "openai_completions",
             ],
         ),
+        "anthropic.messages" => ("/v1/messages", &["anthropic", "anthropic-messages", "claude", "claude code", "claude_code"]),
         "responses" => (
             "/v1/responses",
             &[
@@ -598,7 +601,26 @@ pub async fn creative_account_request(
     request: ModelRequest,
     on_chunk: tauri::ipc::Channel<CreativeChunk>,
 ) -> Result<(), String> {
-    execute(&service, request, &binding_path(), on_chunk).await
+    let result = execute(&service, request, &binding_path(), on_chunk.clone()).await;
+    deliver_creative_result(result, |chunk| on_chunk.send(chunk).map_err(|_| "consumer_closed".into()))
+}
+
+/// Deliver errors on the same ordered Channel as bytes; invoke rejection can
+/// overtake asynchronously fetched Channel payloads and discard complete output.
+pub(crate) fn deliver_creative_result(
+    result: Result<(), String>,
+    send: impl FnOnce(CreativeChunk) -> Result<(), String>,
+) -> Result<(), String> {
+    match result {
+        Ok(()) => Ok(()),
+        Err(code) => send(CreativeChunk::Error { code }),
+    }
+}
+
+pub(crate) fn creative_send_error(error: &reqwest::Error) -> &'static str {
+    if error.is_connect() { "creative_connection_failed" }
+    else if error.is_timeout() { "creative_request_timeout" }
+    else { "creative_outcome_unknown" }
 }
 
 async fn execute(
@@ -685,13 +707,16 @@ async fn execute(
                 .bearer_auth(secret.as_str())
                 .header("X-Request-Id", upstream_id)
                 .timeout(Duration::from_secs(600));
+            if request.action == "anthropic.messages" {
+                builder = builder.header("anthropic-version", "2023-06-01");
+            }
             if let Some((body, content_type)) = payload {
                 builder = builder.header("Content-Type", content_type).body(body);
             }
             let response = builder
                 .send()
                 .await
-                .map_err(|_| "creative_outcome_unknown")?;
+                .map_err(|error| creative_send_error(&error))?;
             account(&service, request.generation)?;
             let status = response.status();
             if status.is_redirection() {
@@ -734,7 +759,7 @@ async fn execute(
             let mut stream = response.bytes_stream();
             while let Some(chunk) = stream.next().await {
                 account(&service, request.generation)?;
-                let bytes = chunk.map_err(|_| "creative_outcome_unknown")?;
+                let bytes = chunk.map_err(|_| "creative_stream_interrupted")?;
                 total += bytes.len();
                 if total > MAX_BODY {
                     return Err("response_too_large".into());
@@ -891,6 +916,18 @@ mod tests {
             &json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/images/generations","method":"GET"}}}),
             "image.generate"
         ));
+    }
+    #[test]
+    fn text_messages_require_catalog_membership_and_post_endpoint() {
+        assert_eq!(target(&request("anthropic.messages")).unwrap(), ("POST", "/v1/messages".into()));
+        for label in ["anthropic", "anthropic-messages", "claude", "claude code", "claude_code"] {
+            let catalog = json!({"items":[{"model_name":"synthetic","supported_endpoint_types":[label]}]});
+            assert!(validate_model(&request("anthropic.messages"), &catalog).is_ok());
+        }
+        assert!(validate_model(&request("anthropic.messages"), &json!({"items":[]})).is_err());
+        assert!(!supports_action(&json!({"model_name":"claude-sonnet"}), "anthropic.messages"));
+        assert!(!supports_action(&json!({"supported_endpoint_types":["claude"],"endpoints":{"claude":{"path":"/v1/messages","method":"GET"}}}), "anthropic.messages"));
+        assert!(!supports_action(&json!({"supported_endpoint_types":["claude"],"endpoints":{"claude":{"path":"/api/token/","method":"POST"}}}), "anthropic.messages"));
     }
     #[test]
     fn multipart_is_encoded_natively_and_rejects_header_injection() {

@@ -20,6 +20,8 @@ export type PromptLineageMeta = NonNullable<GenerationParams['promptMeta']>;
 
 export interface BaseGenerationParams {
   prompt: string;
+  anchorId?: string;
+  conversationLink?: GenerationParams["conversationLink"];
   model?: string;
   modelRef?: unknown;
   workflowId?: string;
@@ -138,7 +140,7 @@ export function createQueueTask(
     const globalIndex = paramsGlobalIndex || options.globalIndex;
 
     const createdTasks: any[] = [];
-    const toolPayload = config.buildTaskPayload();
+    const toolPayload = { ...config.buildTaskPayload(), ...(params.anchorId ? { anchorId: params.anchorId } : {}), ...(params.conversationLink ? { conversationLink: params.conversationLink } : {}) };
 
     // 分支 1: retry
     if (options.retryTaskId) {

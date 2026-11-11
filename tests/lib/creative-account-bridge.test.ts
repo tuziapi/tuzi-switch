@@ -39,6 +39,11 @@ describe("creative account native boundary", () => {
     ["rate_limited", "校验请求过于频繁"],
     ["invalid_model", "未包含有效模型"],
     ["invalid_token", "系统令牌已失效"],
+    ["creative_upstream_429", "HTTP 429"],
+    ["creative_upstream_500", "HTTP 500"],
+    ["creative_upstream_502", "HTTP 502"],
+    ["creative_upstream_503", "HTTP 503"],
+    ["creative_upstream_504", "避免重复提交"],
   ])(
     "explains safe native failure %s without raw diagnostics",
     (code, message) => {
@@ -48,6 +53,14 @@ describe("creative account native boundary", () => {
       ).not.toContain("SYNTHETIC");
     },
   );
+  it("surfaces an upstream rate limit without blaming credentials or resubmitting", async () => {
+    mocks.invoke.mockRejectedValue("creative_upstream_429");
+    await expect(send("/v1/images/generations", {
+      method: "POST", body: JSON.stringify({ model: "synthetic", prompt: "SYNTHETIC", n: 1 }),
+    })).rejects.toThrow("HTTP 429");
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(creativeError("creative_upstream_429").message).not.toContain("Key");
+  });
   it("passes source references and generation without renderer credentials", async () => {
     mocks.invoke.mockImplementation(async (command, args) => {
       expect(command).toBe("creative_account_request");
@@ -77,6 +90,18 @@ describe("creative account native boundary", () => {
     expect(await response.json()).toEqual({
       data: [{ id: "synthetic-model" }],
     });
+  });
+  it.each([["/v1/messages", "anthropic.messages"], ["/v1/responses", "responses"], ["/v1/chat/completions", "chat"]])("maps configured text endpoint %s through the restricted native bridge", async (path, action) => {
+    mocks.invoke.mockImplementation(async (_command, args) => {
+      expect(args.request.action).toBe(action);
+      expect(args.request.body).toMatchObject({ model: "synthetic", stream: true });
+      expect(args.request).not.toHaveProperty("url");
+      expect(args.request).not.toHaveProperty("headers");
+      args.onChunk.onmessage({ type: "start", status: 200, content_type: "application/json" });
+      args.onChunk.onmessage({ type: "data", data: btoa('{}') });
+      args.onChunk.onmessage({ type: "end" });
+    });
+    await (await send(path, { method: "POST", body: JSON.stringify({ model: "synthetic", stream: true }) })).text();
   });
   it.each([
     "https://attacker.invalid/v1/models",
@@ -332,5 +357,38 @@ describe("external creative tool boundary", () => {
   ])("rejects arbitrary external input %s", async (id) => {
     await expect(bridge().openExternalTool!(id)).rejects.toThrow();
     expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("ordered native transport failures", () => {
+  it.each(["account", "manual"])("preserves queued %s response chunks before the error", async transport => {
+    mocks.invoke.mockImplementation(async (_command,args) => {
+      args.onChunk.onmessage({type:"start",status:200,content_type:"text/event-stream"});
+      args.onChunk.onmessage({type:"data",data:btoa("first")});
+      args.onChunk.onmessage({type:"data",data:btoa("second")});
+      args.onChunk.onmessage({type:"error",code:"creative_stream_interrupted"});
+    });
+    const response=await (transport==="account" ? send("/v1/chat/completions",{method:"POST",body:JSON.stringify({model:"synthetic",stream:true})}) : requestCreativeManual("https://example.invalid/v1/chat/completions",{method:"POST",body:"{}"}));
+    const reader=response.body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe("first");
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe("second");
+    await expect(reader.read()).rejects.toMatchObject({code:"creative_stream_interrupted"});
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+  });
+  it("accepts a complete terminal response even when the socket errors immediately afterwards", async () => {
+    const {readTextStream}=await import("../../packages/creative-workspace/upstream/packages/drawnix/src/services/text-chat/protocol");
+    mocks.invoke.mockImplementation(async (_command,args)=>{
+      args.onChunk.onmessage({type:"start",status:200,content_type:"text/event-stream"});
+      const payload='data: '+JSON.stringify({choices:[{delta:{content:'{"content":"ready","next":[]}'},finish_reason:"stop"}]})+'\n\ndata: [DONE]\n\n';
+      args.onChunk.onmessage({type:"data",data:btoa(payload)});
+      args.onChunk.onmessage({type:"error",code:"creative_stream_interrupted"});
+    });
+    const response=await send("/v1/chat/completions",{method:"POST",body:'{"model":"synthetic","stream":true}'});
+    await expect(readTextStream(response,"chat",()=>{})).resolves.toMatchObject({content:'{"content":"ready","next":[]}',finishReason:"stop"});
+  });
+  it("rejects an ordered pre-header failure without exposing raw diagnostics",async()=>{
+    mocks.invoke.mockImplementation(async (_command,args)=>args.onChunk.onmessage({type:"error",code:"creative_connection_failed"}));
+    await expect(send()).rejects.toMatchObject({code:"creative_connection_failed",message:expect.stringContaining("无法连接")});
   });
 });

@@ -1,3 +1,4 @@
+import { getComposerPortalContainer } from '../dialog/dialog';
 /**
  * 尺寸下拉选择器组件
  *
@@ -188,7 +189,7 @@ export const SizeDropdown: React.FC<SizeDropdownProps> = ({
                 })}
               </div>
             </div>,
-            (document.getElementById('creative-portals') || document.body)
+            getComposerPortalContainer()
           )}
         </div>
       )}

@@ -305,6 +305,8 @@ export interface AgentExecutionContext {
  * Agent 执行选项
  */
 export interface AgentExecuteOptions {
+  /** Optional transport for discussion; legacy callers keep their existing client. */
+  complete?: (messages: Array<{ role: string; content: GeminiMessagePart[] }>) => Promise<string>;
   /** 指定使用的模型 */
   model?: string;
   /** 指定使用的供应商模型来源 */

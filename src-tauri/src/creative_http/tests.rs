@@ -138,3 +138,23 @@ fn rejects_local_files_credentials_references_and_header_injection() {
         assert!(prepare(&req, &client).is_err());
     }
 }
+
+
+#[test]
+fn ordered_failure_delivery_preserves_native_error_contract() {
+    let seen = Mutex::new(Vec::new());
+    deliver_creative_result(Err("creative_stream_interrupted".into()), |chunk| {
+        seen.lock().unwrap().push(chunk);
+        Ok(())
+    }).unwrap();
+    assert!(matches!(seen.lock().unwrap().first(), Some(CreativeChunk::Error {code}) if code == "creative_stream_interrupted"));
+    assert_eq!(deliver_creative_result(Err("creative_outcome_unknown".into()), |_| Err("consumer_closed".into())), Err("consumer_closed".into()));
+}
+
+#[tokio::test]
+async fn connection_failure_is_distinct_from_unknown_response() {
+    let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url=format!("http://{}",listener.local_addr().unwrap());
+    drop(listener);
+    assert_eq!(execute(request(&url), |_| Ok(())).await.unwrap_err(), "creative_connection_failed");
+}

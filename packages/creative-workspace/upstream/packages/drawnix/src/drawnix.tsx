@@ -34,6 +34,7 @@ import { withDraw, BasicShapes, DrawTransforms } from '@plait/draw';
 import { MindThemeColors, withMind } from '@plait/mind';
 import { withMindExtend } from './plugins/with-mind-extend';
 import { withCommonPlugin } from './plugins/with-common';
+import { CanvasTemporaryPanSupport } from './components/canvas-interaction-mode';
 import { UnifiedToolbar } from './components/toolbar/unified-toolbar';
 import classNames from 'classnames';
 import './styles/index.scss';
@@ -341,9 +342,10 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   };
 
   const [appState, setAppState] = useState<DrawnixState>(() => {
-    // TODO: need to consider how to maintenance the pointer state in future
     return {
-      pointer: PlaitPointerType.hand,
+      pointer: import.meta.env.VITE_TUZI_ASSISTANT === 'true'
+        ? PlaitPointerType.selection
+        : PlaitPointerType.hand,
       isMobile: detectMobileViewport(),
       isPencilMode: false,
       openDialogTypes: new Set(),
@@ -423,6 +425,11 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   const enableGenerationRuntime = useCallback(() => {
     enableDeferredRuntime(TOOL_WINDOW_GROUPS);
   }, [enableDeferredRuntime]);
+
+  useEffect(() => {
+    window.addEventListener('aitu:open-discussion', enableGenerationRuntime);
+    return () => window.removeEventListener('aitu:open-discussion', enableGenerationRuntime);
+  }, [enableGenerationRuntime]);
 
   useEffect(() => {
     let active = true;
@@ -1794,6 +1801,10 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
           <Board
             className={isTauriEnvironment() || import.meta.env.VITE_TUZI_ASSISTANT === 'true' ? 'desktop-warm-canvas' : undefined}
             afterInit={(board) => {
+              if (import.meta.env.VITE_TUZI_ASSISTANT === 'true') {
+                // Set the actual board tool as well as the toolbar state.
+                BoardTransforms.updatePointerType(board, appState.pointer);
+              }
               setBoard(board as DrawnixBoard);
               // 挂载 board 实例到 window，供知识库等外部模块访问
               (window as any).__drawnixBoard = board;
@@ -1812,6 +1823,7 @@ const DrawnixContent: React.FC<DrawnixContentProps> = ({
               }
             }}
           ></Board>
+          {import.meta.env.VITE_TUZI_ASSISTANT === 'true' && <CanvasTemporaryPanSupport />}
           {/* 多选时的缩放控制点 */}
           <MultiSelectionHandles />
           <CanvasImageContextMenu board={board} onPreview={openMediaPreview} />

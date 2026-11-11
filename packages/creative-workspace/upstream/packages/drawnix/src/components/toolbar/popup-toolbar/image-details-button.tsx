@@ -102,6 +102,17 @@ export function PopupImageDetailsButton({
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
   const [decodedImage, setDecodedImage] = useState<CanvasImageDetailsSource>();
   const zh = language === 'zh';
+  // The desktop host scopes creative CSS and creates a fixed containing block.
+  // Keep this portal inside that scope and translate viewport coordinates once.
+  const portalContainer = typeof document === 'undefined'
+    ? null : document.getElementById('creative-portals');
+  const portalScope = portalContainer?.closest('.creative-root');
+  const panelStyle = getImageDetailsPanelStyle(selectionRect);
+  if (panelStyle && portalScope) {
+    const origin = portalScope.getBoundingClientRect();
+    panelStyle.left = Number(panelStyle.left) - origin.left;
+    panelStyle.top = Number(panelStyle.top) - origin.top;
+  }
   const kind = image.kind || 'image';
   const kindLabel = {
     image: zh ? '图片' : 'Image',
@@ -261,8 +272,9 @@ export function PopupImageDetailsButton({
         />
       </PopoverTrigger>
       <PopoverContent
+        container={portalContainer ?? undefined}
         className={`image-details-panel ${ATTACHED_ELEMENT_CLASS_NAME}`}
-        style={getImageDetailsPanelStyle(selectionRect)}
+        style={panelStyle}
         aria-label={title}
         onPointerDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {

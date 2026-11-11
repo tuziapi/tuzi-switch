@@ -219,7 +219,8 @@ export const ImageGenerationAnchorContent: React.FC<
       }
 
       if (actionType === 'dismiss') {
-        board.deleteFragment([element]);
+        const current = board.children.find((node) => node.id === element.id);
+        if (current) board.deleteFragment([current]);
       }
     },
     [board, element, relatedTasks]

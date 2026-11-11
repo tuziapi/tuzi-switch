@@ -1,0 +1,97 @@
+{
+  "task": "UC-AGENT-CHAT-03",
+  "date": "2026-11-09",
+  "baseHead": "efac7cc127f6c1da3703b12c39ca8fbb934df3f3",
+  "sourceBranch": "codex/opentu-text-chat",
+  "uncommittedChanges": true,
+  "cleanup": {
+    "removedItems": 31,
+    "bytes": 1383286238,
+    "manifest": "/Users/sdy09/Documents/tuzi-switch-artifacts/agent-discussion-2026-11-09/CLEANUP-REPORT.json"
+  },
+  "deliveryDirectory": "/Users/sdy09/Documents/tuzi-switch-artifacts/agent-discussion-2026-11-09",
+  "binarySha256": "b57200e7879f196e519f1eb9d47c1d6cc14f743087ce003c5e283550b87687a0",
+  "build": "macOS arm64 Release; local ad-hoc signature; codesign verification passed",
+  "browser": {
+    "chromium": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "main input streams actual reasoning/reply to the shared sidebar; independent draft retained",
+        "sidebar continues the same main-input context",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px window: no toolbar/sidebar overlap, historical 640px collapse handle stays attached, model controls occupy a separate row",
+        "stop strip cancels running reply",
+        "reload recovers board-linked discussion and messages"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "webkit": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "main input streams actual reasoning/reply to the shared sidebar; independent draft retained",
+        "sidebar continues the same main-input context",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px window: no toolbar/sidebar overlap, historical 640px collapse handle stays attached, model controls occupy a separate row",
+        "stop strip cancels running reply",
+        "reload recovers board-linked discussion and messages"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    }
+  },
+  "native": {
+    "window": [
+      347.0,
+      48.0,
+      980.0,
+      760.0
+    ],
+    "collapseHandle": [
+      837.0,
+      484.0,
+      18.0,
+      48.0
+    ],
+    "attachmentButton": [
+      429.0,
+      754.0,
+      32.0,
+      32.0
+    ],
+    "agentButton": [
+      495.0,
+      715.0,
+      88.0,
+      27.0
+    ],
+    "autoButton": [
+      586.0,
+      715.0,
+      77.0,
+      27.0
+    ],
+    "sendButton": [
+      771.0,
+      750.0,
+      40.0,
+      40.0
+    ],
+    "checks": [
+      "final arm64 Release launched",
+      "existing preview profile reused",
+      "strip opens sidebar",
+      "collapse and reopen passed",
+      "980px: handle at half-window sidebar edge",
+      "980px: model controls above attachment buttons; no overlap",
+      "main send remains clear of sidebar"
+    ],
+    "paidModelCalls": 0,
+    "screenCapture": "unavailable; native checks use Accessibility actions and geometry"
+  },
+  "provenance": {
+    "reconstructedFiles": 1606,
+    "patchBytes": 1001480
+  },
+  "published": false
+}

@@ -428,6 +428,7 @@ class AgentExecutor {
       }
 
       if (
+        !options.complete &&
         textSupportsImageInput &&
         allReferenceImages.length > 0 &&
         !hasImageParts(messages)
@@ -451,7 +452,8 @@ class AgentExecutor {
         // 调用 LLM，使用指定或全局默认的文本模型
         let fullResponse = '';
         const t0 = Date.now();
-        const response = await defaultGeminiClient.sendChat(
+        signal?.throwIfAborted();
+        const response = options.complete ? { choices: [{ message: { content: await options.complete(messages) } }] } : await defaultGeminiClient.sendChat(
           messages,
           (accumulatedContent) => {
             // accumulatedContent 已经是累积的完整内容
@@ -465,6 +467,7 @@ class AgentExecutor {
         if (response.choices && response.choices.length > 0) {
           fullResponse = response.choices[0].message.content || fullResponse;
         }
+        signal?.throwIfAborted();
         // 解析工具调用
         const toolCalls = parseToolCalls(fullResponse);
 

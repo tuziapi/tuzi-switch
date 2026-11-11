@@ -367,6 +367,7 @@ function canInsertTaskCanvasAssociationsOnCurrentBoard(
 ): boolean {
   const associations = getTaskCanvasAssociations(task);
   const binding = getCurrentCanvasBoardBinding();
+  if (task.params.conversationLink && task.params.conversationLink.boardId !== binding?.boardId) return false;
   if (expectedBoard && (!binding || binding.board !== expectedBoard)) {
     return false;
   }
@@ -1596,6 +1597,8 @@ export function useAutoInsertToCanvas(
                     task,
                     requestedDimensions?.width
                   )
+                : type === 'video' && task.params.conversationLink && scopedImageAnchor
+                ? { width: Math.abs(scopedImageAnchor.points[1][0] - scopedImageAnchor.points[0][0]), height: Math.abs(scopedImageAnchor.points[1][1] - scopedImageAnchor.points[0][1]) }
                 : requestedDimensions;
             const audioMetadata =
               type === 'audio'
@@ -1681,7 +1684,7 @@ export function useAutoInsertToCanvas(
                 | { width: number; height: number }
                 | undefined);
             const imageAnchor =
-              type === 'image'
+              (type === 'image' || task.params.conversationLink)
                 ? scopedImageAnchor ??
                   findImageGenerationAnchorForTask(board, task)
                 : null;
@@ -2013,7 +2016,7 @@ export function useAutoInsertToCanvas(
                 metadata,
                 board,
                 () => isCanvasInsertionBoardTokenCurrent(insertionBoardToken),
-                ...(type !== 'image' || scrollToImageResult ? [] : [false] as const)
+                ...(scrollToImageResult ? [] : [false] as const)
               );
               if (abortIfCanvasChanged()) {
                 continue promptGroupLoop;
@@ -2029,7 +2032,7 @@ export function useAutoInsertToCanvas(
               insertedSize = insertionGeometry.size;
             }
 
-            if (type === 'image' && imageAnchor && insertedSize) {
+            if (imageAnchor && insertedSize) {
               syncImageAnchorGeometry(board, imageAnchor, {
                 position: insertedPoint,
                 size: insertedSize,
@@ -2229,7 +2232,7 @@ export function useAutoInsertToCanvas(
                   )
                 : requestedDimensions;
             const groupImageAnchor =
-              type === 'image'
+              (type === 'image' || firstInsertTask.params.conversationLink)
                 ? scopedImageAnchor ??
                   findImageGenerationAnchorForTask(board, firstInsertTask)
                 : null;
@@ -3268,7 +3271,7 @@ export function useAutoInsertToCanvas(
 
       if (retryTask.status === TaskStatus.COMPLETED) {
         updateRetryAnchor('inserting', {
-          subtitle: '图片已生成，正在重新加载并插入',
+          subtitle: '作品已生成，正在重新加载并插入',
         });
         releaseTaskInsertion(taskId);
         workflowCompletionService.clearTask(taskId);
@@ -3281,8 +3284,14 @@ export function useAutoInsertToCanvas(
       handleAnchorRetry as EventListener
     );
 
+    const retryDiscussionSync = (event: Event) => {
+      const task = taskQueueService.getTask((event as CustomEvent<{ taskId: string }>).detail?.taskId);
+      if (task?.params.conversationLink && task.status === TaskStatus.COMPLETED && !task.insertedToCanvas) handleTaskCompleted({ ...task, params: { ...task.params, autoInsertToCanvas: true } });
+    };
+    window.addEventListener('aitu:discussion-sync', retryDiscussionSync);
     // 清理函数
     return () => {
+      window.removeEventListener('aitu:discussion-sync', retryDiscussionSync);
       isActive = false;
       subscription.unsubscribe();
       workspaceSub.unsubscribe();

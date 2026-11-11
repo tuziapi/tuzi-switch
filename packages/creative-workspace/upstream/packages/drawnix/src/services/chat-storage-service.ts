@@ -5,6 +5,7 @@
  */
 
 import localforage from 'localforage';
+import { removeSessionAttachments, clearTextAttachments } from './text-chat/attachments';
 import { generateUUID } from '../utils/runtime-helpers';
 import { CHAT_STORAGE_KEYS, CHAT_CONSTANTS } from '../constants/CHAT_CONSTANTS';
 import type {
@@ -23,6 +24,16 @@ const messagesStore = localforage.createInstance({
   name: CHAT_STORAGE_KEYS.DATABASE_NAME,
   storeName: CHAT_STORAGE_KEYS.MESSAGES_STORE,
 });
+
+// Finish both store upgrades before streamed sessions start saving. Legacy task
+// listeners may read messages for the first time when a discussion generates media.
+let sessionStoresReady: Promise<unknown> | undefined;
+function ensureSessionStoresReady() {
+  return sessionStoresReady ??= Promise.all([sessionsStore.ready(), messagesStore.ready()]).catch(error => {
+    sessionStoresReady = undefined;
+    throw error;
+  });
+}
 
 /** Generate UUID v4 */
 function generateId(): string {
@@ -60,7 +71,15 @@ export async function getSession(id: string): Promise<ChatSession | null> {
   return sessionsStore.getItem<ChatSession>(id);
 }
 
+/** A text conversation is one IndexedDB record: messages/metadata commit together. */
+export async function saveTextSession(session: ChatSession): Promise<void> {
+  if (session.kind !== 'text' || session.textChat?.version !== 1) throw new Error('无效的文本会话');
+  await ensureSessionStoresReady();
+  await sessionsStore.setItem(session.id, session);
+}
+
 export async function getAllSessions(): Promise<ChatSession[]> {
+  await ensureSessionStoresReady();
   const sessions: ChatSession[] = [];
   await sessionsStore.iterate<ChatSession, void>((value) => {
     sessions.push(value);
@@ -103,6 +122,7 @@ export async function deleteSession(id: string): Promise<void> {
   }
   // Then delete the session
   await sessionsStore.removeItem(id);
+  await removeSessionAttachments(id);
 }
 
 // ============================================================================
@@ -234,14 +254,18 @@ export function setDrawerState(state: Partial<DrawerState>): void {
 // ============================================================================
 
 export async function clearAllData(): Promise<void> {
+  window.dispatchEvent(new Event('aitu-chat-cleared'));
   await sessionsStore.clear();
   await messagesStore.clear();
+  await clearTextAttachments();
   localStorage.removeItem(CHAT_STORAGE_KEYS.DRAWER_STATE);
 }
 
 export async function clearConversationHistory(): Promise<void> {
+  window.dispatchEvent(new Event('aitu-chat-cleared'));
   await sessionsStore.clear();
   await messagesStore.clear();
+  await clearTextAttachments();
   setDrawerState({ activeSessionId: null });
 }
 
@@ -253,6 +277,7 @@ export { generateId, generateTitle };
 
 // Export as service object for easier mocking
 export const chatStorageService = {
+  saveTextSession,
   createSession,
   getSession,
   getAllSessions,

@@ -69,7 +69,7 @@
     justify-content: flex-end;
   }
 }
-.workspace-view:not([data-view="account"]):not([data-view="settings"]):not(
+.workspace-view:not([data-view="creative"]):not([data-view="account"]):not([data-view="settings"]):not(
     [data-view="providers"]
   ) {
   padding-block: 20px;

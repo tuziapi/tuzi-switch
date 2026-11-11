@@ -1,0 +1,125 @@
+{
+  "task": "UC-AGENT-CHAT-04",
+  "date": "2026-11-09",
+  "branch": "codex/opentu-text-chat",
+  "baseCommit": "efac7cc127f6c1da3703b12c39ca8fbb934df3f3",
+  "authorization": {
+    "textMax": 2,
+    "imageMax": 1,
+    "cnyMax": 5
+  },
+  "findings": {
+    "originalFailureStage": "text planning; no linked image tasks existed",
+    "originalNetworkFailureRootCause": "not established",
+    "reproducedTransportEdge": "native command rejection can overtake Channel delivery and discard buffered data",
+    "nativeLocalBlock": "stale account binding; same previously selected Key rebound using settings UI; retained after restart"
+  },
+  "validation": {
+    "textChatTests": 79,
+    "hostBridgeTests": 42,
+    "rustManualTests": 5,
+    "rustAccountTests": 3,
+    "chromiumWorkflowGroups": 8,
+    "webkitWorkflowGroups": 8,
+    "browserPageErrors": 0,
+    "hostTypecheck": "passed",
+    "creativeBuild": "passed",
+    "releaseArm64Build": "passed",
+    "codesignVerification": "passed; local ad-hoc",
+    "provenanceFiles": 1606
+  },
+  "realVerification": {
+    "authorization": {
+      "textMax": 2,
+      "imageMax": 1,
+      "cnyMax": 5
+    },
+    "calls": [
+      {
+        "kind": "text",
+        "model": "gpt-6-sol",
+        "maxOutputTokens": 1024,
+        "time": "2026-11-09T15:05:03.700702",
+        "purpose": "wallpaper prompt only",
+        "status": "local_binding_not_found",
+        "billable": false
+      },
+      {
+        "kind": "text",
+        "model": "gpt-6-sol",
+        "maxOutputTokens": 1024,
+        "time": "2026-11-09T15:17:25.832880",
+        "purpose": "single wallpaper generation plan",
+        "status": "completed",
+        "imageModel": "gpt-image-2.5-1k",
+        "imageCount": 1,
+        "durationMs": 4000,
+        "inputTokens": 15948,
+        "outputTokens": 108,
+        "streaming": true,
+        "displayedCostCny": 0.02
+      },
+      {
+        "kind": "image",
+        "model": "gpt-image-2.5-1k",
+        "count": 1,
+        "status": "completed",
+        "timeObserved": "2026-11-09T15:18:27.283321",
+        "durationMs": 41000,
+        "inputTokens": 33,
+        "outputTokens": 1584,
+        "displayedCostCny": 0.02
+      }
+    ],
+    "balanceBeforeCny": 180.1,
+    "realTextRequests": 1,
+    "localBlockedTextAttempts": 1,
+    "realImageRequests": 1,
+    "displayedTotalCostCny": 0.04,
+    "balanceAfterCny": 179.54,
+    "costEvidence": "Per-request account details; balance delta is not used for attribution",
+    "originalImageModelRestored": true,
+    "maxOutputRestored": true
+  },
+  "nativeChecks": [
+    "one completed discussion image task",
+    "sidebar cached preview available",
+    "automatic original-board insertion completed",
+    "locate action finds saved result",
+    "restart retains completed chat result and canvas linkage",
+    "original image model restored",
+    "max output limit restored to model default",
+    "account binding retained after restart"
+  ],
+  "persistence": {
+    "linkedTaskCount": 1,
+    "boardCount": 1,
+    "linkedTask": {
+      "ids": [
+        "7b8a945b-6b8b-4d8d-9676-8290017b58ec",
+        "dbb4a669-d454-43be-bbf6-56418081da54",
+        "030f134f-f585-42ea-9de3-8d522a5a3d52",
+        "17e89e2b-5a14-4d10-9368-487c46ea9bcb",
+        "d61fa4a1-bc02-45cd-b74c-e27980a6e290"
+      ],
+      "completed": true,
+      "insertedFlagBytes": "09ffffff",
+      "boardMatchCounts": {
+        "7b8a945b-6b8b-4d8d-9676-8290017b58ec": 1,
+        "dbb4a669-d454-43be-bbf6-56418081da54": 0,
+        "030f134f-f585-42ea-9de3-8d522a5a3d52": 0,
+        "17e89e2b-5a14-4d10-9368-487c46ea9bcb": 0,
+        "d61fa4a1-bc02-45cd-b74c-e27980a6e290": 1
+      }
+    }
+  },
+  "limitations": [
+    "original network error cause not established",
+    "Sunburst was restored but not used for paid image validation",
+    "no real video/batch/other-model checks",
+    "no native screenshot capture; UI checks used Accessibility and read-only persisted data",
+    "no claim of private reasoning visibility; protocol supports model-returned reasoning only"
+  ],
+  "binarySha256": "ee7cbd956d99cb87f37581d8f8266b306195538255edf6fd8de2ce7e07330f11",
+  "published": false
+}

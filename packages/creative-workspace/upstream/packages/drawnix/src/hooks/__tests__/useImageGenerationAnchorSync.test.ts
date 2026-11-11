@@ -272,6 +272,35 @@ describe('useImageGenerationAnchorSync', () => {
     expect(anchor.subtitle).toBe('请求已受理，等待执行');
   });
 
+  it.each([TaskType.VIDEO, TaskType.AUDIO])('tracks discussion %s slots through failure, retry and completion', (type) => {
+    const anchor = createAnchor({ title: type === TaskType.VIDEO ? '视频生成' : '音频生成' });
+    const board = createBoard(anchor);
+    const task = createTask({ type, status: TaskStatus.PROCESSING,
+      params: { prompt: 'synthetic', anchorId: anchor.id, conversationLink: { boardId: 'board', sessionId: 'session', messageId: 'message', runId: 'run' } },
+    });
+    taskState.tasks = [task];
+    const { unmount } = renderHook(() => useImageGenerationAnchorSync({ board, enabled: true }));
+    const current = () => board.children[0] as PlaitImageGenerationAnchor;
+    expect(current().taskIds).toEqual([task.id]);
+    expect(current().phase).toBe('generating');
+    task.status = TaskStatus.FAILED;
+    task.error = { code: 'SYNTHETIC', message: 'synthetic failure' };
+    act(() => emitTaskUpdate(task));
+    expect(current().phase).toBe('failed');
+    task.status = TaskStatus.PROCESSING;
+    task.error = undefined;
+    act(() => emitTaskUpdate(task));
+    expect(current().phase).toBe('generating');
+    task.status = TaskStatus.COMPLETED;
+    task.insertedToCanvas = true;
+    task.result = { url: 'synthetic.mp4' };
+    board.children.push(createImageElement({ type: type === TaskType.VIDEO ? "image" : type, url: type === TaskType.VIDEO ? "synthetic.mp4" : "synthetic.wav" }) as any);
+    act(() => emitTaskUpdate(task));
+    expect(current().phase).toBe('completed');
+    expect(current().previewImageUrl).toBeUndefined();
+    unmount();
+  });
+
   it('advances displayed progress without dirtying the board until a real task event', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-15T08:00:00.000Z'));

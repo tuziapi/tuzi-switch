@@ -32,6 +32,11 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@/features/creative/CreativeWorkspace", () => ({
+  CreativeWorkspace: ({ active }: { active: boolean }) =>
+    active ? <section data-testid="creative-workspace">Creative workspace</section> : null,
+}));
+
 vi.mock("@/components/providers/ProviderList", () => ({
   ProviderList: ({
     providers,
@@ -160,6 +165,7 @@ vi.mock("@/components/shell/TuziSidebar", () => ({
       </button>
       <span>{activeApp}</span>
       {[
+        "creative",
         "prompts",
         "skills",
         "sessions",
@@ -342,6 +348,18 @@ describe("App integration with MSW", () => {
     resetProviderState();
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
+  });
+
+  it("leaves Escape to the active creative workspace instead of navigating to providers", async () => {
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    fireEvent.click(await screen.findByRole("button", { name: "firstRunNotice.confirm" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByText("nav-creative"));
+    expect(await screen.findByTestId("creative-workspace")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByTestId("creative-workspace")).toBeInTheDocument();
+    expect(screen.queryByTestId("provider-list")).not.toBeInTheDocument();
   });
 
   it("requires an explicit target when entering a global editor from a native tool", async () => {

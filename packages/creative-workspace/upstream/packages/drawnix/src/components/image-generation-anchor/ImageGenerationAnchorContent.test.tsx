@@ -244,7 +244,7 @@ describe('native SVG anchor readiness', () => {
     const generator = new ImageGenerationAnchorGenerator(board);
     try {
       await act(async () => { generator.processDrawing(anchor, host, false); });
-      expect(host.textContent).toContain('正在加载图片');
+      expect(host.textContent).toContain('正在加载结果');
       expect(host.querySelector('image')).toBeNull();
       await act(async () => { registerCanvasImage(board, 'image-1', task.result!.url).setReady(true); });
       expect(host.textContent).toContain('已完成');
@@ -268,7 +268,7 @@ describe('native SVG failure diagnostics', () => {
       error: { code: 'FAILED', message: '合成失败', details: { requestId: 'provider-126', modelId: 'gpt-image-2.6-1k', httpStatus: 400 } },
     } as Task];
     const anchor = createAnchor();
-    const board = { children: [], deleteFragment: vi.fn() } as unknown as PlaitBoard;
+    const board = { children: [anchor], deleteFragment: vi.fn() } as unknown as PlaitBoard;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     const host = document.createElementNS(svg.namespaceURI, 'g') as SVGGElement;
     svg.appendChild(host); document.body.appendChild(svg);
@@ -283,8 +283,24 @@ describe('native SVG failure diagnostics', () => {
       await waitFor(() => expect(copyText).toHaveBeenCalledWith(expect.stringContaining('Request ID：provider-126')));
       expect(copyText.mock.calls[0][0]).toContain('本地任务：task-1');
       expect(onSizeChange.mock.lastCall?.[0].height).toBeGreaterThan(320);
-      fireEvent.click(screen.getByRole('button', { name: '关闭' }));
-      expect(board.deleteFragment).toHaveBeenCalledWith([expect.objectContaining({ id: anchor.id, taskIds: anchor.taskIds })]);
+      const close = screen.getByRole('button', { name: '关闭' });
+      const bubbled = vi.fn();
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) host.addEventListener(type, bubbled);
+      fireEvent.pointerDown(close);
+      fireEvent.mouseDown(close);
+      const current = { ...anchor, title: 'updated live node' };
+      board.children = [current];
+      await act(async () => { generator.updateDrawing(current, host, true); });
+      expect(screen.getByRole('button', { name: '关闭' })).toBe(close);
+      expect(host.textContent).toContain('已复制');
+      fireEvent.pointerUp(close);
+      fireEvent.mouseUp(close);
+      expect(bubbled).not.toHaveBeenCalled();
+      fireEvent.click(close);
+      expect(vi.mocked(board.deleteFragment).mock.lastCall?.[0][0]).toBe(current);
+      board.children = [];
+      fireEvent.click(close);
+      expect(board.deleteFragment).toHaveBeenCalledTimes(1);
     } finally {
       generator.destroy();
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
@@ -336,7 +352,7 @@ describe('native SVG progress rendering', () => {
     mocks.tasks = [{ id: 'task-1', type: TaskType.IMAGE, status: TaskStatus.PROCESSING,
       params: {}, createdAt: 1, progress: 40 } as Task];
     let anchor: PlaitImageGenerationAnchor = { ...createAnchor(), phase: 'generating', error: undefined, progress: 40 };
-    const board = { children: [], deleteFragment: vi.fn() } as unknown as PlaitBoard;
+    const board = { children: [anchor], deleteFragment: vi.fn() } as unknown as PlaitBoard;
     const host = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     document.body.appendChild(host);
     const generator = new ImageGenerationAnchorGenerator(board);
@@ -359,13 +375,14 @@ describe('native SVG progress rendering', () => {
       mocks.tasks = [{ ...mocks.tasks[0], id: 'task-retry', status: TaskStatus.FAILED,
         error: { code: 'FAILED', message: 'synthetic new failure', details: { requestId: 'request-new' } } }];
       anchor = { ...anchor, phase: 'failed', taskIds: ['task-retry'], primaryTaskId: 'task-retry' };
+      board.children = [anchor];
       await act(async () => { generator.updateDrawing(anchor, host, false); });
       expect(host.textContent).toContain('request-new');
       expect(host.querySelector('animateTransform')).toBeNull();
       fireEvent.click(host.querySelector('[aria-label="重试"]')!);
       expect(onRetry.mock.lastCall?.[0].detail).toEqual({ taskId: 'task-retry', anchorId: anchor.id });
       fireEvent.click(host.querySelector('[aria-label="关闭"]')!);
-      expect(board.deleteFragment).toHaveBeenCalledWith([expect.objectContaining({ primaryTaskId: 'task-retry', points: anchor.points })]);
+      expect(vi.mocked(board.deleteFragment).mock.lastCall?.[0][0]).toBe(anchor);
     } finally {
       window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, onRetry);
       generator.destroy();

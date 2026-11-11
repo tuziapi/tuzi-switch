@@ -14,17 +14,20 @@ interface ChatDrawerTriggerProps {
   isOpen: boolean;
   onClick: () => void;
   drawerWidth?: number;
+  maxWidth?: string;
 }
 
 export const ChatDrawerTrigger: React.FC<ChatDrawerTriggerProps> = React.memo(
-  ({ isOpen, onClick, drawerWidth }) => {
+  ({ isOpen, onClick, drawerWidth, maxWidth }) => {
     // 抽屉打开时跟随抽屉左缘；工具栏贴右时，抽屉和关闭态把手都避开工具栏
+    // Match the drawer's CSS cap without a separate resize listener.
+    const effectiveWidth = maxWidth
+      ? `min(${drawerWidth}px, ${maxWidth})`
+      : `${drawerWidth}px`;
     const style: React.CSSProperties = {
       right:
         isOpen && drawerWidth
-          ? `calc(var(--aitu-toolbar-right-dock-width, 0px) + ${
-              drawerWidth - 18
-            }px)`
+          ? `calc(var(--aitu-toolbar-right-dock-width, 0px) + ${effectiveWidth} - 18px)`
           : 'var(--aitu-toolbar-right-dock-width, 0px)',
     };
 

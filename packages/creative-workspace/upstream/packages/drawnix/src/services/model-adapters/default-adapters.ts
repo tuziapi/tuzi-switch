@@ -5,6 +5,7 @@ import {
   extractAudioGenerationResult,
 } from '../audio-api-service';
 import { videoAPIService } from '../video-api-service';
+import { isGeminiOmniModel } from '../../utils/gemini-omni-model';
 import { getFileExtension, normalizeImageDataUrl } from '@aitu/utils';
 import {
   DEFAULT_AUDIO_MODEL_ID,
@@ -264,7 +265,7 @@ export const geminiVideoAdapter: VideoModelAdapter = {
   kind: 'video',
   docsUrl: 'https://tuzi-api.apifox.cn',
   matchProtocols: ['openai.async.video'],
-  matchRequestSchemas: ['openai.video.form-input-reference'],
+  matchRequestSchemas: ['openai.video.form-input-reference', 'gemini.omni.video.json'],
   matchPredicate(modelConfig) {
     if (modelConfig.type !== 'video') {
       return false;
@@ -293,6 +294,8 @@ export const geminiVideoAdapter: VideoModelAdapter = {
       ? undefined
       : request.duration
       ? String(request.duration)
+      : isGeminiOmniModel(model)
+      ? '4'
       : model?.toString().startsWith('sora')
       ? undefined
       : '8';

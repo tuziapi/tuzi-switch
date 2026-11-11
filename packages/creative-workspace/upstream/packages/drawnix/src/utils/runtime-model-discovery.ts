@@ -1294,7 +1294,8 @@ function adaptRuntimeModel(model: RemoteModelListItem): ModelConfig | null {
       GPT_IMAGE_25_MODEL_IDS.includes(staticConfig.id) ||
       GPT_IMAGE_1K_MODEL_IDS.includes(staticConfig.id) ||
       GPT_IMAGE_2_MODEL_IDS.includes(staticConfig.id) ||
-      staticConfig.id === 'gemini-nano-banana-2.1'
+      staticConfig.id === 'gemini-nano-banana-2.1' ||
+      staticConfig.id === 'gemini-omni-1.1-flash'
     ) {
       return clonedConfig;
     }
@@ -1472,6 +1473,9 @@ function decorateRuntimeModels(
   const marketplaceMetadata = (Array.isArray(pricingCaches) ? pricingCaches : [])
     .find((cache) => cache.profileId === profileId)?.modelCatalog;
   return models.map((model) => {
+    if (model.id === 'gemini-omni-1.1-flash' && !(model.tags || []).includes('manual')) {
+      return attachRuntimeSource(profileId, refreshPersistedModelConfig(model, useRemoteDisplayName));
+    }
     if (isGPTImage26ModelId(model.id) && !(model.tags || []).includes('manual')) {
       return attachRuntimeSource(profileId, {
         ...refreshPersistedModelConfig(model, useRemoteDisplayName),

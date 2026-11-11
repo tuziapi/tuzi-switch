@@ -209,6 +209,15 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
   useEffect(() => {
     if (!visible) return;
 
+    // Toolbar/tooltips can stop bubbling key events. Capture only Escape so
+    // closing the preview cannot also dismiss the underlying workspace/chat.
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target instanceof HTMLElement ? e.target : null;
       if (
@@ -227,10 +236,6 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
           : viewportRefs.current[focusedSlot] || null;
 
       switch (e.key) {
-        case 'Escape':
-          e.preventDefault();
-          onClose();
-          break;
         case 'ArrowLeft':
         case 'ArrowUp':
           e.preventDefault();
@@ -318,7 +323,11 @@ export const UnifiedMediaViewer: React.FC<UnifiedMediaViewerProps> = ({
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleEscape, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleEscape, true);
+    };
   }, [
     visible,
     mode,
