@@ -10,6 +10,8 @@ import "@/index.css";
 const params = new URLSearchParams(location.search);
 const channel = params.get("channel") ?? "acceptance";
 const platform = params.get("platform") ?? "macos";
+const failure = params.get("failure");
+let openAttempts = 0;
 mockIPC((command, args) => {
   if (command === "get_update_build_info")
     return {
@@ -22,9 +24,17 @@ mockIPC((command, args) => {
     };
   if (command === "plugin:app|version") return "1.5.5";
   if (command === "open_external") {
+    openAttempts++;
+    if (failure === "opener" && openAttempts === 1)
+      throw "打开链接失败: synthetic OS error 1155";
     document.querySelector("output")!.textContent = String(
       (args as { url?: string } | undefined)?.url,
     );
+    return true;
+  }
+  if (command === "copy_text_to_clipboard") {
+    document.querySelector("output")!.textContent =
+      `copied: ${(args as { text: string }).text}`;
     return true;
   }
   throw new Error(`Unexpected IPC: ${command}`);

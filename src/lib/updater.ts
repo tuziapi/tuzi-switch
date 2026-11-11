@@ -50,6 +50,9 @@ export interface UpdateHandle {
   notes?: string;
   date?: string;
   manual?: boolean;
+  // Validated, version-pinned manual links. Never used by signed updates.
+  downloadUrl?: string;
+  openDownloadPage?: () => Promise<void>;
   downloadAndInstall: (
     onProgress?: (e: UpdateProgressEvent) => void,
   ) => Promise<void>;

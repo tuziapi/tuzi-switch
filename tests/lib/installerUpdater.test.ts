@@ -3,6 +3,7 @@ import {
   checkInstallerUpdate,
   validateInstallerRelease,
   isNewerInstallerVersion,
+  installerUpdateFromRelease,
 } from "@/lib/installerUpdater";
 const invoke = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
@@ -105,7 +106,7 @@ describe.each(["tuziapi/tuzi-switch", "AiW520/tuzi-switch"])(
           : "tuziapi/tuzi-switch";
       expect(() => validateInstallerRelease(fixture(other), repo)).toThrow();
     });
-    it("does not silently download a version different from the displayed notes", async () => {
+    it("keeps the validated download pinned when a newer release appears", async () => {
       const changed = JSON.parse(
         JSON.stringify(fixture(repo)).split("v1.5.1").join("v1.5.2"),
       );
@@ -128,17 +129,17 @@ describe.each(["tuziapi/tuzi-switch", "AiW520/tuzi-switch"])(
         1000,
       );
       expect(result.status).toBe("available");
-      if (result.status === "available")
-        await expect(result.update.download!()).rejects.toThrow(
-          "Release changed",
-        );
-      expect(invoke).not.toHaveBeenCalled();
+      if (result.status === "available") await result.update.download!();
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(invoke).toHaveBeenCalledWith("open_external", {
+        url: `https://github.com/${repo}/releases/download/v1.5.1/tuzi-assistant-macos-arm64.dmg`,
+      });
     });
-    it("revalidates withdrawn releases before opening and never opens an artifact archive", async () => {
+    it("does not make an already validated manual download depend on a second API request", async () => {
       const fetchMock = vi
         .fn()
         .mockResolvedValueOnce({ ok: true, json: async () => fixture(repo) })
-        .mockResolvedValueOnce({ ok: false, status: 404 });
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"));
       vi.stubGlobal("fetch", fetchMock);
       const r = await checkInstallerUpdate(
         {
@@ -151,9 +152,61 @@ describe.each(["tuziapi/tuzi-switch", "AiW520/tuzi-switch"])(
         "1.5.0",
         1000,
       );
-      if (r.status === "available")
-        await expect(r.update.download!()).rejects.toThrow();
-      expect(invoke).not.toHaveBeenCalled();
+      if (r.status === "available") await r.update.download!();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(invoke).toHaveBeenCalledWith("open_external", {
+        url: `https://github.com/${repo}/releases/download/v1.5.1/tuzi-assistant-macos-arm64.dmg`,
+      });
+    });
+    it("snapshots URLs and exposes a version-specific release page without trusting later mutation", async () => {
+      const release = fixture(repo);
+      const r = installerUpdateFromRelease(
+        {
+          channel: "stable",
+          repository: repo,
+          platform: "macos",
+          runNumber: 0,
+          commit: "",
+        },
+        "1.5.0",
+        release,
+        1000,
+      );
+      release.assets[0].browser_download_url = "https://untrusted.test/app.dmg";
+      release.html_url = "https://untrusted.test/";
+      if (r.status !== "available") throw Error("Expected update");
+      expect(r.update.downloadUrl).toBe(
+        `https://github.com/${repo}/releases/download/v1.5.1/tuzi-assistant-macos-arm64.dmg`,
+      );
+      await r.update.downloadAndInstall();
+      await r.update.openDownloadPage!();
+      expect(invoke.mock.calls).toEqual([
+        ["open_external", { url: r.update.downloadUrl }],
+        [
+          "open_external",
+          { url: `https://github.com/${repo}/releases/tag/v1.5.1` },
+        ],
+      ]);
+    });
+    it("does not create a manual handle for invalid or signed release metadata", () => {
+      for (const name of ["latest.json", "installer.sig"]) {
+        const release = fixture(repo);
+        release.assets.push({ ...release.assets[0], name });
+        expect(() =>
+          installerUpdateFromRelease(
+            {
+              channel: "stable",
+              repository: repo,
+              platform: "macos",
+              runNumber: 0,
+              commit: "",
+            },
+            "1.5.0",
+            release,
+            1000,
+          ),
+        ).toThrow();
+      }
     });
   },
 );

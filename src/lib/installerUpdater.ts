@@ -122,20 +122,45 @@ export function installerUpdateFromRelease(
   build: UpdateBuildInfo,
   currentVersion: string,
   release: InstallerRelease,
-  timeout: number,
+  _timeout: number,
 ): Awaited<ReturnType<typeof checkInstallerUpdate>> {
+  validateInstallerRelease(release, build.repository);
+  if (!installers[build.platform])
+    throw Error("Unsupported installer platform");
+  if (
+    release.assets.some(
+      (asset) => asset.name === "latest.json" || asset.name.endsWith(".sig"),
+    )
+  )
+    throw Error("Signed releases require the native updater");
   if (!isNewerInstallerVersion(release.tag_name, currentVersion))
     return { status: "up-to-date" };
+  // Opening a browser is not an install. Keep the exact validated version from
+  // the displayed notes; another /latest lookup only adds a network failure
+  // point and can reject a perfectly valid pinned download after a new release.
+  // A withdrawn asset is handled by GitHub, never by switching to another URL.
+  const downloadUrl = release.assets.find(
+    (asset) => asset.name === installers[build.platform],
+  )!.browser_download_url;
+  const releaseUrl = release.html_url;
+  const openUrl = async (url: string) => {
+    try {
+      const opened = await invoke("open_external", { url });
+      if (opened === false) throw Error("Browser did not open");
+    } catch (cause) {
+      const detail =
+        cause instanceof Error
+          ? cause.message
+          : typeof cause === "string"
+            ? cause
+            : "Unknown system error";
+      throw Error(
+        `系统未能打开浏览器。可以复制下载链接，在浏览器中粘贴打开。\n系统信息：${detail.slice(0, 240)}`,
+      );
+    }
+  };
   const openDownload = async () => {
-    const current = await fetchInstallerRelease(build, timeout);
-    if (!isNewerInstallerVersion(current.tag_name, currentVersion))
-      throw Error("Update withdrawn; check again");
-    if (current.tag_name !== release.tag_name)
-      throw Error("Release changed; check again before downloading");
-    const asset = current.assets.find(
-      (a) => a.name === installers[build.platform],
-    )!;
-    await invoke("open_external", { url: asset.browser_download_url });
+    await openUrl(downloadUrl);
   };
   return {
     status: "available",
@@ -152,6 +177,8 @@ export function installerUpdateFromRelease(
       notes: release.body ?? undefined,
       date: release.published_at,
       manual: true,
+      downloadUrl,
+      openDownloadPage: () => openUrl(releaseUrl),
       downloadAndInstall: openDownload,
       download: openDownload,
     },

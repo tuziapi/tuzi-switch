@@ -1,6 +1,6 @@
 [package]
 name = "tu-zi-switch"
-version = "1.6.0"
+version = "1.6.1"
 description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI - tuzi switch"
 authors = ["lkj020626-lgtm"]
 license = "MIT"
@@ -103,6 +103,7 @@ winreg = "0.52"
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
+    "Win32_System_Com",
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

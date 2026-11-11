@@ -257,12 +257,72 @@ describe("official manual update presentation", () => {
       fireEvent.click(screen.getByRole("button", { name: "下载安装包" }));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "下载安装包" }));
+      fireEvent.click(screen.getByRole("button", { name: "正在打开浏览器…" }));
     });
     expect(download).toHaveBeenCalledOnce();
     await act(async () => {
       finish();
     });
     expect(success).toHaveBeenCalledWith("settings.updatePageOpened");
+  });
+
+  it("keeps an OS opening failure visible with copy and version-page recovery", async () => {
+    const downloadUrl =
+      "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.0/tuzi-assistant-windows-x64.exe";
+    const openPage = vi.fn().mockResolvedValue(undefined);
+    check.mockResolvedValue({
+      status: "available",
+      info: {
+        currentVersion: "1.5.7",
+        availableVersion: "1.6.0",
+        channel: "stable",
+      },
+      update: {
+        manual: true,
+        version: "1.6.0",
+        downloadUrl,
+        openDownloadPage: openPage,
+        downloadAndInstall: download,
+      },
+    });
+    download.mockRejectedValue(new Error("系统未能打开浏览器：os error 1155"));
+    invoke.mockResolvedValue(true);
+    render(
+      <UpdateProvider>
+        <Probe />
+      </UpdateProvider>,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    act(() => info.mock.calls[0][1].action.onClick());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "下载安装包" }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("os error 1155");
+    expect(screen.getByRole("textbox", { name: "安装包下载链接" })).toHaveValue(
+      downloadUrl,
+    );
+    expect(success).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "复制下载链接" }));
+    });
+    expect(invoke).toHaveBeenCalledWith("copy_text_to_clipboard", {
+      text: downloadUrl,
+    });
+    invoke.mockRejectedValueOnce("clipboard unavailable");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "复制下载链接" }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("手动复制");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "打开版本下载页" }));
+    });
+    expect(openPage).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "已请求浏览器打开下载",
+    );
+    expect(screen.queryByRole("button", { name: "重启并更新" })).toBeNull();
   });
 });

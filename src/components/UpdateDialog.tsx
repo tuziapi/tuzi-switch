@@ -17,11 +17,15 @@ export function UpdateDialog() {
     updateDialogOpen,
     closeUpdateDialog,
     installState,
+    manualDownloadState,
+    openManualDownloadPage,
+    copyManualDownloadLink,
     downloadUpdate,
     installUpdate,
   } = useUpdate();
   if (!updateInfo) return null;
   const manual = updateHandle?.manual === true;
+  const opening = manual && manualDownloadState.phase === "opening";
   const { phase, downloaded, total, error } = installState;
   const downloading =
     !manual && (phase === "downloading" || phase === "verifying");
@@ -69,6 +73,52 @@ export function UpdateDialog() {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 px-6 py-4">
+          {manual && manualDownloadState.error && (
+            <p
+              role="alert"
+              className="whitespace-pre-line text-sm text-destructive"
+            >
+              {manualDownloadState.error}
+            </p>
+          )}
+          {manual && manualDownloadState.phase === "opened" && (
+            <p role="status" className="text-sm text-muted-foreground">
+              已请求浏览器打开下载。若浏览器没有出现，请复制下方链接手动打开。
+            </p>
+          )}
+          {manual && updateHandle.downloadUrl && (
+            <div className="space-y-2 rounded-lg border p-3 text-xs">
+              <p className="text-muted-foreground">
+                安装包对应当前显示的版本。
+              </p>
+              <input
+                aria-label="安装包下载链接"
+                readOnly
+                value={updateHandle.downloadUrl}
+                onFocus={(event) => event.currentTarget.select()}
+                className="w-full min-w-0 rounded bg-muted px-2 py-2 text-xs select-text"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void copyManualDownloadLink()}
+                >
+                  复制下载链接
+                </Button>
+                {updateHandle.openDownloadPage && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={opening}
+                    onClick={() => void openManualDownloadPage()}
+                  >
+                    打开版本下载页
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
           {(downloading || installing || ready) && (
             <div role="status" aria-live="polite" className="space-y-2 text-sm">
               <p>
@@ -124,28 +174,30 @@ export function UpdateDialog() {
             {downloading ? "后台下载" : "稍后"}
           </Button>
           <Button
-            disabled={downloading || installing}
+            disabled={downloading || installing || opening}
             onClick={() => void (ready ? installUpdate() : downloadUpdate())}
             className="gap-2"
           >
-            {downloading || installing ? (
+            {downloading || installing || opening ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : ready ? (
               <RotateCcw className="h-4 w-4" />
             ) : (
               <Download className="h-4 w-4" />
             )}
-            {installing
-              ? label
-              : downloading
-                ? "正在下载"
-                : ready
-                  ? "重启并更新"
-                  : manual
-                    ? "下载安装包"
-                    : phase === "error"
-                      ? "重新下载"
-                      : "下载更新"}
+            {opening
+              ? "正在打开浏览器…"
+              : installing
+                ? label
+                : downloading
+                  ? "正在下载"
+                  : ready
+                    ? "重启并更新"
+                    : manual
+                      ? "下载安装包"
+                      : phase === "error"
+                        ? "重新下载"
+                        : "下载更新"}
           </Button>
         </DialogFooter>
       </DialogContent>

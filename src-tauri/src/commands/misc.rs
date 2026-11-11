@@ -18,6 +18,47 @@ use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+// Browser activation may use an STA COM extension. Async command worker threads
+// do not initialize it. Keep this apartment off the UI and shared worker pool.
+#[cfg(target_os = "windows")]
+async fn run_windows_shell(
+    action: impl FnOnce() -> Result<(), String> + Send + 'static,
+) -> Result<(), String> {
+    let (send, receive) = tokio::sync::oneshot::channel();
+    std::thread::Builder::new()
+        .name("external-browser".into())
+        .spawn(move || {
+            use windows_sys::Win32::System::Com::{
+                CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+            };
+            let result = unsafe {
+                CoInitializeEx(
+                    std::ptr::null(),
+                    (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+                )
+            };
+            if result < 0 {
+                let _ = send.send(Err(format!(
+                    "初始化系统浏览器失败: HRESULT 0x{:08X}",
+                    result as u32
+                )));
+                return;
+            }
+            struct Apartment;
+            impl Drop for Apartment {
+                fn drop(&mut self) {
+                    unsafe { CoUninitialize() };
+                }
+            }
+            let _apartment = Apartment;
+            let _ = send.send(action());
+        })
+        .map_err(|error| format!("创建浏览器任务失败: {error}"))?;
+    receive
+        .await
+        .map_err(|_| "系统浏览器任务中断".to_string())?
+}
+
 /// 打开外部链接
 #[tauri::command]
 pub async fn open_external(app: AppHandle, url: String) -> Result<bool, String> {
@@ -27,11 +68,60 @@ pub async fn open_external(app: AppHandle, url: String) -> Result<bool, String> 
         format!("https://{url}")
     };
 
+    #[cfg(target_os = "windows")]
+    run_windows_shell(move || {
+        app.opener()
+            .open_url(&url, None::<String>)
+            .map_err(|e| format!("打开链接失败: {e}"))
+    })
+    .await?;
+
+    #[cfg(not(target_os = "windows"))]
     app.opener()
         .open_url(&url, None::<String>)
         .map_err(|e| format!("打开链接失败: {e}"))?;
 
     Ok(true)
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod external_browser_tests {
+    #[tokio::test]
+    async fn browser_opener_runs_in_sta_and_preserves_os_failure() {
+        super::run_windows_shell(|| {
+            use windows_sys::Win32::System::Com::{
+                CoGetApartmentType, APTTYPE_MAINSTA, APTTYPE_STA,
+            };
+            let mut apartment = 0;
+            let mut qualifier = 0;
+            let result = unsafe { CoGetApartmentType(&mut apartment, &mut qualifier) };
+            assert!(result >= 0);
+            assert!(apartment == APTTYPE_STA || apartment == APTTYPE_MAINSTA);
+            Ok(())
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            super::run_windows_shell(|| Err("synthetic OS error 1155".into()))
+                .await
+                .unwrap_err(),
+            "synthetic OS error 1155"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "opens the public release page in the Windows test machine's browser"]
+    async fn windows_real_browser_activation() {
+        let url = "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.6.0";
+        let original = tauri_plugin_opener::open_url(url, None::<String>);
+        println!("Original worker-thread browser activation: {original:?}");
+        let fixed = super::run_windows_shell(move || {
+            tauri_plugin_opener::open_url(url, None::<String>).map_err(|error| error.to_string())
+        })
+        .await;
+        println!("Initialized STA browser activation: {fixed:?}");
+        fixed.unwrap();
+    }
 }
 
 #[tauri::command]
