@@ -66,3 +66,10 @@ v1.5.6 延续正式 Release 提醒、展示更新说明及手动安装。模型�
 v1.5.7 改进三列批量布局、准备占位、结果固定位置与视口保持，并减少无关事件刷新。仍为未签名手动安装交付；不将未来签名升级实现视为本次已通过真实验收。正式源码、Release、下载 URL 均为 tuziapi/tuzi-switch，测试仓库仅执行构建。
 
 当前版本构建：`RELEASE_TAG=v1.5.7 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm build:download`。发布后默认加载器使用 v1.5.7；v1.5.6 和 v1.5.5 保留固定历史脚本/摘要。安装包和页面来源分别记录于 `download-SOURCE.json`，完整证据见 `docs/development/2026-11-06-batch-updater-release.md`。
+
+
+## v1.6.0 发布（2026-11-11）
+
+新增创作讨论与主输入框协同、跨媒体批量规划、可选本地 Codex、附件及 Gemini Omni 视频；完善播放、拖动和原生导出。正式手动安装交付，不提供本次签名自动安装。已知限制与实测范围见 `docs/releases/v1.6.0.md`。
+
+当前构建：`RELEASE_TAG=v1.6.0 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm build:download`。加载器默认 v1.6.0，保留 v1.5.7/v1.5.6/v1.5.5 固定脚本。新 DMG 摘要必须与正式 Release 一致后才部署。

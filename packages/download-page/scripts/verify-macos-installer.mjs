@@ -217,21 +217,21 @@ cat "$BOOTSTRAP"
     };
     for (const [args, tag, ok] of [
       [["--help"], "", true],
-      [["--version", "v1.5.7", "--help"], "", true],
+      [["--version", macosInstallerTag, "--help"], "", true],
       [
-        ["--no-open", "--version", "1.5.7", "--install-dir", "/tmp/tuzi test"],
+        ["--no-open", "--version", macosInstallerTag.slice(1), "--install-dir", "/tmp/tuzi test"],
         "",
         true,
       ],
-      [["--help"], "v1.5.7", true],
+      [["--help"], macosInstallerTag, true],
       [["--help"], "v1.3.1", false],
-      [["--version", "v1.5.7", "--help"], "v1.3.1", true],
+      [["--version", macosInstallerTag, "--help"], "v1.3.1", true],
       [["--version", "v1.3.1"], "", false],
       [["--version", "$(touch /tmp/tuzi-injection)"], "", false],
       [["--version", ""], "", false],
       [["--version"], "", false],
       [["--version", "--help"], "", false],
-      [["--version", "v1.5.7", "--version", "v1.5.7"], "", false],
+      [["--version", macosInstallerTag, "--version", macosInstallerTag], "", false],
     ]) {
       await rm(downloaded, { force: true });
       await rm(executed, { force: true });
@@ -266,9 +266,8 @@ cat "$BOOTSTRAP"
       assert.equal(result.status, 0, result.stderr.toString());
       assert.equal(await readFile(executed, "utf8"), "\n");
     }
-    assert.match(
-      macosInstallCommand(r, { pinned: true }),
-      /--version v1\.5\.7/,
+    assert.ok(
+      macosInstallCommand(r, { pinned: true }).includes(`--version ${macosInstallerTag}`),
     );
   } finally {
     await rm(dir, { recursive: true, force: true });

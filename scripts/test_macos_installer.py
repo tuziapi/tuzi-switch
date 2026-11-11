@@ -132,7 +132,7 @@ exec /bin/mv "$@"
         self.assertTrue((self.app / "old-sentinel").exists())
 
     def test_newer_version_is_not_downgraded(self):
-        self.old_app("1.6.0")
+        self.old_app("99.0.0")
         code, output = self.run_installer()
         self.assertNotEqual(code, 0, output)
         self.assertIn("不会降级", output)
