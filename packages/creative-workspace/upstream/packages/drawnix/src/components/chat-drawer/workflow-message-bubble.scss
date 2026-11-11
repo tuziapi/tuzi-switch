@@ -209,6 +209,24 @@
     object-fit: cover;
   }
 
+  &__media-status {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--td-text-color-secondary);
+    font-size: 13px;
+  }
+
+  &__media-reload {
+    color: var(--td-brand-color);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   &__audio-preview {
     display: flex;
     align-items: center;

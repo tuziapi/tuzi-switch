@@ -1,0 +1,63 @@
+{
+  "task": "UC-CANVAS-MODE-01",
+  "date": "2026-11-08",
+  "baseCommit": "502d492e950239f5e048a18665dd4f17e1d73760",
+  "binarySha256": "874f9638a43099ecc9cf0eca18354fab0612e72579b614e066b2121b16cb3ed9",
+  "bundleId": "com.tuziswitch.desktop.textchatqa",
+  "published": false,
+  "realModelCalls": 0,
+  "unitTestsPassed": 9,
+  "hostComponentTestsPassed": 2,
+  "hostTypecheck": "passed",
+  "upstreamTypecheck": {
+    "existingErrors": 7,
+    "newFileErrors": 0
+  },
+  "browserResults": [
+    {
+      "engine": "chromium",
+      "status": "passed",
+      "checks": [
+        "missing preference defaults actual board and visible control to browse",
+        "dragging directly over an image pans viewport without changing image coordinates",
+        "edit dragging moves image while viewport remains fixed",
+        "edit preference and edited image restore after reload",
+        "browse preference restores after reload",
+        "existing hand/selection tools and H/V stay synchronized",
+        "temporary Space pan does not move image or overwrite edit preference",
+        "typing H/V/Space in chat leaves browse mode intact",
+        "700px toolbar controls fit; dark appearance captured"
+      ],
+      "errors": [],
+      "realProvider": false
+    },
+    {
+      "engine": "webkit",
+      "status": "passed",
+      "checks": [
+        "missing preference defaults actual board and visible control to browse",
+        "dragging directly over an image pans viewport without changing image coordinates",
+        "edit dragging moves image while viewport remains fixed",
+        "edit preference and edited image restore after reload",
+        "browse preference restores after reload",
+        "existing hand/selection tools and H/V stay synchronized",
+        "temporary Space pan does not move image or overwrite edit preference",
+        "typing H/V/Space in chat leaves browse mode intact",
+        "700px toolbar controls fit; dark appearance captured"
+      ],
+      "errors": [],
+      "realProvider": false
+    }
+  ],
+  "nativeChecks": {
+    "defaultBrowse": true,
+    "dragImagePans": true,
+    "editSelection": true,
+    "editRestoredAfterNormalQuit": true,
+    "finalMode": "browse"
+  },
+  "nativePlatformsTested": [
+    "macOS"
+  ],
+  "performanceScope": "No additional pointermove handlers, per-frame React state or drag-time preference writes; no large-canvas benchmark."
+}

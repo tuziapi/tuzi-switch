@@ -1,0 +1,46 @@
+{
+  "task": "UC-MEDIA-DISCUSS-01",
+  "paidRequests": 0,
+  "unitTests": 169,
+  "browser": {
+    "chromium": {
+      "checks": [
+        "opening discussion retains the image model; planner uses an independent configured text model",
+        "image: preview, correct planner/execution models, single dispatch, result and canvas placement",
+        "video: preview, correct planner/execution models, single dispatch, result and canvas placement",
+        "audio: preview, correct planner/execution models, single dispatch, result and canvas placement",
+        "text: preview, correct planner/execution models, single dispatch, result and canvas placement",
+        "ready plan survives reload; cancellation creates no tasks",
+        "explicit exit restores direct generation and closes discussion"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "webkit": {
+      "checks": [
+        "opening discussion retains the image model; planner uses an independent configured text model",
+        "image: preview, correct planner/execution models, single dispatch, result and canvas placement",
+        "video: preview, correct planner/execution models, single dispatch, result and canvas placement",
+        "audio: preview, correct planner/execution models, single dispatch, result and canvas placement",
+        "text: preview, correct planner/execution models, single dispatch, result and canvas placement",
+        "ready plan survives reload; cancellation creates no tasks",
+        "explicit exit restores direct generation and closes discussion"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    }
+  },
+  "finalDelivery": {
+    "app": "/Users/sdy09/Documents/tuzi-switch-artifacts/codex-discussion-2026-11-10/Tuzi Text Chat QA.app",
+    "launcher": "/Users/sdy09/Documents/tuzi-switch-artifacts/codex-discussion-2026-11-10/启动兔子助手最新版.command",
+    "sha256": "244a56d23e3df96c205eb67d34ca91c15b55fe24c6024968b16bc719a02ee2d8",
+    "releaseBuilt": true,
+    "codesignVerified": true,
+    "opened": true
+  },
+  "limitations": [
+    "Synthetic media transport; no new paid provider generation",
+    "One earlier WebKit confirmation timeout did not reproduce in subsequent runs",
+    "Full upstream TypeScript check retains pre-existing errors"
+  ]
+}

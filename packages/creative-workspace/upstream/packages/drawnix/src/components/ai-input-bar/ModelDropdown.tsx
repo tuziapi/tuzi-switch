@@ -1,3 +1,4 @@
+import { getComposerPortalContainer } from '../dialog/dialog';
 import { isSunoNativeModel } from '../../services/suno-native';
 import {
   saveTuziActiveProviderId,
@@ -1511,7 +1512,7 @@ export const ModelDropdown: React.FC<ModelDropdownProps> = ({
             data-testid="model-selector"
           >
             {renderTrigger(handleTriggerKeyDown)}
-            {isOpen && (isPortalled ? createPortal(menu, (document.getElementById('creative-portals') || document.body)) : menu)}
+            {isOpen && (isPortalled ? createPortal(menu, getComposerPortalContainer()) : menu)}
             {isOpen ? (
               <ContextMenu
                 state={contextMenu}

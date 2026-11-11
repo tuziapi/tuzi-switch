@@ -192,6 +192,10 @@ export interface ChatSessionGenerationState {
 
 /** 对话会话接口 */
 export interface ChatSession {
+  /** Missing kind denotes the original creative/Agent conversation. */
+  kind?: 'text';
+  /** Atomic text conversation snapshot; included in existing session backups. */
+  textChat?: import('../services/text-chat/conversation').TextConversationState;
   id: string;
   title: string;
   createdAt: number;
@@ -211,6 +215,9 @@ export interface ChatSession {
 
 /** 抽屉状态接口 */
 export interface DrawerState {
+  mode?: 'text' | 'creative';
+  textActiveSessionId?: string | null;
+  textFocus?: boolean;
   isOpen: boolean;
   width: number;
   activeSessionId: string | null;

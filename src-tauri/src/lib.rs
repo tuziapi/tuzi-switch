@@ -13,7 +13,9 @@ mod codex_state_db;
 mod commands;
 mod config;
 mod creative_http;
+mod creative_codex;
 mod creative_images;
+mod creative_media;
 mod database;
 mod deeplink;
 mod error;
@@ -1265,8 +1267,12 @@ pub fn run() {
             commands::get_providers,
             tuzi_account::account_get_state,
             creative_http::creative_manual_request,
+            creative_codex::creative_codex_probe,
+            creative_codex::creative_codex_chat,
+            creative_codex::creative_codex_cancel,
             creative_http::check_update_ready,
             creative_images::creative_image_action,
+            creative_media::creative_save_media,
             creative_http::creative_manual_cancel,
             tuzi_account::creative::creative_account_bindings,
             tuzi_account::creative::creative_account_bind,

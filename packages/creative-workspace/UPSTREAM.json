@@ -6390,6 +6390,281 @@
       "path": "packages/drawnix/src/utils/__tests__/image-batch-preparation.test.ts",
       "origin": "assistant-local",
       "reason": "UC-PERF-02 approved batch preparation, reserved grid and cancellation regression"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/backup.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/conversation.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/protocol.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/protocol.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/request.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/request.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/routing.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/runtime.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/runtime.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/TextChatWorkspace.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/TextMarkdown.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/TextMarkdown.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/text-chat.scss",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-01 approved configured text conversations, protocol adapters and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/chat-drawer/WorkflowResultImage.tsx",
+      "origin": "assistant-integration",
+      "reason": "Resolve creative assistant result images through desktop cache with display-only retry"
+    },
+    {
+      "path": "packages/drawnix/src/components/canvas-interaction-mode.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/use-canvas-temporary-pan.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/use-canvas-temporary-pan.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "openspec/changes/add-canvas-browse-edit/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "openspec/changes/add-canvas-browse-edit/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "openspec/changes/add-canvas-browse-edit/specs/canvas-interaction/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-MODE-01 approved desktop browse/edit modes, local preference and safe temporary pan"
+    },
+    {
+      "path": "openspec/changes/add-text-chat-attachments/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 approved image, PDF and text attachments with local payload storage and protocol adapters"
+    },
+    {
+      "path": "openspec/changes/add-text-chat-attachments/specs/text-chat-attachments/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 approved image, PDF and text attachments with local payload storage and protocol adapters"
+    },
+    {
+      "path": "openspec/changes/add-text-chat-attachments/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 approved image, PDF and text attachments with local payload storage and protocol adapters"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/TextAttachments.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 approved image, PDF and text attachments with local payload storage and protocol adapters"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/attachment-pdf.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 approved image, PDF and text attachments with local payload storage and protocol adapters"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/attachment-prepare.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 approved image, PDF and text attachments with local payload storage and protocol adapters"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/attachments.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 approved image, PDF and text attachments with local payload storage and protocol adapters"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/attachments.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 approved image, PDF and text attachments with local payload storage and protocol adapters"
+    },
+    {
+      "path": "openspec/changes/add-text-chat-attachments/design.md",
+      "origin": "assistant-integration",
+      "reason": "UC-TEXT-ATTACH-01 local storage, lazy PDF/CJK resources and compatibility decisions"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/DiscussionStrip.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/DiscussionResults.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/discussion-ui.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/discussion.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/discussion.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "openspec/changes/add-agent-discussion/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "openspec/changes/add-agent-discussion/design.md",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "openspec/changes/add-agent-discussion/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "openspec/changes/add-agent-discussion/specs/agent-discussion/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-02 approved shared Agent discussion, compact composer status and isolated verification"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AttachedDiscussion.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-AGENT-CHAT-05 approved attached discussion, single composer and viewport-bounded reading mode"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/discussion-plan.ts",
+      "reason": "UC-DISCUSSION-MEDIA-01 approved cross-media planning, durable preview and explicit text placement"
+    },
+    {
+      "path": "openspec/changes/add-cross-media-discussion/tasks.md",
+      "reason": "UC-DISCUSSION-MEDIA-01 approved cross-media planning, durable preview and explicit text placement"
+    },
+    {
+      "path": "openspec/changes/add-cross-media-discussion/design.md",
+      "reason": "UC-DISCUSSION-MEDIA-01 approved cross-media planning, durable preview and explicit text placement"
+    },
+    {
+      "path": "openspec/changes/add-cross-media-discussion/proposal.md",
+      "reason": "UC-DISCUSSION-MEDIA-01 approved cross-media planning, durable preview and explicit text placement"
+    },
+    {
+      "path": "openspec/changes/add-cross-media-discussion/specs/agent-discussion/spec.md",
+      "reason": "UC-DISCUSSION-MEDIA-01 approved cross-media planning, durable preview and explicit text placement"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/local-codex.ts",
+      "reason": "UC-CODEX-DISCUSS-01 explicit optional local Codex discussion backend, isolated native bridge and validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/local-codex.test.ts",
+      "reason": "UC-CODEX-DISCUSS-01 explicit optional local Codex discussion backend, isolated native bridge and validation"
+    },
+    {
+      "path": "packages/drawnix/src/components/text-chat/DiscussionBackend.tsx",
+      "reason": "UC-CODEX-DISCUSS-01 explicit optional local Codex discussion backend, isolated native bridge and validation"
+    },
+    {
+      "path": "openspec/changes/add-local-codex-discussion/tasks.md",
+      "reason": "UC-CODEX-DISCUSS-01 explicit optional local Codex discussion backend, isolated native bridge and validation"
+    },
+    {
+      "path": "openspec/changes/add-local-codex-discussion/design.md",
+      "reason": "UC-CODEX-DISCUSS-01 explicit optional local Codex discussion backend, isolated native bridge and validation"
+    },
+    {
+      "path": "openspec/changes/add-local-codex-discussion/proposal.md",
+      "reason": "UC-CODEX-DISCUSS-01 explicit optional local Codex discussion backend, isolated native bridge and validation"
+    },
+    {
+      "path": "openspec/changes/add-local-codex-discussion/specs/agent-discussion/spec.md",
+      "reason": "UC-CODEX-DISCUSS-01 explicit optional local Codex discussion backend, isolated native bridge and validation"
+    },
+    {
+      "path": "packages/drawnix/src/utils/gemini-omni-model.ts",
+      "reason": "UC-OMNI-VIDEO-01 exact-model JSON video adaptation and isolated regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/gemini-omni-video.ts",
+      "reason": "UC-OMNI-VIDEO-01 exact-model JSON video adaptation and isolated regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/gemini-omni-video.test.ts",
+      "reason": "UC-OMNI-VIDEO-01 exact-model JSON video adaptation and isolated regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/discussion-canvas.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-01: reserve discussion media task slots on the source canvas."
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/discussion-canvas.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-01: reserve discussion media task slots on the source canvas."
+    },
+    {
+      "path": "packages/drawnix/src/services/assistant-creation-setup.ts",
+      "reason": "Desktop send-time configuration handoff; preserves drafts and reuses host creative settings.",
+      "origin": "assistant-integration"
+    },
+    {
+      "path": "packages/drawnix/src/services/assistant-creation-setup.test.ts",
+      "reason": "Desktop send-time configuration handoff; preserves drafts and reuses host creative settings.",
+      "origin": "assistant-integration"
     }
   ],
   "integration": {

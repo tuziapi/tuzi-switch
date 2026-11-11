@@ -168,6 +168,10 @@ async function configure(p) {
         );
         const progress = p.locator(".image-generation-anchor-desktop-fallback");
         await progress.waitFor();
+        assert.equal(await p.locator('.text-chat-creative-body').count(), 0,
+          'legacy creative conversation must remain unmounted during generation');
+        assert.equal(await p.getByRole('button', { name: '对话', exact: true }).getAttribute('aria-expanded'), 'false',
+          'canvas generation must not open a conversation');
         assert(
           (await progress.textContent()).length > 0,
           "generation progress must have visible status",

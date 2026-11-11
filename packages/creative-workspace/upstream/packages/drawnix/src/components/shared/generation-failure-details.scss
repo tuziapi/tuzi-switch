@@ -58,3 +58,37 @@
     }
   }
 }
+
+// Native SVG cards inherit the same restrained palette in either desktop theme.
+.image-generation-anchor-desktop-fallback,
+.native-generation-failure-details {
+  --failure-surface: #ffffff;
+  --failure-border: #dde2e5;
+  --failure-text: #34434a;
+  --failure-muted: #68747b;
+  --failure-danger: #b34d42;
+  --failure-action: #356859;
+  --failure-action-text: #ffffff;
+
+  [role='button']:hover > rect {
+    filter: brightness(0.96);
+  }
+  [role='button']:focus-visible {
+    outline: 2px solid var(--failure-action);
+    outline-offset: 3px;
+    border-radius: 7px;
+  }
+}
+
+.creative-root[data-theme='dark'] {
+  .image-generation-anchor-desktop-fallback,
+  .native-generation-failure-details {
+    --failure-surface: #292d2b;
+    --failure-border: #474f4b;
+    --failure-text: #e0e6e2;
+    --failure-muted: #acb6b0;
+    --failure-danger: #efa99e;
+    --failure-action: #a6c8b8;
+    --failure-action-text: #20382d;
+  }
+}

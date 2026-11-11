@@ -14,6 +14,7 @@ import {
 import { TaskStatus, TaskType, type Task } from '../types/task.types';
 import { getImageGenerationAnchorControllerResult } from '../utils/image-generation-anchor-controller';
 import {
+  isGenerationAnchorTask,
   getImageGenerationAnchorTaskBatchId,
   getImageGenerationAnchorTaskBatchIndex,
   getImageGenerationAnchorTaskWorkflowId,
@@ -46,9 +47,6 @@ function isActiveAnchorPhase(
   return phase === 'submitted' || phase === 'queued' || phase === 'generating';
 }
 
-function isImageTask(task: Task): boolean {
-  return task.type === TaskType.IMAGE;
-}
 
 function shallowEqualIds(left: string[], right: string[]): boolean {
   if (left.length !== right.length) {
@@ -125,6 +123,7 @@ function deriveAnchorPreviewImageUrl(
   anchor: PlaitImageGenerationAnchor,
   primaryTask: Task | null
 ): string | undefined {
+  if (primaryTask && primaryTask.type !== TaskType.IMAGE) return undefined;
   const result = primaryTask?.result as
     | {
         previewImageUrl?: string;
@@ -622,7 +621,7 @@ export function useImageGenerationAnchorSync({
     const taskSubscription = taskQueueService
       .observeTaskUpdates()
       .subscribe((event) => {
-        if (!isImageTask(event.task)) {
+        if (!isGenerationAnchorTask(event.task)) {
           return;
         }
 

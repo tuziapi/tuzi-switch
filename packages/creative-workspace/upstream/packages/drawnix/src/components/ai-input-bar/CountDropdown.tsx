@@ -1,3 +1,4 @@
+import { getComposerPortalContainer } from '../dialog/dialog';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
@@ -151,7 +152,7 @@ export const CountDropdown: React.FC<CountDropdownProps> = ({
                 })}
               </div>
             </div>,
-            (document.getElementById('creative-portals') || document.body)
+            getComposerPortalContainer()
           )}
         </div>
       )}

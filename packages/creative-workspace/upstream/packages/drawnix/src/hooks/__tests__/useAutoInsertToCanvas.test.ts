@@ -799,6 +799,27 @@ describe('useAutoInsertToCanvas', () => {
     expect(mocks.markAsInserted).toHaveBeenCalledWith(task.id, 'auto_insert');
   });
 
+  it('keeps discussion results on their originating board and inserts only once after return', async () => {
+    const task = createCompletedImageTask({ id: 'discussion-origin', params: {
+      prompt: 'synthetic discussion', autoInsertToCanvas: true,
+      conversationLink: { sessionId: 'session', messageId: 'message', runId: 'run', boardId: 'board-1' },
+    } });
+    mocks.board = { children: [] };
+    mocks.currentBoardId = mocks.boundBoardId = 'board-2';
+    mocks.taskState.tasks = [task];
+    renderHook(() => useAutoInsertToCanvas({ enabled: true, groupSimilarTasks: false }));
+    emitTaskEvent(task);
+    await act(async () => { await vi.runAllTimersAsync(); });
+    expect(mocks.quickInsert).not.toHaveBeenCalled();
+    mocks.currentBoardId = mocks.boundBoardId = 'board-1';
+    act(() => emitBoardSwitched());
+    await act(async () => { await vi.runAllTimersAsync(); });
+    expect(mocks.quickInsert).toHaveBeenCalledTimes(1);
+    emitTaskEvent(task);
+    await act(async () => { await vi.runAllTimersAsync(); });
+    expect(mocks.quickInsert).toHaveBeenCalledTimes(1);
+  });
+
   it('defers PPT explainer video until its source board becomes active', async () => {
     const task = createCompletedImageTask({
       id: 'ppt-explainer-cross-board',
@@ -3593,7 +3614,7 @@ describe('useAutoInsertToCanvas', () => {
       'anchor-post-processing-failed',
       expect.objectContaining({
         phase: 'inserting',
-        subtitle: '图片已生成，正在重新加载并插入',
+        subtitle: '作品已生成，正在重新加载并插入',
       })
     );
     expect(mocks.clearTask).toHaveBeenCalledWith(task.id);

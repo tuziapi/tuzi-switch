@@ -1,0 +1,75 @@
+{
+  "task": "UC-DISCUSS-UI-02",
+  "date": "2026-11-10",
+  "base": "efac7cc127f6c1da3703b12c39ca8fbb934df3f3",
+  "approved": "B: original-style refinement, unified composer background, no icon badges or outlined buttons, larger text and clearer spacing",
+  "browser": {
+    "chromiumLight": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+        "closing unmounts transcript without cancelling the running request",
+        "main input streams model reasoning and reply into attached discussion",
+        "main input continues the same discussion context",
+        "planning failure creates no media tasks; explicit main-input resend succeeds",
+        "durable preview requires explicit confirmation before media dispatch",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+        "stop strip cancels running reply",
+        "reload recovers board-linked discussion and messages",
+        "new discussion and history retain current-board association",
+        "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "webkitDark": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+        "closing unmounts transcript without cancelling the running request",
+        "main input streams model reasoning and reply into attached discussion",
+        "main input continues the same discussion context",
+        "planning failure creates no media tasks; explicit main-input resend succeeds",
+        "durable preview requires explicit confirmation before media dispatch",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+        "stop strip cancels running reply",
+        "reload recovers board-linked discussion and messages",
+        "new discussion and history retain current-board association",
+        "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    }
+  },
+  "native": {
+    "checks": [
+      "discussion strip exposes accessible toggle in native app",
+      "strip opens and closes twice",
+      "collapsed transcript unmounted; canvas visible"
+    ],
+    "paidRequests": 0,
+    "method": "macOS accessibility; no inference"
+  },
+  "focusFix": {
+    "before": "SVG pointer target bypassed interactive-element guard; input blurred and stop target moved by 10px during click.",
+    "after": "Decorative SVGs pass hits to button; primary mousedown preserves composer focus. Both browser suites pass the focused stop assertion.",
+    "diagnosticBefore": "/tmp/tuzi-strip-b-focus.log",
+    "diagnosticHypothesis": "/tmp/tuzi-strip-b-target-check.log"
+  },
+  "bundle": "/Users/sdy09/Documents/tuzi-switch-artifacts/discussion-clean-2026-11-10/Tuzi Text Chat QA.app",
+  "binarySha256": "bc0220b88e711719bfd76a8d986a67a698d2343254e2f72c83f519bbbc4314e3",
+  "signature": "ad-hoc; codesign --verify --deep --strict passed",
+  "paidRequests": 0,
+  "limitations": [
+    "Screenshots and browser generation results are synthetic.",
+    "Prior intermittent plan confirmation issue remains a separate historical observation; not claimed fixed here."
+  ],
+  "logs": [
+    "/tmp/tuzi-strip-b-creative-delivery.log",
+    "/tmp/tuzi-strip-b-preview-delivery.log",
+    "/tmp/tuzi-strip-b-native-delivery.log",
+    "/tmp/tuzi-strip-b-provenance-delivery.log"
+  ]
+}

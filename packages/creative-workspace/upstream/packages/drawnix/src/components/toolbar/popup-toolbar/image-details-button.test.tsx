@@ -61,6 +61,26 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('image details popover', () => {
+  it('keeps desktop details in the styled portal and offsets its fixed coordinates', async () => {
+    const scope = document.createElement('div');
+    scope.className = 'creative-root';
+    scope.getBoundingClientRect = () => ({ left: 80, top: 44 }) as DOMRect;
+    const portal = document.createElement('div');
+    portal.id = 'creative-portals';
+    scope.append(portal);
+    document.body.append(scope);
+    try {
+      render(<PopupImageDetailsButton language="zh" autoOpenRequest={1}
+        image={image} selectionRect={{ top: 200, bottom: 400, left: 100, right: 300 }} />);
+      await waitFor(() => expect(portal.querySelector('.image-details-panel')).toBeTruthy());
+      const panel = portal.querySelector<HTMLElement>('.image-details-panel')!;
+      expect(panel.style.left).toBe('232px');
+      expect(panel.style.top).toBe('156px');
+    } finally {
+      cleanup();
+      scope.remove();
+    }
+  });
   it('shows decoded Gemini pixels when the task has no recorded result dimensions', async () => {
     vi.mocked(taskQueueService.getCompleteTask).mockResolvedValue({
       ...task,

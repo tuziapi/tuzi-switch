@@ -1,0 +1,133 @@
+{
+  "date": "2026-11-10",
+  "task": "UC-CODEX-DISCUSS-01",
+  "baseline": "efac7cc127f6c1da3703b12c39ca8fbb934df3f3",
+  "nativeProtocolTests": 6,
+  "hostTests": 46,
+  "creativeTargetedTests": 175,
+  "paidRequests": 0,
+  "realCliProbe": {
+    "version": "0.160.0",
+    "models": 11,
+    "emptyThread": true,
+    "turnsStarted": 0
+  },
+  "browser": {
+    "chromium": {
+      "codex": {
+        "checks": [
+          "opening discussion retains the image model; planner uses an independent configured text model",
+          "failed connection retains the configured text-model route",
+          "Codex model selection, streamed summary, preview, pinned image execution model and canvas placement",
+          "stop cancels the local turn; failure remains on Codex with no silent fallback",
+          "disconnect restores the original configured text model and conversation context",
+          "narrow layout and discussion toggle still work"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "media": {
+        "checks": [
+          "opening discussion retains the image model; planner uses an independent configured text model",
+          "image: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "video: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "audio: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "text: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "ready plan survives reload; cancellation creates no tasks",
+          "explicit exit restores direct generation and closes discussion"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "layout": {
+        "checks": [
+          "30px strip attached to the main composer",
+          "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+          "closing unmounts transcript without cancelling the running request",
+          "main input streams model reasoning and reply into attached discussion",
+          "main input continues the same discussion context",
+          "planning failure creates no media tasks; explicit main-input resend succeeds",
+          "durable preview requires explicit confirmation before media dispatch",
+          "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+          "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+          "stop strip cancels running reply",
+          "reload recovers board-linked discussion and messages",
+          "new discussion and history retain current-board association",
+          "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      }
+    },
+    "webkit": {
+      "codex": {
+        "checks": [
+          "opening discussion retains the image model; planner uses an independent configured text model",
+          "failed connection retains the configured text-model route",
+          "Codex model selection, streamed summary, preview, pinned image execution model and canvas placement",
+          "stop cancels the local turn; failure remains on Codex with no silent fallback",
+          "disconnect restores the original configured text model and conversation context",
+          "narrow layout and discussion toggle still work"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "media": {
+        "checks": [
+          "opening discussion retains the image model; planner uses an independent configured text model",
+          "image: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "video: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "audio: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "text: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "ready plan survives reload; cancellation creates no tasks",
+          "explicit exit restores direct generation and closes discussion"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "layout": {
+        "checks": [
+          "30px strip attached to the main composer",
+          "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+          "closing unmounts transcript without cancelling the running request",
+          "main input streams model reasoning and reply into attached discussion",
+          "main input continues the same discussion context",
+          "planning failure creates no media tasks; explicit main-input resend succeeds",
+          "durable preview requires explicit confirmation before media dispatch",
+          "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+          "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+          "stop strip cancels running reply",
+          "reload recovers board-linked discussion and messages",
+          "new discussion and history retain current-board association",
+          "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      }
+    }
+  },
+  "native": {
+    "checks": [
+      "native discussion opens with configured text-model route",
+      "real installed CLI probe populates native Codex model and effort controls; no inference",
+      "native disconnect restores configured text selector",
+      "native strip closes/reopens and preserves disconnected state"
+    ],
+    "paidRequests": 0,
+    "turnsStarted": 0,
+    "method": "macOS accessibility against final isolated Tauri bundle; actual metadata probe only"
+  },
+  "delivery": {
+    "app": "/Users/sdy09/Documents/tuzi-switch-artifacts/codex-discussion-2026-11-10/Tuzi Text Chat QA.app",
+    "launcher": "/Users/sdy09/Documents/tuzi-switch-artifacts/codex-discussion-2026-11-10/启动兔子助手最新版.command",
+    "sha256": "244a56d23e3df96c205eb67d34ca91c15b55fe24c6024968b16bc719a02ee2d8",
+    "releaseBuilt": true,
+    "codesignVerified": true,
+    "opened": true
+  },
+  "provenance": {
+    "reconstructedFiles": 1619,
+    "originalFiles": 1522,
+    "localFiles": 97
+  }
+}

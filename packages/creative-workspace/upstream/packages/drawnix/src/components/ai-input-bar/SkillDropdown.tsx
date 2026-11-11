@@ -1,3 +1,4 @@
+import { getComposerPortalContainer } from '../dialog/dialog';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Zap, Plus, Image, Video, Presentation, Music } from 'lucide-react';
@@ -299,7 +300,7 @@ export const SkillDropdown: React.FC<SkillDropdownProps> = ({
                   <span>添加 Skill</span>
                 </div>
               </div>,
-              (document.getElementById('creative-portals') || document.body)
+              getComposerPortalContainer()
             )}
         </div>
       )}

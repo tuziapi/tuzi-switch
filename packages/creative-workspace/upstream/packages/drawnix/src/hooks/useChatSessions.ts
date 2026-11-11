@@ -19,7 +19,7 @@ export function useChatSessions(): UseChatSessionsReturn {
     const loadSessions = async () => {
       setIsLoading(true);
       try {
-        const loadedSessions = await chatStorageService.getAllSessions();
+        const loadedSessions = (await chatStorageService.getAllSessions()).filter(s => s.kind !== 'text');
         setSessions(loadedSessions);
 
         // Load drawer state to get active session

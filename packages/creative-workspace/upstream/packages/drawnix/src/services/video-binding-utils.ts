@@ -14,6 +14,7 @@ import type {
   ResolvedProviderContext,
 } from './provider-routing/types';
 import { getVeoPersonGenerationOptions } from '../utils/veo-parameters';
+import { isGeminiOmniModel, GEMINI_OMNI_VIDEO_METADATA } from '../utils/gemini-omni-model';
 
 export {
   areSeedanceAudioDataUrlsWithinLimit,
@@ -468,6 +469,7 @@ export function getResolvedVideoBindingMetadata(
   binding?: ProviderModelBinding | null,
   params?: Record<string, unknown> | null
 ): ProviderVideoBindingMetadata | null {
+  if (isGeminiOmniModel(modelId)) return GEMINI_OMNI_VIDEO_METADATA;
   const staticMetadata = buildStaticSoraMetadata(modelId);
   const bindingMetadata = binding?.metadata?.video || null;
   const frontendMetadata = buildFrontendSoraMetadata(modelId, binding, params);

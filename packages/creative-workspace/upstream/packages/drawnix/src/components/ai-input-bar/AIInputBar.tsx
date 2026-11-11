@@ -1,3 +1,7 @@
+import { discussionDefaultModel } from "../../services/text-chat/discussion-ui";
+import { ensureAssistantCreationConfigured } from '../../services/assistant-creation-setup';
+import { AttachedDiscussion } from './AttachedDiscussion';
+import { textChatRuntime } from '../../services/text-chat/runtime';
 import { createImageBatchPreparation, yieldBatchPreparationPaint } from '../../utils/image-batch-preparation';
 import type { TaskError } from '../../types/shared/core.types';
 import { toGenerationTaskError } from '../../utils/generation-error-details';
@@ -2085,6 +2089,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     const submitCooldownRef = useRef<NodeJS.Timeout | null>(null); // 提交冷却定时器
     const inputResizeFrameRef = useRef<number | null>(null);
     const [isFocused, setIsFocused] = useState(false);
+    const [discussionOpen, setDiscussionOpen] = useState(false);
+    const [discussionReading, setDiscussionReading] = useState(false);
+    const [discussionEnabled, setDiscussionEnabled] = useState(false);
     const [isPromptManuallyExpanded, setIsPromptManuallyExpanded] =
       useState(false);
     const [canPromptManuallyExpand, setCanPromptManuallyExpand] =
@@ -2930,7 +2937,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       const handleClickOutside = (event: MouseEvent) => {
         const target = event.target as HTMLElement;
         // 检查点击是否在 AIInputBar 容器外部
-        if (containerRef.current && !containerRef.current.contains(target)) {
+        if (containerRef.current && !containerRef.current.contains(target) &&
+            !target.closest('.attached-discussion-modal')) {
           setIsFocused(false);
         }
       };
@@ -3191,6 +3199,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
           // 查找与此任务关联的步骤（即使 workflow 为 null 也继续处理 postProcessingCompleted）
           const eventTask = taskQueueService.getTask(event.taskId);
+          // Discussion owns its session and viewport; legacy completion must not close it.
+          if (eventTask?.params.conversationLink) return;
           const step = eventTask
             ? findWorkflowStepForTask(workflow, eventTask)
             : findWorkflowStepByTaskId(workflow, event.taskId);
@@ -4398,6 +4408,21 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     const handleBoundImageTargetChange = useCallback(
       (target: BoundImageTarget | null) => {
         resetBoundTaskbarDraftsForBoard(currentBoardId ?? null);
+        // Discussion uses selected works as context. Selecting a newly generated
+        // result must not restore its empty editing draft over the next message.
+        if (discussionEnabled) {
+          if (activeDraftElementIdRef.current) detachTaskbarDraft(true);
+          const referenceTarget = target ? { ...target, referenceOnly: true } : null;
+          const key = referenceTarget ? createBoundImageTargetStateKey(referenceTarget, 'reference') : null;
+          if (lastBoundImageTargetKeyRef.current === key && boundImageTargetRef.current?.text === referenceTarget?.text) return;
+          lastBoundImageTargetKeyRef.current = key;
+          boundImageTargetRef.current = referenceTarget;
+          setBoundImageTarget(referenceTarget);
+          setBoundImageTargetMode('reference');
+          setBoundTargetError(null);
+          updatePromptSuggestion(null);
+          return;
+        }
         if (canvasToolbarPrefillElementIdRef.current) {
           if (
             target?.elementId === canvasToolbarPrefillElementIdRef.current
@@ -4542,6 +4567,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         resetBoundTaskbarDraftsForBoard,
         saveActiveTaskbarDraft,
         generationType,
+        discussionEnabled,
         updatePromptSuggestion,
       ]
     );
@@ -5018,12 +5044,14 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       restoredParams.forEach((p) => {
         if (p.id === 'size') return;
         const prevVal = baseParams[p.id];
+        const numberValue = Number(prevVal);
         const prevValIsValid =
-          !prevVal ||
-          p.valueType !== 'enum' ||
-          p.control === 'multiselect' ||
-          !p.options ||
-          p.options.some((option) => option.value === prevVal);
+          (!prevVal || p.valueType !== 'enum' || p.control === 'multiselect' ||
+            !p.options || p.options.some((option) => option.value === prevVal)) &&
+          (p.valueType !== 'number' || (Number.isFinite(numberValue) &&
+            (p.min === undefined || numberValue >= p.min) &&
+            (p.max === undefined || numberValue <= p.max) &&
+            (!p.integer || Number.isInteger(numberValue))));
         if (prevVal && prevValIsValid) {
           nextParams[p.id] = prevVal;
         } else if (p.defaultValue) {
@@ -5135,6 +5163,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             | null) ?? null;
         const canUseActiveBoundTarget =
           !override &&
+          !discussionEnabled &&
           shouldUseBoundTargetForSubmission(
             generationType,
             effectiveBoundTargetMode
@@ -5201,7 +5230,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           ? [activeBoundTargetGenerationContent, ...uploadedContent]
           : generationContent;
         let effectiveContent = baseEffectiveContent;
-        const effectiveGenerationType = activeBoundImageTarget
+        const effectiveGenerationType = activeBoundImageTarget && !(discussionEnabled && !override)
           ? activeBoundImageTarget.type
           : override?.generationType ?? generationType;
         const effectiveSelectedModel = override?.selectedModel ?? selectedModel;
@@ -5362,7 +5391,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
         if (
           !override &&
-          effectiveGenerationType === 'agent' &&
+          !discussionEnabled && effectiveGenerationType === 'agent' &&
           selectedSkillId === 'generate_ppt_explainer_video'
         ) {
           setPptExplainerDialogOpen(true);
@@ -5387,6 +5416,53 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         submitLockRef.current = true;
         setIsInspirationSendGuideActive(false);
         onEnableRuntime?.();
+
+        if (!override && (discussionEnabled || (effectiveGenerationType === 'agent' && selectedSkillId === SKILL_AUTO_ID))) {
+          const discussionBoardId = activeTaskbarBoardIdRef.current;
+          const submittedPrompt = effectivePrompt;
+          try {
+            if (!discussionBoardId) throw new Error('请先打开画板。');
+            await settingsManager.waitForInitialization();
+            const id = await textChatRuntime.ensureDiscussion(discussionBoardId, discussionDefaultModel());
+            if (activeTaskbarBoardIdRef.current !== discussionBoardId) throw new Error('画板已切换，请重新确认后发送。');
+            if (textChatRuntime.getSnapshot().running.has(id)) throw new Error('当前讨论仍在执行，请等待或点击状态条停止。');
+            if (!textChatRuntime.canSend(id)) return;
+            textChatRuntime.select(id);
+            const content = [...baseEffectiveContent];
+            if (submittedCanvasAssociations.length) {
+              if (!submittedBoard) throw new Error('当前画板尚未就绪。');
+              const resolved = await resolveCanvasAssociationsForSubmission(submittedBoard, discussionBoardId, submittedCanvasAssociations);
+              if (resolved.errors.length) throw new Error(resolved.errors.map(e => e.message).join('；'));
+              content.push(...resolved.content);
+            }
+            if (activeTaskbarBoardIdRef.current !== discussionBoardId) throw new Error('画板已切换，请重新发送。');
+            const priorMessageCount = textChatRuntime.getSnapshot().sessions.find(s => s.id === id)?.messageCount || 0;
+            const run = textChatRuntime.send(id, submittedPrompt, undefined, {
+              origin: 'canvas',
+              context: {
+                ...(effectiveGenerationType !== 'agent' ? { targetType: effectiveGenerationType, targetModelRef: effectiveSelectedModelRef || { profileId: null, modelId: effectiveSelectedModel }, executionParams: { ...effectiveSelectedParams } } : {}),
+                knowledgeContextRefs: effectiveKnowledgeContextRefs,
+                params: { count: effectiveSelectedCount, size: effectiveSelectedParams.size, duration: effectiveSelectedParams.duration },
+                defaultModels: agentMediaDefaultModels, defaultModelRefs: agentMediaDefaultModelRefs,
+                selection: {
+                  texts: content.filter(c => c.type === 'text').map(c => c.text || ''),
+                  images: content.filter(c => c.type === 'image').map(c => c.url || '').filter(Boolean),
+                  graphics: content.filter(c => c.type === 'graphics').map(c => c.url || '').filter(Boolean),
+                  videos: content.filter(c => c.type === 'video').map(c => c.url || '').filter(Boolean),
+                },
+              },
+            });
+            // send records the turn synchronously; each composer retains its own draft.
+            if ((textChatRuntime.getSnapshot().sessions.find(s => s.id === id)?.messageCount || 0) > priorMessageCount) clearSubmittedLocalInput();
+            void run.catch(error => MessagePlugin.error(error.message));
+          } catch (error) {
+            MessagePlugin.error(error instanceof Error ? error.message : '无法开始讨论');
+          } finally {
+            submitLockRef.current = false;
+            setIsSubmitting(false);
+          }
+          return;
+        }
 
         const submitStartTime = Date.now();
         const promptLength = trimmedPrompt.length;
@@ -5657,6 +5733,11 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               : 'image';
           await settingsManager.waitForInitialization();
           if (abortIfSubmittedBoardChanged('settings_initialization')) return;
+          if (!ensureAssistantCreationConfigured(currentRouteType, effectiveSelectedModelRef || effectiveSelectedModel)) {
+            submitLockRef.current = false;
+            setIsSubmitting(false);
+            return;
+          }
           const initialRoute = resolveInvocationRoute(
             currentRouteType,
             effectiveSelectedModelRef || effectiveSelectedModel
@@ -7064,6 +7145,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         knowledgeContextRefs,
         agentMediaDefaultModels,
         agentMediaDefaultModelRefs,
+        discussionEnabled,
         generationType,
         selectedCount,
         selectedSkillId,
@@ -8038,7 +8120,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         canvasAssociationRefs.length > 0);
     const shouldHighlightInspirationSend =
       isInspirationSendGuideActive && canGenerate && !isSubmitting;
-    const showInspirationBoard = isCanvasEmpty === true;
+    const showInspirationBoard = isCanvasEmpty === true && !discussionOpen;
     const hasSelectedTextContent = selectedContent.some(
       (item) => item.type === 'text' && item.text?.trim()
     );
@@ -8050,6 +8132,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       canvasAssociationRefs.length > 0 ||
       Boolean(canvasAssociationTrigger);
     const shouldKeepExpanded =
+      // Keep the modal layout steady when focus moves to a plan or model menu.
+      // Collapsing on blur can move the clicked action before mouseup.
+      discussionReading ||
       isPromptManuallyExpanded ||
       isFocused ||
       hasUnsubmittedInputContent ||
@@ -8132,17 +8217,21 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
     }, []);
     const inputViewport = useMemo(() => {
       const viewport = window.visualViewport;
+      const width = viewport?.width ?? window.innerWidth;
+      const occupied = chatDrawerControl.isDrawerOpen
+        ? Math.min(chatDrawerControl.drawerWidth, width * 0.5) : 0;
+      const toolbarInset = chatDrawerControl.isDrawerOpen ? 56 : 0;
       return {
-        left: viewport?.offsetLeft ?? 0,
+        left: (viewport?.offsetLeft ?? 0) + toolbarInset,
         top: viewport?.offsetTop ?? 0,
-        width: viewport?.width ?? window.innerWidth,
+        width: Math.max(240, width - occupied - toolbarInset),
         height: viewport?.height ?? window.innerHeight,
       };
       // Viewport events from SelectionWatcher invalidate these measurements.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [boundInputLayoutTick]);
+    }, [boundInputLayoutTick, chatDrawerControl.isDrawerOpen, chatDrawerControl.drawerWidth]);
     const boundInputPosition = useMemo(() => {
-      if (!positionedBoundImageTarget) return null;
+      if (discussionOpen || !positionedBoundImageTarget) return null;
 
       const board = SelectionWatcherBoardRef.current;
       const boardContainer = board
@@ -8202,6 +8291,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       boundInputLayoutTick,
       inputViewport,
       positionedBoundImageTarget,
+      discussionOpen,
       shouldKeepExpanded,
     ]);
 
@@ -8572,6 +8662,26 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
           <AIInputComposerShell
             variant="canvas"
+            discussionExpanded={discussionReading && discussionOpen}
+            onCloseDiscussion={() => {
+              setDiscussionReading(false);
+              setDiscussionOpen(false);
+            }}
+            status={<AttachedDiscussion
+              boardId={currentBoardId}
+              active={discussionEnabled}
+              targetLabel={generationType === 'agent' ? '按任务使用已配置模型' : `${({ image: '图片', video: '视频', audio: '音频', text: '文本' })[generationType]} · ${selectedModel}`}
+              onDeactivate={() => setDiscussionEnabled(false)}
+              onOpenChange={setDiscussionOpen}
+              open={discussionOpen}
+              reading={discussionReading}
+              onReadingChange={setDiscussionReading}
+              onActivate={() => {
+                setDiscussionEnabled(true);
+                onEnableRuntime?.();
+              }}
+              onPrompt={(value) => { setPrompt(value); inputRef.current?.focus(); }}
+            />}
             expanded={shouldKeepExpanded}
             longText={isPromptManuallyExpanded}
             disabled={isSubmitting}
@@ -8888,7 +8998,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                     shouldHighlightInspirationSend,
                 })}
                 aria-label={
-                  language === 'zh' ? '发送生成请求' : 'Send generation request'
+                  discussionEnabled ? '发送到讨论' : language === 'zh' ? '发送生成请求' : 'Send generation request'
                 }
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -8973,7 +9083,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                     onFocus={handleFocus}
                     onBlur={handleBlur}
                     placeholder={
-                      promptSuggestion
+                      discussionEnabled ? '输入想法或粘贴多条提示词，先讨论并预览计划…' : promptSuggestion
                         ? formatBoundTargetPromptSuggestion(
                             promptSuggestion,
                             language === 'zh' ? 'zh' : 'en'

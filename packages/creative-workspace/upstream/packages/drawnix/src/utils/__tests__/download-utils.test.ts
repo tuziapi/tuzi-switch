@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssetSource, AssetType, type Asset } from '../../types/asset.types';
 import { TaskStatus, TaskType, type Task } from '../../types/task.types';
 import type { AudioDownloadMetadata } from '../audio-id3';
+import { setAssistantAccount } from '../../services/assistant-account';
 import {
   buildAssetDownloadItem,
   buildTaskDownloadItems,
@@ -135,7 +136,36 @@ describe('download-utils', () => {
   });
 
   afterEach(() => {
+    setAssistantAccount(undefined);
     vi.unstubAllGlobals();
+  });
+
+  it('saves cached video through the host media dialog without image decoding or remote fetch', async () => {
+    const video = new Blob([new Uint8Array([0,0,0,24,102,116,121,112,109,112,52,50])], { type: 'video/mp4' });
+    getCachedBlobMock.mockResolvedValue(video);
+    const saveMedia = vi.fn().mockResolvedValueOnce('saved').mockResolvedValueOnce('cancelled');
+    const imageAction = vi.fn();
+    setAssistantAccount({ saveMedia, imageAction } as any);
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    const item = { url: '/__aitu_cache__/video/result', type: 'video' as const, filename: 'rabbit.png' };
+    await expect(smartDownload([item])).resolves.toMatchObject({ downloadedCount: 1 });
+    expect(saveMedia).toHaveBeenCalledWith(video, 'rabbit.mp4', 'video');
+    await expect(smartDownload([item])).resolves.toMatchObject({ downloadedCount: 0 });
+    expect(imageAction).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(downloadFromBlobMock).not.toHaveBeenCalled();
+  });
+
+  it('routes cached audio with metadata through the same native save capability', async () => {
+    const audio = new Blob(['ID3synthetic'], { type: 'audio/mpeg' });
+    getCachedBlobMock.mockResolvedValue(audio);
+    const saveMedia = vi.fn().mockResolvedValue('saved');
+    setAssistantAccount({ saveMedia } as any);
+    await expect(downloadMediaFile('/__aitu_cache__/audio/result.mp3', 'song', 'mp3', 'audio', { title: 'song' }))
+      .resolves.toMatchObject({ downloadedCount: 1 });
+    expect(saveMedia).toHaveBeenCalledWith(audio, 'song.mp3', 'audio');
+    expect(applyAudioMetadataToBlobMock).toHaveBeenCalledWith(audio, { title: 'song' }, '/__aitu_cache__/audio/result.mp3');
   });
 
   it('为素材库音频构建带封面的下载项', () => {

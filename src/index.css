@@ -203,3 +203,8 @@ input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
 }
+
+/* OpenTu toolbar entry is rendered outside the embedded style scope. */
+.creative-chat-entry { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border:1px solid hsl(var(--border)); border-radius:9px; background:hsl(var(--background)); color:hsl(var(--foreground)); font-size:12px; font-weight:500; cursor:pointer; }
+.creative-chat-entry:hover, .creative-chat-entry[aria-expanded=true] { background:hsl(var(--muted)); }
+.creative-chat-entry:focus-visible { outline:2px solid #337fca; outline-offset:3px; }

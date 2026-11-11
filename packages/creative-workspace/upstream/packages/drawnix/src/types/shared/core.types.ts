@@ -161,7 +161,15 @@ export interface DocumentBatchTaskMetadata {
   dispatchTicket?: string;
 }
 
+export interface ConversationTaskLink {
+  sessionId: string;
+  messageId: string;
+  runId: string;
+  boardId: string;
+}
 export interface GenerationParams {
+  /** Shared discussion identity, fixed before queue dispatch. */
+  conversationLink?: ConversationTaskLink;
   /** Durable workflow owner. Generic queue scans must never submit these tasks. */
   workflow?: { scopeId: string; targetId: string; attemptId: string; routeIdentity?: string };
   /** Text prompt describing the desired content */

@@ -117,6 +117,10 @@ export async function downloadMediaFile(
   saveLocation?: string
 ): Promise<SmartDownloadResult> {
   const normalizedUrl = normalizeImageDataUrl(url);
+  if (getAssistantAccount()?.saveMedia && (fallbackName === 'video' || fallbackName === 'audio')) {
+    return smartDownload([{ url: normalizedUrl, type: fallbackName,
+      filename: `${sanitizeFilename(prompt) || fallbackName}.${format}`, audioMetadata }]);
+  }
   if (getAssistantAccount()?.imageAction && /^(png|jpe?g|webp|gif)$/i.test(format)) {
     const result = await runCanvasImageAction('save', normalizedUrl, `${sanitizeFilename(prompt) || fallbackName}.${format}`);
     return createDownloadResult({ downloadedCount: result === 'saved' ? 1 : 0 });
@@ -683,7 +687,8 @@ export async function downloadAsZip(
   const zip = new JSZip();
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
   const finalZipName = zipFilename || `aitu_download_${timestamp}.zip`;
-  const isDesktop = isTauriEnvironment();
+  const saveMedia = getAssistantAccount()?.saveMedia;
+  const isDesktop = isTauriEnvironment() && !saveMedia;
   const desktopZipPath = isDesktop
     ? await pickDesktopSavePath(finalZipName)
     : null;
@@ -758,7 +763,12 @@ export async function downloadAsZip(
   const content = await zip.generateAsync({ type: 'blob' }, (metadata) => {
     reportProgress(onProgress, 50 + metadata.percent / 2);
   });
-  if (desktopZipPath) {
+  if (saveMedia) {
+    const status = await saveMedia(content, finalZipName, 'archive');
+    reportProgress(onProgress, 100);
+    return createDownloadResult({ downloadedCount: status === 'saved' ? addedCount : 0,
+      failedCount: items.length - addedCount });
+  } else if (desktopZipPath) {
     await writeBlobToDesktopPath(desktopZipPath, content);
   } else {
     downloadFromBlob(content, finalZipName);
@@ -795,6 +805,19 @@ export async function smartDownload(
       const result = await runCanvasImageAction('save', assetUrl, item.filename);
       reportProgress(onProgress, 100);
       return createDownloadResult({ downloadedCount: result === 'saved' ? 1 : 0 });
+    }
+
+    const saveMedia = getAssistantAccount()?.saveMedia;
+    if (saveMedia && (item.type === 'video' || item.type === 'audio')) {
+      const original = await readDownloadBlob(item);
+      const blob = item.type === 'audio'
+        ? await applyAudioMetadataToBlob(original, item.audioMetadata, assetUrl)
+        : original;
+      const ext = await sniffMediaExtension(blob, item.type, assetUrl);
+      const filename = replaceFilenameExtension(item.filename || `${item.type}_download`, ext);
+      const status = await saveMedia(blob, filename, item.type);
+      reportProgress(onProgress, 100);
+      return createDownloadResult({ downloadedCount: status === 'saved' ? 1 : 0 });
     }
 
     // 如果有自定义保存路径，使用该路径

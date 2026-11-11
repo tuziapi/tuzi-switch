@@ -2,6 +2,7 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Image as CanvasImage } from './image';
+import { Video } from './video';
 import { unifiedCacheService } from '../../services/unified-cache-service';
 import { getCanvasImageError, isCanvasImageReady, retryCanvasImage } from '../../services/canvas-image-readiness';
 
@@ -181,5 +182,36 @@ describe('canvas image automatic loading', () => {
     expect(document.querySelector('img')?.getAttribute('src')).toBe('/cover.png');
     fireEvent.click(screen.getByRole('button', { name: '播放视频' }));
     expect(document.querySelector('video')?.getAttribute('src')).toBe(url);
+  });
+
+  it('plays from the central button without opening canvas details or dragging', async () => {
+    const canvasClick = vi.fn();
+    const canvasPointer = vi.fn();
+    render(<div onClick={canvasClick} onPointerDown={canvasPointer}>
+      <Video videoItem={{ url: '/video.mp4' }} />
+    </div>);
+    const video = document.querySelector('video')!;
+    fireEvent.loadedMetadata(video);
+    const play = screen.getByRole('button', { name: '播放视频' });
+    expect(Number(play.style.zIndex)).toBeGreaterThan(Number(document.querySelector<HTMLElement>('[data-canvas-media-drag]')!.style.zIndex));
+    fireEvent.pointerDown(play);
+    fireEvent.click(play);
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledOnce();
+    expect(canvasClick).not.toHaveBeenCalled();
+    expect(canvasPointer).not.toHaveBeenCalled();
+    fireEvent.play(video);
+    expect(screen.queryByRole('button', { name: '播放视频' })).toBeNull();
+    fireEvent.pause(video);
+    expect(screen.getByRole('button', { name: '播放视频' })).toBeTruthy();
+  });
+
+  it('allows a denied playback to be retried on the same video', async () => {
+    vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('Playback denied'));
+    render(<Video videoItem={{ url: '/video.mp4' }} />);
+    const video = document.querySelector('video');
+    fireEvent.click(screen.getByRole('button', { name: '播放视频' }));
+    fireEvent.click(await screen.findByRole('button', { name: '重试播放视频' }));
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('video')).toBe(video);
   });
 });

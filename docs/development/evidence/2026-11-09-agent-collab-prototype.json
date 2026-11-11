@@ -1,0 +1,29 @@
+{
+  "task": "UC-AGENT-CHAT-02",
+  "date": "2026-11-09",
+  "scope": "local interactive proposal and mockup validation only",
+  "prototype": "/Users/sdy09/.codex/visualizations/2026/11/08/01a1b8e2-c283-7a23-9384-5435bf11f7da/tuzi-agent-collab.html",
+  "variants": ["紧凑贴合思考条", "动态圆球"],
+  "engine": "Chromium via in-app browser",
+  "checks": [
+    "紧凑贴合思考条打开 Agent 讨论侧边栏",
+    "动态圆球打开 Agent 讨论侧边栏",
+    "Agent/普通对话/图片任务/视频任务模式可切换",
+    "文本模型、图片模型、视频模型配置位可见",
+    "批量生成 4 张结果同时展示在聊天和画布",
+    "显示思考摘要和工具步骤",
+    "停止、定位画布、继续修改、回填主输入框",
+    "侧边栏关闭后保留画布结果",
+    "浏览器控制台无 error/warning"
+  ],
+  "runtimeErrors": [],
+  "realModelRequests": 0,
+  "productionRuntimeModified": false,
+  "nativeBuildPerformed": false,
+  "notVerified": [
+    "真实 Agent 事件适配",
+    "真实文本/图片/视频模型请求",
+    "原生任务恢复",
+    "桌面端生产性能"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "task": "UC-CANVAS-MODE-03",
+  "baseCommit": "896acdb0c0607533f1995d601f6b87029e712433",
+  "hostTypecheck": "passed",
+  "unitTestsPassed": 5,
+  "hostTestsPassed": 2,
+  "modelCalls": 0,
+  "published": false,
+  "browserResults": [
+    {
+      "engine": "chromium",
+      "status": "passed",
+      "checks": [
+        "no extra browse/edit controls; actual canvas defaults to selection",
+        "dragging directly over an image pans viewport without changing image coordinates",
+        "vertical wheel and two-axis trackpad-like deltas pan without moving image",
+        "edit dragging moves image while viewport remains fixed",
+        "selection and edited image restore after reload",
+        "reopening starts selection even after hand tool and obsolete browse preference",
+        "existing hand/selection tools and H/V stay synchronized",
+        "temporary Space pan does not move image and returns to selection without storage writes",
+        "typing H/V/Space in chat leaves selection intact",
+        "700px toolbar controls fit; dark appearance captured"
+      ],
+      "errors": [],
+      "realProvider": false
+    },
+    {
+      "engine": "webkit",
+      "status": "passed",
+      "checks": [
+        "no extra browse/edit controls; actual canvas defaults to selection",
+        "dragging directly over an image pans viewport without changing image coordinates",
+        "vertical wheel and two-axis trackpad-like deltas pan without moving image",
+        "edit dragging moves image while viewport remains fixed",
+        "selection and edited image restore after reload",
+        "reopening starts selection even after hand tool and obsolete browse preference",
+        "existing hand/selection tools and H/V stay synchronized",
+        "temporary Space pan does not move image and returns to selection without storage writes",
+        "typing H/V/Space in chat leaves selection intact",
+        "700px toolbar controls fit; dark appearance captured"
+      ],
+      "errors": [],
+      "realProvider": false
+    }
+  ],
+  "releaseBuild": "passed",
+  "nativeChecks": {
+    "initialSelection": true,
+    "selectionAfterHandAndReenter": true,
+    "noExtraButtons": true
+  },
+  "binarySha256": "a16070a3fd92c09e6f56daf05c696a873caa299d1e4485e35e4d9e7dc72b34f3"
+}

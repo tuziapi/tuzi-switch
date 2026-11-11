@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import {
   Popover,
   PopoverContent,
@@ -18,10 +19,13 @@ export function TuziNavigation(props: TuziSidebarProps) {
         <button
           type="button"
           aria-label="兔子助手导航"
-          className="tuzi-top-navigation-arrival mr-3 flex h-8 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+          className="tuzi-creative-navigation tuzi-top-navigation-arrival mr-3 flex h-8 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
         >
-          <Sparkles size={15} aria-hidden="true" />
-          兔子助手
+          <TuziAccountIcon
+            size={22}
+            className="tuzi-navigation-icon"
+          />
+          <span className="tuzi-navigation-label">兔子助手</span>
           <ChevronDown
             size={14}
             aria-hidden="true"

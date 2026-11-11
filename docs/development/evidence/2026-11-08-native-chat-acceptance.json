@@ -1,0 +1,169 @@
+{
+  "task": "UC-NATIVE-CHAT-01",
+  "date": "2026-11-08",
+  "branch": "codex/opentu-text-chat",
+  "baseCommit": "5398abb265889af98a2736b34c6e40266dab54d9",
+  "binarySha256": "777b69c28f461bb136d9cb8e1a71c79dce82d97c0a94f077e75a57bd18438051",
+  "bundleId": "com.tuziswitch.desktop.textchatqa",
+  "published": false,
+  "realRequestLimits": {
+    "text": 3,
+    "imageCount": 1,
+    "maxCNY": 5
+  },
+  "realRequests": [
+    {
+      "kind": "text",
+      "model": "gpt-6-sol",
+      "start": "2026-11-08T06:06:22.595Z",
+      "maxOutput": 256,
+      "observedComplete": "2026-11-08T06:07:00.178Z",
+      "result": "success; heading/list/code visible; output tokens 172",
+      "serverElapsedMs": 2000
+    },
+    {
+      "kind": "text",
+      "model": "deepseek-v3.2",
+      "start": "2026-11-08T06:07:56.081Z",
+      "maxOutput": 256,
+      "observedComplete": "2026-11-08T06:08:41.278Z",
+      "result": "provider error: 当前模型暂不可用; request id 2026110806075935401218268d9d6575a9cCu",
+      "serverElapsedMs": 1000
+    },
+    {
+      "kind": "text",
+      "model": "claude-haiku-4-5",
+      "start": "2026-11-08T06:09:20.430Z",
+      "maxOutput": 256,
+      "observedComplete": "2026-11-08T06:10:14.531Z",
+      "result": "success; QA1108-A，兔子; output tokens 13",
+      "serverElapsedMs": 10000
+    },
+    {
+      "kind": "image",
+      "model": "gpt-image-2.5-sunburst",
+      "start": "2026-11-08T06:12:37.249Z",
+      "count": 1,
+      "parameters": "1:1,1K,快速,自动背景",
+      "observedComplete": "2026-11-08T06:14:11.381Z",
+      "result": "failed: 模型服务拒绝了请求，请检查 Key 状态、模型权限或额度。",
+      "taskId": "5e4c8c2c-c9f2-4734-8f77-87ddf0073e8f",
+      "serverDiagnostic": "HTTP 429 Rate limit reached for requests; server elapsed 61000ms; request id 2026110806124110674529xQtRkBxn; recorded charge 0"
+    }
+  ],
+  "verdict": "partial; DeepSeek unavailable, image generation rate-limited",
+  "automatedTests": {
+    "hostIntegration": 24,
+    "accountBridge": 38,
+    "browsers": [
+      {
+        "engine": "chromium",
+        "status": "passed",
+        "checks": [
+          {
+            "name": "generated cache image paints in assistant",
+            "pixels": {
+              "red": 79265,
+              "cyan": 79269,
+              "area": 165546
+            }
+          },
+          {
+            "name": "single click opens loaded full preview",
+            "status": "passed"
+          },
+          {
+            "name": "reload preserves image without generation",
+            "pixels": {
+              "red": 79265,
+              "cyan": 79269,
+              "area": 165546
+            }
+          },
+          {
+            "name": "close and reopen preserves result",
+            "status": "passed"
+          },
+          {
+            "name": "missing cache shows explicit display failure, no new generation",
+            "status": "passed"
+          },
+          {
+            "name": "keyboard reload recovers same cached result",
+            "pixels": {
+              "red": 79265,
+              "cyan": 79269,
+              "area": 165546
+            }
+          }
+        ],
+        "errors": [],
+        "realProvider": false,
+        "nativeUI": false
+      },
+      {
+        "engine": "webkit",
+        "status": "passed",
+        "checks": [
+          {
+            "name": "generated cache image paints in assistant",
+            "pixels": {
+              "red": 80098,
+              "cyan": 80102,
+              "area": 165546
+            }
+          },
+          {
+            "name": "single click opens loaded full preview",
+            "status": "passed"
+          },
+          {
+            "name": "reload preserves image without generation",
+            "pixels": {
+              "red": 80098,
+              "cyan": 80102,
+              "area": 165546
+            }
+          },
+          {
+            "name": "close and reopen preserves result",
+            "status": "passed"
+          },
+          {
+            "name": "missing cache shows explicit display failure, no new generation",
+            "status": "passed"
+          },
+          {
+            "name": "keyboard reload recovers same cached result",
+            "pixels": {
+              "red": 80098,
+              "cyan": 80102,
+              "area": 165546
+            }
+          }
+        ],
+        "errors": [],
+        "realProvider": false,
+        "nativeUI": false
+      }
+    ]
+  },
+  "nativeRetest": {
+    "previewToolbarEscape": "passed; viewer closed, chat and workspace retained",
+    "textPersistence": "passed; GPT, failed DeepSeek, Claude all retained",
+    "previousImage": "passed; rendered after restart",
+    "failedCanvasCardDismissal": "passed; stayed dismissed after restart"
+  },
+  "hostTypecheck": "passed",
+  "nativeBuild": "passed; isolated macOS ARM debug app",
+  "provenance": {
+    "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+    "originalFiles": 1522,
+    "localFiles": 60,
+    "reconstructedFiles": 1582,
+    "patchBytes": 863292
+  },
+  "billing": "visible balance reduction about CNY 0.01; successful rows sum <0.02; failed provider final billing unknown",
+  "performance": "no rigorous native frame or memory benchmark this round",
+  "newPersistedFields": false
+}

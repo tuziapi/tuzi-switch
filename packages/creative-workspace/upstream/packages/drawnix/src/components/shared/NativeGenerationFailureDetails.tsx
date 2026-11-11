@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
+import './generation-failure-details.scss';
 import { getAssistantAccount } from '../../services/assistant-account';
 import { formatGenerationErrorReport } from '../../utils/generation-error-details';
 
@@ -7,7 +8,7 @@ const NS = 'http://www.w3.org/2000/svg';
 
 /** SVG text remains visible in native WebKit, where foreignObject can disappear. */
 export function getNativeFailureLayout(rows: FailureRows, width: number) {
-  const lines: { text: string; y: number; label: boolean }[] = [];
+  const lines: { text: string; y: number; label: boolean; error?: boolean }[] = [];
   const available = Math.max(100, width - 32);
   let y = 44;
   for (const [label, value] of rows) {
@@ -18,14 +19,14 @@ export function getNativeFailureLayout(rows: FailureRows, width: number) {
     for (const char of value.replace(/\r\n?/g, '\n')) {
       const size = /[^\x00-\x7f]/.test(char) ? 12 : 7.5;
       if (char === '\n' || pixels + size > available) {
-        lines.push({ text: line, y, label: false });
+        lines.push({ text: line, y, label: false, error: label === '错误' });
         y += 18;
         line = '';
         pixels = 0;
       }
       if (char !== '\n') { line += char; pixels += size; }
     }
-    lines.push({ text: line, y, label: false });
+    lines.push({ text: line, y, label: false, error: label === '错误' });
     y += 26;
   }
   return { lines, height: y };
@@ -41,7 +42,7 @@ export function createNativeFailureDetails(rows: FailureRows, width: number) {
     text.setAttribute('x', '16');
     text.setAttribute('y', String(line.y));
     text.setAttribute('font-size', line.label ? '10' : '12');
-    text.setAttribute('fill', line.label ? '#64748b' : '#9c3b30');
+    text.setAttribute('fill', line.label ? 'var(--failure-muted, #68747b)' : line.error ? 'var(--failure-danger, #b34d42)' : 'var(--failure-text, #34434a)');
     text.textContent = line.text;
     group.appendChild(text);
   }
@@ -51,9 +52,9 @@ export function createNativeFailureDetails(rows: FailureRows, width: number) {
   button.setAttribute('tabindex', '0');
   button.style.cursor = 'pointer';
   const rect = document.createElementNS(NS, 'rect');
-  for (const [key, value] of Object.entries({ x: '16', y: '0', width: '112', height: '26', rx: '5', fill: '#ffffff', stroke: '#e5caca' })) rect.setAttribute(key, value);
+  for (const [key, value] of Object.entries({ x: '16', y: '0', width: '112', height: '26', rx: '5', fill: 'var(--failure-surface, #ffffff)', stroke: 'var(--failure-border, #dde2e5)' })) rect.setAttribute(key, value);
   const label = document.createElementNS(NS, 'text');
-  for (const [key, value] of Object.entries({ x: '72', y: '17', 'text-anchor': 'middle', 'font-size': '11', fill: '#9c3b30' })) label.setAttribute(key, value);
+  for (const [key, value] of Object.entries({ x: '72', y: '17', 'text-anchor': 'middle', 'font-size': '11', fill: 'var(--failure-muted, #68747b)' })) label.setAttribute(key, value);
   label.textContent = '复制错误信息';
   button.append(rect, label);
   const copy = async () => {

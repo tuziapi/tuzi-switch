@@ -1,3 +1,4 @@
+import { getComposerPortalContainer } from '../dialog/dialog';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Sparkles, Image, Video, Music4, FileText, Bot } from 'lucide-react';
@@ -151,7 +152,7 @@ export const GenerationTypeDropdown: React.FC<GenerationTypeDropdownProps> = ({
                 })}
               </div>
             </div>,
-            (document.getElementById('creative-portals') || document.body)
+            getComposerPortalContainer()
           )}
         </div>
       )}

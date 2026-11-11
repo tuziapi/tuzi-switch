@@ -1,3 +1,4 @@
+import { getComposerPortalContainer } from '../dialog/dialog';
 /**
  * PromptHistoryPopover 组件
  *
@@ -336,7 +337,7 @@ export const PromptHistoryPopover: React.FC<PromptHistoryPopoverProps> = ({
 
       {/* 提示词面板 */}
       {isOpen && (
-        <FloatingPortal root={document.getElementById('creative-portals') || undefined}>
+        <FloatingPortal root={getComposerPortalContainer()}>
           <div
             ref={refs.setFloating}
             style={floatingStyles}

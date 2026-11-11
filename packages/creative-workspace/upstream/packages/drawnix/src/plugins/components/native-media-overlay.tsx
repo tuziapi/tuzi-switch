@@ -21,6 +21,52 @@ export function NativeMediaOverlay({
     layer.style.cssText =
       "position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:auto;";
     board.appendChild(layer);
+    // The HTML media layer is a sibling of the SVG host. Forward only the
+    // dedicated drag surface; playback controls keep their native events.
+    let draggingPointer: number | undefined;
+    let releaseFrame = 0;
+    let pendingRelease: PointerEvent | undefined;
+    const forwardedEvents = new WeakSet<Event>();
+    const finishRelease = () => {
+      cancelAnimationFrame(releaseFrame);
+      releaseFrame = 0;
+      if (pendingRelease) {
+        const release = pendingRelease;
+        pendingRelease = undefined;
+        foreignObject.dispatchEvent(release);
+      }
+    };
+    const forwardDrag = (event: PointerEvent) => {
+      if (forwardedEvents.has(event)) return;
+      if (event.type === 'pointerdown') {
+        if (!(event.target instanceof Element) || !event.target.closest('[data-canvas-media-drag]')) return;
+        finishRelease();
+        draggingPointer = event.pointerId;
+        for (const type of ['pointermove', 'pointerup', 'pointercancel']) window.addEventListener(type, forwardDrag as EventListener, true);
+        // Keep the gesture when the pointer leaves the media or crosses a toolbar.
+        try { layer.setPointerCapture(event.pointerId); } catch { /* Window capture is the fallback. */ }
+      } else if (draggingPointer === undefined || draggingPointer !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const forwarded = new PointerEvent(event.type === 'pointercancel' ? 'pointerup' : event.type, {
+        bubbles: true, cancelable: true, composed: true,
+        pointerId: event.pointerId, pointerType: event.pointerType, isPrimary: event.isPrimary,
+        clientX: event.clientX, clientY: event.clientY, button: event.button, buttons: event.buttons,
+        ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey,
+        pressure: event.pressure,
+      });
+      forwardedEvents.add(forwarded);
+      if (event.type === 'pointerup' || event.type === 'pointercancel') {
+        draggingPointer = undefined;
+        for (const type of ['pointermove', 'pointerup', 'pointercancel']) window.removeEventListener(type, forwardDrag as EventListener, true);
+        try { layer.releasePointerCapture(event.pointerId); } catch { /* Already released. */ }
+        // Plait applies the final movement on rAF. Releasing synchronously would
+        // clear its movement state before a fast drag's last frame is applied.
+        pendingRelease = forwarded;
+        releaseFrame = requestAnimationFrame(finishRelease);
+      } else foreignObject.dispatchEvent(forwarded);
+    };
+    layer.addEventListener('pointerdown', forwardDrag as EventListener);
     let frame = 0;
     const sync = () => {
       frame = 0;
@@ -50,6 +96,9 @@ export function NativeMediaOverlay({
     sync();
     setHost(layer);
     return () => {
+      finishRelease();
+      layer.removeEventListener('pointerdown', forwardDrag as EventListener);
+      for (const type of ['pointermove', 'pointerup', 'pointercancel']) window.removeEventListener(type, forwardDrag as EventListener, true);
       observer.disconnect();
       resize.disconnect();
       cancelAnimationFrame(frame);

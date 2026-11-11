@@ -177,6 +177,15 @@ const PATH_PATTERNS: PathPattern[] = [
       pollPathTemplate: '/videos/{taskId}',
     }),
   },
+  // Native text protocols must retain their request/stream formats.
+  {
+    test: (p, ep) => /\/responses\/?$/.test(p) && isPostEndpoint(ep),
+    hint: (p) => ({ protocol: 'openai.responses', requestSchema: 'openai.responses.input', responseSchema: 'openai.responses.events', submitPath: p, baseUrlStrategy: /^\/(?:v1\/)?responses$/.test(p) ? 'ensure-v1' : 'preserve' }),
+  },
+  {
+    test: (p, ep) => /\/messages\/?$/.test(p) && isPostEndpoint(ep),
+    hint: (p) => ({ protocol: 'anthropic.messages', requestSchema: 'anthropic.messages', responseSchema: 'anthropic.messages.events', submitPath: p, baseUrlStrategy: /^\/(?:v1\/)?messages$/.test(p) ? 'ensure-v1' : 'preserve' }),
+  },
   // OpenAI chat completions
   {
     test: (p) => /\/chat\/completions/i.test(p),
