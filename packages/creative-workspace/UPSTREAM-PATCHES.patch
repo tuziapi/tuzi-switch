@@ -15530,10 +15530,10 @@ index d8822e6..22f4cfc 100644
      foreignObject.style.visibility = previousVisibility;
 diff --git a/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx b/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx
 new file mode 100644
-index 0000000..c4e12a2
+index 0000000..959a1a7
 --- /dev/null
 +++ b/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,102 @@
 +import React from "react";
 +import { act, cleanup, render, fireEvent } from "@testing-library/react";
 +import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15611,7 +15611,22 @@ index 0000000..c4e12a2
 +    svg.addEventListener('pointermove', move); svg.addEventListener('pointerup', up);
 +    fireEvent.pointerMove(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 150, clientY: 90, buttons: 1 });
 +    fireEvent.pointerUp(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 150, clientY: 90 });
++    expect(up).not.toHaveBeenCalled();
++    act(() => scheduled?.(0));
 +    expect(move).toHaveBeenCalledOnce(); expect(up).toHaveBeenCalledOnce();
++    // A fast drag can leave the overlay before its next geometry frame.
++    const unrelatedUp = vi.fn();
++    const outsideButton = document.createElement('button');
++    board.append(outsideButton);
++    outsideButton.addEventListener('pointerup', unrelatedUp);
++    fireEvent.pointerDown(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 120, clientY: 80, buttons: 1, pointerId: 7 });
++    fireEvent.pointerMove(outsideButton, { clientX: 900, clientY: 50, buttons: 1, pointerId: 7 });
++    fireEvent.pointerUp(outsideButton, { clientX: 900, clientY: 50, pointerId: 7 });
++    act(() => scheduled?.(0));
++    expect(move).toHaveBeenCalledTimes(2); expect(up).toHaveBeenCalledTimes(2);
++    expect(unrelatedUp).not.toHaveBeenCalled();
++    fireEvent.pointerUp(outsideButton, { pointerId: 7 });
++    expect(unrelatedUp).toHaveBeenCalledOnce();
 +    fo.x.baseVal.value = 50;
 +    fo.setAttribute("x", "50");
 +    await act(async () => {});
@@ -15623,10 +15638,10 @@ index 0000000..c4e12a2
 +});
 diff --git a/packages/drawnix/src/plugins/components/native-media-overlay.tsx b/packages/drawnix/src/plugins/components/native-media-overlay.tsx
 new file mode 100644
-index 0000000..c4cafad
+index 0000000..e7f5fb0
 --- /dev/null
 +++ b/packages/drawnix/src/plugins/components/native-media-overlay.tsx
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,119 @@
 +import React, { useLayoutEffect, useRef, useState } from "react";
 +import { createPortal } from "react-dom";
 +import { isNativeRenderEnvironment } from "../../utils/tauri-env";
@@ -15653,25 +15668,49 @@ index 0000000..c4cafad
 +    // The HTML media layer is a sibling of the SVG host. Forward only the
 +    // dedicated drag surface; playback controls keep their native events.
 +    let draggingPointer: number | undefined;
++    let releaseFrame = 0;
++    let pendingRelease: PointerEvent | undefined;
++    const forwardedEvents = new WeakSet<Event>();
++    const finishRelease = () => {
++      cancelAnimationFrame(releaseFrame);
++      releaseFrame = 0;
++      if (pendingRelease) {
++        const release = pendingRelease;
++        pendingRelease = undefined;
++        foreignObject.dispatchEvent(release);
++      }
++    };
 +    const forwardDrag = (event: PointerEvent) => {
++      if (forwardedEvents.has(event)) return;
 +      if (event.type === 'pointerdown') {
 +        if (!(event.target instanceof Element) || !event.target.closest('[data-canvas-media-drag]')) return;
++        finishRelease();
 +        draggingPointer = event.pointerId;
++        for (const type of ['pointermove', 'pointerup', 'pointercancel']) window.addEventListener(type, forwardDrag as EventListener, true);
++        // Keep the gesture when the pointer leaves the media or crosses a toolbar.
++        try { layer.setPointerCapture(event.pointerId); } catch { /* Window capture is the fallback. */ }
 +      } else if (draggingPointer === undefined || draggingPointer !== event.pointerId) return;
 +      event.preventDefault();
 +      event.stopPropagation();
-+      foreignObject.dispatchEvent(new PointerEvent(event.type, {
++      const forwarded = new PointerEvent(event.type === 'pointercancel' ? 'pointerup' : event.type, {
 +        bubbles: true, cancelable: true, composed: true,
 +        pointerId: event.pointerId, pointerType: event.pointerType, isPrimary: event.isPrimary,
 +        clientX: event.clientX, clientY: event.clientY, button: event.button, buttons: event.buttons,
 +        ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey,
 +        pressure: event.pressure,
-+      }));
++      });
++      forwardedEvents.add(forwarded);
++      if (event.type === 'pointerup' || event.type === 'pointercancel') {
++        draggingPointer = undefined;
++        for (const type of ['pointermove', 'pointerup', 'pointercancel']) window.removeEventListener(type, forwardDrag as EventListener, true);
++        try { layer.releasePointerCapture(event.pointerId); } catch { /* Already released. */ }
++        // Plait applies the final movement on rAF. Releasing synchronously would
++        // clear its movement state before a fast drag's last frame is applied.
++        pendingRelease = forwarded;
++        releaseFrame = requestAnimationFrame(finishRelease);
++      } else foreignObject.dispatchEvent(forwarded);
 +    };
-+    const endDrag = () => { draggingPointer = undefined; };
-+    for (const type of ['pointerdown', 'pointermove', 'pointerup']) layer.addEventListener(type, forwardDrag as EventListener);
-+    window.addEventListener('pointerup', endDrag);
-+    window.addEventListener('pointercancel', endDrag);
++    layer.addEventListener('pointerdown', forwardDrag as EventListener);
 +    let frame = 0;
 +    const sync = () => {
 +      frame = 0;
@@ -15701,9 +15740,9 @@ index 0000000..c4cafad
 +    sync();
 +    setHost(layer);
 +    return () => {
-+      for (const type of ['pointerdown', 'pointermove', 'pointerup']) layer.removeEventListener(type, forwardDrag as EventListener);
-+      window.removeEventListener('pointerup', endDrag);
-+      window.removeEventListener('pointercancel', endDrag);
++      finishRelease();
++      layer.removeEventListener('pointerdown', forwardDrag as EventListener);
++      for (const type of ['pointermove', 'pointerup', 'pointercancel']) window.removeEventListener(type, forwardDrag as EventListener, true);
 +      observer.disconnect();
 +      resize.disconnect();
 +      cancelAnimationFrame(frame);

@@ -135,6 +135,16 @@ await p.mouse.move(rect.x+rect.width*.4+100,rect.y+85,{steps:12});
 await p.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 await p.mouse.up();
 await until(async()=>{const b=(await records(p,'aitu-workspace','boards')).find(b=>b.id===boardBefore.id);const v=b.elements.find(e=>e.id===videoBefore.id);return Math.abs(v.points[0][0]-videoBefore.points[0][0]-100)<3&&Math.abs(v.points[0][1]-videoBefore.points[0][1]-50)<3;},'dragged video position saved');
+await until(async()=>{const b=await surface.boundingBox();return Math.abs(b.x-rect.x-100)<3&&Math.abs(b.y-rect.y-50)<3;},'overlay follows saved move before next gesture');
+const moved=await surface.boundingBox();
+if(process.env.DEBUG_MEDIA_DRAG) await p.evaluate(()=>{
+ window.__dragEvents=[];
+ for(const type of ['pointerdown','pointermove','pointerup']) window.addEventListener(type,e=>window.__dragEvents.push({type,x:e.clientX,y:e.clientY,buttons:e.buttons,trusted:e.isTrusted,target:e.target?.outerHTML?.slice(0,150)}),true);
+});
+await p.mouse.move(moved.x+12,moved.y+12); await p.mouse.down();
+await p.mouse.move(moved.x+62,moved.y-68); await p.mouse.up();
+if(process.env.DEBUG_MEDIA_DRAG) console.log({rect,moved,events:await p.evaluate(()=>window.__dragEvents),points:(await records(p,'aitu-workspace','boards')).flatMap(b=>b.elements||[]).map(e=>e.points)});
+await until(async()=>{const b=(await records(p,'aitu-workspace','boards')).find(b=>b.id===boardBefore.id);const v=b.elements.find(e=>e.id===videoBefore.id);return Math.abs(v.points[0][0]-videoBefore.points[0][0]-150)<3&&Math.abs(v.points[0][1]-videoBefore.points[0][1]+30)<3;},'fast drag outside video persists without triggering toolbar');
 await p.locator('[data-native-media-overlay] video').first().evaluate(v=>{v.loop=true;});
 await p.locator('[data-native-media-overlay]').first().getByRole('button',{name:'播放视频',exact:true}).click();
 await until(async()=>p.locator('[data-native-media-overlay] video').first().evaluate(v=>!v.paused&&v.currentTime>0),'canvas video plays');
@@ -237,8 +247,8 @@ await until(async()=>p.locator('.discussion-result-media video').evaluateAll(vid
 assert.equal((await directPosts()).length,0,'reload must not resubmit');
 assert.equal((await records(p,'aitu-app','tasks')).length,4);
 const restored=(await records(p,'aitu-workspace','boards')).flatMap(b=>b.elements||[]).find(e=>e.id===videoBefore.id);
-assert(Math.abs(restored.points[0][0]-videoBefore.points[0][0]-100)<3);
-assert(Math.abs(restored.points[0][1]-videoBefore.points[0][1]-50)<3);
+assert(Math.abs(restored.points[0][0]-videoBefore.points[0][0]-150)<3);
+assert(Math.abs(restored.points[0][1]-videoBefore.points[0][1]+30)<3);
 checks.push('reload preserves cached video playback without new generation');
 assert.deepEqual(errors,[]);
 fs.writeFileSync(`${output}/${engine}-results.json`,JSON.stringify({checks,errors,requests:'synthetic only',directRequest:bodies[0],referenceRequest:{...bodies[1],input:bodies[1].input.map(part=>part.data?{...part,data:'SYNTHETIC_BASE64_OMITTED'}:part)}},null,2));

@@ -75,7 +75,22 @@ describe("native media overlay", () => {
     svg.addEventListener('pointermove', move); svg.addEventListener('pointerup', up);
     fireEvent.pointerMove(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 150, clientY: 90, buttons: 1 });
     fireEvent.pointerUp(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 150, clientY: 90 });
+    expect(up).not.toHaveBeenCalled();
+    act(() => scheduled?.(0));
     expect(move).toHaveBeenCalledOnce(); expect(up).toHaveBeenCalledOnce();
+    // A fast drag can leave the overlay before its next geometry frame.
+    const unrelatedUp = vi.fn();
+    const outsideButton = document.createElement('button');
+    board.append(outsideButton);
+    outsideButton.addEventListener('pointerup', unrelatedUp);
+    fireEvent.pointerDown(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 120, clientY: 80, buttons: 1, pointerId: 7 });
+    fireEvent.pointerMove(outsideButton, { clientX: 900, clientY: 50, buttons: 1, pointerId: 7 });
+    fireEvent.pointerUp(outsideButton, { clientX: 900, clientY: 50, pointerId: 7 });
+    act(() => scheduled?.(0));
+    expect(move).toHaveBeenCalledTimes(2); expect(up).toHaveBeenCalledTimes(2);
+    expect(unrelatedUp).not.toHaveBeenCalled();
+    fireEvent.pointerUp(outsideButton, { pointerId: 7 });
+    expect(unrelatedUp).toHaveBeenCalledOnce();
     fo.x.baseVal.value = 50;
     fo.setAttribute("x", "50");
     await act(async () => {});
