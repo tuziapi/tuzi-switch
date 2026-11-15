@@ -7,6 +7,9 @@
 // Known built-in video generation models
 export type KnownVideoModel =
   | 'gemini-omni-1.1-flash'
+  | 'gemini-omni-1.2-flash'
+  | 'wan3.0-video'
+  | 'kling-4.0'
   | 'sora-2'
   | 'sora-2-pro'
   | 'sora-2-4s'
@@ -35,7 +38,10 @@ export type KnownVideoModel =
   | 'happyhorse-1.0-t2v'
   | 'happyhorse-1.0-i2v'
   | 'happyhorse-1.0-r2v'
-  | 'happyhorse-1.0-video-edit';
+  | 'happyhorse-1.0-video-edit'
+  | 'happyhorse-1.1-t2v'
+  | 'happyhorse-1.1-i2v'
+  | 'happyhorse-1.1-r2v';
 
 // Video generation models also allow runtime-discovered ids.
 export type VideoModel = KnownVideoModel | string;
@@ -47,7 +53,8 @@ export type VideoProvider =
   | 'veo'
   | 'kling'
   | 'seedance'
-  | 'happyhorse';
+  | 'happyhorse'
+  | 'wan';
 
 // Image upload mode
 export type ImageUploadMode = 'reference' | 'frames' | 'components';

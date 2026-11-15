@@ -14,7 +14,12 @@ import type {
 } from '../types/video.types';
 import { getModelConfig, ModelVendor } from './model-config';
 import { SEEDANCE_25_MODEL_ID } from '../utils/seedance-model';
-import { GEMINI_OMNI_MODEL_ID, GEMINI_OMNI_DURATIONS, GEMINI_OMNI_SIZES } from '../utils/gemini-omni-model';
+import {
+  GEMINI_OMNI_LEGACY_MODEL_ID,
+  GEMINI_OMNI_LEGACY_DURATIONS,
+  GEMINI_OMNI_SIZES,
+} from '../utils/gemini-omni-model';
+import { normalizeTuziVideoParams, TUZI_VIDEO_MODEL_CONFIGS } from './tuzi-video-models';
 
 const SEEDANCE_ASPECT_RATIO_OPTIONS = [
   { label: '横屏 16:9', aspectRatio: '16:9' },
@@ -93,6 +98,24 @@ const HAPPYHORSE_DURATION_OPTIONS: DurationOption[] = [
   { label: '15秒', value: '15' },
 ];
 
+function geminiOmniConfig(modelId: string, label: string): VideoModelConfig {
+  return {
+    id: modelId,
+    label,
+    provider: 'gemini-omni',
+    description: '3–10秒视频，支持 360P/720P/1080P/4K 横竖屏与最多10张参考图',
+    durationOptions: GEMINI_OMNI_LEGACY_DURATIONS.map((value) => ({ label: `${value}秒`, value })),
+    defaultDuration: '4',
+    sizeOptions: GEMINI_OMNI_SIZES,
+    defaultSize: '1280x720',
+    imageUpload: {
+      maxCount: 10,
+      mode: 'reference',
+      labels: Array.from({ length: 10 }, (_, index) => `参考图${index + 1}`),
+    },
+  };
+}
+
 const MINIMAX_H3_DURATION_OPTIONS: DurationOption[] = Array.from(
   { length: 12 },
   (_, index) => {
@@ -111,14 +134,7 @@ const MINIMAX_H3_SIZE_OPTIONS: SizeOption[] = [
  * Each model has specific duration, size, and image upload options
  */
 export const VIDEO_MODEL_CONFIGS: Record<string, VideoModelConfig> = {
-  [GEMINI_OMNI_MODEL_ID]: {
-    id: GEMINI_OMNI_MODEL_ID,
-    label: 'Gemini Omni 1.1 Flash', provider: 'gemini-omni',
-    description: '3–10秒视频，支持横竖屏与最多10张参考图',
-    durationOptions: GEMINI_OMNI_DURATIONS.map(value => ({ label: `${value}秒`, value })),
-    defaultDuration: '4', sizeOptions: GEMINI_OMNI_SIZES, defaultSize: '1280x720',
-    imageUpload: { maxCount: 10, mode: 'reference', labels: Array.from({ length: 10 }, (_, i) => `参考图${i + 1}`) },
-  },
+  [GEMINI_OMNI_LEGACY_MODEL_ID]: geminiOmniConfig(GEMINI_OMNI_LEGACY_MODEL_ID, 'Gemini Omni 1.1 Flash'),
   kling_video: {
     id: 'kling_video',
     label: 'Kling',
@@ -633,6 +649,7 @@ export const VIDEO_MODEL_CONFIGS: Record<string, VideoModelConfig> = {
       labels: ['参考图'],
     },
   },
+  ...TUZI_VIDEO_MODEL_CONFIGS,
 };
 
 /**
@@ -840,6 +857,7 @@ export function getValidVideoSize(
   aspectRatio?: string | null
 ): string {
   const config = getConfigOrDefault(model);
+  size = normalizeTuziVideoParams(model, { size }).size;
   if (size && config.sizeOptions.some((option) => option.value === size)) {
     return size;
   }

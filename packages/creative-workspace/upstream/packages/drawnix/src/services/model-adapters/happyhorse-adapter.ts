@@ -1,7 +1,9 @@
+import { encodeTuziVideoBlob } from '../tuzi-video-media';
 import { notifyTaskSubmitted } from '../submission-persistence';
 import { unifiedCacheService } from '../unified-cache-service';
 import { ensureBase64ForAI } from '../media-executor/fallback-utils';
 import { downloadVideoContentToLocalUrl } from '../video-binding-utils';
+import { buildTuziVideoRequest } from '../tuzi-video-request';
 import {
   buildProviderContextFromAdapterContext,
   sendAdapterRequest,
@@ -18,11 +20,16 @@ const HAPPYHORSE_MODELS = [
   'happyhorse-1.0-i2v',
   'happyhorse-1.0-r2v',
   'happyhorse-1.0-video-edit',
+  'happyhorse-1.1-t2v',
+  'happyhorse-1.1-i2v',
+  'happyhorse-1.1-r2v',
 ];
 
 const HAPPYHORSE_RATIO_MODEL_IDS = new Set([
   'happyhorse-1.0-t2v',
   'happyhorse-1.0-r2v',
+  'happyhorse-1.1-t2v',
+  'happyhorse-1.1-r2v',
 ]);
 
 const HAPPYHORSE_EDIT_MODEL_ID = 'happyhorse-1.0-video-edit';
@@ -65,6 +72,14 @@ interface HappyHorseVideoParameters {
 
 function isHappyHorseModelId(modelId?: string | null): boolean {
   return Boolean(modelId?.toLowerCase().includes('happyhorse'));
+}
+
+function isHappyHorseI2VModel(modelId: string): boolean {
+  return /^happyhorse-1\.[01]-i2v$/i.test(modelId);
+}
+
+function isHappyHorseR2VModel(modelId: string): boolean {
+  return /^happyhorse-1\.[01]-r2v$/i.test(modelId);
 }
 
 function normalizeRatio(value?: string | null): string | undefined {
@@ -304,6 +319,28 @@ export async function submitHappyHorseVideo(
   request: VideoGenerationRequest
 ): Promise<HappyHorseTaskResponse> {
   const model = request.model || 'happyhorse-1.0-t2v';
+  const tuziBody = await buildTuziVideoRequest(
+    { ...request, model },
+    async (url) => {
+      const blob = await unifiedCacheService.getCachedBlob(url);
+      if (!blob) throw new Error('本地参考素材读取失败，请重新选择文件');
+      return encodeTuziVideoBlob(blob);
+    }
+  );
+  if (tuziBody) {
+    context.signal?.throwIfAborted();
+    const response = await sendAdapterRequest(context, {
+      path: '/videos',
+      baseUrlStrategy: 'ensure-v1',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tuziBody),
+    });
+    if (!response.ok) {
+      throw new Error(`HappyHorse 视频提交失败: ${await readErrorResponse(response)}`);
+    }
+    return response.json();
+  }
   const referenceImages = await normalizeImageInputs(request.referenceImages);
   const body: Record<string, unknown> = {
     model,
@@ -311,7 +348,7 @@ export async function submitHappyHorseVideo(
     parameters: buildParameters(model, request),
   };
 
-  if (model === 'happyhorse-1.0-i2v') {
+  if (isHappyHorseI2VModel(model)) {
     const imageParam = getStringParam(request.params, [
       'image',
       'input_reference',
@@ -323,7 +360,7 @@ export async function submitHappyHorseVideo(
       throw new Error('HappyHorse I2V 需要首帧图片');
     }
     body.image = image;
-  } else if (model === 'happyhorse-1.0-r2v') {
+  } else if (isHappyHorseR2VModel(model)) {
     const paramImages = await normalizeImageInputs(
       getStringArrayParam(request.params, ['input_reference', 'images'])
     );

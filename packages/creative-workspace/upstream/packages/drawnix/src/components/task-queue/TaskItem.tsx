@@ -90,7 +90,7 @@ function isKlingTaskModel(model?: string): boolean {
   }
 
   const normalized = model.toLowerCase();
-  return normalized === 'kling_video' || normalized.startsWith('kling-v');
+  return normalized === 'kling_video' || normalized === 'kling-4.0' || normalized.startsWith('kling-v');
 }
 
 function getKlingActionLabel(action?: string): string | undefined {

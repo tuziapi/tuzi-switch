@@ -26,6 +26,8 @@ import {
   parseErrorMessage,
   sleep,
 } from './utils';
+import { encodeTuziVideoBytes } from '../tuzi-video-media';
+import { getTuziVideoModelConfig } from '../../constants/tuzi-video-models';
 import { providerTransport } from '../provider-routing/provider-transport';
 import {
   appendVideoOutputParams,
@@ -36,7 +38,9 @@ import {
   resolveVideoPollPathForModel,
   resolveVideoSubmission,
   shouldDownloadVideoContent,
+  resolveVideoReferenceField,
 } from '../video-binding-utils';
+import { buildTuziVideoRequest } from '../tuzi-video-request';
 import { prepareVideoReferenceImageBlob } from '../video-reference-image-utils';
 import { prepareReferenceImageForMultipart } from '../reference-image-form-data';
 import { mapWithConcurrency } from '../../utils/map-with-concurrency';
@@ -48,6 +52,7 @@ import { buildGeminiOmniVideoBody } from '../gemini-omni-video';
 const DURATION_IN_MODEL_PREFIX = 'sora-2-';
 const PROVIDER_ERROR_PREVIEW_LIMIT = 1000;
 const REFERENCE_IMAGE_PREPARE_CONCURRENCY = 3;
+
 const durationEncodedInModel = (model?: string | null) =>
   Boolean(model && model.startsWith(DURATION_IN_MODEL_PREFIX));
 
@@ -215,6 +220,20 @@ export async function submitVideoGeneration(
   if (isOmni && (params.referenceImages?.length || 0) > 10)
     throw new Error('Gemini Omni 最多支持 10 张参考图');
 
+  const tuziBody = await buildTuziVideoRequest(
+    {
+      ...params,
+      model,
+      duration: secondsParam,
+    },
+    async (url) => {
+      const response = await fetchFn(url, { signal });
+      if (!response.ok) throw new Error('参考图片读取失败');
+      const mimeType = response.headers.get('Content-Type')?.split(';')[0] || 'application/octet-stream';
+      return encodeTuziVideoBytes(new Uint8Array(await response.arrayBuffer()), mimeType);
+    }
+  );
+
   // 构建 FormData
   const formData = new FormData();
   formData.append('model', submission.model);
@@ -233,7 +252,7 @@ export async function submitVideoGeneration(
   );
 
   // 处理参考图片（体积控制在 1MB 内，与图片生成一致）
-  if (!isMiniMaxH3 && params.referenceImages && params.referenceImages.length > 0) {
+  if (!isMiniMaxH3 && !tuziBody && params.referenceImages && params.referenceImages.length > 0) {
     const references = params.referenceImages
       .map((value, index) => ({ value, index }))
       .filter((item): item is { value: string; index: number } => Boolean(item.value));
@@ -252,9 +271,9 @@ export async function submitVideoGeneration(
         };
       }
     );
-    for (const prepared of preparedReferences) {
+    for (const [preparedIndex, prepared] of preparedReferences.entries()) {
       const blob = prepared.blob;
-      formData.append('input_reference', blob, prepared.filename);
+      formData.append(resolveVideoReferenceField(model, preparedIndex), blob, prepared.filename);
     }
   }
 
@@ -276,14 +295,22 @@ export async function submitVideoGeneration(
       )
     : null;
   const submitPath =
-    miniMaxSubmission?.path || config.binding?.submitPath || '/v1/videos';
+    miniMaxSubmission?.path || (getTuziVideoModelConfig(model) ? '/videos' : config.binding?.submitPath || '/v1/videos');
+
+  signal?.throwIfAborted();
 
   const response = await providerTransport.send(providerContext, {
     path: submitPath,
-    baseUrlStrategy: isOmni ? 'ensure-v1' : isMiniMaxH3 ? 'trim-v1' : config.binding?.baseUrlStrategy,
+    baseUrlStrategy: isMiniMaxH3 ? 'trim-v1' : isOmni || getTuziVideoModelConfig(model) ? 'ensure-v1' : config.binding?.baseUrlStrategy,
     method: 'POST',
-    headers: isMiniMaxH3 || isOmni ? { 'Content-Type': 'application/json' } : undefined,
-    body: isOmni ? await buildGeminiOmniVideoBody(formData, signal) : isMiniMaxH3 ? JSON.stringify(miniMaxSubmission!.body) : formData,
+    headers: isMiniMaxH3 || isOmni || tuziBody ? { 'Content-Type': 'application/json' } : undefined,
+    body: tuziBody
+      ? JSON.stringify(tuziBody)
+      : isOmni
+      ? await buildGeminiOmniVideoBody(formData, signal)
+      : isMiniMaxH3
+      ? JSON.stringify(miniMaxSubmission!.body)
+      : formData,
     signal,
     fetcher: fetchFn,
   });
@@ -355,7 +382,11 @@ export async function queryVideoStatus(
       config.binding,
       config.params
     ),
-    baseUrlStrategy: isMiniMaxH3 ? 'trim-v1' : config.binding?.baseUrlStrategy,
+    baseUrlStrategy: isMiniMaxH3
+      ? 'trim-v1'
+      : config.defaultModel && getTuziVideoModelConfig(config.defaultModel)
+      ? 'ensure-v1'
+      : config.binding?.baseUrlStrategy,
     method: 'GET',
     signal,
     fetcher: fetchFn,
@@ -412,6 +443,8 @@ export async function pollVideoUntilComplete(
         ),
         baseUrlStrategy: isMiniMaxH3
           ? 'trim-v1'
+          : config.defaultModel && getTuziVideoModelConfig(config.defaultModel)
+          ? 'ensure-v1'
           : config.binding?.baseUrlStrategy,
         signal,
         fetcher: fetchFn,
