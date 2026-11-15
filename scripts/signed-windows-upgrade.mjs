@@ -43,7 +43,7 @@ const next = candidate(nextDir, '43689683759', '695f4e933d797b39f7a61aad7804800a
 const executable = path.join(root, 'installed', 'tu-zi-switch.exe');
 const env = { ...process.env, TUZI_SIGNED_LAB_ROOT: root, TUZI_SIGNED_LAB_EXE: executable };
 // No build/repository token is passed to the installed desktop process.
-const appEnv = { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1' };
+const appEnv = { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9222' };
 for (const key of Object.keys(appEnv)) if (/TOKEN|SECRET|PASSWORD|PRIVATE_KEY/i.test(key)) delete appEnv[key];
 delete appEnv.CC_SWITCH_TEST_HOME; delete appEnv.TUZI_UPDATER_QA_ROOT;
 function powershell(script) {
@@ -113,7 +113,19 @@ $password=ConvertTo-SecureString 'SYNTHETIC-LAB-ONLY' -AsPlainText -Force
 Export-PfxCertificate -Cert $cert -FilePath (Join-Path $root 'synthetic-tls.pfx') -Password $password | Out-Null
 Export-Certificate -Cert $cert -FilePath (Join-Path $root 'synthetic-tls.cer') | Out-Null
 Import-Certificate -FilePath (Join-Path $root 'synthetic-tls.cer') -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
-[Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS','--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1','User')
+[Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS','--remote-debugging-port=9222','User')
+# Documented WebView2 per-application registry override; temporary runner only.
+$policyPath='HKLM:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+$policyNames=@('com.tuziswitch.desktop','tu-zi-switch.exe')
+$policyBackup=@()
+foreach ($name in $policyNames) {
+ $item=Get-ItemProperty -LiteralPath $policyPath -ErrorAction SilentlyContinue
+ $property=if ($null -ne $item) { $item.PSObject.Properties[$name] } else { $null }
+ $policyBackup += @{name=$name; existed=($null -ne $property); value=$(if ($null -ne $property) { $property.Value } else { $null })}
+}
+ConvertTo-Json -InputObject $policyBackup | Set-Content (Join-Path $root 'webview-policy.original.json')
+New-Item -Path $policyPath -Force | Out-Null
+foreach ($name in $policyNames) { New-ItemProperty -LiteralPath $policyPath -Name $name -PropertyType String -Value '--remote-debugging-port=9222' -Force | Out-Null }
 Add-Content -Path $hosts -Value @('','127.0.0.1 github.com api.github.com')
 Clear-DnsClientCache
 $webviewGlob=Join-Path ([Environment]::GetEnvironmentVariable('ProgramFiles(x86)')) 'Microsoft/EdgeWebView/Application/*/msedgewebview2.exe'
@@ -121,6 +133,7 @@ $programs=@($env:TUZI_SIGNED_LAB_EXE)+@(Get-ChildItem $webviewGlob | ForEach-Obj
 if ($programs.Count -lt 2) { throw 'Preinstalled WebView2 runtime required' }
 foreach ($program in $programs) {
  New-NetFirewallRule -DisplayName 'SYNTHETIC Tuzi signed updater lab' -Direction Outbound -Action Block -Program $program -RemoteAddress '0.0.0.1-126.255.255.255','128.0.0.0-255.255.255.254','::2-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff' | Out-Null
+ New-NetFirewallRule -DisplayName 'SYNTHETIC Tuzi signed updater lab' -Direction Inbound -Action Block -Program $program -RemoteAddress '0.0.0.1-126.255.255.255','128.0.0.0-255.255.255.254','::2-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff' | Out-Null
 }
 `);
   server = https.createServer({ pfx: fs.readFileSync(path.join(root, 'synthetic-tls.pfx')), passphrase: 'SYNTHETIC-LAB-ONLY' }, (req, res) => {
@@ -238,6 +251,15 @@ if (Test-Path (Join-Path $root 'webview-env.original')) {
  $previous=[System.IO.File]::ReadAllText((Join-Path $root 'webview-env.original')).Trim()
  if ($previous.Length -eq 0) { $previous=$null }
  [Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS',$previous,'User')
+}
+}, {
+if (Test-Path (Join-Path $root 'webview-policy.original.json')) {
+ $policyPath='HKLM:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+ $original=Get-Content (Join-Path $root 'webview-policy.original.json') -Raw | ConvertFrom-Json
+ foreach ($property in $original) {
+  if ($property.existed) { New-ItemProperty -LiteralPath $policyPath -Name $property.name -PropertyType String -Value $property.value -Force | Out-Null }
+  else { Remove-ItemProperty -LiteralPath $policyPath -Name $property.name -ErrorAction SilentlyContinue }
+ }
 }
 }, {
 Get-NetFirewallRule -DisplayName 'SYNTHETIC Tuzi signed updater lab' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
