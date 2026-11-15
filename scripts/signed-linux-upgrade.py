@@ -142,7 +142,14 @@ def click(names, seconds=60):
 
 
 def screenshot(name):
-    (output / (name + '.png')).write_bytes(base64.b64decode(request('GET', '/session/' + session + '/screenshot')))
+    # WebKit's screenshot request timed out in the first two runs despite
+    # responsive DOM/IPC. Capture the actual disposable X display instead.
+    pids = application_processes()
+    assert len(pids) == 1
+    environment = dict(v.split(b'=', 1) for v in Path('/proc/' + str(pids[0]) + '/environ').read_bytes().split(b'\0') if b'=' in v)
+    capture_env = {key: environment[key.encode()].decode() for key in ['DISPLAY', 'XAUTHORITY']}
+    subprocess.run(['/usr/bin/import', '-window', 'root', str(output / (name + '.png'))],
+                   env={'PATH': '/usr/bin:/bin', **capture_env}, check=True, timeout=20)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -206,14 +213,22 @@ fixture = dict(id='SYNTHETIC-SIGNED-LINUX', name='SYNTHETIC Linux preserved prov
                                         'ANTHROPIC_BASE_URL': 'https://synthetic.invalid'}})
 try:
     subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
-                    '-keyout', str(lab/'tls.key'), '-out', str(trust), '-subj', '/CN=SYNTHETIC Tuzi update lab',
-                    '-addext', 'subjectAltName=DNS:github.com,DNS:api.github.com'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    '-keyout', str(lab/'ca.key'), '-out', str(trust), '-subj', '/CN=SYNTHETIC Tuzi update lab CA',
+                    '-addext', 'basicConstraints=critical,CA:TRUE'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(['openssl', 'req', '-newkey', 'rsa:2048', '-nodes', '-keyout', str(lab/'tls.key'),
+                    '-out', str(lab/'tls.csr'), '-subj', '/CN=github.com'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    (lab/'tls.ext').write_text('basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:github.com,DNS:api.github.com\n')
+    subprocess.run(['openssl', 'x509', '-req', '-in', str(lab/'tls.csr'), '-CA', str(trust),
+                    '-CAkey', str(lab/'ca.key'), '-CAserial', str(lab/'ca.srl'), '-CAcreateserial',
+                    '-out', str(lab/'tls.crt'), '-days', '1', '-sha256', '-extfile', str(lab/'tls.ext')],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    (lab/'ca.key').chmod(0o600)
     (lab/'tls.key').chmod(0o600)
     subprocess.run(['update-ca-certificates'], check=True, stdout=subprocess.DEVNULL)
     hosts.write_bytes(original_hosts + b'\n127.0.0.1 github.com api.github.com\n')
     server = ThreadingHTTPServer(('127.0.0.1', 443), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(str(trust), str(lab/'tls.key'))
+    context.load_cert_chain(str(lab/'tls.crt'), str(lab/'tls.key'))
     server.socket = context.wrap_socket(server.socket, server_side=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     # No application/IPC overrides or insecure TLS flags. Only documented WebKit automation.
@@ -302,6 +317,8 @@ except Exception as error:
     if session:
         try:
             report['failureUi'] = execute('return document.body.innerText')
+            report['nativeCheckDiagnostic'] = execute('''const done=arguments[arguments.length-1];
+window.__TAURI_INTERNALS__.invoke('plugin:updater|check',{timeout:10000}).then(result=>done({result}),e=>done({error:String(e)}));''', True)
             screenshot('failure')
         except Exception as diagnostic:
             report['diagnosticError'] = str(diagnostic)
