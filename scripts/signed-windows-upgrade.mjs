@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { verifySignature } from './updater-assets.mjs';
+import { model45, model55, syntheticModelResponse, createLegacyCreative, verifyCreativePreserved, exerciseSeedream55, leaveCreative } from './signed-creative-checks.mjs';
 
 assert.equal(process.platform, 'win32');
 assert.equal(process.env.GITHUB_ACTIONS, 'true');
@@ -73,6 +74,8 @@ const report = {
 };
 let server, browser;
 let mode = 'normal';
+let activeVersion = 'not-started', legacyCreative, currentCreative;
+report.creativeRequests = [];
 const assetName = `tuzi-assistant-windows-x64.${installer === 'msi' ? 'msi' : 'exe'}`;
 const release = {
   tag_name: next.tag, html_url: `https://github.com/tuziapi/tuzi-switch/releases/tag/${next.tag}`,
@@ -121,7 +124,7 @@ $root=$env:TUZI_SIGNED_LAB_ROOT
 $hosts=Join-Path $env:SystemRoot 'System32/drivers/etc/hosts'
 Copy-Item $hosts (Join-Path $root 'hosts.original')
 [Environment]::GetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS','User') | Set-Content (Join-Path $root 'webview-env.original')
-$cert=New-SelfSignedCertificate -DnsName 'github.com','api.github.com' -CertStoreLocation Cert:\CurrentUser\My -KeyExportPolicy Exportable -NotAfter (Get-Date).AddDays(1) -FriendlyName 'SYNTHETIC Tuzi updater lab'
+$cert=New-SelfSignedCertificate -DnsName 'github.com','api.github.com','api.tu-zi.com' -CertStoreLocation Cert:\CurrentUser\My -KeyExportPolicy Exportable -NotAfter (Get-Date).AddDays(1) -FriendlyName 'SYNTHETIC Tuzi updater lab'
 $cert.Thumbprint | Set-Content (Join-Path $root 'tls-thumbprint.txt')
 $password=ConvertTo-SecureString 'SYNTHETIC-LAB-ONLY' -AsPlainText -Force
 Export-PfxCertificate -Cert $cert -FilePath (Join-Path $root 'synthetic-tls.pfx') -Password $password | Out-Null
@@ -140,7 +143,7 @@ foreach ($name in $policyNames) {
 ConvertTo-Json -InputObject $policyBackup | Set-Content (Join-Path $root 'webview-policy.original.json')
 New-Item -Path $policyPath -Force | Out-Null
 foreach ($name in $policyNames) { New-ItemProperty -LiteralPath $policyPath -Name $name -PropertyType String -Value '--remote-debugging-port=9222' -Force | Out-Null }
-Add-Content -Path $hosts -Value @('','127.0.0.1 github.com api.github.com')
+Add-Content -Path $hosts -Value @('','127.0.0.1 github.com api.github.com api.tu-zi.com')
 Clear-DnsClientCache
 $webviewGlob=Join-Path ([Environment]::GetEnvironmentVariable('ProgramFiles(x86)')) 'Microsoft/EdgeWebView/Application/*/msedgewebview2.exe'
 $programs=@($env:TUZI_SIGNED_LAB_EXE)+@(Get-ChildItem $webviewGlob | ForEach-Object FullName)
@@ -150,12 +153,35 @@ foreach ($program in $programs) {
  New-NetFirewallRule -DisplayName 'SYNTHETIC Tuzi signed updater lab' -Direction Inbound -Action Block -Program $program -RemoteAddress '0.0.0.1-126.255.255.255','128.0.0.0-255.255.255.254','::2-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff' | Out-Null
 }
 `);
-  server = https.createServer({ pfx: fs.readFileSync(path.join(root, 'synthetic-tls.pfx')), passphrase: 'SYNTHETIC-LAB-ONLY' }, (req, res) => {
+  server = https.createServer({ pfx: fs.readFileSync(path.join(root, 'synthetic-tls.pfx')), passphrase: 'SYNTHETIC-LAB-ONLY' }, async (req, res) => {
     const url = new URL(req.url, `https://${req.headers.host}`);
     report.requests.push({ host: url.hostname, path: url.pathname, mode });
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', 'Accept,Content-Type,Cache-Control');
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+    if (url.hostname === 'api.tu-zi.com') {
+      try {
+        assert.equal(req.headers.authorization, 'Bearer sk-SYNTHETIC-GENERATION');
+        res.setHeader('Content-Type', 'application/json');
+        if (req.method === 'GET' && url.pathname === '/v1/models') {
+          assert.equal(url.searchParams.has('ch'), false, 'Metadata requests must not be attributed as consumption');
+          report.creativeRequests.push({ version: activeVersion, path: url.pathname, syntheticAuthorizationMatched: true });
+          res.end(JSON.stringify({ data: [model45, model55].map(id => ({ id, supported_endpoint_types: ['image-generation'], endpoints: { 'image-generation': { path: '/v1/images/generations', method: 'POST' } } })) })); return;
+        }
+        assert.equal(req.method, 'POST'); assert.equal(url.pathname, '/v1/images/generations');
+        let chunks = [], length = 0;
+        for await (const chunk of req) { length += chunk.length; assert.ok(length < 1024 * 1024); chunks.push(chunk); }
+        const body = JSON.parse(Buffer.concat(chunks).toString());
+        const response = syntheticModelResponse(body);
+        const channels = url.searchParams.getAll('ch');
+        if (activeVersion !== '1.6.0') assert.deepEqual(channels, ['3'], 'Official native model request must identify desktop channel once');
+        report.creativeRequests.push({ version: activeVersion, path: url.pathname, channels, body, syntheticAuthorizationMatched: true });
+        res.end(JSON.stringify(response)); return;
+      } catch (error) {
+        report.creativeServerErrors ??= []; report.creativeServerErrors.push(String(error));
+        res.writeHead(500); res.end(JSON.stringify({ error: 'Synthetic fixture rejected the native request' })); return;
+      }
+    }
     if (url.hostname === 'api.github.com' && url.pathname === '/repos/tuziapi/tuzi-switch/releases/latest') {
       res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(release)); return;
     }
@@ -209,12 +235,15 @@ foreach ($program in $programs) {
   }
   if (legacyDir) {
     manualInstall(legacyDir);
+    activeVersion = '1.6.0';
     const old = manualLaunch();
     const oldPage = await connect('1.6.0', 60000);
     report.legacyIdentity = await identity(oldPage, '1.6.0', legacy.commit);
     await acknowledgeWelcome(oldPage);
     await seed(oldPage);
     await assertPreserved(oldPage);
+    legacyCreative = await createLegacyCreative(oldPage, root);
+    await leaveCreative(oldPage);
     report.legacyExecutableSha256 = sha(fs.readFileSync(executable));
     await oldPage.screenshot({ path: path.join(root, '00-published-legacy-before-transition.png') });
     // Use the ordinary close behavior with close-to-tray disabled in this synthetic profile.
@@ -230,6 +259,7 @@ foreach ($program in $programs) {
     await browser.close(); browser = undefined;
   }
   manualInstall(baseDir);
+  activeVersion = '1.6.2';
   const beforeHash = sha(fs.readFileSync(executable));
   report.initialExecutableSha256 = beforeHash;
   const initial = manualLaunch();
@@ -240,11 +270,17 @@ foreach ($program in $programs) {
   await acknowledgeWelcome(page);
   if (legacyDir) {
     await assertPreserved(page);
+    await verifyCreativePreserved(page, legacyCreative, root, 'manual-transition');
     assert.notEqual(beforeHash, report.legacyExecutableSha256);
     report.manualTransition = { status: 'passed', fromVersion: '1.6.0', toVersion: '1.6.2', publishedSource: legacy, sqliteProviderAndWebviewPreference: 'passed' };
     report.checks.manualTransition = 'passed';
     report.remaining = report.remaining.filter(check => check !== 'older-official-manual-transition');
   } else await seed(page);
+  currentCreative = await exerciseSeedream55(page, root);
+  report.creativeBeforeUpgrade = currentCreative;
+  report.checks.nativeSeedream55Synthetic = 'passed';
+  if (legacyDir) report.checks.legacyCreativeImageAndTaskPreservation = 'passed';
+  await leaveCreative(page);
   await page.reload();
   await page.getByRole('button', { name: /查看更新|View update/i }).first().click({ timeout: 60000 });
   const dialog = page.getByRole('dialog').filter({ hasText: '1.6.3' });
@@ -266,6 +302,7 @@ foreach ($program in $programs) {
   await dialog.getByRole('button', { name: '重启并更新', exact: true }).waitFor({ timeout: 120000 });
   await page.screenshot({ path: path.join(root, '03-native-signature-verified.png') });
   await dialog.getByRole('button', { name: '重启并更新', exact: true }).click();
+  activeVersion = '1.6.3';
   // No manual launch here: the native updater/installer must restart the app.
   page = await connect('1.6.3');
   report.targetIdentity = await identity(page, '1.6.3', next.commit);
@@ -281,6 +318,12 @@ foreach ($program in $programs) {
   assert.ok(report.requests.some(r => r.path.endsWith(assetName) && r.mode === 'normal'));
   Object.assign(report.checks, { download: 'passed', nativeSignature: 'passed', install: 'passed', automaticRestart: 'passed', version: 'passed', sqliteProviderAndWebviewPreference: 'passed', sameInstallationRetry: 'passed' });
   await page.screenshot({ path: path.join(root, '04-real-restarted-application.png') });
+  await verifyCreativePreserved(page, currentCreative, root, 'signed-upgrade');
+  report.checks.creativeImageLayerOcrTaskPreservation = 'passed';
+  assert.ok(report.creativeRequests.filter(r => r.version === '1.6.2' && r.path === '/v1/images/generations').length >= 2);
+  assert.ok(!report.creativeServerErrors?.length, 'All native synthetic provider requests must match the contract');
+  report.checks.installedDesktopAttributionSynthetic = 'passed';
+  report.creativeScope = 'Actual installed UI/native HTTP and persistence; synthetic provider only. No production consumption records, real model quality or complete project-format migration acceptance.';
   report.subsetStatus = 'passed';
 } catch (error) {
   report.subsetStatus = 'failed'; report.error = String(error);
@@ -298,7 +341,11 @@ foreach ($program in $programs) {
   const log = path.join(process.env.USERPROFILE, '.tuzi-switch', 'logs', 'tuzi-switch.log');
   if (fs.existsSync(log)) report.startupLogTail = fs.readFileSync(log, 'utf8').split(/\r?\n/).slice(-80);
 
-  try { await browser?.contexts()[0]?.pages()[0]?.screenshot({ path: path.join(root, 'failure.png') }); } catch {}
+  try {
+    const failurePage = browser?.contexts()[0]?.pages()[0];
+    await failurePage?.screenshot({ path: path.join(root, 'failure.png') });
+    report.failureUi = (await failurePage?.locator('body').innerText())?.slice(0, 20000);
+  } catch {}
   throw error;
 } finally {
   try {
