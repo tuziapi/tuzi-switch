@@ -148,7 +148,7 @@ def wait_for(fn,message,seconds=90):
             if value:
                 return value
         except (subprocess.SubprocessError,OSError) as error:
-            last=str(error)
+            last=(getattr(error, 'stderr', None) or str(error))
         time.sleep(0.5)
     raise AssertionError(message+'; last='+str(last))
 
@@ -165,7 +165,8 @@ def tree():
 def button(names,press=False):
     labels='{'+','.join(json.dumps(s,ensure_ascii=False) for s in names)+'}'
     body='''set labels to LABELS
-repeat with itemRef in (entire contents of front window of p)
+set allItems to get entire contents of front window of p
+repeat with itemRef in allItems
 try
 if role of itemRef is "AXButton" and enabled of itemRef then
 set titleText to name of itemRef
@@ -320,8 +321,20 @@ finally:
         run(['sudo','tee','/etc/hosts'],input=original_hosts,stdout=subprocess.DEVNULL)
         run(['sudo','dscacheutil','-flushcache'])
     if trusted:
-        subprocess.run(['sudo','security','remove-trusted-cert','-d',str(lab/'ca.crt')],check=False,capture_output=True,timeout=30)
         fingerprint=capture([openssl,'x509','-in',str(lab/'ca.crt'),'-noout','-fingerprint','-sha1'],text=True).strip().split('=')[-1].replace(':','')
-        run(['sudo','security','delete-certificate','-Z',fingerprint,'/Library/Keychains/System.keychain'],capture_output=True)
+        # Attempt both removals even if macOS trust-settings cleanup blocks.
+        # The original test failure must remain available in the final report.
+        for command in [
+            ['sudo','security','delete-certificate','-Z',fingerprint,'/Library/Keychains/System.keychain'],
+            ['sudo','security','remove-trusted-cert','-d',str(lab/'ca.crt')],
+        ]:
+            try:
+                run(command,capture_output=True,stdin=subprocess.DEVNULL,timeout=30)
+            except subprocess.SubprocessError as error:
+                report.setdefault('cleanupErrors',[]).append(str(error))
+        (output/'results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     if mount:
         subprocess.run(['hdiutil','detach',mount],check=False,stdout=subprocess.DEVNULL,timeout=30)
+
+if report.get('cleanupErrors'):
+    raise AssertionError('Temporary trust cleanup failed; see preserved results.json')
