@@ -9,6 +9,10 @@ on:
         required: true
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
         required: false
+      OFFICIAL_UPDATER_PRIVATE_KEY:
+        required: false
+      OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD:
+        required: false
 
 permissions:
   contents: read
