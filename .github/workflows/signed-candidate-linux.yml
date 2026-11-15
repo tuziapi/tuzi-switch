@@ -52,18 +52,23 @@ jobs:
       - name: Install candidate and create offline disposable desktop user
         run: |
           sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-0 webkit2gtk-driver libayatana-appindicator3-1 xvfb dbus-x11
+          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-0 webkit2gtk-driver libayatana-appindicator3-1 libappindicator3-1 xvfb dbus-x11
           sudo dpkg -i "$RUNNER_TEMP/signed-base/tuzi-assistant-linux-x64.deb"
           test -x /usr/bin/tu-zi-switch
           sudo useradd --create-home --shell /bin/bash tuziqa
-          sudo install -d -o tuziqa -g tuziqa "$RUNNER_TEMP/signed-linux-evidence"
+          test ! -e /tmp/tuzi-signed-linux-probe
+          sudo install -d -o tuziqa -g tuziqa /tmp/tuzi-signed-linux-probe /tmp/tuzi-signed-linux-probe/evidence
+          sudo install -d -m 0700 -o tuziqa -g tuziqa /tmp/tuzi-signed-linux-probe/runtime
+          sudo install -m 0644 scripts/signed-linux-driver-probe.py /tmp/tuzi-signed-linux-probe/probe.py
           sudo iptables -I OUTPUT 1 -m owner --uid-owner tuziqa ! -d 127.0.0.0/8 -j REJECT
           sudo ip6tables -I OUTPUT 1 -m owner --uid-owner tuziqa ! -d ::1 -j REJECT
       - name: Read actual installed WebKit UI and native identity
         run: |
-          sudo -H -u tuziqa env GITHUB_ACTIONS=true GITHUB_REPOSITORY=AiW520/tuzi-switch RUNNER_ENVIRONMENT=github-hosted \
-            xvfb-run -a dbus-run-session -- python3 scripts/signed-linux-driver-probe.py \
-            /usr/bin/tu-zi-switch "$RUNNER_TEMP/signed-linux-evidence"
+          cd /tmp/tuzi-signed-linux-probe
+          sudo -H -u tuziqa env -u DBUS_SESSION_BUS_ADDRESS XDG_RUNTIME_DIR=/tmp/tuzi-signed-linux-probe/runtime \
+            GITHUB_ACTIONS=true GITHUB_REPOSITORY=AiW520/tuzi-switch RUNNER_ENVIRONMENT=github-hosted \
+            xvfb-run -a dbus-run-session -- python3 /tmp/tuzi-signed-linux-probe/probe.py \
+            /usr/bin/tu-zi-switch /tmp/tuzi-signed-linux-probe/evidence
       - name: Stop disposable applications and restore network rules
         if: always()
         run: |
@@ -77,7 +82,7 @@ jobs:
         with:
           name: signed-installed-linux-driver-probe
           path: |
-            ${{ runner.temp }}/signed-linux-evidence/results.json
-            ${{ runner.temp }}/signed-linux-evidence/driver.log
-            ${{ runner.temp }}/signed-linux-evidence/*.png
+            /tmp/tuzi-signed-linux-probe/evidence/results.json
+            /tmp/tuzi-signed-linux-probe/evidence/driver.log
+            /tmp/tuzi-signed-linux-probe/evidence/*.png
           if-no-files-found: warn
