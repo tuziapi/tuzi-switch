@@ -3,6 +3,7 @@ import {
   SORA_MODE_PARAM_ID,
   type ParamConfig,
 } from '../constants/model-config';
+import { getTuziVideoModelConfig } from '../constants/tuzi-video-models';
 import { getVideoModelConfig } from '../constants/video-model-config';
 import type { VideoModelConfig } from '../types/video.types';
 import type { ModelRef } from '../utils/settings-manager';
@@ -14,7 +15,7 @@ import type {
   ResolvedProviderContext,
 } from './provider-routing/types';
 import { getVeoPersonGenerationOptions } from '../utils/veo-parameters';
-import { isGeminiOmniModel, GEMINI_OMNI_VIDEO_METADATA } from '../utils/gemini-omni-model';
+import { isGeminiOmniModel, getGeminiOmniVideoMetadata } from '../utils/gemini-omni-model';
 
 export {
   areSeedanceAudioDataUrlsWithinLimit,
@@ -43,6 +44,24 @@ const MINIMAX_H3_RATIOS = new Set([
 const SORA_API_ALLOWED_DURATIONS = ['4', '8', '12'] as const;
 const SORA_MODE_VALUES = new Set(['api', 'web']);
 const KLING_ACTION_VALUES = new Set(['text2video', 'image2video']);
+const WAN_VIDEO_MODEL_ID = 'wan3.0-video';
+const KLING_4_MODEL_ID = 'kling-4.0';
+const WAN_VIDEO_METADATA: ProviderVideoBindingMetadata = {
+  allowedDurations: [...Array.from({ length: 29 }, (_, index) => String(index + 2)), '-1'],
+  defaultDuration: '5',
+  durationMode: 'request-param',
+  durationField: 'duration',
+  strictDurationValidation: true,
+  resultMode: 'download-content',
+  downloadPathTemplate: '/videos/{taskId}/content',
+};
+const KLING_4_VIDEO_METADATA: ProviderVideoBindingMetadata = {
+  allowedDurations: Array.from({ length: 28 }, (_, index) => String(index + 3)),
+  defaultDuration: '10',
+  durationMode: 'request-param',
+  durationField: 'seconds',
+  strictDurationValidation: true,
+};
 const KLING_CAMERA_PARAM_IDS = new Set([
   'camera_control_type',
   'camera_horizontal',
@@ -266,7 +285,7 @@ function buildDurationOptions(
   return allowedDurations.map((value) => ({
     value,
     label:
-      baseLabels.get(value) ||
+      (baseConfig.id === 'wan3.0-video' && value === '-1' ? '智能时长' : baseLabels.get(value)) ||
       `${value}秒${allowedDurations.length === 1 ? '（固定）' : ''}`,
   }));
 }
@@ -288,6 +307,24 @@ export interface ResolvedVideoSubmission {
 
 export function isMiniMaxH3Model(modelId?: string | null): boolean {
   return modelId?.trim().toLowerCase() === 'minimax-h3';
+}
+
+export function isWanVideoModel(modelId?: string | null): boolean {
+  return modelId?.trim().toLowerCase() === WAN_VIDEO_MODEL_ID;
+}
+
+export function isKling4VideoModel(modelId?: string | null): boolean {
+  return modelId?.trim().toLowerCase() === KLING_4_MODEL_ID;
+}
+
+export function resolveVideoReferenceField(
+  modelId: string | undefined,
+  index: number
+): string {
+  if (isWanVideoModel(modelId)) {
+    return index === 0 ? 'first_frame' : 'last_frame';
+  }
+  return 'input_reference';
 }
 
 export type MiniMaxH3ApiVersion = 'v1' | 'v2';
@@ -450,16 +487,29 @@ export function appendVideoOutputParams(
   params?: Record<string, unknown>
 ): void {
   const isMiniMaxH3 = isMiniMaxH3Model(model);
+  const isWan = isWanVideoModel(model);
+  const isKling4 = isKling4VideoModel(model);
 
   if (size) {
-    const normalizedSize = isMiniMaxH3 ? size.trim().toUpperCase() : size;
-    formData.append(isMiniMaxH3 ? 'resolution' : 'size', normalizedSize);
+    const normalizedSize = isMiniMaxH3 || isWan
+      ? size.trim().toUpperCase()
+      : isKling4
+        ? size.trim().toLowerCase()
+        : size;
+    formData.append(isMiniMaxH3 || isWan ? 'resolution' : 'size', normalizedSize);
   }
 
-  if (isMiniMaxH3) {
+  if (isMiniMaxH3 || isWan || isKling4) {
     const ratio = params?.ratio;
     if (ratio !== undefined && ratio !== null && String(ratio).trim()) {
       formData.append('ratio', String(ratio).trim());
+    }
+  }
+
+  if (isWan || isKling4) {
+    const watermark = params?.watermark;
+    if (watermark !== undefined && watermark !== null && String(watermark).trim()) {
+      formData.append('watermark', String(watermark).trim());
     }
   }
 }
@@ -469,7 +519,9 @@ export function getResolvedVideoBindingMetadata(
   binding?: ProviderModelBinding | null,
   params?: Record<string, unknown> | null
 ): ProviderVideoBindingMetadata | null {
-  if (isGeminiOmniModel(modelId)) return GEMINI_OMNI_VIDEO_METADATA;
+  if (isGeminiOmniModel(modelId)) return getGeminiOmniVideoMetadata(modelId);
+  if (isWanVideoModel(modelId)) return WAN_VIDEO_METADATA;
+  if (isKling4VideoModel(modelId)) return KLING_4_VIDEO_METADATA;
   const staticMetadata = buildStaticSoraMetadata(modelId);
   const bindingMetadata = binding?.metadata?.video || null;
   const frontendMetadata = buildFrontendSoraMetadata(modelId, binding, params);
@@ -629,7 +681,7 @@ export function getEffectiveVideoCompatibleParams(
 
       return {
         ...param,
-        options: effectiveConfig.durationOptions.map((option) => ({
+        options: [...effectiveConfig.durationOptions, ...(modelId === 'wan3.0-video' && !effectiveConfig.durationOptions.some((option) => option.value === '-1') ? [{ value: '-1', label: '智能时长' }] : [])].map((option) => ({
           value: option.value,
           label: option.label,
         })),
@@ -756,7 +808,6 @@ export function shouldDownloadVideoContent(
   if (metadata?.resultMode === 'download-content') {
     return true;
   }
-
   if (!inlineUrl && Boolean(metadata?.downloadPathTemplate)) {
     return true;
   }
@@ -764,7 +815,7 @@ export function shouldDownloadVideoContent(
   const status = String(payload?.status || payload?.state || '').toLowerCase();
   return (
     !inlineUrl &&
-    isSoraModel(modelId) &&
+    (isSoraModel(modelId) || Boolean(modelId && getTuziVideoModelConfig(modelId))) &&
     (status === 'completed' || status === 'succeeded')
   );
 }
@@ -804,7 +855,9 @@ export async function downloadVideoContentToLocalUrl(params: {
       params.modelId,
       params.binding
     ),
-    baseUrlStrategy: params.binding?.baseUrlStrategy,
+    baseUrlStrategy: params.modelId && getTuziVideoModelConfig(params.modelId)
+      ? 'ensure-v1'
+      : params.binding?.baseUrlStrategy,
     method: 'GET',
     headers: {
       Accept: 'video/*,application/octet-stream',

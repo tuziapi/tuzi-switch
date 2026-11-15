@@ -15,7 +15,13 @@ import { isSunoV2Model, isUnavailableSunoModel } from '../services/suno-v2';
 import { isSunoNativeModel } from '../services/suno-native';
 import { getSunoNativeParams } from '../services/suno-native-params';
 import { getSunoV2Params } from '../services/suno-v2-params';
-import { GEMINI_OMNI_MODEL_ID, GEMINI_OMNI_DURATIONS, GEMINI_OMNI_SIZES } from '../utils/gemini-omni-model';
+import { KLING_4_RATIO_OPTIONS, TUZI_VIDEO_MODEL_CONFIGS, TUZI_VIDEO_MODEL_SHORT_CODES } from './tuzi-video-models';
+import {
+  GEMINI_OMNI_LEGACY_MODEL_ID,
+  GEMINI_OMNI_MODEL_ID,
+  GEMINI_OMNI_LEGACY_DURATIONS,
+  GEMINI_OMNI_SIZES,
+} from '../utils/gemini-omni-model';
 
 /**
  * 模型类型
@@ -129,7 +135,7 @@ export interface ParamConfig {
   /** 可选值列表（enum 类型时使用） */
   options?: Array<{ value: string; label: string }>;
   /** 二元枚举的展示控件 */
-  control?: 'switch' | 'select' | 'multiselect' | 'textarea' | 'file';
+  control?: 'switch' | 'select' | 'multiselect' | 'textarea' | 'file' | 'video-media';
   advanced?: boolean;
   /** 默认值 */
   defaultValue?: string;
@@ -1036,13 +1042,10 @@ const BUILT_IN_VIDEO_MODELS: ModelConfig[] = [
     tags: ['happyhorse'],
   },
   {
-    id: GEMINI_OMNI_MODEL_ID,
-    label: 'Gemini Omni 1.1 Flash',
-    shortCode: 'omni11',
-    description: '3–10秒视频，360P/720P/1080P/4K 横竖屏，支持文本与参考图生成视频',
-    type: 'video',
-    vendor: ModelVendor.GEMINI,
-    supportsTools: true,
+    id: GEMINI_OMNI_LEGACY_MODEL_ID,
+    label: 'Gemini Omni 1.1 Flash', shortCode: 'omni11',
+    description: 'Gemini Omni 1.1 视频生成兼容入口',
+    type: 'video', vendor: ModelVendor.GEMINI, supportsTools: true,
     videoDefaults: { duration: '4', size: '1280x720', aspectRatio: '16:9' },
   },
   {
@@ -1209,6 +1212,34 @@ const BUILT_IN_VIDEO_MODELS: ModelConfig[] = [
     supportsTools: true,
     videoDefaults: KLING_DEFAULT_PARAMS,
   },
+  ...Object.values(TUZI_VIDEO_MODEL_CONFIGS).map((config): ModelConfig => ({
+    id: config.id,
+    label: config.label,
+    description: config.description || config.label,
+    shortCode: TUZI_VIDEO_MODEL_SHORT_CODES[config.id],
+    type: 'video',
+    vendor:
+      config.provider === 'happyhorse'
+        ? ModelVendor.HAPPYHORSE
+        : config.provider === 'kling'
+        ? ModelVendor.KLING
+        : config.provider === 'wan'
+        ? ModelVendor.QWEN
+        : ModelVendor.GEMINI,
+    videoDefaults: {
+      duration: config.defaultDuration,
+      size: config.defaultSize,
+      aspectRatio:
+        config.sizeOptions.find((option) => option.value === config.defaultSize)
+          ?.aspectRatio === 'resolution'
+          ? config.provider === 'wan' || config.provider === 'kling'
+            ? 'adaptive'
+            : '16:9'
+          : config.sizeOptions.find(
+              (option) => option.value === config.defaultSize
+            )?.aspectRatio || '16:9',
+    },
+  })),
 ];
 
 /**
@@ -2138,7 +2169,9 @@ const HAPPYHORSE_MODEL_IDS = [
   'happyhorse-1.0-video-edit',
 ];
 
-const HAPPYHORSE_RATIO_MODEL_IDS = ['happyhorse-1.0-r2v', 'happyhorse-1.0-t2v'];
+const HAPPYHORSE_RATIO_MODEL_IDS = [
+  'happyhorse-1.0-r2v', 'happyhorse-1.0-t2v',
+];
 
 /** Seedream 图片模型 ID */
 const SEEDREAM_IMAGE_MODEL_IDS = [
@@ -2259,18 +2292,18 @@ export const VIDEO_PARAMS: ParamConfig[] = [
     compatibleModels: ['veo3.1'],
     modelType: 'video' as const,
   })),
-  // Veo 系列时长参数（只有 8 秒，包括标清和 4K）
+  // Legacy Gemini Omni 1.1 retains its 3–10 second contract.
   {
     id: 'duration', label: '视频时长', shortLabel: '时长',
-    description: 'Gemini Omni 视频时长（3–10秒）', valueType: 'enum',
-    options: GEMINI_OMNI_DURATIONS.map(value => ({ value, label: `${value}秒` })),
-    defaultValue: '4', compatibleModels: [GEMINI_OMNI_MODEL_ID], modelType: 'video',
+    description: 'Gemini Omni 1.1 视频时长（3–10秒）', valueType: 'enum',
+    options: GEMINI_OMNI_LEGACY_DURATIONS.map(value => ({ value, label: `${value}秒` })),
+    defaultValue: '4', compatibleModels: [GEMINI_OMNI_LEGACY_MODEL_ID], modelType: 'video',
   },
   {
     id: 'size', label: '视频尺寸', shortLabel: '尺寸',
     description: 'Gemini Omni 分辨率与画面比例', valueType: 'enum',
     options: GEMINI_OMNI_SIZES, defaultValue: '1280x720',
-    compatibleModels: [GEMINI_OMNI_MODEL_ID], modelType: 'video',
+    compatibleModels: [GEMINI_OMNI_LEGACY_MODEL_ID], modelType: 'video',
   },
   {
     id: 'duration',
@@ -2630,11 +2663,7 @@ export const VIDEO_PARAMS: ParamConfig[] = [
       { value: '15', label: '15秒' },
     ],
     defaultValue: '5',
-    compatibleModels: [
-      'happyhorse-1.0-i2v',
-      'happyhorse-1.0-r2v',
-      'happyhorse-1.0-t2v',
-    ],
+    compatibleModels: ['happyhorse-1.0-i2v', 'happyhorse-1.0-r2v', 'happyhorse-1.0-t2v'],
     modelType: 'video',
   },
   {
@@ -2891,6 +2920,85 @@ export const VIDEO_PARAMS: ParamConfig[] = [
     compatibleModels: ['kling_video'],
     modelType: 'video',
   },
+  ...Object.values(TUZI_VIDEO_MODEL_CONFIGS).flatMap((config): ParamConfig[] => {
+    const common = { compatibleModels: [config.id], modelType: 'video' as const };
+    const params: ParamConfig[] = [
+      {
+        ...common,
+        id: 'duration',
+        label: '视频时长',
+        shortLabel: '时长',
+        valueType: 'enum',
+        options: config.durationOptions.map((option) => ({ value: option.value, label: option.label })),
+        defaultValue: config.defaultDuration,
+      },
+      {
+        ...common,
+        id: 'size',
+        label: '视频尺寸',
+        shortLabel: '尺寸',
+        valueType: 'enum',
+        options: config.sizeOptions.map((option) => ({ value: option.value, label: option.label })),
+        defaultValue: config.defaultSize,
+      },
+    ];
+    if (config.id === 'gemini-omni-1.2-flash' || (config.provider === 'happyhorse' && !config.id.endsWith('-i2v')) || config.provider === 'wan' || config.provider === 'kling') {
+      params.push({
+        ...common,
+        id: 'ratio',
+        label: '视频比例',
+        shortLabel: '比例',
+        valueType: 'enum',
+        options: (config.provider === 'kling'
+          ? KLING_4_RATIO_OPTIONS
+          : config.id === 'gemini-omni-1.2-flash'
+          ? ['16:9', '9:16']
+          : config.provider === 'wan'
+          ? ['adaptive', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9']
+          : ['16:9', '9:16', '1:1', '4:3', '3:4']
+        ).map((value) => ({ value, label: value === 'adaptive' ? '自适应' : value })),
+        defaultValue: config.provider === 'wan' || config.provider === 'kling' ? 'adaptive' : '16:9',
+      });
+    }
+    if (config.provider === 'kling' || config.provider === 'wan' || config.provider === 'happyhorse') {
+      params.push({
+        ...common,
+        id: 'watermark',
+        label: '水印',
+        shortLabel: '水印',
+        valueType: 'enum',
+        options: [{ value: 'false', label: '关闭' }, { value: 'true', label: '开启' }],
+        defaultValue: 'false',
+      });
+    }
+    if (config.provider === 'happyhorse') {
+      params.push({ ...common, id: 'seed', label: '随机种子', shortLabel: 'Seed',
+        valueType: 'number', min: 0, max: 2147483647, step: 1, integer: true });
+    }
+    if (config.id === 'wan3.0-video') {
+      params[0] = { ...params[0], options: [...(params[0].options || []), { value: '-1', label: '智能时长' }] };
+      params.push(
+        { ...common, id: 'reference_mode', label: '参考模式', valueType: 'enum', options: [{ value: 'frames', label: '首尾帧' }, { value: 'mixed', label: '混合参考' }], defaultValue: 'frames' },
+        { ...common, id: 'audio', label: '生成音轨', valueType: 'enum', control: 'switch', advanced: true, options: [{ value: 'false', label: '关闭' }, { value: 'true', label: '开启' }] },
+        { ...common, id: 'prompt_extend', label: '提示词改写', valueType: 'enum', control: 'switch', advanced: true, options: [{ value: 'false', label: '关闭' }, { value: 'true', label: '开启' }] },
+        { ...common, id: 'seed', label: '随机种子', valueType: 'number', min: -1, max: 2147483647, step: 1, integer: true, advanced: true },
+        { ...common, id: 'file', label: '辅助文档 URL', valueType: 'string', advanced: true, description: '与网页二选一，需要开启提示词改写。' },
+        { ...common, id: 'link', label: '辅助网页 URL', valueType: 'string', advanced: true, description: '与文档二选一，需要开启提示词改写。' },
+      );
+    }
+    if (config.id === 'gemini-omni-1.2-flash') {
+      params.push(
+        { ...common, id: 'video_task', label: '视频动作', valueType: 'enum', defaultValue: 'auto', options: [
+          { value: 'auto', label: '自动' }, { value: 'text_to_video', label: '文生视频' }, { value: 'image_to_video', label: '图生视频' },
+          { value: 'reference_to_video', label: '多模态参考' }, { value: 'edit', label: '编辑已有视频' }, { value: 'extend', label: '延展已有视频' },
+        ] },
+        { ...common, id: 'previous_interaction_id', label: '前序任务 ID', valueType: 'string', advanced: true, description: '编辑或延展时，填写同一供应商下本人可访问的已完成 task_ 任务 ID；每次延展最多 10 秒。' },
+      );
+    }
+    if (config.provider !== 'happyhorse') params.push({ ...common, id: 'video_media', label: '参考素材', valueType: 'string', control: 'video-media', advanced: true,
+      description: config.provider === 'kling' ? '选择素材角色；主体与音色使用已有 ID。视频需为公网 URL，总时长最多 30 秒。' : config.provider === 'wan' ? '首尾帧与混合参考互斥；视频和音频需为公网 URL。智能时长和参考视频需要渠道支持。' : '支持图片与视频；本地素材直接作为多模态内容提交。服务尚未开放时会保留接口错误。' });
+    return params;
+  }),
 ];
 
 /**
@@ -3518,6 +3626,7 @@ export const IMAGE_PARAMS: ParamConfig[] = [
     compatibleTags: ['mj', 'midjourney'],
     modelType: 'image',
   },
+
 ];
 
 /**
@@ -3613,6 +3722,10 @@ export function getCompatibleParams(modelId: string): ParamConfig[] {
   // 这里不再自动按 doubao 分类，避免与 seedream 重复；若需要可通过 tags 显式声明
 
   const compatibleParams = ALL_PARAMS.filter((param) => {
+    if (Object.prototype.hasOwnProperty.call(TUZI_VIDEO_MODEL_CONFIGS, parameterModelId)) {
+      return param.modelType === 'video' && param.compatibleModels.length === 1 &&
+        param.compatibleModels[0] === parameterModelId;
+    }
     // 检查模型类型是否匹配
     if (param.modelType !== modelConfig.type) return false;
     // 检查标签兼容（可选）
@@ -3637,6 +3750,7 @@ export function getCompatibleParams(modelId: string): ParamConfig[] {
     }
     return idMatched || tagMatched;
   });
+
 
   if (
     modelConfig.type === 'image' &&

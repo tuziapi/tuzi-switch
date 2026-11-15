@@ -3012,6 +3012,28 @@ describe('provider routing', () => {
     ).toBe(true);
   });
 
+  it('routes Kling 4 through the unified video endpoint', () => {
+    const bindings = inferBindingsForProviderModel(
+      {
+        id: 'provider-kling',
+        name: 'Kling Provider',
+        providerType: 'openai-compatible',
+        baseUrl: 'https://api.tu-zi.com/v1',
+        apiKey: 'key-a',
+        authType: 'bearer',
+      },
+      {
+        id: 'kling-4.0',
+        label: 'Kling 4.0',
+        type: 'video',
+        vendor: ModelVendor.KLING,
+      },
+    );
+
+    expect(bindings.some((binding) => binding.protocol === 'kling.video')).toBe(false);
+    expect(bindings.some((binding) => binding.protocol === 'openai.async.video')).toBe(true);
+  });
+
   it('marks gemini text bindings as image-capable for gemini-family models', () => {
     const [binding] = inferBindingsForProviderModel(
       {

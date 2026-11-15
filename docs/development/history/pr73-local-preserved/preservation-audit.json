@@ -1,0 +1,211 @@
+{
+  "task": "SYNC-PR73-LOCAL-01",
+  "snapshot": "387ee8f30cbdd08a1c86b2d840d8032b2189294a",
+  "upstream": "6cf7201f51de5f7abf447cd9f15f45b18d8af979",
+  "files": [
+    {
+      "path": "docs/development/2026-10-27-release-acceptance.md",
+      "local_sha256": "6718835ce915508e364a4718b46ab09e9e211ecc9290db69a40452e575ba7e19",
+      "local_blob": "ed800f0f815533985aa94913a1c6f67d8c8779e1",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "docs/development/2026-10-28-macos-desktop-test.md",
+      "local_sha256": "67c135f08f1ea88f789ee8cec70cd0ac677bee3f3bedf41882b7153e16a5b2a5",
+      "local_blob": "649080d618352f585c68b0f4c9fcd86a8904ba9b",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "docs/development/README.md",
+      "local_sha256": "2f61d1e06aaf445ff97e6fccd7c694ead0ed87794ee774716431673b5e8d2318",
+      "local_blob": "3c8438933edd4147ca498dd592e0db7fe61f2960",
+      "upstream_matching_commit": null
+    },
+    {
+      "path": "docs/development/opentu-unified-client-design.md",
+      "local_sha256": "428a3fce0b0bc1dc0257f79e567b0563d25ace3d421548877a462389ca1b8629",
+      "local_blob": "3e8f61d7d65104dd3a042afb6f900dba5ce82ab8",
+      "upstream_matching_commit": null
+    },
+    {
+      "path": "docs/development/opentu-unified-client-ui.md",
+      "local_sha256": "fdb42bdc56c832b84928d1a49ec64b7047fba67bc3cd266587e1c3875bff6237",
+      "local_blob": "91bb0b738323a68ed06833317c0aeac5cc44f3fb",
+      "upstream_matching_commit": null
+    },
+    {
+      "path": "docs/development/progress.md",
+      "local_sha256": "ab23c8948e0d3927359450e4d5267c0d6e9013296d5f5950190cf0c1d6609a6f",
+      "local_blob": "ec78a4ad41d03e2a7822125a02fc8d35a5c1b5bc",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/app_config.rs",
+      "local_sha256": "6524f070a714e124b6f18a175de72fbd834ae0ea7b1febd54ac877c5569bc998",
+      "local_blob": "7d734ac5a582271dfc41df4b2474cce7d7e45c54",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/commands/mcp.rs",
+      "local_sha256": "1e1454b93753ff666b73112cf99b5e33e2fdbf1e00e8f77d208e13f3915be6eb",
+      "local_blob": "fcf84468e9adadf03e666898e633515fbec2513b",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/database/dao/mcp.rs",
+      "local_sha256": "cf94466099bb8c1380fffc967256024775fd919ea3c62072dfb9c80d41d2c08d",
+      "local_blob": "ce06fadb2eebd949c7ed1d975fd43f03484cc19b",
+      "upstream_matching_commit": "1fdae5dcc0b69ccf63533629e4e736985ddf358d"
+    },
+    {
+      "path": "src-tauri/src/database/migration.rs",
+      "local_sha256": "a619d893245572a1ee697b5068e998749c4947575504f7ff28cb066875ee34e4",
+      "local_blob": "5d0175b1f528cf83398e15063f2663b7f0ae8016",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src-tauri/src/database/mod.rs",
+      "local_sha256": "95ff04b89dd1427530fae45f3ae1d8688231fab0a91b1bac086e4aaf648b34a9",
+      "local_blob": "3c7bbd3645284f962c90896019c98bc815582124",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src-tauri/src/database/schema.rs",
+      "local_sha256": "1d28d232fff91f80c966eb5ba1e1b3ca8b3f6037558c9b639274e4e65c51a1c5",
+      "local_blob": "7233374ac28a5cff719ebb216819d71c674eb28d",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src-tauri/src/database/tests.rs",
+      "local_sha256": "373789efa2000b1b0921af9b33fa719122cc815500bd0ec8e51796168b8157ba",
+      "local_blob": "4fb0e9643fcfe9506a150f2c98d0db18b14a82a7",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src-tauri/src/deeplink/mcp.rs",
+      "local_sha256": "29b9735a14f8715e2a79ace3b0010260194852c5a96a524ad26f1e619d4bf32f",
+      "local_blob": "8a6a99e6b35850064c68b1c0ca8d9d7e7366ab5c",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "local_sha256": "1a189fd2228e0e96bcaa8a95aeafb0d0cfeaee33c2a5e5088583e7e8d935e8b0",
+      "local_blob": "257b7f4eab097c7a8ac8dd2a9c493567035e11ec",
+      "upstream_matching_commit": "4f1653578b35f2588697f67bf136efcce613c70b"
+    },
+    {
+      "path": "src-tauri/src/mcp/claude.rs",
+      "local_sha256": "c9bceebc00ad660752879862f9d649e339a1e870acc1b95a835e44512dc14f72",
+      "local_blob": "b7007789e00dc5bae196eb2e211f896e1ea765ed",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/mcp/codex.rs",
+      "local_sha256": "49dd215453011a59cc6fc1a54ca81a8dda1c60f57e516a414462a2bafbefedb1",
+      "local_blob": "daf8cdd84b0b41161ea5d883611a84a31b11df1d",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/mcp/gemini.rs",
+      "local_sha256": "5bf1b34be9b3b6a7a1d6b3afe5d676e42059e10f6e27a668079976eb7c02f012",
+      "local_blob": "155baacee36e7d4916707d964eac3ac03ea01150",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/mcp/hermes.rs",
+      "local_sha256": "e6bbc99483b94dfebdca189ad37650590eb5eb492a73f2a830b92c6846e60085",
+      "local_blob": "cbd9e155de6ac162e381d0c6f276b0a2e9a7cdbe",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/mcp/opencode.rs",
+      "local_sha256": "bee260df586b77c0cca5e1bdaa5e20b83d32c901ce5151b8681f2f365239d314",
+      "local_blob": "672da92f4181d384ec4de903b046b3ffe18f6012",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/native_mcp.rs",
+      "local_sha256": "a913c92959921846331b9650fec860e3d852a0cde7915a30944f8d4006abb41e",
+      "local_blob": "606bcfade2fa890a3df9d4360ca56aed153bf3f8",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src-tauri/src/native_tools.rs",
+      "local_sha256": "ca71250880cdb4b8fcccc3f9307b05c753772b4b54fe861386c69134e5e51fb9",
+      "local_blob": "7a0b4c8388af83a08079cc4f5c6600e73c579bdd",
+      "upstream_matching_commit": "60b090e794381b8e3f348bf7f138412311210001"
+    },
+    {
+      "path": "src-tauri/src/services/mcp.rs",
+      "local_sha256": "a1d5bd020940092ed546f2884c810bf04a23ee8f787fd03d2c81455aa96db681",
+      "local_blob": "4e1a9abb79825b3369a344e5904386d30b173190",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src/components/common/AppCountBar.tsx",
+      "local_sha256": "9e613f079a675d24669ee938594f0d0b625981c5d44c500281afe48ada159638",
+      "local_blob": "7d9b6c8d2931603d8a2c1f56b3f35d439c61079a",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src/components/common/AppToggleGroup.tsx",
+      "local_sha256": "a0deaf6745385c6310bff2b4a52e65f08de050e01af0720930281fb42b8a63b3",
+      "local_blob": "eb607bd3fa2ad6a93c9f324038ca273e767fb6ec",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src/components/mcp/McpFormModal.tsx",
+      "local_sha256": "992cfcfeaee0b3d00296b6b5945cd0a22fd50481bf9da0922d2f5f1ff646cf7c",
+      "local_blob": "0021f3a2aa2e37e247dd825c1c6f163c3fe40e20",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src/components/mcp/UnifiedMcpPanel.tsx",
+      "local_sha256": "590d577bb0a0ab51f880269331d78091d1ab181d7f348268df0bb474c5afb504",
+      "local_blob": "75f6d4d35ea19150f7d73a5197d51dac992bcd87",
+      "upstream_matching_commit": "9d3a216cec50703bdc683574e78f390eaa99dfbf"
+    },
+    {
+      "path": "src/config/appConfig.tsx",
+      "local_sha256": "ca908cce37b4405da21fb8a60c2af80884a31873ef697f2fd4bd2ed33f494ef5",
+      "local_blob": "2713dd7680ac8dc87f7cfd3ef020d9f4dfea1d6f",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src/config/workspace.ts",
+      "local_sha256": "20c3c0250b2a637bb81d570f7cdf80607323ef6996ad6b0c259dc412c3989b68",
+      "local_blob": "0f5003930f39cddd8a7e91627abe63e2b162b051",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src/hooks/useMcp.ts",
+      "local_sha256": "a2db6f87e6726542137291e45e5ce6dd71a2f8facaedaf0d9dedb1e6d5c84a1c",
+      "local_blob": "822aafd0364d3c34716d898d08026ab96ac5e2c5",
+      "upstream_matching_commit": "32a333342edd75424056069c44a9c4e1c65d5373"
+    },
+    {
+      "path": "src/lib/api/mcp.ts",
+      "local_sha256": "5b5663d54c5acdaebcde23f8a07ca1072bb30aed21bf9495bb15cb44fd0448f1",
+      "local_blob": "724b5b658c709016b98497d786037854c747178e",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "src/types.ts",
+      "local_sha256": "6424f810c5b0a4230dd3f45d0f6f11038c01e08f7b6af65945826ab18ac6281a",
+      "local_blob": "4000fc05377444fd3b2e82ebe38f286a8cc66bee",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "tests/components/McpFormModal.test.tsx",
+      "local_sha256": "eb9703164a2b66d86672b2dfe75a4e2a0efbff54b65bbc8ff040dcffc60ce76d",
+      "local_blob": "9cf1d3e7fbe90038998f5b33e78ff591e674360c",
+      "upstream_matching_commit": "857c4e328f10453b8410658af461611662d02171"
+    },
+    {
+      "path": "tests/visual/ui04.tsx",
+      "local_sha256": "0d6fa27ef81fd680935b7a332c0d7571b304d9b0497bd3b64e8886294cae7d9c",
+      "local_blob": "b2b707758042569801836e11e4362fc4d8ea6a8c",
+      "upstream_matching_commit": "4f1653578b35f2588697f67bf136efcce613c70b"
+    }
+  ]
+}

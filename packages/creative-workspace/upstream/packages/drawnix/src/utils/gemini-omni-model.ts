@@ -1,9 +1,17 @@
 import type { ProviderVideoBindingMetadata } from '../services/provider-routing/types';
 
-export const GEMINI_OMNI_MODEL_ID = 'gemini-omni-1.1-flash';
+export const GEMINI_OMNI_MODEL_ID = 'gemini-omni-1.2-flash';
+export const GEMINI_OMNI_LEGACY_MODEL_ID = 'gemini-omni-1.1-flash';
+export const GEMINI_OMNI_MODEL_IDS = [
+  GEMINI_OMNI_LEGACY_MODEL_ID,
+  GEMINI_OMNI_MODEL_ID,
+] as const;
 export const isGeminiOmniModel = (id?: string | null) =>
-  id?.trim().toLowerCase() === GEMINI_OMNI_MODEL_ID;
-export const GEMINI_OMNI_DURATIONS = Array.from({ length: 8 }, (_, i) => String(i + 3));
+  GEMINI_OMNI_MODEL_IDS.includes(
+    id?.trim().toLowerCase() as (typeof GEMINI_OMNI_MODEL_IDS)[number]
+  );
+export const GEMINI_OMNI_DURATIONS = Array.from({ length: 13 }, (_, i) => String(i + 3));
+export const GEMINI_OMNI_LEGACY_DURATIONS = Array.from({ length: 8 }, (_, i) => String(i + 3));
 export const GEMINI_OMNI_SIZES = [
   ['360P', '640x360', '360x640'],
   ['720P', '1280x720', '720x1280'],
@@ -15,10 +23,15 @@ export const GEMINI_OMNI_SIZES = [
 ]);
 export const GEMINI_OMNI_VIDEO_METADATA: ProviderVideoBindingMetadata = {
   allowedDurations: GEMINI_OMNI_DURATIONS,
-  defaultDuration: '4',
+  defaultDuration: '10',
   durationMode: 'request-param',
   durationField: 'seconds',
   strictDurationValidation: true,
   resultMode: 'download-content',
   downloadPathTemplate: '/videos/{taskId}/content',
 };
+export function getGeminiOmniVideoMetadata(modelId?: string | null): ProviderVideoBindingMetadata {
+  return modelId?.toLowerCase() === GEMINI_OMNI_LEGACY_MODEL_ID
+    ? { ...GEMINI_OMNI_VIDEO_METADATA, allowedDurations: GEMINI_OMNI_LEGACY_DURATIONS, defaultDuration: '4' }
+    : GEMINI_OMNI_VIDEO_METADATA;
+}

@@ -78,3 +78,9 @@ gh workflow run unified-release.yml -R AiW520/tuzi-switch --ref codex/verified-d
 新增 `official-updater-preflight.yml` 的测试库作业使用上述环境，只签署并验证合成探针，不上传私钥或签署安装包，不发布。正式公钥 SHA256 固定为 `4563ca397f2a4d652b21c046a659ff2149b7537278e70b564263d688164fa7f1`（来源 ca378b86），禁止替换测试公钥。现有常规候选仍使用测试库自己的密钥，不能因此视作正式签名候选。
 
 环境 Secrets 需密钥管理员从原始保管处设置 `OFFICIAL_UPDATER_PRIVATE_KEY`，有密码时设置 `OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD`。创建时核对 Secrets 数量为0；GitHub 已保存的 Secret 不能通过 API 读回，本任务未读取、复制或生成新的正式私钥。若原私钥无法找回，新密钥仅可用于另行确认的手动过渡安装方案，不能将其冒充旧公钥配对成功。
+
+## 合入 PR #73 的本地实现
+
+按用户新增指示合入会话“同步 PR #73 最新实现”的 `51681502a2ef640adb5b63793a5e2c375c23ea18`，其中正式 PR #73 为 `6cf7201f51de5f7abf447cd9f15f45b18d8af979`。业务代码无合并冲突；开发入口、进度两处文档冲突保留双方记录。该会话已另行将原目录同步到 51681502；本任务继续使用独立 worktree，不回写或覆盖原目录。
+
+合并后的本轮验证：创作模块156文件2614项、宿主99文件839项、类型检查和完整renderer构建均通过。上述仍为本机合成回归；正在执行的较早云端run源码是ce7d9ab0，不宣称包含PR #73。用户随后批准另行补齐Seedream 5.5全部能力及更换正式密钥，后续最终源码须重新验证。

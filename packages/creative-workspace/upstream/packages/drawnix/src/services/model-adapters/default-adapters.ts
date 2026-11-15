@@ -5,7 +5,8 @@ import {
   extractAudioGenerationResult,
 } from '../audio-api-service';
 import { videoAPIService } from '../video-api-service';
-import { isGeminiOmniModel } from '../../utils/gemini-omni-model';
+import { isGeminiOmniModel, getGeminiOmniVideoMetadata } from '../../utils/gemini-omni-model';
+import { getTuziVideoModelConfig } from '../../constants/tuzi-video-models';
 import { getFileExtension, normalizeImageDataUrl } from '@aitu/utils';
 import {
   DEFAULT_AUDIO_MODEL_ID,
@@ -265,14 +266,18 @@ export const geminiVideoAdapter: VideoModelAdapter = {
   kind: 'video',
   docsUrl: 'https://tuzi-api.apifox.cn',
   matchProtocols: ['openai.async.video'],
-  matchRequestSchemas: ['openai.video.form-input-reference', 'gemini.omni.video.json'],
+  matchRequestSchemas: [
+    'openai.video.form-input-reference',
+    'gemini.omni.video.json',
+    'tuzi.video.generation-json',
+  ],
   matchPredicate(modelConfig) {
     if (modelConfig.type !== 'video') {
       return false;
     }
     const lowerId = modelConfig.id.toLowerCase();
     return (
-      !lowerId.includes('kling') &&
+      (!lowerId.includes('kling') || lowerId === 'kling-4.0') &&
       !lowerId.includes('seedance') &&
       !lowerId.includes('happyhorse')
     );
@@ -290,16 +295,19 @@ export const geminiVideoAdapter: VideoModelAdapter = {
           )
         )
       : undefined;
+    const tuziConfig = getTuziVideoModelConfig(model);
     const seconds = durationEncoded
       ? undefined
       : request.duration
       ? String(request.duration)
+      : tuziConfig
+      ? tuziConfig.defaultDuration
       : isGeminiOmniModel(model)
-      ? '4'
+      ? getGeminiOmniVideoMetadata(model).defaultDuration
       : model?.toString().startsWith('sora')
       ? undefined
       : '8';
-    const size = request.size || '1280x720';
+    const size = request.size || tuziConfig?.defaultSize || '1280x720';
     const inputReferences = toUploadedVideoImages(request.referenceImages);
 
     const result = await videoAPIService.generateVideoWithPolling(

@@ -582,6 +582,27 @@ describe('model-config image size options', () => {
     );
   });
 
+  it('按最新视频目录暴露 Wan、Kling 4 和 HappyHorse 1.1 参数', () => {
+    const wanParams = getCompatibleParams('wan3.0-video');
+    const kling4Params = getCompatibleParams('kling-4.0');
+    const happyhorse11Params = getCompatibleParams('happyhorse-1.1-r2v');
+
+    expect(getVideoModelConfig('wan3.0-video').durationOptions[0]?.value).toBe('2');
+    expect(getVideoModelConfig('wan3.0-video').durationOptions.at(-1)?.value).toBe('30');
+    expect(wanParams.find((param) => param.id === 'size')?.options?.map((option) => option.value)).toEqual(['1080P', '720P', '480P']);
+    expect(wanParams.find((param) => param.id === 'ratio')?.options?.map((option) => option.value)).toContain('adaptive');
+    expect(getVideoModelConfig('kling-4.0').defaultDuration).toBe('10');
+    expect(kling4Params.find((param) => param.id === 'duration')?.options?.at(-1)?.value).toBe('30');
+    expect(kling4Params.find((param) => param.id === 'size')?.options?.map((option) => option.value)).toEqual(
+      ['1080p', '720p']
+    );
+    expect(kling4Params.find((param) => param.id === 'ratio')?.options?.map((option) => option.value)).toEqual(
+      ['adaptive', '16:9', '9:16', '1:1', '21:9']
+    );
+    expect(getStaticModelConfig('kling-4.0')?.videoDefaults?.aspectRatio).toBe('adaptive');
+    expect(happyhorse11Params.find((param) => param.id === 'size')?.options?.map((option) => option.value)).toEqual(['1080P', '720P', '480P']);
+  });
+
   it('为 Omni Flash 系列按 Veo 3.1 暴露视频参数', () => {
     const omniFlashParams = getCompatibleParams('omni-flash');
     const omniComponentsParams = getCompatibleParams('omni-flash-components');
