@@ -19,6 +19,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 
 assert sys.platform == 'linux' and os.geteuid() == 0
 assert os.environ.get('GITHUB_ACTIONS') == 'true'
@@ -148,7 +149,19 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
 
+    def end_headers(self):
+        # Match the public GitHub API's cross-origin response, just as the
+        # Windows fixture does. The installed renderer performs discovery.
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Headers', 'Accept,Content-Type,Cache-Control')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.end_headers()
+
     def do_GET(self):
+        self.path = urlsplit(self.path).path
         host = self.headers.get('Host', '').split(':')[0]
         report['requests'].append(dict(host=host, path=self.path, mode=mode))
         if host == 'api.github.com' and self.path == '/repos/tuziapi/tuzi-switch/releases/latest':
