@@ -72,13 +72,14 @@ async function connect(version, timeout = 180000) {
   while (Date.now() < deadline) {
     try {
       const b = await chromium.connectOverCDP('http://127.0.0.1:9222', { timeout: 3000 });
+      report.cdpPages = b.contexts().flatMap(c => c.pages()).map(p => p.url());
       const p = b.contexts().flatMap(c => c.pages()).find(p => /tauri\.localhost|^tauri:/.test(p.url()));
       if (p) {
         const v = await p.evaluate(() => window.__TAURI_INTERNALS__.invoke('plugin:app|version'));
         if (v === version) { browser = b; p.setDefaultTimeout(30000); return p; }
       }
       await b.close();
-    } catch { /* The installer owns launching the new process. */ }
+    } catch (error) { report.lastConnectError = String(error); }
     await delay(1000);
   }
   throw Error(`No automatically running application at version ${version}`);
@@ -150,7 +151,10 @@ foreach ($program in $programs) {
   assert.ok(fs.existsSync(executable));
   const beforeHash = sha(fs.readFileSync(executable));
   report.initialExecutableSha256 = beforeHash;
-  const initial = spawn(executable, [], { env: appEnv, stdio: 'ignore', detached: true }); initial.unref();
+  const initial = spawn(executable, [], { env: appEnv, stdio: 'ignore', detached: true });
+  report.initialPid = initial.pid;
+  initial.on('exit', (code, signal) => { report.initialExit = { code, signal }; });
+  initial.unref();
   let page = await connect('1.6.2');
   report.baseIdentity = await identity(page, '1.6.2', base.commit);
   const fixture = { id: 'SYNTHETIC-SIGNED-UPGRADE', name: 'SYNTHETIC signed upgrade preservation', settingsConfig: { env: { ANTHROPIC_AUTH_TOKEN: 'SYNTHETIC-NO-REAL-CREDENTIAL', ANTHROPIC_BASE_URL: 'https://synthetic.invalid' } } };
@@ -198,6 +202,14 @@ foreach ($program in $programs) {
   report.subsetStatus = 'passed';
 } catch (error) {
   report.subsetStatus = 'failed'; report.error = String(error);
+  try {
+    report.processDiagnostics = JSON.parse(powershell(String.raw`
+@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:TUZI_SIGNED_LAB_EXE -or $_.Name -eq 'msedgewebview2.exe' } | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath) | ConvertTo-Json -Compress
+`));
+  } catch (diagnosticError) { report.diagnosticError = String(diagnosticError); }
+  const log = path.join(process.env.USERPROFILE, '.tuzi-switch', 'logs', 'tuzi-switch.log');
+  if (fs.existsSync(log)) report.startupLogTail = fs.readFileSync(log, 'utf8').split(/\r?\n/).slice(-80);
+
   try { await browser?.contexts()[0]?.pages()[0]?.screenshot({ path: path.join(root, 'failure.png') }); } catch {}
   throw error;
 } finally {
