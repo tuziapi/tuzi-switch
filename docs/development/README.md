@@ -1,5 +1,7 @@
 2026-11-15 SYNC-DESKTOP-LOCAL-01：按用户选择 A，完整快进同步 verified-desktop-updates `9d2a60ee` 至本地 `codex/sync-verified-desktop-updates`，保留原分支及备份。839项宿主、2681项创作、25项原生、22项签名/发布检查、类型、两阶段前端构建与双浏览器合成流程通过；Windows/正式升级及真实模型验收限制保留。仅本地，无 push/PR/发布或安装。见 [同步与验证记录](2026-11-15-verified-desktop-local-sync.md)。
 
+2026-11-15 UP-03-LOCAL-INTEGRATION：已合并指定会话的图片加载和卡片优化，完整回归通过；按用户要求构建本机 1.6.2 安装包供亲测，正式发布待验收。见 [整合安装记录](2026-11-15-integrated-local-installer.md)。
+
 2026-11-15 UP-03/SD55-01：更新签名、七种安装类型、PR #73、经营分析与 Seedream 5.5 的完成状态统一见 [逐项验收清单](2026-11-15-desktop-task-checklist.md)；部分通过不代表正式发布验收通过。
 
 2026-11-15 SD55-01：按用户已确认范围补齐 Seedream 5.5 生图、透明背景、分层与 OCR；与 PR #73 联合回归和浏览器合成链路通过，真实模型/正式安装升级仍待验收。见 [适配与验证](2026-11-15-seedream55-desktop.md)。

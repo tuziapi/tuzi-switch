@@ -19,6 +19,7 @@
 - `pnpm typecheck`：通过。
 - 更新签名/发布门禁/Tauri 依赖配对脚本测试：通过（合成签名测试，不替代正式包验收）。
 - 日志：`/tmp/tuzi-integrated-{creative-tests,host-tests,typecheck,updater-tests}.log`。
+- Chrome/WebKit 均重新通过透明 PNG、三层/OCR、重复 URL 图层、OCR 文案、保存重载及完成占位移除；本机合成 HTTP，无付费请求。WebKit OCR 截图已查看。
 
 ## 本机交付与限制
 
@@ -27,3 +28,17 @@
 安装前保留原应用回退副本，正常退出后替换，用户数据目录不改写。构建、安装及启动结果在完成后追加。
 
 本轮 CUA 获取现有应用时 ScreenCaptureKit 返回 -3811，暂未能查看画面。不会把进程启动核对当作完整视觉验收。真实 Seedream 两次计费验收及生产经营统计仍待完成，本会话没有新增付费请求。其他跨平台门禁沿用逐项清单，未发布。
+
+旧候选 43708139009 已取消（GitHub completed/cancelled），因其不含用户最新要求的画布优化，不再请求旧运行审批。用户已确认“奶酪”就是授权专用测试 Key；真实两次调用仍需核定账户实际定价，预算合计不超过 ¥5。
+
+安装前通过原生 AX 确认现有 1.6.0 应用任务队列：总计46、生成中0、失败11、已完成35。此只用于安装前后记录保留核对，不重复执行任何历史任务。
+
+## 交付完成
+
+- 构建源码：`a3e2a39153d27275609d9ab16539dc22c77ea06f`，应用1.6.2、ARM64。Release应用和DMG构建成功；初次构建因工具PATH未含Cargo而未启动编译，指定本机已安装的1.95工具链后完成。
+- DMG：`/Users/sdy09/Downloads/tuzi-1.6.2-integrated-a3e2a391/兔子助手_1.6.2_aarch64.dmg`；SHA256 `16c3f51e332b5432aed1de96c329b9343523faa60b7d2e120506f27ee23cf2da`。同目录含校验和及安装记录。
+- `hdiutil verify`通过，从DMG挂载内容安装至`/Applications/兔子助手.app`；ARM架构、版本、bundle ID、ad-hoc代码签名完整性及全部文件字节/权限比对通过。不是Apple开发者签名/公证，也没有生成正式更新签名载荷。
+- 安装前重新确认生成中0，向旧应用发送正常quit并观察旧进程退出，未强杀。原包移至`/Users/sdy09/Documents/tuzi-switch-artifacts/integrated-1.6.2-20261115/pre-install/兔子助手.app`，备份逐文件一致。
+- 新应用进程已启动；AX实际进入opentu，原4个项目可见，打开原“1.6.0安装验收”项目后队列生成中0、失败11、已完成35，与安装前一致。此不等于全部媒体像素、原生交互或真实模型验收。
+- 用户数据目录未由安装脚本写入或清理。新应用留在原项目供用户亲测，未发布、未更新公网下载或更新清单。本轮整合未推送远程。
+- [安装证据](evidence/2026-11-15-integrated-local-installation.json)、[集成回归](evidence/2026-11-15-integrated-local-validation.json)。发布仍待最终候选逐平台验收、真实供应商/经营记录与用户授权。

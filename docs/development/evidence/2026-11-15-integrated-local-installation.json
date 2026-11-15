@@ -1,0 +1,51 @@
+{
+  "sourceCommit": "a3e2a39153d27275609d9ab16539dc22c77ea06f",
+  "version": "1.6.2",
+  "architecture": "arm64",
+  "previousVersion": "1.6.0",
+  "installedPath": "/Applications/兔子助手.app",
+  "backupPath": "/Users/sdy09/Documents/tuzi-switch-artifacts/integrated-1.6.2-20261115/pre-install/兔子助手.app",
+  "dmgPath": "/Users/sdy09/Downloads/tuzi-1.6.2-integrated-a3e2a391/兔子助手_1.6.2_aarch64.dmg",
+  "dmgSha256": "16c3f51e332b5432aed1de96c329b9343523faa60b7d2e120506f27ee23cf2da",
+  "appFiles": {
+    "Contents/Info.plist": {
+      "sha256": "9bb54e4e61aa159e0f8d3f51a8e86474d001ee482a33ae099c94e07f201e7870",
+      "mode": 420
+    },
+    "Contents/MacOS/tu-zi-switch": {
+      "sha256": "b4dd17ee84e4fa3ba3f2bf0d3e4c13e8c30099161049cf017c259888cfdc99b8",
+      "mode": 493
+    },
+    "Contents/Resources/icon.icns": {
+      "sha256": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc",
+      "mode": 420
+    },
+    "Contents/_CodeSignature/CodeResources": {
+      "sha256": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+      "mode": 420
+    }
+  },
+  "oldAppExactBackup": true,
+  "normalQuitObserved": true,
+  "installedFilesEqualDmg": true,
+  "processStarted": true,
+  "updaterSignedArtifact": false,
+  "appleNotarized": false,
+  "published": false,
+  "nativeAxChecks": {
+    "creativeWorkspaceOpened": true,
+    "existingProjects": 4,
+    "existingAcceptanceProjectOpened": true,
+    "before": {
+      "generating": 0,
+      "failed": 11,
+      "completed": 35
+    },
+    "after": {
+      "generating": 0,
+      "failed": 11,
+      "completed": 35
+    },
+    "pixelInspection": false
+  }
+}

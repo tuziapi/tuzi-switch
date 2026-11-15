@@ -1,0 +1,40 @@
+{
+  "sourceCommit": "a3e2a39153d27275609d9ab16539dc22c77ea06f",
+  "mergedSourceCommit": "168b363a9b7984ae68735fc11a4fd52cbb4a7693",
+  "creativeTests": 2684,
+  "hostTests": 839,
+  "updaterScriptTests": 17,
+  "typecheck": true,
+  "sourceReconstructionFiles": 1639,
+  "liveProvider": false,
+  "officialAcceptance": false,
+  "publication": false,
+  "browsers": [
+    {
+      "kind": "synthetic-transport-browser",
+      "engine": "chromium",
+      "generation": true,
+      "transparentPngRequest": true,
+      "layers": 3,
+      "ocr": true,
+      "ocrTextVisible": true,
+      "duplicateUrlLayers": true,
+      "reloadPreserved": true,
+      "completedPlaceholderRemoved": true,
+      "liveProvider": false
+    },
+    {
+      "kind": "synthetic-transport-browser",
+      "engine": "webkit",
+      "generation": true,
+      "transparentPngRequest": true,
+      "layers": 3,
+      "ocr": true,
+      "ocrTextVisible": true,
+      "duplicateUrlLayers": true,
+      "reloadPreserved": true,
+      "completedPlaceholderRemoved": true,
+      "liveProvider": false
+    }
+  ]
+}
