@@ -44,6 +44,7 @@ jobs:
           workspaces: './src-tauri -> target'
           cache-on-failure: true
       - run: pnpm install --frozen-lockfile
+      - run: node scripts/tauri-compatibility.mjs
       - run: pnpm build:renderer
       - name: Native transport attribution regression
         shell: bash

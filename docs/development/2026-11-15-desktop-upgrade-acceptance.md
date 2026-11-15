@@ -116,3 +116,9 @@ gh workflow run unified-release.yml -R AiW520/tuzi-switch --ref codex/verified-d
 进一步审阅 Windows/Linux 日志发现五种包均有 `Failed to add bundler type` 警告。锁定的 CLI 2.8.1 仍寻找旧 `.taubndl` 布局，Rust 端 tauri-utils 2.8.3 已使用 `__TAURI_BUNDLE_TYPE_VAR_UNK` 格式；CLI 2.10.1 源码支持新标记。单纯调整 strip 不能解决协议不兼容，因此保留原构建优化，将 CLI 精确固定 2.10.1 并更新 lockfile。构建与实验遇到标记警告即失败，原生实验 started 事件新增 bundleType，并要求实际运行的每个版本识别正确安装类型，禁止依赖默认 NSIS/AppImage 分支冒充全类型验收。该成功候选判定不可发布，详见 [审查记录](evidence/2026-11-15-candidate-43674252720-rejected.json)。
 
 run `43672875113` / `8834834b` 的 Linux 和 Mac ARM 各 8 场景成功，Linux 退出与同安装目录重试修复已复验；但此次没有安装类型断言，不能据此证明 DEB/RPM/MSI 选择正确。Windows 已正确选到安装包，随后因实验隔离校验失败：Windows 规范路径前缀与原始路径比较不一致，且 isolated-profile 仍可能命中旧 HOME 数据库回退。修正为规范路径比较，并仅在非隔离 Windows 版本保留旧目录兼容。原生实验须在兼容 CLI 下重新执行。正式验收记录仍不存在，未发布。
+
+Intel Mac 随后完成该轮 8 场景；该 run 最终因 Windows 失败而失败。修复隔离逻辑后，本机 release/isolated-profile 的原生归因与 HTTP/账户请求联合 24 项通过。测试过滤条件合并为同一次 libtest 调用，已实测多个过滤条件为并集，避免重复链接；不减少测试范围。
+
+CLI 升级后的实验 run `43677933306` / `3ee9f87e` 在 Linux 构建前正确拦截历史依赖不一致：Rust tauri 2.10.3、dialog 2.6.0、updater 2.10.0，对应宿主 JS 仍为 2.8.0、2.4.0、2.9.0。因此取消这一轮剩余作业及仍待审核的正式候选 `43677936778`，不请求或沿用这批签名审批。宿主 JS API 固定 2.10.1、dialog 固定 2.6.0、updater 固定 2.10.0，与 Rust 主/次版本一致；不跳过 CLI 的版本一致性校验。新增构建前兼容检查，与 3 项回归共同覆盖旧 CLI、三个不匹配的 JS 版本及缺失原生插件；签名/门禁/兼容共 16 项通过。后续候选必须基于此完整配对重新构建。
+
+配对更新后本机 99 文件/839 项宿主测试、类型检查、完整 renderer 构建、冻结 lockfile 安装及 actionlint 通过。兼容检查读取实际安装的宿主 JS 包与 Cargo.lock，放在构建前执行。首次 `tauri info` 未在 PATH 找到本机 Rust 工具链，回退显示 Cargo.toml 的旧最低版本；使用已安装 1.95 工具链后确认实际锁定 tauri 2.10.3。正式构建仍以真实 Cargo 元数据及 CLI 版本检查为准。

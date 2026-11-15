@@ -79,6 +79,7 @@ jobs:
         with:
           version: '9'
       - run: pnpm install --frozen-lockfile
+      - run: node scripts/tauri-compatibility.mjs
       - run: pnpm build:creative
       - run: pnpm --filter @tuzi/download-page test
       - name: Compile download page before building installers
@@ -90,7 +91,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - run: python3 scripts/test_release_assets.py
-      - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs
+      - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs scripts/verify-tauri-compatibility.mjs
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
       - run: pnpm test:creative
