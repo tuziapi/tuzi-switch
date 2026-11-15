@@ -269,3 +269,5 @@ MSI临时密钥实验43689414375 attempt1于08:27:20 UTC自行失败，取消请
 新增signed_candidate_linux_probe_only（bool，默认false），单独调用signed-candidate-linux.yml，Windows/实验/签名/构建/汇总路径均跳过。只读取已批准1.6.2候选原字节，复核run/SHA/manifest摘要/正式签名后用系统dpkg安装DEB；独立一次性tuziqa用户阻断全部非loopback IPv4/IPv6请求，通过WebKitWebDriver读取实际UI和原生版本/应用ID/源码。无重编、重签、付费/生产请求；验证Linux正式包后续自动化控制通路，不等同升级通过。报告明确officialAcceptance=false。新增测试输入、reusable调用与默认值均补齐，actionlint、Python语法及diff检查通过，真实预检待运行。
 
 Linux预检43698634342已验证正式候选摘要/签名并由dpkg成功安装1.6.2；尚未启动应用，独立用户不能穿过runner私有工作目录读取脚本，且继承了runner的XDG_RUNTIME_DIR。改为只复制测试脚本到独立/tmp目录，并为tuziqa创建0700运行目录；不放开runner目录或读取其凭证。补显式安装DEB声明的libappindicator3-1，避免依赖runner预装状态。原失败保留，未记UI/原生身份通过。
+
+43699005552在apt准备阶段失败：libayatana-appindicator3-1与libappindicator3-1互斥；首轮已经证明Ayatana包可满足本候选dpkg依赖，不能同时显式安装两者。恢复只安装Ayatana实现，保留独立用户路径与运行目录修正；未改候选包或绕过dpkg依赖检查。
