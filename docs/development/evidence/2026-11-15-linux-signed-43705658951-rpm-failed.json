@@ -1,0 +1,16 @@
+{
+  "kind": "failed-linux-rpm-environment-test",
+  "officialAcceptance": false,
+  "testRunId": "43705658951",
+  "testCommit": "fa0fa0d873ce2e8cad5fb5b89ae0137ed8b1b68e",
+  "artifactId": "14157747934",
+  "artifactSha256": "acfb19ba66005405610fe4fbbe487a86cecd73a814e1217b7bf87358f6e5ba02",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "subsetStatus": "failed",
+  "observations": [
+    "Real RPM dependency resolution and installation completed; UI native identity succeeded before empty process-list assertion.",
+    "Cleanup then failed because pkill was absent; archive contains driver.log and runtime-os-release.txt, no results.json.",
+    "Subsequent test adds procps-ng, SYS_PTRACE and effective-UID/executable-path inspection. Do not infer the exact cause from absent prior diagnostics."
+  ]
+}

@@ -31,3 +31,8 @@ OpenSpec记录：`packages/creative-workspace/upstream/openspec/changes/add-seed
 新增回归验证全部图层真正绘制就绪后才完成旧任务占位，以及JSON重载后的关联；导入图片无关联继续保持。17项定向、160文件2683项创作全量、宿主类型及创作构建通过；Chrome/WebKit实际生图/分层/OCR/保存重载均验证占位消失且重载不复现。原生候选测试也加入此必需断言，旧候选不会被误记完整业务通过。见evidence/2026-11-15-layer-generation-handoff.json。修复后的正式签名候选须重新构建与实装验收，不能用前一候选通过证据替代。
 
 补丁重建检查发现此前PR#73视频及Seedream新增12条源码/规范路径未登记在UPSTREAM.json，已按实际引入commit补登记并重建完整补丁，1523原始文件+116本地文件=1639文件逐字节还原通过。生成的统一diff保留其必需空白上下文，不按普通源码尾空格规则改写；普通修改通过git diff --check，补丁独立通过git apply --check及全部文件字节比对。未更改原opentu源码仓库。
+
+
+## 修复正式候选 Windows 四组业务升级复验
+
+修复候选43699923173/5bfee5f3已经完成四平台正式更新签名及完整性独立核验。43703529198的NSIS/MSI × 旧1.6.0/1.6.1四组各16项通过：真实UI和原生HTTP执行Seedream5.5透明PNG、三图层/OCR；手动过渡及正式签名自动重启后，画板、图层、OCR嵌套字段、未知扩展、任务与精确缓存像素保留。新增completedGenerationPlaceholderRemoved通过，四张升级后创作截图人工核对无残留占位卡。供应商是本机合成HTTPS，真实模型质量、权限、准确率、计费和生产经营统计仍未验收。逐份证据见桌面任务清单。

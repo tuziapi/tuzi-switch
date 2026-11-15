@@ -1,0 +1,37 @@
+{
+  "kind": "installed-macos-control-probe",
+  "officialAcceptance": false,
+  "candidateRunId": "43699923173",
+  "candidateCommit": "5bfee5f39b0b370093081227c6e19883f21280a0",
+  "platform": "macos-x64",
+  "architecture": "x86_64",
+  "executableSha256": "2f5e70c603c34bd1992222beff9485c6a9d67d551c58f230ffa63045a321886c",
+  "pid": 1499,
+  "accessibilityProbe": {
+    "returncode": 0,
+    "stdout": "true",
+    "stderr": ""
+  },
+  "screenCapture": {
+    "returncode": 0,
+    "stderr": ""
+  },
+  "accessibilityTree": {
+    "returncode": 0,
+    "stdout": "group 1 of window 1 of application process tu-zi-switch, group 1 of group 1 of window 1 of application process tu-zi-switch, scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, group 1 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, group Tuzi account of group 1 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, group API keys of group Tuzi account of group 1 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, group 1 of group API keys of group Tuzi account of group 1 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, static text Disconnected of group 1 of group API keys of group Tuzi account of group 1 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, group Notifications alt+T of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, group Welcome to 兔子助手 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, UI element Welcome to 兔子助手 of group Welcome to 兔子助手 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, static text Welcome to 兔子助手 of UI element Welcome to 兔子助手 of group Welcome to 兔子助手 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, group 1 of group Welcome to 兔子助手 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, static text 兔子助手 lets you switch between multiple Claude Code / Codex / Gemini CLI providers with a single click. If you already had these tools configured, 兔子助手 has saved your existing setup as a provider named “default” so none of your previous configuration is lost. of group 1 of group Welcome to 兔子助手 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, group 2 of group Welcome to 兔子助手 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, static text An “Official” preset is also included in the list — click it any time you want to switch back to the official default. 兔子助手 automatically backs up your current config to “default” before switching, so you can move back and forth freely. That's how 兔子助手 works 😊 of group 2 of group Welcome to 兔子助手 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, button Got it of group Welcome to 兔子助手 of UI element 1 of scroll area 1 of group 1 of group 1 of window 1 of application process tu-zi-switch, button 1 of window 1 of application process tu-zi-switch, button 2 of window 1 of application process tu-zi-switch, group 1 of button 2 of window 1 of application process tu-zi-switch, button 3 of window 1 of application process tu-zi-switch, static text 1 of window 1 of application process tu-zi-switch\n",
+    "stderr": ""
+  },
+  "probeStatus": "ui-control-available",
+  "unchangedAfterLaunch": true,
+  "cleanupExitCode": -15,
+  "testRunId": "43706075287",
+  "testCommit": "8ca9172bde38aebf5a69a58f3ec4072ad4fc8d15",
+  "artifactId": "14158064554",
+  "artifactSha256": "9db50696303d930d29bbc3601c052887535fb7e0603379ed97acd51c24a9bb85",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "reviewObservations": [
+    "Reviewed real installed application screenshot and Accessibility tree on matching CPU architecture.",
+    "Existing UI permission only; no TCC changes. No upgrade was attempted and cleanup SIGTERM is not a normal user exit test."
+  ]
+}
