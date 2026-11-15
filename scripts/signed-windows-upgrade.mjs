@@ -115,7 +115,7 @@ $webviewGlob=Join-Path ([Environment]::GetEnvironmentVariable('ProgramFiles(x86)
 $programs=@($env:TUZI_SIGNED_LAB_EXE)+@(Get-ChildItem $webviewGlob | ForEach-Object FullName)
 if ($programs.Count -lt 2) { throw 'Preinstalled WebView2 runtime required' }
 foreach ($program in $programs) {
- New-NetFirewallRule -DisplayName 'SYNTHETIC Tuzi signed updater lab' -Direction Outbound -Action Block -Program $program -RemoteAddress '0.0.0.0-127.0.0.0','127.0.0.2-255.255.255.255','::/0' | Out-Null
+ New-NetFirewallRule -DisplayName 'SYNTHETIC Tuzi signed updater lab' -Direction Outbound -Action Block -Program $program -RemoteAddress '0.0.0.1-126.255.255.255','128.0.0.0-255.255.255.254','::2-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff' | Out-Null
 }
 `);
   server = https.createServer({ pfx: fs.readFileSync(path.join(root, 'synthetic-tls.pfx')), passphrase: 'SYNTHETIC-LAB-ONLY' }, (req, res) => {
