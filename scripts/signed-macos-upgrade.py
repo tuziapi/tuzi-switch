@@ -118,6 +118,7 @@ report = dict(kind='real-installed-macos-subset',officialAcceptance=False,platfo
                          'creative-project-migration','native-runtime-IPC-identity','business-provider-acceptance'])
 app = executable = process = server = mount = None
 trusted = hosts_changed = False
+trust_restore = None
 original_hosts = Path('/etc/hosts').read_bytes()
 pid = None
 
@@ -247,6 +248,17 @@ try:
     (lab/'ca.key').chmod(0o600); (lab/'tls.key').chmod(0o600)
     stage('trust temporary local CA')
     run(['sudo','security','add-trusted-cert','-d','-r','trustRoot','-k','/Library/Keychains/System.keychain',str(lab/'ca.crt')],capture_output=True); trusted=True
+    fingerprint=capture([openssl,'x509','-in',str(lab/'ca.crt'),'-noout','-fingerprint','-sha1'],text=True).strip().split('=')[-1].replace(':','')
+    # Preserve all unrelated trust settings in this disposable host. Removing a
+    # single admin trust record with remove-trusted-cert hangs on these runners.
+    trust_export=lab/'admin-trust-with-probe.plist'
+    run(['sudo','security','trust-settings-export','-d',str(trust_export)],capture_output=True)
+    trust_settings=plistlib.loads(trust_export.read_bytes())
+    matching=[key for key in trust_settings['trustList'] if key.upper()==fingerprint]
+    assert len(matching)==1, 'Synthetic CA missing from exported admin trust'
+    del trust_settings['trustList'][matching[0]]
+    trust_restore=lab/'admin-trust-without-probe.plist'
+    trust_restore.write_bytes(plistlib.dumps(trust_settings))
     stage('prepare loopback discovery')
     hosts_changed=True
     run(['sudo','tee','/etc/hosts'],input=original_hosts+b'\n127.0.0.1 github.com api.github.com\n',stdout=subprocess.DEVNULL)
@@ -264,7 +276,8 @@ try:
     process=subprocess.Popen(['sandbox-exec','-f',str(sandbox),str(executable)],env=app_env,stdout=application_log,stderr=application_log)
     pid=process.pid; report['initialPid']=pid
     click(['Got it','我知道了'])
-    click(['View update','查看更新'])
+    # Use the persistent toolbar control, not the expiring 15-second toast.
+    click(['New version available: 1.6.3','检测到新版本：1.6.3'])
     screenshot('01-update-dialog')
     for failure in ['corrupt','interrupted','missing']:
         (lab/'mode').write_text(failure)
@@ -298,7 +311,7 @@ try:
     report['subsetStatus']='passed'
     stage('completed signed upgrade subset')
 except Exception as error:
-    report['subsetStatus']='failed'; report['error']=str(error)
+    report['subsetStatus']='failed'; report['error']=repr(error)
     try:
         screenshot('failure')
     except Exception as diagnostic:
@@ -322,16 +335,22 @@ finally:
         run(['sudo','dscacheutil','-flushcache'])
     if trusted:
         fingerprint=capture([openssl,'x509','-in',str(lab/'ca.crt'),'-noout','-fingerprint','-sha1'],text=True).strip().split('=')[-1].replace(':','')
-        # Attempt both removals even if macOS trust-settings cleanup blocks.
-        # The original test failure must remain available in the final report.
-        for command in [
-            ['sudo','security','delete-certificate','-Z',fingerprint,'/Library/Keychains/System.keychain'],
-            ['sudo','security','remove-trusted-cert','-d',str(lab/'ca.crt')],
-        ]:
+        commands=[(['sudo','security','trust-settings-import','-d',str(trust_restore)]
+                   if trust_restore else ['sudo','security','remove-trusted-cert','-d',str(lab/'ca.crt')]),
+                  ['sudo','security','delete-certificate','-Z',fingerprint,'/Library/Keychains/System.keychain']]
+        for command in commands:
             try:
                 run(command,capture_output=True,stdin=subprocess.DEVNULL,timeout=30)
             except subprocess.SubprocessError as error:
                 report.setdefault('cleanupErrors',[]).append(str(error))
+        if trust_restore and not report.get('cleanupErrors'):
+            try:
+                restored=lab/'admin-trust-restored.plist'
+                run(['sudo','security','trust-settings-export','-d',str(restored)],capture_output=True)
+                assert plistlib.loads(restored.read_bytes())==plistlib.loads(trust_restore.read_bytes())
+                report['adminTrustRestored']=True
+            except (subprocess.SubprocessError,OSError,AssertionError) as error:
+                report.setdefault('cleanupErrors',[]).append('Admin trust verification: '+repr(error))
         (output/'results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     if mount:
         subprocess.run(['hdiutil','detach',mount],check=False,stdout=subprocess.DEVNULL,timeout=30)
