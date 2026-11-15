@@ -122,7 +122,20 @@ original_hosts = Path('/etc/hosts').read_bytes()
 pid = None
 
 
+def stage(name):
+    report['stage'] = name
+    print('MAC-STAGE: ' + name, flush=True)
+    (output/'results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+
+
+def capture(args, **kwargs):
+    kwargs.setdefault('timeout', 30)
+    return subprocess.check_output(args, **kwargs)
+
+
 def run(args, **kwargs):
+    kwargs.setdefault('timeout', 60)
+    print('MAC-COMMAND: ' + ' '.join(str(a) for a in args[:3]), flush=True)
     return subprocess.run(args,check=True,**kwargs)
 
 
@@ -142,7 +155,7 @@ def wait_for(fn,message,seconds=90):
 
 def ax(body):
     script = 'tell application "System Events"\nset p to first application process whose unix id is '+str(pid)+'\nset frontmost of p to true\n'+body+'\nend tell'
-    return subprocess.check_output(['osascript','-e',script],text=True,stderr=subprocess.PIPE,timeout=25).strip()
+    return capture(['osascript','-e',script],text=True,stderr=subprocess.PIPE,timeout=25).strip()
 
 
 def tree():
@@ -168,6 +181,7 @@ return false'''.replace('LABELS',labels).replace('PRESS','perform action "AXPres
 
 
 def click(names):
+    stage('press '+str(names))
     wait_for(lambda: button(names),'Accessible enabled button missing: '+str(names))
     assert button(names,True)
 
@@ -194,16 +208,18 @@ def assert_app(expected,version):
 
 
 def app_pids():
-    rows=subprocess.check_output(['ps','-axo','pid=,command='],text=True).splitlines()
+    rows=capture(['ps','-axo','pid=,command='],text=True).splitlines()
     return [int(row.split(None,1)[0]) for row in rows if len(row.split(None,1))==2 and row.split(None,1)[1]==str(executable)]
 
 
 try:
-    assert subprocess.check_output(['osascript','-e','tell application "System Events" to get UI elements enabled'],text=True).strip()=='true', 'Existing Accessibility permission required; never grant it automatically'
+    stage('existing Accessibility permission')
+    assert capture(['osascript','-e','tell application "System Events" to get UI elements enabled'],text=True).strip()=='true', 'Existing Accessibility permission required; never grant it automatically'
+    stage('verify and install original DMG')
     expected_base=files_in_archive(base_dir); expected_target=files_in_archive(target_dir)
     dmg=base_dir/('tuzi-assistant-'+platform+'.dmg')
     assert sha(dmg.read_bytes())==base['files'][dmg.name]
-    mounted=plistlib.loads(subprocess.check_output(['hdiutil','attach','-readonly','-nobrowse','-plist',str(dmg)]))
+    mounted=plistlib.loads(capture(['hdiutil','attach','-readonly','-nobrowse','-plist',str(dmg)]))
     mounts=[e['mount-point'] for e in mounted['system-entities'] if 'mount-point' in e]
     assert len(mounts)==1
     mount=mounts[0]
@@ -214,10 +230,11 @@ try:
     run(['hdiutil','detach',mount],stdout=subprocess.DEVNULL); mount=None
     info=plistlib.loads((app/'Contents/Info.plist').read_bytes())
     executable=app/'Contents/MacOS'/info['CFBundleExecutable']
-    report['architecture']=subprocess.check_output(['lipo','-archs',str(executable)],text=True).strip()
+    report['architecture']=capture(['lipo','-archs',str(executable)],text=True).strip()
     assert report['architecture']==('arm64' if platform=='macos-arm64' else 'x86_64')
-    assert subprocess.check_output(['uname','-m'],text=True).strip()==report['architecture']
+    assert capture(['uname','-m'],text=True).strip()==report['architecture']
     report['installedBase']=assert_app(expected_base,'1.6.2')
+    stage('create temporary TLS certificates')
     # Ephemeral HTTPS trust, separate from the immutable official update key.
     openssl = os.environ.get('TUZI_TEST_OPENSSL','openssl')
     run([openssl,'req','-x509','-newkey','rsa:2048','-nodes','-days','1','-keyout',str(lab/'ca.key'),
@@ -227,7 +244,9 @@ try:
     run([openssl,'x509','-req','-in',str(lab/'tls.csr'),'-CA',str(lab/'ca.crt'),'-CAkey',str(lab/'ca.key'),
          '-CAserial',str(lab/'ca.srl'),'-CAcreateserial','-out',str(lab/'tls.crt'),'-days','1','-sha256','-extfile',str(lab/'tls.ext')],capture_output=True)
     (lab/'ca.key').chmod(0o600); (lab/'tls.key').chmod(0o600)
+    stage('trust temporary local CA')
     run(['sudo','security','add-trusted-cert','-d','-r','trustRoot','-k','/Library/Keychains/System.keychain',str(lab/'ca.crt')],capture_output=True); trusted=True
+    stage('prepare loopback discovery')
     hosts_changed=True
     run(['sudo','tee','/etc/hosts'],input=original_hosts+b'\n127.0.0.1 github.com api.github.com\n',stdout=subprocess.DEVNULL)
     run(['sudo','dscacheutil','-flushcache'])
@@ -240,6 +259,7 @@ try:
     sandbox.write_text('(version 1)\n(allow default)\n(deny network*)\n(allow network-outbound (remote ip "localhost:*"))\n(allow network-inbound (local ip "localhost:*"))\n')
     app_env={k:v for k,v in os.environ.items() if not any(w in k.upper() for w in ['TOKEN','SECRET','PASSWORD','PRIVATE_KEY'])}
     application_log=(output/'application.log').open('w')
+    stage('launch original installed application')
     process=subprocess.Popen(['sandbox-exec','-f',str(sandbox),str(executable)],env=app_env,stdout=application_log,stderr=application_log)
     pid=process.pid; report['initialPid']=pid
     click(['Got it','我知道了'])
@@ -275,6 +295,7 @@ try:
     report['checks'].update({k:'passed' for k in ['download','nativeSignature','install','automaticRestart',
         'exactSignedTargetBytes','welcomePreferencePreserved','sameInstallationRetry']})
     report['subsetStatus']='passed'
+    stage('completed signed upgrade subset')
 except Exception as error:
     report['subsetStatus']='failed'; report['error']=str(error)
     try:
@@ -292,15 +313,15 @@ finally:
         except ProcessLookupError:
             pass
     if (lab/'server.pid').exists():
-        subprocess.run(['sudo','kill', (lab/'server.pid').read_text().strip()],check=False)
+        subprocess.run(['sudo','kill', (lab/'server.pid').read_text().strip()],check=False,timeout=15)
     if server:
         server.wait(timeout=15)
     if hosts_changed:
         run(['sudo','tee','/etc/hosts'],input=original_hosts,stdout=subprocess.DEVNULL)
         run(['sudo','dscacheutil','-flushcache'])
     if trusted:
-        subprocess.run(['sudo','security','remove-trusted-cert','-d',str(lab/'ca.crt')],check=False,capture_output=True)
-        fingerprint=subprocess.check_output([openssl,'x509','-in',str(lab/'ca.crt'),'-noout','-fingerprint','-sha1'],text=True).strip().split('=')[-1].replace(':','')
+        subprocess.run(['sudo','security','remove-trusted-cert','-d',str(lab/'ca.crt')],check=False,capture_output=True,timeout=30)
+        fingerprint=capture([openssl,'x509','-in',str(lab/'ca.crt'),'-noout','-fingerprint','-sha1'],text=True).strip().split('=')[-1].replace(':','')
         run(['sudo','security','delete-certificate','-Z',fingerprint,'/Library/Keychains/System.keychain'],capture_output=True)
     if mount:
-        subprocess.run(['hdiutil','detach',mount],check=False,stdout=subprocess.DEVNULL)
+        subprocess.run(['hdiutil','detach',mount],check=False,stdout=subprocess.DEVNULL,timeout=30)
