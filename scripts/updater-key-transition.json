@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "repository": "tuziapi/tuzi-switch",
+  "firstVersion": "1.6.2",
+  "delivery": "manual-key-transition",
+  "oldPublicKeySha256": "4563ca397f2a4d652b21c046a659ff2149b7537278e70b564263d688164fa7f1",
+  "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+  "authorizedAt": "2026-11-15",
+  "reason": "Original private key has no backup; user explicitly authorized a new official key and one manual transition installation."
+}

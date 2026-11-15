@@ -70,15 +70,15 @@ jobs:
         with:
           version: '9'
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Preserve the public key embedded in the official release
+      - name: Verify the user-approved transition public key
         run: |
           node --input-type=module <<'JS'
           import fs from 'node:fs';
           import {createHash} from 'node:crypto';
           const key=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).plugins.updater.pubkey.trim();
-          // Official source ca378b869422b18f7b11c72b735ee8990dfb6a8b.
-          if(createHash('sha256').update(key).digest('hex')!=='4563ca397f2a4d652b21c046a659ff2149b7537278e70b564263d688164fa7f1')
-            throw Error('Official public key changed; refusing to substitute a new trust root');
+          // User authorized a new official key and one manual transition on 2026-11-15.
+          if(createHash('sha256').update(key).digest('hex')!=='8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5')
+            throw Error('Unexpected transition public key');
           JS
       - name: Verify the protected official key without publishing or exporting it
         shell: bash
