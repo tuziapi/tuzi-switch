@@ -99,6 +99,8 @@ def main():
         config_file.write_text(json.dumps(config))
         print(f'Building isolated application {version}', flush=True)
         command(cli + ['build', '--features', 'updater-acceptance', '--bundles', bundle, '--config', str(config_file)], env, root / f'build-{version}.log')
+        if 'Failed to add bundler type' in (root / f'build-{version}.log').read_text(errors='replace'):
+            raise RuntimeError('Native bundle is missing its installer type; refusing fallback-only acceptance')
         if saved.exists():
             raise SystemExit(f'Refusing to overwrite previous test app: {saved}')
         bundles = target_dir / 'release/bundle'
@@ -209,6 +211,10 @@ def main():
                     if process.poll() is None:
                         process.terminate()
                     raise RuntimeError(f'{name} failed: {terminal}; logs: {case}')
+                expected_bundle = {'macos': 'Some(App)', 'windows': 'Some(Nsis)', 'linux': 'Some(AppImage)'}[platform]
+                starts = [e for e in events if e['event'] == 'started']
+                if not starts or any(e['detail'].get('bundleType') != expected_bundle for e in starts):
+                    raise RuntimeError(f'{name}: installed app did not retain its native installer type')
                 try:
                     process.wait(timeout=10)
                 except subprocess.TimeoutExpired:

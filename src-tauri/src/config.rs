@@ -108,7 +108,8 @@ pub fn get_app_config_dir() -> PathBuf {
     // v3.10.3 可能在 `HOME/.tuzi-switch/` 下创建/使用了数据库。
     // 这里仅在“默认位置没有数据库”时回退到旧位置，避免再次出现“供应商消失”问题，
     // 同时也避免新安装因为 `HOME` 被设置而写入非预期路径。
-    #[cfg(windows)]
+    // An isolated preview/laboratory must never adopt a legacy production home.
+    #[cfg(all(windows, not(feature = "isolated-profile")))]
     {
         let default_db = default_dir.join("tuzi-switch.db");
         if !default_db.exists() {

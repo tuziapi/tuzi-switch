@@ -58,7 +58,13 @@ async fn execute(app: &tauri::AppHandle, root: &Path) -> Result<(), String> {
             .canonicalize()
             .map_err(|e| e.to_string())?
             != home
-        || crate::config::get_app_config_dir() != home.join(".tuzi-switch")
+        || crate::config::get_app_config_dir()
+            .canonicalize()
+            .map_err(|e| e.to_string())?
+            != home
+                .join(".tuzi-switch")
+                .canonicalize()
+                .map_err(|e| e.to_string())?
     {
         return Err("Refusing non-isolated updater test".into());
     }
@@ -80,7 +86,7 @@ async fn execute(app: &tauri::AppHandle, root: &Path) -> Result<(), String> {
     record(
         root,
         "started",
-        json!({"version":version,"pid":std::process::id(),"executable":std::env::current_exe().map_err(|e|e.to_string())?}),
+        json!({"version":version,"pid":std::process::id(),"bundleType":format!("{:?}",tauri::utils::platform::bundle_type()),"executable":std::env::current_exe().map_err(|e|e.to_string())?}),
     )?;
     if version == scenario.version {
         let history = fs::read_to_string(root.join("events.jsonl")).map_err(|e| e.to_string())?;

@@ -108,3 +108,11 @@ gh workflow run unified-release.yml -R AiW520/tuzi-switch --ref codex/verified-d
 `unified-release.yml`新增 `official_candidate` bool（默认false），只允许测试库指定分支；四个构建作业须人工通过 `official-updater-signing` 环境，使用其中的新正式私钥及密码。安装包嵌入正式公钥/正式更新地址，候选不自动发布。构建来源 `repository` 保留实际执行库，新增必填 `releaseRepository` 表示发布渠道；两者不同时必须明确为受保护测试模式。逐包manifest、候选与验收证据同步记录该字段。晋级流程新增有固定选项的 `candidate_repository`，核对正式tag与测试run的同一SHA，并从原始run取得完全相同的安装字节，仍须正式main与完整真实验收。
 
 首轮测试渠道候选run43669383453成功（源码ce7d9ab0），四个平台七个安装包构建、签名与汇总通过，但使用测试密钥且源码较早。首轮原生实验run43669380178：ARM Mac成功；Linux/Windows失败；Intel Mac在第二个版本编译期间达到60分钟被取消，未进入实验，不算通过。后续实验上限增至90分钟，并保留失败构建缓存；不改变编译优化或降低验收检查。修复运行43672875113源码8834834b进行中。
+
+## 构建成功后审查发现打包器不兼容（此候选不可发布）
+
+受保护正式候选 run `43674252720` / `a986a3d03c8d1bd84214e8916d8378b314d6bc2d` 经用户批准后，四平台七包构建、签名和汇总成功。Mac ARM 的完整 artifact 经 GitHub 归档 SHA256 及 ZIP CRC 核验；DMG 摘要、1.6.2 版本/正式应用 ID、架构、新公钥内嵌、正式包不含 QA 入口及 DMG 与更新归档内 4 个文件一致性通过，更新归档已独立验签。其他候选元数据通过逐文件摘要核对；未将选择性下载元数据表述为所有平台安装包均已本机下载。
+
+进一步审阅 Windows/Linux 日志发现五种包均有 `Failed to add bundler type` 警告。锁定的 CLI 2.8.1 仍寻找旧 `.taubndl` 布局，Rust 端 tauri-utils 2.8.3 已使用 `__TAURI_BUNDLE_TYPE_VAR_UNK` 格式；CLI 2.10.1 源码支持新标记。单纯调整 strip 不能解决协议不兼容，因此保留原构建优化，将 CLI 精确固定 2.10.1 并更新 lockfile。构建与实验遇到标记警告即失败，原生实验 started 事件新增 bundleType，并要求实际运行的每个版本识别正确安装类型，禁止依赖默认 NSIS/AppImage 分支冒充全类型验收。该成功候选判定不可发布，详见 [审查记录](evidence/2026-11-15-candidate-43674252720-rejected.json)。
+
+run `43672875113` / `8834834b` 的 Linux 和 Mac ARM 各 8 场景成功，Linux 退出与同安装目录重试修复已复验；但此次没有安装类型断言，不能据此证明 DEB/RPM/MSI 选择正确。Windows 已正确选到安装包，随后因实验隔离校验失败：Windows 规范路径前缀与原始路径比较不一致，且 isolated-profile 仍可能命中旧 HOME 数据库回退。修正为规范路径比较，并仅在非隔离 Windows 版本保留旧目录兼容。原生实验须在兼容 CLI 下重新执行。正式验收记录仍不存在，未发布。
