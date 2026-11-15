@@ -11,6 +11,39 @@ use serde_json::json;
 use std::collections::HashMap;
 use tempfile::NamedTempFile;
 
+#[test]
+fn mcp_native_flags_survive_database_and_sql_roundtrip() -> Result<(), crate::error::AppError> {
+    use crate::app_config::{McpApps, McpServer};
+    let source = Database::memory()?;
+    let server = McpServer {
+        id: "synthetic".into(),
+        name: "Synthetic".into(),
+        server: json!({"command": "fixture"}),
+        apps: McpApps {
+            claude: true,
+            grokbuild: true,
+            pi: true,
+            pi_managed: true,
+            mcode: true,
+            ..Default::default()
+        },
+        description: None,
+        homepage: None,
+        docs: None,
+        tags: vec![],
+    };
+    source.save_mcp_server(&server)?;
+    assert_eq!(source.get_all_mcp_servers()?["synthetic"].apps, server.apps);
+    let dump = source.export_sql_string()?;
+    let restored = Database::memory()?;
+    restored.import_sql_string(&dump)?;
+    assert_eq!(
+        restored.get_all_mcp_servers()?["synthetic"].apps,
+        server.apps
+    );
+    Ok(())
+}
+
 const LEGACY_SCHEMA_SQL: &str = r#"
     CREATE TABLE providers (
         id TEXT NOT NULL,

@@ -10,7 +10,7 @@ import {
   useImportMcpFromApps,
 } from "@/hooks/useMcp";
 import type { McpServer } from "@/types";
-import type { AppId } from "@/lib/api/types";
+import type { WorkspaceTool } from "@/config/workspace";
 import McpFormModal from "./McpFormModal";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { Edit3, Trash2, ExternalLink } from "lucide-react";
@@ -65,6 +65,9 @@ const UnifiedMcpPanel = React.forwardRef<
       opencode: 0,
       openclaw: 0,
       hermes: 0,
+      grokbuild: 0,
+      pi: 0,
+      mcode: 0,
     };
     serverEntries.forEach(([_, server]) => {
       for (const app of MCP_APP_IDS) {
@@ -76,7 +79,7 @@ const UnifiedMcpPanel = React.forwardRef<
 
   const handleToggleApp = async (
     serverId: string,
-    app: AppId,
+    app: WorkspaceTool,
     enabled: boolean,
   ) => {
     try {
@@ -220,7 +223,7 @@ UnifiedMcpPanel.displayName = "UnifiedMcpPanel";
 interface UnifiedMcpListItemProps {
   id: string;
   server: McpServer;
-  onToggleApp: (serverId: string, app: AppId, enabled: boolean) => void;
+  onToggleApp: (serverId: string, app: WorkspaceTool, enabled: boolean) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   isLast?: boolean;

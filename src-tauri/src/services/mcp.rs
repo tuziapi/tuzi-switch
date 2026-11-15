@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use crate::app_config::{AppType, McpServer};
 use crate::error::AppError;
@@ -8,24 +9,94 @@ use crate::store::AppState;
 
 /// MCP 相关业务逻辑（v3.7.0 统一结构）
 pub struct McpService;
+static MCP_MUTATION_LOCK: Mutex<()> = Mutex::new(());
+
+fn mutation_lock() -> Result<std::sync::MutexGuard<'static, ()>, AppError> {
+    MCP_MUTATION_LOCK
+        .lock()
+        .map_err(|_| AppError::Message("MCP 操作锁不可用".into()))
+}
+
+#[cfg(all(test, not(feature = "local-preview")))]
+mod native_integration_tests {
+    use super::*;
+    use crate::app_config::McpApps;
+    use serde_json::json;
+    use std::{fs, sync::Arc};
+
+    #[test]
+    #[ignore = "changes process environment; run alone with one test thread"]
+    fn native_mcp_service_roundtrip_uses_isolated_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let pi_dir = home.join("pi");
+        let mcode_dir = home.join("mcode");
+        std::env::set_var("CC_SWITCH_TEST_HOME", home);
+        std::env::set_var("PI_CODING_AGENT_DIR", &pi_dir);
+        std::env::set_var("MINIMAX_DATA_DIR", &mcode_dir);
+        let state = AppState::new(Arc::new(crate::database::Database::memory().unwrap()));
+        let server = McpServer {
+            id: "fixture".into(),
+            name: "Fixture".into(),
+            server: json!({"type":"stdio", "command":"synthetic"}),
+            apps: McpApps {
+                grokbuild: true,
+                pi: true,
+                mcode: true,
+                ..Default::default()
+            },
+            description: None,
+            homepage: None,
+            docs: None,
+            tags: vec![],
+        };
+        McpService::upsert_server(&state, server).unwrap();
+        assert!(home.join(".grok/config.toml").exists());
+        assert!(mcode_dir.join("mcp.json").exists());
+        assert!(
+            state.db.get_all_mcp_servers().unwrap()["fixture"]
+                .apps
+                .pi_managed
+        );
+        McpService::toggle_native_app(&state, "fixture", "pi", false).unwrap();
+        let pi: serde_json::Value =
+            serde_json::from_slice(&fs::read(pi_dir.join("mcp.json")).unwrap()).unwrap();
+        assert_eq!(pi["mcpServers"]["fixture"]["enabled"], false);
+        assert!(McpService::delete_server(&state, "fixture").unwrap());
+        let pi: serde_json::Value =
+            serde_json::from_slice(&fs::read(pi_dir.join("mcp.json")).unwrap()).unwrap();
+        assert!(pi["mcpServers"].get("fixture").is_none());
+        assert!(state.db.get_all_mcp_servers().unwrap().is_empty());
+        std::env::remove_var("CC_SWITCH_TEST_HOME");
+        std::env::remove_var("PI_CODING_AGENT_DIR");
+        std::env::remove_var("MINIMAX_DATA_DIR");
+    }
+}
 
 impl McpService {
+    pub fn import_from_native_tools(state: &AppState) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
+        crate::native_mcp::import(state)
+    }
     /// 获取所有 MCP 服务器（统一结构）
     pub fn get_all_servers(state: &AppState) -> Result<IndexMap<String, McpServer>, AppError> {
         state.db.get_all_mcp_servers()
     }
 
     /// 添加或更新 MCP 服务器
-    pub fn upsert_server(state: &AppState, server: McpServer) -> Result<(), AppError> {
+    pub fn upsert_server(state: &AppState, mut server: McpServer) -> Result<(), AppError> {
+        let _guard = mutation_lock()?;
         // 读取旧状态：用于处理“编辑时取消勾选某个应用”的场景（需要从对应 live 配置中移除）
-        let prev_apps = state
-            .db
-            .get_all_mcp_servers()?
-            .get(&server.id)
+        let previous = state.db.get_all_mcp_servers()?.get(&server.id).cloned();
+        let prev_apps = previous
+            .as_ref()
             .map(|s| s.apps.clone())
             .unwrap_or_default();
+        server.apps.pi_managed = prev_apps.pi_managed || server.apps.pi;
 
-        state.db.save_mcp_server(&server)?;
+        crate::native_mcp::commit(previous.as_ref(), Some(&server), || {
+            state.db.save_mcp_server(&server)
+        })?;
 
         // 处理禁用：若旧版本启用但新版本取消，则需要从该应用的 live 配置移除
         if prev_apps.claude && !server.apps.claude {
@@ -52,10 +123,11 @@ impl McpService {
 
     /// 删除 MCP 服务器
     pub fn delete_server(state: &AppState, id: &str) -> Result<bool, AppError> {
+        let _guard = mutation_lock()?;
         let server = state.db.get_all_mcp_servers()?.shift_remove(id);
 
         if let Some(server) = server {
-            state.db.delete_mcp_server(id)?;
+            crate::native_mcp::commit(Some(&server), None, || state.db.delete_mcp_server(id))?;
 
             // 从所有应用的 live 配置中移除
             Self::remove_server_from_all_apps(state, id, &server)?;
@@ -65,6 +137,34 @@ impl McpService {
         }
     }
 
+    pub fn toggle_native_app(
+        state: &AppState,
+        server_id: &str,
+        app: &str,
+        enabled: bool,
+    ) -> Result<(), AppError> {
+        let _guard = mutation_lock()?;
+        let previous = state
+            .db
+            .get_all_mcp_servers()?
+            .shift_remove(server_id)
+            .ok_or_else(|| AppError::Message("MCP 服务器不存在".into()))?;
+        let mut next = previous.clone();
+        match app {
+            "grokbuild" => next.apps.grokbuild = enabled,
+            "pi" => next.apps.pi = enabled,
+            "mcode" => next.apps.mcode = enabled,
+            _ => return Err(AppError::Message("不支持的工具".into())),
+        }
+        next.apps.pi_managed = previous.apps.pi_managed || next.apps.pi;
+        if next.apps == previous.apps {
+            return Ok(());
+        }
+        crate::native_mcp::commit(Some(&previous), Some(&next), || {
+            state.db.save_mcp_server(&next)
+        })
+    }
+
     /// 切换指定应用的启用状态
     pub fn toggle_app(
         state: &AppState,
@@ -72,6 +172,7 @@ impl McpService {
         app: AppType,
         enabled: bool,
     ) -> Result<(), AppError> {
+        let _guard = mutation_lock()?;
         let mut servers = state.db.get_all_mcp_servers()?;
 
         if let Some(server) = servers.get_mut(server_id) {
@@ -264,6 +365,7 @@ impl McpService {
 
     /// 从 Claude 导入 MCP（v3.7.0 已更新为统一结构）
     pub fn import_from_claude(state: &AppState) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
         // 创建临时 MultiAppConfig 用于导入
         let mut temp_config = crate::app_config::MultiAppConfig::default();
 
@@ -302,6 +404,7 @@ impl McpService {
 
     /// 从 Codex 导入 MCP（v3.7.0 已更新为统一结构）
     pub fn import_from_codex(state: &AppState) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
         // 创建临时 MultiAppConfig 用于导入
         let mut temp_config = crate::app_config::MultiAppConfig::default();
 
@@ -340,6 +443,7 @@ impl McpService {
 
     /// 从 Gemini 导入 MCP（v3.7.0 已更新为统一结构）
     pub fn import_from_gemini(state: &AppState) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
         // 创建临时 MultiAppConfig 用于导入
         let mut temp_config = crate::app_config::MultiAppConfig::default();
 
@@ -378,6 +482,7 @@ impl McpService {
 
     /// 从 OpenCode 导入 MCP（v3.9.2+ 新增）
     pub fn import_from_opencode(state: &AppState) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
         // 创建临时 MultiAppConfig 用于导入
         let mut temp_config = crate::app_config::MultiAppConfig::default();
 
@@ -416,6 +521,7 @@ impl McpService {
 
     /// 从 Hermes 导入 MCP
     pub fn import_from_hermes(state: &AppState) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
         // 创建临时 MultiAppConfig 用于导入
         let mut temp_config = crate::app_config::MultiAppConfig::default();
 

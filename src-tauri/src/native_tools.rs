@@ -12,7 +12,7 @@ use std::{
 };
 use tauri::Manager;
 
-static LOCK: Mutex<()> = Mutex::new(());
+pub(crate) static LOCK: Mutex<()> = Mutex::new(());
 const MAX_BYTES: u64 = 1024 * 1024;
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -145,7 +145,7 @@ fn digest(bytes: Option<&[u8]>) -> String {
         .map(|v| format!("{:x}", Sha256::digest(v)))
         .unwrap_or_else(|| "missing".into())
 }
-fn read_bytes(path: &Path) -> Result<Option<Vec<u8>>, String> {
+pub(crate) fn read_bytes(path: &Path) -> Result<Option<Vec<u8>>, String> {
     match fs::symlink_metadata(path) {
         Ok(meta) => {
             if !meta.is_file() || meta.len() > MAX_BYTES {
@@ -552,13 +552,13 @@ fn apply_transaction(
         can_restore: true,
     })
 }
-struct FileLock(PathBuf);
+pub(crate) struct FileLock(PathBuf);
 impl Drop for FileLock {
     fn drop(&mut self) {
         let _ = fs::remove_dir(&self.0);
     }
 }
-fn file_lock(path: &Path) -> Result<FileLock, String> {
+pub(crate) fn file_lock(path: &Path) -> Result<FileLock, String> {
     let parent = path.parent().ok_or("Invalid path")?;
     if !parent.exists() {
         fs::create_dir_all(parent).map_err(|_| "Cannot create tool directory")?;

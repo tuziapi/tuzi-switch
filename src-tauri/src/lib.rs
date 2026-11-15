@@ -24,6 +24,7 @@ mod lightweight;
 mod linux_fix;
 mod mcp;
 mod native_tools;
+mod native_mcp;
 mod openclaw_config;
 mod opencode_config;
 mod panic_hook;

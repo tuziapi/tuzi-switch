@@ -1,5 +1,7 @@
 # 账户中心与工具管理开发基线
 
+2026-11-01 UC-D02：按用户当前兔子助手截图修订[统一客户端设计稿 v0.2](opentu-unified-client-design.md)与[界面设计](opentu-unified-client-ui.md)。保留原侧栏、账户及十工具直达，只新增 opentu 创作入口，撤回 v0.1 五分类导航建议。设计待审阅，尚未编码，不替代下方现行业务基线或代表发布授权。
+
 2026-10-27 UI-11：五个实际 CLI 已在隔离配置和本机合成上游进行兼容验证，桌面预览包已重新构建；真实服务及用户验收待完成，见 [UI-11记录](ui11-cli-compatibility.md)。
 
 2026-10-27 UI-10：账户 Key 已本地接入 Grok Build、Pi、MiniMax Code 配置；真实工具联调和用户验收待完成，见 [UI-10记录](ui10-native-account-tools.md)。

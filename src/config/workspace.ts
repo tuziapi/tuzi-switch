@@ -28,7 +28,7 @@ export const WORKSPACE_TOOL_NAMES: Record<WorkspaceTool, string> = {
 };
 export const WORKSPACE_SUPPORT: Record<
   "mcp" | "skills" | "prompts" | "sessions" | "agents",
-  AppId[]
+  WorkspaceTool[]
 > = {
   mcp: MCP_APP_IDS,
   agents: ["claude", "opencode"],

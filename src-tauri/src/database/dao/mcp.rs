@@ -6,14 +6,32 @@ use crate::app_config::{McpApps, McpServer};
 use crate::database::{lock_conn, Database};
 use crate::error::AppError;
 use indexmap::IndexMap;
-use rusqlite::params;
+use rusqlite::{params, Connection};
+
+fn save_server(conn: &Connection, server: &McpServer) -> Result<(), AppError> {
+    conn.execute(
+        "INSERT OR REPLACE INTO mcp_servers (
+            id, name, server_config, description, homepage, docs, tags,
+            enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+        params![
+            server.id, server.name,
+            serde_json::to_string(&server.server).map_err(|e| AppError::Database(format!("Failed to serialize server config: {e}")))?,
+            server.description, server.homepage, server.docs,
+            serde_json::to_string(&server.tags).map_err(|e| AppError::Database(format!("Failed to serialize tags: {e}")))?,
+            server.apps.claude, server.apps.codex, server.apps.gemini, server.apps.opencode,
+            server.apps.hermes, server.apps.grokbuild, server.apps.pi, server.apps.mcode, server.apps.pi_managed,
+        ],
+    ).map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
+}
 
 impl Database {
     /// 获取所有 MCP 服务器
     pub fn get_all_mcp_servers(&self) -> Result<IndexMap<String, McpServer>, AppError> {
         let conn = lock_conn!(self.conn);
         let mut stmt = conn.prepare(
-            "SELECT id, name, server_config, description, homepage, docs, tags, enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes
+            "SELECT id, name, server_config, description, homepage, docs, tags, enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed
              FROM mcp_servers
              ORDER BY name ASC, id ASC"
         ).map_err(|e| AppError::Database(e.to_string()))?;
@@ -48,6 +66,10 @@ impl Database {
                             gemini: enabled_gemini,
                             opencode: enabled_opencode,
                             hermes: enabled_hermes,
+                            grokbuild: row.get(12)?,
+                            pi: row.get(13)?,
+                            mcode: row.get(14)?,
+                            pi_managed: row.get(15)?,
                         },
                         description,
                         homepage,
@@ -69,31 +91,18 @@ impl Database {
     /// 保存 MCP 服务器
     pub fn save_mcp_server(&self, server: &McpServer) -> Result<(), AppError> {
         let conn = lock_conn!(self.conn);
-        conn.execute(
-            "INSERT OR REPLACE INTO mcp_servers (
-                id, name, server_config, description, homepage, docs, tags,
-                enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            params![
-                server.id,
-                server.name,
-                serde_json::to_string(&server.server).map_err(|e| AppError::Database(format!(
-                    "Failed to serialize server config: {e}"
-                )))?,
-                server.description,
-                server.homepage,
-                server.docs,
-                serde_json::to_string(&server.tags)
-                    .map_err(|e| AppError::Database(format!("Failed to serialize tags: {e}")))?,
-                server.apps.claude,
-                server.apps.codex,
-                server.apps.gemini,
-                server.apps.opencode,
-                server.apps.hermes,
-            ],
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
-        Ok(())
+        save_server(&conn, server)
+    }
+
+    pub(crate) fn save_mcp_servers_atomic(&self, servers: &[McpServer]) -> Result<(), AppError> {
+        let mut conn = lock_conn!(self.conn);
+        let tx = conn
+            .transaction()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        for server in servers {
+            save_server(&tx, server)?;
+        }
+        tx.commit().map_err(|e| AppError::Database(e.to_string()))
     }
 
     /// 删除 MCP 服务器

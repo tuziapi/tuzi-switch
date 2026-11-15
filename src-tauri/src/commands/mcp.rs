@@ -190,6 +190,10 @@ pub async fn toggle_mcp_app(
     app: String,
     enabled: bool,
 ) -> Result<(), String> {
+    if matches!(app.as_str(), "grokbuild" | "pi" | "mcode") {
+        return McpService::toggle_native_app(&state, &server_id, &app, enabled)
+            .map_err(|e| e.to_string());
+    }
     let app_ty = AppType::from_str(&app).map_err(|e| e.to_string())?;
     McpService::toggle_app(&state, &server_id, app_ty, enabled).map_err(|e| e.to_string())
 }
@@ -198,10 +202,26 @@ pub async fn toggle_mcp_app(
 #[tauri::command]
 pub async fn import_mcp_from_apps(state: State<'_, AppState>) -> Result<usize, String> {
     let mut total = 0;
-    total += McpService::import_from_claude(&state).unwrap_or(0);
-    total += McpService::import_from_codex(&state).unwrap_or(0);
-    total += McpService::import_from_gemini(&state).unwrap_or(0);
-    total += McpService::import_from_opencode(&state).unwrap_or(0);
-    total += McpService::import_from_hermes(&state).unwrap_or(0);
-    Ok(total)
+    let mut errors = Vec::new();
+    for (name, result) in [
+        ("Claude", McpService::import_from_claude(&state)),
+        ("Codex", McpService::import_from_codex(&state)),
+        ("Gemini", McpService::import_from_gemini(&state)),
+        ("OpenCode", McpService::import_from_opencode(&state)),
+        ("Hermes", McpService::import_from_hermes(&state)),
+        ("新工具", McpService::import_from_native_tools(&state)),
+    ] {
+        match result {
+            Ok(count) => total += count,
+            Err(error) => errors.push(format!("{name}: {error}")),
+        }
+    }
+    if errors.is_empty() {
+        Ok(total)
+    } else {
+        Err(format!(
+            "部分导入已完成（其他来源新增 {total} 项）；{}",
+            errors.join("; ")
+        ))
+    }
 }

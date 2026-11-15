@@ -48,6 +48,15 @@ import "@/index.css";
 import "@/components/shell/workspace-pages.css";
 void i18n.changeLanguage("zh");
 const params = new URLSearchParams(location.search);
+const mcpFixture = {
+  fixture: {
+    id: "fixture",
+    name: "合成 MCP 服务",
+    server: { type: "stdio", command: "fixture" },
+    apps: { claude: true, codex: false, gemini: false, opencode: false, hermes: false, grokbuild: true, pi: true, mcode: true },
+    tags: [],
+  },
+};
 const client = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
@@ -144,11 +153,13 @@ mockIPC(
       return next;
     }
     if (command === "get_settings") return { commonConfigConfirmed: true };
-    if (
-      ["get_mcp_servers", "get_prompts", "get_universal_providers"].includes(
-        command,
-      )
-    )
+    if (command === "get_mcp_servers") return params.get("scenario") === "mcp" ? mcpFixture : {};
+    if (command === "toggle_mcp_app" && params.get("scenario") === "mcp") {
+      const { app, enabled } = args as { app: keyof typeof mcpFixture.fixture.apps; enabled: boolean };
+      mcpFixture.fixture.apps[app] = enabled;
+      return;
+    }
+    if (["get_prompts", "get_universal_providers"].includes(command))
       return {};
     if (
       [
