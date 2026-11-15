@@ -27,7 +27,7 @@ assert os.environ.get('GITHUB_REPOSITORY') == 'AiW520/tuzi-switch'
 assert os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted'
 base_dir, target_dir, output = map(Path, sys.argv[1:4])
 installer = sys.argv[4] if len(sys.argv) > 4 else 'deb'
-assert installer in ['deb', 'appimage']
+assert installer in ['deb', 'appimage', 'rpm']
 base = json.loads((base_dir / 'candidate.json').read_text())
 target = json.loads((target_dir / 'candidate.json').read_text())
 assert (base['runId'], base['commit'], base['tag']) == ('43699923173', '5bfee5f39b0b370093081227c6e19883f21280a0', 'v1.6.2')
@@ -43,8 +43,8 @@ username = 'tuziupgrade'
 uid = int(subprocess.check_output(['id', '-u', username]))
 gid = int(subprocess.check_output(['id', '-g', username]))
 assert not (Path('/home') / username / '.tuzi-switch').exists(), 'Fresh disposable user required'
-executable = Path('/usr/bin/tu-zi-switch') if installer == 'deb' else lab/'installed'/'Tuzi.AppImage'
-asset = 'tuzi-assistant-linux-x64.' + ('deb' if installer == 'deb' else 'AppImage')
+executable = lab/'installed'/'Tuzi.AppImage' if installer == 'appimage' else Path('/usr/bin/tu-zi-switch')
+asset = 'tuzi-assistant-linux-x64.' + ('AppImage' if installer == 'appimage' else installer)
 if installer == 'appimage':
     executable.parent.mkdir()
     shutil.copyfile(base_dir/asset, executable)
@@ -59,7 +59,8 @@ mode = 'normal'
 server = driver = session = None
 hosts = Path('/etc/hosts')
 original_hosts = hosts.read_bytes()
-trust = Path('/usr/local/share/ca-certificates/tuzi-signed-upgrade.crt')
+trust = Path('/etc/pki/ca-trust/source/anchors/tuzi-signed-upgrade.crt') if installer == 'rpm' else Path('/usr/local/share/ca-certificates/tuzi-signed-upgrade.crt')
+refresh_trust = ['update-ca-trust', 'extract'] if installer == 'rpm' else ['update-ca-certificates']
 sudoers = Path('/etc/sudoers.d/tuzi-signed-upgrade')
 assert not trust.exists() and not sudoers.exists()
 
@@ -77,7 +78,7 @@ def application_processes():
             if proc.stat().st_uid != uid:
                 continue
             process_exe = str((proc/'exe').readlink()).removesuffix(' (deleted)')
-            if installer == 'deb' and process_exe == str(executable):
+            if installer != 'appimage' and process_exe == str(executable):
                 found.append(int(proc.name))
             elif installer == 'appimage' and Path(process_exe).name == 'tu-zi-switch':
                 process_environment = (proc/'environ').read_bytes().split(b'\0')
@@ -162,7 +163,8 @@ def screenshot(name):
     pids = application_processes()
     assert len(pids) == 1
     environment = dict(v.split(b'=', 1) for v in Path('/proc/' + str(pids[0]) + '/environ').read_bytes().split(b'\0') if b'=' in v)
-    capture_env = {key: environment[key.encode()].decode() for key in ['DISPLAY', 'XAUTHORITY']}
+    capture_env = {key: environment[key.encode()].decode() for key in ['DISPLAY', 'XAUTHORITY'] if key.encode() in environment}
+    assert 'DISPLAY' in capture_env
     subprocess.run(['/usr/bin/import', '-window', 'root', str(output / (name + '.png'))],
                    env={'PATH': '/usr/bin:/bin', **capture_env}, check=True, timeout=20)
 
@@ -239,7 +241,7 @@ try:
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     (lab/'ca.key').chmod(0o600)
     (lab/'tls.key').chmod(0o600)
-    subprocess.run(['update-ca-certificates'], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(refresh_trust, check=True, stdout=subprocess.DEVNULL)
     hosts.write_bytes(original_hosts + b'\n127.0.0.1 github.com api.github.com\n')
     server = ThreadingHTTPServer(('127.0.0.1', 443), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -252,9 +254,20 @@ try:
     if installer == 'appimage':
         app_env.append('APPIMAGE_EXTRACT_AND_RUN=1')
     log = (output/'driver.log').open('w')
+    driver_binary = shutil.which('WebKitWebDriver')
+    if not driver_binary:
+        matches = list(Path('/usr/libexec').rglob('WebKitWebDriver'))
+        assert len(matches) == 1, 'Exactly one installed WebKit driver is required'
+        driver_binary = str(matches[0])
+    display_command = ['xvfb-run', '-a', 'dbus-run-session', '--', driver_binary, '--port=4444']
+    if installer == 'rpm':
+        subprocess.Popen(['sudo', '-H', '-u', username, 'Xvfb', ':99', '-screen', '0', '1280x900x24', '-nolisten', 'tcp', '-ac'], stdout=log, stderr=log)
+        wait_for(lambda: Path('/tmp/.X11-unix/X99').exists(), 'Disposable Fedora display did not start')
+        app_env.append('DISPLAY=:99')
+        display_command = ['dbus-run-session', '--', driver_binary, '--port=4444']
     driver = subprocess.Popen(['sudo', '-H', '-u', username, 'env', '-i', 'HOME=/home/' + username,
                               'USER=' + username, 'PATH=/usr/bin:/bin', *app_env,
-                              'xvfb-run', '-a', 'dbus-run-session', '--', 'WebKitWebDriver', '--port=4444'],
+                              *display_command],
                              stdin=subprocess.DEVNULL, stdout=log, stderr=log)
     wait_for(lambda: request('GET', '/status'), 'WebKitWebDriver not listening')
     attach()
@@ -295,7 +308,7 @@ localStorage.setItem('SYNTHETIC-SIGNED-LINUX','preserve-me');done(true)},e=>done
     wait_for(lambda: buttons(['重新下载']), 'Expected package-manager permission failure', 60)
     assert digest_executable() == before_hash
     identity('1.6.2', base['commit'])
-    if installer == 'deb':
+    if installer != 'appimage':
         permission_diagnostics = (output/'driver.log').read_text(errors='replace')
         denial = re.findall(r'[^\n]*(?:not in the sudoers|a password is required|a terminal is required|no tty present|No authentication agent)[^\n]*', permission_diagnostics, flags=re.IGNORECASE)
         assert denial, 'Installation rejection must include actual OS authorization diagnostics'
@@ -305,8 +318,9 @@ localStorage.setItem('SYNTHETIC-SIGNED-LINUX','preserve-me');done(true)},e=>done
     report['checks']['validPackageInstallPermissionDenied'] = 'passed'
     screenshot('04-install-permission-denied')
     # Grant only the real updater dpkg command on this disposable user/VM, then retry.
-    if installer == 'deb':
-        sudoers.write_text(username + ' ALL=(root) NOPASSWD: /usr/bin/dpkg -i /tmp/tauri_rpm_update*/package.rpm\n')
+    if installer != 'appimage':
+        package_command = '/usr/bin/rpm -U' if installer == 'rpm' else '/usr/bin/dpkg -i'
+        sudoers.write_text(username + ' ALL=(root) NOPASSWD: ' + package_command + ' /tmp/tauri_rpm_update*/package.rpm\n')
         sudoers.chmod(0o440)
         subprocess.run(['visudo', '-cf', str(sudoers)], check=True, stdout=subprocess.DEVNULL)
     else:
@@ -359,6 +373,9 @@ finally:
         report['installedPackageOwner'] = package_owner
         if package_owner:
             report['finalPackageVersion'] = subprocess.run(['dpkg-query', '-W', '-f=${Version}', package_owner.split(': ')[0]], capture_output=True, text=True).stdout
+    elif installer == 'rpm':
+        report['installedPackageOwner'] = subprocess.run(['rpm', '-qf', str(executable)], capture_output=True, text=True).stdout.strip()
+        report['finalPackageVersion'] = subprocess.run(['rpm', '-qf', str(executable), '--qf', '%{VERSION}'], capture_output=True, text=True).stdout
     if server:
         server.shutdown()
         server.server_close()
@@ -372,5 +389,5 @@ finally:
     hosts.write_bytes(original_hosts)
     trust.unlink(missing_ok=True)
     sudoers.unlink(missing_ok=True)
-    subprocess.run(['update-ca-certificates'], stdout=subprocess.DEVNULL, check=False)
+    subprocess.run(refresh_trust, stdout=subprocess.DEVNULL, check=False)
     (output/'results.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')

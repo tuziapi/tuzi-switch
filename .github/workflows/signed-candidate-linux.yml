@@ -38,36 +38,7 @@ jobs:
         run: |
           gh api repos/AiW520/tuzi-switch/actions/runs/43699923173 > "$RUNNER_TEMP/base-run.json"
           gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          import path from 'node:path';
-          import assert from 'node:assert/strict';
-          import {createHash} from 'node:crypto';
-          import {verifySignature} from './scripts/updater-assets.mjs';
-          const key=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).plugins.updater.pubkey;
-          for(const [folder,runFile,id,sha,version] of [
-            ['signed-base','base-run.json','43699923173','5bfee5f39b0b370093081227c6e19883f21280a0','1.6.2'],
-            ['signed-target','target-run.json','43689683759','695f4e933d797b39f7a61aad7804800a01eddc96','1.6.3'],
-          ]) {
-            const dir=path.join(process.env.RUNNER_TEMP,folder);
-            const c=JSON.parse(fs.readFileSync(path.join(dir,'candidate.json')));
-            const r=JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP,runFile)));
-            assert.equal(r.conclusion,'success'); assert.equal(r.head_sha,c.commit);
-            assert.equal(r.path,'.github/workflows/unified-release.yml');
-            assert.equal(c.commit,sha);
-            assert.equal(c.repository,'AiW520/tuzi-switch'); assert.equal(c.releaseRepository,'tuziapi/tuzi-switch');
-            assert.equal(c.runId,id); assert.equal(c.tag,'v'+version);
-            assert.equal(createHash('sha256').update(key.trim()).digest('hex'),c.publicKeySha256);
-            for(const [name,digest] of Object.entries(c.files)) {
-              assert.equal(path.basename(name),name);
-              assert.equal(createHash('sha256').update(fs.readFileSync(path.join(dir,name))).digest('hex'),digest);
-            }
-            for(const extension of ['deb','AppImage']) {
-              const file=path.join(dir,'tuzi-assistant-linux-x64.'+extension);
-              verifySignature(fs.readFileSync(file),fs.readFileSync(file+'.sig','utf8'),key);
-            }
-          }
-          JS
+          node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP"
       - name: Install candidate and create offline disposable desktop user
         run: |
           sudo apt-get -o Acquire::Retries=3 update
@@ -133,4 +104,55 @@ jobs:
             /tmp/tuzi-signed-linux-upgrade/evidence/results.json
             /tmp/tuzi-signed-linux-upgrade/evidence/driver.log
             /tmp/tuzi-signed-linux-upgrade/evidence/*.png
+          if-no-files-found: warn
+  installed-rpm:
+    if: github.repository == 'AiW520/tuzi-switch'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          path: ${{ runner.temp }}/signed-base
+          repository: AiW520/tuzi-switch
+          run-id: 43699923173
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          path: ${{ runner.temp }}/signed-target
+          repository: AiW520/tuzi-switch
+          run-id: 43689683759
+          github-token: ${{ github.token }}
+      - name: Verify exact approved candidate pair and signatures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/AiW520/tuzi-switch/actions/runs/43699923173 > "$RUNNER_TEMP/base-run.json"
+          gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
+          node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP"
+      - name: Exercise unchanged RPM in offline disposable Fedora user
+        run: |
+          mkdir "$RUNNER_TEMP/signed-rpm"
+          docker run --rm --init --cap-add NET_ADMIN \
+            -v "$GITHUB_WORKSPACE:/work:ro" \
+            -v "$RUNNER_TEMP/signed-base:/base:ro" \
+            -v "$RUNNER_TEMP/signed-target:/target:ro" \
+            -v "$RUNNER_TEMP/signed-rpm:/lab" -w /work \
+            -e GITHUB_ACTIONS=true -e GITHUB_REPOSITORY=AiW520/tuzi-switch \
+            -e RUNNER_ENVIRONMENT=github-hosted \
+            fedora:43 bash scripts/signed-rpm-container.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signed-installed-linux-rpm
+          path: |
+            ${{ runner.temp }}/signed-rpm/evidence/results.json
+            ${{ runner.temp }}/signed-rpm/evidence/driver.log
+            ${{ runner.temp }}/signed-rpm/evidence/runtime-os-release.txt
+            ${{ runner.temp }}/signed-rpm/evidence/*.png
           if-no-files-found: warn

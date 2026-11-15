@@ -2,7 +2,6 @@
 
 This probes the installed WebKit UI/IPC control path, not upgrade acceptance.
 """
-import base64
 import json
 import os
 from pathlib import Path
@@ -79,7 +78,9 @@ Promise.all([
         assert identity['build']['channel'] == 'stable'
         assert identity['build']['commit'] == report['candidateCommit']
         report['ui'] = request('POST', prefix + '/execute/sync', {'script': 'return document.body.innerText', 'args': []})
-        (root / 'installed.png').write_bytes(base64.b64decode(request('GET', prefix + '/screenshot')))
+        # Capture the actual X display; WebKit's screenshot endpoint can stall
+        # even while the installed app's DOM and native IPC remain responsive.
+        subprocess.run(['import', '-window', 'root', str(root/'installed.png')], check=True, timeout=20)
         report['status'] = 'passed'
     except Exception as error:
         report['status'] = 'failed'
