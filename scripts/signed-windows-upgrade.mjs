@@ -107,7 +107,7 @@ $cert.Thumbprint | Set-Content (Join-Path $root 'tls-thumbprint.txt')
 $password=ConvertTo-SecureString 'SYNTHETIC-LAB-ONLY' -AsPlainText -Force
 Export-PfxCertificate -Cert $cert -FilePath (Join-Path $root 'synthetic-tls.pfx') -Password $password | Out-Null
 Export-Certificate -Cert $cert -FilePath (Join-Path $root 'synthetic-tls.cer') | Out-Null
-Import-Certificate -FilePath (Join-Path $root 'synthetic-tls.cer') -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+Import-Certificate -FilePath (Join-Path $root 'synthetic-tls.cer') -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
 [Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS','--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1','User')
 Add-Content -Path $hosts -Value @('','127.0.0.1 github.com api.github.com')
 Clear-DnsClientCache
@@ -215,7 +215,7 @@ if (Test-Path (Join-Path $root 'webview-env.original')) {
 Get-NetFirewallRule -DisplayName 'SYNTHETIC Tuzi signed updater lab' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 if (Test-Path (Join-Path $root 'tls-thumbprint.txt')) {
  $thumb=(Get-Content (Join-Path $root 'tls-thumbprint.txt') -Raw).Trim()
- Remove-Item "Cert:\CurrentUser\My\$thumb","Cert:\CurrentUser\Root\$thumb" -Force -ErrorAction SilentlyContinue
+ Remove-Item "Cert:\CurrentUser\My\$thumb","Cert:\LocalMachine\Root\$thumb" -Force -ErrorAction SilentlyContinue
 }
 `);
   } catch (error) {

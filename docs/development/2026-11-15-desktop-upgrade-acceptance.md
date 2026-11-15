@@ -213,3 +213,5 @@ signed_candidate_windows_only新增布尔输入，默认false。只在测试仓�
 脚本只产出real-installed-app-subset且officialAcceptance=false；尚不覆盖旧正式版手动过渡、有效安装包系统安装失败、完整创作项目迁移、经营归因或全平台审阅。语法、Python编译、shell语法、actionlint与diff检查通过；Windows实际结果待运行。无新增应用持久化字段，无发布。
 
 Windows原字节首跑43691893665：两候选完整归档摘要、文件摘要及正式签名检查通过，但初始化合成TLS环境时旧powershell.exe未加载Cert驱动，安装尚未开始。改用与workflow一致的pwsh并显式加载Microsoft.PowerShell.Security，避免PowerShell 7→Node→Windows PowerShell 5.1继承PSModulePath的模块混用。该失败不算安装升级通过，不修改或重签候选。
+
+复跑43692079099已解决Cert驱动加载，继续发现CurrentUser Root导入会要求交互信任UI，在非交互runner返回“UI is not allowed”。仅在受限一次性runner中改用LocalMachine Root，并同步精确thumbprint清理；未降低应用TLS验证、未修改候选。仍未开始安装，保留失败run。
