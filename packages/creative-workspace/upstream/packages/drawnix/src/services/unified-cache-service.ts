@@ -332,6 +332,7 @@ function blobToDataURL(blob: Blob): Promise<string> {
  * 单例模式，协调 Service Worker 和 IndexedDB
  */
 class UnifiedCacheService {
+  private readonly imageReadInflight = new Map<string, Promise<Blob | null>>();
   private db: IDBDatabase | null = null;
   private dbPromise: Promise<IDBDatabase> | null = null;
   private migrationPromise: Promise<void> | null = null;
@@ -2274,16 +2275,50 @@ class UnifiedCacheService {
   async getCachedImageBlobWithThumbnailFallback(
     url: string
   ): Promise<Blob | null> {
+    const key = `full:${url}`;
+    const inflight = this.imageReadInflight.get(key);
+    if (inflight) return inflight;
+    const read = this.readCachedImageBlobWithThumbnailFallback(url);
+    this.imageReadInflight.set(key, read);
+    try {
+      return await read;
+    } finally {
+      if (this.imageReadInflight.get(key) === read) {
+        this.imageReadInflight.delete(key);
+      }
+    }
+  }
+
+  /** Read only an existing thumbnail for a fast canvas preview. */
+  async getCachedImageThumbnailBlob(url: string): Promise<Blob | null> {
+    const key = `thumb:${url}`;
+    const inflight = this.imageReadInflight.get(key);
+    if (inflight) return inflight;
+    const read = this.readCachedImageThumbnailBlob(url);
+    this.imageReadInflight.set(key, read);
+    try {
+      return await read;
+    } finally {
+      if (this.imageReadInflight.get(key) === read) {
+        this.imageReadInflight.delete(key);
+      }
+    }
+  }
+
+  private async readCachedImageBlobWithThumbnailFallback(
+    url: string
+  ): Promise<Blob | null> {
     // 预览回退只读取已有本地内容，避免任务列表挂载时重复下载远程资源。
     const originalBlob = await this.getCachedBlob(url, { allowNetwork: false });
     if (originalBlob && originalBlob.size > 0) {
       return originalBlob;
     }
 
-    if (typeof caches === 'undefined') {
-      return null;
-    }
+    return this.readCachedImageThumbnailBlob(url);
+  }
 
+  private async readCachedImageThumbnailBlob(url: string): Promise<Blob | null> {
+    if (typeof caches === 'undefined') return null;
     try {
       const cacheUrl = isVirtualMediaUrl(url)
         ? normalizeVirtualMediaUrl(url)
@@ -2291,16 +2326,13 @@ class UnifiedCacheService {
       const normalizedUrl = this.normalizeRemoteCacheUrl(cacheUrl);
       const thumbCache = await caches.open(IMAGE_THUMB_CACHE_NAME);
       const candidates = new Set<string>();
-
       for (const baseUrl of [normalizedUrl, cacheUrl, url]) {
         if (!baseUrl) continue;
         for (const size of ['large', 'small'] as const) {
           try {
             const thumbnailUrl = new URL(
               baseUrl,
-              typeof window !== 'undefined'
-                ? window.location.origin
-                : 'http://aitu.local'
+              typeof window !== 'undefined' ? window.location.origin : 'http://aitu.local'
             );
             thumbnailUrl.searchParams.delete('thumbnail');
             thumbnailUrl.searchParams.set('_thumb', size);
@@ -2312,22 +2344,15 @@ class UnifiedCacheService {
           }
         }
       }
-
       for (const candidate of candidates) {
         const response = await thumbCache.match(candidate);
         if (!response) continue;
         const blob = await response.blob();
-        if (blob.size > 0) {
-          return blob;
-        }
+        if (blob.size > 0) return blob;
       }
     } catch (error) {
-      console.warn(
-        '[UnifiedCache] Failed to read image thumbnail fallback:',
-        error
-      );
+      console.warn('[UnifiedCache] Failed to read image thumbnail:', error);
     }
-
     return null;
   }
 

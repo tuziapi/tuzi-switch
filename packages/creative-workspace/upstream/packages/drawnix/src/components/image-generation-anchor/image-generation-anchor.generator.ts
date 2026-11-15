@@ -146,6 +146,13 @@ export class ImageGenerationAnchorGenerator {
 
     const rect = RectangleClient.getRectangleByPoints(element.points);
     const isFailed = element.phase === 'failed';
+    host.style.setProperty('--failure-surface', '#fff8f4');
+    host.style.setProperty('--failure-border', '#ebc6b9');
+    host.style.setProperty('--failure-muted', '#8a756b');
+    host.style.setProperty('--failure-text', '#4a3b34');
+    host.style.setProperty('--failure-danger', '#a74739');
+    host.style.setProperty('--failure-action', '#c77b1c');
+    host.style.setProperty('--failure-action-text', '#fffaf0');
     const layout = [
       element.id, rect.x, rect.y, rect.width, rect.height, element.phase, element.batchIndex,
       element.batchTotal || element.requestedCount || element.taskIds.length || 1,
@@ -183,7 +190,7 @@ export class ImageGenerationAnchorGenerator {
       const height = Math.max(rect.height, getNativeFailureLayout(rows, width).height + 60);
       host.setAttribute('aria-label', '生成失败');
       const background = createSvgElement('rect');
-      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 14, fill: 'var(--failure-surface, #ffffff)', stroke: 'var(--failure-border, #dde2e5)' })) background.setAttribute(key, String(value));
+      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 18, fill: 'var(--failure-surface, #fff8f4)', stroke: 'var(--failure-border, #ebc6b9)' })) background.setAttribute(key, String(value));
       host.appendChild(background);
       const content = createNativeFailureDetails(rows, width);
       content.setAttribute('transform', `translate(${rect.x} ${rect.y + 12})`);
@@ -201,13 +208,13 @@ export class ImageGenerationAnchorGenerator {
     this.onSizeChange?.({ width: rect.width, height: rect.height });
     const isCompleted = element.phase === 'completed';
     const isLoadingImage = element.phase === 'developing' || element.phase === 'inserting';
-    const accent = isFailed ? '#c15a5a' : '#25755e';
+    const accent = isFailed ? '#b45543' : '#d99119';
     const background = isFailed
-      ? '#fffafa'
+      ? '#fff8f4'
       : isCompleted
-      ? '#f8fcfa'
-      : '#fcfdfc';
-    const border = isFailed ? '#e5caca' : isCompleted ? '#c9dfd4' : '#dfe4e9';
+      ? '#fffdf4'
+      : '#fff6dc';
+    const border = isFailed ? '#ebc6b9' : isCompleted ? '#efd99d' : '#f0c56d';
     const minDimension = Math.min(rect.width, rect.height);
     const compact = rect.width < 220 || rect.height < 190;
     const titleSize = compact ? 14 : 18;
@@ -233,7 +240,31 @@ export class ImageGenerationAnchorGenerator {
     backgroundRect.setAttribute('width', String(rect.width));
     backgroundRect.setAttribute('height', String(rect.height));
     backgroundRect.setAttribute('rx', String(Math.min(18, minDimension / 8)));
-    backgroundRect.setAttribute('fill', background);
+    if (!isFailed) {
+      const defs = createSvgElement('defs');
+      const gradientId = `generation-anchor-warm-${encodeURIComponent(element.id)}`;
+      const gradient = createSvgElement('linearGradient');
+      gradient.setAttribute('id', gradientId);
+      gradient.setAttribute('x1', '0');
+      gradient.setAttribute('y1', '0');
+      gradient.setAttribute('x2', '1');
+      gradient.setAttribute('y2', '1');
+      const first = createSvgElement('stop');
+      first.setAttribute('offset', '0');
+      first.setAttribute('stop-color', '#fffdf4');
+      const second = createSvgElement('stop');
+      second.setAttribute('offset', '0.58');
+      second.setAttribute('stop-color', '#fff6dc');
+      const third = createSvgElement('stop');
+      third.setAttribute('offset', '1');
+      third.setAttribute('stop-color', '#ffe8ad');
+      gradient.append(first, second, third);
+      defs.appendChild(gradient);
+      host.appendChild(defs);
+      backgroundRect.setAttribute('fill', `url(#${gradientId})`);
+    } else {
+      backgroundRect.setAttribute('fill', background);
+    }
     backgroundRect.setAttribute('stroke', border);
     backgroundRect.setAttribute('stroke-width', '1');
     host.appendChild(backgroundRect);
@@ -252,7 +283,7 @@ export class ImageGenerationAnchorGenerator {
       dot.setAttribute('cx', '1');
       dot.setAttribute('cy', '1');
       dot.setAttribute('r', '0.65');
-      dot.setAttribute('fill', '#d5ddd8');
+      dot.setAttribute('fill', '#d7bf84');
       pattern.appendChild(dot);
       defs.appendChild(pattern);
       host.appendChild(defs);
@@ -282,7 +313,7 @@ export class ImageGenerationAnchorGenerator {
           `M ${right} ${bottom - 14} V ${bottom} H ${right - 14}`
       );
       corners.setAttribute('fill', 'none');
-      corners.setAttribute('stroke', '#b7c8bd');
+      corners.setAttribute('stroke', '#d8b96e');
       corners.setAttribute('stroke-width', '1.2');
       corners.style.pointerEvents = 'none';
       host.appendChild(corners);

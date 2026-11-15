@@ -11,6 +11,7 @@ vi.mock('../../services/ppt', () => ({ getImageRegion: vi.fn() }));
 vi.mock('../../services/unified-cache-service', () => ({
   unifiedCacheService: {
     getCachedImageBlobWithThumbnailFallback: vi.fn(),
+    getCachedImageThumbnailBlob: vi.fn(),
     getCachedBlob: vi.fn(async () => null),
   },
 }));
@@ -25,12 +26,14 @@ const props = {
 
 describe('canvas image automatic loading', () => {
   const readCache = vi.mocked(unifiedCacheService.getCachedImageBlobWithThumbnailFallback);
+  const readThumbnail = vi.mocked(unifiedCacheService.getCachedImageThumbnailBlob);
   const observe = vi.fn();
   const revokeObjectURL = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     readCache.mockReset().mockResolvedValue(null);
+    readThumbnail.mockReset().mockResolvedValue(null);
     vi.stubGlobal('IntersectionObserver', class {
       observe = observe;
       disconnect = vi.fn();
@@ -60,6 +63,27 @@ describe('canvas image automatic loading', () => {
     expect(observe).not.toHaveBeenCalled();
     unmount();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:cached-image');
+  });
+
+  it('shows a cached thumbnail before the original and only marks the original ready', async () => {
+    readThumbnail.mockResolvedValue(new Blob(['thumb'], { type: 'image/png' }));
+    let resolveFull!: (value: Blob) => void;
+    readCache.mockReturnValue(new Promise((resolve) => { resolveFull = resolve; }));
+    let objectUrl = 0;
+    vi.stubGlobal('URL', class extends URL {
+      static createObjectURL = vi.fn(() => `blob:cached-${++objectUrl}`);
+      static revokeObjectURL = revokeObjectURL;
+    });
+    render(<CanvasImage {...props} />);
+    await waitFor(() => expect(document.querySelector('img')?.getAttribute('src')).toBe('blob:cached-1'));
+    fireEvent.load(screen.getByRole('presentation'));
+    expect(isCanvasImageReady(props.board, 'a', props.imageItem.url)).toBe(false);
+    resolveFull(new Blob(['full'], { type: 'image/png' }));
+    await waitFor(() => expect(document.querySelector('img')?.getAttribute('src')).toBe('blob:cached-2'));
+    fireEvent.load(screen.getByRole('presentation'));
+    expect(isCanvasImageReady(props.board, 'a', props.imageItem.url)).toBe(true);
+    expect(readThumbnail).toHaveBeenCalledWith(props.imageItem.url);
+    expect(readCache).toHaveBeenCalledWith(props.imageItem.url);
   });
 
   it('uses the original signed URL immediately when no cached image exists', async () => {

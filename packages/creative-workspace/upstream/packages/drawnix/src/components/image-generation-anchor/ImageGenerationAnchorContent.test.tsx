@@ -327,7 +327,7 @@ describe('native SVG progress rendering', () => {
       const spinner = host.querySelector('animateTransform')!;
       const background = fallback.firstChild;
       const replace = vi.spyOn(fallback, 'replaceChildren');
-      const bar = [...host.querySelectorAll('rect')].find(node => node.getAttribute('height') === '3' && node.getAttribute('fill') === '#25755e')!;
+      const bar = [...host.querySelectorAll('rect')].find(node => node.getAttribute('height') === '3' && node.getAttribute('fill') === '#d99119')!;
       expect(bar.getAttribute('width')).toBe('18');
       for (const progress of [10, 20, 40, 60, 90, 90]) {
         mocks.tasks[0] = { ...mocks.tasks[0], progress };

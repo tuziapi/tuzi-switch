@@ -56,6 +56,8 @@ export interface RetryImageProps
   wrapperStyle?: React.CSSProperties;
   /** Prefer a Blob URL from Cache Storage before loading the original URL. */
   preferCachedBlob?: boolean;
+  /** Show an existing thumbnail while the original image is being read. */
+  preferThumbnailPreview?: boolean;
   /** Skip Cache Storage fallback when retrying a known-bad cached image. */
   skipCacheFallback?: boolean;
   /** Reports the URL currently used by the underlying image element. */
@@ -195,6 +197,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
       wrapperClassName,
       wrapperStyle,
       preferCachedBlob = false,
+      preferThumbnailPreview = false,
       skipCacheFallback = false,
       onSourceChange,
       deferCacheRead = false,
@@ -219,6 +222,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
     const shouldHideWhileLoading = showSkeleton && isLoading;
     // 存储降级创建的 blob URL，用于清理
     const blobUrlRef = useRef<string | null>(null);
+    const previewBlobUrlRef = useRef<string | null>(null);
     const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const settledRef = useRef(false);
@@ -332,6 +336,25 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
       []
     );
 
+    const tryThumbnailPreviewBlobUrl = useCallback(
+      async (url: string): Promise<string | null> => {
+        if (!isVirtualUrl(url) && !isExternalUrl(url) && !isDesktopAssetUrl(url)) {
+          return null;
+        }
+        try {
+          const blob = await withImageOperationTimeout(
+            () => unifiedCacheService.getCachedImageThumbnailBlob(url),
+            IMAGE_CACHE_TIMEOUT_MS,
+            '图片缩略图读取超时（20秒）'
+          );
+          return blob && blob.size > 0 ? URL.createObjectURL(blob) : null;
+        } catch {
+          return null;
+        }
+      },
+      []
+    );
+
     // Calculate exponential backoff delay
     const getRetryDelay = useCallback(
       (attemptNumber: number): number => {
@@ -349,6 +372,13 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
             event.currentTarget.currentSrc || event.currentTarget.getAttribute('src')
           )
         ) return;
+        const loadedSrc =
+          event.currentTarget.currentSrc || event.currentTarget.getAttribute('src');
+        if (loadedSrc && loadedSrc === previewBlobUrlRef.current) {
+          // A thumbnail is visible immediately, but it must not mark the
+          // canvas result ready until the original bytes have loaded.
+          return;
+        }
         if (settledRef.current) {
           const recovery = externalRecoveryRef.current;
           const recoveredSrc = event.currentTarget.getAttribute('src');
@@ -533,6 +563,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
       }
+      previewBlobUrlRef.current = null;
 
       setRetryCount(0);
       setIsLoading(true);
@@ -551,7 +582,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
 
       if (shouldReadCachedBlob) {
         cacheFallbackTriedRef.current = true;
-        tryFallbackToBlobUrl(normalizedSrc).then((blobUrl) => {
+        const loadFullImage = () => tryFallbackToBlobUrl(normalizedSrc).then((blobUrl) => {
           if (!active || !isCurrentSource(normalizedSrc, sourceVersion)) {
             if (blobUrl) {
               URL.revokeObjectURL(blobUrl);
@@ -564,6 +595,21 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
             cacheFallbackTriedRef.current = false;
           }
         });
+        if (preferThumbnailPreview) {
+          tryThumbnailPreviewBlobUrl(normalizedSrc).then((previewUrl) => {
+            if (!active || !isCurrentSource(normalizedSrc, sourceVersion)) {
+              if (previewUrl) URL.revokeObjectURL(previewUrl);
+              return;
+            }
+            if (previewUrl) {
+              previewBlobUrlRef.current = previewUrl;
+              adoptBlobUrl(normalizedSrc, previewUrl, sourceVersion);
+            }
+            void loadFullImage();
+          });
+        } else {
+          void loadFullImage();
+        }
       } else {
         setImageSrc(normalizedSrc);
       }
@@ -582,6 +628,8 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
       isCurrentSource,
       normalizedSrc,
       preferCachedBlob,
+      preferThumbnailPreview,
+      tryThumbnailPreviewBlobUrl,
       tryFallbackToBlobUrl,
       deferCacheRead,
       skipCacheFallback,
@@ -675,6 +723,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
           URL.revokeObjectURL(blobUrlRef.current);
           blobUrlRef.current = null;
         }
+        previewBlobUrlRef.current = null;
       };
     }, [clearLoadTimeout]);
 
