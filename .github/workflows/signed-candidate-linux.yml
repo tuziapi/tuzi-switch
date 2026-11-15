@@ -5,7 +5,23 @@ permissions:
   contents: read
   actions: read
 jobs:
+  resolve-pair:
+    if: github.repository == 'AiW520/tuzi-switch'
+    runs-on: ubuntu-22.04
+    outputs:
+      base_run_id: ${{ steps.pair.outputs.base_run_id }}
+      target_run_id: ${{ steps.pair.outputs.target_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - id: pair
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/signed-candidate-pair.mjs resolve
   installed-candidate:
+    needs: resolve-pair
     if: github.repository == 'AiW520/tuzi-switch'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
@@ -24,21 +40,23 @@ jobs:
           name: verified-release
           path: ${{ runner.temp }}/signed-base
           repository: AiW520/tuzi-switch
-          run-id: 43699923173
+          run-id: ${{ needs.resolve-pair.outputs.base_run_id }}
           github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         with:
           name: verified-release
           path: ${{ runner.temp }}/signed-target
           repository: AiW520/tuzi-switch
-          run-id: 43689683759
+          run-id: ${{ needs.resolve-pair.outputs.target_run_id }}
           github-token: ${{ github.token }}
       - name: Verify unchanged official candidate bytes and signature
         env:
           GH_TOKEN: ${{ github.token }}
+          BASE_RUN_ID: ${{ needs.resolve-pair.outputs.base_run_id }}
+          TARGET_RUN_ID: ${{ needs.resolve-pair.outputs.target_run_id }}
         run: |
-          gh api repos/AiW520/tuzi-switch/actions/runs/43699923173 > "$RUNNER_TEMP/base-run.json"
-          gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
+          gh api "repos/AiW520/tuzi-switch/actions/runs/$BASE_RUN_ID" > "$RUNNER_TEMP/base-run.json"
+          gh api "repos/AiW520/tuzi-switch/actions/runs/$TARGET_RUN_ID" > "$RUNNER_TEMP/target-run.json"
           node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP"
       - name: Download immutable published legacy installer
         env:
@@ -62,6 +80,7 @@ jobs:
           sudo install -d -o tuziqa -g tuziqa /tmp/tuzi-signed-linux-probe /tmp/tuzi-signed-linux-probe/evidence
           sudo install -d -m 0700 -o tuziqa -g tuziqa /tmp/tuzi-signed-linux-probe/runtime
           sudo install -m 0644 scripts/signed-linux-driver-probe.py /tmp/tuzi-signed-linux-probe/probe.py
+          sudo install -m 0644 scripts/signed_candidate_identity.py scripts/signed-candidate-pair.json /tmp/tuzi-signed-linux-probe/
           sudo iptables -I OUTPUT 1 -m owner --uid-owner tuziqa ! -d 127.0.0.0/8 -j REJECT
           sudo ip6tables -I OUTPUT 1 -m owner --uid-owner tuziqa ! -d ::1 -j REJECT
       - name: Read actual installed WebKit UI and native identity
@@ -124,6 +143,7 @@ jobs:
       fail-fast: false
       matrix:
         legacy_version: ['1.6.0', '1.6.1']
+    needs: resolve-pair
     if: github.repository == 'AiW520/tuzi-switch'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
@@ -137,21 +157,23 @@ jobs:
           name: verified-release
           path: ${{ runner.temp }}/signed-base
           repository: AiW520/tuzi-switch
-          run-id: 43699923173
+          run-id: ${{ needs.resolve-pair.outputs.base_run_id }}
           github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         with:
           name: verified-release
           path: ${{ runner.temp }}/signed-target
           repository: AiW520/tuzi-switch
-          run-id: 43689683759
+          run-id: ${{ needs.resolve-pair.outputs.target_run_id }}
           github-token: ${{ github.token }}
       - name: Verify exact approved candidate pair and signatures
         env:
           GH_TOKEN: ${{ github.token }}
+          BASE_RUN_ID: ${{ needs.resolve-pair.outputs.base_run_id }}
+          TARGET_RUN_ID: ${{ needs.resolve-pair.outputs.target_run_id }}
         run: |
-          gh api repos/AiW520/tuzi-switch/actions/runs/43699923173 > "$RUNNER_TEMP/base-run.json"
-          gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
+          gh api "repos/AiW520/tuzi-switch/actions/runs/$BASE_RUN_ID" > "$RUNNER_TEMP/base-run.json"
+          gh api "repos/AiW520/tuzi-switch/actions/runs/$TARGET_RUN_ID" > "$RUNNER_TEMP/target-run.json"
           node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP"
       - name: Download immutable published legacy installer
         env:

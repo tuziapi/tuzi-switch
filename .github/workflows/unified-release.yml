@@ -151,7 +151,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - run: python3 scripts/test_release_assets.py
-      - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs scripts/verify-tauri-compatibility.mjs
+      - run: python3 scripts/test_windows_branding.py
+      - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs scripts/verify-tauri-compatibility.mjs scripts/test-signed-candidate-pair.mjs
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
       - run: pnpm test:creative

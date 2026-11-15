@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "repository": "AiW520/tuzi-switch",
+  "releaseRepository": "tuziapi/tuzi-switch",
+  "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+  "base": {
+    "runId": "43699923173",
+    "commit": "5bfee5f39b0b370093081227c6e19883f21280a0",
+    "version": "1.6.2"
+  },
+  "target": {
+    "runId": "43689683759",
+    "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+    "version": "1.6.3"
+  }
+}

@@ -5,6 +5,7 @@ unprivileged, network-blocked user. Discovery/TLS are local; signatures and the
 package manager are real. This is a subset, never a release acceptance record.
 """
 import hashlib
+from signed_candidate_identity import verify_candidate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -37,8 +38,8 @@ legacy_sources = {
 }
 base = json.loads((base_dir / 'candidate.json').read_text())
 target = json.loads((target_dir / 'candidate.json').read_text())
-assert (base['runId'], base['commit'], base['tag']) == ('43699923173', '5bfee5f39b0b370093081227c6e19883f21280a0', 'v1.6.2')
-assert (target['runId'], target['commit'], target['tag']) == ('43689683759', '695f4e933d797b39f7a61aad7804800a01eddc96', 'v1.6.3')
+verify_candidate(base, 'base')
+verify_candidate(target, 'target')
 for directory, candidate in [(base_dir, base), (target_dir, target)]:
     assert candidate['releaseRepository'] == 'tuziapi/tuzi-switch'
     for name, digest in candidate['files'].items():

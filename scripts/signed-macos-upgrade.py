@@ -4,6 +4,7 @@ Runs only on disposable test-repository hosts. The actual app and its restarted
 child inherit a loopback-only sandbox. Discovery is synthetic; packages are not.
 """
 import hashlib
+from signed_candidate_identity import verify_candidate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -31,7 +32,7 @@ def sha(data):
 def serve(target_dir, lab, asset):
     assert os.geteuid() == 0
     target = json.loads((target_dir/'candidate.json').read_text())
-    assert target['runId'] == '43689683759'
+    verify_candidate(target, 'target')
     (lab/'server.pid').write_text(str(os.getpid()))
 
     class Handler(BaseHTTPRequestHandler):
@@ -109,8 +110,8 @@ output.mkdir(parents=True,exist_ok=True)
 lab = output.parent
 base = json.loads((base_dir/'candidate.json').read_text())
 target = json.loads((target_dir/'candidate.json').read_text())
-assert (base['runId'],base['commit']) == ('43699923173','5bfee5f39b0b370093081227c6e19883f21280a0')
-assert (target['runId'],target['commit']) == ('43689683759','695f4e933d797b39f7a61aad7804800a01eddc96')
+verify_candidate(base, 'base')
+verify_candidate(target, 'target')
 asset = 'tuzi-assistant-'+platform+'.app.tar.gz'
 report = dict(kind='real-installed-macos-subset',officialAcceptance=False,platform=platform,
               base=base,target=target,checks={},discovery='synthetic-local-https',

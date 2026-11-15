@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { pair, verifyCandidateIdentity } from './signed-candidate-pair.mjs';
 import { verifySignature } from './updater-assets.mjs';
 import { model45, model55, syntheticModelResponse, createLegacyCreative, verifyCreativePreserved, exerciseSeedream55, leaveCreative } from './signed-creative-checks.mjs';
 
@@ -23,11 +24,9 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const publicKey = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).plugins.updater.pubkey;
-function candidate(dir, run, commit, version) {
+function candidate(dir, role) {
   const c = JSON.parse(fs.readFileSync(path.join(dir, 'candidate.json')));
-  assert.equal(c.repository, 'AiW520/tuzi-switch');
-  assert.equal(c.releaseRepository, 'tuziapi/tuzi-switch');
-  assert.equal(c.runId, run); assert.equal(c.commit, commit); assert.equal(c.tag, `v${version}`);
+  verifyCandidateIdentity(c, role);
   assert.equal(c.publicKeySha256, sha(publicKey.trim()));
   for (const [name, hash] of Object.entries(c.files)) {
     assert.equal(path.basename(name), name);
@@ -39,8 +38,10 @@ function candidate(dir, run, commit, version) {
   }
   return c;
 }
-const base = candidate(baseDir, '43699923173', '5bfee5f39b0b370093081227c6e19883f21280a0', '1.6.2');
-const next = candidate(nextDir, '43689683759', '695f4e933d797b39f7a61aad7804800a01eddc96', '1.6.3');
+assert.equal(pair.base.version, '1.6.2');
+assert.equal(pair.target.version, '1.6.3');
+const base = candidate(baseDir, 'base');
+const next = candidate(nextDir, 'target');
 const legacyDir = process.env.LEGACY_INSTALLER_DIR || null;
 const legacyVersion = process.env.LEGACY_VERSION || '1.6.0';
 const legacySources = {

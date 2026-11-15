@@ -1,6 +1,7 @@
 """Probe actual unchanged macOS candidate UI on a disposable hosted runner."""
 import hashlib
 import json
+from signed_candidate_identity import PAIR
 import os
 from pathlib import Path
 import plistlib
@@ -18,7 +19,7 @@ assert platform in ['macos-arm64', 'macos-x64']
 assert not (Path.home()/'.tuzi-switch').exists(), 'Disposable clean application profile required'
 output.mkdir(parents=True, exist_ok=True)
 report = dict(kind='installed-macos-control-probe', officialAcceptance=False,
-              candidateRunId='43699923173', candidateCommit='5bfee5f39b0b370093081227c6e19883f21280a0', platform=platform)
+              candidateRunId=PAIR['base']['runId'], candidateCommit=PAIR['base']['commit'], platform=platform)
 mount = process = None
 try:
     m = json.loads((source/f'manifest-{platform}.json').read_text())

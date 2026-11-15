@@ -3,6 +3,7 @@
 This probes the installed WebKit UI/IPC control path, not upgrade acceptance.
 """
 import json
+from signed_candidate_identity import PAIR
 import os
 from pathlib import Path
 import subprocess
@@ -21,7 +22,7 @@ root = Path(output)
 root.mkdir(parents=True, exist_ok=True)
 assert not (Path.home() / '.tuzi-switch').exists(), 'Clean disposable profile required'
 report = {'kind': 'installed-linux-driver-probe', 'officialAcceptance': False,
-          'candidateRunId': '43699923173', 'candidateCommit': '5bfee5f39b0b370093081227c6e19883f21280a0'}
+          'candidateRunId': PAIR['base']['runId'], 'candidateCommit': PAIR['base']['commit']}
 env = {k: v for k, v in os.environ.items() if not any(word in k.upper() for word in ['TOKEN', 'SECRET', 'PASSWORD', 'PRIVATE_KEY'])}
 env.update(TAURI_WEBVIEW_AUTOMATION='true', WEBKIT_DISABLE_DMABUF_RENDERER='1', WEBKIT_DISABLE_COMPOSITING_MODE='1')
 session = None

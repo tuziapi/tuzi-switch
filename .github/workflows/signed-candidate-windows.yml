@@ -9,7 +9,23 @@ permissions:
   contents: read
   actions: read
 jobs:
+  resolve-pair:
+    if: github.repository == 'AiW520/tuzi-switch'
+    runs-on: ubuntu-22.04
+    outputs:
+      base_run_id: ${{ steps.pair.outputs.base_run_id }}
+      target_run_id: ${{ steps.pair.outputs.target_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - id: pair
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/signed-candidate-pair.mjs resolve
   installed-candidate:
+    needs: resolve-pair
     if: github.repository == 'AiW520/tuzi-switch'
     runs-on: windows-latest
     timeout-minutes: 30
@@ -23,38 +39,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify the approved immutable source pair
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh api repos/AiW520/tuzi-switch/actions/runs/43699923173 > "$RUNNER_TEMP/base-run.json"
-          gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          import path from 'node:path';
-          import assert from 'node:assert/strict';
-          for (const [file,sha] of [['base-run.json','5bfee5f39b0b370093081227c6e19883f21280a0'],['target-run.json','695f4e933d797b39f7a61aad7804800a01eddc96']]) {
-            const r=JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP,file)));
-            assert.equal(r.conclusion,'success'); assert.equal(r.head_sha,sha);
-            assert.equal(r.path,'.github/workflows/unified-release.yml');
-          }
-          JS
       - uses: actions/download-artifact@v4
         with:
           name: verified-release
           path: ${{ runner.temp }}/signed-base
           repository: AiW520/tuzi-switch
-          run-id: 43699923173
+          run-id: ${{ needs.resolve-pair.outputs.base_run_id }}
           github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         with:
           name: verified-release
           path: ${{ runner.temp }}/signed-target
           repository: AiW520/tuzi-switch
-          run-id: 43689683759
+          run-id: ${{ needs.resolve-pair.outputs.target_run_id }}
           github-token: ${{ github.token }}
+      - name: Verify pinned candidate identities, all bytes and signatures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_RUN_ID: ${{ needs.resolve-pair.outputs.base_run_id }}
+          TARGET_RUN_ID: ${{ needs.resolve-pair.outputs.target_run_id }}
+        run: |
+          gh api "repos/AiW520/tuzi-switch/actions/runs/$BASE_RUN_ID" > "$RUNNER_TEMP/base-run.json"
+          gh api "repos/AiW520/tuzi-switch/actions/runs/$TARGET_RUN_ID" > "$RUNNER_TEMP/target-run.json"
+          node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP" windows
       - name: Download the immutable published manual-transition source
         if: inputs.manual_transition
         shell: bash
