@@ -66,6 +66,74 @@
   opacity: 0.78;
 }
 
+.image-generation-anchor__header {
+  position: relative;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 13px 16px 8px;
+  color: rgba(100, 93, 77, 0.72);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.image-generation-anchor__header-title {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-generation-anchor__header-title svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.8;
+}
+
+.image-generation-anchor__header-count {
+  flex: none;
+  color: rgba(133, 123, 101, 0.64);
+  font-variant-numeric: tabular-nums;
+}
+
+.image-generation-anchor__header-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: rgba(106, 99, 91, 0.78);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 21px;
+  font-weight: 300;
+  line-height: 1;
+  transition: color 160ms ease, background-color 160ms ease,
+    transform 120ms ease;
+}
+
+.image-generation-anchor__header-close:hover {
+  color: rgba(152, 72, 55, 0.92);
+  background: rgba(255, 255, 255, 0.5);
+  transform: scale(1.04);
+}
+
 .image-generation-anchor__surface,
 .image-generation-anchor__details,
 .image-generation-anchor__actions {
@@ -497,6 +565,61 @@
   transition: opacity 220ms ease, transform 260ms ease;
 }
 
+.image-generation-anchor__failure-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 210px;
+  padding: 24px 24px 16px;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+}
+
+.image-generation-anchor__failure-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 15px;
+  color: #b34d42;
+  background: rgba(246, 225, 216, 0.72);
+  box-shadow: 0 6px 16px rgba(180, 83, 67, 0.08) inset;
+}
+
+.image-generation-anchor__failure-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.image-generation-anchor__failure-title {
+  color: rgba(67, 54, 48, 0.96);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.image-generation-anchor__failure-copy {
+  margin: 0;
+  color: rgba(126, 109, 99, 0.9);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.image-generation-anchor__failure-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .image-generation-anchor__progress-display {
   --image-generation-progress-accent: var(--anchor-accent);
   --image-generation-progress-accent-soft: rgba(245, 158, 11, 0.14);
@@ -581,9 +704,14 @@
   cursor: pointer;
   font: inherit;
   font-size: 11px;
-  color: rgba(146, 64, 14, 0.82);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  color: rgba(126, 93, 68, 0.86);
+  text-decoration: none;
+  transition: color 160ms ease, transform 120ms ease;
+}
+
+.image-generation-anchor__error-link:hover {
+  color: rgba(164, 92, 36, 0.96);
+  transform: translateX(1px);
 }
 
 .image-generation-anchor__stack-badge {
@@ -694,8 +822,11 @@
 
 .image-generation-anchor__actions {
   display: flex;
+  align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
+  padding: 2px 20px 18px;
   z-index: 8;
   pointer-events: auto;
 }
@@ -711,17 +842,56 @@
   cursor: pointer;
   font: inherit;
   font-size: 12px;
-  color: #4b5563;
+  color: rgba(95, 77, 59, 0.9);
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  border: 1px solid rgba(217, 194, 162, 0.78);
   transition: transform 120ms ease, border-color 160ms ease,
     background-color 160ms ease;
 }
 
 .image-generation-anchor__action:hover {
   transform: translateY(-1px);
-  border-color: rgba(245, 158, 11, 0.34);
+  border-color: rgba(197, 123, 28, 0.48);
   background: rgba(255, 255, 255, 0.98);
+}
+
+.image-generation-anchor--phase-failed {
+  --anchor-accent: #b34d42;
+  --anchor-accent-strong: #984837;
+  --anchor-border: rgba(213, 139, 116, 0.66);
+  color: #4a3b34;
+  background-color: #fff8f4;
+  background: radial-gradient(
+      circle at 92% 92%,
+      rgba(251, 225, 213, 0.72),
+      transparent 36%
+    ),
+    linear-gradient(142deg, #fffdfb 0%, #fff8f4 58%, #fff1eb 100%);
+  border-color: rgba(222, 151, 127, 0.62);
+  box-shadow: 0 16px 36px rgba(151, 83, 61, 0.08),
+    0 2px 6px rgba(255, 255, 255, 0.78) inset;
+  animation: none;
+}
+
+.image-generation-anchor--phase-failed .image-generation-anchor__action {
+  color: #fffaf4;
+  background: #806b54;
+  border-color: #806b54;
+  box-shadow: 0 8px 16px rgba(98, 75, 51, 0.14);
+}
+
+.image-generation-anchor--phase-failed
+  .image-generation-anchor__action:hover {
+  background: #735d49;
+  border-color: #735d49;
+}
+
+.image-generation-anchor--phase-failed
+  .image-generation-anchor__action--secondary {
+  color: rgba(109, 91, 77, 0.9);
+  background: rgba(255, 252, 248, 0.74);
+  border-color: rgba(207, 183, 164, 0.78);
+  box-shadow: none;
 }
 
 .image-generation-anchor__action--secondary {

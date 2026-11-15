@@ -235,6 +235,44 @@ export const ImageGenerationAnchorContent: React.FC<
   );
 
   const renderCore = () => {
+    if (showFailureSummary) {
+      return (
+        <div className="image-generation-anchor__failure-summary">
+          <div className="image-generation-anchor__failure-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="presentation">
+              <path d="M8.5 8.5a4.8 4.8 0 0 1 7.7 1.1" />
+              <path d="M15.5 15.5a4.8 4.8 0 0 1-7.7-1.1" />
+              <path d="m16.5 7.5-.3 3.2-3.2-.3" />
+              <path d="m7.5 16.5.3-3.2 3.2.3" />
+            </svg>
+          </div>
+          <strong className="image-generation-anchor__failure-title">
+            暂时没能生成图片
+          </strong>
+          <p className="image-generation-anchor__failure-copy">
+            服务暂时繁忙，请稍后重试。
+            <br />
+            你的提示词和参数已保留。
+          </p>
+          <button
+            type="button"
+            className="image-generation-anchor__error-link"
+            onPointerDown={stopInteractionStart}
+            onMouseDown={stopInteractionStart}
+            onPointerUp={stopEventPropagation}
+            onMouseUp={stopEventPropagation}
+            onClick={(event) => {
+              stopPointer(event);
+              runDeferredAction('details');
+            }}
+          >
+            <span aria-hidden="true">›</span> 查看错误详情
+          </button>
+          <span className="image-generation-anchor__failure-status">生成失败</span>
+        </div>
+      );
+    }
+
     return (
       <div className="image-generation-anchor__surface-core">
         {showCenterLabel ? (
@@ -293,6 +331,14 @@ export const ImageGenerationAnchorContent: React.FC<
       ? '收起'
       : viewModel.secondaryAction?.label;
   const secondaryActionType = viewModel.secondaryAction?.type;
+  const headerTitle =
+    viewModel.phase === 'failed'
+      ? viewModel.failureDetails?.modelId || viewModel.title || '图片生成'
+      : viewModel.title || '图片生成';
+  const headerCount = `${candidateCount}/${candidateCount}`;
+  const showFailureSummary =
+    viewModel.phase === 'failed' &&
+    viewModel.failureStage !== 'post-processing';
   const stackBadgeLabel =
     candidateCount > 1 ? `${candidateCount} 张` : String(candidateCount);
   const stackSummaryLabel =
@@ -409,6 +455,38 @@ export const ImageGenerationAnchorContent: React.FC<
       )}
     >
       <div className="image-generation-anchor__glow" />
+
+      <div className="image-generation-anchor__header">
+        <div className="image-generation-anchor__header-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <circle cx="9" cy="9" r="1.5" />
+            <path d="m6.5 17 4.2-4.2 2.6 2.6 1.8-1.8 2.4 3.4" />
+          </svg>
+          <span>{headerTitle}</span>
+        </div>
+        {viewModel.phase === 'failed' ? (
+          <button
+            type="button"
+            className="image-generation-anchor__header-close"
+            aria-label="移除卡片"
+            onPointerDown={stopInteractionStart}
+            onMouseDown={stopInteractionStart}
+            onPointerUp={stopEventPropagation}
+            onMouseUp={stopEventPropagation}
+            onClick={(event) => {
+              stopPointer(event);
+              runDeferredAction('dismiss');
+            }}
+          >
+            ×
+          </button>
+        ) : (
+          <span className="image-generation-anchor__header-count">
+            {headerCount}
+          </span>
+        )}
+      </div>
 
       <div
         className={classNames('image-generation-anchor__surface', {
