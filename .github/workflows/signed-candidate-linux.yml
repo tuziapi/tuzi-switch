@@ -13,6 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         installer: [deb, appimage]
+        legacy_version: ['1.6.0', '1.6.1']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,6 +40,17 @@ jobs:
           gh api repos/AiW520/tuzi-switch/actions/runs/43699923173 > "$RUNNER_TEMP/base-run.json"
           gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
           node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP"
+      - name: Download immutable published legacy installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEGACY_VERSION: ${{ matrix.legacy_version }}
+          INSTALLER_TYPE: ${{ matrix.installer }}
+        run: |
+          extension="$INSTALLER_TYPE"
+          if [ "$extension" = appimage ]; then extension=AppImage; fi
+          gh release download "v$LEGACY_VERSION" --repo tuziapi/tuzi-switch \
+            --pattern manifest-linux-x64.json --pattern "tuzi-assistant-linux-x64.$extension" \
+            --dir "$RUNNER_TEMP/signed-legacy"
       - name: Install candidate and create offline disposable desktop user
         run: |
           sudo apt-get -o Acquire::Retries=3 update
@@ -74,8 +86,10 @@ jobs:
       - name: Exercise real signed Linux UI, failures, install and automatic restart
         env:
           INSTALLER_TYPE: ${{ matrix.installer }}
+          LEGACY_VERSION: ${{ matrix.legacy_version }}
         run: |
           sudo env GITHUB_ACTIONS=true GITHUB_REPOSITORY=AiW520/tuzi-switch RUNNER_ENVIRONMENT=github-hosted \
+            LEGACY_INSTALLER_DIR="$RUNNER_TEMP/signed-legacy" LEGACY_VERSION="$LEGACY_VERSION" \
             python3 scripts/signed-linux-upgrade.py "$RUNNER_TEMP/signed-base" "$RUNNER_TEMP/signed-target" /tmp/tuzi-signed-linux-upgrade/evidence "$INSTALLER_TYPE"
       - name: Stop disposable applications and restore network rules
         if: always()
@@ -90,7 +104,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: signed-installed-linux-driver-probe-${{ matrix.installer }}
+          name: signed-installed-linux-driver-probe-${{ matrix.installer }}-${{ matrix.legacy_version }}
           path: |
             /tmp/tuzi-signed-linux-probe/evidence/results.json
             /tmp/tuzi-signed-linux-probe/evidence/driver.log
@@ -99,13 +113,17 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: signed-installed-linux-${{ matrix.installer }}
+          name: signed-installed-linux-${{ matrix.installer }}-${{ matrix.legacy_version }}
           path: |
             /tmp/tuzi-signed-linux-upgrade/evidence/results.json
             /tmp/tuzi-signed-linux-upgrade/evidence/driver.log
             /tmp/tuzi-signed-linux-upgrade/evidence/*.png
           if-no-files-found: warn
   installed-rpm:
+    strategy:
+      fail-fast: false
+      matrix:
+        legacy_version: ['1.6.0', '1.6.1']
     if: github.repository == 'AiW520/tuzi-switch'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
@@ -135,6 +153,17 @@ jobs:
           gh api repos/AiW520/tuzi-switch/actions/runs/43699923173 > "$RUNNER_TEMP/base-run.json"
           gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
           node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP"
+      - name: Download immutable published legacy installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEGACY_VERSION: ${{ matrix.legacy_version }}
+          INSTALLER_TYPE: rpm
+        run: |
+          extension="$INSTALLER_TYPE"
+          if [ "$extension" = appimage ]; then extension=AppImage; fi
+          gh release download "v$LEGACY_VERSION" --repo tuziapi/tuzi-switch \
+            --pattern manifest-linux-x64.json --pattern "tuzi-assistant-linux-x64.$extension" \
+            --dir "$RUNNER_TEMP/signed-legacy"
       - name: Exercise unchanged RPM in offline disposable Fedora user
         run: |
           mkdir "$RUNNER_TEMP/signed-rpm"
@@ -142,14 +171,16 @@ jobs:
             -v "$GITHUB_WORKSPACE:/work:ro" \
             -v "$RUNNER_TEMP/signed-base:/base:ro" \
             -v "$RUNNER_TEMP/signed-target:/target:ro" \
+            -v "$RUNNER_TEMP/signed-legacy:/legacy:ro" \
             -v "$RUNNER_TEMP/signed-rpm:/lab" -w /work \
             -e GITHUB_ACTIONS=true -e GITHUB_REPOSITORY=AiW520/tuzi-switch \
             -e RUNNER_ENVIRONMENT=github-hosted \
+            -e LEGACY_INSTALLER_DIR=/legacy -e LEGACY_VERSION="${{ matrix.legacy_version }}" \
             fedora:43 bash scripts/signed-rpm-container.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: signed-installed-linux-rpm
+          name: signed-installed-linux-rpm-${{ matrix.legacy_version }}
           path: |
             ${{ runner.temp }}/signed-rpm/evidence/results.json
             ${{ runner.temp }}/signed-rpm/evidence/driver.log

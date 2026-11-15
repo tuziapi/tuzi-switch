@@ -28,6 +28,13 @@ assert os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted'
 base_dir, target_dir, output = map(Path, sys.argv[1:4])
 installer = sys.argv[4] if len(sys.argv) > 4 else 'deb'
 assert installer in ['deb', 'appimage', 'rpm']
+legacy_dir = Path(os.environ['LEGACY_INSTALLER_DIR']) if os.environ.get('LEGACY_INSTALLER_DIR') else None
+legacy_version = os.environ.get('LEGACY_VERSION', '1.6.1')
+legacy = None
+legacy_sources = {
+    '1.6.0': ('a32d0a5766cc6a8d0e9f0c84258db29b7ce5b747e771844816730e296ab0c0c2', '21cad50c7f5b916b94bccf39c6d594724241bfb1'),
+    '1.6.1': ('a9a621811b3b52c7bb9d61bd070f5666ae72a04bbdbc955fa6005fcf3dc52cc2', '7c13bc943a4b7116af15593ec0ac18af0ba9727f'),
+}
 base = json.loads((base_dir / 'candidate.json').read_text())
 target = json.loads((target_dir / 'candidate.json').read_text())
 assert (base['runId'], base['commit'], base['tag']) == ('43699923173', '5bfee5f39b0b370093081227c6e19883f21280a0', 'v1.6.2')
@@ -45,9 +52,18 @@ gid = int(subprocess.check_output(['id', '-g', username]))
 assert not (Path('/home') / username / '.tuzi-switch').exists(), 'Fresh disposable user required'
 executable = lab/'installed'/'Tuzi.AppImage' if installer == 'appimage' else Path('/usr/bin/tu-zi-switch')
 asset = 'tuzi-assistant-linux-x64.' + ('AppImage' if installer == 'appimage' else installer)
+if legacy_dir:
+    assert legacy_version in legacy_sources
+    manifest = (legacy_dir/'manifest-linux-x64.json').read_bytes()
+    assert hashlib.sha256(manifest).hexdigest() == legacy_sources[legacy_version][0]
+    legacy = json.loads(manifest)
+    assert legacy['repository'] == 'tuziapi/tuzi-switch'
+    assert legacy['version'] == legacy_version and legacy['commit'] == legacy_sources[legacy_version][1]
+    entry = next(f for f in legacy['files'] if f['file'] == asset)
+    assert hashlib.sha256((legacy_dir/asset).read_bytes()).hexdigest() == entry['sha256']
 if installer == 'appimage':
     executable.parent.mkdir()
-    shutil.copyfile(base_dir/asset, executable)
+    shutil.copyfile((legacy_dir or base_dir)/asset, executable)
     executable.chmod(0o755)
     executable.parent.chmod(0o555)
 report = dict(kind='real-installed-linux-subset', officialAcceptance=False, installerType=installer,
@@ -234,6 +250,33 @@ class Handler(BaseHTTPRequestHandler):
 fixture = dict(id='SYNTHETIC-SIGNED-LINUX', name='SYNTHETIC Linux preserved provider',
                settingsConfig={'env': {'ANTHROPIC_AUTH_TOKEN': 'SYNTHETIC-NO-REAL-CREDENTIAL',
                                         'ANTHROPIC_BASE_URL': 'https://synthetic.invalid'}})
+
+
+def seed():
+    seeded = execute('''const provider=arguments[0],done=arguments[arguments.length-1];
+window.__TAURI_INTERNALS__.invoke('add_provider',{app:'claude',provider,addToLive:false}).then(()=>{
+localStorage.setItem('SYNTHETIC-SIGNED-LINUX','preserve-me');done(true)},e=>done({error:String(e)}));''', True, [fixture])
+    assert seeded is True
+
+
+def assert_preserved():
+    preserved = execute('''const done=arguments[arguments.length-1];
+window.__TAURI_INTERNALS__.invoke('get_providers',{app:'claude'}).then(providers=>done({providers,
+preference:localStorage.getItem('SYNTHETIC-SIGNED-LINUX')}),e=>done({error:String(e)}));''', True)
+    assert preserved['providers'][fixture['id']]['settingsConfig'] == fixture['settingsConfig']
+    assert preserved['providers'][fixture['id']]['name'] == fixture['name']
+    assert preserved['preference'] == 'preserve-me'
+
+
+def manual_install(directory, old=False):
+    if installer == 'appimage':
+        shutil.copyfile(directory/asset, executable)
+        executable.chmod(0o755)
+    else:
+        command = ['rpm', '-U'] + (['--oldpackage'] if old else []) if installer == 'rpm' else ['dpkg', '-i']
+        subprocess.run([*command, str(directory/asset)], check=True)
+
+
 try:
     subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
                     '-keyout', str(lab/'ca.key'), '-out', str(trust), '-subj', '/CN=SYNTHETIC Tuzi update lab CA',
@@ -276,6 +319,35 @@ try:
                               *display_command],
                              stdin=subprocess.DEVNULL, stdout=log, stderr=log)
     wait_for(lambda: request('GET', '/status'), 'WebKitWebDriver not listening')
+    if legacy_dir:
+        manual_install(legacy_dir, old=True)
+        attach()
+        report['legacy'] = legacy
+        report['legacyIdentity'] = identity(legacy_version, legacy['commit'])
+        legacy_pids = application_processes()
+        assert len(legacy_pids) == 1
+        report['legacyPid'] = legacy_pids[0]
+        report['legacyExecutableSha256'] = digest_executable()
+        click(['我知道了', 'Got it'])
+        seed()
+        assert_preserved()
+        screenshot('00-published-legacy-before-transition')
+        settings_saved = execute('''const done=arguments[arguments.length-1];
+window.__TAURI_INTERNALS__.invoke('get_settings').then(settings=>window.__TAURI_INTERNALS__.invoke('save_settings',
+{settings:{...settings,minimizeToTrayOnClose:false}})).then(()=>done(true),e=>done({error:String(e)}));''', True)
+        assert settings_saved is True
+        try:
+            execute("window.__TAURI_INTERNALS__.invoke('plugin:window|close',{label:'main'}); return true")
+        except (OSError, RuntimeError):
+            pass
+        wait_for(lambda: not any(p in application_processes() for p in legacy_pids), 'Published old app failed to close normally')
+        report['legacyCloseMethod'] = 'ordinary-window-close-with-minimize-to-tray-disabled; process disappearance observed; exit code not exposed by WebDriver'
+        try:
+            request('DELETE', '/session/' + session)
+        except (OSError, RuntimeError):
+            pass
+        session = None
+        manual_install(base_dir)
     attach()
     report['baseIdentity'] = identity('1.6.2', base['commit'])
     initial_pids = application_processes()
@@ -286,11 +358,15 @@ try:
     report['inspectorAddress'] = inspector
     before_hash = digest_executable()
     report['initialExecutableSha256'] = before_hash
-    click(['我知道了', 'Got it'])
-    seeded = execute('''const provider=arguments[0],done=arguments[arguments.length-1];
-window.__TAURI_INTERNALS__.invoke('add_provider',{app:'claude',provider,addToLive:false}).then(()=>{
-localStorage.setItem('SYNTHETIC-SIGNED-LINUX','preserve-me');done(true)},e=>done({error:String(e)}));''', True, [fixture])
-    assert seeded is True
+    if legacy_dir:
+        assert_preserved()
+        assert not buttons(['我知道了', 'Got it'])
+        assert report['legacyExecutableSha256'] != before_hash
+        report['checks']['publishedLegacyManualTransition'] = 'passed'
+        report['remaining'].remove('published-old-version-manual-transition')
+    else:
+        click(['我知道了', 'Got it'])
+        seed()
     click(['查看更新', 'View update'])
     screenshot('01-update-dialog')
     for failure in ['corrupt', 'interrupted', 'missing']:
@@ -348,12 +424,7 @@ localStorage.setItem('SYNTHETIC-SIGNED-LINUX','preserve-me');done(true)},e=>done
     session = None
     attach(inspector)
     report['targetIdentity'] = identity('1.6.3', target['commit'])
-    preserved = execute('''const done=arguments[arguments.length-1];
-window.__TAURI_INTERNALS__.invoke('get_providers',{app:'claude'}).then(providers=>done({providers,
-preference:localStorage.getItem('SYNTHETIC-SIGNED-LINUX')}),e=>done({error:String(e)}));''', True)
-    assert preserved['providers'][fixture['id']]['settingsConfig'] == fixture['settingsConfig']
-    assert preserved['providers'][fixture['id']]['name'] == fixture['name']
-    assert preserved['preference'] == 'preserve-me'
+    assert_preserved()
     report['finalExecutableSha256'] = digest_executable()
     if installer == 'appimage':
         assert report['initialExecutableSha256'] == base['files'][asset]
