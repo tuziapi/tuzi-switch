@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import urllib.error
 
 assert sys.platform == 'linux'
 assert os.environ.get('GITHUB_REPOSITORY') == 'AiW520/tuzi-switch'
@@ -30,8 +31,13 @@ def request(method, route, body=None):
     data = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request('http://127.0.0.1:4444' + route, data=data, method=method,
                                  headers={'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=75) as response:
-        result = json.load(response)
+    try:
+        with urllib.request.urlopen(req, timeout=75) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as error:
+        # Only the local WebDriver server is reachable here. Preserve its
+        # structured reason instead of hiding it behind an HTTP 500 summary.
+        raise RuntimeError(f'{method} {route}: {error.read().decode()[:12000]}') from error
     value = result.get('value', result)
     if isinstance(value, dict) and value.get('error'):
         raise RuntimeError(value)
