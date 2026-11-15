@@ -285,3 +285,7 @@ Linux预检43699354264已在独立用户正常启动正式1.6.2主窗口（原�
 Linux43699772576的结构化错误为session not created / Failed to match capabilities。核对Tauri官方crates/tauri-driver/src/server.rs，Linux仅传webkitgtk:browserOptions，不强制MiniBrowser品牌。修正测试参数并等待真实文档加载后再读IPC，无候选应用修改。
 
 分层占位修复正式候选已启动run43699923173，固定源码5bfee5f39b0b370093081227c6e19883f21280a0、版本1.6.2；旧候选43680220045的通过证据保留但不作为修复后验证。Windows后续测试已将base run/SHA及下载输入统一更新到本次候选，并增加完成占位清理的明确断言；须等该run全量校验、用户逐次签名审核、构建及独立验签完成后才运行，不使用测试密钥替代。内部1.6.3升级目标保持原已批准字节，仅用于升级测试，不作为本次最终发布包。
+
+Linux控制通路43700222624/a40c2b31通过，artifact14155848597已完整下载并核对SHA256/ZIP CRC；实际原生IPC为1.6.2/com.tuziswitch.desktop/stable/tuziapi仓库/11b8e308精确源码，真实DOM含opentu创作与欢迎弹窗。见evidence/2026-11-15-linux-probe-43700222624.json。仅证明原字节DEB实装、启动与可控IPC，不包含升级。截图发现最小runner缺CJK字体、日志缺update-desktop-database，不能算视觉或深链验收；补充测试机fonts-noto-cjk、desktop-file-utils和AT-SPI基础包再采集，不改应用包。
+
+修复候选43699923173/5bfee5f3的verify已成功，四平台目前等待official-updater-signing；已向用户说明新增修复需逐次审批，不能沿用旧run批准。仍无正式发布。
