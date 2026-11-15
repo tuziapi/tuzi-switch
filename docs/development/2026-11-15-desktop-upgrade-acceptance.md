@@ -229,3 +229,5 @@ Fedora43真实rpm实验八场景通过；artifact14153490733归档SHA256/ZIP CRC
 43693103081诊断确认正式1.6.2正常显示主窗口且已访问更新信息，但127.0.0.1:9222拒绝连接。增加IPv4/localhost/IPv6 loopback连接及调试监听/参数的精确诊断，避免把自动化连接问题误记为应用启动失败。
 
 43693664668：三个loopback地址都拒绝连接；进程诊断显示WebView2未收到调试参数且9222没有监听。应用正常显示窗口，清理已无错误。依据Microsoft WebView2 CreateCoreWebView2EnvironmentWithOptions文档，追加仅针对com.tuziswitch.desktop/tu-zi-switch.exe的临时AdditionalBrowserArguments注册表覆盖，保留并恢复原值；只使用remote-debugging-port，入站也阻断非loopback。无需修改正式候选或禁用TLS；后续实跑验证能否连接。
+
+43694284150的临时注册表覆盖生效，已通过实际IPC读取1.6.2正式ID、stable渠道、正式仓库与11b8e308精确commit。随后“View update”被首次欢迎弹窗挡住；已人工查看failure.png，补充正常点击Got it/我知道了，保留真实UI操作，不强制穿透遮罩。升级尚未开始，继续复验。

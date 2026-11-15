@@ -72,7 +72,7 @@ async function connect(version, timeout = 180000) {
   while (Date.now() < deadline) {
     for (const endpoint of ['http://127.0.0.1:9222', 'http://localhost:9222', 'http://[::1]:9222']) {
     try {
-      const b = await chromium.connectOverCDP(endpoint, { timeout: 1000 });
+      const b = await chromium.connectOverCDP(endpoint, { timeout: 3000 });
       report.cdpPages = b.contexts().flatMap(c => c.pages()).map(p => p.url());
       const p = b.contexts().flatMap(c => c.pages()).find(p => /tauri\.localhost|^tauri:/.test(p.url()));
       if (p) {
@@ -174,6 +174,9 @@ foreach ($program in $programs) {
   initial.unref();
   let page = await connect('1.6.2', 60000);
   report.baseIdentity = await identity(page, '1.6.2', base.commit);
+  const welcome = page.getByRole('button', { name: /^(Got it|我知道了)$/ });
+  const hasWelcome = await welcome.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  if (hasWelcome) await welcome.click();
   const fixture = { id: 'SYNTHETIC-SIGNED-UPGRADE', name: 'SYNTHETIC signed upgrade preservation', settingsConfig: { env: { ANTHROPIC_AUTH_TOKEN: 'SYNTHETIC-NO-REAL-CREDENTIAL', ANTHROPIC_BASE_URL: 'https://synthetic.invalid' } } };
   await page.evaluate(async provider => {
     await window.__TAURI_INTERNALS__.invoke('add_provider', { app: 'claude', provider, addToLive: false });
