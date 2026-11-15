@@ -72,11 +72,15 @@ async function configure(p) {
     await p.locator('.model-dropdown__trigger').first().click();
     await p.getByText('豆包',{exact:true}).click();
     await p.locator('.model-dropdown__item').filter({hasText:/Seedream 5.5|doubao-seedream-5-5/}).first().click();
+    await p.locator('.parameters-dropdown__trigger').first().click();
+    await p.getByText('透明（PNG）',{exact:true}).click();
     await p.locator('.ai-input-bar__input').first().fill('SYNTHETIC Seedream 5.5');
     await p.locator('[data-track="ai_input_click_send"]').first().click();
     await until(async()=>(await records(p,'aitu-app','tasks')).some(t=>t.insertedToCanvas),'generation not inserted');
     const generation=await p.evaluate(()=>JSON.parse(atob(window.__creativeRequestFixture.requests.find(r=>r.method==='POST').body)));
     assert.equal(generation.model,'doubao-seedream-5-5-261028');
+    assert.equal(generation.background,'transparent');
+    assert.equal(generation.output_format,'png');
     const boards=await records(p,'aitu-workspace','boards');const original=boards.find(b=>b.elements.some(e=>e.type==='image'));
     const element=original.elements.find(e=>e.type==='image');
 
@@ -94,6 +98,8 @@ async function configure(p) {
     const request=await p.evaluate(()=>JSON.parse(atob(window.__creativeRequestFixture.requests.filter(r=>r.method==='POST').at(-1).body)));
     assert.deepEqual(request.layer_decomposition_options,{max_images:30,text_recognition:true});
     assert.equal(request.size,'1.5K');assert.equal(request.background,undefined);
+    await dialog.getByText('标题1 · OCR',{exact:true}).click();
+    await dialog.getByText('你好 1',{exact:true}).waitFor();
     await p.screenshot({path:output+'/seedream55-ocr.png'});
     await dialog.getByRole('button',{name:/应用|插入/}).click();
     await until(async()=>(await records(p,'aitu-workspace','boards')).find(b=>b.id===original.id)?.elements.filter(e=>e.metadata?.semanticLayer).length===3,'layer metadata not saved');
@@ -105,7 +111,7 @@ async function configure(p) {
     assert.equal(layers[2].metadata.semanticLayer.providerMetadata.future_extension.preserve,true);
     const manifest=restored.elements.find(e=>e.metadata?.semanticLayerGroup)?.metadata.semanticLayerGroup.manifest;
     assert.equal(manifest.layers.length,3);assert.equal(manifest.layers[1].textRecognition.text,'你好 1');
-    fs.writeFileSync(output+'/seedream55-results.json',JSON.stringify({kind:'synthetic-transport-browser',engine,generation:true,layers:3,ocr:true,duplicateUrlLayers:true,reloadPreserved:true,liveProvider:false},null,2));
+    fs.writeFileSync(output+'/seedream55-results.json',JSON.stringify({kind:'synthetic-transport-browser',engine,generation:true,transparentPngRequest:true,layers:3,ocr:true,ocrTextVisible:true,duplicateUrlLayers:true,reloadPreserved:true,liveProvider:false},null,2));
     console.log('Seedream 5.5 real UI + generation + layer/OCR + canvas reload passed (synthetic HTTP boundary)');
   } catch(error){await p.screenshot({path:output+'/seedream55-failure.png'});fs.writeFileSync(output+'/failure-dom.txt',await p.locator('body').innerText());throw error;} finally {await browser.close();}
 })();

@@ -1,0 +1,34 @@
+{
+  "kind": "synthetic-transport-browser",
+  "applicationCommit": "a986a3d03c8d1bd84214e8916d8378b314d6bc2d",
+  "date": "2026-11-15",
+  "officialAcceptance": false,
+  "liveProvider": false,
+  "script": "tests/visual/seedream55-acceptance.cjs",
+  "results": [
+    {
+      "kind": "synthetic-transport-browser",
+      "engine": "chromium",
+      "generation": true,
+      "transparentPngRequest": true,
+      "layers": 3,
+      "ocr": true,
+      "ocrTextVisible": true,
+      "duplicateUrlLayers": true,
+      "reloadPreserved": true,
+      "liveProvider": false
+    },
+    {
+      "kind": "synthetic-transport-browser",
+      "engine": "webkit",
+      "generation": true,
+      "transparentPngRequest": true,
+      "layers": 3,
+      "ocr": true,
+      "ocrTextVisible": true,
+      "duplicateUrlLayers": true,
+      "reloadPreserved": true,
+      "liveProvider": false
+    }
+  ]
+}

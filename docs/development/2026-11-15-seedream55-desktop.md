@@ -19,7 +19,7 @@ API HEAD `28443ae853a24165b23638a8b98d3ad96ddba4f0`，对应 `docs/2026-11-11-se
 
 - API合成测试：`go test ./dto ./relay/helper ./relay/channel/volcengine ./relay/channel/openai ./relay -run Seedream55 -count=1` 五包通过。
 - 桌面共享契约/请求/分层/交互66项，额外普通适配器发送回归1项；模型与参数兼容164项通过。全量创作159文件2681项、宿主99文件839项通过；类型检查与renderer构建通过。后续微调取消处理和OCR文字展示，定向66项再次通过。
-- Chrome隔离浏览器经实际菜单、生图队列、图层Provider、画布与IndexedDB完成生图→分层/OCR→应用→重载，验证3个相同URL图层未合并，OCR文字、样式与未知扩展保留。脚本 `tests/visual/seedream55-acceptance.cjs`，仅原生HTTP边界返回合成数据，外网请求全部阻断。截图已人工查看。
+- Chrome和WebKit隔离浏览器均经实际菜单、生图队列、图层Provider、画布与IndexedDB完成生图→分层/OCR→应用→重载，验证3个相同URL图层未合并，OCR文字、样式与未知扩展保留。验证源码 `a986a3d03c8d1bd84214e8916d8378b314d6bc2d`；结果分别保存在 `/tmp/tuzi-seedream55-expanded-chrome/seedream55-results.json` 与 `/tmp/tuzi-seedream55-expanded-webkit/seedream55-results.json`。脚本 `tests/visual/seedream55-acceptance.cjs`，仅原生HTTP边界返回合成数据，外网请求全部阻断。补查透明PNG界面选择实际发送 `background=transparent`、`output_format=png`，OCR详情可展开并读取文字；汇总见 [双浏览器记录](evidence/2026-11-15-seedream55-browser.json)。Chrome截图已人工查看。浏览器运行时安装在仓库外；安装器清理的既有WebKit2386缓存已按官方同版本归档恢复，未更改项目依赖。
 - 真实供应商权限、生成效果、透明像素和实际OCR准确率/计费没有付费联调，不能标为真实模型验收通过；最终签名安装包与跨平台实装验收见UP-03。未发布。
 
 OpenSpec记录：`packages/creative-workspace/upstream/openspec/changes/add-seedream55-desktop/`。本机未安装openspec CLI，已人工核对需求/Scenario格式，不声称CLI验证通过。
