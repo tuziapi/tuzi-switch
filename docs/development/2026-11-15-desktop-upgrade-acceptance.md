@@ -53,3 +53,28 @@ Umami 页面/操作统计仍保留，属于尽力上报，不等于 API 经营/�
 - 四平台首轮实验在补充下载中断/同安装重试与编译缓存复用后主动取消，随后只在更新后的测试分支重跑。取消的run不算通过。
 
 - 补充收紧：Windows/Linux 实验按版本精确选择安装包，避免共享构建目录的新旧包混选；正式验收门禁逐项要求 NSIS/MSI 和 AppImage/DEB/RPM，不能以单一安装格式代表整个平台。当前隔离实验仅覆盖 NSIS/AppImage，不宣称另三种安装格式通过。
+
+## 操作入口（替代旧 publish 参数）
+
+以下仅为测试仓库操作；分支须先推送并核对远端 SHA：
+
+```sh
+# 使用测试仓库现有密钥验证配对
+gh workflow run unified-release.yml -R AiW520/tuzi-switch --ref codex/verified-desktop-updates -f signing_preflight_only=true
+# 隔离应用的原生升级实验
+gh workflow run unified-release.yml -R AiW520/tuzi-switch --ref codex/verified-desktop-updates -f native_upgrade_lab_only=true
+# 常规候选：全部测试、四平台构建、逐包签名与汇总；不会发布
+gh workflow run unified-release.yml -R AiW520/tuzi-switch --ref codex/verified-desktop-updates
+```
+
+签名预检、原生实验和候选构建各自独立；不能用某一个 run 的成功代替另一个。下载候选使用该成功 run 的 `verified-release` artifact，保留其中 `candidate.json`、原签名及所有文件字节。
+
+正式晋级流程尚未授权执行。未来正式候选验收完成后，审阅记录必须从对应候选抄录 schemaVersion/repository/commit/runId/tag/files，并填齐真实 reviewer/completedAt、existing-channel-key 配对证据、四平台及全部安装类型的检查结果和证据位置；不能用临时密钥实验或本页汇总生成 passed。将记录审阅合入正式 main，tag 指向该候选源码，再用 `promote-desktop-release.yml` 的 `tag` 和 `candidate_run_id` 晋级同一批文件。旧文档出现的 `-f publish=true/false` 是历史命令，已不适用于本实现。
+
+## 测试执行器中的受保护正式签名环境
+
+2026-11-15 用户选择在测试库配置受保护的正式签名环境。已创建 `AiW520/tuzi-switch` 的 `official-updater-signing`（环境 ID `27339917740`）：只允许分支 `codex/verified-desktop-updates`、必需审核人 AiW520、禁止管理员绕过；因当前唯一指定审核人也是仓库拥有者，允许该用户人工审核自己的运行。本任务不自动批准环境部署。
+
+新增 `official-updater-preflight.yml` 的测试库作业使用上述环境，只签署并验证合成探针，不上传私钥或签署安装包，不发布。正式公钥 SHA256 固定为 `4563ca397f2a4d652b21c046a659ff2149b7537278e70b564263d688164fa7f1`（来源 ca378b86），禁止替换测试公钥。现有常规候选仍使用测试库自己的密钥，不能因此视作正式签名候选。
+
+环境 Secrets 需密钥管理员从原始保管处设置 `OFFICIAL_UPDATER_PRIVATE_KEY`，有密码时设置 `OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD`。创建时核对 Secrets 数量为0；GitHub 已保存的 Secret 不能通过 API 读回，本任务未读取、复制或生成新的正式私钥。若原私钥无法找回，新密钥仅可用于另行确认的手动过渡安装方案，不能将其冒充旧公钥配对成功。

@@ -42,6 +42,7 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          cache-on-failure: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:renderer
       - name: Native transport attribution regression
