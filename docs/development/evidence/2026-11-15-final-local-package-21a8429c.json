@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "kind": "local-package-integrity-only",
+  "sourceCommit": "21a8429c97168aade4475ce209a6608ac234e01c",
+  "version": "1.6.2",
+  "bundleIdentifier": "com.tuziswitch.desktop",
+  "architecture": "arm64",
+  "artifact": "/Users/sdy09/Downloads/tuzi-1.6.2-integrated-21a8429c/兔子助手_1.6.2_aarch64.dmg",
+  "sha256": "77e54a27b417e5945d7abf9d8253b6731f4342316d552b655e72b2382377522e",
+  "sizeBytes": 26853136,
+  "checks": {
+    "dmgIntegrity": true,
+    "appCodeSignatureIntegrity": true,
+    "mountedAppCodeSignatureIntegrity": true,
+    "mountedAppFilesAndPermissionsMatch": true,
+    "sourceCommitEmbedded": true,
+    "configuredUpdaterPublicKeyEmbedded": true
+  },
+  "bundleEntriesCompared": 8,
+  "codeSigning": "ad-hoc",
+  "appleNotarized": false,
+  "officialUpdaterSignedCandidate": false,
+  "installed": false,
+  "realLayerOcrAcceptance": "failed-before-fix-not-retested",
+  "paidRetestAuthorized": false,
+  "published": false,
+  "installedApplicationSourceCommit": "a3e2a39153d27275609d9ab16539dc22c77ea06f",
+  "installedApplicationVersion": "1.6.2",
+  "verificationLog": "/tmp/tuzi-final-21a8429c-build.log"
+}
