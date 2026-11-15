@@ -6846,7 +6846,7 @@ index 40c1937..d905b4b 100644
    );
  };
 diff --git a/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog.tsx b/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog.tsx
-index 00f10c3..2f46371 100644
+index 00f10c3..dc44c42 100644
 --- a/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog.tsx
 +++ b/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog.tsx
 @@ -1,8 +1,11 @@
@@ -6861,15 +6861,16 @@ index 00f10c3..2f46371 100644
  import { useDrawnix } from '../../hooks/use-drawnix';
  import {
    createLayerDecompositionApiClient,
-@@ -22,6 +25,7 @@ interface LayerDecompositionDialogProps {
+@@ -22,6 +25,8 @@ interface LayerDecompositionDialogProps {
    imageUrl: string;
    language: 'zh' | 'en';
    automatic?: boolean;
 +  providerModelId?: string;
++  providerProfileId?: string;
    onClose: () => void;
  }
  
-@@ -71,6 +75,14 @@ function parseBoundingBox(
+@@ -71,6 +76,14 @@ function parseBoundingBox(
    return coordinates as LayerBoundingBoxTuple;
  }
  
@@ -6884,11 +6885,12 @@ index 00f10c3..2f46371 100644
  export const LayerDecompositionDialog: React.FC<
    LayerDecompositionDialogProps
  > = ({
-@@ -80,14 +92,21 @@ export const LayerDecompositionDialog: React.FC<
+@@ -80,14 +93,22 @@ export const LayerDecompositionDialog: React.FC<
    imageUrl,
    language,
    automatic = false,
 +  providerModelId,
++  providerProfileId,
    onClose,
  }) => {
    const { board: activeBoard } = useDrawnix();
@@ -6907,7 +6909,7 @@ index 00f10c3..2f46371 100644
    const [progress, setProgress] = useState(0);
    const [phase, setPhase] = useState('queued');
    const [result, setResult] = useState<LayerDecompositionResponse | null>(null);
-@@ -120,6 +139,7 @@ export const LayerDecompositionDialog: React.FC<
+@@ -120,6 +141,7 @@ export const LayerDecompositionDialog: React.FC<
        abortRef.current = null;
        taskIdRef.current = null;
        setProcessing(false);
@@ -6915,7 +6917,7 @@ index 00f10c3..2f46371 100644
        setProgress(0);
        setPhase('queued');
        setResult(null);
-@@ -154,7 +174,7 @@ export const LayerDecompositionDialog: React.FC<
+@@ -154,7 +176,7 @@ export const LayerDecompositionDialog: React.FC<
    const cancel = useCallback(async () => {
      const taskId = taskIdRef.current;
      abortRef.current?.abort();
@@ -6924,7 +6926,7 @@ index 00f10c3..2f46371 100644
        try {
          await createLayerDecompositionApiClient().cancel(taskId);
        } catch {
-@@ -204,6 +224,7 @@ export const LayerDecompositionDialog: React.FC<
+@@ -204,6 +226,7 @@ export const LayerDecompositionDialog: React.FC<
        runningRef.current = true;
        abortRef.current = controller;
        setProcessing(true);
@@ -6932,7 +6934,7 @@ index 00f10c3..2f46371 100644
        setProgress(0);
        setPhase('queued');
        try {
-@@ -211,6 +232,8 @@ export const LayerDecompositionDialog: React.FC<
+@@ -211,6 +234,8 @@ export const LayerDecompositionDialog: React.FC<
            createLayerDecompositionApiClient(),
            controller.signal
          );
@@ -6941,7 +6943,7 @@ index 00f10c3..2f46371 100644
          if (response.resultKind === 'test') {
            MessagePlugin.warning(
              isZh
-@@ -263,13 +286,11 @@ export const LayerDecompositionDialog: React.FC<
+@@ -263,13 +288,11 @@ export const LayerDecompositionDialog: React.FC<
          ) {
            return;
          }
@@ -6960,7 +6962,7 @@ index 00f10c3..2f46371 100644
          if (automatic) close();
        } finally {
          if (abortRef.current === controller) abortRef.current = null;
-@@ -299,18 +320,40 @@ export const LayerDecompositionDialog: React.FC<
+@@ -299,18 +322,42 @@ export const LayerDecompositionDialog: React.FC<
        return;
      }
      taskIdRef.current = null;
@@ -6987,6 +6989,7 @@ index 00f10c3..2f46371 100644
 +      if (seedream55) {
 +        const response = await decomposeWithConfiguredImageProvider(request, {
 +          modelId: SEEDREAM55_MODEL_ID,
++          profileId: providerProfileId,
 +          signal,
 +          onProgress: handleProgress,
 +        });
@@ -7007,13 +7010,14 @@ index 00f10c3..2f46371 100644
 +    mode,
 +    runTask,
 +    seedream55,
++    providerProfileId,
 +    layerSize,
 +    textRecognition,
 +  ]);
  
    useEffect(() => {
      if (!open || !automatic || autoStartedRef.current) return;
-@@ -424,19 +467,19 @@ export const LayerDecompositionDialog: React.FC<
+@@ -424,19 +471,19 @@ export const LayerDecompositionDialog: React.FC<
    const primaryAction = result
      ? applyResult
      : needsCorrection
@@ -7041,7 +7045,7 @@ index 00f10c3..2f46371 100644
  
    return (
      <ConfirmDialog
-@@ -469,8 +512,8 @@ export const LayerDecompositionDialog: React.FC<
+@@ -469,8 +516,8 @@ export const LayerDecompositionDialog: React.FC<
                    ? '取消任务'
                    : 'Cancel task'
                  : isZh
@@ -7052,7 +7056,7 @@ index 00f10c3..2f46371 100644
              </Button>
            </div>
          ) : (
-@@ -485,8 +528,8 @@ export const LayerDecompositionDialog: React.FC<
+@@ -485,8 +532,8 @@ export const LayerDecompositionDialog: React.FC<
                    ? '取消任务'
                    : 'Cancel task'
                  : isZh
@@ -7063,7 +7067,7 @@ index 00f10c3..2f46371 100644
              </Button>
              <Button
                theme="primary"
-@@ -500,10 +543,27 @@ export const LayerDecompositionDialog: React.FC<
+@@ -500,10 +547,27 @@ export const LayerDecompositionDialog: React.FC<
        }
      >
        <div className="layer-decomposition-dialog__body">
@@ -7093,7 +7097,7 @@ index 00f10c3..2f46371 100644
          />
  
          {!automatic && !result && !needsCorrection && (
-@@ -576,7 +636,7 @@ export const LayerDecompositionDialog: React.FC<
+@@ -576,7 +640,7 @@ export const LayerDecompositionDialog: React.FC<
              <input
                type="range"
                min={1}
@@ -7102,7 +7106,7 @@ index 00f10c3..2f46371 100644
                step={1}
                value={maxLayers}
                disabled={processing}
-@@ -585,6 +645,41 @@ export const LayerDecompositionDialog: React.FC<
+@@ -585,6 +649,41 @@ export const LayerDecompositionDialog: React.FC<
            </label>
          )}
  
@@ -7144,7 +7148,7 @@ index 00f10c3..2f46371 100644
          {!automatic && needsCorrection && !result && (
            <div className="layer-decomposition-dialog__correction">
              <strong>
-@@ -651,16 +746,45 @@ export const LayerDecompositionDialog: React.FC<
+@@ -651,16 +750,45 @@ export const LayerDecompositionDialog: React.FC<
              <span>
                {isZh ? '图层数量' : 'Layers'}: {result.layers.length + 1}
              </span>
@@ -13455,7 +13459,7 @@ index a10b381..98aaed9 100644
          onPointerDown={(event) => event.stopPropagation()}
          onKeyDown={(event) => {
 diff --git a/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx b/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
-index 75137cd..853379d 100644
+index 75137cd..0c127e4 100644
 --- a/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
 +++ b/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
 @@ -1,3 +1,6 @@
@@ -13469,11 +13473,11 @@ index 75137cd..853379d 100644
  
    // 图片编辑器状态
    const [showImageEditor, setShowImageEditor] = useState(false);
-+  const [seedreamLayerSource, setSeedreamLayerSource] = useState<{board: PlaitBoard; id: string; url: string} | null>(null);
++  const [seedreamLayerSource, setSeedreamLayerSource] = useState<{board: PlaitBoard; id: string; url: string; profileId?: string} | null>(null);
    const [editingImageBinding, setEditingImageBinding] = useState<CanvasBoardBinding | null>(null);
    const [imageToolMode, setImageToolMode] = useState<ImageToolMode | null>(null);
    const imageToolSelectionKey = selectedElements.map(element => element.id).join(',');
-@@ -1885,6 +1889,16 @@ export const PopupToolbar = () => {
+@@ -1885,6 +1889,23 @@ export const PopupToolbar = () => {
                  }}
                />
              )}
@@ -13481,16 +13485,23 @@ index 75137cd..853379d 100644
 +              <ToolButton type="icon" icon={<Ungroup size={16} />} visible={true}
 +                tooltip={language === 'zh' ? 'Seedream 5.5 分层 / OCR' : 'Seedream 5.5 Layers / OCR'}
 +                aria-label={language === 'zh' ? 'Seedream 5.5 分层 / OCR' : 'Seedream 5.5 Layers / OCR'}
-+                onPointerUp={() => {
++                onPointerUp={async () => {
 +                  const image = selectedElements[0];
-+                  if (PlaitDrawElement.isDrawElement(image) && PlaitDrawElement.isImage(image) && image.url)
-+                    setSeedreamLayerSource({ board, id: image.id, url: image.url });
++                  if (!PlaitDrawElement.isDrawElement(image) || !PlaitDrawElement.isImage(image) || !image.url) return;
++                  try {
++                    const task = await taskQueueService.findImageTaskByResultUrl(image.url);
++                    if (!board.children.some(element => element.id === image.id)) return;
++                    setSeedreamLayerSource({ board, id: image.id, url: image.url,
++                      profileId: task?.params.modelRef?.profileId || undefined });
++                  } catch {
++                    MessagePlugin.error(language === 'zh' ? '读取原图生成服务失败，请稍后重试' : 'Could not read the source image provider');
++                  }
 +                }} />
 +            )}
              {state.hasLayerDecomposition && (
                <ToolButton
                  className="ai-layer-decomposition"
-@@ -2023,6 +2037,7 @@ export const PopupToolbar = () => {
+@@ -2023,6 +2044,7 @@ export const PopupToolbar = () => {
                      if (
                        PlaitDrawElement.isDrawElement(element) &&
                        PlaitDrawElement.isImage(element) &&
@@ -13498,7 +13509,7 @@ index 75137cd..853379d 100644
                        element.url
                      ) {
                        downloadItems.push({ url: element.url, type: 'image' });
-@@ -2087,10 +2102,10 @@ export const PopupToolbar = () => {
+@@ -2087,10 +2109,10 @@ export const PopupToolbar = () => {
                      const processedItems: BatchDownloadItem[] = [];
                      const isDesktopDownload =
                        typeof window !== 'undefined' &&
@@ -13511,7 +13522,7 @@ index 75137cd..853379d 100644
                          processedItems.push(item);
                          continue;
                        }
-@@ -2178,7 +2193,7 @@ export const PopupToolbar = () => {
+@@ -2178,7 +2200,7 @@ export const PopupToolbar = () => {
                            ? `Opened ${downloadResult.openedCount} links for download`
                            : 'Opened link for download'
                        );
@@ -13520,14 +13531,14 @@ index 75137cd..853379d 100644
                        MessagePlugin.success(
                          downloadItems.length > 1
                            ? language === 'zh'
-@@ -2759,6 +2774,12 @@ export const PopupToolbar = () => {
+@@ -2759,6 +2781,12 @@ export const PopupToolbar = () => {
          />
        )}
  
 +      {seedreamLayerSource && (
 +        <LayerDecompositionDialog open board={seedreamLayerSource.board} sourceElementId={seedreamLayerSource.id}
 +          imageUrl={seedreamLayerSource.url} language={language === 'zh' ? 'zh' : 'en'}
-+          providerModelId={SEEDREAM55_MODEL_ID} onClose={() => setSeedreamLayerSource(null)} />
++          providerModelId={SEEDREAM55_MODEL_ID} providerProfileId={seedreamLayerSource.profileId} onClose={() => setSeedreamLayerSource(null)} />
 +      )}
 +
        {imageToolMode && state.hasImageEdit && selectedElements[0] && <Suspense fallback={null}>
@@ -21541,7 +21552,7 @@ index 81595dc..7454e2b 100644
      boundingBox: {
        absolute: [...artifact.boundingBox.absolute],
 diff --git a/packages/drawnix/src/services/layer-decomposition/provider.ts b/packages/drawnix/src/services/layer-decomposition/provider.ts
-index db8e66d..283e833 100644
+index db8e66d..d0d3885 100644
 --- a/packages/drawnix/src/services/layer-decomposition/provider.ts
 +++ b/packages/drawnix/src/services/layer-decomposition/provider.ts
 @@ -1,3 +1,7 @@
@@ -21776,8 +21787,49 @@ index db8e66d..283e833 100644
  }
  
  function readProviderImageSize(
-@@ -588,12 +621,12 @@ export async function decomposeWithConfiguredImageProvider(
-     modelContext.binding?.protocol === 'openai.images.generations'
+@@ -563,18 +596,34 @@ export async function decomposeWithConfiguredImageProvider(
+     signal?: AbortSignal;
+     onProgress?: (progress: LayerDecompositionProgress) => void;
+     modelId?: string;
++    profileId?: string;
+   } = {}
+ ): Promise<LayerDecompositionResponse | null> {
+   await settingsManager.waitForInitialization();
+   const activeRoute = resolveInvocationRoute('image');
+   const requestedModelId = options.modelId?.trim() || activeRoute.modelId;
+-  const modelRoute = resolveInvocationRoute('image', requestedModelId);
++  const explicitProfileId = options.profileId?.trim();
++  if (explicitProfileId) {
++    const profile = settingsManager.getSettings().providerProfiles.find(
++      item => item.id === explicitProfileId && item.enabled !== false
++    );
++    if (!profile) throw new Error('原图使用的图片服务已不可用，请重新配置分层服务');
++  }
++  const modelRoute = resolveInvocationRoute('image', explicitProfileId
++    ? createModelRef(explicitProfileId, requestedModelId) : requestedModelId);
++  if (explicitProfileId && modelRoute.profileId !== explicitProfileId) {
++    throw new Error('原图使用的图片服务已不可用，请重新配置分层服务');
++  }
+   const modelContext = getAdapterContextFromSettings(
+     'image',
+     createModelRef(modelRoute.profileId, requestedModelId)
+   );
++  if (explicitProfileId && (!modelContext.baseUrl ||
++    (modelContext.authType !== 'none' && !modelContext.apiKey?.trim()))) {
++    throw new Error('原图使用的图片服务缺少调用配置，请重新配置分层服务');
++  }
+   const activeContext =
+-    activeRoute.profileId && activeRoute.profileId !== modelRoute.profileId
++    !explicitProfileId && activeRoute.profileId && activeRoute.profileId !== modelRoute.profileId
+       ? getAdapterContextFromSettings(
+           'image',
+           createModelRef(activeRoute.profileId, requestedModelId)
+@@ -585,15 +634,15 @@ export async function decomposeWithConfiguredImageProvider(
+   // keep the active image provider endpoint and credentials instead of
+   // accidentally falling back to the unrelated legacy image endpoint.
+   const context =
+-    modelContext.binding?.protocol === 'openai.images.generations'
++    explicitProfileId || modelContext.binding?.protocol === 'openai.images.generations'
        ? modelContext
        : hasExplicitLayerModel && activeContext
 -      ? activeContext
@@ -21795,7 +21847,7 @@ index db8e66d..283e833 100644
    const capability = getLayerCapability(context, requestedModelId);
    if (!capability?.enabled) return null;
    if (
-@@ -627,6 +660,18 @@ export async function decomposeWithConfiguredImageProvider(
+@@ -627,6 +676,18 @@ export async function decomposeWithConfiguredImageProvider(
      watermark: false,
    };
    if (request.prompt) payload.prompt = request.prompt;
@@ -21814,7 +21866,7 @@ index db8e66d..283e833 100644
    const response = await sendAdapterRequest(context, {
      path:
        capability.path || context.binding?.submitPath || '/images/generations',
-@@ -654,7 +699,11 @@ export async function decomposeWithConfiguredImageProvider(
+@@ -654,7 +715,11 @@ export async function decomposeWithConfiguredImageProvider(
    });
    const result = requireNativeProviderQuality(
      normalizeProviderLayerPayload(await readProviderResponseJson(response), {

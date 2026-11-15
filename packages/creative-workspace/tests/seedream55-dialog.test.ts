@@ -54,13 +54,14 @@ describe('real layer settings dialog',()=>{
     const artifact={groupId:'synthetic',url:'https://example.test/layer.png',zIndex:1,name:'标题',description:'',boundingBox:{absolute:[0,0,1,1],normalized:[0,0,1000,1000]},textRecognition:{text:'你好',lines:[{font:{family:'Synthetic'}}]}};
     decompose.mockResolvedValue({groupId:'synthetic',background:{...artifact,zIndex:0},layers:[artifact],resultKind:'inference'});
     insert.mockResolvedValue({});
-    render(React.createElement(LayerDecompositionDialog,{open:true,board:board as any,sourceElementId:'source',imageUrl:'https://example.test/source.png',language:'zh',providerModelId:'doubao-seedream-5-5-261028',onClose:()=>{}}));
+    render(React.createElement(LayerDecompositionDialog,{open:true,board:board as any,sourceElementId:'source',imageUrl:'https://example.test/source.png',language:'zh',providerModelId:'doubao-seedream-5-5-261028',providerProfileId:'synthetic-source-provider',onClose:()=>{}}));
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.change(screen.getByRole('slider'),{target:{value:'99'}});
     fireEvent.change(screen.getByRole('combobox'),{target:{value:'1.5K'}});
     fireEvent.click(screen.getByRole('button',{name:/开始分层/}));
     await waitFor(()=>expect(decompose).toHaveBeenCalledTimes(1));
     expect(decompose.mock.calls[0][0]).toMatchObject({maxLayers:99,textRecognition:true,size:'1.5K'});
+    expect(decompose.mock.calls[0][1]).toMatchObject({profileId:'synthetic-source-provider'});
     expect(await screen.findByText(/OCR 和图层扩展信息/)).toBeTruthy();
     expect(screen.getAllByText(/你好/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button',{name:/应用|插入/}));

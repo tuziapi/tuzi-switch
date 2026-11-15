@@ -251,7 +251,7 @@ export const PopupToolbar = () => {
 
   // 图片编辑器状态
   const [showImageEditor, setShowImageEditor] = useState(false);
-  const [seedreamLayerSource, setSeedreamLayerSource] = useState<{board: PlaitBoard; id: string; url: string} | null>(null);
+  const [seedreamLayerSource, setSeedreamLayerSource] = useState<{board: PlaitBoard; id: string; url: string; profileId?: string} | null>(null);
   const [editingImageBinding, setEditingImageBinding] = useState<CanvasBoardBinding | null>(null);
   const [imageToolMode, setImageToolMode] = useState<ImageToolMode | null>(null);
   const imageToolSelectionKey = selectedElements.map(element => element.id).join(',');
@@ -1893,10 +1893,17 @@ export const PopupToolbar = () => {
               <ToolButton type="icon" icon={<Ungroup size={16} />} visible={true}
                 tooltip={language === 'zh' ? 'Seedream 5.5 分层 / OCR' : 'Seedream 5.5 Layers / OCR'}
                 aria-label={language === 'zh' ? 'Seedream 5.5 分层 / OCR' : 'Seedream 5.5 Layers / OCR'}
-                onPointerUp={() => {
+                onPointerUp={async () => {
                   const image = selectedElements[0];
-                  if (PlaitDrawElement.isDrawElement(image) && PlaitDrawElement.isImage(image) && image.url)
-                    setSeedreamLayerSource({ board, id: image.id, url: image.url });
+                  if (!PlaitDrawElement.isDrawElement(image) || !PlaitDrawElement.isImage(image) || !image.url) return;
+                  try {
+                    const task = await taskQueueService.findImageTaskByResultUrl(image.url);
+                    if (!board.children.some(element => element.id === image.id)) return;
+                    setSeedreamLayerSource({ board, id: image.id, url: image.url,
+                      profileId: task?.params.modelRef?.profileId || undefined });
+                  } catch {
+                    MessagePlugin.error(language === 'zh' ? '读取原图生成服务失败，请稍后重试' : 'Could not read the source image provider');
+                  }
                 }} />
             )}
             {state.hasLayerDecomposition && (
@@ -2777,7 +2784,7 @@ export const PopupToolbar = () => {
       {seedreamLayerSource && (
         <LayerDecompositionDialog open board={seedreamLayerSource.board} sourceElementId={seedreamLayerSource.id}
           imageUrl={seedreamLayerSource.url} language={language === 'zh' ? 'zh' : 'en'}
-          providerModelId={SEEDREAM55_MODEL_ID} onClose={() => setSeedreamLayerSource(null)} />
+          providerModelId={SEEDREAM55_MODEL_ID} providerProfileId={seedreamLayerSource.profileId} onClose={() => setSeedreamLayerSource(null)} />
       )}
 
       {imageToolMode && state.hasImageEdit && selectedElements[0] && <Suspense fallback={null}>

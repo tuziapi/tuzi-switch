@@ -596,18 +596,34 @@ export async function decomposeWithConfiguredImageProvider(
     signal?: AbortSignal;
     onProgress?: (progress: LayerDecompositionProgress) => void;
     modelId?: string;
+    profileId?: string;
   } = {}
 ): Promise<LayerDecompositionResponse | null> {
   await settingsManager.waitForInitialization();
   const activeRoute = resolveInvocationRoute('image');
   const requestedModelId = options.modelId?.trim() || activeRoute.modelId;
-  const modelRoute = resolveInvocationRoute('image', requestedModelId);
+  const explicitProfileId = options.profileId?.trim();
+  if (explicitProfileId) {
+    const profile = settingsManager.getSettings().providerProfiles.find(
+      item => item.id === explicitProfileId && item.enabled !== false
+    );
+    if (!profile) throw new Error('原图使用的图片服务已不可用，请重新配置分层服务');
+  }
+  const modelRoute = resolveInvocationRoute('image', explicitProfileId
+    ? createModelRef(explicitProfileId, requestedModelId) : requestedModelId);
+  if (explicitProfileId && modelRoute.profileId !== explicitProfileId) {
+    throw new Error('原图使用的图片服务已不可用，请重新配置分层服务');
+  }
   const modelContext = getAdapterContextFromSettings(
     'image',
     createModelRef(modelRoute.profileId, requestedModelId)
   );
+  if (explicitProfileId && (!modelContext.baseUrl ||
+    (modelContext.authType !== 'none' && !modelContext.apiKey?.trim()))) {
+    throw new Error('原图使用的图片服务缺少调用配置，请重新配置分层服务');
+  }
   const activeContext =
-    activeRoute.profileId && activeRoute.profileId !== modelRoute.profileId
+    !explicitProfileId && activeRoute.profileId && activeRoute.profileId !== modelRoute.profileId
       ? getAdapterContextFromSettings(
           'image',
           createModelRef(activeRoute.profileId, requestedModelId)
@@ -618,7 +634,7 @@ export async function decomposeWithConfiguredImageProvider(
   // keep the active image provider endpoint and credentials instead of
   // accidentally falling back to the unrelated legacy image endpoint.
   const context =
-    modelContext.binding?.protocol === 'openai.images.generations'
+    explicitProfileId || modelContext.binding?.protocol === 'openai.images.generations'
       ? modelContext
       : hasExplicitLayerModel && activeContext
         ? activeContext

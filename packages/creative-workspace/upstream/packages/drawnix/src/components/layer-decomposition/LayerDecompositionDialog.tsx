@@ -26,6 +26,7 @@ interface LayerDecompositionDialogProps {
   language: 'zh' | 'en';
   automatic?: boolean;
   providerModelId?: string;
+  providerProfileId?: string;
   onClose: () => void;
 }
 
@@ -93,6 +94,7 @@ export const LayerDecompositionDialog: React.FC<
   language,
   automatic = false,
   providerModelId,
+  providerProfileId,
   onClose,
 }) => {
   const { board: activeBoard } = useDrawnix();
@@ -331,6 +333,7 @@ export const LayerDecompositionDialog: React.FC<
       if (seedream55) {
         const response = await decomposeWithConfiguredImageProvider(request, {
           modelId: SEEDREAM55_MODEL_ID,
+          profileId: providerProfileId,
           signal,
           onProgress: handleProgress,
         });
@@ -351,6 +354,7 @@ export const LayerDecompositionDialog: React.FC<
     mode,
     runTask,
     seedream55,
+    providerProfileId,
     layerSize,
     textRecognition,
   ]);
