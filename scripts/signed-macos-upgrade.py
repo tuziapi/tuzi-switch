@@ -253,7 +253,7 @@ try:
     # single admin trust record with remove-trusted-cert hangs on these runners.
     trust_export=lab/'admin-trust-with-probe.plist'
     run(['sudo','security','trust-settings-export','-d',str(trust_export)],capture_output=True)
-    trust_settings=plistlib.loads(trust_export.read_bytes())
+    trust_settings=plistlib.loads(capture(['sudo','cat',str(trust_export)]))
     matching=[key for key in trust_settings['trustList'] if key.upper()==fingerprint]
     assert len(matching)==1, 'Synthetic CA missing from exported admin trust'
     del trust_settings['trustList'][matching[0]]
@@ -347,7 +347,7 @@ finally:
             try:
                 restored=lab/'admin-trust-restored.plist'
                 run(['sudo','security','trust-settings-export','-d',str(restored)],capture_output=True)
-                assert plistlib.loads(restored.read_bytes())==plistlib.loads(trust_restore.read_bytes())
+                assert plistlib.loads(capture(['sudo','cat',str(restored)]))==plistlib.loads(trust_restore.read_bytes())
                 report['adminTrustRestored']=True
             except (subprocess.SubprocessError,OSError,AssertionError) as error:
                 report.setdefault('cleanupErrors',[]).append('Admin trust verification: '+repr(error))
