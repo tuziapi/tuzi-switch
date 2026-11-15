@@ -1,0 +1,310 @@
+{
+  "kind": "isolated-native-smoke",
+  "platform": "linux-x86_64",
+  "installerType": "rpm",
+  "signingKey": "ephemeral-test-key",
+  "officialAcceptance": false,
+  "results": [
+    {
+      "scenario": "tampered-signature",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 248,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "The signature verification failed",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/tampered-signature-1794730302579608927"
+    },
+    {
+      "scenario": "retry-after-signature-rejection",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 339,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 26098786
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 398,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/tampered-signature-1794730302579608927"
+    },
+    {
+      "scenario": "interrupted-download",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 440,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "error decoding response body",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/interrupted-download-1794730305132570152"
+    },
+    {
+      "scenario": "missing-package",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 494,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "`Download request failed with status: 404 Not Found`",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/missing-package-1794730306266098644"
+    },
+    {
+      "scenario": "install-failure",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 548,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 32
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "installRejected": true,
+            "error": "invalid updater binary format",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/install-failure-1794730307216990186"
+    },
+    {
+      "scenario": "same-version",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 602,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/same-version-1794730308209399667"
+    },
+    {
+      "scenario": "downgrade",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 655,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/downgrade-1794730309313785277"
+    },
+    {
+      "scenario": "upgrade-and-restart",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 708,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 26098786
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 768,
+            "bundleType": "Some(Rpm)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/upgrade-and-restart-1794730310386172412"
+    }
+  ],
+  "repository": "AiW520/tuzi-switch",
+  "runId": "43691829983",
+  "applicationCommit": "9177aac7a72a75f376d42408603a81d1419d99c0",
+  "artifactId": "14153490733",
+  "artifactSha256": "496619748df52badbbe5daff320f1a6bab3b2ce922366f3671e1ff616ef32243",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "runtimeOsRelease": "NAME=\"Fedora Linux\"\nVERSION=\"43 (Container Image)\"\nRELEASE_TYPE=stable\nID=fedora\nVERSION_ID=43\nVERSION_CODENAME=\"\"\nPRETTY_NAME=\"Fedora Linux 43 (Container Image)\"\nANSI_COLOR=\"0;38;2;60;110;180\"\nLOGO=fedora-logo-icon\nCPE_NAME=\"cpe:/o:fedoraproject:fedora:43\"\nDEFAULT_HOSTNAME=\"fedora\"\nHOME_URL=\"https://fedoraproject.org/\"\nDOCUMENTATION_URL=\"https://docs.fedoraproject.org/en-US/fedora/f43/\"\nSUPPORT_URL=\"https://ask.fedoraproject.org/\"\nBUG_REPORT_URL=\"https://bugzilla.redhat.com/\"\nREDHAT_BUGZILLA_PRODUCT=\"Fedora\"\nREDHAT_BUGZILLA_PRODUCT_VERSION=43\nREDHAT_SUPPORT_PRODUCT=\"Fedora\"\nREDHAT_SUPPORT_PRODUCT_VERSION=43\nSUPPORT_END=2026-12-02\nVARIANT=\"Container Image\"\nVARIANT_ID=container\n",
+  "scope": "Fedora 43 RPM eight-scenario temporary-key isolated test; not official candidate acceptance"
+}

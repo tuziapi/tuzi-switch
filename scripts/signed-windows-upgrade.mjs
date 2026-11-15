@@ -70,8 +70,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function connect(version, timeout = 180000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
+    for (const endpoint of ['http://127.0.0.1:9222', 'http://localhost:9222', 'http://[::1]:9222']) {
     try {
-      const b = await chromium.connectOverCDP('http://127.0.0.1:9222', { timeout: 3000 });
+      const b = await chromium.connectOverCDP(endpoint, { timeout: 1000 });
       report.cdpPages = b.contexts().flatMap(c => c.pages()).map(p => p.url());
       const p = b.contexts().flatMap(c => c.pages()).find(p => /tauri\.localhost|^tauri:/.test(p.url()));
       if (p) {
@@ -79,7 +80,10 @@ async function connect(version, timeout = 180000) {
         if (v === version) { browser = b; p.setDefaultTimeout(30000); return p; }
       }
       await b.close();
-    } catch (error) { report.lastConnectError = String(error); }
+    } catch (error) {
+      report.connectionErrors ??= {}; report.connectionErrors[endpoint] = String(error);
+    }
+    }
     await delay(1000);
   }
   throw Error(`No automatically running application at version ${version}`);
@@ -155,7 +159,7 @@ foreach ($program in $programs) {
   report.initialPid = initial.pid;
   initial.on('exit', (code, signal) => { report.initialExit = { code, signal }; });
   initial.unref();
-  let page = await connect('1.6.2');
+  let page = await connect('1.6.2', 60000);
   report.baseIdentity = await identity(page, '1.6.2', base.commit);
   const fixture = { id: 'SYNTHETIC-SIGNED-UPGRADE', name: 'SYNTHETIC signed upgrade preservation', settingsConfig: { env: { ANTHROPIC_AUTH_TOKEN: 'SYNTHETIC-NO-REAL-CREDENTIAL', ANTHROPIC_BASE_URL: 'https://synthetic.invalid' } } };
   await page.evaluate(async provider => {
@@ -204,9 +208,15 @@ foreach ($program in $programs) {
   report.subsetStatus = 'failed'; report.error = String(error);
   try {
     report.processDiagnostics = JSON.parse(powershell(String.raw`
-@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:TUZI_SIGNED_LAB_EXE -or $_.Name -eq 'msedgewebview2.exe' } | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath) | ConvertTo-Json -Compress
+@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:TUZI_SIGNED_LAB_EXE -or $_.Name -eq 'msedgewebview2.exe' } | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,@{Name='debugArguments';Expression={@([regex]::Matches($_.CommandLine,'--remote-debugging[^ ]*') | ForEach-Object Value)}}) | ConvertTo-Json -Compress
 `));
   } catch (diagnosticError) { report.diagnosticError = String(diagnosticError); }
+  try {
+    report.debugListeners = JSON.parse(powershell(String.raw`
+@(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -eq 9222 } | Select-Object LocalAddress,LocalPort,OwningProcess) | ConvertTo-Json -Compress
+`) || '[]');
+  } catch {}
+  report.launchDebugArguments = appEnv.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS;
   const log = path.join(process.env.USERPROFILE, '.tuzi-switch', 'logs', 'tuzi-switch.log');
   if (fs.existsSync(log)) report.startupLogTail = fs.readFileSync(log, 'utf8').split(/\r?\n/).slice(-80);
 
@@ -218,17 +228,29 @@ foreach ($program in $programs) {
 $ErrorActionPreference='Stop'
 Import-Module Microsoft.PowerShell.Security
 $root=$env:TUZI_SIGNED_LAB_ROOT
+$cleanupErrors=@()
+$operations=@({
 Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:TUZI_SIGNED_LAB_EXE } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}, {
 if (Test-Path (Join-Path $root 'hosts.original')) { Copy-Item (Join-Path $root 'hosts.original') (Join-Path $env:SystemRoot 'System32/drivers/etc/hosts') -Force; Clear-DnsClientCache }
+}, {
 if (Test-Path (Join-Path $root 'webview-env.original')) {
- $previous=Get-Content (Join-Path $root 'webview-env.original') -Raw
- [Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS',([string]$previous).Trim(),'User')
+ $previous=[System.IO.File]::ReadAllText((Join-Path $root 'webview-env.original')).Trim()
+ if ($previous.Length -eq 0) { $previous=$null }
+ [Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS',$previous,'User')
 }
+}, {
 Get-NetFirewallRule -DisplayName 'SYNTHETIC Tuzi signed updater lab' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+}, {
 if (Test-Path (Join-Path $root 'tls-thumbprint.txt')) {
  $thumb=(Get-Content (Join-Path $root 'tls-thumbprint.txt') -Raw).Trim()
  Remove-Item "Cert:\CurrentUser\My\$thumb","Cert:\LocalMachine\Root\$thumb" -Force -ErrorAction SilentlyContinue
 }
+})
+foreach ($operation in $operations) {
+ try { & $operation } catch { $cleanupErrors += $_.Exception.Message }
+}
+if ($cleanupErrors.Count) { throw ($cleanupErrors -join '; ') }
 `);
   } catch (error) {
     report.cleanupError = String(error);
