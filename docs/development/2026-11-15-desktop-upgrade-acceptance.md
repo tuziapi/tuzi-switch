@@ -289,3 +289,10 @@ Linux43699772576的结构化错误为session not created / Failed to match capab
 Linux控制通路43700222624/a40c2b31通过，artifact14155848597已完整下载并核对SHA256/ZIP CRC；实际原生IPC为1.6.2/com.tuziswitch.desktop/stable/tuziapi仓库/11b8e308精确源码，真实DOM含opentu创作与欢迎弹窗。见evidence/2026-11-15-linux-probe-43700222624.json。仅证明原字节DEB实装、启动与可控IPC，不包含升级。截图发现最小runner缺CJK字体、日志缺update-desktop-database，不能算视觉或深链验收；补充测试机fonts-noto-cjk、desktop-file-utils和AT-SPI基础包再采集，不改应用包。
 
 修复候选43699923173/5bfee5f3的verify已成功，四平台目前等待official-updater-signing；已向用户说明新增修复需逐次审批，不能沿用旧run批准。仍无正式发布。
+
+
+## Linux 实装预检字体补齐与修复候选审批
+
+用户已批准修复候选 `43699923173`（`5bfee5f39b0b370093081227c6e19883f21280a0`）的受保护环境，四平台已实际开始构建，未发布。
+
+Linux 预检 `43700641638` / `9db60abdff83e0bcc95441d56bf1dc06aa2609be` 成功。证据归档 `14156118378` 的整体 SHA256 `32788f8fe0160c0eeaf07df72930863aa4f7e0450c1a7ca750bae531ad614a84` 与 ZIP CRC 独立通过；原生身份仍匹配原候选 `43680220045`。人工查看截图确认补齐 Noto CJK 字体后欢迎弹窗及导航中文正常。仅记录实际安装、启动、原生 IPC 和有限截图观察；不当作完整视觉、深链、创作或升级验收，也不替代修复候选测试。

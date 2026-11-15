@@ -1,0 +1,30 @@
+{
+  "kind": "installed-linux-driver-probe",
+  "officialAcceptance": false,
+  "candidateRunId": "43680220045",
+  "candidateCommit": "11b8e308ef77708df3526a7701d106fc04b15f57",
+  "identity": {
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "repository": "tuziapi/tuzi-switch",
+      "channel": "stable",
+      "platform": "linux",
+      "commit": "11b8e308ef77708df3526a7701d106fc04b15f57",
+      "runNumber": 33
+    },
+    "version": "1.6.2"
+  },
+  "ui": "兔子助手\nAssistant workspace\n\n\n兔子账户\n\nopentu 创作\n工具\n\nClaude Code\n\nClaude Desktop\n\nCodex\n\nGemini CLI\n\nOpenCode\n\nOpenClaw\n\nHermes\n\nGrok Build\n\nP\nPi\n\nMiniMax Code\n工作区\n\nMCP 管理\n\nSkills 管理\n\n提示词\n\n会话管理\n\n授权管理\n\n本机使用统计\n\n智能体\n\n统一供应商\n\n设置\n兔子账户\n\n\n\n连接兔子账户\n在 API 站复制系统令牌，回跳时会尝试从剪贴板填入；请确认后连接。\n未连接\n\n账户系统令牌\n\n前往获取系统令牌\n连接\n连接账户后可使用账户功能，工具管理不受影响。\n欢迎使用 兔子助手\n兔子助手 可以帮你在 Claude Code / Codex / Gemini CLI 的多个供应商之间一键切换。如果你之前已经配置过这些工具，兔子助手 会自动把现有设置保存为名为 “default” 的供应商，保证你的配置不会丢失。\n列表里还预置了 “官方（Official）” 供应商，随时点一下即可切回官方默认配置。切换前 兔子助手 会自动把当前配置备份回 default，可以放心来回切。兔子助手 就是这样工作的 😊\n我知道了\n",
+  "status": "passed",
+  "testRunId": "43700641638",
+  "testCommit": "9db60abdff83e0bcc95441d56bf1dc06aa2609be",
+  "artifactId": "14156118378",
+  "artifactSha256": "32788f8fe0160c0eeaf07df72930863aa4f7e0450c1a7ca750bae531ad614a84",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "reviewObservations": [
+    "Chinese labels and welcome dialog render legibly after installing fonts-noto-cjk on the disposable runner.",
+    "Actual DEB installation, UI and IPC identity passed. No upgrade, deep-link behavior, full visual acceptance or creative workflow was exercised.",
+    "This probe used the previous candidate, not the layer-placeholder fix candidate."
+  ]
+}
