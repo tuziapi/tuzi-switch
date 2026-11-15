@@ -31,8 +31,18 @@ export function mountNativeImageOverlay(
   };
   syncRectangle();
   const previousVisibility = foreignObject.style.visibility;
-  const onLoad = () => { foreignObject.style.visibility = 'hidden'; };
-  const onError = () => { foreignObject.style.visibility = previousVisibility; };
+  // Do not let an unresolved virtual URL paint the browser's broken-image
+  // glyph into the native SVG layer. The HTML fallback remains visible until
+  // this overlay has decoded a valid source.
+  image.setAttribute('visibility', 'hidden');
+  const onLoad = () => {
+    image.setAttribute('visibility', 'visible');
+    foreignObject.style.visibility = 'hidden';
+  };
+  const onError = () => {
+    image.setAttribute('visibility', 'hidden');
+    foreignObject.style.visibility = previousVisibility;
+  };
   // A virtual cache path may not be resolved yet. Keep the HTML fallback until
   // the SVG has loaded the resolved blob; never turn a load error into a blank.
   image.addEventListener('load', onLoad);

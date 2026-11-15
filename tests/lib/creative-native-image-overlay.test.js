@@ -51,8 +51,10 @@ describe("desktop canvas image rendering", () => {
     );
     const image = svg.querySelector("image");
     expect(image.getAttribute("href")).toBe("blob:synthetic-result");
+    expect(image.getAttribute("visibility")).toBe("hidden");
     expect(foreignObject.style.visibility).toBe("");
     image.dispatchEvent(new Event("load"));
+    expect(image.getAttribute("visibility")).toBe("visible");
     expect(foreignObject.style.visibility).toBe("hidden");
     foreignObject.setAttribute("width", "640");
     foreignObject.setAttribute("x", "120");
@@ -60,6 +62,7 @@ describe("desktop canvas image rendering", () => {
     expect(image.getAttribute("width")).toBe("640");
     expect(image.getAttribute("x")).toBe("120");
     image.dispatchEvent(new Event("error"));
+    expect(image.getAttribute("visibility")).toBe("hidden");
     expect(foreignObject.style.visibility).toBe("");
     cleanup();
     image.dispatchEvent(new Event("load"));

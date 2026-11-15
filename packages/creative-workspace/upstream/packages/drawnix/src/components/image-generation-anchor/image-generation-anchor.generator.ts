@@ -133,6 +133,7 @@ export class ImageGenerationAnchorGenerator {
       'class',
       'image-generation-anchor-desktop-fallback'
     );
+    this.desktopFallback.setAttribute('data-anchor-id', element.id);
     this.desktopFallback.style.pointerEvents = 'auto';
     g.appendChild(this.desktopFallback);
     this.renderDesktopFallback(element);
@@ -146,6 +147,13 @@ export class ImageGenerationAnchorGenerator {
 
     const rect = RectangleClient.getRectangleByPoints(element.points);
     const isFailed = element.phase === 'failed';
+    host.style.setProperty('--failure-surface', '#fff8f4');
+    host.style.setProperty('--failure-border', '#ebc6b9');
+    host.style.setProperty('--failure-muted', '#8a756b');
+    host.style.setProperty('--failure-text', '#4a3b34');
+    host.style.setProperty('--failure-danger', '#a74739');
+    host.style.setProperty('--failure-action', '#c77b1c');
+    host.style.setProperty('--failure-action-text', '#fffaf0');
     const layout = [
       element.id, rect.x, rect.y, rect.width, rect.height, element.phase, element.batchIndex,
       element.batchTotal || element.requestedCount || element.taskIds.length || 1,
@@ -183,8 +191,16 @@ export class ImageGenerationAnchorGenerator {
       const height = Math.max(rect.height, getNativeFailureLayout(rows, width).height + 60);
       host.setAttribute('aria-label', '生成失败');
       const background = createSvgElement('rect');
-      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 14, fill: 'var(--failure-surface, #ffffff)', stroke: 'var(--failure-border, #dde2e5)' })) background.setAttribute(key, String(value));
+      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 18, fill: 'var(--failure-surface, #fff8f4)', stroke: 'var(--failure-border, #ebc6b9)' })) background.setAttribute(key, String(value));
       host.appendChild(background);
+      this.appendDesktopHeader(
+        host,
+        rect.x,
+        rect.y,
+        width,
+        details.modelId || '图片生成',
+        true
+      );
       const content = createNativeFailureDetails(rows, width);
       content.setAttribute('transform', `translate(${rect.x} ${rect.y + 12})`);
       host.appendChild(content);
@@ -201,13 +217,13 @@ export class ImageGenerationAnchorGenerator {
     this.onSizeChange?.({ width: rect.width, height: rect.height });
     const isCompleted = element.phase === 'completed';
     const isLoadingImage = element.phase === 'developing' || element.phase === 'inserting';
-    const accent = isFailed ? '#c15a5a' : '#25755e';
+    const accent = isFailed ? '#b45543' : '#d99119';
     const background = isFailed
-      ? '#fffafa'
+      ? '#fff8f4'
       : isCompleted
-      ? '#f8fcfa'
-      : '#fcfdfc';
-    const border = isFailed ? '#e5caca' : isCompleted ? '#c9dfd4' : '#dfe4e9';
+      ? '#fffdf4'
+      : '#fff6dc';
+    const border = isFailed ? '#ebc6b9' : isCompleted ? '#efd99d' : '#f0c56d';
     const minDimension = Math.min(rect.width, rect.height);
     const compact = rect.width < 220 || rect.height < 190;
     const titleSize = compact ? 14 : 18;
@@ -233,10 +249,51 @@ export class ImageGenerationAnchorGenerator {
     backgroundRect.setAttribute('width', String(rect.width));
     backgroundRect.setAttribute('height', String(rect.height));
     backgroundRect.setAttribute('rx', String(Math.min(18, minDimension / 8)));
-    backgroundRect.setAttribute('fill', background);
+    if (!isFailed) {
+      const defs = createSvgElement('defs');
+      const gradientId = `generation-anchor-warm-${encodeURIComponent(element.id)}`;
+      const gradient = createSvgElement('linearGradient');
+      gradient.setAttribute('id', gradientId);
+      gradient.setAttribute('x1', '0');
+      gradient.setAttribute('y1', '0');
+      gradient.setAttribute('x2', '1');
+      gradient.setAttribute('y2', '1');
+      const first = createSvgElement('stop');
+      first.setAttribute('offset', '0');
+      first.setAttribute('stop-color', '#fffdf4');
+      const second = createSvgElement('stop');
+      second.setAttribute('offset', '0.58');
+      second.setAttribute('stop-color', '#fff6dc');
+      const third = createSvgElement('stop');
+      third.setAttribute('offset', '1');
+      third.setAttribute('stop-color', '#ffe8ad');
+      gradient.append(first, second, third);
+      defs.appendChild(gradient);
+      host.appendChild(defs);
+      backgroundRect.setAttribute('fill', `url(#${gradientId})`);
+    } else {
+      backgroundRect.setAttribute('fill', background);
+    }
     backgroundRect.setAttribute('stroke', border);
     backgroundRect.setAttribute('stroke-width', '1');
     host.appendChild(backgroundRect);
+
+    const count =
+      element.batchTotal || element.requestedCount || element.taskIds.length || 1;
+
+    this.appendDesktopHeader(
+      host,
+      rect.x,
+      rect.y,
+      rect.width,
+      count > 1 ? '图片生成' : '图片生成',
+      false,
+      element.batchIndex && element.batchTotal
+        ? `${element.batchIndex}/${element.batchTotal}`
+        : count > 1
+        ? `${count} 张`
+        : `${count}/${count}`
+    );
 
     if (!compact) {
       const patternId = `generation-anchor-grid-${encodeURIComponent(
@@ -252,7 +309,7 @@ export class ImageGenerationAnchorGenerator {
       dot.setAttribute('cx', '1');
       dot.setAttribute('cy', '1');
       dot.setAttribute('r', '0.65');
-      dot.setAttribute('fill', '#d5ddd8');
+      dot.setAttribute('fill', '#d7bf84');
       pattern.appendChild(dot);
       defs.appendChild(pattern);
       host.appendChild(defs);
@@ -282,32 +339,11 @@ export class ImageGenerationAnchorGenerator {
           `M ${right} ${bottom - 14} V ${bottom} H ${right - 14}`
       );
       corners.setAttribute('fill', 'none');
-      corners.setAttribute('stroke', '#b7c8bd');
+      corners.setAttribute('stroke', '#d8b96e');
       corners.setAttribute('stroke-width', '1.2');
       corners.style.pointerEvents = 'none';
       host.appendChild(corners);
 
-      const count =
-        element.batchTotal ||
-        element.requestedCount ||
-        element.taskIds.length ||
-        1;
-      const header = createSvgElement('text');
-      header.setAttribute('x', String(rect.x + 22));
-      header.setAttribute('y', String(rect.y + 32));
-      header.setAttribute('fill', '#777e88');
-      header.setAttribute('font-size', '11');
-      header.textContent = count > 1 ? '批量生成' : '图片生成';
-      host.appendChild(header);
-      const counter = createSvgElement('text');
-      counter.setAttribute('x', String(rect.x + rect.width - 22));
-      counter.setAttribute('y', String(rect.y + 32));
-      counter.setAttribute('text-anchor', 'end');
-      counter.setAttribute('fill', '#777e88');
-      counter.setAttribute('font-size', '11');
-      counter.textContent = element.batchIndex && element.batchTotal
-        ? `${element.batchIndex}/${element.batchTotal}` : `${count} 张`;
-      host.appendChild(counter);
     }
 
     if (element.previewImageUrl && !isLoadingImage) {
@@ -468,6 +504,63 @@ export class ImageGenerationAnchorGenerator {
         this.desktopProgressBar.setAttribute('width', value);
       }
     }
+  }
+
+  private appendDesktopHeader(
+    host: SVGGElement,
+    x: number,
+    y: number,
+    width: number,
+    title: string,
+    failed: boolean,
+    count = ''
+  ): void {
+    const icon = createSvgElement('text');
+    icon.setAttribute('x', String(x + 16));
+    icon.setAttribute('y', String(y + 29));
+    icon.setAttribute('fill', failed ? '#a77a6b' : '#a59b82');
+    icon.setAttribute('font-size', '14');
+    icon.textContent = '▧';
+    host.appendChild(icon);
+
+    const label = createSvgElement('text');
+    label.setAttribute('x', String(x + 36));
+    label.setAttribute('y', String(y + 29));
+    label.setAttribute('fill', failed ? '#8a756b' : '#8d887a');
+    label.setAttribute('font-size', '11');
+    label.textContent = truncateText(title, 28);
+    host.appendChild(label);
+
+    if (failed) {
+      const close = createSvgElement('text');
+      close.setAttribute('x', String(x + width - 18));
+      close.setAttribute('y', String(y + 30));
+      close.setAttribute('text-anchor', 'middle');
+      close.setAttribute('fill', '#8a756b');
+      close.setAttribute('font-size', '20');
+      close.setAttribute('font-weight', '300');
+      close.textContent = '×';
+      close.style.cursor = 'pointer';
+      close.style.pointerEvents = 'auto';
+      close.setAttribute('role', 'button');
+      close.setAttribute('aria-label', '移除卡片');
+      close.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.dismissAnchor(host.getAttribute('data-anchor-id') || '');
+      });
+      host.appendChild(close);
+      return;
+    }
+
+    const counter = createSvgElement('text');
+    counter.setAttribute('x', String(x + width - 18));
+    counter.setAttribute('y', String(y + 29));
+    counter.setAttribute('text-anchor', 'end');
+    counter.setAttribute('fill', '#a59b82');
+    counter.setAttribute('font-size', '11');
+    counter.textContent = count;
+    host.appendChild(counter);
   }
 
   private appendDesktopActionButton(

@@ -843,6 +843,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
         eager
         showSkeleton={false}
         preferCachedBlob
+        preferThumbnailPreview
         loadTimeoutMs={
           elementData.generationTaskId ? GENERATED_IMAGE_LOAD_TIMEOUT_MS : undefined
         }

@@ -1,0 +1,127 @@
+{
+  "task": "SYNC-DESKTOP-LOCAL-01",
+  "date": "2026-11-15",
+  "timezone": "Asia/Shanghai",
+  "kind": "local-source-integration-verification",
+  "sourceCommit": "9d2a60ee92be7d3537dd8a4c0bf9b1995f63c32a",
+  "previousCommit": "51681502a2ef640adb5b63793a5e2c375c23ea18",
+  "branch": "codex/sync-verified-desktop-updates",
+  "backupBranch": "codex/backup-before-desktop-sync-20261115",
+  "hostTests": {
+    "initialPassedFiles": 97,
+    "initialPassedTests": 835,
+    "initialFailedToLoadFiles": 2,
+    "recheckedFiles": 2,
+    "recheckedTests": 4,
+    "finalPassedTests": 839
+  },
+  "creativeTests": {
+    "files": 159,
+    "passed": 2681
+  },
+  "nativeTests": {
+    "passed": 25,
+    "features": [
+      "updater-acceptance"
+    ],
+    "platform": "macOS ARM64",
+    "actualInstallerUpgrade": false
+  },
+  "updaterAndCompatibilityTests": 17,
+  "releaseAssetTests": 5,
+  "typecheck": "passed",
+  "creativeBuild": "passed",
+  "hostBuild": "passed-after-resume",
+  "browser": [
+    {
+      "kind": "synthetic-transport-browser",
+      "engine": "chromium",
+      "generation": true,
+      "transparentPngRequest": true,
+      "layers": 3,
+      "ocr": true,
+      "ocrTextVisible": true,
+      "duplicateUrlLayers": true,
+      "reloadPreserved": true,
+      "liveProvider": false
+    },
+    {
+      "kind": "synthetic-transport-browser",
+      "engine": "webkit",
+      "generation": true,
+      "transparentPngRequest": true,
+      "layers": 3,
+      "ocr": true,
+      "ocrTextVisible": true,
+      "duplicateUrlLayers": true,
+      "reloadPreserved": true,
+      "liveProvider": false
+    }
+  ],
+  "liveProvider": false,
+  "productionDataAccess": false,
+  "published": false,
+  "installedApplication": false,
+  "rawLogsDirectory": "/tmp/tuzi-desktop-sync-20261115.6lwYGF",
+  "logs": [
+    {
+      "file": "install.log",
+      "sha256": "0cc381e67c248e8a3614b55d5e14ecb335839849b2d1dfbb16367e5a967ccbad"
+    },
+    {
+      "file": "host-tests.log",
+      "sha256": "3d01687ef6e1852d315b238fe4deb16e14ef3a6c096770a0b89c8ce9c8fe7971"
+    },
+    {
+      "file": "host-recheck.log",
+      "sha256": "41fde9cabcd114beec3b9d2a237cf88882697377a25c47e3484584e9b3644ea9"
+    },
+    {
+      "file": "creative-tests.log",
+      "sha256": "f4aa8e0b972fce8711c5eb53a16c18a87ed6fc7349e8aed00375f55293b6eee9"
+    },
+    {
+      "file": "typecheck.log",
+      "sha256": "ef359eefa55f92cfad482f83d81b849bcfe5d6bad262c2bebfd0939ce0317a71"
+    },
+    {
+      "file": "renderer-build.log",
+      "sha256": "98b894b59983b4c18b646412556f159c5c509babc2983d8b5c83c3acd07ea3c1"
+    },
+    {
+      "file": "host-build-resumed.log",
+      "sha256": "4617d288a2fbfc6fdbcebc0acaf471e7a5d44fef9afdd677f6157668736b23fa"
+    },
+    {
+      "file": "updater-tests.log",
+      "sha256": "25cedaac151305cb3873c4b406f03d4cd6f603e801ad4186f20ec1782a5b457d"
+    },
+    {
+      "file": "release-assets-tests.log",
+      "sha256": "1ba217cf53379915310da875e646d945a20c01c77e244e4e51128487cf3b8b69"
+    },
+    {
+      "file": "native-tests.log",
+      "sha256": "f7dd9a7c732600fc3e20822f15e68e44e42e5898201dfcd728e66950e688c502"
+    },
+    {
+      "file": "native-tests-resumed.log",
+      "sha256": "b18b7cffcdf8cf6ee0a74980411e811a60e1f6562f44891f0473f7deb87b60d5"
+    },
+    {
+      "file": "chromium.log",
+      "sha256": "5da1f6a0cff5fb53fc1aae8f44bd5f439d0551989ee3e2abc0b925b0647dd604"
+    },
+    {
+      "file": "webkit.log",
+      "sha256": "5da1f6a0cff5fb53fc1aae8f44bd5f439d0551989ee3e2abc0b925b0647dd604"
+    }
+  ],
+  "limitations": [
+    "Host first run required creative build output; only the two failed-to-load suites were rerun.",
+    "Renderer host build and Rust compilation were interrupted; both resumed stages completed.",
+    "Native test initial CLI filters were rejected before execution and corrected.",
+    "No Windows/MSI/DEB/RPM or official signed transition acceptance in this run.",
+    "No paid model or production usage attribution acceptance."
+  ]
+}

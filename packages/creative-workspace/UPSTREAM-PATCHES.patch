@@ -4700,7 +4700,7 @@ index 30be31c..7ff5760 100644
            }
          }
 diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
-index 4ef1925..aa76b73 100644
+index 4ef1925..3ae8f7c 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 +++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.test.tsx
 @@ -1,3 +1,4 @@
@@ -4865,7 +4865,7 @@ index 4ef1925..aa76b73 100644
 +      const spinner = host.querySelector('animateTransform')!;
 +      const background = fallback.firstChild;
 +      const replace = vi.spyOn(fallback, 'replaceChildren');
-+      const bar = [...host.querySelectorAll('rect')].find(node => node.getAttribute('height') === '3' && node.getAttribute('fill') === '#25755e')!;
++      const bar = [...host.querySelectorAll('rect')].find(node => node.getAttribute('height') === '3' && node.getAttribute('fill') === '#d99119')!;
 +      expect(bar.getAttribute('width')).toBe('18');
 +      for (const progress of [10, 20, 40, 60, 90, 90]) {
 +        mocks.tasks[0] = { ...mocks.tasks[0], progress };
@@ -4930,7 +4930,7 @@ index 4ef1925..aa76b73 100644
 +  });
 +});
 diff --git a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
-index b20cedc..cb3f633 100644
+index b20cedc..127332a 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
 +++ b/packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx
 @@ -1,8 +1,14 @@
@@ -5095,7 +5095,52 @@ index b20cedc..cb3f633 100644
        }
      },
      [board, element, relatedTasks]
-@@ -270,7 +244,7 @@ export const ImageGenerationAnchorContent: React.FC<
+@@ -261,6 +235,44 @@ export const ImageGenerationAnchorContent: React.FC<
+   );
+ 
+   const renderCore = () => {
++    if (showFailureSummary) {
++      return (
++        <div className="image-generation-anchor__failure-summary">
++          <div className="image-generation-anchor__failure-icon" aria-hidden="true">
++            <svg viewBox="0 0 24 24" role="presentation">
++              <path d="M8.5 8.5a4.8 4.8 0 0 1 7.7 1.1" />
++              <path d="M15.5 15.5a4.8 4.8 0 0 1-7.7-1.1" />
++              <path d="m16.5 7.5-.3 3.2-3.2-.3" />
++              <path d="m7.5 16.5.3-3.2 3.2.3" />
++            </svg>
++          </div>
++          <strong className="image-generation-anchor__failure-title">
++            暂时没能生成图片
++          </strong>
++          <p className="image-generation-anchor__failure-copy">
++            服务暂时繁忙，请稍后重试。
++            <br />
++            你的提示词和参数已保留。
++          </p>
++          <button
++            type="button"
++            className="image-generation-anchor__error-link"
++            onPointerDown={stopInteractionStart}
++            onMouseDown={stopInteractionStart}
++            onPointerUp={stopEventPropagation}
++            onMouseUp={stopEventPropagation}
++            onClick={(event) => {
++              stopPointer(event);
++              runDeferredAction('details');
++            }}
++          >
++            <span aria-hidden="true">›</span> 查看错误详情
++          </button>
++          <span className="image-generation-anchor__failure-status">生成失败</span>
++        </div>
++      );
++    }
++
+     return (
+       <div className="image-generation-anchor__surface-core">
+         {showCenterLabel ? (
+@@ -270,7 +282,7 @@ export const ImageGenerationAnchorContent: React.FC<
              tone={progressTone}
              statusText={centerLabel}
              compact
@@ -5104,7 +5149,7 @@ index b20cedc..cb3f633 100644
              className="image-generation-anchor__progress-display"
            />
          ) : null}
-@@ -284,21 +258,10 @@ export const ImageGenerationAnchorContent: React.FC<
+@@ -284,21 +296,10 @@ export const ImageGenerationAnchorContent: React.FC<
                  <span className="image-generation-anchor__error-id-text">
                    ID: {failureIdentifier}
                  </span>
@@ -5130,7 +5175,22 @@ index b20cedc..cb3f633 100644
                </span>
              ) : null}
              <button
-@@ -430,6 +393,7 @@ export const ImageGenerationAnchorContent: React.FC<
+@@ -330,6 +331,14 @@ export const ImageGenerationAnchorContent: React.FC<
+       ? '收起'
+       : viewModel.secondaryAction?.label;
+   const secondaryActionType = viewModel.secondaryAction?.type;
++  const headerTitle =
++    viewModel.phase === 'failed'
++      ? viewModel.failureDetails?.modelId || viewModel.title || '图片生成'
++      : viewModel.title || '图片生成';
++  const headerCount = `${candidateCount}/${candidateCount}`;
++  const showFailureSummary =
++    viewModel.phase === 'failed' &&
++    viewModel.failureStage !== 'post-processing';
+   const stackBadgeLabel =
+     candidateCount > 1 ? `${candidateCount} 张` : String(candidateCount);
+   const stackSummaryLabel =
+@@ -430,6 +439,7 @@ export const ImageGenerationAnchorContent: React.FC<
  
    return (
      <div
@@ -5138,7 +5198,46 @@ index b20cedc..cb3f633 100644
        className={classNames(
          'image-generation-anchor',
          `image-generation-anchor--${viewModel.anchorType}`,
-@@ -474,40 +438,14 @@ export const ImageGenerationAnchorContent: React.FC<
+@@ -446,6 +456,38 @@ export const ImageGenerationAnchorContent: React.FC<
+     >
+       <div className="image-generation-anchor__glow" />
+ 
++      <div className="image-generation-anchor__header">
++        <div className="image-generation-anchor__header-title">
++          <svg viewBox="0 0 24 24" aria-hidden="true">
++            <rect x="4" y="4" width="16" height="16" rx="2" />
++            <circle cx="9" cy="9" r="1.5" />
++            <path d="m6.5 17 4.2-4.2 2.6 2.6 1.8-1.8 2.4 3.4" />
++          </svg>
++          <span>{headerTitle}</span>
++        </div>
++        {viewModel.phase === 'failed' ? (
++          <button
++            type="button"
++            className="image-generation-anchor__header-close"
++            aria-label="移除卡片"
++            onPointerDown={stopInteractionStart}
++            onMouseDown={stopInteractionStart}
++            onPointerUp={stopEventPropagation}
++            onMouseUp={stopEventPropagation}
++            onClick={(event) => {
++              stopPointer(event);
++              runDeferredAction('dismiss');
++            }}
++          >
++            ×
++          </button>
++        ) : (
++          <span className="image-generation-anchor__header-count">
++            {headerCount}
++          </span>
++        )}
++      </div>
++
+       <div
+         className={classNames('image-generation-anchor__surface', {
+           'image-generation-anchor__surface--compact': isGhost,
+@@ -474,40 +516,14 @@ export const ImageGenerationAnchorContent: React.FC<
        </div>
  
        {detailsOpen ? (
@@ -5550,7 +5649,7 @@ index 380b825..8a4c5a4 100644
  
      if (this.activeGenerator) {
 diff --git a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
-index d8018b2..f26237f 100644
+index d8018b2..1459c92 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 +++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.generator.ts
 @@ -1,12 +1,16 @@
@@ -5652,7 +5751,13 @@ index d8018b2..f26237f 100644
    private createDesktopFallback(
      element: PlaitImageGenerationAnchor,
      g: SVGGElement
-@@ -105,16 +138,69 @@ export class ImageGenerationAnchorGenerator {
+@@ -100,28 +133,97 @@ export class ImageGenerationAnchorGenerator {
+       'class',
+       'image-generation-anchor-desktop-fallback'
+     );
++    this.desktopFallback.setAttribute('data-anchor-id', element.id);
+     this.desktopFallback.style.pointerEvents = 'auto';
+     g.appendChild(this.desktopFallback);
      this.renderDesktopFallback(element);
    }
  
@@ -5666,6 +5771,13 @@ index d8018b2..f26237f 100644
 -    host.replaceChildren();
      const rect = RectangleClient.getRectangleByPoints(element.points);
      const isFailed = element.phase === 'failed';
++    host.style.setProperty('--failure-surface', '#fff8f4');
++    host.style.setProperty('--failure-border', '#ebc6b9');
++    host.style.setProperty('--failure-muted', '#8a756b');
++    host.style.setProperty('--failure-text', '#4a3b34');
++    host.style.setProperty('--failure-danger', '#a74739');
++    host.style.setProperty('--failure-action', '#c77b1c');
++    host.style.setProperty('--failure-action-text', '#fffaf0');
 +    const layout = [
 +      element.id, rect.x, rect.y, rect.width, rect.height, element.phase, element.batchIndex,
 +      element.batchTotal || element.requestedCount || element.taskIds.length || 1,
@@ -5703,8 +5815,16 @@ index d8018b2..f26237f 100644
 +      const height = Math.max(rect.height, getNativeFailureLayout(rows, width).height + 60);
 +      host.setAttribute('aria-label', '生成失败');
 +      const background = createSvgElement('rect');
-+      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 14, fill: 'var(--failure-surface, #ffffff)', stroke: 'var(--failure-border, #dde2e5)' })) background.setAttribute(key, String(value));
++      for (const [key, value] of Object.entries({ x: rect.x, y: rect.y, width, height, rx: 18, fill: 'var(--failure-surface, #fff8f4)', stroke: 'var(--failure-border, #ebc6b9)' })) background.setAttribute(key, String(value));
 +      host.appendChild(background);
++      this.appendDesktopHeader(
++        host,
++        rect.x,
++        rect.y,
++        width,
++        details.modelId || '图片生成',
++        true
++      );
 +      const content = createNativeFailureDetails(rows, width);
 +      content.setAttribute('transform', `translate(${rect.x} ${rect.y + 12})`);
 +      host.appendChild(content);
@@ -5720,11 +5840,23 @@ index d8018b2..f26237f 100644
 +    host.replaceChildren();
 +    this.onSizeChange?.({ width: rect.width, height: rect.height });
      const isCompleted = element.phase === 'completed';
+-    const accent = isFailed ? '#c15a5a' : '#25755e';
 +    const isLoadingImage = element.phase === 'developing' || element.phase === 'inserting';
-     const accent = isFailed ? '#c15a5a' : '#25755e';
++    const accent = isFailed ? '#b45543' : '#d99119';
      const background = isFailed
-       ? '#fffafa'
-@@ -138,7 +224,7 @@ export class ImageGenerationAnchorGenerator {
+-      ? '#fffafa'
++      ? '#fff8f4'
+       : isCompleted
+-      ? '#f8fcfa'
+-      : '#fcfdfc';
+-    const border = isFailed ? '#e5caca' : isCompleted ? '#c9dfd4' : '#dfe4e9';
++      ? '#fffdf4'
++      : '#fff6dc';
++    const border = isFailed ? '#ebc6b9' : isCompleted ? '#efd99d' : '#f0c56d';
+     const minDimension = Math.min(rect.width, rect.height);
+     const compact = rect.width < 220 || rect.height < 190;
+     const titleSize = compact ? 14 : 18;
+@@ -138,7 +240,7 @@ export class ImageGenerationAnchorGenerator {
  
      host.setAttribute(
        'aria-label',
@@ -5733,14 +5865,99 @@ index d8018b2..f26237f 100644
      );
  
      const backgroundRect = createSvgElement('rect');
-@@ -219,11 +305,12 @@ export class ImageGenerationAnchorGenerator {
-       counter.setAttribute('text-anchor', 'end');
-       counter.setAttribute('fill', '#777e88');
-       counter.setAttribute('font-size', '11');
+@@ -147,11 +249,52 @@ export class ImageGenerationAnchorGenerator {
+     backgroundRect.setAttribute('width', String(rect.width));
+     backgroundRect.setAttribute('height', String(rect.height));
+     backgroundRect.setAttribute('rx', String(Math.min(18, minDimension / 8)));
+-    backgroundRect.setAttribute('fill', background);
++    if (!isFailed) {
++      const defs = createSvgElement('defs');
++      const gradientId = `generation-anchor-warm-${encodeURIComponent(element.id)}`;
++      const gradient = createSvgElement('linearGradient');
++      gradient.setAttribute('id', gradientId);
++      gradient.setAttribute('x1', '0');
++      gradient.setAttribute('y1', '0');
++      gradient.setAttribute('x2', '1');
++      gradient.setAttribute('y2', '1');
++      const first = createSvgElement('stop');
++      first.setAttribute('offset', '0');
++      first.setAttribute('stop-color', '#fffdf4');
++      const second = createSvgElement('stop');
++      second.setAttribute('offset', '0.58');
++      second.setAttribute('stop-color', '#fff6dc');
++      const third = createSvgElement('stop');
++      third.setAttribute('offset', '1');
++      third.setAttribute('stop-color', '#ffe8ad');
++      gradient.append(first, second, third);
++      defs.appendChild(gradient);
++      host.appendChild(defs);
++      backgroundRect.setAttribute('fill', `url(#${gradientId})`);
++    } else {
++      backgroundRect.setAttribute('fill', background);
++    }
+     backgroundRect.setAttribute('stroke', border);
+     backgroundRect.setAttribute('stroke-width', '1');
+     host.appendChild(backgroundRect);
+ 
++    const count =
++      element.batchTotal || element.requestedCount || element.taskIds.length || 1;
++
++    this.appendDesktopHeader(
++      host,
++      rect.x,
++      rect.y,
++      rect.width,
++      count > 1 ? '图片生成' : '图片生成',
++      false,
++      element.batchIndex && element.batchTotal
++        ? `${element.batchIndex}/${element.batchTotal}`
++        : count > 1
++        ? `${count} 张`
++        : `${count}/${count}`
++    );
++
+     if (!compact) {
+       const patternId = `generation-anchor-grid-${encodeURIComponent(
+         element.id
+@@ -166,7 +309,7 @@ export class ImageGenerationAnchorGenerator {
+       dot.setAttribute('cx', '1');
+       dot.setAttribute('cy', '1');
+       dot.setAttribute('r', '0.65');
+-      dot.setAttribute('fill', '#d5ddd8');
++      dot.setAttribute('fill', '#d7bf84');
+       pattern.appendChild(dot);
+       defs.appendChild(pattern);
+       host.appendChild(defs);
+@@ -196,34 +339,14 @@ export class ImageGenerationAnchorGenerator {
+           `M ${right} ${bottom - 14} V ${bottom} H ${right - 14}`
+       );
+       corners.setAttribute('fill', 'none');
+-      corners.setAttribute('stroke', '#b7c8bd');
++      corners.setAttribute('stroke', '#d8b96e');
+       corners.setAttribute('stroke-width', '1.2');
+       corners.style.pointerEvents = 'none';
+       host.appendChild(corners);
+ 
+-      const count =
+-        element.batchTotal ||
+-        element.requestedCount ||
+-        element.taskIds.length ||
+-        1;
+-      const header = createSvgElement('text');
+-      header.setAttribute('x', String(rect.x + 22));
+-      header.setAttribute('y', String(rect.y + 32));
+-      header.setAttribute('fill', '#777e88');
+-      header.setAttribute('font-size', '11');
+-      header.textContent = count > 1 ? '批量生成' : '图片生成';
+-      host.appendChild(header);
+-      const counter = createSvgElement('text');
+-      counter.setAttribute('x', String(rect.x + rect.width - 22));
+-      counter.setAttribute('y', String(rect.y + 32));
+-      counter.setAttribute('text-anchor', 'end');
+-      counter.setAttribute('fill', '#777e88');
+-      counter.setAttribute('font-size', '11');
 -      counter.textContent = `${count} 张`;
-+      counter.textContent = element.batchIndex && element.batchTotal
-+        ? `${element.batchIndex}/${element.batchTotal}` : `${count} 张`;
-       host.appendChild(counter);
+-      host.appendChild(counter);
      }
  
 -    if (element.previewImageUrl) {
@@ -5748,7 +5965,7 @@ index d8018b2..f26237f 100644
        const preview = createSvgElement('image');
        preview.setAttribute('x', String(rect.x));
        preview.setAttribute('y', String(rect.y));
-@@ -235,7 +322,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -235,7 +358,7 @@ export class ImageGenerationAnchorGenerator {
      }
  
      const centerX = rect.x + rect.width / 2;
@@ -5757,7 +5974,7 @@ index d8018b2..f26237f 100644
      const spinnerRadius = compact ? 10 : Math.min(28, minDimension * 0.1);
      const contentCenterY =
        rect.y +
-@@ -302,7 +389,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -302,7 +425,7 @@ export class ImageGenerationAnchorGenerator {
      title.textContent = phaseLabel;
      host.appendChild(title);
  
@@ -5766,7 +5983,7 @@ index d8018b2..f26237f 100644
        const maxChars = Math.max(
          12,
          Math.floor((rect.width - padding * 2) / 13)
-@@ -323,6 +410,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -323,6 +446,7 @@ export class ImageGenerationAnchorGenerator {
        );
        description.setAttribute('font-size', String(bodySize));
        description.textContent = truncateText(subtitle, maxChars);
@@ -5774,13 +5991,20 @@ index d8018b2..f26237f 100644
        host.appendChild(description);
      }
  
-@@ -348,44 +436,37 @@ export class ImageGenerationAnchorGenerator {
+@@ -348,45 +472,95 @@ export class ImageGenerationAnchorGenerator {
        progressBar.setAttribute('height', '3');
        progressBar.setAttribute('rx', '1.5');
        progressBar.setAttribute('fill', accent);
 +      this.desktopProgressBar = progressBar;
        host.appendChild(progressBar);
      }
++  }
++
++  private dismissAnchor(id: string): void {
++    // The native controller renders a presentation copy. Plait paths are keyed
++    // by the live node identity, so resolve it again at the time of activation.
++    const current = this.board.children.find((node) => node.id === id);
++    if (current) this.board.deleteFragment([current]);
 +  }
  
 -    if (isFailed && rect.width >= 180 && rect.height >= 120) {
@@ -5789,7 +6013,28 @@ index d8018b2..f26237f 100644
 -      const buttonY = rect.y + rect.height - padding - buttonHeight;
 -      const retryX = centerX - buttonWidth - 5;
 -      const closeX = centerX + 5;
--
++  private updateDesktopProgress(element: PlaitImageGenerationAnchor, width: number): void {
++    const subtitle = element.subtitle || DESKTOP_PHASE_SUBTITLES[element.phase];
++    const phaseLabel = DESKTOP_PHASE_LABELS[element.phase];
++    const loading = element.phase === 'developing' || element.phase === 'inserting';
++    const label = loading ? phaseLabel : `${phaseLabel}：${subtitle}`;
++    if (this.desktopFallback?.getAttribute('aria-label') !== label) {
++      this.desktopFallback?.setAttribute('aria-label', label);
++    }
++    if (this.desktopDescription) {
++      // A description exists only in the non-compact layout (20px padding).
++      const text = truncateText(subtitle, Math.max(12, Math.floor((width - 40) / 13)));
++      if (this.desktopDescription.textContent !== text) this.desktopDescription.textContent = text;
++    }
++    if (this.desktopProgressBar && typeof element.progress === 'number') {
++      const progress = Math.max(0, Math.min(100, Math.round(element.progress)));
++      const value = String((Math.min(180, width - 40) * progress) / 100);
++      if (this.desktopProgressBar.getAttribute('width') !== value) {
++        this.desktopProgressBar.setAttribute('width', value);
++      }
++    }
++  }
+ 
 -      this.appendDesktopActionButton(
 -        host,
 -        retryX,
@@ -5818,36 +6063,65 @@ index d8018b2..f26237f 100644
 -        () => this.board.deleteFragment([element]),
 -        true
 -      );
-+  private dismissAnchor(id: string): void {
-+    // The native controller renders a presentation copy. Plait paths are keyed
-+    // by the live node identity, so resolve it again at the time of activation.
-+    const current = this.board.children.find((node) => node.id === id);
-+    if (current) this.board.deleteFragment([current]);
-+  }
++  private appendDesktopHeader(
++    host: SVGGElement,
++    x: number,
++    y: number,
++    width: number,
++    title: string,
++    failed: boolean,
++    count = ''
++  ): void {
++    const icon = createSvgElement('text');
++    icon.setAttribute('x', String(x + 16));
++    icon.setAttribute('y', String(y + 29));
++    icon.setAttribute('fill', failed ? '#a77a6b' : '#a59b82');
++    icon.setAttribute('font-size', '14');
++    icon.textContent = '▧';
++    host.appendChild(icon);
 +
-+  private updateDesktopProgress(element: PlaitImageGenerationAnchor, width: number): void {
-+    const subtitle = element.subtitle || DESKTOP_PHASE_SUBTITLES[element.phase];
-+    const phaseLabel = DESKTOP_PHASE_LABELS[element.phase];
-+    const loading = element.phase === 'developing' || element.phase === 'inserting';
-+    const label = loading ? phaseLabel : `${phaseLabel}：${subtitle}`;
-+    if (this.desktopFallback?.getAttribute('aria-label') !== label) {
-+      this.desktopFallback?.setAttribute('aria-label', label);
-+    }
-+    if (this.desktopDescription) {
-+      // A description exists only in the non-compact layout (20px padding).
-+      const text = truncateText(subtitle, Math.max(12, Math.floor((width - 40) / 13)));
-+      if (this.desktopDescription.textContent !== text) this.desktopDescription.textContent = text;
-+    }
-+    if (this.desktopProgressBar && typeof element.progress === 'number') {
-+      const progress = Math.max(0, Math.min(100, Math.round(element.progress)));
-+      const value = String((Math.min(180, width - 40) * progress) / 100);
-+      if (this.desktopProgressBar.getAttribute('width') !== value) {
-+        this.desktopProgressBar.setAttribute('width', value);
-+      }
++    const label = createSvgElement('text');
++    label.setAttribute('x', String(x + 36));
++    label.setAttribute('y', String(y + 29));
++    label.setAttribute('fill', failed ? '#8a756b' : '#8d887a');
++    label.setAttribute('font-size', '11');
++    label.textContent = truncateText(title, 28);
++    host.appendChild(label);
++
++    if (failed) {
++      const close = createSvgElement('text');
++      close.setAttribute('x', String(x + width - 18));
++      close.setAttribute('y', String(y + 30));
++      close.setAttribute('text-anchor', 'middle');
++      close.setAttribute('fill', '#8a756b');
++      close.setAttribute('font-size', '20');
++      close.setAttribute('font-weight', '300');
++      close.textContent = '×';
++      close.style.cursor = 'pointer';
++      close.style.pointerEvents = 'auto';
++      close.setAttribute('role', 'button');
++      close.setAttribute('aria-label', '移除卡片');
++      close.addEventListener('click', (event) => {
++        event.preventDefault();
++        event.stopPropagation();
++        this.dismissAnchor(host.getAttribute('data-anchor-id') || '');
++      });
++      host.appendChild(close);
++      return;
      }
++
++    const counter = createSvgElement('text');
++    counter.setAttribute('x', String(x + width - 18));
++    counter.setAttribute('y', String(y + 29));
++    counter.setAttribute('text-anchor', 'end');
++    counter.setAttribute('fill', '#a59b82');
++    counter.setAttribute('font-size', '11');
++    counter.textContent = count;
++    host.appendChild(counter);
    }
  
-@@ -413,8 +494,8 @@ export class ImageGenerationAnchorGenerator {
+   private appendDesktopActionButton(
+@@ -413,8 +587,8 @@ export class ImageGenerationAnchorGenerator {
      buttonRect.setAttribute('width', String(width));
      buttonRect.setAttribute('height', String(height));
      buttonRect.setAttribute('rx', '7');
@@ -5858,7 +6132,7 @@ index d8018b2..f26237f 100644
      buttonRect.setAttribute('stroke-width', '1');
      button.appendChild(buttonRect);
  
-@@ -423,7 +504,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -423,7 +597,7 @@ export class ImageGenerationAnchorGenerator {
      buttonText.setAttribute('y', String(y + height / 2));
      buttonText.setAttribute('text-anchor', 'middle');
      buttonText.setAttribute('dominant-baseline', 'middle');
@@ -5867,7 +6141,7 @@ index d8018b2..f26237f 100644
      buttonText.setAttribute(
        'font-family',
        '-apple-system, BlinkMacSystemFont, sans-serif'
-@@ -433,9 +514,9 @@ export class ImageGenerationAnchorGenerator {
+@@ -433,9 +607,9 @@ export class ImageGenerationAnchorGenerator {
      buttonText.textContent = label;
      button.appendChild(buttonText);
  
@@ -5880,7 +6154,7 @@ index d8018b2..f26237f 100644
      button.addEventListener('click', (event) => {
        event.preventDefault();
        event.stopPropagation();
-@@ -514,6 +595,7 @@ export class ImageGenerationAnchorGenerator {
+@@ -514,6 +688,7 @@ export class ImageGenerationAnchorGenerator {
          board: this.board,
          element,
          selected,
@@ -5888,7 +6162,7 @@ index d8018b2..f26237f 100644
        })
      );
    }
-@@ -536,6 +618,10 @@ export class ImageGenerationAnchorGenerator {
+@@ -536,6 +711,10 @@ export class ImageGenerationAnchorGenerator {
        }, 0);
      }
  
@@ -5900,10 +6174,147 @@ index d8018b2..f26237f 100644
      this.htmlContainer = null;
      this.desktopFallback = null;
 diff --git a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.scss b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.scss
-index f2d5ebb..2dfb623 100644
+index f2d5ebb..c16147d 100644
 --- a/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.scss
 +++ b/packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.scss
-@@ -506,6 +506,8 @@
+@@ -66,6 +66,74 @@
+   opacity: 0.78;
+ }
+ 
++.image-generation-anchor__header {
++  position: relative;
++  z-index: 8;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 12px;
++  min-height: 48px;
++  padding: 13px 16px 8px;
++  color: rgba(100, 93, 77, 0.72);
++  font-size: 12px;
++  line-height: 1.3;
++}
++
++.image-generation-anchor__header-title {
++  display: inline-flex;
++  align-items: center;
++  min-width: 0;
++  gap: 8px;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.image-generation-anchor__header-title svg {
++  width: 16px;
++  height: 16px;
++  flex: none;
++  fill: none;
++  stroke: currentColor;
++  stroke-width: 1.55;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++  opacity: 0.8;
++}
++
++.image-generation-anchor__header-count {
++  flex: none;
++  color: rgba(133, 123, 101, 0.64);
++  font-variant-numeric: tabular-nums;
++}
++
++.image-generation-anchor__header-close {
++  display: grid;
++  place-items: center;
++  width: 26px;
++  height: 26px;
++  flex: none;
++  padding: 0;
++  border: 0;
++  border-radius: 8px;
++  color: rgba(106, 99, 91, 0.78);
++  background: transparent;
++  cursor: pointer;
++  font: inherit;
++  font-size: 21px;
++  font-weight: 300;
++  line-height: 1;
++  transition: color 160ms ease, background-color 160ms ease,
++    transform 120ms ease;
++}
++
++.image-generation-anchor__header-close:hover {
++  color: rgba(152, 72, 55, 0.92);
++  background: rgba(255, 255, 255, 0.5);
++  transform: scale(1.04);
++}
++
+ .image-generation-anchor__surface,
+ .image-generation-anchor__details,
+ .image-generation-anchor__actions {
+@@ -497,6 +565,61 @@
+   transition: opacity 220ms ease, transform 260ms ease;
+ }
+ 
++.image-generation-anchor__failure-summary {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  min-height: 210px;
++  padding: 24px 24px 16px;
++  flex-direction: column;
++  gap: 10px;
++  text-align: center;
++}
++
++.image-generation-anchor__failure-icon {
++  display: grid;
++  place-items: center;
++  width: 44px;
++  height: 44px;
++  border-radius: 15px;
++  color: #b34d42;
++  background: rgba(246, 225, 216, 0.72);
++  box-shadow: 0 6px 16px rgba(180, 83, 67, 0.08) inset;
++}
++
++.image-generation-anchor__failure-icon svg {
++  width: 20px;
++  height: 20px;
++  fill: none;
++  stroke: currentColor;
++  stroke-width: 1.45;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++}
++
++.image-generation-anchor__failure-title {
++  color: rgba(67, 54, 48, 0.96);
++  font-size: 16px;
++  font-weight: 650;
++  letter-spacing: -0.01em;
++}
++
++.image-generation-anchor__failure-copy {
++  margin: 0;
++  color: rgba(126, 109, 99, 0.9);
++  font-size: 12px;
++  line-height: 1.75;
++}
++
++.image-generation-anchor__failure-status {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  overflow: hidden;
++  clip: rect(0 0 0 0);
++  white-space: nowrap;
++}
++
+ .image-generation-anchor__progress-display {
+   --image-generation-progress-accent: var(--anchor-accent);
+   --image-generation-progress-accent-soft: rgba(245, 158, 11, 0.14);
+@@ -506,6 +629,8 @@
  
  .image-generation-anchor__error {
    display: flex;
@@ -5912,7 +6323,25 @@ index f2d5ebb..2dfb623 100644
    flex-direction: column;
    align-items: center;
    gap: 4px;
-@@ -622,11 +624,23 @@
+@@ -579,9 +704,14 @@
+   cursor: pointer;
+   font: inherit;
+   font-size: 11px;
+-  color: rgba(146, 64, 14, 0.82);
+-  text-decoration: underline;
+-  text-underline-offset: 2px;
++  color: rgba(126, 93, 68, 0.86);
++  text-decoration: none;
++  transition: color 160ms ease, transform 120ms ease;
++}
++
++.image-generation-anchor__error-link:hover {
++  color: rgba(164, 92, 36, 0.96);
++  transform: translateX(1px);
+ }
+ 
+ .image-generation-anchor__stack-badge {
+@@ -622,11 +752,23 @@
    border-radius: 14px;
    background: rgba(255, 255, 255, 0.82);
    border: 1px solid rgba(226, 232, 240, 0.9);
@@ -5937,7 +6366,7 @@ index f2d5ebb..2dfb623 100644
    gap: 8px;
    align-items: flex-start;
  }
-@@ -643,8 +657,32 @@
+@@ -643,8 +785,32 @@
    font-size: 11px;
    line-height: 1.45;
    color: rgba(51, 65, 85, 0.84);
@@ -5972,6 +6401,80 @@ index f2d5ebb..2dfb623 100644
  }
  
  .image-generation-anchor__detail-value-text {
+@@ -656,8 +822,11 @@
+ 
+ .image-generation-anchor__actions {
+   display: flex;
++  align-items: center;
++  justify-content: center;
+   flex-wrap: wrap;
+   gap: 8px;
++  padding: 2px 20px 18px;
+   z-index: 8;
+   pointer-events: auto;
+ }
+@@ -673,19 +842,58 @@
+   cursor: pointer;
+   font: inherit;
+   font-size: 12px;
+-  color: #4b5563;
++  color: rgba(95, 77, 59, 0.9);
+   background: rgba(255, 255, 255, 0.92);
+-  border: 1px solid rgba(226, 232, 240, 0.9);
++  border: 1px solid rgba(217, 194, 162, 0.78);
+   transition: transform 120ms ease, border-color 160ms ease,
+     background-color 160ms ease;
+ }
+ 
+ .image-generation-anchor__action:hover {
+   transform: translateY(-1px);
+-  border-color: rgba(245, 158, 11, 0.34);
++  border-color: rgba(197, 123, 28, 0.48);
+   background: rgba(255, 255, 255, 0.98);
+ }
+ 
++.image-generation-anchor--phase-failed {
++  --anchor-accent: #b34d42;
++  --anchor-accent-strong: #984837;
++  --anchor-border: rgba(213, 139, 116, 0.66);
++  color: #4a3b34;
++  background-color: #fff8f4;
++  background: radial-gradient(
++      circle at 92% 92%,
++      rgba(251, 225, 213, 0.72),
++      transparent 36%
++    ),
++    linear-gradient(142deg, #fffdfb 0%, #fff8f4 58%, #fff1eb 100%);
++  border-color: rgba(222, 151, 127, 0.62);
++  box-shadow: 0 16px 36px rgba(151, 83, 61, 0.08),
++    0 2px 6px rgba(255, 255, 255, 0.78) inset;
++  animation: none;
++}
++
++.image-generation-anchor--phase-failed .image-generation-anchor__action {
++  color: #fffaf4;
++  background: #806b54;
++  border-color: #806b54;
++  box-shadow: 0 8px 16px rgba(98, 75, 51, 0.14);
++}
++
++.image-generation-anchor--phase-failed
++  .image-generation-anchor__action:hover {
++  background: #735d49;
++  border-color: #735d49;
++}
++
++.image-generation-anchor--phase-failed
++  .image-generation-anchor__action--secondary {
++  color: rgba(109, 91, 77, 0.9);
++  background: rgba(255, 252, 248, 0.74);
++  border-color: rgba(207, 183, 164, 0.78);
++  box-shadow: none;
++}
++
+ .image-generation-anchor__action--secondary {
+   color: rgba(75, 85, 99, 0.72);
+ }
 diff --git a/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx b/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx
 index 3406255..7150338 100644
 --- a/packages/drawnix/src/components/image-recovery/manual-image-recovery.tsx
@@ -7205,6 +7708,131 @@ index eec8c78..3842aeb 100644
 +    (document.getElementById('creative-portals') || document.body)
    );
  };
+diff --git a/packages/drawnix/src/components/retry-image.tsx b/packages/drawnix/src/components/retry-image.tsx
+index 06e4659..e7b9232 100644
+--- a/packages/drawnix/src/components/retry-image.tsx
++++ b/packages/drawnix/src/components/retry-image.tsx
+@@ -56,6 +56,8 @@ export interface RetryImageProps
+   wrapperStyle?: React.CSSProperties;
+   /** Prefer a Blob URL from Cache Storage before loading the original URL. */
+   preferCachedBlob?: boolean;
++  /** Show an existing thumbnail while the original image is being read. */
++  preferThumbnailPreview?: boolean;
+   /** Skip Cache Storage fallback when retrying a known-bad cached image. */
+   skipCacheFallback?: boolean;
+   /** Reports the URL currently used by the underlying image element. */
+@@ -195,6 +197,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+       wrapperClassName,
+       wrapperStyle,
+       preferCachedBlob = false,
++      preferThumbnailPreview = false,
+       skipCacheFallback = false,
+       onSourceChange,
+       deferCacheRead = false,
+@@ -219,6 +222,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+     const shouldHideWhileLoading = showSkeleton && isLoading;
+     // 存储降级创建的 blob URL，用于清理
+     const blobUrlRef = useRef<string | null>(null);
++    const previewBlobUrlRef = useRef<string | null>(null);
+     const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+     const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+     const settledRef = useRef(false);
+@@ -332,6 +336,25 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+       []
+     );
+ 
++    const tryThumbnailPreviewBlobUrl = useCallback(
++      async (url: string): Promise<string | null> => {
++        if (!isVirtualUrl(url) && !isExternalUrl(url) && !isDesktopAssetUrl(url)) {
++          return null;
++        }
++        try {
++          const blob = await withImageOperationTimeout(
++            () => unifiedCacheService.getCachedImageThumbnailBlob(url),
++            IMAGE_CACHE_TIMEOUT_MS,
++            '图片缩略图读取超时（20秒）'
++          );
++          return blob && blob.size > 0 ? URL.createObjectURL(blob) : null;
++        } catch {
++          return null;
++        }
++      },
++      []
++    );
++
+     // Calculate exponential backoff delay
+     const getRetryDelay = useCallback(
+       (attemptNumber: number): number => {
+@@ -349,6 +372,13 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+             event.currentTarget.currentSrc || event.currentTarget.getAttribute('src')
+           )
+         ) return;
++        const loadedSrc =
++          event.currentTarget.currentSrc || event.currentTarget.getAttribute('src');
++        if (loadedSrc && loadedSrc === previewBlobUrlRef.current) {
++          // A thumbnail is visible immediately, but it must not mark the
++          // canvas result ready until the original bytes have loaded.
++          return;
++        }
+         if (settledRef.current) {
+           const recovery = externalRecoveryRef.current;
+           const recoveredSrc = event.currentTarget.getAttribute('src');
+@@ -533,6 +563,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+         URL.revokeObjectURL(blobUrlRef.current);
+         blobUrlRef.current = null;
+       }
++      previewBlobUrlRef.current = null;
+ 
+       setRetryCount(0);
+       setIsLoading(true);
+@@ -551,7 +582,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+ 
+       if (shouldReadCachedBlob) {
+         cacheFallbackTriedRef.current = true;
+-        tryFallbackToBlobUrl(normalizedSrc).then((blobUrl) => {
++        const loadFullImage = () => tryFallbackToBlobUrl(normalizedSrc).then((blobUrl) => {
+           if (!active || !isCurrentSource(normalizedSrc, sourceVersion)) {
+             if (blobUrl) {
+               URL.revokeObjectURL(blobUrl);
+@@ -564,6 +595,21 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+             cacheFallbackTriedRef.current = false;
+           }
+         });
++        if (preferThumbnailPreview) {
++          tryThumbnailPreviewBlobUrl(normalizedSrc).then((previewUrl) => {
++            if (!active || !isCurrentSource(normalizedSrc, sourceVersion)) {
++              if (previewUrl) URL.revokeObjectURL(previewUrl);
++              return;
++            }
++            if (previewUrl) {
++              previewBlobUrlRef.current = previewUrl;
++              adoptBlobUrl(normalizedSrc, previewUrl, sourceVersion);
++            }
++            void loadFullImage();
++          });
++        } else {
++          void loadFullImage();
++        }
+       } else {
+         setImageSrc(normalizedSrc);
+       }
+@@ -582,6 +628,8 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+       isCurrentSource,
+       normalizedSrc,
+       preferCachedBlob,
++      preferThumbnailPreview,
++      tryThumbnailPreviewBlobUrl,
+       tryFallbackToBlobUrl,
+       deferCacheRead,
+       skipCacheFallback,
+@@ -675,6 +723,7 @@ export const RetryImage = forwardRef<HTMLImageElement, RetryImageProps>(
+           URL.revokeObjectURL(blobUrlRef.current);
+           blobUrlRef.current = null;
+         }
++        previewBlobUrlRef.current = null;
+       };
+     }, [clearLoadTimeout]);
+ 
 diff --git a/packages/drawnix/src/components/settings-dialog/AssistantAccountBinding.tsx b/packages/drawnix/src/components/settings-dialog/AssistantAccountBinding.tsx
 new file mode 100644
 index 0000000..75374e8
@@ -17112,7 +17740,7 @@ index 6af77d4..bb73dec 100644
    model?: string;
    /** 指定使用的供应商模型来源 */
 diff --git a/packages/drawnix/src/plugins/components/image.loading.test.tsx b/packages/drawnix/src/plugins/components/image.loading.test.tsx
-index 35d13c8..1e97bc0 100644
+index 35d13c8..9633535 100644
 --- a/packages/drawnix/src/plugins/components/image.loading.test.tsx
 +++ b/packages/drawnix/src/plugins/components/image.loading.test.tsx
 @@ -2,6 +2,7 @@ import React from 'react';
@@ -17123,7 +17751,58 @@ index 35d13c8..1e97bc0 100644
  import { unifiedCacheService } from '../../services/unified-cache-service';
  import { getCanvasImageError, isCanvasImageReady, retryCanvasImage } from '../../services/canvas-image-readiness';
  
-@@ -182,4 +183,35 @@ describe('canvas image automatic loading', () => {
+@@ -10,6 +11,7 @@ vi.mock('../../services/ppt', () => ({ getImageRegion: vi.fn() }));
+ vi.mock('../../services/unified-cache-service', () => ({
+   unifiedCacheService: {
+     getCachedImageBlobWithThumbnailFallback: vi.fn(),
++    getCachedImageThumbnailBlob: vi.fn(),
+     getCachedBlob: vi.fn(async () => null),
+   },
+ }));
+@@ -24,12 +26,14 @@ const props = {
+ 
+ describe('canvas image automatic loading', () => {
+   const readCache = vi.mocked(unifiedCacheService.getCachedImageBlobWithThumbnailFallback);
++  const readThumbnail = vi.mocked(unifiedCacheService.getCachedImageThumbnailBlob);
+   const observe = vi.fn();
+   const revokeObjectURL = vi.fn();
+ 
+   beforeEach(() => {
+     vi.clearAllMocks();
+     readCache.mockReset().mockResolvedValue(null);
++    readThumbnail.mockReset().mockResolvedValue(null);
+     vi.stubGlobal('IntersectionObserver', class {
+       observe = observe;
+       disconnect = vi.fn();
+@@ -61,6 +65,27 @@ describe('canvas image automatic loading', () => {
+     expect(revokeObjectURL).toHaveBeenCalledWith('blob:cached-image');
+   });
+ 
++  it('shows a cached thumbnail before the original and only marks the original ready', async () => {
++    readThumbnail.mockResolvedValue(new Blob(['thumb'], { type: 'image/png' }));
++    let resolveFull!: (value: Blob) => void;
++    readCache.mockReturnValue(new Promise((resolve) => { resolveFull = resolve; }));
++    let objectUrl = 0;
++    vi.stubGlobal('URL', class extends URL {
++      static createObjectURL = vi.fn(() => `blob:cached-${++objectUrl}`);
++      static revokeObjectURL = revokeObjectURL;
++    });
++    render(<CanvasImage {...props} />);
++    await waitFor(() => expect(document.querySelector('img')?.getAttribute('src')).toBe('blob:cached-1'));
++    fireEvent.load(screen.getByRole('presentation'));
++    expect(isCanvasImageReady(props.board, 'a', props.imageItem.url)).toBe(false);
++    resolveFull(new Blob(['full'], { type: 'image/png' }));
++    await waitFor(() => expect(document.querySelector('img')?.getAttribute('src')).toBe('blob:cached-2'));
++    fireEvent.load(screen.getByRole('presentation'));
++    expect(isCanvasImageReady(props.board, 'a', props.imageItem.url)).toBe(true);
++    expect(readThumbnail).toHaveBeenCalledWith(props.imageItem.url);
++    expect(readCache).toHaveBeenCalledWith(props.imageItem.url);
++  });
++
+   it('uses the original signed URL immediately when no cached image exists', async () => {
+     const url = 'https://cdn.example.com/image.png?signature=original';
+     render(<CanvasImage {...props} imageItem={{ ...props.imageItem, url }} />);
+@@ -182,4 +207,35 @@ describe('canvas image automatic loading', () => {
      fireEvent.click(screen.getByRole('button', { name: '播放视频' }));
      expect(document.querySelector('video')?.getAttribute('src')).toBe(url);
    });
@@ -17160,7 +17839,7 @@ index 35d13c8..1e97bc0 100644
 +  });
  });
 diff --git a/packages/drawnix/src/plugins/components/image.tsx b/packages/drawnix/src/plugins/components/image.tsx
-index f9203d1..c198825 100644
+index f9203d1..f84983d 100644
 --- a/packages/drawnix/src/plugins/components/image.tsx
 +++ b/packages/drawnix/src/plugins/components/image.tsx
 @@ -9,6 +9,7 @@ import {
@@ -17217,8 +17896,16 @@ index f9203d1..c198825 100644
        </div>
      );
    }
+@@ -839,6 +843,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
+         eager
+         showSkeleton={false}
+         preferCachedBlob
++        preferThumbnailPreview
+         loadTimeoutMs={
+           elementData.generationTaskId ? GENERATED_IMAGE_LOAD_TIMEOUT_MS : undefined
+         }
 diff --git a/packages/drawnix/src/plugins/components/native-image-overlay.ts b/packages/drawnix/src/plugins/components/native-image-overlay.ts
-index d8822e6..22f4cfc 100644
+index d8822e6..86180ed 100644
 --- a/packages/drawnix/src/plugins/components/native-image-overlay.ts
 +++ b/packages/drawnix/src/plugins/components/native-image-overlay.ts
 @@ -12,7 +12,6 @@ export function mountNativeImageOverlay(
@@ -17229,13 +17916,23 @@ index d8822e6..22f4cfc 100644
    image.setAttribute(
      'preserveAspectRatio',
      options.contain ? 'xMidYMid meet' : 'none'
-@@ -31,16 +30,23 @@ export function mountNativeImageOverlay(
+@@ -31,16 +30,33 @@ export function mountNativeImageOverlay(
      }
    };
    syncRectangle();
 +  const previousVisibility = foreignObject.style.visibility;
-+  const onLoad = () => { foreignObject.style.visibility = 'hidden'; };
-+  const onError = () => { foreignObject.style.visibility = previousVisibility; };
++  // Do not let an unresolved virtual URL paint the browser's broken-image
++  // glyph into the native SVG layer. The HTML fallback remains visible until
++  // this overlay has decoded a valid source.
++  image.setAttribute('visibility', 'hidden');
++  const onLoad = () => {
++    image.setAttribute('visibility', 'visible');
++    foreignObject.style.visibility = 'hidden';
++  };
++  const onError = () => {
++    image.setAttribute('visibility', 'hidden');
++    foreignObject.style.visibility = previousVisibility;
++  };
 +  // A virtual cache path may not be resolved yet. Keep the HTML fallback until
 +  // the SVG has loaded the resolved blob; never turn a load error into a blank.
 +  image.addEventListener('load', onLoad);
@@ -30330,7 +31027,7 @@ index 9fd4a92..1ba21e4 100644
      vi.stubGlobal('caches', undefined);
      const blob = new Blob(['local-image'], { type: 'image/png' });
 diff --git a/packages/drawnix/src/services/unified-cache-service.ts b/packages/drawnix/src/services/unified-cache-service.ts
-index a2e237d..76dbf49 100644
+index a2e237d..fa7d8d8 100644
 --- a/packages/drawnix/src/services/unified-cache-service.ts
 +++ b/packages/drawnix/src/services/unified-cache-service.ts
 @@ -143,7 +143,7 @@ type CacheMediaMetadata = NonNullable<CacheMediaFromBlobOptions['metadata']>;
@@ -30342,7 +31039,15 @@ index a2e237d..76dbf49 100644
    );
  }
  
-@@ -1200,7 +1200,7 @@ class UnifiedCacheService {
+@@ -332,6 +332,7 @@ function blobToDataURL(blob: Blob): Promise<string> {
+  * 单例模式，协调 Service Worker 和 IndexedDB
+  */
+ class UnifiedCacheService {
++  private readonly imageReadInflight = new Map<string, Promise<Blob | null>>();
+   private db: IDBDatabase | null = null;
+   private dbPromise: Promise<IDBDatabase> | null = null;
+   private migrationPromise: Promise<void> | null = null;
+@@ -1200,7 +1201,7 @@ class UnifiedCacheService {
          // file:// 协议：通过 Tauri invoke 命令读取本地文件
          const filePath = url.replace('file://', '');
          try {
@@ -30351,7 +31056,7 @@ index a2e237d..76dbf49 100644
            if (internals) {
              const base64Data = await internals.invoke('read_local_file', { base64_path: filePath });
              const mimeType = this.getMimeTypeFromUrl(filePath);
-@@ -1500,7 +1500,7 @@ class UnifiedCacheService {
+@@ -1500,7 +1501,7 @@ class UnifiedCacheService {
          const fileName = this.getFileNameFromUrl(cacheUrl);
          const fileType = this.getMediaTypeFromUrl(cacheUrl);
          try {
@@ -30360,7 +31065,7 @@ index a2e237d..76dbf49 100644
              fileName,
              fileType,
            });
-@@ -2036,7 +2036,7 @@ class UnifiedCacheService {
+@@ -2036,7 +2037,7 @@ class UnifiedCacheService {
        // 从 URL 提取文件名
        const fileName = this.getFileNameFromUrl(url);
  
@@ -30369,7 +31074,7 @@ index a2e237d..76dbf49 100644
          'get_default_save_path',
          {
            fileName,
-@@ -2133,7 +2133,7 @@ class UnifiedCacheService {
+@@ -2133,7 +2134,7 @@ class UnifiedCacheService {
  
        try {
          const filePath = decodeURIComponent(new URL(url).pathname.slice(1));
@@ -30378,7 +31083,7 @@ index a2e237d..76dbf49 100644
            'read_local_file',
            { base64_path: filePath }
          );
-@@ -2192,7 +2192,7 @@ class UnifiedCacheService {
+@@ -2192,7 +2193,7 @@ class UnifiedCacheService {
        if (
          isVirtualUrl &&
          typeof window !== 'undefined' &&
@@ -30387,7 +31092,7 @@ index a2e237d..76dbf49 100644
        ) {
          const fileName = this.getFileNameFromUrl(cacheUrl);
          const fileType = this.getMediaTypeFromUrl(cacheUrl);
-@@ -2204,7 +2204,7 @@ class UnifiedCacheService {
+@@ -2204,7 +2205,7 @@ class UnifiedCacheService {
            return assetBlob;
          }
  
@@ -30396,7 +31101,7 @@ index a2e237d..76dbf49 100644
            'get_cached_media_file',
            {
              fileName,
-@@ -2249,7 +2249,7 @@ class UnifiedCacheService {
+@@ -2249,7 +2250,7 @@ class UnifiedCacheService {
      fileType: CacheMediaType
    ): Promise<Blob | null> {
      try {
@@ -30405,6 +31110,104 @@ index a2e237d..76dbf49 100644
          'get_file_path',
          {
            fileName,
+@@ -2273,6 +2274,39 @@ class UnifiedCacheService {
+ 
+   async getCachedImageBlobWithThumbnailFallback(
+     url: string
++  ): Promise<Blob | null> {
++    const key = `full:${url}`;
++    const inflight = this.imageReadInflight.get(key);
++    if (inflight) return inflight;
++    const read = this.readCachedImageBlobWithThumbnailFallback(url);
++    this.imageReadInflight.set(key, read);
++    try {
++      return await read;
++    } finally {
++      if (this.imageReadInflight.get(key) === read) {
++        this.imageReadInflight.delete(key);
++      }
++    }
++  }
++
++  /** Read only an existing thumbnail for a fast canvas preview. */
++  async getCachedImageThumbnailBlob(url: string): Promise<Blob | null> {
++    const key = `thumb:${url}`;
++    const inflight = this.imageReadInflight.get(key);
++    if (inflight) return inflight;
++    const read = this.readCachedImageThumbnailBlob(url);
++    this.imageReadInflight.set(key, read);
++    try {
++      return await read;
++    } finally {
++      if (this.imageReadInflight.get(key) === read) {
++        this.imageReadInflight.delete(key);
++      }
++    }
++  }
++
++  private async readCachedImageBlobWithThumbnailFallback(
++    url: string
+   ): Promise<Blob | null> {
+     // 预览回退只读取已有本地内容，避免任务列表挂载时重复下载远程资源。
+     const originalBlob = await this.getCachedBlob(url, { allowNetwork: false });
+@@ -2280,10 +2314,11 @@ class UnifiedCacheService {
+       return originalBlob;
+     }
+ 
+-    if (typeof caches === 'undefined') {
+-      return null;
+-    }
++    return this.readCachedImageThumbnailBlob(url);
++  }
+ 
++  private async readCachedImageThumbnailBlob(url: string): Promise<Blob | null> {
++    if (typeof caches === 'undefined') return null;
+     try {
+       const cacheUrl = isVirtualMediaUrl(url)
+         ? normalizeVirtualMediaUrl(url)
+@@ -2291,16 +2326,13 @@ class UnifiedCacheService {
+       const normalizedUrl = this.normalizeRemoteCacheUrl(cacheUrl);
+       const thumbCache = await caches.open(IMAGE_THUMB_CACHE_NAME);
+       const candidates = new Set<string>();
+-
+       for (const baseUrl of [normalizedUrl, cacheUrl, url]) {
+         if (!baseUrl) continue;
+         for (const size of ['large', 'small'] as const) {
+           try {
+             const thumbnailUrl = new URL(
+               baseUrl,
+-              typeof window !== 'undefined'
+-                ? window.location.origin
+-                : 'http://aitu.local'
++              typeof window !== 'undefined' ? window.location.origin : 'http://aitu.local'
+             );
+             thumbnailUrl.searchParams.delete('thumbnail');
+             thumbnailUrl.searchParams.set('_thumb', size);
+@@ -2312,22 +2344,15 @@ class UnifiedCacheService {
+           }
+         }
+       }
+-
+       for (const candidate of candidates) {
+         const response = await thumbCache.match(candidate);
+         if (!response) continue;
+         const blob = await response.blob();
+-        if (blob.size > 0) {
+-          return blob;
+-        }
++        if (blob.size > 0) return blob;
+       }
+     } catch (error) {
+-      console.warn(
+-        '[UnifiedCache] Failed to read image thumbnail fallback:',
+-        error
+-      );
++      console.warn('[UnifiedCache] Failed to read image thumbnail:', error);
+     }
+-
+     return null;
+   }
+ 
 diff --git a/packages/drawnix/src/services/video-api-service.test.ts b/packages/drawnix/src/services/video-api-service.test.ts
 index 3ed7e6a..59c12fe 100644
 --- a/packages/drawnix/src/services/video-api-service.test.ts
