@@ -39,16 +39,24 @@
       "maximumOutputImagesIncludingBase": 3
     }
   ],
-  "executionStatus": "transparent-generation-success-layer-request-not-submitted",
+  "executionStatus": "layer-attempt-failed-no-retry",
   "notes": [
     "No credentials, account identity, or unrelated account records are retained.",
     "Pricing is a preflight, not a receipt or evidence of a completed paid call.",
-    "Recheck the same exact-model price before execution; do not automatically retry either paid request."
+    "Recheck the same exact-model price before execution; do not automatically retry either paid request.",
+    "Second UI submission returned without a result; no automatic retry. An empty scoped receipt query is not evidence of zero charge."
   ],
-  "uiSubmissionCount": 1,
+  "uiSubmissionCount": 2,
   "maximumProjectedUsd": 0.5700000000000001,
   "maximumProjectedCnyAtSiteRate": 0.399,
   "submissionObservedAt": "2026-11-15T12:30:29.846929+00:00",
   "actualChargedCny": 0.091,
-  "remainingAuthorizedCalls": 1
+  "remainingAuthorizedCalls": 0,
+  "secondCallPriceCheckedAt": "2026-11-15T13:02:27.518502+00:00",
+  "secondCallPriceResponseSha256": "ddde3cb035447137ffb65375250fa65c42bce7c4cc15b78c18d7a440fd8717aa",
+  "secondCallMaximumCnyAtSiteRate": 0.308,
+  "secondCallSubmissionRecordedAt": "2026-11-15T13:03:15.778136+00:00",
+  "paidCallCountConfirmed": 1,
+  "secondCallProviderReceipt": "not-found-in-scoped-query",
+  "secondCallBillingStatus": "unconfirmed"
 }

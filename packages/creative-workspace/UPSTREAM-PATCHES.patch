@@ -6846,7 +6846,7 @@ index 40c1937..d905b4b 100644
    );
  };
 diff --git a/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog.tsx b/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog.tsx
-index 00f10c3..a4b9f84 100644
+index 00f10c3..2f46371 100644
 --- a/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog.tsx
 +++ b/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog.tsx
 @@ -1,8 +1,11 @@
@@ -6884,7 +6884,7 @@ index 00f10c3..a4b9f84 100644
  export const LayerDecompositionDialog: React.FC<
    LayerDecompositionDialogProps
  > = ({
-@@ -80,13 +92,19 @@ export const LayerDecompositionDialog: React.FC<
+@@ -80,14 +92,21 @@ export const LayerDecompositionDialog: React.FC<
    imageUrl,
    language,
    automatic = false,
@@ -6903,9 +6903,19 @@ index 00f10c3..a4b9f84 100644
 +    'auto'
 +  );
    const [processing, setProcessing] = useState(false);
++  const [taskError, setTaskError] = useState<string | null>(null);
    const [progress, setProgress] = useState(0);
    const [phase, setPhase] = useState('queued');
-@@ -154,7 +172,7 @@ export const LayerDecompositionDialog: React.FC<
+   const [result, setResult] = useState<LayerDecompositionResponse | null>(null);
+@@ -120,6 +139,7 @@ export const LayerDecompositionDialog: React.FC<
+       abortRef.current = null;
+       taskIdRef.current = null;
+       setProcessing(false);
++      setTaskError(null);
+       setProgress(0);
+       setPhase('queued');
+       setResult(null);
+@@ -154,7 +174,7 @@ export const LayerDecompositionDialog: React.FC<
    const cancel = useCallback(async () => {
      const taskId = taskIdRef.current;
      abortRef.current?.abort();
@@ -6914,7 +6924,15 @@ index 00f10c3..a4b9f84 100644
        try {
          await createLayerDecompositionApiClient().cancel(taskId);
        } catch {
-@@ -211,6 +229,8 @@ export const LayerDecompositionDialog: React.FC<
+@@ -204,6 +224,7 @@ export const LayerDecompositionDialog: React.FC<
+       runningRef.current = true;
+       abortRef.current = controller;
+       setProcessing(true);
++      setTaskError(null);
+       setProgress(0);
+       setPhase('queued');
+       try {
+@@ -211,6 +232,8 @@ export const LayerDecompositionDialog: React.FC<
            createLayerDecompositionApiClient(),
            controller.signal
          );
@@ -6923,18 +6941,26 @@ index 00f10c3..a4b9f84 100644
          if (response.resultKind === 'test') {
            MessagePlugin.warning(
              isZh
-@@ -267,8 +287,8 @@ export const LayerDecompositionDialog: React.FC<
-           error instanceof Error
-             ? error.message
-             : isZh
+@@ -263,13 +286,11 @@ export const LayerDecompositionDialog: React.FC<
+         ) {
+           return;
+         }
+-        MessagePlugin.error(
+-          error instanceof Error
+-            ? error.message
+-            : isZh
 -            ? '图片分层失败'
 -            : 'Layer decomposition failed'
-+              ? '图片分层失败'
-+              : 'Layer decomposition failed'
-         );
+-        );
++        const message = error instanceof Error
++          ? error.message
++          : isZh ? '图片分层失败' : 'Layer decomposition failed';
++        setTaskError(message);
++        MessagePlugin.error(message);
          if (automatic) close();
        } finally {
-@@ -299,18 +319,40 @@ export const LayerDecompositionDialog: React.FC<
+         if (abortRef.current === controller) abortRef.current = null;
+@@ -299,18 +320,40 @@ export const LayerDecompositionDialog: React.FC<
        return;
      }
      taskIdRef.current = null;
@@ -6987,7 +7013,7 @@ index 00f10c3..a4b9f84 100644
  
    useEffect(() => {
      if (!open || !automatic || autoStartedRef.current) return;
-@@ -424,19 +466,19 @@ export const LayerDecompositionDialog: React.FC<
+@@ -424,19 +467,19 @@ export const LayerDecompositionDialog: React.FC<
    const primaryAction = result
      ? applyResult
      : needsCorrection
@@ -7015,7 +7041,7 @@ index 00f10c3..a4b9f84 100644
  
    return (
      <ConfirmDialog
-@@ -469,8 +511,8 @@ export const LayerDecompositionDialog: React.FC<
+@@ -469,8 +512,8 @@ export const LayerDecompositionDialog: React.FC<
                    ? '取消任务'
                    : 'Cancel task'
                  : isZh
@@ -7026,7 +7052,7 @@ index 00f10c3..a4b9f84 100644
              </Button>
            </div>
          ) : (
-@@ -485,8 +527,8 @@ export const LayerDecompositionDialog: React.FC<
+@@ -485,8 +528,8 @@ export const LayerDecompositionDialog: React.FC<
                    ? '取消任务'
                    : 'Cancel task'
                  : isZh
@@ -7037,11 +7063,18 @@ index 00f10c3..a4b9f84 100644
              </Button>
              <Button
                theme="primary"
-@@ -500,10 +542,20 @@ export const LayerDecompositionDialog: React.FC<
+@@ -500,10 +543,27 @@ export const LayerDecompositionDialog: React.FC<
        }
      >
        <div className="layer-decomposition-dialog__body">
 -        <img
++        {taskError && (
++          <div role="alert" className="layer-decomposition-dialog__error">
++            <strong>{isZh ? '分层未完成' : 'Layer decomposition did not complete'}</strong>
++            <div>{taskError}</div>
++            <div>{isZh ? '未自动重试。再次提交前请先核对调用记录，避免重复计费。' : 'No automatic retry was made. Check the request record before submitting again to avoid duplicate charges.'}</div>
++          </div>
++        )}
 +        <RetryImage
            src={imageUrl}
 -          alt=""
@@ -7060,7 +7093,7 @@ index 00f10c3..a4b9f84 100644
          />
  
          {!automatic && !result && !needsCorrection && (
-@@ -576,7 +628,7 @@ export const LayerDecompositionDialog: React.FC<
+@@ -576,7 +636,7 @@ export const LayerDecompositionDialog: React.FC<
              <input
                type="range"
                min={1}
@@ -7069,7 +7102,7 @@ index 00f10c3..a4b9f84 100644
                step={1}
                value={maxLayers}
                disabled={processing}
-@@ -585,6 +637,41 @@ export const LayerDecompositionDialog: React.FC<
+@@ -585,6 +645,41 @@ export const LayerDecompositionDialog: React.FC<
            </label>
          )}
  
@@ -7111,7 +7144,7 @@ index 00f10c3..a4b9f84 100644
          {!automatic && needsCorrection && !result && (
            <div className="layer-decomposition-dialog__correction">
              <strong>
-@@ -651,16 +738,45 @@ export const LayerDecompositionDialog: React.FC<
+@@ -651,16 +746,45 @@ export const LayerDecompositionDialog: React.FC<
              <span>
                {isZh ? '图层数量' : 'Layers'}: {result.layers.length + 1}
              </span>
@@ -7159,6 +7192,24 @@ index 00f10c3..a4b9f84 100644
          {processing && (
            <div
              className="layer-decomposition-dialog__progress"
+diff --git a/packages/drawnix/src/components/layer-decomposition/layer-decomposition-dialog.scss b/packages/drawnix/src/components/layer-decomposition/layer-decomposition-dialog.scss
+index 2e3b52f..6b2e92e 100644
+--- a/packages/drawnix/src/components/layer-decomposition/layer-decomposition-dialog.scss
++++ b/packages/drawnix/src/components/layer-decomposition/layer-decomposition-dialog.scss
+@@ -160,3 +160,13 @@
+     width: 100%;
+   }
+ }
++
++.layer-decomposition-dialog__error {
++  padding: 12px;
++  border: 1px solid var(--td-error-color, #d54941);
++  border-radius: 6px;
++  color: var(--td-error-color, #d54941);
++  overflow-wrap: anywhere;
++  font-size: 13px;
++  line-height: 1.5;
++}
 diff --git a/packages/drawnix/src/components/model-benchmark/image-inspection-report.scss b/packages/drawnix/src/components/model-benchmark/image-inspection-report.scss
 index 76508f9..0253158 100644
 --- a/packages/drawnix/src/components/model-benchmark/image-inspection-report.scss

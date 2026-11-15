@@ -1,0 +1,27 @@
+{
+  "kind": "real-seedream55-layer-attempt",
+  "installedSourceCommit": "a3e2a39153d27275609d9ab16539dc22c77ea06f",
+  "status": "failed-no-result",
+  "uiSubmissionCount": 1,
+  "model": "doubao-seedream-5-5-261028",
+  "size": "1K",
+  "foregroundLayers": 2,
+  "maximumOutputImagesIncludingBase": 3,
+  "ocrRequested": true,
+  "automaticRetry": false,
+  "requestReceiptCount": 0,
+  "receiptQueryScope": {
+    "p": 1,
+    "page_size": 2,
+    "type": 0,
+    "model_name": "doubao-seedream-5-5-261028",
+    "token_name": "奶酪",
+    "start_timestamp": 1794747765,
+    "end_timestamp": 1794747825
+  },
+  "receiptResponseSha256": "f50bc756e6a9e0ffb34bbca9d43a5cbc9cfc929d2358a32903bbc2daca187ccd",
+  "receiptCheckedAt": "2026-11-15T13:04:20.595488+00:00",
+  "billingStatus": "unconfirmed",
+  "failureReason": "not-yet-observed; transient error disappeared",
+  "releaseAcceptance": "not-passed"
+}

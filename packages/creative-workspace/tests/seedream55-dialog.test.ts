@@ -67,4 +67,17 @@ describe('real layer settings dialog',()=>{
     await waitFor(()=>expect(insert).toHaveBeenCalledTimes(1));
     expect(insert.mock.calls[0][2].layers[0].textRecognition).toEqual(artifact.textRecognition);
   });
+  it('keeps a failed request visible and never retries it on rerender',async()=>{
+    decompose.mockRejectedValue(new Error('SYNTHETIC source read failed'));
+    const props={open:true,board:board as any,sourceElementId:'source',imageUrl:'https://example.test/source.png',language:'zh' as const,providerModelId:'doubao-seedream-5-5-261028',onClose:()=>{}};
+    const {rerender}=render(React.createElement(LayerDecompositionDialog,props));
+    fireEvent.click(screen.getByRole('button',{name:/开始分层/}));
+    expect((await screen.findByRole('alert')).textContent).toContain('SYNTHETIC source read failed');
+    rerender(React.createElement(LayerDecompositionDialog,{...props,language:'en'}));
+    expect(screen.getByRole('alert').textContent).toContain('No automatic retry');
+    expect(decompose).toHaveBeenCalledTimes(1);
+    expect(insert).not.toHaveBeenCalled();
+    rerender(React.createElement(LayerDecompositionDialog,{...props,open:false}));
+    await waitFor(()=>expect(screen.queryByRole('alert')).toBeNull());
+  });
 });

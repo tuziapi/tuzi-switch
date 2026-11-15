@@ -106,6 +106,7 @@ export const LayerDecompositionDialog: React.FC<
     'auto'
   );
   const [processing, setProcessing] = useState(false);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState('queued');
   const [result, setResult] = useState<LayerDecompositionResponse | null>(null);
@@ -138,6 +139,7 @@ export const LayerDecompositionDialog: React.FC<
       abortRef.current = null;
       taskIdRef.current = null;
       setProcessing(false);
+      setTaskError(null);
       setProgress(0);
       setPhase('queued');
       setResult(null);
@@ -222,6 +224,7 @@ export const LayerDecompositionDialog: React.FC<
       runningRef.current = true;
       abortRef.current = controller;
       setProcessing(true);
+      setTaskError(null);
       setProgress(0);
       setPhase('queued');
       try {
@@ -283,13 +286,11 @@ export const LayerDecompositionDialog: React.FC<
         ) {
           return;
         }
-        MessagePlugin.error(
-          error instanceof Error
-            ? error.message
-            : isZh
-              ? '图片分层失败'
-              : 'Layer decomposition failed'
-        );
+        const message = error instanceof Error
+          ? error.message
+          : isZh ? '图片分层失败' : 'Layer decomposition failed';
+        setTaskError(message);
+        MessagePlugin.error(message);
         if (automatic) close();
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
@@ -542,6 +543,13 @@ export const LayerDecompositionDialog: React.FC<
       }
     >
       <div className="layer-decomposition-dialog__body">
+        {taskError && (
+          <div role="alert" className="layer-decomposition-dialog__error">
+            <strong>{isZh ? '分层未完成' : 'Layer decomposition did not complete'}</strong>
+            <div>{taskError}</div>
+            <div>{isZh ? '未自动重试。再次提交前请先核对调用记录，避免重复计费。' : 'No automatic retry was made. Check the request record before submitting again to avoid duplicate charges.'}</div>
+          </div>
+        )}
         <RetryImage
           src={imageUrl}
           alt={isZh ? '待分层原图' : 'Source image for layers'}

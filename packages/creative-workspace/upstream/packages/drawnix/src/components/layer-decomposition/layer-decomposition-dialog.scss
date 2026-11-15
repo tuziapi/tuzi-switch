@@ -160,3 +160,13 @@
     width: 100%;
   }
 }
+
+.layer-decomposition-dialog__error {
+  padding: 12px;
+  border: 1px solid var(--td-error-color, #d54941);
+  border-radius: 6px;
+  color: var(--td-error-color, #d54941);
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.5;
+}
