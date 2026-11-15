@@ -249,3 +249,9 @@ MSI临时密钥实验43689414375 attempt1于08:27:20 UTC自行失败，取消请
 新增signed_candidate_windows_manual_transition布尔输入（默认false），仅signed_candidate_windows_only路径传入reusable manual_transition（默认false）。开启后下载正式已发布v1.6.0的Windows两包和manifest，固定manifest SHA256 ab7eb20f36407dfa80631f855cf68633f7876ee5b7b72b930326579c15ec6599、正式commit21cad50c及安装包摘要；只读正式Release，不修改线上附件。
 
 在一次性runner先真实安装/启动1.6.0、通过普通IPC保存合成供应商和WebView偏好，关闭托盘最小化选项后走正常窗口退出；要求原进程exit0。再用真实1.6.2安装器手动过渡，核查精确身份和原数据保留，不重新种入fixture；随后继续既有1.6.2→1.6.3正式签名升级及三种失败重试。仍不手工启动1.6.3。仅新增测试选项和LEGACY_INSTALLER_DIR测试环境变量，无业务/数据库字段。node语法、actionlint、diff检查通过，真实结果待运行。
+
+## Windows旧版手动过渡及签名升级43695838168通过
+
+测试源码beeb7e4485f69a8249056ea46c7edfa9e3b034aa，NSIS/MSI两个job成功。独立下载artifact14153354402（NSIS）和14153999896（MSI），归档SHA256/ZIP CRC、11项checks、三代运行时版本/应用ID/stable渠道/精确commit与请求格式全部复核通过。1.6.0正常退出码0，真实1.6.2手动安装保留此前SQLite合成供应商和WebView偏好；随后1.6.2通过正式签名下载、安装器自动重启到1.6.3，原进程exit0。全程没有重种fixture或手动启动1.6.3，三类下载失败及同目录重试继续通过，清理无错误。已查看实际重启后截图。
+
+证据见evidence/2026-11-15-signed-43695838168-nsis.json与evidence/2026-11-15-signed-43695838168-msi.json。该结果补齐Windows旧用户手动过渡路径的安装/基础数据子集；完整创作项目、多媒体、有效安装包的系统安装失败、生产经营统计和Mac/Linux正式包仍未验收，officialAcceptance继续为false，没有正式发布。

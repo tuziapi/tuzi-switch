@@ -1,0 +1,283 @@
+{
+  "kind": "real-installed-app-subset",
+  "platform": "windows-x64",
+  "installerType": "msi",
+  "officialAcceptance": false,
+  "discovery": "synthetic-local-https",
+  "signingKey": "new-official-channel-key",
+  "fromVersion": "1.6.2",
+  "toVersion": "1.6.3",
+  "base": {
+    "schemaVersion": 2,
+    "repository": "AiW520/tuzi-switch",
+    "releaseRepository": "tuziapi/tuzi-switch",
+    "commit": "11b8e308ef77708df3526a7701d106fc04b15f57",
+    "runId": "43680220045",
+    "tag": "v1.6.2",
+    "files": {
+      "SHA256SUMS": "1021297b585fdc749501712989026a51cfd4e608bbc74bb13a827a56260c6421",
+      "latest.json": "87a6099e8d72e89a17a9dc796ec478e56fea1abf7ea71466f5361e95767df5c2",
+      "manifest-linux-x64.json": "73f29f41096f6d80d1e274635e2336f4aa94482e711c4fa826fe6099e0e8e4c1",
+      "manifest-macos-arm64.json": "697a4f496939d56dee299b5196231797be0c53cfa400078258244cdd528a4020",
+      "manifest-macos-x64.json": "b45bd2089a1d9345c783fd8fc8f89ac0c93c7b4d52643d90bd9bf263189d4e7b",
+      "manifest-windows-x64.json": "5c3f942f33d22349337d202fffc47d2f18029eefb4ce18a716d70a41d2327891",
+      "tuzi-assistant-linux-x64.AppImage": "255be272d43a13d9495c800bf8d9d8c9e625d8393f97c2259dc0767287b2993e",
+      "tuzi-assistant-linux-x64.AppImage.sig": "bf16863c8eb09c024f3dae676b2b5e5b328ff7279a024223225ec42935ff3008",
+      "tuzi-assistant-linux-x64.deb": "03523be40891d30f4657193a56a4b14beb43f95ee2cc927f1c49d6990eb76c6f",
+      "tuzi-assistant-linux-x64.deb.sig": "53ed0d45b5088217b402116ff6521454bc2d54f1e826cc6ee15e143e6791ecc5",
+      "tuzi-assistant-linux-x64.rpm": "2def3d37655fd41c143b2ceefeaa628f5cbf5b884cc9c8cfc9f50ddf0f85cdb8",
+      "tuzi-assistant-linux-x64.rpm.sig": "03af367162f5dee7f799393636491f26a17bb8c2a2dbcb4a0eebba3ea28b2d78",
+      "tuzi-assistant-macos-arm64.app.tar.gz": "eefff0f320660a2184a06f021248fbd7df3ac0211a99e0b7f61ca2a8255e7355",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig": "9e23191980c83ec40d7d78045f34129c6b3db53c8875220b4bc416f3b0c51978",
+      "tuzi-assistant-macos-arm64.dmg": "251938f6d2831c2749eef4a6055c504a90ba44453b6c53732fb8ca843cc4804f",
+      "tuzi-assistant-macos-x64.app.tar.gz": "3e3ebe6117e154ea59aa42870ea987c7d131e96bdb127dd0eccc9347e9a6e773",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig": "222cebf597e51a8666e0dea111696b28da96220bf3019e904f7d7d3872d9cba3",
+      "tuzi-assistant-macos-x64.dmg": "8e3d3f0fad7edd29d36c8bd00eced6c1ad56c0948c72670fc04bac604c55b6dc",
+      "tuzi-assistant-source.tar.gz": "b6526fdf957376ec87bc9e4d1d3e3c7e7b34ec736e0f288f1ade1c79b8ca51ed",
+      "tuzi-assistant-windows-x64.exe": "35d29195b1db0156bf1073c1906c5a7be6bf005c8b666d59f834b30c259c2ddd",
+      "tuzi-assistant-windows-x64.exe.sig": "582443955692d19d6a6c8fc7653784d7d9b5d8e608f7ceacfe4656b3288928ae",
+      "tuzi-assistant-windows-x64.msi": "da7dcbf2c96f0020f7d1ea7cbac0286de66d917ffc31cb9567085d700502f6c3",
+      "tuzi-assistant-windows-x64.msi.sig": "dabec2cbfa319158e87798476a05e1f070d72bd6438409c317afb6c1d37dfef1"
+    },
+    "delivery": "manual-key-transition",
+    "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+    "publicationFiles": [
+      "SHA256SUMS",
+      "manifest-linux-x64.json",
+      "manifest-macos-arm64.json",
+      "manifest-macos-x64.json",
+      "manifest-windows-x64.json",
+      "tuzi-assistant-linux-x64.AppImage",
+      "tuzi-assistant-linux-x64.deb",
+      "tuzi-assistant-linux-x64.rpm",
+      "tuzi-assistant-macos-arm64.dmg",
+      "tuzi-assistant-macos-x64.dmg",
+      "tuzi-assistant-source.tar.gz",
+      "tuzi-assistant-windows-x64.exe",
+      "tuzi-assistant-windows-x64.msi"
+    ]
+  },
+  "target": {
+    "schemaVersion": 2,
+    "repository": "AiW520/tuzi-switch",
+    "releaseRepository": "tuziapi/tuzi-switch",
+    "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+    "runId": "43689683759",
+    "tag": "v1.6.3",
+    "files": {
+      "SHA256SUMS": "c02bb6aaf63a41b224291701c125c4b8fc50260079ab3675650726ae71ddfb15",
+      "latest.json": "d30b2eff7649d58784426e4cd3444a5ff6df7ec585c8fedf530ec7533d2df26d",
+      "manifest-linux-x64.json": "462d2261954e6170f730178946f7aae27926cda480117abf358e31568d476b87",
+      "manifest-macos-arm64.json": "183bc1557966e993d17f24d9c7b22f2a7f4b1e687d9b2cbf1cb17b1b54a6f129",
+      "manifest-macos-x64.json": "d5f6203b81e1e8de5abc6702b5451d2e9afdd27e037c090b2f364295092fb841",
+      "manifest-windows-x64.json": "4e96ac3235c7e4733d7dde4f171664d1982570973cf891467146d3bd056b01a6",
+      "tuzi-assistant-linux-x64.AppImage": "5556369b5f6b8d054a46c8ab688ab3a1dfd85e814d97f0a29fb116d014c2e8b0",
+      "tuzi-assistant-linux-x64.AppImage.sig": "e1b1c0854a1dbe99d8eb08e249a4561214c3b210668e2a687f8f177cdef7959c",
+      "tuzi-assistant-linux-x64.deb": "a92f738f70bd5dc39523d452e774bae451c33c2c5025b2d0bac98542c8b806c8",
+      "tuzi-assistant-linux-x64.deb.sig": "4fd49991046d95cacd1f98b9e7d911b0288d1187ebcfac4b437eb5537ee6c627",
+      "tuzi-assistant-linux-x64.rpm": "03b31e4051e4b27097bb8c16dd2f4d23a6029a7326c8d15d7aeb6781d5cf75ef",
+      "tuzi-assistant-linux-x64.rpm.sig": "9da33311f717d3ba3a6a9f10736abb0207ddbef05657d0559e06cf70ab1d2085",
+      "tuzi-assistant-macos-arm64.app.tar.gz": "5791348a6a965e47367389c48bd7b34e70b76f02cf299ad5a1356b7c44f045ce",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig": "5bdc59336f3d48f9b2781f066e0fb2147d0bae65460c9504fabc98bce118093b",
+      "tuzi-assistant-macos-arm64.dmg": "a735d23d050c316a16ecb53a0b827aaf3d812865f77f929a6ac5ad58d2f33ead",
+      "tuzi-assistant-macos-x64.app.tar.gz": "5bc447ff69db3698a2f6c17d66db940eeb1eb0551d2e3bfc3caa3bb3e1046f67",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig": "787b3e15180b29e9af7cc80b90d8d16fd97737af6393d348bcecb920bd1b18bd",
+      "tuzi-assistant-macos-x64.dmg": "51baf8c0a5298693268b5bc7030b147191a54013132835a25dd15716480d40a9",
+      "tuzi-assistant-source.tar.gz": "262fe0970daa8d5a8070a556810cc4d5781c770ff03033166c22ad79e8f612b9",
+      "tuzi-assistant-windows-x64.exe": "c0924e6bc79220b9ed1ff1972d84f348678bc215dfb835b35ca5c941b42c8878",
+      "tuzi-assistant-windows-x64.exe.sig": "bcfbc5ed5ca3fb5589e727b65e604e90f995cab750ca109bfc3a7231e77f6d31",
+      "tuzi-assistant-windows-x64.msi": "08e06d4b26dd736a023447d09fe64cb4d3db1733adfe12eaaad2a22e72888e49",
+      "tuzi-assistant-windows-x64.msi.sig": "7523bb3e4a28a94d2e00f3822475f1fc542ab1deb36a0d178c64eda9592399e3"
+    },
+    "delivery": "signed-update",
+    "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+    "publicationFiles": [
+      "SHA256SUMS",
+      "latest.json",
+      "manifest-linux-x64.json",
+      "manifest-macos-arm64.json",
+      "manifest-macos-x64.json",
+      "manifest-windows-x64.json",
+      "tuzi-assistant-linux-x64.AppImage",
+      "tuzi-assistant-linux-x64.AppImage.sig",
+      "tuzi-assistant-linux-x64.deb",
+      "tuzi-assistant-linux-x64.deb.sig",
+      "tuzi-assistant-linux-x64.rpm",
+      "tuzi-assistant-linux-x64.rpm.sig",
+      "tuzi-assistant-macos-arm64.app.tar.gz",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig",
+      "tuzi-assistant-macos-arm64.dmg",
+      "tuzi-assistant-macos-x64.app.tar.gz",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig",
+      "tuzi-assistant-macos-x64.dmg",
+      "tuzi-assistant-source.tar.gz",
+      "tuzi-assistant-windows-x64.exe",
+      "tuzi-assistant-windows-x64.exe.sig",
+      "tuzi-assistant-windows-x64.msi",
+      "tuzi-assistant-windows-x64.msi.sig"
+    ]
+  },
+  "checks": {
+    "manualTransition": "passed",
+    "corrupt": "passed",
+    "interrupted": "passed",
+    "missing": "passed",
+    "download": "passed",
+    "nativeSignature": "passed",
+    "install": "passed",
+    "automaticRestart": "passed",
+    "version": "passed",
+    "sqliteProviderAndWebviewPreference": "passed",
+    "sameInstallationRetry": "passed"
+  },
+  "requests": [
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/latest/download/latest.json",
+      "mode": "normal"
+    },
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/latest/download/latest.json",
+      "mode": "normal"
+    },
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/latest/download/latest.json",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.msi",
+      "mode": "corrupt"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.msi",
+      "mode": "interrupted"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.msi",
+      "mode": "missing"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.msi",
+      "mode": "normal"
+    }
+  ],
+  "remaining": [
+    "installer-failure",
+    "full-creative-project-migration",
+    "business-attribution",
+    "reviewed-cross-platform-acceptance"
+  ],
+  "connectionErrors": {
+    "http://127.0.0.1:9222": "Error: browserType.connectOverCDP: connect ECONNREFUSED 127.0.0.1:9222\nCall log:\n\u001b[2m  - <ws preparing> retrieving websocket url from http://127.0.0.1:9222\u001b[22m\n",
+    "http://localhost:9222": "Error: browserType.connectOverCDP: connect ECONNREFUSED ::1:9222\nCall log:\n\u001b[2m  - <ws preparing> retrieving websocket url from http://localhost:9222\u001b[22m\n",
+    "http://[::1]:9222": "Error: browserType.connectOverCDP: connect ECONNREFUSED ::1:9222\nCall log:\n\u001b[2m  - <ws preparing> retrieving websocket url from http://[::1]:9222\u001b[22m\n"
+  },
+  "cdpPages": [
+    "http://tauri.localhost/"
+  ],
+  "legacyIdentity": {
+    "version": "1.6.0",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 19,
+      "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+      "platform": "windows"
+    }
+  },
+  "legacyExecutableSha256": "fad8dc0e656b35ef49e77c4204c973f9be671eafa8bc00e4084ea802dce6b5f7",
+  "legacyExitCode": 0,
+  "initialExecutableSha256": "ffe07f339e071290fab2f2e169bbbd37dc2c0682ed18860891453ef68c7246d2",
+  "initialPid": 8252,
+  "baseIdentity": {
+    "version": "1.6.2",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 33,
+      "commit": "11b8e308ef77708df3526a7701d106fc04b15f57",
+      "platform": "windows"
+    }
+  },
+  "manualTransition": {
+    "status": "passed",
+    "fromVersion": "1.6.0",
+    "toVersion": "1.6.2",
+    "publishedSource": {
+      "repository": "tuziapi/tuzi-switch",
+      "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+      "builderRepository": "AiW520/tuzi-switch",
+      "builderCommit": "3685725f3f76f9df607035024718421ffc78fd66",
+      "updaterSigned": false,
+      "publicationReady": false,
+      "run": "42974374413",
+      "target": "x86_64-pc-windows-msvc",
+      "version": "1.6.0",
+      "developerSigned": false,
+      "notarized": false,
+      "channel": "stable",
+      "applicationId": "com.tuziswitch.desktop",
+      "isolatedLocalProfile": false,
+      "files": [
+        {
+          "file": "tuzi-assistant-windows-x64.msi",
+          "sha256": "2cf974ecbb3620b7b3a2d151ded64eeb81c19156bb910874a0b96bf5be5f30f6",
+          "bytes": 25993216
+        },
+        {
+          "file": "tuzi-assistant-windows-x64.exe",
+          "sha256": "0495fe632dd23d9afb134e59d12db52fe071e23d2cfde3f716e82caa05a1dd1a",
+          "bytes": 22673572
+        }
+      ]
+    },
+    "sqliteProviderAndWebviewPreference": "passed"
+  },
+  "initialExit": {
+    "code": 0,
+    "signal": null
+  },
+  "targetIdentity": {
+    "version": "1.6.3",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 39,
+      "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+      "platform": "windows"
+    }
+  },
+  "finalExecutableSha256": "fa379383b68f86571c5c2a4d8aacb4f5a5a02d0a7ca1e1cf2d8f93b57c7c733e",
+  "subsetStatus": "passed",
+  "testRepository": "AiW520/tuzi-switch",
+  "testRunId": "43695838168",
+  "testCommit": "beeb7e4485f69a8249056ea46c7edfa9e3b034aa",
+  "artifactId": "14153999896",
+  "artifactSha256": "5108773944279b47bde1d6c238f1c856a3ce446d037b78950083b7200c23dff8",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true
+}
