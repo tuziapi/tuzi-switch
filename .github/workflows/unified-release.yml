@@ -39,7 +39,7 @@ on:
         type: boolean
         default: false
       signed_candidate_linux_probe_only:
-        description: Probe the unchanged signed Linux candidate UI in an offline disposable user; never publish
+        description: Test signed Linux candidate UI and DEB upgrade in offline disposable users; never publish
         type: boolean
         default: false
       signed_candidate_windows_only:

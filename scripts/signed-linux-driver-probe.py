@@ -22,7 +22,7 @@ root = Path(output)
 root.mkdir(parents=True, exist_ok=True)
 assert not (Path.home() / '.tuzi-switch').exists(), 'Clean disposable profile required'
 report = {'kind': 'installed-linux-driver-probe', 'officialAcceptance': False,
-          'candidateRunId': '43680220045', 'candidateCommit': '11b8e308ef77708df3526a7701d106fc04b15f57'}
+          'candidateRunId': '43699923173', 'candidateCommit': '5bfee5f39b0b370093081227c6e19883f21280a0'}
 env = {k: v for k, v in os.environ.items() if not any(word in k.upper() for word in ['TOKEN', 'SECRET', 'PASSWORD', 'PRIVATE_KEY'])}
 env.update(TAURI_WEBVIEW_AUTOMATION='true', WEBKIT_DISABLE_DMABUF_RENDERER='1', WEBKIT_DISABLE_COMPOSITING_MODE='1')
 session = None
