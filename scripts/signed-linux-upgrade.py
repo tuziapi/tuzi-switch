@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import ssl
 import subprocess
@@ -247,6 +248,10 @@ localStorage.setItem('SYNTHETIC-SIGNED-LINUX','preserve-me');done(true)},e=>done
     wait_for(lambda: buttons(['重新下载']), 'Expected package-manager permission failure', 60)
     assert digest_executable() == before_hash
     identity('1.6.2', base['commit'])
+    permission_diagnostics = (output/'driver.log').read_text(errors='replace')
+    denial = re.findall(r'[^\n]*(?:not in the sudoers|a password is required|a terminal is required|no tty present|No authentication agent)[^\n]*', permission_diagnostics, flags=re.IGNORECASE)
+    assert denial, 'Installation rejection must include actual OS authorization diagnostics'
+    report['installPermissionDiagnostics'] = denial
     report['checks']['validPackageInstallPermissionDenied'] = 'passed'
     screenshot('04-install-permission-denied')
     # Grant only the real updater dpkg command on this disposable user/VM, then retry.
