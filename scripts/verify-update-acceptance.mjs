@@ -171,3 +171,19 @@ test("manual transition excludes native update metadata and requires subsequent 
       assert.throws(() => verify(d, copy, c));
     }
   }, "1.6.2"));
+
+test("protected test executor binds official key, manual delivery and public installer subset", () =>
+  fixture((d) => {
+    fs.writeFileSync(path.join(d,'tuzi-assistant-macos-arm64.dmg'),'SYNTHETIC direct installer');
+    fs.writeFileSync(path.join(d,'tuzi-assistant-macos-arm64.app.tar.gz'),'SYNTHETIC updater');
+    fs.writeFileSync(path.join(d,'tuzi-assistant-macos-arm64.app.tar.gz.sig'),'SYNTHETIC signature');
+    const env={GITHUB_REPOSITORY:'AiW520/tuzi-switch',TUZI_SWITCH_RELEASE_REPOSITORY:'tuziapi/tuzi-switch',GITHUB_SHA:'a'.repeat(40),GITHUB_RUN_ID:'123'};
+    assert.throws(()=>candidate(d,env), /Unapproved/);
+    const c=candidate(d,{...env,TUZI_OFFICIAL_TEST_CANDIDATE:'1'});
+    assert.equal(c.repository,'AiW520/tuzi-switch');
+    assert.equal(c.releaseRepository,'tuziapi/tuzi-switch');
+    assert.equal(c.delivery,'manual-key-transition');
+    assert.ok(c.publicationFiles.includes('tuzi-assistant-macos-arm64.dmg'));
+    assert.ok(!c.publicationFiles.some(f=>f.endsWith('.sig') || f.endsWith('.app.tar.gz') || f==='latest.json'));
+    assert.ok(!fs.readFileSync(path.join(d,'SHA256SUMS'),'utf8').includes('.sig'));
+  }, '1.6.2'));

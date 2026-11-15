@@ -79,7 +79,7 @@ function publicationFiles(files, delivery) {
 }
 
 function verifyPolicy(c) {
-  const policy = deliveryPolicy(c.repository, c.tag.slice(1));
+  const policy = deliveryPolicy(c.releaseRepository, c.tag.slice(1));
   if (
     c.delivery !== policy.delivery ||
     c.publicKeySha256 !== policy.publicKeySha256 ||
@@ -111,6 +111,7 @@ export function candidate(dir, env = process.env) {
   const result = {
     schemaVersion: 2,
     repository: env.GITHUB_REPOSITORY,
+    releaseRepository: channels.releaseChannel(env).repository,
     commit: env.GITHUB_SHA,
     runId: env.GITHUB_RUN_ID,
     tag: `v${manifest.version}`,
@@ -125,7 +126,10 @@ export function candidate(dir, env = process.env) {
     !/^v\d+\.\d+\.\d+$/.test(result.tag)
   )
     fail("Invalid candidate identity");
-  Object.assign(result, deliveryPolicy(result.repository, manifest.version));
+  if (result.repository !== result.releaseRepository && !(result.repository === "AiW520/tuzi-switch"
+    && result.releaseRepository === "tuziapi/tuzi-switch" && env.TUZI_OFFICIAL_TEST_CANDIDATE === "1"))
+    fail("Unapproved cross-repository signing executor");
+  Object.assign(result, deliveryPolicy(result.releaseRepository, manifest.version));
   result.publicationFiles = publicationFiles(
     [...new Set([...filenames(dir), "SHA256SUMS"])],
     result.delivery,
@@ -155,7 +159,7 @@ export function verify(dir, evidence, expected) {
   const c = JSON.parse(fs.readFileSync(path.join(dir, "candidate.json")));
   if (c.schemaVersion !== 2 || evidence.schemaVersion !== 2)
     fail("Unsupported evidence schema");
-  for (const key of ["repository", "commit", "runId", "tag"]) {
+  for (const key of ["repository", "releaseRepository", "commit", "runId", "tag"]) {
     if (!expected[key] || c[key] !== expected[key] || evidence[key] !== c[key])
       fail(`Acceptance ${key} mismatch`);
   }
@@ -278,7 +282,8 @@ if (
     stagePublication(process.argv[3], process.argv[4]);
   else if (process.argv[2] === "verify") {
     verify(process.argv[3], JSON.parse(fs.readFileSync(process.argv[4])), {
-      repository: process.env.GITHUB_REPOSITORY,
+      repository: process.env.CANDIDATE_REPOSITORY || process.env.GITHUB_REPOSITORY,
+      releaseRepository: process.env.GITHUB_REPOSITORY,
       commit: process.env.CANDIDATE_SHA,
       runId: process.env.CANDIDATE_RUN_ID,
       tag: process.env.RELEASE_TAG,

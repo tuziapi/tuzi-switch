@@ -14,13 +14,13 @@ class ReleaseAssetsTest(unittest.TestCase):
             root = Path(temp)
             (root/'package.json').write_text('{"version":"1.5.0"}')
             assets = root/'assets'; assets.mkdir()
-            env = dict(os.environ, GITHUB_REPOSITORY='tuziapi/tuzi-switch', GITHUB_SHA='a'*40, GITHUB_RUN_ID='123')
+            env = dict(os.environ, GITHUB_REPOSITORY='tuziapi/tuzi-switch', TUZI_SWITCH_RELEASE_REPOSITORY='tuziapi/tuzi-switch', GITHUB_SHA='a'*40, GITHUB_RUN_ID='123')
             for name, target, suffixes in [('macos-arm64','aarch64-apple-darwin',['.dmg']),('macos-x64','x86_64-apple-darwin',['.dmg']),('windows-x64','x86_64-pc-windows-msvc',['.exe','.msi']),('linux-x64','x86_64-unknown-linux-gnu',['.AppImage','.deb','.rpm'])]:
                 files=[]
                 for ext in suffixes:
                     file=f'tuzi-assistant-{name}{ext}'; data=b'SYNTHETIC installer'; (assets/file).write_bytes(data)
                     files.append(dict(file=file,bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
-                m=dict(repository=env['GITHUB_REPOSITORY'],commit=env['GITHUB_SHA'],run='123',target=target,version='1.5.0',channel='stable',applicationId='com.tuziswitch.desktop',isolatedLocalProfile=False,files=files)
+                m=dict(repository=env['GITHUB_REPOSITORY'],releaseRepository='tuziapi/tuzi-switch',commit=env['GITHUB_SHA'],run='123',target=target,version='1.5.0',channel='stable',applicationId='com.tuziswitch.desktop',isolatedLocalProfile=False,files=files)
                 (assets/f'manifest-{name}.json').write_text(json.dumps(m))
             if mutation: mutation(assets)
             return subprocess.run([sys.executable,str(SCRIPT),'assets'],cwd=root,env=env,capture_output=True).returncode

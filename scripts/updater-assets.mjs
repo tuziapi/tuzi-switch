@@ -130,7 +130,9 @@ export function manifest(dir, env = process.env, write = true) {
   ).version;
   const tag = env.RELEASE_TAG || env.GITHUB_REF_NAME;
   const { repository, pubkey } = channels.releaseChannel(env);
-  if (tag !== `v${version}` || env.GITHUB_REPOSITORY !== repository)
+  const protectedTest = env.GITHUB_REPOSITORY === "AiW520/tuzi-switch"
+    && repository === "tuziapi/tuzi-switch" && env.TUZI_OFFICIAL_TEST_CANDIDATE === "1";
+  if (tag !== `v${version}` || (env.GITHUB_REPOSITORY !== repository && !protectedTest))
     throw Error("Invalid updater release identity");
   const platforms = {};
   for (const [name, entries] of Object.entries(targets)) {
@@ -142,6 +144,7 @@ export function manifest(dir, env = process.env, write = true) {
       source.commit !== env.GITHUB_SHA ||
       source.run !== env.GITHUB_RUN_ID ||
       source.repository !== env.GITHUB_REPOSITORY
+      || (protectedTest && source.releaseRepository !== repository)
     )
       throw Error("Updater source mismatch");
     for (const [target, ext] of Object.entries(entries)) {
@@ -155,7 +158,7 @@ export function manifest(dir, env = process.env, write = true) {
         pubkey,
       );
       platforms[target] = {
-        url: `https://github.com/${env.GITHUB_REPOSITORY}/releases/download/${tag}/${filename}`,
+        url: `https://github.com/${repository}/releases/download/${tag}/${filename}`,
         signature,
       };
     }

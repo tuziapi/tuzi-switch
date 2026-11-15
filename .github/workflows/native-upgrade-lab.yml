@@ -11,7 +11,7 @@ concurrency:
 jobs:
   native-upgrade:
     if: github.repository == 'AiW520/tuzi-switch'
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:

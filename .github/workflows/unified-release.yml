@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      official_candidate:
+        description: Build official-channel candidates on the protected test executor; never publish
+        type: boolean
+        default: false
       native_upgrade_lab_only:
         description: Run isolated native upgrade tests in the test repository; never publish
         type: boolean
@@ -25,8 +29,9 @@ concurrency:
 env:
   # Creative workspace exceeds the 2 GiB heap default on macOS runners.
   NODE_OPTIONS: --max-old-space-size=4096
-  TUZI_SWITCH_RELEASE_REPOSITORY: ${{ github.repository }}
-  VITE_RELEASE_REPOSITORY: ${{ github.repository }}
+  TUZI_SWITCH_RELEASE_REPOSITORY: ${{ inputs.official_candidate && 'tuziapi/tuzi-switch' || github.repository }}
+  VITE_RELEASE_REPOSITORY: ${{ inputs.official_candidate && 'tuziapi/tuzi-switch' || github.repository }}
+  TUZI_OFFICIAL_TEST_CANDIDATE: ${{ inputs.official_candidate && '1' || '0' }}
 
 jobs:
   native-upgrade-lab:
@@ -38,7 +43,7 @@ jobs:
     uses: ./.github/workflows/channel-updater-preflight.yml
     secrets:
       UPDATER_KEY: ${{ github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY || secrets.TUZI_UPDATER_PRIVATE_KEY }}
-      UPDATER_PASSWORD: ${{ github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+      UPDATER_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
 
   verify:
     if: ${{ !inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
@@ -47,18 +52,25 @@ jobs:
       tag: ${{ steps.identity.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+      - name: Validate protected executor mode
+        if: inputs.official_candidate
+        run: |
+          test "$GITHUB_REPOSITORY" = 'AiW520/tuzi-switch'
+          test "$GITHUB_REF" = 'refs/heads/codex/verified-desktop-updates'
       - name: Verify version identity
         id: identity
         env:
           PUBLISH: "false"
         run: node scripts/verify-release-identity.mjs
       - name: Require the existing channel signing key
+        if: ${{ !inputs.official_candidate }}
         shell: bash
         env:
           OFFICIAL_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TEST_UPDATER_KEY: ${{ secrets.TUZI_UPDATER_PRIVATE_KEY }}
+          PROTECTED_UPDATER_KEY: ${{ secrets.OFFICIAL_UPDATER_PRIVATE_KEY }}
         run: |
-          if [[ "$GITHUB_REPOSITORY" == 'tuziapi/tuzi-switch' ]]; then UPDATER_KEY="$OFFICIAL_UPDATER_KEY"; else UPDATER_KEY="$TEST_UPDATER_KEY"; fi
+          if [[ "$TUZI_OFFICIAL_TEST_CANDIDATE" == 1 ]]; then UPDATER_KEY="$PROTECTED_UPDATER_KEY"; elif [[ "$GITHUB_REPOSITORY" == 'tuziapi/tuzi-switch' ]]; then UPDATER_KEY="$OFFICIAL_UPDATER_KEY"; else UPDATER_KEY="$TEST_UPDATER_KEY"; fi
           if [[ -z "$UPDATER_KEY" ]]; then echo 'Missing channel signing key; refusing unsigned build'; exit 1; fi
       - uses: actions/setup-node@v4
         with:
@@ -86,6 +98,7 @@ jobs:
 
   installers:
     needs: verify
+    environment: ${{ inputs.official_candidate && 'official-updater-signing' || 'candidate-build' }}
     strategy:
       fail-fast: false
       matrix:
@@ -135,9 +148,10 @@ jobs:
         env:
           OFFICIAL_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TEST_UPDATER_KEY: ${{ secrets.TUZI_UPDATER_PRIVATE_KEY }}
+          PROTECTED_UPDATER_KEY: ${{ secrets.OFFICIAL_UPDATER_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REPOSITORY" == 'tuziapi/tuzi-switch' ]]; then UPDATER_KEY="$OFFICIAL_UPDATER_KEY"; else UPDATER_KEY="$TEST_UPDATER_KEY"; fi
+          if [[ "$TUZI_OFFICIAL_TEST_CANDIDATE" == 1 ]]; then UPDATER_KEY="$PROTECTED_UPDATER_KEY"; elif [[ "$GITHUB_REPOSITORY" == 'tuziapi/tuzi-switch' ]]; then UPDATER_KEY="$OFFICIAL_UPDATER_KEY"; else UPDATER_KEY="$TEST_UPDATER_KEY"; fi
           if [[ -z "$UPDATER_KEY" ]]; then echo 'Missing channel signing key; refusing unsigned release'; exit 1; fi
           umask 077
           KEY_PATH="$RUNNER_TEMP/tuzi-updater.key"
@@ -145,7 +159,7 @@ jobs:
           echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_PATH" >> "$GITHUB_ENV"
       - name: Verify signing key against channel public key
         env:
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
         run: node scripts/updater-assets.mjs check-key
       - run: pnpm build:renderer
       - name: Native regression (host target)
@@ -163,7 +177,7 @@ jobs:
         env:
           APPLE_SIGNING_IDENTITY: '-'
           BUILD_TARGET: ${{ matrix.target }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
         run: |
           set -euo pipefail
           if [[ "$RUNNER_OS" == "macOS" ]]; then
@@ -193,7 +207,7 @@ jobs:
           if not files:
               raise SystemExit('No installers were produced')
           (output / ('manifest-' + os.environ['BUILD_NAME'] + '.json')).write_text(json.dumps({
-              'repository': os.environ['GITHUB_REPOSITORY'], 'commit': os.environ['GITHUB_SHA'],
+              'repository': os.environ['GITHUB_REPOSITORY'], 'releaseRepository': os.environ['TUZI_SWITCH_RELEASE_REPOSITORY'], 'commit': os.environ['GITHUB_SHA'],
               'run': os.environ['GITHUB_RUN_ID'], 'target': os.environ['BUILD_TARGET'],
               'version': json.loads(pathlib.Path('package.json').read_text(encoding='utf-8'))['version'],
               'developerSigned': False, 'notarized': False, 'channel': 'stable',
@@ -203,7 +217,7 @@ jobs:
       - name: Collect and verify signed updater artifacts
         shell: bash
         env:
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
         run: node scripts/updater-assets.mjs collect "src-tauri/target/${{ matrix.target }}/release/bundle" release-assets "${{ matrix.name }}"
       - name: Remove temporary signing key
         if: always()

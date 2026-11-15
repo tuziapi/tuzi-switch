@@ -17,6 +17,7 @@ for name, (target, formats) in expected.items():
     m = json.loads((root / f'manifest-{name}.json').read_text())
     for key, value in {
         'repository': os.environ['GITHUB_REPOSITORY'], 'commit': os.environ['GITHUB_SHA'],
+        'releaseRepository': os.environ.get('TUZI_SWITCH_RELEASE_REPOSITORY', os.environ['GITHUB_REPOSITORY']),
         'run': os.environ['GITHUB_RUN_ID'], 'target': target, 'version': version,
         'channel': 'stable', 'applicationId': 'com.tuziswitch.desktop', 'isolatedLocalProfile': False,
     }.items():

@@ -164,6 +164,17 @@ test("complete signed manifest rejects cross-channel manifests and tampered inst
           );
         }
       }
+      if (repository === 'AiW520/tuzi-switch') {
+        const protectedEnv={...env,TUZI_SWITCH_RELEASE_REPOSITORY:'tuziapi/tuzi-switch',TUZI_OFFICIAL_TEST_CANDIDATE:'1'};
+        assert.throws(()=>manifest(temp,protectedEnv),/source mismatch/);
+        for(const name of Object.keys(targets)) {
+          const file=path.join(temp,`manifest-${name}.json`);
+          fs.writeFileSync(file,JSON.stringify({...JSON.parse(fs.readFileSync(file)),releaseRepository:'tuziapi/tuzi-switch'}));
+        }
+        const official=manifest(temp,protectedEnv);
+        assert.ok(Object.values(official.platforms).every(p=>p.url.includes('/tuziapi/tuzi-switch/')));
+        assert.throws(()=>manifest(temp,{...protectedEnv,TUZI_OFFICIAL_TEST_CANDIDATE:'0'}),/identity/);
+      }
       const result = manifest(temp, env);
       assert.equal(Object.keys(result.platforms).length, 9);
       assert.ok(

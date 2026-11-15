@@ -7,6 +7,12 @@ on:
         description: Version already tested, e.g. v1.6.2
         required: true
         type: string
+      candidate_repository:
+        description: Executor that produced the official-channel candidate
+        type: choice
+        options: [tuziapi/tuzi-switch, AiW520/tuzi-switch]
+        default: tuziapi/tuzi-switch
+        required: true
       candidate_run_id:
         description: Successful Unified desktop release run containing the tested bytes
         required: true
@@ -29,6 +35,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.tag }}
+      CANDIDATE_REPOSITORY: ${{ inputs.candidate_repository }}
       CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
     steps:
       - uses: actions/checkout@v4
@@ -42,20 +49,21 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" > /tmp/candidate-run.json
+          gh api "repos/$CANDIDATE_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" > /tmp/candidate-run.json
           gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" > /tmp/candidate-tag.json
           node --input-type=module <<'JS'
           import fs from 'node:fs';
           const run=JSON.parse(fs.readFileSync('/tmp/candidate-run.json'));
           const tag=JSON.parse(fs.readFileSync('/tmp/candidate-tag.json'));
           if(run.conclusion!=='success' || run.path!=='.github/workflows/unified-release.yml'
-            || run.head_sha!==tag.sha || run.repository.full_name!==process.env.GITHUB_REPOSITORY)
+            || run.head_sha!==tag.sha || run.repository.full_name!==process.env.CANDIDATE_REPOSITORY)
             throw Error('Candidate run, repository and version tag must match');
           fs.appendFileSync(process.env.GITHUB_ENV,`CANDIDATE_SHA=${run.head_sha}\n`);
           fs.appendFileSync(process.env.GITHUB_OUTPUT,`sha=${run.head_sha}\n`);
           JS
       - uses: actions/download-artifact@v4
         with:
+          repository: ${{ inputs.candidate_repository }}
           name: verified-release
           run-id: ${{ inputs.candidate_run_id }}
           github-token: ${{ github.token }}
@@ -69,10 +77,12 @@ jobs:
       - name: Reverify installer identity and signatures without rebuilding
         working-directory: candidate-source
         env:
-          GITHUB_SHA: ${{ steps.source.outputs.sha }}
-          GITHUB_RUN_ID: ${{ inputs.candidate_run_id }}
+          TUZI_OFFICIAL_TEST_CANDIDATE: ${{ inputs.candidate_repository == 'AiW520/tuzi-switch' && '1' || '0' }}
           TUZI_SWITCH_RELEASE_REPOSITORY: tuziapi/tuzi-switch
         run: |
+          export GITHUB_REPOSITORY="$CANDIDATE_REPOSITORY"
+          export GITHUB_SHA="$CANDIDATE_SHA"
+          export GITHUB_RUN_ID="$CANDIDATE_RUN_ID"
           python3 scripts/verify-release-assets.py ../release-assets
           node scripts/updater-assets.mjs verify-manifest ../release-assets
       - name: Stage the policy-approved publication subset without rebuilding
