@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ export const useAddProviderMutation = (appId: AppId) => {
       providerInput: Omit<Provider, "id"> & {
         providerKey?: string;
         addToLive?: boolean;
+        analyticsAction?: "duplicate";
       },
     ) => {
       let id: string;
@@ -40,7 +42,12 @@ export const useAddProviderMutation = (appId: AppId) => {
         id = generateUUID();
       }
 
-      const { providerKey: _providerKey, addToLive, ...rest } = providerInput;
+      const {
+        providerKey: _providerKey,
+        addToLive,
+        analyticsAction,
+        ...rest
+      } = providerInput;
 
       const newProvider: Provider = {
         ...rest,
@@ -49,7 +56,12 @@ export const useAddProviderMutation = (appId: AppId) => {
       };
       delete (newProvider as any).providerKey;
 
-      await providersApi.add(newProvider, appId, addToLive);
+      await trackOperation(
+        "providers",
+        analyticsAction ?? "add",
+        { tool: appId },
+        () => providersApi.add(newProvider, appId, addToLive),
+      );
       return newProvider;
     },
     onSuccess: async () => {
@@ -122,7 +134,9 @@ export const useUpdateProviderMutation = (appId: AppId) => {
       provider: Provider;
       originalId?: string;
     }) => {
-      await providersApi.update(provider, appId, originalId);
+      await trackOperation("providers", "edit", { tool: appId }, () =>
+        providersApi.update(provider, appId, originalId),
+      );
       return provider;
     },
     onSuccess: async () => {
@@ -162,7 +176,9 @@ export const useDeleteProviderMutation = (appId: AppId) => {
 
   return useMutation({
     mutationFn: async (providerId: string) => {
-      await providersApi.delete(providerId, appId);
+      await trackOperation("providers", "delete", { tool: appId }, () =>
+        providersApi.delete(providerId, appId),
+      );
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
@@ -228,7 +244,9 @@ export const useSwitchProviderMutation = (appId: AppId) => {
 
   return useMutation({
     mutationFn: async (providerId: string): Promise<SwitchResult> => {
-      return await providersApi.switch(providerId, appId);
+      return await trackOperation("providers", "switch", { tool: appId }, () =>
+        providersApi.switch(providerId, appId),
+      );
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });

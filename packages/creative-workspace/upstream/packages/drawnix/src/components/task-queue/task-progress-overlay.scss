@@ -1,0 +1,157 @@
+/**
+ * TaskProgressOverlay Styles
+ *
+ * 任务进度覆盖层样式
+ * - 填充整个预览区域
+ * - 环形进度条 + 百分比（等比缩放）
+ * - 底部线性进度条
+ */
+
+.task-progress-overlay {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  --task-progress-accent: #f39c12;
+  background-color: #fef3d7;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(245, 184, 73, 0.16), transparent 24%),
+    radial-gradient(circle at 76% 78%, rgba(179, 144, 122, 0.14), transparent 32%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(236, 230, 224, 0.74)),
+    #fef3d7;
+  border-radius: inherit;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1.5px rgba(217, 119, 6, 0.42);
+
+  // 背景层（装饰）
+  &__backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(140deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.1)),
+      radial-gradient(circle at 50% 60%, rgba(255, 255, 255, 0.18), transparent 60%);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
+  &__pulse,
+  &__dots {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  &__pulse {
+    background:
+      radial-gradient(circle at 16% 18%, rgba(243, 156, 18, 0.14), transparent 22%),
+      radial-gradient(circle at 72% 70%, rgba(168, 133, 112, 0.12), transparent 34%);
+    mix-blend-mode: normal;
+    animation: task-progress-overlay-pulse 3.6s ease-in-out infinite;
+  }
+
+  &__dots {
+    inset: 18% 20%;
+    opacity: 0.32;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.7) 0 1.2px, transparent 1.8px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 92%);
+  }
+
+  // 进度内容容器（支持等比缩放）
+  &__content {
+    position: relative;
+    z-index: 1;
+    transform-origin: center center;
+    transition: transform 0.15s ease-out;
+  }
+
+  &__progress {
+    --image-generation-progress-accent: var(--task-progress-accent);
+    --image-generation-progress-accent-soft: rgba(243, 156, 18, 0.14);
+    --image-generation-progress-ring-bg: rgba(100, 116, 139, 0.36);
+    --image-generation-progress-text: rgba(31, 41, 55, 0.96);
+  }
+
+  // 底部进度条
+  &__bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(148, 163, 184, 0.18);
+    z-index: 1;
+  }
+
+  &__bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #F39C12, #E67E22);
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(243, 156, 18, 0.5);
+  }
+}
+
+.opentu-desktop .task-progress-overlay__backdrop {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.opentu-desktop .task-progress-overlay__dots {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+// 视频任务的特殊样式
+.task-progress-overlay--video {
+  --task-progress-accent: #5a4fcf;
+  background-color: #ebe8fa;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(105, 91, 224, 0.18), transparent 24%),
+    radial-gradient(circle at 72% 74%, rgba(90, 79, 207, 0.1), transparent 32%),
+    linear-gradient(135deg, rgba(250, 249, 255, 0.88), rgba(232, 229, 247, 0.78)),
+    #ebe8fa;
+  box-shadow: inset 0 0 0 1.5px rgba(90, 79, 207, 0.42);
+
+  .task-progress-overlay__pulse {
+    background:
+      radial-gradient(circle at 18% 22%, rgba(123, 104, 238, 0.16), transparent 22%),
+      radial-gradient(circle at 72% 70%, rgba(90, 79, 207, 0.14), transparent 34%);
+  }
+
+  .task-progress-overlay__bar-fill {
+    background: linear-gradient(90deg, #5A4FCF, #7B68EE);
+    box-shadow: 0 0 8px rgba(90, 79, 207, 0.5);
+  }
+}
+
+// 图片加载阶段的特殊样式
+.task-progress-overlay--loading {
+  --task-progress-accent: #00a870;
+
+  .task-progress-overlay__pulse {
+    background:
+      radial-gradient(circle at 18% 18%, rgba(0, 168, 112, 0.12), transparent 22%),
+      radial-gradient(circle at 76% 72%, rgba(132, 204, 166, 0.12), transparent 34%);
+  }
+
+  .task-progress-overlay__bar-fill {
+    background: linear-gradient(90deg, #00A870, #00C48C);
+    box-shadow: 0 0 8px rgba(0, 168, 112, 0.5);
+  }
+}
+
+@keyframes task-progress-overlay-pulse {
+  0%,
+  100% {
+    opacity: 0.48;
+    transform: scale(0.98);
+  }
+
+  50% {
+    opacity: 0.82;
+    transform: scale(1.04);
+  }
+}

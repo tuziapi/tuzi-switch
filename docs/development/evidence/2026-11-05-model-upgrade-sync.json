@@ -1,0 +1,155 @@
+{
+  "date": "2026-11-05",
+  "scope": "A: basic integration; local only",
+  "models": [
+    "gpt-image-2.6-1k",
+    "gpt-image-2.6-flare",
+    "gpt-image-2.6-sunburst"
+  ],
+  "creativeTests": {
+    "full": 2244,
+    "finalTargeted": 185
+  },
+  "hostTests": {
+    "full": 778,
+    "newStartupAndNavigation": 4
+  },
+  "typecheck": "passed",
+  "rendererBuild": "passed",
+  "provenance": {
+    "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+    "originalFiles": 1522,
+    "localFiles": 43,
+    "reconstructedFiles": 1565,
+    "patchBytes": 642513
+  },
+  "automaticDiscovery": {
+    "chromium": [
+      {
+        "mode": "manual",
+        "passed": true,
+        "selected": [
+          "gpt-image-2",
+          "user-custom",
+          "gpt-image-2.6-1k",
+          "gpt-image-2.6-flare",
+          "gpt-image-2.6-sunburst"
+        ],
+        "startupModelRequests": 1,
+        "restartModelRequests": 0,
+        "generated": 0,
+        "errors": []
+      },
+      {
+        "mode": "account",
+        "passed": true,
+        "selected": [
+          "gpt-image-2",
+          "user-custom",
+          "gpt-image-2.6-1k",
+          "gpt-image-2.6-flare",
+          "gpt-image-2.6-sunburst"
+        ],
+        "startupModelRequests": 1,
+        "restartModelRequests": 0,
+        "generated": 0,
+        "errors": []
+      }
+    ],
+    "webkit": [
+      {
+        "mode": "manual",
+        "passed": true,
+        "selected": [
+          "gpt-image-2",
+          "user-custom",
+          "gpt-image-2.6-1k",
+          "gpt-image-2.6-flare",
+          "gpt-image-2.6-sunburst"
+        ],
+        "startupModelRequests": 1,
+        "restartModelRequests": 0,
+        "generated": 0,
+        "errors": []
+      },
+      {
+        "mode": "account",
+        "passed": true,
+        "selected": [
+          "gpt-image-2",
+          "user-custom",
+          "gpt-image-2.6-1k",
+          "gpt-image-2.6-flare",
+          "gpt-image-2.6-sunburst"
+        ],
+        "startupModelRequests": 1,
+        "restartModelRequests": 0,
+        "generated": 0,
+        "errors": []
+      }
+    ]
+  },
+  "media": {
+    "flare": [
+      {
+        "outcome": "failure",
+        "status": "passed",
+        "pageErrors": []
+      },
+      {
+        "outcome": "gif",
+        "status": "passed",
+        "pageErrors": []
+      }
+    ],
+    "sunburst": [
+      {
+        "outcome": "failure",
+        "status": "passed",
+        "pageErrors": []
+      },
+      {
+        "outcome": "gif",
+        "status": "passed",
+        "pageErrors": []
+      }
+    ]
+  },
+  "batch20": [
+    {
+      "count": 20,
+      "anchors": 20,
+      "inputVerified": true,
+      "panDisplacement": {
+        "x": 100,
+        "y": 100
+      },
+      "engine": "chromium",
+      "cpu": 1,
+      "longTasksSupported": true,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 24
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.700000000000728,
+      "frameMax": 16.80000000000291,
+      "inputP95": 14.900000005960464,
+      "errors": [],
+      "resultsPersisted": 20,
+      "generationRequests": 20
+    }
+  ],
+  "limitations": [
+    "synthetic transport only",
+    "no paid generation",
+    "no official-group GIF/SVG controls",
+    "no new installer or release",
+    "no production change"
+  ]
+}

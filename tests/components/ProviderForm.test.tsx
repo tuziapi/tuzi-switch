@@ -101,6 +101,9 @@ describe("ProviderForm soft confirmation", () => {
     );
     expect(input).toHaveAttribute("type", "password");
     expect(readEnv).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     const config = JSON.parse(onSubmit.mock.calls[0][0].settingsConfig);
@@ -118,6 +121,9 @@ describe("ProviderForm soft confirmation", () => {
     });
     renderProviderForm(onSubmit);
 
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     expect(await screen.findByText("配置存在以下问题")).toBeInTheDocument();
 
@@ -132,6 +138,9 @@ describe("ProviderForm soft confirmation", () => {
     const onSubmit = vi.fn().mockRejectedValue(new Error("save failed"));
     renderProviderForm(onSubmit);
 
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     expect(await screen.findByText("配置存在以下问题")).toBeInTheDocument();
 

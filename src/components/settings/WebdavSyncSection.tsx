@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -446,7 +447,9 @@ export function WebdavSyncSection({
     closeDialog();
     setActionState("uploading");
     try {
-      await settingsApi.webdavSyncUpload();
+      await trackOperation("config", "sync_upload", {}, () =>
+        settingsApi.webdavSyncUpload(),
+      );
       toast.success(t("settings.webdavSync.uploadSuccess"));
       await queryClient.invalidateQueries();
     } catch (error) {
@@ -506,7 +509,9 @@ export function WebdavSyncSection({
     closeDialog();
     setActionState("downloading");
     try {
-      await settingsApi.webdavSyncDownload();
+      await trackOperation("config", "sync_download", {}, () =>
+        settingsApi.webdavSyncDownload(),
+      );
       toast.success(t("settings.webdavSync.downloadSuccess"));
       await queryClient.invalidateQueries();
     } catch (error) {

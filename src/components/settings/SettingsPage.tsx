@@ -1,3 +1,4 @@
+import { useAnalyticsView } from "@/hooks/useAnalyticsView";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -102,7 +103,8 @@ export function SettingsPage({
 
   const { data: installedSkills } = useInstalledSkills();
 
-  const [activeTab, setActiveTab] = useState<string>("general");
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
+  useAnalyticsView(activeTab);
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
 
   useEffect(() => {

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <script
+      defer
+      src="https://umami.tu-zi.com/script.js"
+      data-website-id="853b4529-0976-4f8a-b00b-6e716f9a2f20"
+      data-auto-track="false"
+    ></script>
+    <script>
+      const pending = [];
+      const platforms = new Set(['macos', 'macos-intel', 'windows', 'msi', 'linux', 'rpm', 'deb', 'appimage']);
+      function flush() {
+        if (typeof window.umami?.track !== 'function') return;
+        while (pending.length) {
+          const data = pending.shift();
+          try {
+            const result = window.umami.track('switch_download_click', data);
+            if (result && typeof result.catch === 'function')
+              result.catch(() => {});
+          } catch (_) {}
+        }
+      }
+      window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (
+          event.origin !== location.origin ||
+          event.source !== window.parent ||
+          data?.type !== 'tuzi-download-click' ||
+          !platforms.has(data.platform) ||
+          !/^(?:v\d+\.\d+\.\d+|test-[a-f0-9]{8})$/.test(data.version || '')
+        )
+          return;
+        if (pending.length < 20)
+          pending.push({ platform: data.platform, version: data.version });
+        flush();
+      });
+      window.addEventListener('load', flush);
+    </script>
+  </head>
+  <body></body>
+</html>

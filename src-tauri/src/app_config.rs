@@ -24,6 +24,7 @@ pub struct McpApps {
     #[serde(default)]
     pub mcode: bool,
     #[serde(default)]
+    // Legacy portable intent only. Local Pi ownership is verified by a file receipt.
     pub pi_managed: bool,
 }
 

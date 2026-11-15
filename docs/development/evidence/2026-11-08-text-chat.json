@@ -1,0 +1,69 @@
+{
+  "task": "UC-TEXT-01",
+  "date": "2026-11-08",
+  "baseCommit": "f731039e1323945bf8b955a926b140089f2b2110",
+  "hostTests": {
+    "files": 97,
+    "passed": 815
+  },
+  "creativeTests": {
+    "files": 142,
+    "passed": 2334
+  },
+  "nativeTests": {
+    "passed": 13,
+    "type": "synthetic loopback and unit"
+  },
+  "browsers": [
+    {
+      "engine": "chromium",
+      "checks": [
+        "focus hides canvas toolbar and handle",
+        "configured model catalogue and search reused",
+        "initial unsent draft survives reload; IME confirmation does not submit",
+        "streaming, reasoning, Markdown, code, math, final usage",
+        "conversation, model and draft restored after reload",
+        "follow-up carries complete history",
+        "regeneration retains replies and excludes later user turns",
+        "explicit insertion persists text in canvas and exits focus",
+        "concurrent sessions stay independent; stop retains partial output",
+        "HTTP failure preserved; retry only on explicit click",
+        "legacy creative mode retained, text draft restored",
+        "dark and 1000×700 layouts",
+        "no browser runtime exceptions"
+      ],
+      "requests": "synthetic only",
+      "errors": []
+    },
+    {
+      "engine": "webkit",
+      "checks": [
+        "focus hides canvas toolbar and handle",
+        "configured model catalogue and search reused",
+        "initial unsent draft survives reload; IME confirmation does not submit",
+        "streaming, reasoning, Markdown, code, math, final usage",
+        "conversation, model and draft restored after reload",
+        "follow-up carries complete history",
+        "regeneration retains replies and excludes later user turns",
+        "explicit insertion persists text in canvas and exits focus",
+        "concurrent sessions stay independent; stop retains partial output",
+        "HTTP failure preserved; retry only on explicit click",
+        "legacy creative mode retained, text draft restored",
+        "dark and 1000×700 layouts",
+        "no browser runtime exceptions"
+      ],
+      "requests": "synthetic only",
+      "errors": []
+    }
+  ],
+  "rootTypecheck": "passed",
+  "upstreamEntryTypecheck": {
+    "modifiedFilesErrors": 0,
+    "unchangedDependencyErrors": 7
+  },
+  "nativeBuild": "passed",
+  "nativeGui": "blocked: ScreenCaptureKit -3811",
+  "realProviders": "not called",
+  "published": false,
+  "binarySha256": "ab8458e99a9c7f5f40ea7cbc6b915f270c79046b066591f128d7391aee31d68d"
+}

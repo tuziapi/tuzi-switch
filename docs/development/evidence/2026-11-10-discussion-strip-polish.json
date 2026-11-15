@@ -1,0 +1,68 @@
+{
+  "task": "UC-DISCUSS-UI-01",
+  "date": "2026-11-10",
+  "base": "efac7cc127f6c1da3703b12c39ca8fbb934df3f3",
+  "browser": {
+    "chromiumLight": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+        "closing unmounts transcript without cancelling the running request",
+        "main input streams model reasoning and reply into attached discussion",
+        "main input continues the same discussion context",
+        "planning failure creates no media tasks; explicit main-input resend succeeds",
+        "durable preview requires explicit confirmation before media dispatch",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+        "stop strip cancels running reply",
+        "reload recovers board-linked discussion and messages",
+        "new discussion and history retain current-board association",
+        "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "webkitDarkRecheck": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+        "closing unmounts transcript without cancelling the running request",
+        "main input streams model reasoning and reply into attached discussion",
+        "main input continues the same discussion context",
+        "planning failure creates no media tasks; explicit main-input resend succeeds",
+        "durable preview requires explicit confirmation before media dispatch",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+        "stop strip cancels running reply",
+        "reload recovers board-linked discussion and messages",
+        "new discussion and history retain current-board association",
+        "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    }
+  },
+  "native": {
+    "checks": [
+      "discussion strip exposes accessible toggle in native app",
+      "strip opens and closes twice",
+      "collapsed transcript unmounted; canvas visible"
+    ],
+    "paidRequests": 0,
+    "method": "macOS accessibility; no inference"
+  },
+  "limitations": [
+    "WebKit initial run timed out after confirming a media plan; unchanged rerun passed. Previously observed intermittent issue remains unresolved.",
+    "Screenshots and media generation use synthetic responses; no real model inference."
+  ],
+  "bundle": "/Users/sdy09/Documents/tuzi-switch-artifacts/discussion-polish-2026-11-10/Tuzi Text Chat QA.app",
+  "binarySha256": "24d10a1605186dadecf0ff36676c988efff09bbdf51d41b919e4af76e36e90b3",
+  "signature": "ad-hoc; codesign --verify --deep --strict passed",
+  "paidRequests": 0,
+  "logs": [
+    "/tmp/tuzi-strip-creative-build.log",
+    "/tmp/tuzi-strip-preview-build.log",
+    "/tmp/tuzi-strip-native-build.log",
+    "/tmp/tuzi-strip-provenance.log"
+  ]
+}

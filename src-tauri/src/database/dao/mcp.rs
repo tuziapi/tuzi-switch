@@ -6,7 +6,7 @@ use crate::app_config::{McpApps, McpServer};
 use crate::database::{lock_conn, Database};
 use crate::error::AppError;
 use indexmap::IndexMap;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 
 fn save_server(conn: &Connection, server: &McpServer) -> Result<(), AppError> {
     conn.execute(
@@ -27,6 +27,72 @@ fn save_server(conn: &Connection, server: &McpServer) -> Result<(), AppError> {
 }
 
 impl Database {
+    /// Commit managed MCP state and matching Codex provider/common snapshots
+    /// together. Otherwise restoring a saved provider can resurrect deleted MCP.
+    pub(crate) fn commit_mcp_change(
+        &self,
+        previous: Option<&McpServer>,
+        next: Option<&McpServer>,
+    ) -> Result<(), AppError> {
+        let mut conn = lock_conn!(self.conn);
+        let tx = conn
+            .transaction()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        if let Some(old) = previous.filter(|s| s.apps.codex) {
+            let spec = next.filter(|s| s.apps.codex).map(|s| &s.server);
+            let mut stmt = tx
+                .prepare("SELECT id, settings_config FROM providers WHERE app_type = 'codex'")
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
+                .map_err(|e| AppError::Database(e.to_string()))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            drop(stmt);
+            for (id, raw) in rows {
+                let mut settings: serde_json::Value = serde_json::from_str(&raw)
+                    .map_err(|_| AppError::Message("Codex 已保存配置无效，未修改 MCP".into()))?;
+                let Some(text) = settings.get("config").and_then(|v| v.as_str()) else {
+                    continue;
+                };
+                if let Some(text) = update_codex_snapshot(text, old, spec)? {
+                    settings["config"] = serde_json::Value::String(text);
+                    tx.execute("UPDATE providers SET settings_config = ?1 WHERE id = ?2 AND app_type = 'codex'", params![settings.to_string(),id])
+                        .map_err(|e| AppError::Database(e.to_string()))?;
+                }
+            }
+            let snippet: Option<String> = tx
+                .query_row(
+                    "SELECT value FROM settings WHERE key = 'common_config_codex'",
+                    [],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(|e| AppError::Database(e.to_string()))?;
+            if let Some(text) = snippet {
+                if let Some(text) = update_codex_snapshot(&text, old, spec)? {
+                    tx.execute(
+                        "UPDATE settings SET value = ?1 WHERE key = 'common_config_codex'",
+                        params![text],
+                    )
+                    .map_err(|e| AppError::Database(e.to_string()))?;
+                }
+            }
+        }
+        if let Some(next) = next {
+            save_server(&tx, next)?;
+        } else if let Some(previous) = previous {
+            tx.execute(
+                "DELETE FROM mcp_servers WHERE id = ?1",
+                params![previous.id],
+            )
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
+        tx.commit().map_err(|e| AppError::Database(e.to_string()))
+    }
+
     /// 获取所有 MCP 服务器
     pub fn get_all_mcp_servers(&self) -> Result<IndexMap<String, McpServer>, AppError> {
         let conn = lock_conn!(self.conn);
@@ -112,4 +178,35 @@ impl Database {
             .map_err(|e| AppError::Database(e.to_string()))?;
         Ok(())
     }
+}
+
+fn update_codex_snapshot(
+    text: &str,
+    old: &McpServer,
+    next: Option<&serde_json::Value>,
+) -> Result<Option<String>, AppError> {
+    if !text.contains(&old.id) {
+        return Ok(None);
+    }
+    let doc = text
+        .parse::<toml_edit::DocumentMut>()
+        .map_err(|_| AppError::Message("Codex 已保存配置无效，未修改 MCP".into()))?;
+    if doc
+        .get("mcp_servers")
+        .and_then(|v| v.get(&old.id))
+        .is_none()
+    {
+        return Ok(None);
+    }
+    let bytes = crate::mcp::transaction::transform(
+        &crate::app_config::AppType::Codex,
+        std::path::Path::new("config.toml"),
+        Some(text.as_bytes()),
+        &old.id,
+        Some(&old.server),
+        next,
+    )?;
+    String::from_utf8(bytes)
+        .map(Some)
+        .map_err(|_| AppError::Message("Codex 已保存配置编码无效".into()))
 }

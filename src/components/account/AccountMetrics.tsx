@@ -1,23 +1,35 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { desktopRequest, type AccountState } from "@/lib/api/account";
-import type { DesktopAccount, UsageValues } from "@/lib/api/desktop";
+import {
+  desktopRequest,
+  openAccountWeb,
+  type AccountState,
+} from "@/lib/api/account";
+import type {
+  Capabilities,
+  DesktopAccount,
+  UsageValues,
+} from "@/lib/api/desktop";
 import { useAccountRead, useDesktop } from "@/lib/query/desktop";
 import { displayAmount, useAccountCurrency } from "./AccountCurrency";
 import { QueryState } from "./BusinessShared";
 import { Wallet, ArrowUpRight, Activity, Layers3 } from "lucide-react";
 
-/** The first release needs only today's summary, not the hidden trend data. */
+/** Summary belongs exclusively to the key workspace. */
 export function AccountMetrics({
   state,
   accountEnabled,
   usageEnabled,
+  web,
 }: {
   state: AccountState;
   accountEnabled: boolean;
   usageEnabled: boolean;
+  web?: Capabilities["web"];
 }) {
   const { t } = useTranslation();
   const currency = useAccountCurrency();
+  const [webFailed, setWebFailed] = useState(false);
   const account = useDesktop<DesktopAccount>(
     accountEnabled ? state : { ...state, identity: null },
     "/account/account",
@@ -57,6 +69,19 @@ export function AccountMetrics({
               <Wallet size={15} aria-hidden="true" />
             </span>
             {t("account.business.balance")}
+            {(web?.topup || web?.redemption) && (
+              <button
+                className="account-balance-link"
+                onClick={() => {
+                  setWebFailed(false);
+                  void openAccountWeb(web.topup ? "topup" : "redemption").catch(
+                    () => setWebFailed(true),
+                  );
+                }}
+              >
+                {t("account.workspace.wallet")} ↗
+              </button>
+            )}
           </dt>
           <dd>
             {account.data
@@ -110,6 +135,7 @@ export function AccountMetrics({
       >
         今日数据按已记录消费统计 ⓘ
       </p>
+      {webFailed && <p role="alert">{t("account.business.errors.generic")}</p>}
       <div className="account-sync">
         <QueryState query={account} showUpdated={false} />
         <QueryState query={consumption} showUpdated={false} />

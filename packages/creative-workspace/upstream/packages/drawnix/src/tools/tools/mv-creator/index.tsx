@@ -1,0 +1,59 @@
+import React, { lazy, Suspense, type CSSProperties } from 'react';
+import type { ToolPluginModule } from '../../types';
+import { ToolCategory } from '../../../types/toolbox.types';
+import { Film } from 'lucide-react';
+
+const MVCreatorOriginal = lazy(
+  () => import('../../../components/mv-creator/MVCreator')
+);
+
+const containerStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  boxSizing: 'border-box',
+};
+
+const LoadingFallback: React.FC = () => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      minHeight: 200,
+      color: '#999',
+      fontSize: 14,
+    }}
+  >
+    加载中...
+  </div>
+);
+
+export const MVCreatorToolComponent: React.FC<Record<string, unknown>> = (props) => (
+  <div style={containerStyle}>
+    <Suspense fallback={<LoadingFallback />}>
+      <MVCreatorOriginal {...props} />
+    </Suspense>
+  </div>
+);
+
+export const mvCreatorTool: ToolPluginModule = {
+  manifest: {
+    id: 'mv-creator',
+    name: '爆款MV生成',
+    description: '输入创意，AI 生成音乐和分镜视频，一站式 MV 创作',
+    icon: <Film size={18} strokeWidth={1.75} />,
+    category: ToolCategory.AI_TOOLS,
+    component: 'mv-creator',
+    supportsMultipleWindows: true,
+    defaultWindowBehavior: {
+      autoPinOnOpen: true,
+    },
+    defaultWidth: 680,
+    defaultHeight: 700,
+  },
+  Component: MVCreatorToolComponent,
+};

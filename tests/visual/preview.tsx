@@ -1,5 +1,5 @@
 // Synthetic, in-memory visual fixture. Not imported by the application entry point.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { mockIPC } from "@tauri-apps/api/mocks";
@@ -19,6 +19,10 @@ function Preview() {
   const [scenario, setScenario] = useState("normal");
   const [theme, setTheme] = useState("light");
   const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    return () => document.documentElement.classList.remove("dark");
+  }, [theme]);
   const [configure, setConfigure] = useState<{
     key: DesktopKey;
     model?: DesktopPricing;

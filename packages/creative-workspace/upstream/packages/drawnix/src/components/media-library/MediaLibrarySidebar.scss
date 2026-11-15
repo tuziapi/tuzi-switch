@@ -1,0 +1,235 @@
+/**
+ * Media Library Sidebar Styles
+ * 素材库侧边栏样式 - 简洁素雅风格
+ */
+
+.media-library-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    &--storage {
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+    }
+  }
+
+  &__title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--aitu-ui-text-tertiary, #94a3b8);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    &::before {
+      content: '';
+      width: 3px;
+      height: 12px;
+      background: var(--aitu-ui-brand, #f39c12);
+      border-radius: 2px;
+    }
+  }
+
+  &__buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .t-button {
+      justify-content: flex-start;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 10px;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: auto;
+      min-height: 40px;
+      border: 1px solid transparent;
+
+      // 图标容器
+      .t-icon,
+      svg {
+        flex-shrink: 0;
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px !important;
+        transition: transform 0.2s ease, color 0.2s ease;
+      }
+
+      // 文本
+      > span {
+        flex: 1;
+        text-align: left;
+        line-height: 1.4;
+        display: flex;
+        align-items: center;
+      }
+
+      // 移除 TDesign 默认的间距
+      .t-button__icon {
+        margin: 0 !important;
+      }
+
+      .t-button__text {
+        display: flex;
+        align-items: center;
+      }
+
+      // 激活状态 (base variant)
+      &.t-button--variant-base {
+        background: var(--aitu-ui-brand-soft, rgba(243, 156, 18, 0.12));
+        color: var(--aitu-ui-brand-text, #b45309);
+        border: 1px solid var(--aitu-ui-brand-border-soft, rgba(243, 156, 18, 0.28));
+
+        svg {
+          color: var(--aitu-ui-brand, #f39c12);
+        }
+
+        &:hover {
+          background: var(--aitu-ui-brand-soft, rgba(243, 156, 18, 0.12));
+        }
+      }
+
+      // 非激活状态 (outline variant)
+      &.t-button--variant-outline {
+        background: transparent;
+        color: var(--aitu-ui-text-secondary, #64748b);
+        border-color: transparent;
+
+        svg {
+          color: var(--aitu-ui-text-tertiary, #94a3b8);
+        }
+
+        &:hover {
+          background: var(--aitu-ui-brand-softer, rgba(243, 156, 18, 0.06));
+          color: var(--aitu-ui-brand-text, #b45309);
+          border-color: var(--aitu-ui-brand-border-soft, rgba(243, 156, 18, 0.28));
+          transform: translateX(4px);
+
+          svg {
+            color: var(--aitu-ui-brand, #f39c12);
+            transform: scale(1.1);
+          }
+        }
+      }
+    }
+  }
+
+  // ========== 移动端优化 ==========
+  @media (max-width: 768px) {
+    gap: 10px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px;
+
+    &__section {
+      gap: 6px;
+      flex: 1 1 auto;
+      min-width: 120px;
+
+      &--storage {
+        padding-top: 0;
+        border-top: none;
+        border-left: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+        padding-left: 10px;
+        margin-left: auto;
+        display: none;
+      }
+    }
+
+    &__title {
+      font-size: 9px;
+      margin-bottom: 4px;
+      padding: 0 6px;
+
+      &::before {
+        width: 2px;
+        height: 10px;
+      }
+    }
+
+    &__buttons {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 4px;
+
+      .t-button {
+        padding: 6px 10px;
+        font-size: 11px;
+        min-height: 32px;
+        gap: 6px;
+        flex: 1 1 auto;
+        min-width: 80px;
+        border-radius: 8px;
+
+        .t-icon,
+        svg {
+          width: 14px;
+          height: 14px;
+          margin-right: 6px !important;
+        }
+
+        &.t-button--variant-base:hover,
+        &.t-button--variant-outline:hover {
+          transform: none;
+        }
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    padding: 6px;
+
+    &__section {
+      min-width: 100px;
+      gap: 4px;
+    }
+
+    &__title {
+      font-size: 8px;
+      margin-bottom: 3px;
+
+      &::before {
+        display: none;
+      }
+    }
+
+    &__buttons {
+      gap: 3px;
+
+      .t-button {
+        padding: 4px 8px;
+        font-size: 10px;
+        min-height: 28px;
+        min-width: 70px;
+        gap: 4px;
+        border-radius: 6px;
+
+        .t-icon,
+        svg {
+          width: 12px;
+          height: 12px;
+          margin-right: 4px !important;
+        }
+      }
+    }
+  }
+}

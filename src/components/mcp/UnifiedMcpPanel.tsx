@@ -38,6 +38,7 @@ const UnifiedMcpPanel = React.forwardRef<
 >(({ onOpenChange: _onOpenChange }, ref) => {
   const { t } = useTranslation();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -100,6 +101,8 @@ const UnifiedMcpPanel = React.forwardRef<
   };
 
   const handleImport = async () => {
+    if (importMutation.isPending) return;
+    setImportError(null);
     try {
       const count = await importMutation.mutateAsync();
       if (count === 0) {
@@ -112,7 +115,11 @@ const UnifiedMcpPanel = React.forwardRef<
         });
       }
     } catch (error) {
-      toast.error(t("common.error"), { description: String(error) });
+      setImportError(String(error));
+      toast.error(t("common.error"), {
+        description: String(error),
+        duration: 10000,
+      });
     }
   };
 
@@ -152,6 +159,23 @@ const UnifiedMcpPanel = React.forwardRef<
       />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24">
+        {importError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm"
+          >
+            <p className="whitespace-pre-wrap break-words">{importError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              disabled={importMutation.isPending}
+              onClick={handleImport}
+            >
+              {t("common.retry", { defaultValue: "重试" })}
+            </Button>
+          </div>
+        )}
         {error ? (
           <WorkspaceQueryError onRetry={() => void refetch()} />
         ) : isLoading ? (

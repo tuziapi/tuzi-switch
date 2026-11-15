@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -34,7 +35,12 @@ export function usePromptActions(appId: AppId) {
   const savePrompt = useCallback(
     async (id: string, prompt: Prompt) => {
       try {
-        await promptsApi.upsertPrompt(appId, id, prompt);
+        await trackOperation(
+          "prompts",
+          prompts[id] ? "edit" : "add",
+          { tool: appId },
+          () => promptsApi.upsertPrompt(appId, id, prompt),
+        );
         await reload();
         toast.success(t("prompts.saveSuccess"), { closeButton: true });
       } catch (error) {
@@ -42,13 +48,15 @@ export function usePromptActions(appId: AppId) {
         throw error;
       }
     },
-    [appId, reload, t],
+    [appId, prompts, reload, t],
   );
 
   const deletePrompt = useCallback(
     async (id: string) => {
       try {
-        await promptsApi.deletePrompt(appId, id);
+        await trackOperation("prompts", "delete", { tool: appId }, () =>
+          promptsApi.deletePrompt(appId, id),
+        );
         await reload();
         toast.success(t("prompts.deleteSuccess"), { closeButton: true });
       } catch (error) {
@@ -62,7 +70,9 @@ export function usePromptActions(appId: AppId) {
   const enablePrompt = useCallback(
     async (id: string) => {
       try {
-        await promptsApi.enablePrompt(appId, id);
+        await trackOperation("prompts", "enable", { tool: appId }, () =>
+          promptsApi.enablePrompt(appId, id),
+        );
         await reload();
         toast.success(t("prompts.enableSuccess"), { closeButton: true });
       } catch (error) {
@@ -103,14 +113,18 @@ export function usePromptActions(appId: AppId) {
 
       try {
         if (enabled) {
-          await promptsApi.enablePrompt(appId, id);
+          await trackOperation("prompts", "enable", { tool: appId }, () =>
+            promptsApi.enablePrompt(appId, id),
+          );
           toast.success(t("prompts.enableSuccess"), { closeButton: true });
         } else {
           // 禁用提示词 - 需要后端支持
-          await promptsApi.upsertPrompt(appId, id, {
-            ...prompts[id],
-            enabled: false,
-          });
+          await trackOperation("prompts", "disable", { tool: appId }, () =>
+            promptsApi.upsertPrompt(appId, id, {
+              ...prompts[id],
+              enabled: false,
+            }),
+          );
           toast.success(t("prompts.disableSuccess"), { closeButton: true });
         }
         await reload();
@@ -128,7 +142,12 @@ export function usePromptActions(appId: AppId) {
 
   const importFromFile = useCallback(async () => {
     try {
-      const id = await promptsApi.importFromFile(appId);
+      const id = await trackOperation(
+        "prompts",
+        "import",
+        { tool: appId },
+        () => promptsApi.importFromFile(appId),
+      );
       await reload();
       toast.success(t("prompts.importSuccess"), { closeButton: true });
       return id;

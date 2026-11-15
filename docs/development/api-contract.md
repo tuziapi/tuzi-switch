@@ -1,5 +1,7 @@
 # 接口与权限契约
 
+2026-11-01 ACCOUNT-OPEN-01：客户端开放已有 logs/models/performance/profile 能力，业务路由和 DTO 不变。原生 release.profile=phase1 为历史标记，不再表示完整 UI 可见性。保留 keys 发布开关及逐页 native/web 能力检查，实际权限仍由服务端校验。
+
 有效基线 `TA-AC-1.5-B4`；契约 `system-token-v1`（2026-10-18）。适用于本轮配对本地版本；不证明生产已支持。原站接口返回继续兼容网站及其他接入方；Rust 适配为现有页面 DTO，不能将旧 `/api/desktop` 改名后重建网络 facade。历史 A 契约见 [归档](history/b3-oauth-a/api-contract.md)。
 
 ## 凭证、身份及兼容
@@ -93,3 +95,14 @@ HTTP 契约仍为 `system-token-v1`。网站回跳地址严格保持无参数 `t
 ## B13本地凭证存储兼容
 
 HTTP路由、认证、DTO及system-token-v1不变。账户原生后端改用独立本地JSON，不调用钥匙串；已有IPC错误码secure_storage_unavailable/secure_storage_failed继续兼容，界面含义更新为本地账户文件访问/保存失败，storage_invalid提供损坏后重连提示。普通IPC仍不返回保存的令牌。详见ADR-011。
+
+## 2026-11-02 ACCOUNT-OPEN-02 原生展示 DTO 增补
+
+不新增服务端路由或权限，仍为 `system-token-v1`。原生 `/account/logs` 及请求关联记录的 Log 增加可选 `request_path`、`upstream_request_id`、`public_error_code`、`status_code`；`error_message` 为普通用户可见日志 content，仅错误记录提供。旧分类 `error_code` 保持兼容。不得直接透传 other、admin_info 或私有上游诊断。Summary 的 `refund_quota` 可选且单列，不将日志消费称为净账务。
+
+模型目录保留原字段/价格；前端将可省略或null的可选数组规范化为空数组，并拒绝无效目录结构。筛选取 pricing_meta.filter_facets 全目录维度，计费类型0=按次、1=按量、2=按秒。状态页传 page_size=6，沿用API全局目录次序，再通过已有POST `/account/model-performance/batch` 读取当前页（models、groups数组、hours、resolution）。该POST是逻辑只读，不改变账户或触发模型调用。
+
+来源与本地验证记录见 account-workspace-opening.md 的 ACCOUNT-OPEN-02；API源代码SHA仅作兼容性依据，不作为线上联调/部署凭据。
+
+
+2026-11-02 ACCOUNT-OPEN-04：批量性能请求的 `groups` 必须区分省略和空数组：省略代表全部可见分组，显式空数组代表空选择。客户端全部分组时省略字段，明确筛选时传对应数组，不修改API及原生路由。模型详情按用户要求仅展示目录原始字段，不再合并账户/分组特价元数据，不能称为个性化最终扣费价。

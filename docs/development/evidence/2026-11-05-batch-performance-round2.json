@@ -1,0 +1,80 @@
+{
+  "baselineCommit": "653708a9",
+  "scope": "Local display refresh; unchanged batch count, concurrency, task persistence and schema",
+  "regressionBefore": {
+    "taskListReadsPerTwentyAnchorSweep": 20,
+    "rendersPerCappedAnchorOver60Seconds": 60
+  },
+  "regressionAfter": {
+    "taskListReadsPerTwentyAnchorSweep": 1,
+    "historyTaskCount": 1000,
+    "rendersPerCappedAnchorOver60Seconds": 0,
+    "emptySweepTaskReads": 0
+  },
+  "chrome": [
+    {
+      "count": 20,
+      "anchors": 20,
+      "inputVerified": true,
+      "panDisplacement": {
+        "x": 100,
+        "y": 100
+      },
+      "engine": "chromium",
+      "cpu": 1,
+      "longTasksSupported": true,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 24
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 16.799999999999272,
+      "frameMax": 16.80000000000291,
+      "inputP95": 14.199999988079071,
+      "errors": [],
+      "resultsPersisted": 20,
+      "generationRequests": 20
+    }
+  ],
+  "webkit": [
+    {
+      "count": 20,
+      "anchors": 20,
+      "inputVerified": true,
+      "panDisplacement": {
+        "x": 36,
+        "y": 36
+      },
+      "engine": "webkit",
+      "cpu": 1,
+      "longTasksSupported": false,
+      "idle": {
+        "replacements": 0,
+        "puts": {}
+      },
+      "replacements": 0,
+      "puts": {
+        "aitu-workspace/boards": 2
+      },
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "frameP95": 18,
+      "frameMax": 26,
+      "inputP95": 14,
+      "errors": [],
+      "resultsPersisted": 20,
+      "generationRequests": 20
+    }
+  ],
+  "limitations": [
+    "Synthetic HTTP; no paid generation",
+    "Browser results use twenty tasks on a synthetic board, not the reporting user device or a real large project",
+    "Reduced work counts are not a claimed percentage improvement in user-visible latency",
+    "WebKit does not support the Long Tasks API"
+  ]
+}

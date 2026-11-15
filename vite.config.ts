@@ -22,6 +22,7 @@ export default defineConfig(({ command }) => ({
     react(),
   ].filter(Boolean),
   base: "./",
+  worker: { format: "es" },
   build: {
     outDir: "../dist",
     emptyOutDir: true,

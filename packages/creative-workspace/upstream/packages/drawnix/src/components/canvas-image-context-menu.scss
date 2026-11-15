@@ -1,0 +1,22 @@
+.canvas-image-menu {
+  background: var(--color-bg-container, #fff);
+  color: var(--color-text-primary, #334155);
+}
+.canvas-image-menu .context-menu__item {
+  color: inherit;
+}
+.canvas-image-menu .context-menu__item:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+.creative-root[data-theme="dark"] .canvas-image-menu {
+  background: #252a33;
+  color: #e2e8f0;
+  border-color: #444b57;
+  .context-menu__item:hover:not(:disabled) {
+    background: #353d49;
+  }
+  .context-menu__divider {
+    background: #444b57;
+  }
+}

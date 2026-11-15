@@ -1,3 +1,6 @@
+import { useAccountViewState } from "./AccountViewState";
+import { CurrencySwitcher } from "./AccountCurrency";
+import { trackOperation } from "@/lib/analytics";
 import { toast } from "sonner";
 import { LoaderCircle } from "lucide-react";
 import { AccountDialog } from "./AccountDialog";
@@ -42,16 +45,19 @@ export function Keys({
   onConfigure?: (key: DesktopKey, model?: DesktopPricing) => void;
 }) {
   const { t } = useTranslation();
-  const [page, setPage] = useState(1),
-    [filters, setFilters] = useState<Record<string, string>>({}),
+  const [page, setPage] = useAccountViewState("keys.page", 1),
+    [filters, setFilters] = useAccountViewState<Record<string, string>>(
+      "keys.filters",
+      {},
+    ),
     [selected, setSelected] = useState<string | null>(null),
     [form, setForm] = useState<KeyWrite | null>(null),
     [original, setOriginal] = useState<KeyWrite | null>(null),
     [secret, setSecret] = useState(""),
     [secretSearch, setSecretSearch] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<Record<string, string>>(
-    {},
-  );
+  const [appliedFilters, setAppliedFilters] = useAccountViewState<
+    Record<string, string>
+  >("keys.appliedFilters", {});
   const [composing, setComposing] = useState(false);
   const trimmedFilters = Object.fromEntries(
     Object.entries(filters).map(([k, v]) => [k, v.trim()]),
@@ -120,8 +126,8 @@ export function Keys({
     state,
     "/account/key-groups",
   );
-  const { write: performWrite, busy, error, clear } = useWrite(state);
-  const reveal = useWrite(state);
+  const { write: performWrite, busy, error, clear } = useWrite(state, true);
+  const reveal = useWrite(state, true);
   const operation = useRef<{
     method: string;
     path: string;
@@ -353,6 +359,7 @@ export function Keys({
             ))}
           </select>
         </div>
+        <CurrencySwitcher />
         <Button
           className="account-key-create"
           disabled={busy || !!error?.outcomeUnknown}
@@ -736,7 +743,9 @@ export function Keys({
               <Button
                 onClick={async () => {
                   try {
-                    await navigator.clipboard.writeText(secret);
+                    await trackOperation("keys", "copy", {}, () =>
+                      navigator.clipboard.writeText(secret),
+                    );
                     toast.success("已复制密钥");
                   } catch {
                     toast.error("复制失败，请选中密钥手动复制");

@@ -879,6 +879,66 @@ mod tests {
     }
     #[test]
     #[serial_test::serial]
+    fn codex_mcp_changes_preserve_active_and_pending_overlays() {
+        use crate::{
+            app_config::{McpApps, McpServer},
+            services::mcp::McpService,
+        };
+        use std::sync::Arc;
+        for enabled in [true, false] {
+            let _home = TestHome::new();
+            let db = Arc::new(Database::memory().unwrap());
+            let state = AppState::new(db.clone());
+            let config = crate::codex_config::get_codex_config_path();
+            private_write(&config, b"model = \"synthetic\"\n").unwrap();
+            let server = McpServer {
+                id: "synthetic-mcp".into(),
+                name: "Synthetic".into(),
+                server: json!({"command":"synthetic"}),
+                apps: McpApps {
+                    codex: true,
+                    ..Default::default()
+                },
+                description: None,
+                homepage: None,
+                docs: None,
+                tags: vec![],
+            };
+            McpService::upsert_server(&state, server.clone()).unwrap();
+            let before = fs::read(&config).unwrap();
+            let mut written = before.clone();
+            written.extend_from_slice(b"\n# aggregation overlay\n");
+            private_write(&config, &written).unwrap();
+            let mut overlay = AggregationState {
+                enabled,
+                plan: plan(),
+                overlays: BTreeMap::from([(
+                    "config".into(),
+                    Overlay {
+                        before: Some(before.clone()),
+                        written: hash(Some(&written)),
+                        target: config.to_string_lossy().into_owned(),
+                    },
+                )]),
+            };
+            store("codex", &overlay).unwrap();
+            let mut changed = server.clone();
+            changed.server = json!({"command":"changed"});
+            assert!(McpService::upsert_server(&state, changed).is_err());
+            assert!(McpService::toggle_app(&state, &server.id, AppType::Codex, false).is_err());
+            assert!(McpService::delete_server(&state, &server.id).is_err());
+            assert_eq!(fs::read(&config).unwrap(), written);
+            let saved = db.get_all_mcp_servers().unwrap();
+            assert_eq!(saved[&server.id].server, server.server);
+            assert!(saved[&server.id].apps.codex);
+            restore_overlay("codex", &mut overlay).unwrap();
+            assert_eq!(fs::read(&config).unwrap(), before);
+            McpService::delete_server(&state, &server.id).unwrap();
+            assert!(db.get_all_mcp_servers().unwrap().is_empty());
+        }
+    }
+    #[test]
+    #[serial_test::serial]
     fn codex_catalog_keeps_existing_config_and_restores_previous_catalog() {
         let _home = TestHome::new();
         let dir = crate::codex_config::get_codex_config_dir();

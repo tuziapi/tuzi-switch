@@ -1,0 +1,114 @@
+{
+  "task": "UC-DISCUSS-UI-04",
+  "date": "2026-11-10",
+  "scope": "CSS width correction inside expanded discussion only",
+  "paidRequests": 0,
+  "native": {
+    "build": "release/app passed",
+    "signature": "ad-hoc strict verification passed",
+    "sha256": "edf3895fc5a5c2376456a0581236094fa50faf6710ea335c9ed645e16aa03799",
+    "app": "/Users/sdy09/Documents/tuzi-switch-artifacts/discussion-width-2026-11-10/Tuzi Text Chat QA.app",
+    "checks": [
+      "prior discussion restored after restart",
+      "existing five completed results retained on original canvas",
+      "expanded dialog and plan visually fill width with narrow side padding"
+    ],
+    "method": "CUA native accessibility and screenshot",
+    "localCodex": "existing connection is session-scoped; disconnected after restart; no new connection or inference initiated"
+  },
+  "browser": {
+    "chromium": {
+      "geometry": {
+        "modal": {
+          "x": 180,
+          "width": 1000,
+          "right": 1180
+        },
+        "messages": {
+          "x": 181,
+          "width": 998,
+          "right": 1179
+        },
+        "answer": {
+          "x": 205,
+          "width": 950,
+          "right": 1155
+        },
+        "plan": {
+          "x": 205,
+          "width": 950,
+          "right": 1155
+        },
+        "overflow": false
+      },
+      "regression": {
+        "checks": [
+          "30px strip attached to the main composer",
+          "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+          "closing unmounts transcript without cancelling the running request",
+          "main input streams model reasoning and reply into attached discussion",
+          "main input continues the same discussion context",
+          "planning failure creates no media tasks; explicit main-input resend succeeds",
+          "durable preview requires explicit confirmation before media dispatch",
+          "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+          "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+          "large dialog: preserved draft/DOM, model menu, history, focus trap, responsive size, Escape, send, media confirmation/location and stop",
+          "reload recovers board-linked discussion and messages",
+          "new discussion and history retain current-board association",
+          "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      }
+    },
+    "webkit": {
+      "geometry": {
+        "modal": {
+          "x": 180,
+          "width": 1000,
+          "right": 1180
+        },
+        "messages": {
+          "x": 181,
+          "width": 998,
+          "right": 1179
+        },
+        "answer": {
+          "x": 205,
+          "width": 950,
+          "right": 1155
+        },
+        "plan": {
+          "x": 205,
+          "width": 950,
+          "right": 1155
+        },
+        "overflow": false
+      },
+      "regression": {
+        "checks": [
+          "30px strip attached to the main composer",
+          "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+          "closing unmounts transcript without cancelling the running request",
+          "main input streams model reasoning and reply into attached discussion",
+          "main input continues the same discussion context",
+          "planning failure creates no media tasks; explicit main-input resend succeeds",
+          "durable preview requires explicit confirmation before media dispatch",
+          "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+          "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+          "large dialog: preserved draft/DOM, model menu, history, focus trap, responsive size, Escape, send, media confirmation/location and stop",
+          "reload recovers board-linked discussion and messages",
+          "new discussion and history retain current-board association",
+          "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      }
+    }
+  },
+  "provenance": {
+    "status": "passed",
+    "reconstructedFiles": 1619
+  },
+  "diffCheck": "passed excluding generated patch context"
+}

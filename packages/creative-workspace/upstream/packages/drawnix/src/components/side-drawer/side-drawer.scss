@@ -1,0 +1,418 @@
+/**
+ * SideDrawer Styles
+ *
+ * 通用侧边抽屉样式
+ */
+
+@import '../../styles/_common-variables.scss';
+@import '../../styles/z-index.scss';
+
+// ============================================================================
+// Variables
+// ============================================================================
+
+$drawer-width-narrow: 300px;
+$drawer-width-medium: 400px;
+$drawer-width-wide: min(1024px, 50vw);
+
+// ============================================================================
+// SideDrawer Container
+// ============================================================================
+
+.side-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--td-bg-color-container);
+  border-right: none; // 移除右侧边框，由阴影替代
+  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.08); // 增强阴影
+  border-radius: 0 16px 16px 0; // 右侧增加圆角
+  transition: transform $animation-duration cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
+
+  // ========================================
+  // Position Variants
+  // ========================================
+
+  &--toolbar-right {
+    left: 0;
+    z-index: $z-side-drawer;
+    max-width: var(
+      --aitu-toolbar-side-panel-max-width,
+      calc(100vw - #{$toolbar-width})
+    );
+    transform: translateX(-100%);
+    box-shadow: 16px 0 48px rgba(0, 0, 0, 0.08);
+
+    &.side-drawer--open {
+      transform: translateX(var(--aitu-toolbar-right-edge, #{$toolbar-width}));
+      box-shadow:
+        calc(-1 * var(--aitu-toolbar-right-edge, #{$toolbar-width})) 0 0 0
+          var(--td-bg-color-container),
+        16px 0 48px rgba(0, 0, 0, 0.08);
+    }
+
+    // 移动端适配：抽屉从屏幕左边缘开始
+    @media (max-width: 768px) {
+      left: 0;
+      transform: translateX(-100%);
+
+      &.side-drawer--open {
+        transform: translateX(0);
+      }
+    }
+  }
+
+  // 屏幕左边缘（TaskQueuePanel）
+  &--screen-left {
+    left: 0;
+    z-index: $z-task-queue-panel;
+    transform: translateX(-100%);
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.06);
+
+    &.side-drawer--open {
+      transform: translateX(0);
+    }
+  }
+
+  // ========================================
+  // Width Variants
+  // ========================================
+
+  &--narrow {
+    width: $drawer-width-narrow;
+  }
+
+  &--medium {
+    width: $drawer-width-medium;
+  }
+
+  &--wide {
+    width: $drawer-width-wide;
+  }
+
+  &--responsive {
+    width: clamp(320px, 50vw, 1024px);
+
+    @media (max-width: 768px) {
+      width: 100vw;
+      max-width: 100vw;
+      border-radius: 0;
+      left: 0 !important; // 覆盖 toolbar-right 的 left 设置
+    }
+  }
+
+  // ========================================
+  // Header
+  // ========================================
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-lg $spacing-md;
+    flex-shrink: 0;
+
+    .side-drawer--toolbar-right & {
+      padding-left: $spacing-lg; // 稍微多一点
+    }
+  }
+
+  &__header-left {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__header-right {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    flex-shrink: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 20px; // 加大标题
+    font-weight: 700;
+    color: var(--td-text-color-primary);
+    letter-spacing: -0.02em;
+  }
+
+  &__subtitle {
+    font-size: 12px;
+    color: var(--td-text-color-placeholder);
+  }
+
+  &__close-btn,
+  &__pin-btn {
+    color: var(--td-text-color-placeholder, #999) !important;
+
+    &:hover {
+      color: var(--td-text-color-primary) !important;
+      background: var(--td-bg-color-container-hover) !important;
+    }
+  }
+
+  &__pin-btn--active {
+    color: var(--td-brand-color, #f39c12) !important;
+    background: var(--td-brand-color-light, rgba(243, 156, 18, 0.12)) !important;
+
+    &:hover {
+      color: var(--td-brand-color, #f39c12) !important;
+      background: var(--td-brand-color-light, rgba(243, 156, 18, 0.12)) !important;
+    }
+  }
+
+  // ========================================
+  // Filter Section
+  // ========================================
+
+  &__filter {
+    padding: 0 $spacing-md $spacing-md;
+    border-bottom: 1px solid var(--td-component-border);
+    flex-shrink: 0;
+    background: transparent;
+
+    .side-drawer--toolbar-right & {
+      padding-left: $spacing-lg;
+    }
+
+    .t-input {
+      border-radius: 8px;
+      background: var(--td-bg-color-container); // 改为纯白背景，让边框更清晰
+      border: 1px solid var(--td-gray-color-4); // 使用更深的灰色边框
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: var(--td-gray-color-6);
+      }
+
+      &:focus-within {
+        background: var(--td-bg-color-container);
+        border-color: var(--brand-primary, #f39c12);
+        box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.1);
+      }
+    }
+  }
+
+  input,
+  textarea,
+  .t-input__inner,
+  .t-textarea__inner {
+    color: #1f2933;
+    -webkit-text-fill-color: #1f2933;
+    caret-color: var(--td-brand-color, #f39c12);
+  }
+
+  input::placeholder,
+  textarea::placeholder,
+  .t-input__inner::placeholder,
+  .t-textarea__inner::placeholder {
+    color: #8b95a1;
+    -webkit-text-fill-color: #8b95a1;
+  }
+
+  // ========================================
+  // Content
+  // ========================================
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    .side-drawer--toolbar-right & {
+      padding-left: $spacing-md;
+    }
+
+    // 自定义滚动条样式 - 更窄更贴边
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+      margin: 4px 0; // 上下留一点间距
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--td-bg-color-component, #e7e7e7);
+      border-radius: 3px;
+
+      &:hover {
+        background: var(--td-bg-color-component-hover, #d0d0d0);
+      }
+    }
+  }
+
+  // ========================================
+  // Footer
+  // ========================================
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-md;
+    border-top: 1px solid var(--td-component-border);
+    flex-shrink: 0;
+    background: var(--td-bg-color-container, #fff);
+  }
+
+  // ========================================
+  // Backdrop
+  // ========================================
+
+  &__backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: $z-task-queue-panel - 1;
+    cursor: pointer;
+  }
+
+  // ========================================
+  // Resize Handle
+  // ========================================
+
+  // ========================================
+  // Mobile Responsive
+  // ========================================
+
+  @media (max-width: 768px) {
+    &__header {
+      padding: $spacing-md $spacing-sm;
+    }
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__filter {
+      padding: 0 $spacing-sm $spacing-sm;
+    }
+
+    &__content {
+      padding-left: $spacing-sm;
+    }
+  }
+
+  &__resize-handle {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    width: 8px;
+    height: 100%;
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 10;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 4px;
+      height: 40px;
+      background: var(--td-component-border, #e7e7e7);
+      border-radius: 2px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    &:hover::after {
+      opacity: 1;
+      background: #F39C12;
+    }
+  }
+
+  &--resizable {
+    // 拖拽时覆盖宽度预设
+    &.side-drawer--dragging {
+      transition: none;
+      user-select: none;
+    }
+  }
+
+  &--dragging &__resize-handle::after {
+    opacity: 1;
+    background: #F39C12;
+  }
+}
+
+.aitu-toolbar-dock-right .side-drawer--toolbar-right {
+  --aitu-toolbar-drawer-left: max(
+    0px,
+    calc(var(--aitu-toolbar-left, 0px) - 100%)
+  );
+
+  border-radius: 16px 0 0 16px;
+  transform: translateX(calc(100vw + 12px));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  box-shadow: -16px 0 48px rgba(0, 0, 0, 0.08);
+  transition:
+    transform $animation-duration cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 140ms ease-out,
+    visibility 0s linear $animation-duration;
+
+  &.side-drawer--open {
+    transform: translateX(var(--aitu-toolbar-drawer-left));
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    box-shadow:
+      100vw 0 0 100vw var(--td-bg-color-container),
+      -16px 0 48px rgba(0, 0, 0, 0.08);
+    transition:
+      transform $animation-duration cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 140ms ease-out;
+  }
+
+  .side-drawer__resize-handle {
+    left: -4px;
+    right: auto;
+  }
+}
+
+.aitu-toolbar-dragging .side-drawer--toolbar-right {
+  transition: none;
+}
+
+// ============================================================================
+// Mobile Responsive Styles for Side Drawer
+// ============================================================================
+
+@media (max-width: 768px) {
+  .side-drawer {
+    // 移动端增加 resize handle 触摸区域
+    &__resize-handle {
+      width: 20px; // 增加触摸区域宽度
+      right: -10px;
+      
+      // 移动端始终显示拖动指示条
+      &::after {
+        opacity: 0.5;
+        width: 6px;
+        height: 50px;
+      }
+      
+      &:active::after {
+        opacity: 1;
+        background: #F39C12;
+      }
+    }
+  }
+}

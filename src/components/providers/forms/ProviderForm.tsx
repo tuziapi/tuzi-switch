@@ -771,19 +771,6 @@ function ProviderFormFull({
     initialData,
     isCreationPrefill: appId === "codex" && !editData && !!creationPrefill,
   });
-  useEffect(() => {
-    onSubmittingChange?.(
-      isSubmitting ||
-        isConfirmSubmitting ||
-        (appId === "codex" && codexCredentialStatus === "loading"),
-    );
-  }, [
-    appId,
-    codexCredentialStatus,
-    isSubmitting,
-    isConfirmSubmitting,
-    onSubmittingChange,
-  ]);
   const [codexChatReasoning, setCodexChatReasoning] =
     useState<CodexChatReasoning>(
       () => initialData?.meta?.codexChatReasoning ?? {},
@@ -978,6 +965,15 @@ function ProviderFormFull({
       appId === "codex" ? initialData?.meta?.commonConfigEnabled : undefined,
     selectedPresetId: selectedPresetId ?? undefined,
   });
+
+  const isSubmitBlocked =
+    isSubmitting ||
+    isConfirmSubmitting ||
+    (appId === "codex" &&
+      (codexCredentialStatus === "loading" || isCodexCommonConfigLoading));
+  useEffect(() => {
+    onSubmittingChange?.(isSubmitBlocked);
+  }, [isSubmitBlocked, onSubmittingChange]);
 
   const {
     geminiEnv,
@@ -1250,6 +1246,8 @@ function ProviderFormFull({
   const [isCommonConfigModalOpen, setIsCommonConfigModalOpen] = useState(false);
 
   const handleSubmit = async (values: ProviderFormData) => {
+    // Also guard keyboard/programmatic submission while configuration loads.
+    if (appId === "codex" && isCodexCommonConfigLoading) return;
     if (appId === "codex" && codexCredentialStatus === "loading") {
       toast.info(
         t("providerForm.codexCredentialLoading", {
@@ -3167,7 +3165,7 @@ function ProviderFormFull({
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || isConfirmSubmitting}
+                disabled={isSubmitBlocked}
               >
                 {submitLabel}
               </Button>

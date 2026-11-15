@@ -1,0 +1,540 @@
+import {
+  getDefaultAudioModel,
+  getDefaultImageModel,
+  getDefaultTextModel,
+  getDefaultVideoModel,
+  getModelConfig,
+  ModelVendor,
+  type ModelConfig,
+  type ModelType,
+} from '../../constants/model-config';
+import {
+  DEFAULT_PROVIDER_IMAGE_API_COMPATIBILITY,
+  LEGACY_DEFAULT_PROVIDER_IMAGE_API_COMPATIBILITY,
+  LEGACY_DEFAULT_PROVIDER_PROFILE_ID,
+  TUZI_DEFAULT_PROVIDER_NAME,
+  TUZI_PROVIDER_DEFAULT_BASE_URL,
+  createModelRef,
+  geminiSettings,
+  providerCatalogsSettings,
+  providerProfilesSettings,
+  resolveInvocationRoute,
+  type ModelRef,
+  type ProviderProfile,
+} from '../../utils/settings-manager';
+import { InvocationPlanner } from './invocation-planner';
+import { inferBindingsForProviderCatalog } from './binding-inference';
+import { isTuziCompatibleBaseUrl } from './tuzi-api-endpoints';
+import { modelPricingService } from '../../utils/model-pricing-service';
+import type {
+  InvocationPlan,
+  InvocationPlanRequest,
+  InvocationPlannerRepositories,
+  NormalizedModelRef,
+  ProviderAuthStrategy,
+  ProviderModelBinding,
+  ProviderProfileSnapshot,
+} from './types';
+import type {
+  ProviderCatalog,
+  ProviderCatalogManualBinding,
+} from '../../utils/settings-types';
+
+export interface SettingsInvocationPlannerOptions {
+  includeLegacyProfile?: boolean;
+  manualBindings?: ProviderModelBinding[];
+  bindingId?: string | null;
+  preferredRequestSchema?: string | readonly string[] | null;
+}
+
+function inferProviderTypeFromBaseUrl(
+  baseUrl: string
+): ProviderProfile['providerType'] {
+  const normalizedBaseUrl = baseUrl.trim().toLowerCase();
+
+  if (
+    normalizedBaseUrl.includes('generativelanguage.googleapis.com') ||
+    normalizedBaseUrl.includes('vertex.googleapis.com')
+  ) {
+    return 'gemini-compatible';
+  }
+
+  if (
+    normalizedBaseUrl.includes('/openai') ||
+    normalizedBaseUrl.endsWith('/v1') ||
+    normalizedBaseUrl.includes('api.openai.com') ||
+    isTuziBaseUrl(normalizedBaseUrl)
+  ) {
+    return 'openai-compatible';
+  }
+
+  return 'custom';
+}
+
+function isTuziBaseUrl(baseUrl: string): boolean {
+  return isTuziCompatibleBaseUrl(baseUrl);
+}
+
+function inferAuthType(
+  baseUrl: string,
+  providerType: ProviderProfile['providerType'],
+  authType?: ProviderProfile['authType']
+): ProviderAuthStrategy {
+  if (
+    authType === 'bearer' ||
+    authType === 'header' ||
+    authType === 'query' ||
+    authType === 'custom'
+  ) {
+    return authType;
+  }
+
+  return 'bearer';
+}
+
+function toProviderProfileSnapshot(
+  profile: Pick<
+    ProviderProfile,
+    | 'id'
+    | 'name'
+    | 'providerType'
+    | 'baseUrl'
+    | 'apiKey'
+    | 'authType'
+    | 'imageApiCompatibility'
+    | 'preferAsyncImageEndpoint'
+    | 'extraHeaders'
+  >
+): ProviderProfileSnapshot {
+  return {
+    id: profile.id,
+    name: profile.name,
+    providerType: profile.providerType,
+    baseUrl: profile.baseUrl,
+    apiKey: profile.apiKey,
+    authType: inferAuthType(
+      profile.baseUrl,
+      profile.providerType,
+      profile.authType
+    ),
+    imageApiCompatibility:
+      profile.imageApiCompatibility || DEFAULT_PROVIDER_IMAGE_API_COMPATIBILITY,
+    preferAsyncImageEndpoint: profile.preferAsyncImageEndpoint ?? false,
+    extraHeaders: profile.extraHeaders,
+  };
+}
+
+function inferVendorFromModelId(modelId: string): ModelVendor {
+  const lowerId = modelId.toLowerCase();
+
+  if (lowerId.includes('flux')) return ModelVendor.FLUX;
+  if (lowerId.startsWith('mj') || lowerId.includes('midjourney')) {
+    return ModelVendor.MIDJOURNEY;
+  }
+  if (lowerId.includes('suno') || lowerId.includes('chirp')) {
+    return ModelVendor.SUNO;
+  }
+  if (lowerId.includes('kling')) return ModelVendor.KLING;
+  if (lowerId.includes('happyhorse')) return ModelVendor.HAPPYHORSE;
+  if (lowerId.includes('seedance') || lowerId.includes('seedream')) {
+    return ModelVendor.DOUBAO;
+  }
+  if (lowerId.includes('veo')) return ModelVendor.VEO;
+  if (
+    lowerId.includes('gemini') ||
+    lowerId.includes('gemma') ||
+    lowerId.includes('imagen')
+  ) {
+    return ModelVendor.GEMINI;
+  }
+
+  return ModelVendor.OTHER;
+}
+
+function buildFallbackModelConfig(
+  modelId: string,
+  type: ModelType
+): ModelConfig {
+  return {
+    id: modelId,
+    label: modelId,
+    shortLabel: modelId,
+    type,
+    vendor: inferVendorFromModelId(modelId),
+  };
+}
+
+function getLegacyModelConfig(modelId: string, type: ModelType): ModelConfig {
+  const staticModel = getModelConfig(modelId);
+  if (staticModel) {
+    return staticModel;
+  }
+  return buildFallbackModelConfig(modelId, type);
+}
+
+function buildLegacyProfileSnapshot(): ProviderProfileSnapshot {
+  const gemini = geminiSettings.get();
+  const existingLegacyProfile = providerProfilesSettings
+    .get()
+    .find((profile) => profile.id === LEGACY_DEFAULT_PROVIDER_PROFILE_ID);
+  const baseUrl = gemini.baseUrl?.trim() || TUZI_PROVIDER_DEFAULT_BASE_URL;
+  const legacyImageApiCompatibilityFallback = isTuziBaseUrl(baseUrl)
+    ? LEGACY_DEFAULT_PROVIDER_IMAGE_API_COMPATIBILITY
+    : DEFAULT_PROVIDER_IMAGE_API_COMPATIBILITY;
+  const providerType =
+    existingLegacyProfile?.providerType === 'openai-compatible' ||
+    existingLegacyProfile?.providerType === 'gemini-compatible' ||
+    existingLegacyProfile?.providerType === 'custom'
+      ? existingLegacyProfile.providerType
+      : inferProviderTypeFromBaseUrl(baseUrl);
+
+  return {
+    id: LEGACY_DEFAULT_PROVIDER_PROFILE_ID,
+    name: TUZI_DEFAULT_PROVIDER_NAME,
+    providerType,
+    baseUrl,
+    apiKey: gemini.apiKey?.trim() || '',
+    authType: inferAuthType(
+      baseUrl,
+      providerType,
+      existingLegacyProfile?.authType
+    ),
+    imageApiCompatibility:
+      existingLegacyProfile?.imageApiCompatibility ||
+      legacyImageApiCompatibilityFallback,
+    preferAsyncImageEndpoint:
+      existingLegacyProfile?.preferAsyncImageEndpoint ?? false,
+  };
+}
+
+function buildLegacyBindings(
+  profile: ProviderProfileSnapshot
+): ProviderModelBinding[] {
+  const gemini = geminiSettings.get();
+  const legacyModels: Array<{ modelId: string; type: ModelType }> = [
+    {
+      modelId:
+        gemini.textModelName?.trim() ||
+        gemini.chatModel?.trim() ||
+        getDefaultTextModel(),
+      type: 'text',
+    },
+    {
+      modelId: gemini.audioModelName?.trim() || getDefaultAudioModel(),
+      type: 'audio',
+    },
+    {
+      modelId: gemini.imageModelName?.trim() || getDefaultImageModel(),
+      type: 'image',
+    },
+    {
+      modelId: gemini.videoModelName?.trim() || getDefaultVideoModel(),
+      type: 'video',
+    },
+  ];
+
+  return inferBindingsForProviderCatalog(
+    profile,
+    legacyModels.map((entry) => getLegacyModelConfig(entry.modelId, entry.type))
+  );
+}
+
+function groupBindingsByModel(
+  bindings: ProviderModelBinding[]
+): Map<string, ProviderModelBinding[]> {
+  const grouped = new Map<string, ProviderModelBinding[]>();
+
+  bindings.forEach((binding) => {
+    const key = `${binding.profileId}:${binding.modelId}:${binding.operation}`;
+    const current = grouped.get(key) || [];
+    current.push(binding);
+    grouped.set(key, current);
+  });
+
+  return grouped;
+}
+
+function inheritUniqueCustomHttpBinding(
+  bindings: ProviderModelBinding[],
+  modelRef: NormalizedModelRef,
+  operation: ModelType,
+  catalogs: ProviderCatalog[]
+): ProviderModelBinding | null {
+  const catalog = catalogs.find((item) => item.profileId === modelRef.profileId);
+  const isSelectedModel =
+    catalog?.selectedModelIds.includes(modelRef.modelId) &&
+    catalog.discoveredModels.some(
+      (model) => model.id === modelRef.modelId && model.type === operation
+    );
+  if (!isSelectedModel) {
+    return null;
+  }
+
+  const reusableBindings = bindings.filter(
+    (binding) =>
+      binding.profileId === modelRef.profileId &&
+      binding.operation === operation &&
+      binding.source === 'manual' &&
+      binding.protocol === 'custom-http' &&
+      binding.requestSchema === 'custom-http' &&
+      Boolean(binding.metadata?.manualHttp)
+  );
+  if (reusableBindings.length !== 1) {
+    return null;
+  }
+
+  const template = reusableBindings[0];
+  return {
+    ...template,
+    id: `${modelRef.profileId}:${modelRef.modelId}:${operation}:manual:inherited-custom-http`,
+    modelId: modelRef.modelId,
+    source: 'manual',
+  };
+}
+
+function toManualProviderModelBinding(
+  profileId: string,
+  binding: ProviderCatalogManualBinding
+): ProviderModelBinding {
+  return {
+    id: binding.id,
+    profileId,
+    modelId: binding.modelId,
+    operation: binding.operation,
+    protocol: binding.protocol,
+    requestSchema: binding.requestSchema,
+    responseSchema: binding.responseSchema,
+    submitPath: binding.submitPath,
+    baseUrlStrategy: binding.baseUrlStrategy,
+    pollPathTemplate: binding.pollPathTemplate,
+    priority: binding.priority,
+    confidence: binding.confidence,
+    source: 'manual',
+    metadata: binding.metadata,
+  };
+}
+
+export function listSettingsProviderProfiles(
+  options: SettingsInvocationPlannerOptions = {}
+): ProviderProfileSnapshot[] {
+  const profiles = providerProfilesSettings
+    .get()
+    .filter((profile) => profile.enabled !== false)
+    .filter((profile) => profile.id !== LEGACY_DEFAULT_PROVIDER_PROFILE_ID)
+    .map((profile) => toProviderProfileSnapshot(profile));
+
+  if (options.includeLegacyProfile !== false) {
+    profiles.unshift(buildLegacyProfileSnapshot());
+  }
+
+  return profiles;
+}
+
+export function listSettingsModelBindings(
+  options: SettingsInvocationPlannerOptions = {}
+): ProviderModelBinding[] {
+  const profiles = listSettingsProviderProfiles(options);
+  return buildSettingsModelBindings(
+    profiles,
+    providerCatalogsSettings.get(),
+    options
+  );
+}
+
+function buildSettingsModelBindings(
+  profiles: ProviderProfileSnapshot[],
+  catalogs: ProviderCatalog[],
+  options: SettingsInvocationPlannerOptions
+): ProviderModelBinding[] {
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const catalogBindings = catalogs.flatMap((catalog) => {
+    const profile = profileById.get(catalog.profileId);
+    if (!profile) {
+      return [];
+    }
+    const pricingCache = modelPricingService.getCache(catalog.profileId);
+    const inferredBindings = inferBindingsForProviderCatalog(
+      profile,
+      catalog.discoveredModels,
+      pricingCache?.modelEndpoints ?? null
+    );
+
+    const manualBindings = (catalog.manualBindings || []).map((binding) =>
+      toManualProviderModelBinding(catalog.profileId, binding)
+    );
+
+    return [...inferredBindings, ...manualBindings];
+  });
+  const legacyBindings =
+    options.includeLegacyProfile === false
+      ? []
+      : buildLegacyBindings(
+          profileById.get(LEGACY_DEFAULT_PROVIDER_PROFILE_ID) ||
+            buildLegacyProfileSnapshot()
+        );
+
+  const deduped = new Map<string, ProviderModelBinding>();
+  [
+    ...catalogBindings,
+    ...legacyBindings,
+    ...(options.manualBindings || []),
+  ].forEach((binding) => {
+    deduped.set(binding.id, binding);
+  });
+
+  return Array.from(deduped.values());
+}
+
+export function createSettingsInvocationPlannerRepositories(
+  options: SettingsInvocationPlannerOptions = {}
+): InvocationPlannerRepositories {
+  const profiles = listSettingsProviderProfiles(options);
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const catalogs = providerCatalogsSettings.get();
+  const bindings = buildSettingsModelBindings(profiles, catalogs, options);
+  const groupedBindings = groupBindingsByModel(bindings);
+
+  return {
+    getProviderProfile(profileId: string) {
+      return profileById.get(profileId) || null;
+    },
+    getModelBindings(modelRef: NormalizedModelRef, operation: ModelType) {
+      const directBindings =
+        groupedBindings.get(
+          `${modelRef.profileId}:${modelRef.modelId}:${operation}`
+        ) || [];
+      if (directBindings.some((binding) => binding.source === 'manual')) {
+        return directBindings;
+      }
+
+      const inheritedBinding = inheritUniqueCustomHttpBinding(
+        bindings,
+        modelRef,
+        operation,
+        catalogs
+      );
+      return inheritedBinding
+        ? [inheritedBinding, ...directBindings]
+        : directBindings;
+    },
+  };
+}
+
+export function planInvocationFromSettings(
+  request: InvocationPlanRequest,
+  options: SettingsInvocationPlannerOptions = {}
+): InvocationPlan {
+  const repositories = createSettingsInvocationPlannerRepositories(options);
+  return new InvocationPlanner(repositories).plan(request);
+}
+
+export function resolveInvocationPlanFromRoute(
+  operation: ModelType,
+  requestedModel?: string | ModelRef | null,
+  options: SettingsInvocationPlannerOptions = {}
+): InvocationPlan | null {
+  return resolveInvocationPlanWithPlanner(
+    operation,
+    requestedModel,
+    options,
+    planInvocationFromSettings
+  );
+}
+
+/** Reuse only within a synchronous batch; create a new resolver after settings change. */
+export function createSettingsInvocationPlanResolver(
+  options: SettingsInvocationPlannerOptions = {}
+): (
+  operation: ModelType,
+  requestedModel?: string | ModelRef | null
+) => InvocationPlan | null {
+  const planner = new InvocationPlanner(
+    createSettingsInvocationPlannerRepositories(options)
+  );
+
+  return (operation, requestedModel) => {
+    const plan = resolveInvocationPlanWithPlanner(
+      operation,
+      requestedModel,
+      options,
+      (request, resolvedOptions) =>
+        resolvedOptions === options
+          ? planner.plan(request)
+          : planInvocationFromSettings(request, resolvedOptions)
+    );
+    // Keep returned bindings and nested metadata independent between models.
+    if (!plan) return null;
+    return {
+      ...plan,
+      provider: {
+        ...plan.provider,
+        ...(plan.provider.extraHeaders
+          ? { extraHeaders: { ...plan.provider.extraHeaders } }
+          : {}),
+      },
+      modelRef: { ...plan.modelRef },
+      binding: {
+        ...plan.binding,
+        ...(plan.binding.metadata
+          ? { metadata: JSON.parse(JSON.stringify(plan.binding.metadata)) }
+          : {}),
+      },
+    };
+  };
+}
+
+function resolveInvocationPlanWithPlanner(
+  operation: ModelType,
+  requestedModel: string | ModelRef | null | undefined,
+  options: SettingsInvocationPlannerOptions,
+  planInvocation: (
+    request: InvocationPlanRequest,
+    options: SettingsInvocationPlannerOptions
+  ) => InvocationPlan
+): InvocationPlan | null {
+  const route = resolveInvocationRoute(operation, requestedModel);
+  let modelRef = createModelRef(route.profileId, route.modelId);
+  let plannerOptions = options;
+
+  // 旧版直连设置允许选择非默认静态模型。执行器会使用 legacy 凭据发送，
+  // 因此这里也必须为同一个实际节点生成可持久化的 profile/binding 快照。
+  if (
+    !modelRef?.profileId &&
+    route.modelId &&
+    route.baseUrl?.trim() &&
+    route.apiKey?.trim()
+  ) {
+    const legacyProfile = buildLegacyProfileSnapshot();
+    modelRef = createModelRef(
+      LEGACY_DEFAULT_PROVIDER_PROFILE_ID,
+      route.modelId
+    );
+    plannerOptions = {
+      ...options,
+      manualBindings: [
+        ...(options.manualBindings || []),
+        ...inferBindingsForProviderCatalog(legacyProfile, [
+          getLegacyModelConfig(route.modelId, operation),
+        ]),
+      ],
+    };
+  }
+
+  if (!modelRef) {
+    return null;
+  }
+
+  try {
+    return planInvocation(
+      {
+        operation,
+        modelRef,
+        bindingId: options.bindingId,
+        preferredRequestSchema: options.preferredRequestSchema,
+      },
+      plannerOptions
+    );
+  } catch {
+    return null;
+  }
+}

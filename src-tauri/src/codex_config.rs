@@ -4491,6 +4491,12 @@ wire_api = "responses"
     #[test]
     #[serial]
     fn copy_managed_env_key_only_fills_an_empty_destination() {
+        #[cfg(windows)]
+        let _environment = crate::services::tuzi_provider::TestEnvironmentGuard::new(&[
+            "CODING_CODEX_API_KEY", "CODING01_CODEX_API_KEY",
+        ]);
+        #[cfg(windows)]
+        std::env::set_var("CODING_CODEX_API_KEY", "legacy-key");
         let _guard = TEST_ENV_LOCK.lock().expect("lock test env");
         let temp = tempfile::tempdir().expect("temp home");
         let old_test_home = std::env::var_os("CC_SWITCH_TEST_HOME");
@@ -4530,6 +4536,10 @@ wire_api = "responses"
     #[test]
     #[serial]
     fn ensure_provider_env_ready_mirrors_shell_key_and_rejects_missing_key() {
+        #[cfg(windows)]
+        let _environment = crate::services::tuzi_provider::TestEnvironmentGuard::new(&["READY_CODEX_API_KEY"]);
+        #[cfg(windows)]
+        std::env::set_var("READY_CODEX_API_KEY", "ready-key");
         let _guard = TEST_ENV_LOCK.lock().expect("lock test env");
         let temp = tempfile::tempdir().expect("temp home");
         let old_test_home = std::env::var_os("CC_SWITCH_TEST_HOME");

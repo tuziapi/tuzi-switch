@@ -1,0 +1,131 @@
+import { isVideoElement } from '../plugins/with-video';
+import type { PlaitBoard } from '@plait/core';
+import {
+  getCanvasImageError,
+  isCanvasImageReady,
+  retryCanvasImage,
+} from '../services/canvas-image-readiness';
+import { workflowCompletionService } from '../services/workflow-completion-service';
+import type { PlaitImageGenerationAnchor } from '../types/image-generation-anchor.types';
+import { TaskType, type Task } from '../types/task.types';
+
+function getImageGenerationResultImages(
+  board: PlaitBoard,
+  anchor: PlaitImageGenerationAnchor,
+  tasks: Task[]
+) {
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const resultIds = new Set(
+    tasks
+      .map(
+        (task) =>
+          workflowCompletionService.getPostProcessingStatus(task.id)
+            ?.firstElementId
+      )
+      .filter(Boolean)
+  );
+  if (anchor.resultElementId) {
+    resultIds.add(anchor.resultElementId);
+  }
+
+  const candidates = board.children.filter(
+    (element) =>
+      element.type === 'image' &&
+      typeof element.url === 'string' &&
+      (resultIds.has(element.id) ||
+        taskIds.has(element.generationTaskId) ||
+        element.generationAnchorId === anchor.id)
+  );
+
+  // A history result can be inserted more than once. Old copies (including
+  // copies bound to another anchor) must not block this handoff.
+  const images = candidates.filter((image) => {
+    if (image.generationAnchorId === anchor.id || resultIds.has(image.id)) {
+      return true;
+    }
+    if (image.generationAnchorId) return false;
+    const hasSpecificResult = candidates.some(
+      (candidate) =>
+        candidate.generationTaskId === image.generationTaskId &&
+        (candidate.generationAnchorId === anchor.id ||
+          resultIds.has(candidate.id))
+    );
+    return !hasSpecificResult;
+  });
+
+  return images;
+}
+
+export function getImageGenerationResultLoadError(
+  board: PlaitBoard,
+  anchor: PlaitImageGenerationAnchor,
+  tasks: Task[]
+): string | undefined {
+  for (const image of getImageGenerationResultImages(board, anchor, tasks)) {
+    const error = getCanvasImageError(board, image.id, image.url);
+    if (error) return error;
+  }
+  return undefined;
+}
+
+export function retryImageGenerationResultLoads(
+  board: PlaitBoard,
+  anchor: PlaitImageGenerationAnchor,
+  tasks: Task[]
+): boolean {
+  let retried = false;
+  for (const image of getImageGenerationResultImages(board, anchor, tasks)) {
+    if (retryCanvasImage(board, image.id, image.url)) retried = true;
+  }
+  return retried;
+}
+
+export function areImageGenerationResultsReady(
+  board: PlaitBoard,
+  anchor: PlaitImageGenerationAnchor,
+  tasks: Task[]
+): boolean {
+  if (tasks.length && tasks.every(task => task.type === TaskType.VIDEO || task.type === TaskType.AUDIO)) {
+    return tasks.every(task => board.children.some(element => (task.type === TaskType.VIDEO ? isVideoElement(element) : element.type === task.type) &&
+      (element.generationTaskId === task.id || element.id === workflowCompletionService.getPostProcessingStatus(task.id)?.firstElementId)));
+  }
+  const images = getImageGenerationResultImages(board, anchor, tasks);
+  if (images.length === 0) {
+    return false;
+  }
+
+  // Every inserted task must have a canvas result; a thumbnail is not enough.
+  if (
+    !tasks.every((task) => {
+      const resultId = workflowCompletionService.getPostProcessingStatus(
+        task.id
+      )?.firstElementId;
+      return images.some(
+        (image) =>
+          image.generationTaskId === task.id ||
+          image.id === resultId ||
+          (tasks.length === 1 && image.id === anchor.resultElementId)
+      );
+    })
+  ) {
+    return false;
+  }
+
+  return images.every((image) =>
+    isCanvasImageReady(board, image.id, image.url)
+  );
+}
+
+/** Filter readiness notifications before scanning task history or deriving display state. */
+export function isAnchorImageReadinessRelevant(
+  board: PlaitBoard, anchor: PlaitImageGenerationAnchor, elementId: string, tasks: Task[] = []
+): boolean {
+  if (anchor.resultElementId === elementId) return true;
+  const taskIds = new Set([...anchor.taskIds, ...tasks.map((task) => task.id)]);
+  if (anchor.primaryTaskId) taskIds.add(anchor.primaryTaskId);
+  for (const taskId of taskIds) {
+    if (workflowCompletionService.getPostProcessingStatus(taskId)?.firstElementId === elementId) return true;
+  }
+  const image = board.children.find((element) => element.id === elementId);
+  return Boolean(image && (image.generationAnchorId === anchor.id || taskIds.has(image.generationTaskId)));
+}

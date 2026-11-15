@@ -1,0 +1,1567 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Music2, X } from 'lucide-react';
+import './ttd-dialog.scss';
+import './ai-video-generation.scss';
+import { useI18n } from '../../i18n';
+import { type Language } from '../../constants/prompts';
+import { useDeviceType } from '../../hooks/useDeviceType';
+import { useGenerationHistory } from '../../hooks/useGenerationHistory';
+import {
+  useGenerationState,
+  useKeyboardShortcuts,
+  ActionButtons,
+  ErrorDisplay,
+  PromptInput,
+  type ImageFile,
+  getMergedPresetPrompts,
+  savePromptToHistory as savePromptToHistoryUtil,
+  ReferenceImageUpload,
+  type ReferenceImage,
+  StoryboardEditor,
+  ResizableDivider,
+  loadSavedWidth,
+  AutoInsertCheckbox,
+  getAutoInsertValue,
+} from './shared';
+import {
+  geminiSettings,
+  resolveInvocationRoute,
+  createModelRef,
+  type ModelRef,
+} from '../../utils/settings-manager';
+import {
+  loadScopedAIVideoToolPreferences,
+  saveAIVideoToolPreferences,
+} from '../../services/ai-generation-preferences-service';
+import { isSeedance2ModelId } from '../../utils/seedance-model';
+import { promptStorageService } from '../../services/prompt-storage-service';
+import { useTaskQueue } from '../../hooks/useTaskQueue';
+import { TaskType, type KnowledgeContextRef } from '../../types/task.types';
+import { MessagePlugin } from 'tdesign-react';
+import { DialogTaskList } from '../task-queue/DialogTaskList';
+import { LS_KEYS } from '../../constants/storage-keys';
+import type {
+  VideoModel,
+  UploadedVideoImage,
+  StoryboardScene,
+} from '../../types/video.types';
+import { ModelDropdown } from '../ai-input-bar/ModelDropdown';
+import { ParametersDropdown } from '../ai-input-bar/ParametersDropdown';
+import { type ModelConfig } from '../../constants/model-config';
+import {
+  supportsStoryboardMode,
+  getStoryboardModeConfig,
+  normalizeVideoModel,
+} from '../../constants/video-model-config';
+import {
+  getEffectiveVideoCompatibleParams,
+  getEffectiveVideoModelConfigForSelection,
+  isSeedanceAudioReference,
+} from '../../services/video-binding-utils';
+import {
+  formatStoryboardPrompt,
+  parseStoryboardPrompt,
+  isStoryboardPrompt,
+  validateSceneDurations,
+} from '../../utils/storyboard-utils';
+import { useSelectableModels } from '../../hooks/use-runtime-models';
+import { getPinnedSelectableModel } from '../../utils/runtime-model-discovery';
+import {
+  findMatchingSelectableModel,
+  getModelRefFromConfig,
+  getSelectionKey,
+} from '../../utils/model-selection';
+import { KnowledgeNoteContextSelector } from '../shared';
+
+function areStringMapsEqual(
+  a: Record<string, string>,
+  b: Record<string, string>
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every((key) => a[key] === b[key]);
+}
+
+function buildFilteredUploadedImages(
+  images: UploadedVideoImage[],
+  maxCount: number,
+  labels: string[]
+): UploadedVideoImage[] {
+  return images.slice(0, maxCount).map((img, index) => ({
+    ...img,
+    slot: index,
+    slotLabel: labels[index] || `参考图${index + 1}`,
+  }));
+}
+
+function areUploadedImagesEqual(
+  a: UploadedVideoImage[],
+  b: UploadedVideoImage[]
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((item, index) => {
+      const next = b[index];
+      return (
+        item.slot === next.slot &&
+        item.slotLabel === next.slotLabel &&
+        item.url === next.url &&
+        item.name === next.name &&
+        item.file === next.file
+      );
+    })
+  );
+}
+
+function areModelRefsEqual(
+  left?: ModelRef | null,
+  right?: ModelRef | null
+): boolean {
+  return (
+    (left?.profileId || null) === (right?.profileId || null) &&
+    (left?.modelId || null) === (right?.modelId || null)
+  );
+}
+
+function getAlignedModelRef(
+  modelId?: string | null,
+  modelRef?: ModelRef | null
+): ModelRef | null {
+  const normalized = createModelRef(modelRef?.profileId, modelRef?.modelId);
+  return normalized?.modelId === (modelId || null) ? normalized : null;
+}
+
+function resolveVideoModelRef(
+  models: ModelConfig[],
+  modelId?: string | null,
+  modelRef?: ModelRef | null
+): ModelRef | null {
+  if (!modelId) {
+    return null;
+  }
+
+  const alignedRef = getAlignedModelRef(modelId, modelRef);
+  const matchedModel = findMatchingSelectableModel(models, modelId, alignedRef);
+  return getModelRefFromConfig(matchedModel) || alignedRef;
+}
+
+function getDefaultParamsFromConfigs(
+  params: Array<{ id: string; defaultValue?: string }>
+): Record<string, string> {
+  return params.reduce<Record<string, string>>((acc, param) => {
+    if (param.defaultValue) {
+      acc[param.id] = param.defaultValue;
+    }
+    return acc;
+  }, {});
+}
+
+function getDefaultVideoParamsForSelection(
+  modelId: VideoModel,
+  modelRef?: ModelRef | string | null
+): Record<string, string> {
+  return getDefaultParamsFromConfigs(
+    getEffectiveVideoCompatibleParams(modelId, modelRef || modelId, {})
+  );
+}
+
+function mergeVideoToolParams(
+  modelId: string,
+  extraParams: Record<string, string>,
+  duration?: string | number | null,
+  size?: string | null
+): Record<string, string> {
+  const nextParams: Record<string, string> = {
+    ...extraParams,
+    ...(duration !== undefined && duration !== null
+      ? { duration: String(duration) }
+      : {}),
+    ...(size ? { size } : {}),
+  };
+
+  if (isSeedance2ModelId(modelId) && nextParams.size) {
+    const [resolution, legacyRatio] = nextParams.size.split('@');
+    nextParams.size = resolution;
+    if (legacyRatio && !nextParams.ratio) {
+      nextParams.ratio = legacyRatio;
+    }
+  }
+
+  return nextParams;
+}
+
+function splitVideoToolParams(
+  params: Record<string, string>,
+  fallbackDuration: string,
+  fallbackSize: string
+): {
+  extraParams: Record<string, string>;
+  duration: string;
+  size: string;
+} {
+  const { duration: _duration, size: _size, ...extraParams } = params;
+  return {
+    extraParams,
+    duration: fallbackDuration,
+    size: fallbackSize,
+  };
+}
+
+interface AIVideoGenerationProps {
+  initialPrompt?: string;
+  initialImage?: ImageFile; // 保留单图片支持（向后兼容）
+  initialImages?: UploadedVideoImage[]; // 新增：支持多图片
+  initialKnowledgeContextRefs?: KnowledgeContextRef[];
+  initialDuration?: number;
+  initialModel?: VideoModel; // 新增：模型选择
+  initialSize?: string; // 新增：尺寸选择
+  initialResultUrl?: string;
+  selectedModel?: string;
+  selectedModelRef?: ModelRef | null;
+  onModelChange?: (value: string) => void;
+  onModelRefChange?: (value: ModelRef | null) => void;
+  externalBatchId?: string;
+  initialAutoInsertToCanvas?: boolean;
+  onDraftChange?: (draft: {
+    prompt: string;
+    images: Array<{ url: string; name: string }>;
+    duration?: number;
+    size?: string;
+  }) => void | Promise<void>;
+}
+
+const AIVideoGeneration = ({
+  initialPrompt = '',
+  initialImage,
+  initialImages,
+  initialKnowledgeContextRefs = [],
+  initialDuration,
+  initialModel,
+  initialSize,
+  initialResultUrl,
+  selectedModel,
+  selectedModelRef,
+  onModelChange,
+  onModelRefChange,
+  externalBatchId,
+  initialAutoInsertToCanvas,
+  onDraftChange,
+}: AIVideoGenerationProps = {}) => {
+  const videoModels = useSelectableModels('video');
+  const [prompt, setPrompt] = useState(initialPrompt);
+  const [knowledgeContextRefs, setKnowledgeContextRefs] = useState<
+    KnowledgeContextRef[]
+  >(initialKnowledgeContextRefs);
+  const [error, setError] = useState<string | null>(null);
+  const [referenceAudioUrl, setReferenceAudioUrl] = useState('');
+
+  // 任务列表面板状态 - 使用像素宽度
+  const [isTaskListVisible, setIsTaskListVisible] = useState(true);
+  const [taskListWidth, setTaskListWidth] = useState(() =>
+    loadSavedWidth('video')
+  );
+  const [mobilePanel, setMobilePanel] = useState<'config' | 'tasks'>('config');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { viewportWidth } = useDeviceType();
+  const isCompactLayout = viewportWidth <= 768;
+
+  // Video model parameters - use state to support dynamic updates
+  const initialRoute = resolveInvocationRoute('video');
+  const initialPreferredModelId = initialModel || initialRoute.modelId;
+  const initialPreferredModelRef = getAlignedModelRef(
+    initialPreferredModelId,
+    initialModel && initialModel === selectedModel
+      ? selectedModelRef
+      : initialRoute.modelId === initialPreferredModelId
+      ? createModelRef(initialRoute.profileId, initialRoute.modelId)
+      : null
+  );
+  const initialMatchedModel =
+    findMatchingSelectableModel(
+      videoModels,
+      initialPreferredModelId,
+      initialPreferredModelRef
+    ) ||
+    getPinnedSelectableModel(
+      'video',
+      initialPreferredModelId,
+      initialPreferredModelRef
+    );
+  const initialResolvedModelRef = resolveVideoModelRef(
+    videoModels,
+    (initialMatchedModel?.id as VideoModel) || initialPreferredModelId,
+    getModelRefFromConfig(initialMatchedModel) || initialPreferredModelRef
+  );
+  const [currentModel, setCurrentModel] = useState<VideoModel>(
+    (initialMatchedModel?.id as VideoModel) ||
+      videoModels[0]?.id ||
+      normalizeVideoModel('veo3')
+  );
+  const [currentModelRef, setCurrentModelRef] = useState<ModelRef | null>(
+    initialResolvedModelRef
+  );
+  const initialVideoSelectionKey = getSelectionKey(
+    ((initialMatchedModel?.id as VideoModel) ||
+      videoModels[0]?.id ||
+      normalizeVideoModel('veo3')) as VideoModel,
+    initialResolvedModelRef
+  );
+  const initialScopedVideoPreferences = loadScopedAIVideoToolPreferences(
+    ((initialMatchedModel?.id as VideoModel) ||
+      videoModels[0]?.id ||
+      normalizeVideoModel('veo3')) as VideoModel,
+    initialVideoSelectionKey
+  );
+  const visibleVideoModels = React.useMemo(() => {
+    const currentMatch = findMatchingSelectableModel(
+      videoModels,
+      currentModel,
+      currentModelRef
+    );
+    if (currentMatch || !currentModel) {
+      return videoModels;
+    }
+
+    const pinnedModel = getPinnedSelectableModel(
+      'video',
+      currentModel,
+      currentModelRef
+    );
+    return pinnedModel ? [pinnedModel, ...videoModels] : videoModels;
+  }, [currentModel, currentModelRef, videoModels]);
+
+  // 所有视频参数（duration / size / provider params）统一放在同一个 selectedParams 中
+  const [videoSelectedParams, setVideoSelectedParams] = useState<
+    Record<string, string>
+  >(() =>
+    mergeVideoToolParams(
+      currentModel,
+      initialScopedVideoPreferences.extraParams,
+      initialDuration?.toString() || initialScopedVideoPreferences.duration,
+      initialSize || initialScopedVideoPreferences.size
+    )
+  );
+  const compatibleVideoParams = React.useMemo(
+    () =>
+      getEffectiveVideoCompatibleParams(
+        currentModel,
+        currentModelRef || currentModel,
+        videoSelectedParams
+      ),
+    [currentModel, currentModelRef, videoSelectedParams]
+  );
+  const modelConfig = React.useMemo(
+    () =>
+      getEffectiveVideoModelConfigForSelection(
+        currentModel,
+        currentModelRef || currentModel,
+        videoSelectedParams
+      ),
+    [currentModel, currentModelRef, videoSelectedParams]
+  );
+  const imageUploadLabelsSignature = React.useMemo(
+    () => (modelConfig.imageUpload.labels || []).join('|'),
+    [modelConfig.imageUpload.labels]
+  );
+  const stableImageUploadLabels = React.useMemo(
+    () =>
+      imageUploadLabelsSignature ? imageUploadLabelsSignature.split('|') : [],
+    [imageUploadLabelsSignature]
+  );
+  const imageUploadConfig = React.useMemo(() => {
+    return {
+      maxCount: modelConfig.imageUpload.maxCount,
+      mode: modelConfig.imageUpload.mode,
+      required: modelConfig.imageUpload.required,
+      labels: stableImageUploadLabels,
+      labelsSignature: imageUploadLabelsSignature,
+    };
+  }, [
+    modelConfig.imageUpload.maxCount,
+    modelConfig.imageUpload.mode,
+    modelConfig.imageUpload.required,
+    stableImageUploadLabels,
+    imageUploadLabelsSignature,
+  ]);
+
+  const effectiveDuration = React.useMemo(() => {
+    const durationParam = compatibleVideoParams.find(
+      (param) => param.id === 'duration'
+    );
+    const selectedDuration = videoSelectedParams.duration;
+    return selectedDuration &&
+      durationParam?.options?.some(
+        (option) => option.value === selectedDuration
+      )
+      ? selectedDuration
+      : durationParam?.defaultValue || modelConfig.defaultDuration;
+  }, [
+    compatibleVideoParams,
+    modelConfig.defaultDuration,
+    videoSelectedParams.duration,
+  ]);
+  const effectiveSize = React.useMemo(() => {
+    const sizeParam = compatibleVideoParams.find(
+      (param) => param.id === 'size'
+    );
+    const selectedSize = videoSelectedParams.size;
+    return selectedSize &&
+      sizeParam?.options?.some((option) => option.value === selectedSize)
+      ? selectedSize
+      : sizeParam?.defaultValue || modelConfig.defaultSize;
+  }, [
+    compatibleVideoParams,
+    modelConfig.defaultSize,
+    videoSelectedParams.size,
+  ]);
+  const hasCompatibleParams = React.useMemo(() => {
+    return compatibleVideoParams.length > 0;
+  }, [compatibleVideoParams]);
+  const handleVideoParamChange = useCallback(
+    (paramId: string, value: string) => {
+      if (!value || value === 'default') {
+        setVideoSelectedParams((prev) => {
+          const next = { ...prev };
+          delete next[paramId];
+          return next;
+        });
+        return;
+      }
+      setVideoSelectedParams((prev) => ({
+        ...prev,
+        [paramId]: value,
+      }));
+    },
+    []
+  );
+
+  useEffect(() => {
+    const nextParams = compatibleVideoParams.reduce<Record<string, string>>(
+      (acc, param) => {
+        const prevValue = videoSelectedParams[param.id];
+        const prevValueIsValid =
+          !prevValue ||
+          param.valueType !== 'enum' ||
+          !param.options ||
+          param.options.some((option) => option.value === prevValue);
+
+        if (prevValue && prevValueIsValid) {
+          acc[param.id] = prevValue;
+        } else if (param.defaultValue) {
+          acc[param.id] = param.defaultValue;
+        }
+
+        return acc;
+      },
+      {}
+    );
+
+    if (!areStringMapsEqual(videoSelectedParams, nextParams)) {
+      setVideoSelectedParams(nextParams);
+    }
+  }, [compatibleVideoParams, videoSelectedParams]);
+
+  // 保存所有原始选中的图片（不受模型切换影响）
+  const [allSelectedImages, setAllSelectedImages] = useState<
+    UploadedVideoImage[]
+  >(() => {
+    if (initialImages && initialImages.length > 0) {
+      return initialImages;
+    }
+    if (initialImage) {
+      return [
+        {
+          slot: 0,
+          slotLabel: '参考图',
+          url: initialImage.url || '',
+          name: initialImage.name,
+          file: initialImage.file,
+        },
+      ];
+    }
+    return [];
+  });
+
+  // 当前显示的图片（根据模型 maxCount 过滤）
+  const [uploadedImages, setUploadedImages] = useState<UploadedVideoImage[]>(
+    () => {
+      const maxCount = modelConfig.imageUpload.maxCount;
+      const labels = modelConfig.imageUpload.labels || [];
+
+      // 从 allSelectedImages 初始值中截取
+      let sourceImages: UploadedVideoImage[] = [];
+      if (initialImages && initialImages.length > 0) {
+        sourceImages = initialImages;
+      } else if (initialImage) {
+        sourceImages = [
+          {
+            slot: 0,
+            slotLabel: labels[0] || '参考图',
+            url: initialImage.url || '',
+            name: initialImage.name,
+            file: initialImage.file,
+          },
+        ];
+      }
+
+      // 按 maxCount 截取并更新 slot 和 label
+      return sourceImages.slice(0, maxCount).map((img, index) => ({
+        ...img,
+        slot: index,
+        slotLabel: labels[index] || `参考图${index + 1}`,
+      }));
+    }
+  );
+  // Storyboard mode state
+  const [storyboardEnabled, setStoryboardEnabled] = useState(false);
+  const [storyboardScenes, setStoryboardScenes] = useState<StoryboardScene[]>(
+    []
+  );
+  const storyboardConfig = React.useMemo(
+    () => getStoryboardModeConfig(currentModel),
+    [currentModel]
+  );
+  const modelSupportsStoryboard = supportsStoryboardMode(currentModel);
+
+  // Use generation history from task queue
+  const { videoHistory } = useGenerationHistory();
+
+  // 用于触发 presetPrompts 重新计算的计数器
+  const [promptHistoryVersion, setPromptHistoryVersion] = useState(0);
+
+  useEffect(() => {
+    return promptStorageService.subscribeChanges(() => {
+      setPromptHistoryVersion((version) => version + 1);
+    });
+  }, []);
+
+  const { isGenerating } = useGenerationState('video');
+
+  // 处理宽度变化
+  const handleWidthChange = useCallback((width: number) => {
+    setTaskListWidth(width);
+  }, []);
+
+  // 切换任务列表显示/隐藏
+  const handleToggleTaskList = useCallback(() => {
+    setIsTaskListVisible((prev) => !prev);
+  }, []);
+
+  const { language } = useI18n();
+  const { createTask } = useTaskQueue();
+  const generatingLockRef = useRef(false);
+  const isModelControlled = selectedModel !== undefined;
+  const lastSyncedSelectedSelectionKeyRef = React.useRef<string | null>(null);
+  // 当 initialModel 传入时，保护 currentModel 不被外部 selectedModel 覆盖，直到用户手动切换
+  const initialModelAppliedRef = React.useRef<string | null>(null);
+
+  // Sync model from global settings changes (from header dropdown)
+  useEffect(() => {
+    if (isModelControlled) {
+      return;
+    }
+
+    const handleSettingsChange = (newSettings: any) => {
+      const newModel = newSettings.videoModelName || 'veo3';
+      if (newModel !== currentModel) {
+        setCurrentModel(newModel);
+        const nextModelRef = resolveVideoModelRef(
+          visibleVideoModels,
+          newModel,
+          currentModelRef
+        );
+        setCurrentModelRef(nextModelRef);
+      }
+    };
+    geminiSettings.addListener(handleSettingsChange);
+    return () => geminiSettings.removeListener(handleSettingsChange);
+  }, [
+    currentModel,
+    currentModelRef,
+    isModelControlled,
+    selectedModel,
+    selectedModelRef,
+    visibleVideoModels,
+  ]);
+
+  useEffect(() => {
+    if (visibleVideoModels.length === 0) return;
+    const matchedModel = findMatchingSelectableModel(
+      visibleVideoModels,
+      currentModel,
+      currentModelRef
+    );
+    const nextModelRef = resolveVideoModelRef(
+      visibleVideoModels,
+      currentModel,
+      currentModelRef
+    );
+    if (!matchedModel) {
+      const fallback = visibleVideoModels[0];
+      const nextRef = getModelRefFromConfig(fallback);
+      setCurrentModel(fallback.id);
+      setCurrentModelRef((prev) => {
+        if (areModelRefsEqual(prev, nextRef)) {
+          return prev;
+        }
+        return nextRef;
+      });
+      return;
+    }
+
+    setCurrentModelRef((prev) => {
+      if (areModelRefsEqual(prev, nextModelRef)) {
+        return prev;
+      }
+      return nextModelRef;
+    });
+  }, [currentModel, currentModelRef, visibleVideoModels]);
+
+  // Sync model from selectedModel prop (from parent component)
+  useEffect(() => {
+    if (!selectedModel) {
+      return;
+    }
+
+    const nextSelectionKey = getSelectionKey(selectedModel, selectedModelRef);
+    if (lastSyncedSelectedSelectionKeyRef.current === nextSelectionKey) {
+      return;
+    }
+
+    // 如果 initialModel 已被应用且外部传来的是不同模型（全局偏好回写），忽略这次覆盖
+    if (
+      initialModelAppliedRef.current &&
+      initialModelAppliedRef.current !== selectedModel
+    ) {
+      return;
+    }
+
+    lastSyncedSelectedSelectionKeyRef.current = nextSelectionKey;
+    setCurrentModel((prev) => (prev === selectedModel ? prev : selectedModel));
+    const nextModelRef = resolveVideoModelRef(
+      visibleVideoModels,
+      selectedModel,
+      selectedModelRef
+    );
+    setCurrentModelRef((prev) => {
+      if (areModelRefsEqual(prev, nextModelRef)) {
+        return prev;
+      }
+      return nextModelRef;
+    });
+  }, [selectedModel, selectedModelRef, visibleVideoModels, initialModel]);
+
+  // Track if we're in manual edit mode (from handleEditTask) to prevent props from overwriting
+  const [isManualEdit, setIsManualEdit] = useState(false);
+
+  // Reset parameters when model changes (智能过滤图片而不是清空)
+  const [isEditMode, setIsEditMode] = useState(false);
+  useEffect(() => {
+    if (isEditMode) {
+      // In edit mode, don't reset parameters automatically
+      setIsEditMode(false);
+      return;
+    }
+
+    const scopedPreferences = loadScopedAIVideoToolPreferences(
+      currentModel,
+      getSelectionKey(currentModel, currentModelRef)
+    );
+    const nextParams = mergeVideoToolParams(
+      currentModel,
+      scopedPreferences.extraParams,
+      initialDuration !== undefined
+        ? initialDuration.toString()
+        : scopedPreferences.duration,
+      initialSize || scopedPreferences.size
+    );
+    setVideoSelectedParams((prev) =>
+      areStringMapsEqual(prev, nextParams) ? prev : nextParams
+    );
+
+    // Disable storyboard mode if new model doesn't support it
+    if (!supportsStoryboardMode(currentModel)) {
+      setStoryboardEnabled((prev) => (prev ? false : prev));
+      setStoryboardScenes((prev) => (prev.length > 0 ? [] : prev));
+    }
+  }, [currentModel, currentModelRef, isEditMode, initialDuration, initialSize]);
+
+  useEffect(() => {
+    const nextUploadedImages =
+      allSelectedImages.length > 0
+        ? buildFilteredUploadedImages(
+            allSelectedImages,
+            imageUploadConfig.maxCount,
+            imageUploadConfig.labels
+          )
+        : [];
+
+    setUploadedImages((prev) =>
+      areUploadedImagesEqual(prev, nextUploadedImages)
+        ? prev
+        : nextUploadedImages
+    );
+  }, [
+    allSelectedImages,
+    imageUploadConfig.labels,
+    imageUploadConfig.labelsSignature,
+    imageUploadConfig.maxCount,
+  ]);
+
+  useEffect(() => {
+    const splitParams = splitVideoToolParams(
+      videoSelectedParams,
+      effectiveDuration,
+      effectiveSize
+    );
+    saveAIVideoToolPreferences({
+      currentModel,
+      currentSelectionKey: getSelectionKey(currentModel, currentModelRef),
+      extraParams: splitParams.extraParams,
+      duration: splitParams.duration,
+      size: splitParams.size,
+    });
+  }, [
+    currentModel,
+    currentModelRef,
+    effectiveDuration,
+    effectiveSize,
+    videoSelectedParams,
+  ]);
+
+  // Handle initial props - use ref to track if we've processed these props before
+  const processedPropsRef = React.useRef<string>('');
+  useEffect(() => {
+    // Skip if we're in manual edit mode (user clicked edit in task list)
+    if (isManualEdit) {
+      return;
+    }
+
+    // Create a unique key from all initial props to detect real changes
+    const propsKey = JSON.stringify({
+      prompt: initialPrompt,
+      image: initialImage?.url,
+      images: initialImages?.map((img) => img.url),
+      knowledgeContextRefs: initialKnowledgeContextRefs.map(
+        (ref) => ref.noteId
+      ),
+      duration: initialDuration,
+      model: initialModel,
+      size: initialSize,
+      result: initialResultUrl,
+    });
+
+    // Skip if we've already processed these exact props
+    if (processedPropsRef.current === propsKey) {
+      return;
+    }
+
+    // console.log('AIVideoGeneration - processing new props:', { propsKey });
+    processedPropsRef.current = propsKey;
+
+    // 记录 initialModel，防止全局偏好回写覆盖
+    if (initialModel) {
+      initialModelAppliedRef.current = initialModel;
+      setCurrentModel(initialModel as VideoModel);
+      setCurrentModelRef(
+        resolveVideoModelRef(videoModels, initialModel, selectedModelRef)
+      );
+    }
+
+    setPrompt(initialPrompt);
+    setKnowledgeContextRefs(initialKnowledgeContextRefs);
+
+    // 处理图片：保存所有原始图片，并按当前模型过滤显示
+    let newAllImages: UploadedVideoImage[] = [];
+    if (initialImages && initialImages.length > 0) {
+      newAllImages = initialImages;
+    } else if (initialImage) {
+      newAllImages = [
+        {
+          slot: 0,
+          slotLabel: '参考图',
+          url: initialImage.url || '',
+          name: initialImage.name,
+          file: initialImage.file,
+        },
+      ];
+    }
+
+    // 更新原始图片列表
+    setAllSelectedImages(newAllImages);
+
+    // 按当前模型 maxCount 过滤显示
+    const filteredImages = buildFilteredUploadedImages(
+      newAllImages,
+      imageUploadConfig.maxCount,
+      imageUploadConfig.labels
+    );
+    setUploadedImages(filteredImages);
+
+    if (initialDuration !== undefined || initialSize) {
+      setVideoSelectedParams((prev) =>
+        mergeVideoToolParams(
+          initialModel || currentModel,
+          prev,
+          initialDuration,
+          initialSize
+        )
+      );
+    }
+
+    setError(null);
+  }, [
+    initialPrompt,
+    initialImage,
+    initialImages,
+    initialKnowledgeContextRefs,
+    initialDuration,
+    initialModel,
+    initialSize,
+    initialResultUrl,
+    imageUploadConfig.labels,
+    imageUploadConfig.labelsSignature,
+    imageUploadConfig.maxCount,
+    isManualEdit,
+    currentModel,
+  ]);
+
+  // Clear errors on mount
+  useEffect(() => {
+    setError(null);
+    return () => {
+      setError(null);
+    };
+  }, []);
+
+  const handleReset = () => {
+    setPrompt('');
+    setAllSelectedImages([]); // 清空原始图片
+    setUploadedImages([]);
+    setReferenceAudioUrl('');
+    setError(null);
+    setMobilePanel('config');
+    // Clear manual edit mode
+    setIsManualEdit(false);
+    // Clear storyboard mode
+    setStoryboardEnabled(false);
+    setStoryboardScenes([]);
+    setVideoSelectedParams(
+      getDefaultVideoParamsForSelection(
+        currentModel,
+        currentModelRef || currentModel
+      )
+    );
+    window.dispatchEvent(new CustomEvent('ai-video-clear'));
+  };
+
+  // Convert ReferenceImage[] to UploadedVideoImage[]
+  const referenceImagesToUploadedImages = React.useCallback(
+    (refImages: ReferenceImage[], labels: string[]): UploadedVideoImage[] => {
+      return refImages.map((img, index) => {
+        const slot = img.slot ?? index;
+        return {
+          slot,
+          slotLabel: labels[slot] || `参考图${slot + 1}`,
+          url: img.url,
+          name: img.name,
+          file: img.file,
+        };
+      });
+    },
+    []
+  );
+
+  // Convert UploadedVideoImage[] to ReferenceImage[]
+  const uploadedImagesToReferenceImages = React.useCallback(
+    (uploadedImgs: UploadedVideoImage[]): ReferenceImage[] => {
+      return uploadedImgs.map((img) => ({
+        url: img.url,
+        name: img.name,
+        file: img.file,
+        slot: img.slot,
+      }));
+    },
+    []
+  );
+
+  // 处理图片变化（用户手动上传/删除时同步更新原始图片列表）
+  const handleImagesChange = React.useCallback(
+    (newImages: ReferenceImage[]) => {
+      const convertedImages = referenceImagesToUploadedImages(
+        newImages,
+        imageUploadConfig.labels
+      );
+      setUploadedImages(convertedImages);
+      // 同步更新原始图片列表（用户手动操作后，原始列表以当前显示的为准）
+      setAllSelectedImages(convertedImages);
+    },
+    [imageUploadConfig.labels, referenceImagesToUploadedImages]
+  );
+
+  // 使用useMemo优化性能，当videoHistory、language或promptHistoryVersion变化时重新计算
+  const presetPrompts = React.useMemo(
+    () => getMergedPresetPrompts('video', language as Language, videoHistory),
+    [videoHistory, language, promptHistoryVersion]
+  );
+
+  // 保存提示词到历史记录（去重）
+  const savePromptToHistory = (promptText: string) => {
+    savePromptToHistoryUtil('video', promptText, { width: 1280, height: 720 });
+    // 触发 presetPrompts 重新计算
+    setPromptHistoryVersion((v) => v + 1);
+  };
+
+  const lastDraftRef = useRef('');
+  useEffect(() => {
+    if (!onDraftChange) {
+      return;
+    }
+
+    const parsedDuration = Number.parseFloat(effectiveDuration);
+    const draft = {
+      prompt,
+      images: uploadedImages.map((image) => ({
+        url: image.url,
+        name: image.name,
+      })),
+      duration: Number.isFinite(parsedDuration) ? parsedDuration : undefined,
+      size: effectiveSize || undefined,
+    };
+    const draftKey = JSON.stringify(draft);
+    if (lastDraftRef.current === draftKey) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (lastDraftRef.current === draftKey) {
+        return;
+      }
+      lastDraftRef.current = draftKey;
+      void onDraftChange(draft);
+    }, 200);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [effectiveDuration, effectiveSize, onDraftChange, prompt, uploadedImages]);
+
+  // 处理任务编辑（从弹窗内的任务列表点击编辑）
+  const handleEditTask = (task: any) => {
+    // console.log('Video handleEditTask - task params:', task.params);
+
+    // 标记为手动编辑模式,防止 props 的 useEffect 覆盖我们的更改
+    setIsManualEdit(true);
+    setMobilePanel('config');
+
+    // 标记为编辑模式,防止模型变化时重置参数
+    setIsEditMode(true);
+
+    // 更新模型选择（通过本地 state 和全局设置）- 先设置模型
+    if (task.params.model) {
+      // console.log('Updating model to:', task.params.model);
+      setCurrentModel(task.params.model);
+      setCurrentModelRef((task.params.modelRef as ModelRef | null) || null);
+      const settings = geminiSettings.get();
+      geminiSettings.update({
+        ...settings,
+        videoModelName: task.params.model,
+      });
+    }
+
+    // 检查是否有故事场景配置
+    if (task.params.storyboard?.enabled && task.params.storyboard?.scenes) {
+      // console.log('Restoring storyboard mode:', task.params.storyboard);
+      setStoryboardEnabled(true);
+      setStoryboardScenes(task.params.storyboard.scenes);
+      setPrompt(''); // 故事场景模式下清空普通提示词
+    } else {
+      // 尝试从提示词解析故事场景格式
+      const prompt = task.params.prompt || '';
+      const parsedScenes = parseStoryboardPrompt(prompt);
+      if (parsedScenes && parsedScenes.length > 0) {
+        // console.log('Parsed storyboard from prompt:', parsedScenes);
+        setStoryboardEnabled(true);
+        setStoryboardScenes(parsedScenes);
+        setPrompt('');
+      } else {
+        // 普通模式
+        setStoryboardEnabled(false);
+        setStoryboardScenes([]);
+        setPrompt(prompt);
+      }
+    }
+
+    const restoredParams =
+      task.params.params && typeof task.params.params === 'object'
+        ? Object.entries(task.params.params as Record<string, unknown>).reduce<
+            Record<string, string>
+          >((acc, [key, value]) => {
+            if (value !== undefined && value !== null && String(value).trim()) {
+              acc[key] = String(value);
+            }
+            return acc;
+          }, {})
+        : {};
+    setVideoSelectedParams(
+      mergeVideoToolParams(
+        task.params.model || currentModel,
+        restoredParams,
+        task.params.duration ?? task.params.seconds,
+        task.params.size
+      )
+    );
+
+    // 更新上传的图片 - 保存原始图片并按模型过滤
+    if (task.params.uploadedImages && task.params.uploadedImages.length > 0) {
+      // console.log('Setting uploadedImages:', task.params.uploadedImages);
+      // 保存原始图片
+      setAllSelectedImages(task.params.uploadedImages);
+      // 按当前模型过滤显示（这里使用任务中的模型配置）
+      const taskModel = task.params.model || currentModel;
+      const taskModelConfig = getEffectiveVideoModelConfigForSelection(
+        taskModel,
+        (task.params.modelRef as ModelRef | null) || taskModel,
+        restoredParams
+      );
+      const maxCount = taskModelConfig.imageUpload.maxCount;
+      const labels = taskModelConfig.imageUpload.labels || [];
+
+      const filteredImages = task.params.uploadedImages
+        .slice(0, maxCount)
+        .map((img: UploadedVideoImage, index: number) => ({
+          ...img,
+          slot: index,
+          slotLabel: labels[index] || `参考图${index + 1}`,
+        }));
+      setUploadedImages(filteredImages);
+    } else {
+      setAllSelectedImages([]);
+      setUploadedImages([]);
+    }
+    const restoredAudio =
+      typeof task.params.params?.input_audio === 'string'
+        ? task.params.params.input_audio
+        : undefined;
+    setReferenceAudioUrl(restoredAudio || '');
+
+    setError(null);
+  };
+
+  const handleGenerate = async (count = 1) => {
+    // 防止快速双击/重复触发导致多次创建任务
+    if (generatingLockRef.current) return;
+    generatingLockRef.current = true;
+    try {
+      const activeReferenceAudioUrl = isSeedance2ModelId(currentModel)
+        ? referenceAudioUrl.trim()
+        : '';
+      if (
+        activeReferenceAudioUrl &&
+        !isSeedanceAudioReference(activeReferenceAudioUrl)
+      ) {
+        setError(
+          language === 'zh'
+            ? '参考音频仅支持 HTTP(S)、asset://、音频 Data URL 或素材 ID'
+            : 'Reference audio must be an HTTP(S), asset://, audio Data URL, or asset ID'
+        );
+        return;
+      }
+      if (count > 1 && activeReferenceAudioUrl.startsWith('data:audio/')) {
+        setError(
+          language === 'zh'
+            ? '音频 Data URL 仅支持单任务生成，批量生成请使用公网 URL 或素材 ID'
+            : 'Audio Data URLs support one task at a time; use a public URL or asset ID for batches'
+        );
+        return;
+      }
+
+      // 验证输入
+      if (storyboardEnabled) {
+        // 故事场景模式验证
+        const validation = validateSceneDurations(
+          storyboardScenes,
+          parseFloat(effectiveDuration),
+          storyboardConfig.minSceneDuration
+        );
+        if (!validation.valid) {
+          setError(validation.error || '场景配置无效');
+          return;
+        }
+      } else {
+        // 普通模式验证
+        if (!prompt || !prompt.trim()) {
+          setError(
+            language === 'zh'
+              ? '请输入视频描述'
+              : 'Please enter video description'
+          );
+          return;
+        }
+      }
+
+      if (
+        imageUploadConfig.required &&
+        !uploadedImages.some((image) => image.url || image.file)
+      ) {
+        setError(
+          language === 'zh'
+            ? '请上传模型所需的参考图片'
+            : 'Please upload the required reference image'
+        );
+        return;
+      }
+
+      try {
+        // Convert uploaded images to serializable format
+        const convertedImages: UploadedVideoImage[] = [];
+        for (const img of uploadedImages) {
+          if (img.file) {
+            // Convert File to base64 data URL
+            const base64Url = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(img.file!);
+            });
+            convertedImages.push({
+              ...img,
+              url: base64Url,
+              file: undefined, // Remove File object for serialization
+            });
+          } else {
+            convertedImages.push({
+              ...img,
+              file: undefined,
+            });
+          }
+        }
+
+        // 构建最终提示词
+        const finalPrompt = storyboardEnabled
+          ? formatStoryboardPrompt(storyboardScenes)
+          : (prompt || '').trim();
+
+        // 批量生成逻辑
+        const batchTaskIds: string[] = [];
+        // 始终生成 batchId，即使 count=1，这样可以跳过 SW 的重复检测
+        const batchId = externalBatchId || `video_batch_${Date.now()}`;
+
+        for (let i = 0; i < count; i++) {
+          const splitParams = splitVideoToolParams(
+            videoSelectedParams,
+            effectiveDuration,
+            effectiveSize
+          );
+          // 额外参数（如 provider mode/action）透传给 adapter，duration/size 单独收口
+          const extraParams =
+            Object.keys(splitParams.extraParams).length > 0
+              ? splitParams.extraParams
+              : undefined;
+
+          // 创建任务参数（包含新的 duration, size, uploadedImages）
+          const taskParams = {
+            prompt: finalPrompt,
+            knowledgeContextRefs,
+            model: currentModel,
+            modelRef: currentModelRef || null,
+            seconds: splitParams.duration,
+            size: splitParams.size,
+            // 保存上传的图片（已转换为可序列化的格式）
+            uploadedImages: convertedImages,
+            // 故事场景配置（用于编辑恢复）
+            ...(storyboardEnabled && {
+              storyboard: {
+                enabled: true,
+                scenes: storyboardScenes,
+                totalDuration: parseFloat(effectiveDuration),
+              },
+            }),
+            // 批量生成信息（始终包含 batchId 以跳过重复检测）
+            batchId,
+            batchIndex: i + 1,
+            batchTotal: count,
+            autoInsertToCanvas:
+              initialAutoInsertToCanvas ??
+              getAutoInsertValue(LS_KEYS.AI_VIDEO_AUTO_INSERT),
+            ...(extraParams ? { params: extraParams } : {}),
+            ...(activeReferenceAudioUrl
+              ? {
+                  params: {
+                    ...(extraParams || {}),
+                    input_audio: activeReferenceAudioUrl,
+                  },
+                }
+              : {}),
+          };
+
+          // 创建任务并添加到队列
+          const task = createTask(taskParams, TaskType.VIDEO);
+
+          if (task) {
+            batchTaskIds.push(task.id);
+          }
+        }
+
+        if (batchTaskIds.length > 0) {
+          // 任务创建成功
+          MessagePlugin.success(
+            language === 'zh'
+              ? count > 1
+                ? `${batchTaskIds.length} 个视频任务已添加到队列，将在后台生成`
+                : '视频任务已添加到队列，将在后台生成'
+              : count > 1
+              ? `${batchTaskIds.length} video tasks added to queue, will be generated in background`
+              : 'Video task added to queue, will be generated in background'
+          );
+
+          // 保存提示词到历史记录
+          savePromptToHistory(finalPrompt);
+
+          // 清空表单（保留模型选择和尺寸设置）
+          setPrompt('');
+          setAllSelectedImages([]); // 清空原始图片
+          setUploadedImages([]);
+          setReferenceAudioUrl('');
+          setStoryboardEnabled(false);
+          setStoryboardScenes([]);
+          setError(null);
+          setMobilePanel('tasks');
+          // Clear manual edit mode after generating
+          setIsManualEdit(false);
+        } else {
+          // 任务创建失败
+          setError(
+            language === 'zh'
+              ? '任务创建失败，请检查参数或稍后重试'
+              : 'Failed to create task, please check parameters or try again later'
+          );
+        }
+      } catch (err: any) {
+        console.error('Failed to create task:', err);
+
+        // 提取更友好的错误信息
+        let errorMessage =
+          language === 'zh'
+            ? '任务创建失败，请检查参数或稍后重试'
+            : 'Failed to create task, please check parameters or try again later';
+
+        if (err.message) {
+          if (err.message.includes('exceed 5000 characters')) {
+            errorMessage =
+              language === 'zh'
+                ? '提示词不能超过 5000 字符'
+                : 'Prompt must not exceed 5000 characters';
+          } else if (err.message.includes('Duplicate submission')) {
+            errorMessage =
+              language === 'zh'
+                ? '请勿重复提交，请等待 5 秒后再试'
+                : 'Duplicate submission. Please wait 5 seconds.';
+          } else if (err.message.includes('Invalid parameters')) {
+            errorMessage =
+              language === 'zh'
+                ? `参数错误: ${err.message.replace('Invalid parameters: ', '')}`
+                : err.message;
+          }
+        }
+
+        setError(errorMessage);
+      }
+    } finally {
+      generatingLockRef.current = false;
+    }
+  };
+
+  useKeyboardShortcuts(isGenerating, prompt, handleGenerate);
+
+  return (
+    <div className="ai-video-generation-container">
+      {isCompactLayout ? (
+        <div className="ai-generation-mobile-switcher" role="tablist">
+          <button
+            type="button"
+            className={`ai-generation-mobile-switcher__tab ${
+              mobilePanel === 'config'
+                ? 'ai-generation-mobile-switcher__tab--active'
+                : ''
+            }`}
+            onClick={() => setMobilePanel('config')}
+          >
+            生成设置
+          </button>
+          <button
+            type="button"
+            className={`ai-generation-mobile-switcher__tab ${
+              mobilePanel === 'tasks'
+                ? 'ai-generation-mobile-switcher__tab--active'
+                : ''
+            }`}
+            onClick={() => setMobilePanel('tasks')}
+          >
+            生成任务
+          </button>
+        </div>
+      ) : null}
+
+      <div
+        className={`main-content ${
+          isCompactLayout ? 'main-content--mobile-panels' : ''
+        }`}
+        ref={containerRef}
+      >
+        {/* AI 视频生成表单 */}
+        <div
+          className={`ai-image-generation-section ${
+            isCompactLayout && mobilePanel !== 'config'
+              ? 'ai-generation-mobile-panel--hidden'
+              : ''
+          }`}
+        >
+          <div className="ai-image-generation-form">
+            {/* 模型选择器 */}
+            {selectedModel !== undefined && onModelChange && (
+              <div className="form-header-row">
+                <div className="model-selector-wrapper">
+                  <ModelDropdown
+                    selectedModel={currentModel}
+                    selectedSelectionKey={getSelectionKey(
+                      currentModel,
+                      currentModelRef
+                    )}
+                    onSelect={(value, modelRef) => {
+                      const nextModel = value as VideoModel;
+                      const nextModelRef = resolveVideoModelRef(
+                        visibleVideoModels,
+                        nextModel,
+                        modelRef || null
+                      );
+                      initialModelAppliedRef.current = null; // 用户手动切换，解除保护
+                      setCurrentModel(nextModel);
+                      setCurrentModelRef(nextModelRef);
+                      setVideoSelectedParams(
+                        getDefaultVideoParamsForSelection(
+                          nextModel,
+                          nextModelRef || nextModel
+                        )
+                      );
+                      onModelChange(value);
+                      onModelRefChange?.(nextModelRef);
+                    }}
+                    onSelectModel={(model: ModelConfig) => {
+                      const nextModel = model.id as VideoModel;
+                      initialModelAppliedRef.current = null; // 用户手动切换，解除保护
+                      setCurrentModel(nextModel);
+                      const nextModelRef = resolveVideoModelRef(
+                        visibleVideoModels,
+                        nextModel,
+                        getModelRefFromConfig(model)
+                      );
+                      setCurrentModelRef(nextModelRef);
+                      setVideoSelectedParams(
+                        getDefaultVideoParamsForSelection(
+                          nextModel,
+                          nextModelRef || nextModel
+                        )
+                      );
+                      onModelChange(model.id);
+                      onModelRefChange?.(nextModelRef);
+                    }}
+                    language={language}
+                    models={visibleVideoModels}
+                    placement="down"
+                    variant="form"
+                    placeholder={
+                      language === 'zh' ? '选择视频模型' : 'Select Video Model'
+                    }
+                    disabled={isGenerating}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 模型参数 */}
+            {hasCompatibleParams && (
+              <div className="model-params-row">
+                <ParametersDropdown
+                  selectedParams={videoSelectedParams}
+                  onParamChange={handleVideoParamChange}
+                  compatibleParams={compatibleVideoParams}
+                  modelId={currentModel}
+                  language={language}
+                  disabled={isGenerating}
+                  placement="down"
+                />
+              </div>
+            )}
+
+            {/* Multi-image upload based on model config */}
+            {imageUploadConfig.maxCount > 0 && (
+              <ReferenceImageUpload
+                images={uploadedImagesToReferenceImages(uploadedImages)}
+                onImagesChange={handleImagesChange}
+                language={language}
+                disabled={isGenerating}
+                multiple={imageUploadConfig.maxCount > 1}
+                maxCount={imageUploadConfig.maxCount}
+                onError={setError}
+                slotLabels={
+                  imageUploadConfig.mode === 'frames'
+                    ? imageUploadConfig.labels
+                    : undefined
+                }
+                label={
+                  imageUploadConfig.mode === 'frames'
+                    ? language === 'zh'
+                      ? '首尾帧图片 (可选)'
+                      : 'Start/End Frames (Optional)'
+                    : imageUploadConfig.required
+                    ? language === 'zh'
+                      ? '参考图片'
+                      : 'Reference Images'
+                    : language === 'zh'
+                    ? '参考图片 (可选)'
+                    : 'Reference Images (Optional)'
+                }
+              />
+            )}
+
+            {isSeedance2ModelId(currentModel) && (
+              <div className="seedance-reference-audio">
+                <Music2 size={16} aria-hidden="true" />
+                <input
+                  type="text"
+                  inputMode="url"
+                  className="seedance-reference-audio__input"
+                  value={referenceAudioUrl}
+                  onChange={(event) => {
+                    setReferenceAudioUrl(event.target.value);
+                    setError(null);
+                  }}
+                  onBlur={() => setReferenceAudioUrl((value) => value.trim())}
+                  placeholder={
+                    language === 'zh'
+                      ? '参考音频地址或素材 ID'
+                      : 'Reference audio or asset ID'
+                  }
+                  aria-label={
+                    language === 'zh'
+                      ? '参考音频地址或素材 ID'
+                      : 'Reference audio or asset ID'
+                  }
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={isGenerating}
+                />
+                {referenceAudioUrl && (
+                  <button
+                    type="button"
+                    className="seedance-reference-audio__remove"
+                    onClick={() => setReferenceAudioUrl('')}
+                    disabled={isGenerating}
+                    title={language === 'zh' ? '清除参考音频' : 'Clear audio'}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Storyboard mode editor (only for supported models) */}
+            {modelSupportsStoryboard && (
+              <StoryboardEditor
+                enabled={storyboardEnabled}
+                onEnabledChange={setStoryboardEnabled}
+                totalDuration={parseFloat(effectiveDuration)}
+                maxScenes={storyboardConfig.maxScenes}
+                minSceneDuration={storyboardConfig.minSceneDuration}
+                scenes={storyboardScenes}
+                onScenesChange={setStoryboardScenes}
+                disabled={isGenerating}
+              />
+            )}
+
+            {/* Normal prompt input (hidden when storyboard mode is enabled) */}
+            {!storyboardEnabled && (
+              <PromptInput
+                prompt={prompt}
+                onPromptChange={setPrompt}
+                presetPrompts={presetPrompts}
+                language={language}
+                type="video"
+                disabled={isGenerating}
+                onError={setError}
+                videoProvider={modelConfig.provider}
+              />
+            )}
+
+            <KnowledgeNoteContextSelector
+              value={knowledgeContextRefs}
+              onChange={setKnowledgeContextRefs}
+              disabled={isGenerating}
+              language={language}
+            />
+
+            <ErrorDisplay error={error} />
+          </div>
+
+          <ActionButtons
+            language={language}
+            type="video"
+            isGenerating={isGenerating}
+            hasGenerated={false}
+            canGenerate={
+              storyboardEnabled
+                ? storyboardScenes.length > 0
+                : !!(prompt && prompt.trim())
+            }
+            onGenerate={handleGenerate}
+            onReset={handleReset}
+            leftContent={
+              <AutoInsertCheckbox
+                storageKey={LS_KEYS.AI_VIDEO_AUTO_INSERT}
+                language={language}
+              />
+            }
+          />
+        </div>
+
+        {!isCompactLayout ? (
+          <ResizableDivider
+            isRightPanelVisible={isTaskListVisible}
+            onToggleRightPanel={handleToggleTaskList}
+            onWidthChange={handleWidthChange}
+            rightPanelWidth={taskListWidth}
+            language={language}
+            storageKey="video"
+          />
+        ) : null}
+
+        {/* 任务列表侧栏 */}
+        {(isCompactLayout || isTaskListVisible) && (
+          <div
+            className={`task-sidebar ${
+              isCompactLayout ? 'task-sidebar--mobile-panel' : ''
+            } ${
+              isCompactLayout && mobilePanel !== 'tasks'
+                ? 'ai-generation-mobile-panel--hidden'
+                : ''
+            }`}
+            style={
+              isCompactLayout
+                ? undefined
+                : { width: taskListWidth, flexShrink: 0 }
+            }
+          >
+            <DialogTaskList
+              taskType={TaskType.VIDEO}
+              onEditTask={handleEditTask}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AIVideoGeneration;

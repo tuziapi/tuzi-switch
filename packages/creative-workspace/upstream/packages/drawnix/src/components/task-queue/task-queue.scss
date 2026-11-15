@@ -1,0 +1,1342 @@
+/**
+ * Task Queue Component Styles
+ * 
+ * BEM-style SCSS for task queue UI components
+ * Uses TDesign design tokens for consistency
+ * 基础抽屉样式由 SideDrawer 提供，此处仅定义业务特定样式
+ */
+
+@import '../../styles/z-index.scss';
+@import '../../styles/_common-variables.scss';
+
+// Task Queue Panel Content Styles
+.task-queue-panel.side-drawer--toolbar-right {
+  transform: translateX(
+    calc(var(--aitu-toolbar-right-edge, #{$toolbar-width}) - 10px)
+  );
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 160ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 120ms ease-out,
+    visibility 0s linear 160ms;
+
+  &.side-drawer--open {
+    transform: translateX(var(--aitu-toolbar-right-edge, #{$toolbar-width}));
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      transform 160ms cubic-bezier(0.2, 0, 0, 1),
+      opacity 120ms ease-out;
+  }
+
+  @media (max-width: 768px) {
+    transform: translateX(-100%);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+
+    &.side-drawer--open {
+      transform: translateX(0);
+    }
+  }
+}
+
+.aitu-toolbar-dock-right .task-queue-panel.side-drawer--toolbar-right {
+  --aitu-toolbar-drawer-left: max(
+    0px,
+    calc(var(--aitu-toolbar-left, 0px) - 100%)
+  );
+
+  transform: translateX(calc(var(--aitu-toolbar-drawer-left) + 10px));
+
+  &.side-drawer--open {
+    transform: translateX(var(--aitu-toolbar-drawer-left));
+  }
+}
+
+.aitu-toolbar-dragging .task-queue-panel.side-drawer--toolbar-right {
+  transition: none;
+}
+
+.task-queue-panel {
+  &__filters-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .t-tabs__nav-container.t-is-top::after{
+      display: none;
+    }
+  }
+
+  &__filters {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px 12px;
+    width: 100%;
+    container: task-filters / inline-size;
+
+    &--archived {
+      grid-template-columns: minmax(0, 1fr);
+
+      .task-queue-panel__search-row {
+        grid-column: 1;
+      }
+    }
+  }
+
+  &__type-filters {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+    border-radius: 10px;
+    flex-shrink: 0;
+
+    .t-button {
+      position: relative;
+      color: var(--td-text-color-secondary, #666);
+      border: none !important;
+      background: transparent !important;
+      height: 32px !important;
+      min-width: 32px !important;
+      padding: 0 !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border-radius: 8px !important;
+
+      &:hover {
+        color: var(--td-text-color-primary, #333);
+        background: rgba(0, 0, 0, 0.04) !important;
+      }
+    }
+  }
+
+  &__filter-btn--active {
+    color: #F39C12 !important;
+    background: rgba(243, 156, 18, 0.12) !important;
+    box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.18);
+
+    svg,
+    .t-icon,
+    span {
+      color: currentColor !important;
+    }
+  }
+
+  &__search-row {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__search-filters {
+    display: contents;
+  }
+
+  &__date-filter {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--td-text-color-secondary);
+
+  }
+
+  &__date-caption {
+    flex-shrink: 0;
+    font-weight: 500;
+  }
+
+  &__date-range {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    max-width: 380px;
+    min-width: 0;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0 6px;
+    border: 1px solid var(--td-component-border, #dcdcdc);
+    border-radius: 8px;
+    background: var(--td-bg-color-container, #fff);
+
+    &:hover {
+      border-color: #f39c12;
+    }
+
+    &:focus-within {
+      border-color: #f39c12;
+      box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.12);
+    }
+
+    label {
+      flex: 1;
+      min-width: 0;
+    }
+
+    input {
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      height: 30px;
+      padding: 0 4px;
+      border: 0;
+      border-radius: 4px;
+      color: var(--td-text-color-primary);
+      background: transparent;
+      font: inherit;
+      font-variant-numeric: tabular-nums;
+
+      &:focus {
+        outline: none;
+      }
+
+      &::-webkit-calendar-picker-indicator {
+        margin: 0;
+        padding: 2px;
+        opacity: 0.55;
+        cursor: pointer;
+      }
+    }
+  }
+
+  &__date-separator {
+    padding: 0 6px;
+    color: var(--td-text-color-placeholder);
+  }
+
+  &__date-clear.t-button {
+    flex-shrink: 0;
+    padding: 0 4px;
+    color: var(--td-text-color-secondary);
+    font-size: 12px;
+
+    &:hover {
+      color: #f39c12;
+    }
+  }
+
+  &__search-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  &__filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  &__search-input {
+    flex: 1;
+    min-width: 100px;
+    
+    .t-input {
+      border-radius: 8px;
+      height: 32px;
+      background: var(--td-bg-color-container, #fff) !important;
+      border: 1px solid var(--td-component-border, #dcdcdc) !important;
+      transition: all 0.25s ease;
+      
+      &:hover {
+        border-color: #F39C12 !important;
+      }
+
+      &--focused {
+        border-color: #F39C12 !important;
+        box-shadow: 0 0 0 3px rgba(243, 156, 18, 0.15) !important;
+      }
+    }
+  }
+
+  &__clear-btn {
+    flex-shrink: 0;
+  }
+
+  &__clear-text {
+    display: inline;
+
+    // 宽度较小时隐藏文字，只显示图标
+    @media (max-width: 480px) {
+      display: none;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  &__batch-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__batch-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 12px; // 与任务列表的 checkbox 左边对齐
+
+    // 覆盖 TDesign Checkbox 默认样式为橙色主题
+    :global(.t-checkbox) {
+      &.t-is-checked .t-checkbox__input {
+        background-color: #F39C12;
+        border-color: #F39C12;
+      }
+
+      &.t-is-indeterminate .t-checkbox__input {
+        background-color: #F39C12;
+        border-color: #F39C12;
+      }
+
+      &:hover .t-checkbox__input {
+        border-color: #F39C12;
+      }
+    }
+  }
+
+  &__batch-count {
+    font-size: 13px;
+    color: var(--td-text-color-secondary, #757575);
+  }
+
+  &__batch-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__content {
+    padding: 12px 0 12px 24px;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--td-text-color-placeholder, #bbbbbb);
+
+    &-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    &-text {
+      font-size: 14px;
+    }
+  }
+}
+
+.virtual-task-list {
+  &__back-to-top {
+    // 使用绝对定位，相对于 .virtual-task-list-container 定位
+    // 使用 !important 确保覆盖 TDesign Button 的默认样式
+    position: absolute !important;
+    bottom: 16px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 10; // 在任务列表内容之上
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--td-component-border, #e7e7e7);
+    background: var(--td-bg-color-container, #fff) !important;
+    color: var(--td-text-color-secondary, #757575) !important;
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    // 确保按钮不影响 flex 布局
+    flex-shrink: 0;
+
+    &:hover {
+      background: var(--td-bg-color-secondarycontainer, #f3f3f3) !important;
+      color: var(--td-text-color-primary, #333) !important;
+    }
+
+    .t-icon {
+      font-size: 16px;
+    }
+  }
+}
+
+// Task Item Component
+.task-item {
+  display: grid;
+  gap: 4px 12px;
+  background: transparent;
+  border-bottom: 1px solid var(--td-component-border, #e7e7e7);
+  padding: 16px 24px 16px 0;
+  transition: background-color 0.2s ease;
+  position: relative;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--td-bg-color-secondarycontainer, #f3f3f3);
+  }
+
+  &--selected {
+    border-color: #F39C12;
+    background: rgba(243, 156, 18, 0.04);
+  }
+
+
+
+  &--processing {
+    .task-item__status-tag {
+      background-color: rgba(90, 79, 207, 0.08) !important;
+      color: #5A4FCF !important;
+      border: 1px solid rgba(90, 79, 207, 0.15) !important;
+    }
+  }
+
+  // ==========================================
+  // 宽布局模式：提示词和信息都在图片右侧
+  // ==========================================
+  &--wide {
+    // 默认：没有 checkbox 的情况（非选择模式）
+    grid-template-columns: 120px 1fr;
+    grid-template-areas: 
+      "preview body";
+
+    .task-item__preview-wrapper {
+      grid-area: preview;
+    }
+
+    .task-item__body {
+      grid-area: body;
+    }
+
+    // 选择模式：有 checkbox 的情况
+    &.task-item--selection-mode {
+      grid-template-columns: auto 120px 1fr;
+      grid-template-areas: 
+        "checkbox preview body";
+
+      .task-item__checkbox {
+        grid-area: checkbox;
+      }
+    }
+  }
+
+  // ==========================================
+  // 紧凑布局模式：信息区域移到图片下方全宽展示
+  // ==========================================
+  &--compact {
+    // 默认：没有 checkbox 的情况（非选择模式）
+    grid-template-columns: 100px 1fr;
+    grid-template-areas: 
+      "preview prompt"
+      "info    info";
+
+    .task-item__preview-wrapper {
+      grid-area: preview;
+      width: 100px;
+      height: 75px;
+    }
+
+    .task-item__body {
+      display: contents; // 让子元素直接参与 Grid 布局
+    }
+
+    .task-item__prompt-area {
+      grid-area: prompt;
+    }
+
+    .task-item__info-area {
+      grid-area: info;
+      margin-top: 4px;
+    }
+
+    .task-item__content-row {
+      align-items: center;
+    }
+
+    // 选择模式：有 checkbox 的情况
+    &.task-item--selection-mode {
+      grid-template-columns: auto 100px 1fr;
+      grid-template-areas: 
+        "checkbox preview prompt"
+        "info     info    info";
+
+      .task-item__checkbox {
+        grid-area: checkbox;
+      }
+    }
+  }
+
+  &__checkbox {
+    display: flex;
+    align-items: flex-start;
+    padding-top: 4px;
+    padding-left: 16px; // 避开失败任务的红色竖线，同时与全选 checkbox 对齐
+
+    // 覆盖 TDesign Checkbox 默认样式为橙色主题
+    :global(.t-checkbox) {
+      &.t-is-checked .t-checkbox__input {
+        background-color: #F39C12;
+        border-color: #F39C12;
+      }
+
+      &.t-is-indeterminate .t-checkbox__input {
+        background-color: #F39C12;
+        border-color: #F39C12;
+      }
+
+      &:hover .t-checkbox__input {
+        border-color: #F39C12;
+      }
+    }
+  }
+
+  &__preview-wrapper {
+    width: 120px;
+    height: 90px;
+    flex-shrink: 0;
+    align-self: start;
+  }
+
+  &__preview {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+
+    img,
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      transition: transform 0.2s ease;
+    }
+
+    // 图片保持完整缩略图；视频保留 hover 放大效果
+    &:hover {
+      video {
+        transform: scale(1.05);
+      }
+    }
+
+    &-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: var(--td-text-color-placeholder, #999);
+      font-size: 11px;
+    }
+
+    &-failed {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      border-radius: 8px;
+      background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+      border: 1px solid var(--td-component-border, #e7e7e7);
+      color: var(--td-text-color-placeholder, #bbb);
+      font-size: 10px;
+
+      .t-icon {
+        opacity: 0.5;
+        font-size: 18px;
+      }
+    }
+  }
+
+  &__video-play-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.15);
+    color: white;
+    opacity: 0.85;
+    transition: all 0.2s ease;
+
+    .t-icon {
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+    }
+  }
+
+  &__preview:hover &__video-play-overlay {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__prompt-area {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__prompt {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--td-text-color-primary, #1d1d1f);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+
+  &__subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--td-text-color-placeholder, #999);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+
+  &__info-area {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__content-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px 12px;
+    margin-top: 4px;
+    width: 100%;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  &__primary-action {
+    font-weight: 500 !important;
+    height: 26px !important;
+    padding: 0 10px !important;
+    border-radius: 13px !important;
+    font-size: 12px !important;
+    background: #f39c12 !important;
+    border: none !important;
+    color: white !important;
+
+    &:hover {
+      background: #e67e22 !important;
+    }
+
+    .t-icon {
+      font-size: 14px;
+    }
+  }
+
+  &__secondary-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .t-button {
+      color: var(--td-text-color-placeholder, #999) !important;
+      padding: 4px !important;
+      height: 24px !important;
+      width: 24px !important;
+      min-width: 0 !important;
+
+      &:hover {
+        color: var(--td-text-color-primary, #333) !important;
+        background: var(--td-bg-color-secondarycontainer, #f3f3f3) !important;
+      }
+    }
+  }
+
+  &__delete-btn {
+    &:hover {
+      color: var(--td-error-color, #e34d59) !important;
+    }
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+
+    .t-tag {
+      font-size: 10px !important;
+      height: 18px !important;
+      border-radius: 4px !important;
+      padding: 0 4px !important;
+      color: var(--td-text-color-secondary, #666);
+      background: var(--td-bg-color-secondarycontainer, #f3f3f3);
+      border: none;
+    }
+
+    .task-item__status-tag {
+      font-weight: 500;
+    }
+  }
+
+  &__details {
+    font-size: 11px;
+    color: var(--td-text-color-placeholder, #999);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.4;
+  }
+
+  &__link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--td-brand-color, #0052d9);
+    cursor: pointer;
+    font: inherit;
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+
+  &__error {
+    background: #FFF1F0;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-top: 4px;
+    
+    &-message {
+      color: #E34D59;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    &-details-link {
+      color: #0052d9;
+      cursor: pointer;
+      text-decoration: underline;
+      margin-left: 4px;
+    }
+  }
+
+  &__multi-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.65);
+    color: white;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  &__cache-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    background: rgba(0, 168, 112, 0.85);
+    color: white;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    z-index: 1;
+
+    svg { width: 10px; height: 10px; }
+  }
+
+
+  &__cache-warning-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    z-index: 2;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(245, 158, 11, 0.92);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 14px;
+    cursor: help;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.28);
+  }
+
+  // Sync badge styles
+  &__sync-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    z-index: 1;
+    backdrop-filter: blur(4px);
+    transition: all 0.2s ease;
+
+    svg { width: 12px; height: 12px; }
+
+    &--synced {
+      background: rgba(0, 168, 112, 0.9);
+      color: white;
+    }
+
+    &--syncing {
+      background: rgba(0, 82, 217, 0.9);
+      color: white;
+    }
+
+    &--warning {
+      background: rgba(237, 125, 49, 0.9);
+      color: white;
+    }
+
+    &--clickable {
+      background: rgba(0, 82, 217, 0.85);
+      color: white;
+      cursor: pointer;
+
+      &:hover {
+        background: rgba(0, 82, 217, 1);
+        transform: scale(1.05);
+      }
+    }
+  }
+}
+
+// Responsive Design for Panel
+@media (max-width: 1200px) {
+  .task-queue-panel {
+    &__filters-container {
+      gap: 8px;
+    }
+
+    &__filters {
+      align-items: center;
+      gap: 8px;
+    }
+
+    &__search-row {
+      width: 100%;
+    }
+
+    &__search-input {
+      max-width: none;
+    }
+
+    &__content {
+      padding: 12px 0 24px 16px;
+    }
+  }
+}
+
+// Mobile specific styles
+@media (max-width: 768px) {
+  // 任务队列抽屉的标题
+  .side-drawer__title {
+    font-size: 16px !important;
+  }
+
+  .side-drawer__header {
+    padding: 12px !important;
+  }
+
+  .side-drawer__filter {
+    padding: 0 12px 12px !important;
+  }
+
+  .task-queue-panel {
+    &__filters-container {
+      gap: 6px;
+
+      // TDesign Tabs 移动端样式 - 更紧凑
+      .t-tabs {
+        .t-tabs__nav-container {
+          padding: 0 !important;
+        }
+        
+        .t-tabs__nav-wrap {
+          padding: 0 !important;
+        }
+        
+        .t-tabs__nav {
+          gap: 0 !important; // 移除 tab 间距
+        }
+        
+        .t-tabs__nav-item {
+          font-size: 11px !important;
+          padding: 4px 2px !important; // 最小 padding
+          min-width: auto !important;
+          white-space: nowrap;
+          margin: 0 !important;
+        }
+        
+        // 缩小滚动箭头
+        .t-tabs__nav-scroll-btn {
+          width: 14px !important;
+          min-width: 14px !important;
+          padding: 0 !important;
+        }
+        
+        // 底部指示条
+        .t-tabs__bar {
+          height: 2px !important;
+        }
+      }
+    }
+
+    &__filters {
+      gap: 6px;
+    }
+
+    &__type-filters {
+      padding: 0;
+      border-radius: 8px;
+
+      .t-button {
+        height: 32px !important;
+        min-width: 32px !important;
+      }
+    }
+
+    &__search-input {
+      flex: 1;
+      min-width: 80px !important;
+      
+      .t-input {
+        min-height: 32px !important;
+        height: 32px !important;
+        font-size: 13px !important;
+        border-width: 1px !important;
+      }
+
+      .t-input__inner {
+        font-size: 13px !important;
+      }
+    }
+
+    &__filter-actions {
+      .t-button {
+        min-height: 32px !important;
+        height: 32px !important;
+        padding: 0 10px !important;
+        font-size: 12px !important;
+      }
+    }
+
+    &__content {
+      padding: 8px 0 16px 12px;
+    }
+
+    &__list {
+      gap: 8px;
+    }
+
+    &__empty {
+      padding: 32px 16px;
+
+      &-icon {
+        font-size: 36px;
+        margin-bottom: 12px;
+      }
+
+      &-text {
+        font-size: 13px;
+      }
+    }
+  }
+
+  // Task Item mobile styles
+  .task-item {
+    padding: 12px 16px 12px 0;
+    gap: 3px 8px;
+
+    // 覆盖全局按钮移动端样式，保持紧凑
+    &__primary-action {
+      min-height: 26px !important;
+      height: 26px !important;
+      min-width: auto !important;
+      padding: 0 10px !important;
+    }
+
+    &--wide {
+      grid-template-columns: 80px 1fr;
+
+      &.task-item--selection-mode {
+        grid-template-columns: auto 80px 1fr;
+      }
+    }
+
+    &--compact {
+      grid-template-columns: 70px 1fr;
+      grid-template-areas: 
+        "preview prompt"
+        "info    info";
+
+      &.task-item--selection-mode {
+        grid-template-columns: auto 70px 1fr;
+        grid-template-areas: 
+          "checkbox preview prompt"
+          "info     info    info";
+      }
+      
+      .task-item__preview-wrapper {
+        grid-area: preview;
+        width: 70px;
+        height: 52px;
+      }
+      
+      .task-item__prompt-area {
+        grid-area: prompt;
+      }
+      
+      .task-item__info-area {
+        grid-area: info;
+        margin-top: 4px;
+      }
+    }
+
+    &__preview-wrapper {
+      width: 80px;
+      height: 60px;
+    }
+
+    &__prompt {
+      font-size: 13px;
+      -webkit-line-clamp: 2;
+    }
+
+    &__checkbox {
+      padding-left: 12px;
+    }
+  }
+}
+
+// Animations
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+// Notification Badge
+.task-notification {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  background: var(--td-error-color, #e34d59);
+  color: white;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+// Task Preview Dialog
+.task-preview-dialog {
+    z-index: $z-dialog!important; // 确保在panel之上
+  .task-preview-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 24px;
+    min-height: 60vh;
+  }
+
+  .task-preview-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: calc(100% - 120px);
+    position: relative;
+  }
+
+  .task-preview-cache-badge {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: rgba(0, 168, 112, 0.9);
+    color: white;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .task-preview-nav {
+    flex-shrink: 0;
+    z-index: 1; // 相对层级,在panel内部
+
+    &--left {
+      margin-right: auto;
+    }
+
+    &--right {
+      margin-left: auto;
+    }
+
+    &:hover {
+      transform: scale(1.1);
+      transition: transform 0.2s ease;
+    }
+  }
+}
+
+// Task Toolbar Button - Embedded version for UnifiedToolbar
+.task-toolbar-button {
+  width: 56px;
+  height: 56px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  position: relative;
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    background: #f5f5f5;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &--expanded {
+    background: #f0f0f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  &--icon-only {
+    width: 48px;
+    height: 48px;
+  }
+
+  &__content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__text {
+    color: #757575;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    transition: color 0.3s ease;
+  }
+
+}
+
+// Badge positioning and styling adjustment for embedded button
+.task-toolbar-button .t-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent !important;
+}
+
+// Override badge background color to transparent for embedded button
+.task-toolbar-button {
+  .t-badge__count {
+    color: #E91E63 !important;
+    border: 1px solid #E91E63 !important;
+  }
+}
+
+// Virtual Task List - Load More Styles
+.virtual-task-list {
+  &__loading-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    color: var(--td-text-color-secondary, #757575);
+    font-size: 13px;
+  }
+
+  &__loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--td-component-border, #e7e7e7);
+    border-top-color: #F39C12;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  &__pagination-info {
+    text-align: center;
+    padding: 12px;
+    color: var(--td-text-color-placeholder, #bbb);
+    font-size: 12px;
+  }
+
+  &__no-more {
+    text-align: center;
+    padding: 12px;
+    color: var(--td-text-color-placeholder, #bbb);
+    font-size: 12px;
+  }
+}
+
+// Respond to the drawer's resized width, independently of the browser viewport.
+@container task-filters (max-width: 480px) {
+  .task-queue-panel__type-filters {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .task-queue-panel__search-row {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .task-queue-panel__date-filter {
+    grid-row: 3;
+  }
+
+  .task-queue-panel__filters--archived {
+    .task-queue-panel__search-row {
+      grid-row: 1;
+    }
+
+    .task-queue-panel__date-filter {
+      grid-row: 2;
+    }
+  }
+}
+
+@container task-filters (max-width: 360px) {
+  .task-queue-panel__date-caption {
+    display: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,560 @@
+/**
+ * Media Library Modal
+ * 素材库弹窗容器组件 - 使用 WinBox 窗口
+ */
+
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { MessagePlugin, Drawer } from 'tdesign-react';
+import { MediaLibraryIcon } from '../icons';
+import { useAssets } from '../../contexts/AssetContext';
+import { MediaLibraryGrid } from './MediaLibraryGrid';
+import { MediaLibraryInspector } from './MediaLibraryInspector';
+import { WinBoxWindow } from '../winbox/WinBoxWindow';
+import type { MediaLibraryModalProps, Asset } from '../../types/asset.types';
+import { AssetType, AssetSource, SelectionMode } from '../../types/asset.types';
+import { useDrawnix } from '../../hooks/use-drawnix';
+import {
+  removeElementsByAssetIds,
+  removeElementsByAssetUrls,
+  isCacheUrl,
+} from '../../utils/asset-cleanup';
+import { isZipFile, extractMediaFromZip } from '../../utils/zip-utils';
+import {
+  buildAssetDownloadItem,
+  smartDownload,
+} from '../../utils/download-utils';
+import { assetStorageService } from '../../services/asset-storage-service';
+import {
+  getNativeFilePath,
+  isTauriEnvironment,
+} from '../../utils/desktop-asset-url';
+import { getSupportedImageFileMimeType } from '../../data/blob';
+import './MediaLibraryModal.scss';
+
+function getAssetTypeFromDesktopFile(
+  fileType: string,
+  mimeType: string
+): AssetType | null {
+  const normalizedFileType = fileType.toLowerCase();
+  if (normalizedFileType === 'image' || mimeType.startsWith('image/')) {
+    return AssetType.IMAGE;
+  }
+  if (normalizedFileType === 'video' || mimeType.startsWith('video/')) {
+    return AssetType.VIDEO;
+  }
+  if (normalizedFileType === 'audio' || mimeType.startsWith('audio/')) {
+    return AssetType.AUDIO;
+  }
+  return null;
+}
+
+export function MediaLibraryModal({
+  isOpen,
+  onClose,
+  mode = SelectionMode.BROWSE,
+  filterType,
+  allowedTypes,
+  filterCategory,
+  onSelect,
+  onSelectMultiple,
+  selectButtonText,
+}: MediaLibraryModalProps) {
+  const {
+    assets,
+    loadAssets,
+    addAsset,
+    setFilters,
+    selectedAssetId,
+    setSelectedAssetId,
+    storageStatus,
+    checkStorageQuota,
+    renameAsset,
+    markAssetAsSubject,
+    removeAsset,
+  } = useAssets();
+
+  const { board } = useDrawnix();
+
+  const [localSelectedAssetId, setLocalSelectedAssetId] = useState<
+    string | null
+  >(null);
+  const [showMobileInspector, setShowMobileInspector] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionModeActive, setSelectionModeActive] = useState(false);
+  const [selectedAssetsForAction, setSelectedAssetsForAction] = useState<
+    Asset[]
+  >([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMountedRef = useRef(true);
+  const isSelectingRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // 加载素材和检查配额
+  useEffect(() => {
+    if (isOpen) {
+      loadAssets();
+      checkStorageQuota();
+    }
+  }, [isOpen, loadAssets, checkStorageQuota]);
+
+  // 应用入口限定筛选（如果提供）
+  useEffect(() => {
+    if (isOpen && (filterType || allowedTypes?.length || filterCategory)) {
+      const activeType =
+        filterType || (allowedTypes?.length === 1 ? allowedTypes[0] : 'ALL');
+      setFilters({
+        activeType,
+        activeCategory: filterCategory || undefined,
+      });
+    }
+  }, [isOpen, filterType, allowedTypes, filterCategory, setFilters]);
+
+  // 同步选中状态
+  useEffect(() => {
+    if (isOpen) {
+      setLocalSelectedAssetId(selectedAssetId);
+    }
+  }, [isOpen, selectedAssetId]);
+
+  // 检测移动端
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // 处理资产选择 - 移动端单击只选中，不弹出详情
+  const handleSelectAsset = useCallback(
+    (id: string) => {
+      setLocalSelectedAssetId(id);
+      setSelectedAssetId(id);
+      // 移动端不再自动弹出详情抽屉，用户可以通过双击预览或点击详情按钮
+    },
+    [setSelectedAssetId]
+  );
+
+  // 关闭移动端检查器
+  const handleCloseMobileInspector = useCallback(() => {
+    setShowMobileInspector(false);
+  }, []);
+
+  // 处理双击插入
+  const handleDoubleClick = useCallback(
+    async (asset: Asset) => {
+      if (!onSelect || isSelectingRef.current) {
+        return;
+      }
+
+      try {
+        isSelectingRef.current = true;
+        setIsSelecting(true);
+        await onSelect(asset);
+        onClose();
+      } finally {
+        isSelectingRef.current = false;
+        if (isMountedRef.current) {
+          setIsSelecting(false);
+        }
+      }
+    },
+    [onClose, onSelect]
+  );
+
+  // 处理"使用"按钮点击
+  const handleUseAsset = useCallback(
+    async (asset: Asset) => {
+      if (!onSelect || isSelectingRef.current) {
+        return;
+      }
+
+      try {
+        isSelectingRef.current = true;
+        setIsSelecting(true);
+        await onSelect(asset);
+        onClose();
+      } finally {
+        isSelectingRef.current = false;
+        if (isMountedRef.current) {
+          setIsSelecting(false);
+        }
+      }
+    },
+    [onClose, onSelect]
+  );
+
+  // 处理批量使用
+  const handleBatchUse = useCallback(
+    async (assets: Asset[]) => {
+      if (!onSelectMultiple || isSelectingRef.current) {
+        return;
+      }
+      if (assets.length === 0) {
+        return;
+      }
+
+      try {
+        isSelectingRef.current = true;
+        setIsSelecting(true);
+        await onSelectMultiple(assets);
+        onClose();
+      } finally {
+        isSelectingRef.current = false;
+        if (isMountedRef.current) {
+          setIsSelecting(false);
+        }
+      }
+    },
+    [onClose, onSelectMultiple]
+  );
+
+  const handleSelectionChange = useCallback(
+    (assets: Asset[], isSelectionMode: boolean) => {
+      setSelectionModeActive(isSelectionMode);
+      setSelectedAssetsForAction(assets);
+    },
+    []
+  );
+
+  const handleDownloadAsset = useCallback(async (asset: Asset) => {
+    await smartDownload([buildAssetDownloadItem(asset)]);
+  }, []);
+
+  // 处理文件上传
+  const handleFileUpload = useCallback(
+    async (files: FileList) => {
+      if (!files || files.length === 0) {
+        return;
+      }
+
+      // 分离 ZIP 文件和普通媒体文件
+      const zipFiles: File[] = [];
+      const mediaFiles: File[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (isZipFile(file)) {
+          zipFiles.push(file);
+        } else {
+          mediaFiles.push(file);
+        }
+      }
+
+      // 处理普通媒体文件
+      const validFiles: File[] = [];
+      for (const file of mediaFiles) {
+        const isImage = !!getSupportedImageFileMimeType(file);
+        const isVideo = file.type.startsWith('video/');
+        const isAudio = file.type.startsWith('audio/');
+
+        if (!isImage && !isVideo && !isAudio) {
+          console.warn(`[MediaLibrary] Invalid file type: ${file.type}`);
+          MessagePlugin.warning(
+            `文件 "${file.name}" 不是有效的图片、视频或音频格式`
+          );
+          continue;
+        }
+
+        const maxSize = 100 * 1024 * 1024;
+        const canUseNativePath =
+          isTauriEnvironment() && !!getNativeFilePath(file);
+        if (file.size > maxSize) {
+          if (canUseNativePath) {
+            validFiles.push(file);
+            continue;
+          }
+          console.warn(`[MediaLibrary] File too large: ${file.size} bytes`);
+          MessagePlugin.warning(`文件 "${file.name}" 超过 100MB 限制`);
+          continue;
+        }
+
+        validFiles.push(file);
+      }
+
+      // 处理 ZIP 文件
+      let zipExtractedCount = 0;
+      for (const zipFile of zipFiles) {
+        try {
+          MessagePlugin.info(`正在解压 "${zipFile.name}"...`);
+          const result = await extractMediaFromZip(zipFile);
+
+          // 显示解压错误
+          if (result.errors.length > 0) {
+            result.errors.forEach((err) => MessagePlugin.warning(err));
+          }
+
+          // 上传解压出的文件
+          for (const extracted of result.files) {
+            const type =
+              extracted.type === 'image' ? AssetType.IMAGE : AssetType.VIDEO;
+            await addAsset(
+              extracted.blob,
+              type,
+              AssetSource.LOCAL,
+              extracted.name
+            );
+            zipExtractedCount++;
+          }
+
+          if (result.skippedCount > 0) {
+            MessagePlugin.info(
+              `"${zipFile.name}" 中跳过了 ${result.skippedCount} 个不支持的文件`
+            );
+          }
+        } catch (error) {
+          console.error('[MediaLibrary] ZIP extraction error:', error);
+          MessagePlugin.error(`解压 "${zipFile.name}" 失败`);
+        }
+      }
+
+      // 上传普通媒体文件
+      try {
+        for (const file of validFiles) {
+          const isImage = !!getSupportedImageFileMimeType(file);
+          const isAudio = file.type.startsWith('audio/');
+          const type = isImage
+            ? AssetType.IMAGE
+            : isAudio
+            ? AssetType.AUDIO
+            : AssetType.VIDEO;
+          await addAsset(file, type, AssetSource.LOCAL);
+        }
+
+        const totalCount = validFiles.length + zipExtractedCount;
+        if (totalCount > 0) {
+          MessagePlugin.success(`成功上传 ${totalCount} 个文件`);
+        }
+
+        await loadAssets();
+      } catch (error) {
+        console.error('[MediaLibrary] File upload error:', error);
+      }
+    },
+    [addAsset, loadAssets]
+  );
+
+  const handleDesktopNativeUpload = useCallback(async () => {
+    try {
+      const files = await assetStorageService.pickDesktopMediaFiles();
+      if (files.length === 0) {
+        return;
+      }
+
+      let importedCount = 0;
+      let skippedCount = 0;
+      let failedCount = 0;
+      for (const file of files) {
+        try {
+          const type = getAssetTypeFromDesktopFile(
+            file.fileType,
+            file.mimeType
+          );
+          if (!type) {
+            skippedCount++;
+            continue;
+          }
+
+          await assetStorageService.addDesktopLocalAssetFromPath({
+            path: file.path,
+            type,
+            name: file.name,
+            mimeType: file.mimeType,
+          });
+          importedCount++;
+        } catch (error) {
+          failedCount++;
+          console.error('[MediaLibrary] Desktop native asset import failed:', {
+            name: file.name,
+            type: file.fileType,
+            error,
+          });
+        }
+      }
+
+      if (importedCount > 0) {
+        MessagePlugin.success(`成功上传 ${importedCount} 个文件`);
+        await loadAssets();
+      }
+      if (skippedCount > 0) {
+        MessagePlugin.warning(`已跳过 ${skippedCount} 个不支持的文件`);
+      }
+      if (failedCount > 0) {
+        MessagePlugin.error(`有 ${failedCount} 个文件上传失败，其余文件已处理`);
+      }
+    } catch (error) {
+      console.error('[MediaLibrary] Desktop native upload error:', error);
+      MessagePlugin.error('本地素材上传失败');
+    }
+  }, [loadAssets]);
+
+  // 打开文件选择器
+  const handleUploadClick = useCallback(() => {
+    if (isTauriEnvironment()) {
+      void handleDesktopNativeUpload();
+      return;
+    }
+    fileInputRef.current?.click();
+  }, [handleDesktopNativeUpload]);
+
+  // 文件输入变化
+  const handleFileInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      if (files) {
+        handleFileUpload(files);
+      }
+      // 清空input值，允许重复上传同一文件
+      event.target.value = '';
+    },
+    [handleFileUpload]
+  );
+
+  // 获取当前选中的资产
+  const selectedAsset =
+    assets.find((a) => a.id === localSelectedAssetId) || null;
+
+  // 显示选择按钮的条件：SELECT模式且有onSelect回调
+  const showSelectButton = mode === 'SELECT' && !!onSelect;
+
+  // 处理删除素材（同时删除画布上使用该素材的元素）
+  const handleRemoveAsset = useCallback(
+    async (assetId: string) => {
+      // 查找素材信息
+      const asset = assets.find((a) => a.id === assetId);
+
+      // 删除画布上使用该素材的元素
+      if (board && asset) {
+        // 缓存类型素材使用 URL 匹配，其他类型使用 ID 匹配
+        const isCacheAsset = isCacheUrl(asset.url);
+
+        if (isCacheAsset) {
+          removeElementsByAssetUrls(board, asset.dedupeUrls || [asset.url]);
+        } else {
+          removeElementsByAssetIds(board, asset.dedupeAssetIds || [assetId]);
+        }
+      }
+
+      // 然后删除素材本身
+      await removeAsset(assetId);
+    },
+    [board, removeAsset, assets]
+  );
+
+  return (
+    <>
+      <WinBoxWindow
+        visible={isOpen}
+        title="素材库"
+        onClose={onClose}
+        width="85%"
+        height="85%"
+        minWidth={800}
+        minHeight={500}
+        x="center"
+        y="center"
+        maximizable={true}
+        minimizable={false}
+        resizable={true}
+        movable={true}
+        modal={false}
+        className="winbox-media-library media-library-modal"
+        data-testid="media-library-modal"
+        icon={<MediaLibraryIcon size={18} />}
+      >
+        {/* 隐藏的文件输入 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,audio/*,.zip,application/zip,application/x-zip-compressed"
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleFileInputChange}
+        />
+
+        <div className="media-library-layout">
+          {/* 主网格区域 */}
+          <div className="media-library-layout__main">
+            <MediaLibraryGrid
+              filterType={filterType}
+              allowedTypes={allowedTypes}
+              filterCategory={filterCategory}
+              selectedAssetId={localSelectedAssetId}
+              onSelectAsset={handleSelectAsset}
+              onDoubleClick={handleDoubleClick}
+              onFileUpload={handleFileUpload}
+              onUploadClick={handleUploadClick}
+              storageStatus={storageStatus}
+              onSelectionChange={handleSelectionChange}
+              selectActionLabel={selectButtonText}
+            />
+          </div>
+
+          {/* 右侧详情面板 - 仅桌面端显示 */}
+          {!isMobile && (
+            <div className="media-library-layout__inspector">
+              <MediaLibraryInspector
+                asset={selectedAsset}
+                selectedAssets={selectedAssetsForAction}
+                isSelectionMode={selectionModeActive}
+                onRename={renameAsset}
+                onDelete={handleRemoveAsset}
+                onDownload={handleDownloadAsset}
+                onMarkAsSubject={markAssetAsSubject}
+                onSelect={showSelectButton ? handleUseAsset : undefined}
+                onSelectMultiple={
+                  showSelectButton && onSelectMultiple
+                    ? handleBatchUse
+                    : undefined
+                }
+                showSelectButton={showSelectButton}
+                selecting={isSelecting}
+                selectButtonText={selectButtonText}
+              />
+            </div>
+          )}
+        </div>
+      </WinBoxWindow>
+
+      {/* 移动端详情抽屉 */}
+      {isMobile && (
+        <Drawer
+          visible={showMobileInspector}
+          onClose={handleCloseMobileInspector}
+          header="素材详情"
+          placement="bottom"
+          size="70vh"
+          destroyOnClose
+          className="media-library-mobile-drawer"
+        >
+          <MediaLibraryInspector
+            asset={selectedAsset}
+            selectedAssets={selectedAssetsForAction}
+            isSelectionMode={selectionModeActive}
+            onRename={renameAsset}
+            onDelete={handleRemoveAsset}
+            onDownload={handleDownloadAsset}
+            onMarkAsSubject={markAssetAsSubject}
+            onSelect={showSelectButton ? handleUseAsset : undefined}
+            onSelectMultiple={
+              showSelectButton && onSelectMultiple ? handleBatchUse : undefined
+            }
+            showSelectButton={showSelectButton}
+            selecting={isSelecting}
+            selectButtonText={selectButtonText}
+          />
+        </Drawer>
+      )}
+    </>
+  );
+}

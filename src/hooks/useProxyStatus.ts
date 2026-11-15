@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 /**
  * 代理服务状态管理 Hook
  */
@@ -47,7 +48,10 @@ export function useProxyStatus() {
 
   // 启动服务器（总开关：仅启动服务，不接管）
   const startProxyServerMutation = useMutation({
-    mutationFn: () => invoke<ProxyServerInfo>("start_proxy_server"),
+    mutationFn: () =>
+      trackOperation("proxy", "start", {}, () =>
+        invoke<ProxyServerInfo>("start_proxy_server"),
+      ),
     onSuccess: (info) => {
       toast.success(
         t("proxy.server.started", {
@@ -74,7 +78,8 @@ export function useProxyStatus() {
 
   // 停止服务器（仅停止服务，不改写/恢复其它应用接管状态）
   const stopProxyServerMutation = useMutation({
-    mutationFn: () => invoke("stop_proxy_server"),
+    mutationFn: () =>
+      trackOperation("proxy", "stop", {}, () => invoke("stop_proxy_server")),
     onSuccess: () => {
       toast.success(
         t("proxy.server.stopped", {
@@ -99,7 +104,10 @@ export function useProxyStatus() {
 
   // 停止服务器（总开关关闭：强制恢复所有已接管的 Live 配置）
   const stopWithRestoreMutation = useMutation({
-    mutationFn: () => invoke("stop_proxy_with_restore"),
+    mutationFn: () =>
+      trackOperation("proxy", "stop", {}, () =>
+        invoke("stop_proxy_with_restore"),
+      ),
     onSuccess: () => {
       toast.success(
         t("proxy.stoppedWithRestore", {

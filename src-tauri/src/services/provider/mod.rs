@@ -712,7 +712,8 @@ requires_openai_auth = false
         );
 
         drop(guard);
-        rx.recv_timeout(Duration::from_secs(2))
+        // Windows setx/registry notification may take several seconds on CI.
+        rx.recv_timeout(Duration::from_secs(30))
             .expect("switch should finish after lock release")
             .expect("switch provider");
         handle.join().expect("join switch thread");

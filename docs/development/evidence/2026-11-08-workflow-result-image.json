@@ -1,0 +1,138 @@
+{
+  "task": "UC-CREATIVE-IMG-01",
+  "date": "2026-11-08",
+  "baseCommit": "b757101890be24aa6a3e07c6475313fe53e18dff",
+  "branch": "codex/opentu-text-chat",
+  "baseline": {
+    "source": "actual compiled canvas/queue/chat/cache, synthetic HTTP only",
+    "url": "/__aitu_cache__/image/content-fb84836423e5efbf7496457d30cdc88e887c269298d1aeaa0566454527e36e0d.png",
+    "complete": true,
+    "naturalWidth": 0,
+    "canvasImageVisible": true
+  },
+  "unitTests": {
+    "files": 2,
+    "passed": 30
+  },
+  "browsers": [
+    {
+      "engine": "chromium",
+      "status": "passed",
+      "checks": [
+        {
+          "name": "generated cache image paints in assistant",
+          "pixels": {
+            "red": 79265,
+            "cyan": 79269,
+            "area": 165546
+          }
+        },
+        {
+          "name": "single click opens loaded full preview",
+          "status": "passed"
+        },
+        {
+          "name": "reload preserves image without generation",
+          "pixels": {
+            "red": 79265,
+            "cyan": 79269,
+            "area": 165546
+          }
+        },
+        {
+          "name": "close and reopen preserves result",
+          "status": "passed"
+        },
+        {
+          "name": "missing cache shows explicit display failure, no new generation",
+          "status": "passed"
+        },
+        {
+          "name": "keyboard reload recovers same cached result",
+          "pixels": {
+            "red": 79265,
+            "cyan": 79269,
+            "area": 165546
+          }
+        }
+      ],
+      "errors": [],
+      "realProvider": false,
+      "nativeUI": false
+    },
+    {
+      "engine": "webkit",
+      "status": "passed",
+      "checks": [
+        {
+          "name": "generated cache image paints in assistant",
+          "pixels": {
+            "red": 80098,
+            "cyan": 80102,
+            "area": 165546
+          }
+        },
+        {
+          "name": "single click opens loaded full preview",
+          "status": "passed"
+        },
+        {
+          "name": "reload preserves image without generation",
+          "pixels": {
+            "red": 80098,
+            "cyan": 80102,
+            "area": 165546
+          }
+        },
+        {
+          "name": "close and reopen preserves result",
+          "status": "passed"
+        },
+        {
+          "name": "missing cache shows explicit display failure, no new generation",
+          "status": "passed"
+        },
+        {
+          "name": "keyboard reload recovers same cached result",
+          "pixels": {
+            "red": 80098,
+            "cyan": 80102,
+            "area": 165546
+          }
+        }
+      ],
+      "errors": [],
+      "realProvider": false,
+      "nativeUI": false
+    }
+  ],
+  "typecheck": {
+    "host": "passed",
+    "changedFilesErrors": 0,
+    "upstreamUnchangedErrors": 7
+  },
+  "nativeBuild": "passed: renderer + isolated macOS debug app",
+  "provenance": {
+    "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+    "originalFiles": 1522,
+    "localFiles": 60,
+    "reconstructedFiles": 1582,
+    "patchBytes": 861338
+  },
+  "realProviders": "not called",
+  "nativeGui": "not verified; previous screen capture restriction",
+  "published": false,
+  "compatibility": "no new persisted fields, dependencies, config or protocol; display retry never invokes generation",
+  "previousIncludedCommits": [
+    "1b0fde0de4d04f71131a4012912a86ce8f2990ea",
+    "b757101890be24aa6a3e07c6475313fe53e18dff"
+  ],
+  "testDevelopmentNotes": [
+    "Initial preview assertion used an outdated selector; corrected to .unified-viewer.",
+    "WebKit initial send raced startup layout; wait for canvas/input stabilization before submitting.",
+    "Keyboard reload initially intercepted by canvas; isolate Enter/Space propagation; both browsers passed after fix."
+  ],
+  "binarySha256": "8b2937cd0147a69069a406f307e3350c175cd2221de9d3c38aadcfcfba524d7e",
+  "bundleId": "com.tuziswitch.desktop.textchatqa",
+  "delivery": "/Users/sdy09/Documents/tuzi-switch-artifacts/text-chat-2026-11-08/创作助手图片修复版"
+}

@@ -1,0 +1,52 @@
+.tuzi-sidebar-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.tuzi-sidebar-transition > aside {
+  pointer-events: auto;
+}
+
+.tuzi-sidebar-transition[data-exiting="true"] > aside {
+  pointer-events: none;
+}
+
+/* Header and content travel together while the old sidebar folds upward. */
+.tuzi-workspace-layout {
+  transition-property: margin-left, left, width;
+  transition-duration: 350ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tuzi-creative-arrival {
+  animation: tuzi-creative-arrival 240ms ease-out 100ms backwards;
+}
+
+.tuzi-top-navigation-arrival {
+  animation: tuzi-creative-arrival 200ms ease-out 120ms backwards;
+}
+
+@keyframes tuzi-creative-arrival {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tuzi-workspace-layout,
+  .tuzi-sidebar-transition > aside {
+    transition: none;
+  }
+
+  .tuzi-creative-arrival,
+  .tuzi-top-navigation-arrival {
+    animation: none;
+  }
+}

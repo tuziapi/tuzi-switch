@@ -988,3 +988,15 @@ fn clipboard_prefill_is_one_use_and_never_reads_without_permission() {
     service.inner.lock().unwrap().state.identity = Some(Identity {user_id:"synthetic".into(),username:"synthetic".into(),display_name:"synthetic".into(),connection_id:"synthetic".into()});
     assert!(service.take_token_prefill(|| panic!("connected clipboard read")).is_none());
 }
+
+
+#[cfg(all(feature = "isolated-profile", not(feature = "local-preview")))]
+#[test]
+fn acceptance_profile_keeps_production_account_protocol_without_debug_fixtures() {
+    assert_eq!(super::ORIGIN, "https://api.tu-zi.com");
+    assert_eq!(super::CLIENT, "tuzi-switch-desktop");
+    assert_eq!(crate::config::ISOLATED_PROFILE_ID, "com.tuziswitch.desktop.acceptance");
+    assert!(!super::prefill::is_system_token_candidate(
+        "synthetic-system-token-preview-local-only-2026"
+    ));
+}

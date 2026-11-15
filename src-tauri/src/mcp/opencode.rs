@@ -274,11 +274,10 @@ pub fn import_from_opencode(config: &mut MultiAppConfig) -> Result<usize, AppErr
     }
 
     if !errors.is_empty() {
-        log::warn!(
-            "Import completed with {} failures: {:?}",
-            errors.len(),
-            errors
-        );
+        return Err(AppError::McpValidation(format!(
+            "该来源未导入，请修复无效条目后重试：{}",
+            errors.join("; ")
+        )));
     }
 
     Ok(changed)

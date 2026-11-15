@@ -1,0 +1,219 @@
+import React, { useState, useCallback } from 'react';
+import { ToolButton } from '../../tool-button';
+import classNames from 'classnames';
+import { ATTACHED_ELEMENT_CLASS_NAME, PlaitBoard } from '@plait/core';
+import { Island } from '../../island';
+import { UnifiedColorPicker } from '../../unified-color-picker';
+import {
+  hexAlphaToOpacity,
+  isFullyTransparent,
+  isWhite,
+  removeHexAlpha,
+} from '@aitu/utils';
+import {
+  StrokeIcon,
+  StrokeStyleDashedIcon,
+  StrokeStyleDotedIcon,
+  StrokeStyleNormalIcon,
+  StrokeWhiteIcon,
+} from '../../icons';
+import { Popover, PopoverContent, PopoverTrigger } from '../../popover/popover';
+import Stack from '../../stack';
+import { StrokeStyle } from '@plait/common';
+import { Slider } from 'tdesign-react';
+import {
+  setStrokeColor,
+  setStrokeColorOpacity,
+  setStrokeStyle as setStrokeStyleTransform,
+  setStrokeWidth as setStrokeWidthTransform,
+} from '../../../transforms/property';
+
+export type PopupStrokeButtonProps = {
+  board: PlaitBoard;
+  currentColor: string | undefined;
+  title: string;
+  hasStrokeStyle: boolean;
+  hasStrokeWidth?: boolean;
+  currentStrokeWidth?: number;
+  children?: React.ReactNode;
+};
+
+export const PopupStrokeButton: React.FC<PopupStrokeButtonProps> = ({
+  board,
+  currentColor,
+  title,
+  hasStrokeStyle,
+  hasStrokeWidth,
+  currentStrokeWidth,
+  children,
+}) => {
+  const [isStrokePropertyOpen, setIsStrokePropertyOpen] = useState(false);
+  const [widthInputValue, setWidthInputValue] = useState(String(currentStrokeWidth || 2));
+  const hexColor = currentColor && removeHexAlpha(currentColor);
+  const opacity = currentColor ? hexAlphaToOpacity(currentColor) : 100;
+  const container = PlaitBoard.getBoardContainer(board);
+
+  // 同步外部值变化
+  React.useEffect(() => {
+    setWidthInputValue(String(currentStrokeWidth || 2));
+  }, [currentStrokeWidth]);
+
+  const IconComponent = isFullyTransparent(opacity)
+    ? StrokeIcon
+    : isWhite(hexColor)
+    ? StrokeWhiteIcon
+    : undefined;
+
+  const icon = IconComponent ? <IconComponent /> : undefined;
+
+  const setStrokeStyle = (style: StrokeStyle) => {
+    setStrokeStyleTransform(board, style);
+  };
+
+  const handleColorChange = useCallback((color: string) => {
+    setStrokeColor(board, color);
+  }, [board]);
+
+  const handleOpacityChange = useCallback((opacity: number) => {
+    setStrokeColorOpacity(board, opacity);
+  }, [board]);
+
+  const handleStrokeWidthChange = useCallback((width: number) => {
+    setStrokeWidthTransform(board, width);
+    setWidthInputValue(String(width));
+  }, [board]);
+
+  // 处理输入框变化
+  const handleWidthInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setWidthInputValue(e.target.value);
+  }, []);
+
+  // 处理输入框确认
+  const handleWidthInputConfirm = useCallback(() => {
+    const value = parseInt(widthInputValue, 10);
+    if (!isNaN(value) && value >= 1 && value <= 100) {
+      setStrokeWidthTransform(board, value);
+    } else {
+      // 恢复为当前值
+      setWidthInputValue(String(currentStrokeWidth || 2));
+    }
+  }, [board, widthInputValue, currentStrokeWidth]);
+
+  // 处理输入框键盘事件
+  const handleWidthInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleWidthInputConfirm();
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setWidthInputValue(String(currentStrokeWidth || 2));
+      (e.target as HTMLInputElement).blur();
+    }
+  }, [handleWidthInputConfirm, currentStrokeWidth]);
+
+  return (
+    <Popover
+      sideOffset={12}
+      crossAxisOffset={40}
+      open={isStrokePropertyOpen}
+      onOpenChange={(open) => {
+        setIsStrokePropertyOpen(open);
+      }}
+      placement={'left'}
+    >
+      <PopoverTrigger asChild>
+        <ToolButton
+          className={classNames(`property-button`)}
+          visible={true}
+          icon={icon}
+          type="button"
+          tooltip={title}
+          aria-label={title}
+          onPointerUp={() => {
+            setIsStrokePropertyOpen(!isStrokePropertyOpen);
+          }}
+        >
+          {!icon && children}
+        </ToolButton>
+      </PopoverTrigger>
+      <PopoverContent container={container}>
+        <Island
+          padding={4}
+          className={classNames(
+            `${ATTACHED_ELEMENT_CLASS_NAME}`,
+            'stroke-setting',
+            { 'has-stroke-style': hasStrokeStyle }
+          )}
+        >
+          <Stack.Col>
+            {hasStrokeWidth && (
+              <div className="stroke-width-section" style={{ marginBottom: '8px' }}>
+                <Stack.Row gap={2} align="center">
+                  <span style={{ fontSize: '12px', color: 'var(--color-on-surface)', whiteSpace: 'nowrap' }}>线宽：</span>
+                  <div style={{ flex: 1, minWidth: '100px' }}>
+                    <Slider
+                      value={currentStrokeWidth || 2}
+                      min={1}
+                      max={100}
+                      step={1}
+                      onChange={(val) => handleStrokeWidthChange(val as number)}
+                      label={false}
+                    />
+                  </div>
+                  <div className="stroke-width-input-wrapper">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={widthInputValue}
+                      onChange={handleWidthInputChange}
+                      onBlur={handleWidthInputConfirm}
+                      onKeyDown={handleWidthInputKeyDown}
+                      className="stroke-width-input"
+                    />
+                    <span className="stroke-width-input-unit">px</span>
+                  </div>
+                </Stack.Row>
+              </div>
+            )}
+            {hasStrokeStyle && (
+              <div className="stroke-style-section">
+                <span className="stroke-style-label">样式：</span>
+                <Stack.Row className={classNames('stroke-style-picker')}>
+                  <ToolButton
+                    visible={true}
+                    icon={<StrokeStyleNormalIcon />}
+                    type="button"
+                    tooltip="实线"
+                    aria-label="实线"
+                    onPointerUp={() => setStrokeStyle(StrokeStyle.solid)}
+                  ></ToolButton>
+                  <ToolButton
+                    visible={true}
+                    icon={<StrokeStyleDashedIcon />}
+                    type="button"
+                    tooltip="虚线"
+                    aria-label="虚线"
+                    onPointerUp={() => setStrokeStyle(StrokeStyle.dashed)}
+                  ></ToolButton>
+                  <ToolButton
+                    visible={true}
+                    icon={<StrokeStyleDotedIcon />}
+                    type="button"
+                    tooltip="点线"
+                    aria-label="点线"
+                    onPointerUp={() => setStrokeStyle(StrokeStyle.dotted)}
+                  ></ToolButton>
+                </Stack.Row>
+              </div>
+            )}
+            <UnifiedColorPicker
+              value={currentColor}
+              onChange={handleColorChange}
+              onOpacityChange={handleOpacityChange}
+            />
+          </Stack.Col>
+        </Island>
+      </PopoverContent>
+    </Popover>
+  );
+};

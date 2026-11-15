@@ -1,0 +1,330 @@
+{
+  "task": "UC-CREATIVE-SETUP-01",
+  "date": "2026-11-11",
+  "unit": {
+    "creative": 131,
+    "host": 27,
+    "typecheck": "passed"
+  },
+  "paidRequests": 0,
+  "published": false,
+  "browsers": {
+    "chromium": {
+      "layout": {
+        "checks": [
+          {
+            "width": 1360,
+            "height": 900,
+            "theme": "light",
+            "bounds": {
+              "header": {
+                "x": 0,
+                "y": 0,
+                "width": 1360,
+                "height": 44,
+                "top": 0,
+                "right": 1360,
+                "bottom": 44,
+                "left": 0
+              },
+              "canvas": {
+                "x": 0,
+                "y": 44,
+                "width": 1360,
+                "height": 856,
+                "top": 44,
+                "right": 1360,
+                "bottom": 900,
+                "left": 0
+              },
+              "brand": {
+                "x": 84,
+                "y": 5.5,
+                "width": 114,
+                "height": 32,
+                "top": 5.5,
+                "right": 198,
+                "bottom": 37.5,
+                "left": 84
+              },
+              "overflow": false,
+              "duplicates": 1,
+              "legacy": 0
+            },
+            "settings": true,
+            "chatToggle": true,
+            "projects": true,
+            "accountRoundtrip": true
+          },
+          {
+            "width": 900,
+            "height": 650,
+            "theme": "light",
+            "bounds": {
+              "header": {
+                "x": 0,
+                "y": 0,
+                "width": 900,
+                "height": 44,
+                "top": 0,
+                "right": 900,
+                "bottom": 44,
+                "left": 0
+              },
+              "canvas": {
+                "x": 0,
+                "y": 44,
+                "width": 900,
+                "height": 606,
+                "top": 44,
+                "right": 900,
+                "bottom": 650,
+                "left": 0
+              },
+              "brand": {
+                "x": 84,
+                "y": 5.5,
+                "width": 114,
+                "height": 32,
+                "top": 5.5,
+                "right": 198,
+                "bottom": 37.5,
+                "left": 84
+              },
+              "overflow": false,
+              "duplicates": 1,
+              "legacy": 0
+            },
+            "settings": true,
+            "chatToggle": true,
+            "projects": true,
+            "accountRoundtrip": true
+          },
+          {
+            "width": 1360,
+            "height": 900,
+            "theme": "dark",
+            "bounds": {
+              "header": {
+                "x": 0,
+                "y": 0,
+                "width": 1360,
+                "height": 44,
+                "top": 0,
+                "right": 1360,
+                "bottom": 44,
+                "left": 0
+              },
+              "canvas": {
+                "x": 0,
+                "y": 44,
+                "width": 1360,
+                "height": 856,
+                "top": 44,
+                "right": 1360,
+                "bottom": 900,
+                "left": 0
+              },
+              "brand": {
+                "x": 84,
+                "y": 5.5,
+                "width": 114,
+                "height": 32,
+                "top": 5.5,
+                "right": 198,
+                "bottom": 37.5,
+                "left": 84
+              },
+              "overflow": false,
+              "duplicates": 1,
+              "legacy": 0
+            },
+            "settings": true,
+            "chatToggle": true,
+            "projects": true,
+            "accountRoundtrip": true
+          }
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "flow": {
+        "checks": [
+          "图片 missing setup opens dialog without request or draft loss",
+          "视频 missing setup opens dialog without request or draft loss",
+          "音频 missing setup opens dialog without request or draft loss",
+          "文本 missing setup opens dialog without request or draft loss",
+          "main discussion retains draft and blocks request",
+          "sidebar retains draft and opens setup",
+          "saving configuration never auto-submits",
+          "configured text send succeeds using synthetic response",
+          "configured image generation passes gate"
+        ],
+        "errors": []
+      }
+    },
+    "webkit": {
+      "layout": {
+        "checks": [
+          {
+            "width": 1360,
+            "height": 900,
+            "theme": "light",
+            "bounds": {
+              "header": {
+                "x": 0,
+                "y": 0,
+                "width": 1360,
+                "height": 44,
+                "top": 0,
+                "right": 1360,
+                "bottom": 44,
+                "left": 0
+              },
+              "canvas": {
+                "x": 0,
+                "y": 44,
+                "width": 1360,
+                "height": 856,
+                "top": 44,
+                "right": 1360,
+                "bottom": 900,
+                "left": 0
+              },
+              "brand": {
+                "x": 84,
+                "y": 5.5,
+                "width": 113.609375,
+                "height": 32,
+                "top": 5.5,
+                "right": 197.609375,
+                "bottom": 37.5,
+                "left": 84
+              },
+              "overflow": false,
+              "duplicates": 1,
+              "legacy": 0
+            },
+            "settings": true,
+            "chatToggle": true,
+            "projects": true,
+            "accountRoundtrip": true
+          },
+          {
+            "width": 900,
+            "height": 650,
+            "theme": "light",
+            "bounds": {
+              "header": {
+                "x": 0,
+                "y": 0,
+                "width": 900,
+                "height": 44,
+                "top": 0,
+                "right": 900,
+                "bottom": 44,
+                "left": 0
+              },
+              "canvas": {
+                "x": 0,
+                "y": 44,
+                "width": 900,
+                "height": 606,
+                "top": 44,
+                "right": 900,
+                "bottom": 650,
+                "left": 0
+              },
+              "brand": {
+                "x": 84,
+                "y": 5.5,
+                "width": 113.609375,
+                "height": 32,
+                "top": 5.5,
+                "right": 197.609375,
+                "bottom": 37.5,
+                "left": 84
+              },
+              "overflow": false,
+              "duplicates": 1,
+              "legacy": 0
+            },
+            "settings": true,
+            "chatToggle": true,
+            "projects": true,
+            "accountRoundtrip": true
+          },
+          {
+            "width": 1360,
+            "height": 900,
+            "theme": "dark",
+            "bounds": {
+              "header": {
+                "x": 0,
+                "y": 0,
+                "width": 1360,
+                "height": 44,
+                "top": 0,
+                "right": 1360,
+                "bottom": 44,
+                "left": 0
+              },
+              "canvas": {
+                "x": 0,
+                "y": 44,
+                "width": 1360,
+                "height": 856,
+                "top": 44,
+                "right": 1360,
+                "bottom": 900,
+                "left": 0
+              },
+              "brand": {
+                "x": 84,
+                "y": 5.5,
+                "width": 113.609375,
+                "height": 32,
+                "top": 5.5,
+                "right": 197.609375,
+                "bottom": 37.5,
+                "left": 84
+              },
+              "overflow": false,
+              "duplicates": 1,
+              "legacy": 0
+            },
+            "settings": true,
+            "chatToggle": true,
+            "projects": true,
+            "accountRoundtrip": true
+          }
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "flow": {
+        "checks": [
+          "图片 missing setup opens dialog without request or draft loss",
+          "视频 missing setup opens dialog without request or draft loss",
+          "音频 missing setup opens dialog without request or draft loss",
+          "文本 missing setup opens dialog without request or draft loss",
+          "main discussion retains draft and blocks request",
+          "sidebar retains draft and opens setup",
+          "saving configuration never auto-submits",
+          "configured text send succeeds using synthetic response",
+          "configured image generation passes gate"
+        ],
+        "errors": []
+      }
+    }
+  },
+  "native": {
+    "build": "passed",
+    "signing": "ad-hoc deep strict passed",
+    "opened": false,
+    "reason": "Current app was being operated by user; no forced restart",
+    "sha256": "519484f197a3f7a7b6339edd23ed5492a3b50012790d70636d4ee031608f2477",
+    "directory": "/Users/sdy09/Documents/tuzi-switch-artifacts/creation-setup-2026-11-11"
+  },
+  "localCodexSyntheticWebKit": 7
+}

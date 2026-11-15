@@ -1,0 +1,48 @@
+name: Official updater signing preflight
+run-name: "正式更新签名验证 · ${{ github.ref_name }}"
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.repository == 'tuziapi/tuzi-switch'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      TUZI_SWITCH_RELEASE_REPOSITORY: tuziapi/tuzi-switch
+      VITE_RELEASE_REPOSITORY: tuziapi/tuzi-switch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9"
+      - run: pnpm install --frozen-lockfile
+      - name: Sign a synthetic probe and verify the existing official public key
+        shell: bash
+        env:
+          OFFICIAL_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$OFFICIAL_UPDATER_KEY" ]]; then echo 'Missing official signing key'; exit 1; fi
+          umask 077
+          KEY_PATH="$(mktemp "$RUNNER_TEMP/tuzi-official-key.XXXXXX")"
+          trap 'rm -f "$KEY_PATH"' EXIT
+          printf '%s' "$OFFICIAL_UPDATER_KEY" > "$KEY_PATH"
+          export TAURI_SIGNING_PRIVATE_KEY="$KEY_PATH"
+          node scripts/updater-assets.mjs check-key
+      - name: Verify packaging contracts using synthetic signatures
+        run: node --test scripts/verify-updater-assets.mjs

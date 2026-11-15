@@ -18,6 +18,70 @@ use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+// Browser activation may use an STA COM extension. Async command worker threads
+// do not initialize it. Keep this apartment off the UI and shared worker pool.
+#[cfg(target_os = "windows")]
+async fn run_windows_shell(
+    action: impl FnOnce() -> Result<(), String> + Send + 'static,
+) -> Result<(), String> {
+    let (send, receive) = tokio::sync::oneshot::channel();
+    std::thread::Builder::new()
+        .name("external-browser".into())
+        .spawn(move || {
+            use windows_sys::Win32::System::Com::{
+                CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+            };
+            let result = unsafe {
+                CoInitializeEx(
+                    std::ptr::null(),
+                    (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+                )
+            };
+            if result < 0 {
+                let _ = send.send(Err(format!(
+                    "初始化系统浏览器失败: HRESULT 0x{:08X}",
+                    result as u32
+                )));
+                return;
+            }
+            struct Apartment;
+            impl Drop for Apartment {
+                fn drop(&mut self) {
+                    unsafe { CoUninitialize() };
+                }
+            }
+            let _apartment = Apartment;
+            let _ = send.send(action());
+        })
+        .map_err(|error| format!("创建浏览器任务失败: {error}"))?;
+    receive
+        .await
+        .map_err(|_| "系统浏览器任务中断".to_string())?
+}
+
+#[cfg(target_os = "windows")]
+async fn open_windows_url(url: String) -> Result<(), String> {
+    run_windows_shell(move || {
+        use windows_sys::Win32::UI::Shell::{
+            ShellExecuteExW, SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
+        };
+        use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        let url: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+        info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+        // This thread has no message loop and ends after the launch. Ask the
+        // shell to finish activation before returning; report errors in our UI.
+        info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+        info.lpFile = url.as_ptr();
+        info.nShow = SW_SHOWNORMAL;
+        if unsafe { ShellExecuteExW(&mut info) } == 0 {
+            return Err(format!("打开链接失败: {}", std::io::Error::last_os_error()));
+        }
+        Ok(())
+    })
+    .await
+}
+
 /// 打开外部链接
 #[tauri::command]
 pub async fn open_external(app: AppHandle, url: String) -> Result<bool, String> {
@@ -27,11 +91,55 @@ pub async fn open_external(app: AppHandle, url: String) -> Result<bool, String> 
         format!("https://{url}")
     };
 
+    #[cfg(target_os = "windows")]
+    {
+        let _ = app;
+        open_windows_url(url).await?;
+    }
+
+    #[cfg(not(target_os = "windows"))]
     app.opener()
         .open_url(&url, None::<String>)
         .map_err(|e| format!("打开链接失败: {e}"))?;
 
     Ok(true)
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod external_browser_tests {
+    #[tokio::test]
+    async fn browser_opener_runs_in_sta_and_preserves_os_failure() {
+        super::run_windows_shell(|| {
+            use windows_sys::Win32::System::Com::{
+                CoGetApartmentType, APTTYPE_MAINSTA, APTTYPE_STA,
+            };
+            let mut apartment = 0;
+            let mut qualifier = 0;
+            let result = unsafe { CoGetApartmentType(&mut apartment, &mut qualifier) };
+            assert!(result >= 0);
+            assert!(apartment == APTTYPE_STA || apartment == APTTYPE_MAINSTA);
+            Ok(())
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            super::run_windows_shell(|| Err("synthetic OS error 1155".into()))
+                .await
+                .unwrap_err(),
+            "synthetic OS error 1155"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "opens the public release page in the Windows test machine's browser"]
+    async fn windows_real_browser_activation() {
+        let url = "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.6.0";
+        let original = tauri_plugin_opener::open_url(url, None::<String>);
+        println!("Original worker-thread browser activation: {original:?}");
+        let fixed = super::open_windows_url(url.to_string()).await;
+        println!("Initialized STA browser activation: {fixed:?}");
+        fixed.unwrap();
+    }
 }
 
 #[tauri::command]
@@ -136,12 +244,47 @@ pub async fn open_webview_with_key(app: AppHandle, url: String, key: String) -> 
 }
 
 /// 检查更新
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateBuildInfo {
+    channel: &'static str,
+    repository: &'static str,
+    run_number: u64,
+    commit: &'static str,
+    platform: &'static str,
+}
+
+#[tauri::command]
+pub fn get_update_build_info() -> UpdateBuildInfo {
+    UpdateBuildInfo {
+        channel: if cfg!(feature = "isolated-profile") {
+            "acceptance"
+        } else {
+            "stable"
+        },
+        repository: crate::release_repository::RELEASE_REPOSITORY,
+        run_number: env!("TUZI_BUILD_NUMBER").parse().unwrap_or(0),
+        commit: env!("TUZI_BUILD_COMMIT"),
+        platform: match (std::env::consts::OS, std::env::consts::ARCH) {
+            ("macos", "aarch64") => "macos",
+            ("macos", "x86_64") => "macos-intel",
+            ("windows", "x86_64") => "windows",
+            ("linux", "x86_64") => "linux",
+            _ => "unsupported",
+        },
+    }
+}
+
 #[tauri::command]
 pub async fn check_for_updates(handle: AppHandle) -> Result<bool, String> {
     handle
         .opener()
         .open_url(
-            crate::release_repository::latest_release_url(),
+            if cfg!(feature = "isolated-profile") {
+                "https://aiw520.github.io/tuzi-switch/".to_string()
+            } else {
+                crate::release_repository::latest_release_url()
+            },
             None::<String>,
         )
         .map_err(|e| format!("打开更新页面失败: {e}"))?;
@@ -1899,5 +2042,31 @@ mod tests {
             command,
             "pushd \"\\\\server\\share\\100%%^&^(test^)\" || exit /b 1\r\n"
         );
+    }
+}
+
+#[cfg(test)]
+mod update_build_tests {
+    #[test]
+    fn update_build_identity_matches_native_profile() {
+        let info = super::get_update_build_info();
+        assert_eq!(
+            info.channel,
+            if cfg!(feature = "isolated-profile") {
+                "acceptance"
+            } else {
+                "stable"
+            }
+        );
+        assert_eq!(
+            info.repository,
+            crate::release_repository::RELEASE_REPOSITORY
+        );
+        assert_eq!(info.commit, env!("TUZI_BUILD_COMMIT"));
+        assert_eq!(
+            info.run_number,
+            env!("TUZI_BUILD_NUMBER").parse().unwrap_or(0)
+        );
+        assert_ne!(info.platform, "unsupported");
     }
 }

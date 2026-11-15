@@ -1,0 +1,247 @@
+{
+  "checkedAt": "2026-10-29",
+  "repository": "tuziapi/tuzi-switch",
+  "timezone": "Asia/Shanghai",
+  "releases": [
+    {
+      "version": "v1.4.2",
+      "publishedAt": "2026-10-22",
+      "commit": "1a3230108820cd4f9917e8d3f4f1bd9e11a2e0ed",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.4.2"
+    },
+    {
+      "version": "v1.4.1",
+      "publishedAt": "2026-10-21",
+      "commit": "9b4e702b2ae973571221c9aa877f8fec0498c045",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.4.1"
+    },
+    {
+      "version": "v1.3.1",
+      "publishedAt": "2026-10-08",
+      "commit": "8ce1777d52fd4bce1ade76cf224f0cb2ccc07c98",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.3.1"
+    },
+    {
+      "version": "v1.3.0",
+      "publishedAt": "2026-09-22",
+      "commit": "4030b898439c70fc11f3807008bb59c90e493c00",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.3.0"
+    },
+    {
+      "version": "v1.2.1",
+      "publishedAt": "2026-07-24",
+      "commit": "275be5ae15bf8353d2e82644095d1c5bffa4a15c",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.2.1"
+    },
+    {
+      "version": "v1.2.0",
+      "publishedAt": "2026-07-14",
+      "commit": "09fff2c146386f088cc91cab4f82d5c5499ae788",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.2.0"
+    },
+    {
+      "version": "v1.1.31",
+      "publishedAt": "2026-06-23",
+      "commit": "e6c20d7660c563aa8b9e790d38defdafee9ddff3",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.31"
+    },
+    {
+      "version": "v1.1.30",
+      "publishedAt": "2026-06-16",
+      "commit": "7dfb27c6a6d4e57853560ec09df556a9541e1511",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.30"
+    },
+    {
+      "version": "v1.1.29",
+      "publishedAt": "2026-06-15",
+      "commit": "0b59bacf8e07d9be8839fa09594a8df850ec8cb8",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.29"
+    },
+    {
+      "version": "v1.1.28",
+      "publishedAt": "2026-06-13",
+      "commit": "db310c55474d89015011317d34d2c9db8159c21e",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.28"
+    },
+    {
+      "version": "v1.1.27",
+      "publishedAt": "2026-06-11",
+      "commit": "96f0646b1e6aa2409fc1c3ff7a8d5599d24a6dc5",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.27"
+    },
+    {
+      "version": "v1.1.26",
+      "publishedAt": "2026-06-10",
+      "commit": "33e92a3b79bcc6489a50ec84bc7cc48619b976ca",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.26"
+    },
+    {
+      "version": "v1.1.25",
+      "publishedAt": "2026-06-09",
+      "commit": "39efd0a2bad4846b28d04923d275525479c469f9",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.25"
+    },
+    {
+      "version": "v1.1.24",
+      "publishedAt": "2026-06-08",
+      "commit": "a16853f1767b17bf60acd01f0c5fab05df9ebf09",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.24"
+    },
+    {
+      "version": "v1.1.23",
+      "publishedAt": "2026-06-08",
+      "commit": "b3b26e622458d75153f058347863402b7737aec6",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.23"
+    },
+    {
+      "version": "v1.1.22",
+      "publishedAt": "2026-06-08",
+      "commit": "a41078056d2ac87d788102536d64653bb3999781",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.22"
+    },
+    {
+      "version": "v1.1.21",
+      "publishedAt": "2026-06-08",
+      "commit": "986a49856dae23b090e6046162bdc0ad171e4310",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.21"
+    },
+    {
+      "version": "v1.1.20",
+      "publishedAt": "2026-06-08",
+      "commit": "c2559136539ddf46dff65ba0fd90868e1944b760",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.20"
+    },
+    {
+      "version": "v1.1.19",
+      "publishedAt": "2026-06-08",
+      "commit": "7d126610a31364d0b622a3b2ec7089d9d8dbe346",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.19"
+    },
+    {
+      "version": "v1.1.16",
+      "publishedAt": "2026-06-08",
+      "commit": "d48f5689746fbaf397cece17653b4d3ca938d1bb",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.16"
+    },
+    {
+      "version": "v1.1.15",
+      "publishedAt": "2026-06-08",
+      "commit": "fcca15fbbbd713bf4acae99ed21eb033c5957a61",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.15"
+    },
+    {
+      "version": "v1.1.14",
+      "publishedAt": "2026-06-07",
+      "commit": "6ec638c81000b506f18f309fe2d36a9ca47a1bf0",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.14"
+    },
+    {
+      "version": "v1.1.13",
+      "publishedAt": "2026-06-07",
+      "commit": "cead935ddbae2d746b0145f042944e35cd83198f",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.13"
+    },
+    {
+      "version": "v1.1.12",
+      "publishedAt": "2026-06-07",
+      "commit": "72c096f4fde18e8e8bf62fe8e059a38a3dc6e526",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.12"
+    },
+    {
+      "version": "v1.1.11",
+      "publishedAt": "2026-06-07",
+      "commit": "95c9ddeb2a216f90089b1ae0e0fdbb643771a661",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.11"
+    },
+    {
+      "version": "v1.1.10",
+      "publishedAt": "2026-06-07",
+      "commit": "2e4ee81f98f5479c1e9b61786501b97a330b2ac5",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.10"
+    },
+    {
+      "version": "v1.1.4",
+      "publishedAt": "2026-06-04",
+      "commit": "c753af9fb52802c5f6ce5c0639977e8ea5ea7c60",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.4"
+    },
+    {
+      "version": "v1.1.2",
+      "publishedAt": "2026-05-31",
+      "commit": "a7e6c571fc643c28cab513caf13ce8c8efb011b1",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.2"
+    },
+    {
+      "version": "v1.1.3",
+      "publishedAt": "2026-05-30",
+      "commit": "26dc5470b25fe07bd7dedd9741ad40dc1b745f47",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.3"
+    },
+    {
+      "version": "v1.1.1",
+      "publishedAt": "2026-05-28",
+      "commit": "9bd354f83e70883b6cce57a49d12c50c6ed8b425",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.1"
+    },
+    {
+      "version": "v1.1.0",
+      "publishedAt": "2026-05-28",
+      "commit": "bd4213d01349d1222b965d2d1a4e7b953a1f3a21",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.1.0"
+    },
+    {
+      "version": "v1.0.2",
+      "publishedAt": "2026-05-24",
+      "commit": "fe84fe98b5b3e82f19217232efc1eaa409ebc44e",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.0.2"
+    },
+    {
+      "version": "v1.0.1",
+      "publishedAt": "2026-05-21",
+      "commit": "e7a8501b7e8818c1ce1c4b8f7d55850d6d86f1a6",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.0.1"
+    },
+    {
+      "version": "v1.0.0",
+      "publishedAt": "2026-05-21",
+      "commit": "3be53a4267de7bdb016a7ea1929754c8955f34b0",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.0.0"
+    },
+    {
+      "version": "v3.12.19",
+      "publishedAt": "2026-05-09",
+      "commit": "38b1e2c07d05e8d667ea5e9f860fb5667c18a0a5",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v3.12.19"
+    },
+    {
+      "version": "v3.12.18",
+      "publishedAt": "2026-05-07",
+      "commit": "75f74253f22880412cd8bf488c5ed2e55e0f6e8c",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v3.12.18"
+    },
+    {
+      "version": "v3.12.16",
+      "publishedAt": "2026-04-21",
+      "commit": "e1ccff9172b4f43135675059c406705e4025fb06",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v3.12.16"
+    },
+    {
+      "version": "v3.12.10",
+      "publishedAt": "2026-04-09",
+      "commit": "cd8ce7ff3844817853959e8d75b16e120c04c42b",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v3.12.10"
+    },
+    {
+      "version": "v3.12.8",
+      "publishedAt": "2026-04-07",
+      "commit": "6c12a98983e6ef26f8ffd0d5f62e03c13d778e24",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v3.12.8"
+    },
+    {
+      "version": "v3.12.7",
+      "publishedAt": "2026-04-07",
+      "commit": "9423158eec427849a819a9af49e5ea87ff1e74a2",
+      "releaseUrl": "https://github.com/tuziapi/tuzi-switch/releases/tag/v3.12.7"
+    }
+  ]
+}

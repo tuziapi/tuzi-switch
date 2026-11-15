@@ -1,5 +1,6 @@
 //! Account system-token connection. Credentials stay in a private native local file.
 pub mod business;
+pub mod creative;
 mod store;
 mod prefill;
 #[cfg(test)]
@@ -140,6 +141,10 @@ pub struct AccountService {
     business_pending: Mutex<std::collections::HashMap<String, tokio::sync::watch::Sender<bool>>>,
 }
 impl AccountService {
+    pub fn has_pending_requests(&self) -> bool {
+        !self.business_pending.lock().unwrap().is_empty()
+    }
+
     /// Keep a confirmed account source valid throughout a synchronous local
     /// provider transaction. Logout cannot change the generation while the
     /// closure performs the approved write set. The closure must not call back

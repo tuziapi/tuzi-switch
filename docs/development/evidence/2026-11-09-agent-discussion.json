@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-09",
+  "task": "UC-AGENT-CHAT-02",
+  "branch": "codex/opentu-text-chat",
+  "baseHead": "efac7cc127f6c1da3703b12c39ca8fbb934df3f3",
+  "unitTests": {
+    "files": 11,
+    "passed": 158
+  },
+  "browser": {
+    "chromium": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "main input streams actual reasoning/reply to the shared sidebar; independent draft retained",
+        "sidebar continues the same main-input context",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px window without sidebar overflow",
+        "stop strip cancels running reply",
+        "reload recovers board-linked discussion and messages"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "webkit": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "main input streams actual reasoning/reply to the shared sidebar; independent draft retained",
+        "sidebar continues the same main-input context",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px window without sidebar overflow",
+        "stop strip cancels running reply",
+        "reload recovers board-linked discussion and messages"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    }
+  },
+  "builds": {
+    "creative": "passed",
+    "hostRenderer": "passed before final storage-initialization and margin changes",
+    "hostTypecheck": "passed"
+  },
+  "provenance": {
+    "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+    "originalFiles": 1522,
+    "localFiles": 84,
+    "reconstructedFiles": 1606,
+    "patchBytes": 999337
+  },
+  "limits": [
+    "Synthetic requests only; external network blocked",
+    "No new paid requests",
+    "No native package or WebView validation this round",
+    "Video dispatch unit-tested; full video generation not browser-verified",
+    "Ad-hoc upstream type scan retains baseline diagnostics; not a clean upstream-wide TypeScript check"
+  ]
+}

@@ -1,0 +1,367 @@
+/**
+ * PromptListItem 样式
+ * 可复用的提示词列表项组件样式
+ */
+
+.prompt-list-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  position: relative;
+
+  &:hover {
+    background: var(--td-bg-color-container-hover, rgba(0, 0, 0, 0.04));
+
+    .prompt-list-item__actions {
+      opacity: 1;
+    }
+  }
+
+  // 置顶项样式（不使用特殊背景色，只通过 pin 图标标识）
+  &--pinned {
+    // 可以根据需要添加置顶项的特殊样式
+  }
+
+  // 预设提示词样式
+  &--preset {
+    // 预设提示词可以有轻微的视觉区分
+    .prompt-list-item__text {
+      color: var(--td-text-color-secondary, #666);
+    }
+  }
+
+  // 禁用状态
+  &--disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  // 置顶标识
+  &__pin-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    color: var(--td-brand-color, #0052d9);
+    flex-shrink: 0;
+  }
+
+  // 预设标识
+  &__preset-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    color: #F59E0B;
+    flex-shrink: 0;
+  }
+
+  // 场景标签
+  &__tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    margin-right: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    // 默认样式（无 modelType 时）
+    background: var(--td-bg-color-component, #f3f3f3);
+    color: var(--td-text-color-secondary, #666);
+
+    // 图片类型 - 蓝色
+    &--image {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    // 视频类型 - 粉色
+    &--video {
+      background: #fce7f3;
+      color: #be185d;
+    }
+
+    // 音频类型 - 青蓝色
+    &--audio {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+
+    // 文本类型 - 绿色
+    &--text {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    // Agent类型 - 橙色（品牌色）
+    &--agent {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    // PPT 公共提示词 - 紫灰色
+    &--ppt-common {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+
+    // PPT 页面提示词 - 黄色
+    &--ppt-slide {
+      background: #fef9c3;
+      color: #a16207;
+    }
+  }
+
+  // 文本内容
+  &__text {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--td-text-color-primary, #333);
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // 操作按钮组
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  // 单个操作按钮
+  &__action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--td-text-color-secondary, #666);
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: var(--td-bg-color-component, #f3f3f3);
+      color: var(--td-text-color-primary, #333);
+    }
+
+    // 删除按钮悬停时变红
+    &--delete:hover {
+      background: var(--td-error-color-1, #fff0ed);
+      color: var(--td-error-color, #d54941);
+    }
+  }
+}
+
+.prompt-list-item__hover-card-popover {
+  padding: 10px;
+  max-width: 320px;
+}
+
+.prompt-list-item__text-tip-popover {
+  max-width: min(420px, calc(100vw - 24px));
+}
+
+.prompt-list-item__text-tip {
+  max-width: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
+.prompt-list-item__history-card-popover {
+  padding: 10px;
+  max-width: min(360px, calc(100vw - 24px));
+}
+
+.prompt-list-item__history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--td-text-color-primary, #333);
+}
+
+.prompt-list-item__history-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.prompt-list-item__history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prompt-list-item__history-label {
+  font-size: 11px;
+  color: var(--td-text-color-placeholder, #999);
+}
+
+.prompt-list-item__history-text {
+  max-height: 128px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.prompt-list-item__history-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  span {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: var(--td-bg-color-component, #f3f3f3);
+    color: var(--td-text-color-secondary, #666);
+  }
+}
+
+.prompt-list-item__result-preview {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.prompt-list-item__result-media {
+  width: 120px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--td-bg-color-component, #f3f3f3);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    background: #f8fafc;
+  }
+}
+
+.prompt-list-item__result-audio {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  img {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+}
+
+.prompt-list-item__result-title {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.prompt-list-item__result-text {
+  max-height: 96px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--td-text-color-secondary, #666);
+
+  &--error {
+    color: var(--td-error-color, #d54941);
+  }
+}
+
+.prompt-list-item__hover-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prompt-list-item__hover-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--td-text-color-primary, #333);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.prompt-list-item__hover-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+
+  &--single {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(104px, calc(100vw - 224px));
+  }
+}
+
+.prompt-list-item__hover-thumb {
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--td-bg-color-component, #f3f3f3);
+  border: 1px solid var(--td-component-stroke, rgba(0, 0, 0, 0.08));
+
+  &--single {
+    width: 100%;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #f8fafc;
+  }
+}
+
+.prompt-list-item__hover-thumb-button {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: inherit;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--td-brand-color, #0052d9);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.prompt-list-item__hover-hint {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--td-text-color-placeholder, #999);
+}

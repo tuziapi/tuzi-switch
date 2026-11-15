@@ -1,0 +1,455 @@
+{
+  "task": "OFFICIAL-REPAIR-01",
+  "version": "1.5.7",
+  "releaseMode": "unsigned manual installation; same-version rebuild",
+  "sourceCommit": "95896b53e16e0021bb1e4062c122c6a0668175dd",
+  "builderCommit": "b43eb2aaf8998abce4ecffe346511d26057538d4",
+  "buildRun": "42217593582",
+  "preservedTagCommit": "cee88e61a2ddd5d85436aeed718c1abb9b273693",
+  "pages": {
+    "sourceCommit": "6d4c6bf5c509c11b2057c4730bf9e45ddeaeaa15",
+    "deploymentCommit": "f598b83018646a684127fd1ea4e3cbf336f76d82",
+    "run": "42240567672",
+    "conclusion": "success"
+  },
+  "release": {
+    "url": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.5.7",
+    "title": "兔子助手 v1.5.7（修复重建）",
+    "assets": [
+      {
+        "name": "BUILD-INFO.json",
+        "bytes": 3519,
+        "sha256": "sha256:7da366da27262dfdb8daa8fcda1237d978d54525fabd7f8fd7b993e2e858f786",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/BUILD-INFO.json"
+      },
+      {
+        "name": "manifest-linux-x64.json",
+        "bytes": 1030,
+        "sha256": "sha256:48765dda8c1fbf9de9b50f2d9f47fc82a46f2352642f1349ddac9ea91604edf5",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/manifest-linux-x64.json"
+      },
+      {
+        "name": "manifest-macos-arm64.json",
+        "bytes": 688,
+        "sha256": "sha256:e354d142733702979e2f8287d5de0af86375ee515ae89a5ae80d5b35100eec1d",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/manifest-macos-arm64.json"
+      },
+      {
+        "name": "manifest-macos-x64.json",
+        "bytes": 685,
+        "sha256": "sha256:d7c09425889d30b2f5439384b8e75c37d913cbdbdc7ad81ed8ab9c35be237638",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/manifest-macos-x64.json"
+      },
+      {
+        "name": "manifest-windows-x64.json",
+        "bytes": 859,
+        "sha256": "sha256:bb772f67e73465e0a3ef4e9495a1553ed5b21ae972027333c45eb331e8d4721e",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/manifest-windows-x64.json"
+      },
+      {
+        "name": "SHA256SUMS",
+        "bytes": 1217,
+        "sha256": "sha256:568370ad67f24c56820bf42997d065145f256b2269d87bf2c9ca45a2a4581524",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/SHA256SUMS"
+      },
+      {
+        "name": "tuzi-assistant-linux-x64.AppImage",
+        "bytes": 102914552,
+        "sha256": "sha256:eaa64b49d59224e0b42824b0abc5a8365f2bf2281318c6bf419d2102152d0b63",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.AppImage"
+      },
+      {
+        "name": "tuzi-assistant-linux-x64.deb",
+        "bytes": 23743968,
+        "sha256": "sha256:962b6e5674f1aaf3a9e8ab957ab1948417b1ab99d64cdfc6d6d95ac53daea26b",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.deb"
+      },
+      {
+        "name": "tuzi-assistant-linux-x64.rpm",
+        "bytes": 23743721,
+        "sha256": "sha256:b81cf2fb5b4f6c6c5a18cfd5d7738258bd5cbe3a6084300549764c5c2f6fd990",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.rpm"
+      },
+      {
+        "name": "tuzi-assistant-macos-arm64.dmg",
+        "bytes": 24710081,
+        "sha256": "sha256:971cd34ca4dcd5da2cf32167db40785792c36fa3960b8e28c96ba4065292b4b0",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-macos-arm64.dmg"
+      },
+      {
+        "name": "tuzi-assistant-macos-x64.dmg",
+        "bytes": 25334431,
+        "sha256": "sha256:25bc94ec4a466149f9c10dad2a0d6e9b42b2b20b9cb17fb3e1f0dfca48ecb5d2",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-macos-x64.dmg"
+      },
+      {
+        "name": "tuzi-assistant-source.tar.gz",
+        "bytes": 25096450,
+        "sha256": "sha256:7d2ec10343d357210945f2784d95a087910468acef63d890de4c87f7559250ed",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-source.tar.gz"
+      },
+      {
+        "name": "tuzi-assistant-windows-x64.exe",
+        "bytes": 20344632,
+        "sha256": "sha256:7571dc6c1f1b2acfe59bd264cb95f31c36499cf1c8836d72e592e9e3fd5ba838",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-windows-x64.exe"
+      },
+      {
+        "name": "tuzi-assistant-windows-x64.msi",
+        "bytes": 23650304,
+        "sha256": "sha256:ed988c2a6f6c4795a4752f5c3354dc6e9b277c5f02deaa174bda678aa0d89bcc",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-windows-x64.msi"
+      }
+    ]
+  },
+  "browserAcceptance": {
+    "url": "https://tuziapi.github.io/tuzi-switch/",
+    "tool": "CUA in-app browser",
+    "passed": [
+      "public version v1.5.7 loaded",
+      "macOS ARM64 and Intel selectors target official DMGs",
+      "Windows EXE and MSI selectors target official installers",
+      "Linux DEB RPM AppImage selectors target official installers",
+      "repair FAQ shows menu/drop/project-content fixes",
+      "same-version manual reinstall notice visible"
+    ]
+  },
+  "artifact-verification": {
+    "sourceCommit": "95896b53e16e0021bb1e4062c122c6a0668175dd",
+    "buildRuns": [
+      "42217593582"
+    ],
+    "sourceFiles": 3066,
+    "installers": [
+      {
+        "file": "tuzi-assistant-macos-arm64.dmg",
+        "sha256": "971cd34ca4dcd5da2cf32167db40785792c36fa3960b8e28c96ba4065292b4b0",
+        "bytes": 24710081
+      },
+      {
+        "file": "tuzi-assistant-macos-x64.dmg",
+        "sha256": "25bc94ec4a466149f9c10dad2a0d6e9b42b2b20b9cb17fb3e1f0dfca48ecb5d2",
+        "bytes": 25334431
+      },
+      {
+        "file": "tuzi-assistant-windows-x64.msi",
+        "sha256": "ed988c2a6f6c4795a4752f5c3354dc6e9b277c5f02deaa174bda678aa0d89bcc",
+        "bytes": 23650304
+      },
+      {
+        "file": "tuzi-assistant-windows-x64.exe",
+        "sha256": "7571dc6c1f1b2acfe59bd264cb95f31c36499cf1c8836d72e592e9e3fd5ba838",
+        "bytes": 20344632
+      },
+      {
+        "file": "tuzi-assistant-linux-x64.AppImage",
+        "sha256": "eaa64b49d59224e0b42824b0abc5a8365f2bf2281318c6bf419d2102152d0b63",
+        "bytes": 102914552
+      },
+      {
+        "file": "tuzi-assistant-linux-x64.deb",
+        "sha256": "962b6e5674f1aaf3a9e8ab957ab1948417b1ab99d64cdfc6d6d95ac53daea26b",
+        "bytes": 23743968
+      },
+      {
+        "file": "tuzi-assistant-linux-x64.rpm",
+        "sha256": "b81cf2fb5b4f6c6c5a18cfd5d7738258bd5cbe3a6084300549764c5c2f6fd990",
+        "bytes": 23743721
+      }
+    ]
+  },
+  "native-verification": {
+    "macos-arm64": {
+      "version": "1.5.7",
+      "arch": "arm64",
+      "sourceCommit": "95896b53e16e0021bb1e4062c122c6a0668175dd",
+      "binarySha256": "8eb5458888ca728a57b92e109821d778d6af764aebb0a0b6fbb3544e58bf98ce",
+      "dmgArchiveMatch": true,
+      "bundleIntegrity": true
+    },
+    "macos-x64": {
+      "version": "1.5.7",
+      "arch": "x86_64",
+      "sourceCommit": "95896b53e16e0021bb1e4062c122c6a0668175dd",
+      "binarySha256": "89b394f6c8f261fe9408e291a28528aab7142b27a1336821df1b44e2e7999d26",
+      "dmgArchiveMatch": true,
+      "bundleIntegrity": true
+    },
+    "linux-deb": {
+      "elfMachine": 62,
+      "sourceCommit": "95896b53e16e0021bb1e4062c122c6a0668175dd",
+      "officialChannel": true,
+      "controlVersion": "1.5.7",
+      "architecture": "amd64"
+    },
+    "windows-msi": {
+      "template": "x64;0"
+    }
+  },
+  "local-acceptance": {
+    "date": "2026-11-06",
+    "version": "1.5.7",
+    "sourceCommit": "95896b53e16e0021bb1e4062c122c6a0668175dd",
+    "localAcceptance": {
+      "os": "macOS Apple Silicon",
+      "application": "~/Applications/Tuzi Assistant v1.5.7 Repair QA.app",
+      "isolatedProfile": true,
+      "productionCsp": true,
+      "passed": [
+        "inline image preview",
+        "native clipboard copy/paste and undo",
+        "native save original bytes",
+        "Finder reveal original copy",
+        "copy prompt",
+        "preview save cancel",
+        "synthetic model discovery",
+        "two batches of 20 synthetic images",
+        "20 placeholders before execution",
+        "three-column results",
+        "generated cache preview/save",
+        "cold restart then rename unopened project preserves 20 images"
+      ],
+      "userConfirmed": [
+        "external local image drag/drop displays image"
+      ],
+      "manualDragAutomation": "inconclusive window hit-testing; not counted as passed",
+      "syntheticImageSize": [
+        128,
+        128
+      ],
+      "savedImageSha256": "57cfcd344d297a4ea622d327234da6be7a587ef1d42cec7630b141fd05239ed3"
+    },
+    "regression": {
+      "host": 812,
+      "creative": 2285,
+      "downloadPage": 16,
+      "typecheck": true,
+      "nativeAcceptanceBuilds": 2
+    },
+    "notVerified": [
+      "Windows/Linux GUI",
+      "real paid provider calls in this repair",
+      "high-resolution batch latency",
+      "official updater signing and installation"
+    ],
+    "reproducedAdditionalDefect": "unopened project rename persisted metadata-only elements=[]; fixed and reverified in installed native app"
+  },
+  "public-verification": {
+    "verifiedAt": "2026-11-06T15:20:49Z",
+    "pages": [
+      {
+        "path": "index.html",
+        "status": 200,
+        "sha256": "1dfc4d3cd3ca575c2c7d3b442fab15f8ffd6ad303f572b99cebfa0133486e667"
+      },
+      {
+        "path": "download-SOURCE.json",
+        "status": 200,
+        "sha256": "d7cc07547f354cd0bb4104cf89cb632024dd5a5c9bcdb582ee80737c10983d85"
+      },
+      {
+        "path": "install-macos-v1.5.7.sh",
+        "status": 200,
+        "sha256": "d961d779546e20aa088f0b8b505c1c2b617a1357007dacbb60ae2f4d839a95d8"
+      },
+      {
+        "path": "install-macos-v1.5.6.sh",
+        "status": 200,
+        "sha256": "06c4932d60768acc2bb8f9e7a0929f3c8884b2e054874a154856ca01082b80f6"
+      },
+      {
+        "path": "install.sh",
+        "status": 200,
+        "sha256": "8804283d2b4da70a1cd6bd73fe37d08426e7c6f40a316a37c5b605abdf1231e9"
+      },
+      {
+        "path": "tuzi-download-analytics.html",
+        "status": 200,
+        "sha256": "8d3ef99572f00d8826c49630c9ade6d082c8e3cb261d81f3dc458cd01460d389"
+      },
+      {
+        "path": "release.json",
+        "status": 200,
+        "sha256": "afef6ab97abedea1d48351d730b4f3894b7d32d5dc9d36346caadf60ffc73ea5"
+      },
+      {
+        "path": "install-macos-v1.5.5.sh",
+        "status": 200,
+        "sha256": "4384f7885226c6cb7c1ea8b797141ad5e7ee542f09cc74ddb9c6d4fb0f7e4b49"
+      },
+      {
+        "path": "tuzi-switch.html",
+        "status": 200,
+        "sha256": "1dfc4d3cd3ca575c2c7d3b442fab15f8ffd6ad303f572b99cebfa0133486e667"
+      },
+      {
+        "path": "LICENSE.txt",
+        "status": 200,
+        "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+      },
+      {
+        "path": "assets/tuzi-switch-D32FSEU9.css",
+        "status": 200,
+        "sha256": "36e7c6fd79dbdb4186ba7b6af9235ac66141c1019df68297791a8ded64df1082"
+      },
+      {
+        "path": "assets/tuzi-switch-CXEGAtJU.js",
+        "status": 200,
+        "sha256": "f81f92c42fc2f8b1dc45a4cae3192c7b9ea441120da3768ecde0e5fd092d090e"
+      },
+      {
+        "path": "tuzi-assistant-assets/icon.png",
+        "status": 200,
+        "sha256": "0ac46b55e71b60d46874ca24ded5a98228967753e9dc9333d52f4faa157cf9bc"
+      },
+      {
+        "path": "tuzi-assistant-assets/projects.png",
+        "status": 200,
+        "sha256": "e2de881f14cd73fe8d7066a3ff84744d697a5e3c5fc2d4efb9353451959c4caa"
+      },
+      {
+        "path": "tuzi-assistant-assets/tools.png",
+        "status": 200,
+        "sha256": "5bde352fcb30dac958ba4f130d2511d533bb5c53d01548db5cdea985e2e1feb9"
+      },
+      {
+        "path": "tuzi-assistant-assets/configuration.png",
+        "status": 200,
+        "sha256": "57f28915982f499f9e089ada427c76bedb5eeda97eedcee5e70648a1a0b0b2b1"
+      }
+    ],
+    "installers": [
+      {
+        "name": "tuzi-assistant-linux-x64.AppImage",
+        "status": 200,
+        "size": 102914552,
+        "sha256": "sha256:eaa64b49d59224e0b42824b0abc5a8365f2bf2281318c6bf419d2102152d0b63",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.AppImage"
+      },
+      {
+        "name": "tuzi-assistant-linux-x64.deb",
+        "status": 200,
+        "size": 23743968,
+        "sha256": "sha256:962b6e5674f1aaf3a9e8ab957ab1948417b1ab99d64cdfc6d6d95ac53daea26b",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.deb"
+      },
+      {
+        "name": "tuzi-assistant-linux-x64.rpm",
+        "status": 200,
+        "size": 23743721,
+        "sha256": "sha256:b81cf2fb5b4f6c6c5a18cfd5d7738258bd5cbe3a6084300549764c5c2f6fd990",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-linux-x64.rpm"
+      },
+      {
+        "name": "tuzi-assistant-macos-arm64.dmg",
+        "status": 200,
+        "size": 24710081,
+        "sha256": "sha256:971cd34ca4dcd5da2cf32167db40785792c36fa3960b8e28c96ba4065292b4b0",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-macos-arm64.dmg"
+      },
+      {
+        "name": "tuzi-assistant-macos-x64.dmg",
+        "status": 200,
+        "size": 25334431,
+        "sha256": "sha256:25bc94ec4a466149f9c10dad2a0d6e9b42b2b20b9cb17fb3e1f0dfca48ecb5d2",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-macos-x64.dmg"
+      },
+      {
+        "name": "tuzi-assistant-windows-x64.exe",
+        "status": 200,
+        "size": 20344632,
+        "sha256": "sha256:7571dc6c1f1b2acfe59bd264cb95f31c36499cf1c8836d72e592e9e3fd5ba838",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-windows-x64.exe"
+      },
+      {
+        "name": "tuzi-assistant-windows-x64.msi",
+        "status": 200,
+        "size": 23650304,
+        "sha256": "sha256:ed988c2a6f6c4795a4752f5c3354dc6e9b277c5f02deaa174bda678aa0d89bcc",
+        "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.7/tuzi-assistant-windows-x64.msi"
+      }
+    ]
+  },
+  "public-commands": {
+    "bootstrapSha256": "8804283d2b4da70a1cd6bd73fe37d08426e7c6f40a316a37c5b605abdf1231e9",
+    "cases": [
+      {
+        "args": [
+          "--help"
+        ],
+        "environmentTag": null,
+        "version": "1.5.7",
+        "passed": true
+      },
+      {
+        "args": [
+          "--version",
+          "v1.5.7",
+          "--help"
+        ],
+        "environmentTag": null,
+        "version": "1.5.7",
+        "passed": true
+      },
+      {
+        "args": [
+          "--version",
+          "v1.5.6",
+          "--help"
+        ],
+        "environmentTag": null,
+        "version": "1.5.6",
+        "passed": true
+      },
+      {
+        "args": [
+          "--version",
+          "v1.5.5",
+          "--help"
+        ],
+        "environmentTag": null,
+        "version": "1.5.5",
+        "passed": true
+      },
+      {
+        "args": [
+          "--help"
+        ],
+        "environmentTag": "v1.5.6",
+        "version": "1.5.6",
+        "passed": true
+      },
+      {
+        "args": [
+          "--version",
+          "v1.5.7",
+          "--help"
+        ],
+        "environmentTag": "v1.5.6",
+        "version": "1.5.7",
+        "passed": true
+      },
+      {
+        "entry": "scripts/install_tuzi_switch.sh",
+        "environmentTag": "v1.5.7",
+        "version": "1.5.7",
+        "passed": true
+      }
+    ],
+    "latestRelease": "v1.5.7",
+    "publicAssets": 14
+  },
+  "additionalPublicFullDownload": {
+    "status": "not completed",
+    "reason": "Stopped redundant downloads after about 4m36s at 10-13% due to local GitHub transfer speed around 10-12 KB/s; not counted as passed.",
+    "exitCode": 143,
+    "architectures": [
+      "arm64",
+      "x64"
+    ],
+    "localRealDmgInstallerTests": {
+      "passed": 13
+    },
+    "publicVerificationScope": "16 files matched byte-for-byte; 7 installer URLs HTTP 200 and size checked; 14 release assets match expected SHA256 via GitHub asset digests; 7 bootstrap routing cases passed."
+  }
+}

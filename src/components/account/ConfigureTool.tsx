@@ -1,3 +1,4 @@
+import { trackInteraction } from "@/lib/analytics";
 import { supportsTuziProtocol } from "@/lib/tuziEndpointCompatibility";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -15,6 +16,7 @@ import {
   CommandItem,
 } from "@/components/ui/command";
 import { ChevronsUpDown, Check } from "lucide-react";
+import { OpentuIcon } from "@/components/icons/OpentuIcon";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { isNativeTool } from "@/lib/api/nativeTools";
 
@@ -71,6 +73,7 @@ function ConfigureToolSession({
   onClose,
   onReady,
   onExisting,
+  onCreative,
 }: {
   state: AccountState;
   keyDto: DesktopKey;
@@ -78,6 +81,7 @@ function ConfigureToolSession({
   onClose: () => void;
   onReady: (draft: TuziProviderDraft<TuziTool>) => void;
   onExisting?: (app: TuziTool, providerId: string) => void;
+  onCreative?: (key: DesktopKey) => void;
 }) {
   const [app, setApp] = useState<TuziTool | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -263,6 +267,20 @@ function ConfigureToolSession({
         </p>
       )}
       <div className="account-tool-grid">
+        {onCreative && (
+          <Button
+            variant="outline"
+            disabled={busy || !!unavailable}
+            onClick={() => onCreative(keyDto)}
+          >
+            <span>
+              opentu 创作<small>关联账户 · 配置供应商与模型</small>
+            </span>
+            <span className="account-tool-icon" aria-hidden="true">
+              <OpentuIcon size={18} />
+            </span>
+          </Button>
+        )}
         {(Object.keys(labels) as TuziTool[])
           .filter(
             (id) =>
@@ -292,6 +310,10 @@ function ConfigureToolSession({
                     onExisting(id, saved[0].providerId);
                     return;
                   }
+                  if (app !== id)
+                    trackInteraction("configure_tool", "select_tool", {
+                      tool: id,
+                    });
                   setApp(id);
                   setModel(undefined);
                   setProtocol("");

@@ -1,0 +1,15 @@
+{
+  "engine": "webkit",
+  "checks": [
+    "five actions, keyboard navigation, Escape",
+    "copy/save/reveal original bytes via native boundary",
+    "exact generation prompt",
+    "cancel is silent and native error surfaced",
+    "original preview and native save from preview",
+    "reload export from original cache without generation",
+    "dark narrow viewport bounds and outside dismissal",
+    "right-click targets top image and disables missing prompt",
+    "missing original reports failure without export, thumbnail or regeneration"
+  ],
+  "errors": []
+}

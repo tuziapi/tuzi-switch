@@ -1,0 +1,1390 @@
+import { toGenerationTaskError } from '../../utils/generation-error-details';
+import { getWorkflowFailureDetails } from '../../utils/workflow-error-details';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  seedance2VideoAdapter,
+  submitSeedance2Request,
+} from '../model-adapters/seedance2-adapter';
+import type { AdapterContext } from '../model-adapters/types';
+
+const { getCachedBlob, cacheMediaFromBlob } = vi.hoisted(() => ({
+  getCachedBlob: vi.fn(),
+  cacheMediaFromBlob: vi.fn(),
+}));
+
+vi.mock('../unified-cache-service', () => ({
+  unifiedCacheService: { getCachedBlob, cacheMediaFromBlob },
+}));
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function createContext(fetcher: typeof fetch): AdapterContext {
+  return {
+    baseUrl: 'https://video.example.com/v1',
+    apiKey: 'sk-test',
+    authType: 'bearer',
+    operation: 'video',
+    fetcher,
+    binding: {
+      id: 'provider:seedance-2:video',
+      profileId: 'provider',
+      modelId: 'doubao-seedance-2-0-260128',
+      operation: 'video',
+      protocol: 'openai.async.video',
+      requestSchema: 'doubao.seedance-2.video.content-json',
+      responseSchema: 'openai.async.task',
+      submitPath: '/videos',
+      pollPathTemplate: '/videos/{taskId}',
+      priority: 700,
+      confidence: 'high',
+      source: 'template',
+    },
+  };
+}
+
+describe('seedance 2.0 video adapter', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    getCachedBlob.mockReset();
+    cacheMediaFromBlob.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it.each(['video_url', 'metadata'])(
+    'uses the configured content endpoint even with an inline %s result',
+    async (field) => {
+      const remoteUrl =
+        'https://pixmax-prod.oss-accelerate.aliyuncs.com/static/video/result.mp4';
+      const download = vi.fn().mockImplementation(
+        async () =>
+          new Response('video bytes', {
+            headers: { 'Content-Type': 'video/mp4' },
+          })
+      );
+      const fetcher = vi.fn(
+        async (input: RequestInfo | URL, init?: RequestInit) =>
+          String(input).endsWith('/content')
+            ? download(input, init)
+            : init?.method === 'POST'
+            ? jsonResponse({ id: 'seedance-25-content', status: 'queued' })
+            : jsonResponse({
+                status: 'completed',
+                [field]: field === 'metadata' ? { url: remoteUrl } : remoteUrl,
+              })
+      );
+      const globalFetch = vi
+        .fn()
+        .mockRejectedValue(new Error('Unexpected global fetch'));
+      vi.stubGlobal('fetch', globalFetch);
+      const context = createContext(fetcher);
+      context.binding = {
+        ...context.binding!,
+        metadata: {
+          video: {
+            resultMode: 'download-content',
+            downloadPathTemplate: '/videos/{taskId}/content',
+          },
+        },
+      };
+      const resultPromise = seedance2VideoAdapter.generateVideo(context, {
+        model: 'doubao-seedance-2-5-260628',
+        prompt: 'content delivery',
+        duration: 4,
+      });
+
+      await vi.advanceTimersByTimeAsync(5000);
+      expect((await resultPromise).url).toBe(
+        '/__aitu_cache__/video/seedance-25-content.mp4'
+      );
+      expect(download).toHaveBeenCalledWith(
+        'https://video.example.com/v1/videos/seedance-25-content/content',
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(cacheMediaFromBlob).toHaveBeenCalledWith(
+        '/__aitu_cache__/video/seedance-25-content.mp4',
+        expect.objectContaining({ size: 11, type: 'video/mp4' }),
+        'video',
+        expect.objectContaining({ taskId: 'seedance-25-content' })
+      );
+      expect(fetcher).toHaveBeenCalledTimes(3);
+      expect(globalFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('surfaces a failed content download without resubmitting generation or returning an unusable remote URL', async () => {
+    const download = vi
+      .fn()
+      .mockImplementation(
+        async () => new Response('forbidden', { status: 403 })
+      );
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input).endsWith('/content')
+          ? download()
+          : init?.method === 'POST'
+          ? jsonResponse({ id: 'content-failed', status: 'queued' })
+          : jsonResponse({
+              status: 'completed',
+              video_url: 'https://cdn.example.com/download-only.mp4',
+            })
+    );
+    const context = createContext(fetcher);
+    context.binding = {
+      ...context.binding!,
+      metadata: { video: { resultMode: 'download-content' } },
+    };
+    const resultPromise = seedance2VideoAdapter.generateVideo(context, {
+      model: 'doubao-seedance-2-5-260628',
+      prompt: 'download failure',
+      duration: 4,
+    });
+    const rejection =
+      expect(resultPromise).rejects.toThrow('视频内容下载失败: 403');
+    await vi.advanceTimersByTimeAsync(5000);
+    await rejection;
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(download).toHaveBeenCalledTimes(1);
+    expect(cacheMediaFromBlob).not.toHaveBeenCalled();
+  });
+
+  describe('completed content delivery', () => {
+    const request = {
+      model: 'doubao-seedance-2-5-260628',
+      prompt: 'recover completed video',
+      duration: 4,
+    };
+
+    function createDeliveryContext(download: typeof fetch) {
+      const fetcher = vi.fn(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+          if (String(input).endsWith('/content')) return download(input, init);
+          return init?.method === 'POST'
+            ? jsonResponse({ id: 'completed-task', status: 'queued' })
+            : jsonResponse({
+                status: 'completed',
+                video_url: 'https://cdn.example.com/result.mp4',
+              });
+        }
+      );
+      const context = createContext(fetcher);
+      context.binding = {
+        ...context.binding!,
+        metadata: { video: { resultMode: 'download-content' } },
+      };
+      const globalFetch = vi
+        .fn()
+        .mockRejectedValue(new Error('Unexpected global fetch'));
+      vi.stubGlobal('fetch', globalFetch);
+      return { context, fetcher, globalFetch };
+    }
+
+    function videoResponse() {
+      return new Response('video bytes', {
+        headers: { 'Content-Type': 'video/mp4' },
+      });
+    }
+
+    it.each([408, 425, 429, 500, 503, 'network'])(
+      'recovers from %s by downloading the same task without polling or submitting again',
+      async (failure) => {
+        const download = vi.fn<typeof fetch>();
+        if (failure === 'network') {
+          download.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        } else {
+          download.mockResolvedValueOnce(
+            new Response('temporary failure', { status: Number(failure) })
+          );
+        }
+        download.mockResolvedValueOnce(videoResponse());
+        const { context, fetcher, globalFetch } =
+          createDeliveryContext(download);
+        const result = seedance2VideoAdapter.generateVideo(context, request);
+
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(download).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(999);
+        expect(download).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(result).resolves.toMatchObject({
+          url: '/__aitu_cache__/video/completed-task.mp4',
+        });
+        expect(download).toHaveBeenCalledTimes(2);
+        for (const [url, init] of download.mock.calls) {
+          expect(url).toBe(
+            'https://video.example.com/v1/videos/completed-task/content'
+          );
+          expect(init?.method).toBe('GET');
+        }
+        expect(fetcher).toHaveBeenCalledTimes(4);
+        expect(globalFetch).not.toHaveBeenCalled();
+        expect(cacheMediaFromBlob).toHaveBeenCalledTimes(1);
+      }
+    );
+
+    it('stops after three failed downloads without resetting the delivery budget', async () => {
+      const download = vi
+        .fn<typeof fetch>()
+        .mockImplementation(
+          async () => new Response('temporarily unavailable', { status: 503 })
+        );
+      const { context, fetcher } = createDeliveryContext(download);
+      const result = seedance2VideoAdapter.generateVideo(context, request);
+      const rejection = expect(result).rejects.toThrow('视频内容下载失败: 503');
+
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(download).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(download).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(2000);
+      await rejection;
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(download).toHaveBeenCalledTimes(3);
+      expect(fetcher).toHaveBeenCalledTimes(5);
+      expect(cacheMediaFromBlob).not.toHaveBeenCalled();
+    });
+
+    it.each([401, 403, 404])(
+      'does not retry permanent HTTP %s errors',
+      async (status) => {
+        const download = vi
+          .fn<typeof fetch>()
+          .mockImplementation(
+            async () => new Response('permanent failure', { status })
+          );
+        const { context, fetcher } = createDeliveryContext(download);
+        const result = seedance2VideoAdapter.generateVideo(context, request);
+        const rejection = expect(result).rejects.toThrow(
+          `视频内容下载失败: ${status}`
+        );
+        await vi.advanceTimersByTimeAsync(60000);
+        await rejection;
+        expect(download).toHaveBeenCalledTimes(1);
+        expect(fetcher).toHaveBeenCalledTimes(3);
+        expect(cacheMediaFromBlob).not.toHaveBeenCalled();
+      }
+    );
+
+    it('stops retrying when cancelled during the backoff', async () => {
+      const download = vi
+        .fn<typeof fetch>()
+        .mockRejectedValue(new TypeError('Failed to fetch'));
+      const { context, fetcher } = createDeliveryContext(download);
+      const controller = new AbortController();
+      context.signal = controller.signal;
+      const result = seedance2VideoAdapter.generateVideo(context, request);
+      const rejection = expect(result).rejects.toThrow('cancelled');
+
+      await vi.advanceTimersByTimeAsync(5000);
+      controller.abort();
+      await rejection;
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(download).toHaveBeenCalledTimes(1);
+      expect(fetcher).toHaveBeenCalledTimes(3);
+      expect(cacheMediaFromBlob).not.toHaveBeenCalled();
+    });
+
+    it('passes cancellation to an in-flight download without retrying AbortError', async () => {
+      const download = vi.fn<typeof fetch>().mockImplementation(
+        (_input, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener(
+              'abort',
+              () => reject(init.signal?.reason),
+              { once: true }
+            );
+          })
+      );
+      const { context } = createDeliveryContext(download);
+      const controller = new AbortController();
+      context.signal = controller.signal;
+      const result = seedance2VideoAdapter.generateVideo(context, request);
+      const rejection = expect(result).rejects.toMatchObject({
+        name: 'AbortError',
+      });
+
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(download.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+      controller.abort();
+      await rejection;
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(download).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports empty content immediately instead of retrying a non-transport error', async () => {
+      const download = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(''));
+      const { context } = createDeliveryContext(download);
+      const result = seedance2VideoAdapter.generateVideo(context, request);
+      const rejection = expect(result).rejects.toThrow('视频内容下载为空');
+      await vi.advanceTimersByTimeAsync(60000);
+      await rejection;
+      expect(download).toHaveBeenCalledTimes(1);
+      expect(cacheMediaFromBlob).not.toHaveBeenCalled();
+    });
+
+    it('keeps global fetch working when no context fetcher is supplied', async () => {
+      const download = vi.fn<typeof fetch>().mockResolvedValue(videoResponse());
+      const { context, fetcher } = createDeliveryContext(download);
+      delete context.fetcher;
+      vi.stubGlobal('fetch', fetcher);
+      const result = seedance2VideoAdapter.generateVideo(context, request);
+      await vi.advanceTimersByTimeAsync(5000);
+      await expect(result).resolves.toMatchObject({
+        url: '/__aitu_cache__/video/completed-task.mp4',
+      });
+      expect(fetcher).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  it('submits official model IDs as JSON and polls queued tasks to completion', async () => {
+    const onProgress = vi.fn();
+    const onSubmitted = vi.fn();
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({ url: String(input), init: init || {} });
+
+        if ((init?.method || 'GET') === 'POST') {
+          return jsonResponse({ id: 'seedance-2-task', status: 'queued' });
+        }
+
+        return jsonResponse({
+          id: 'seedance-2-task',
+          status: 'completed',
+          progress: 100,
+          duration: 12,
+          metadata: { url: 'https://cdn.example.com/seedance-2.mp4' },
+        });
+      }
+    ) as unknown as typeof fetch;
+
+    const resultPromise = seedance2VideoAdapter.generateVideo(
+      createContext(fetcher),
+      {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'camera flies over a glass city',
+        size: '1080p',
+        duration: 12,
+        referenceImages: ['https://assets.example.com/ref.png'],
+        params: {
+          generate_audio: true,
+          watermark: false,
+          input_video: 'https://assets.example.com/ref.mp4',
+          input_audio: 'https://assets.example.com/ref.mp3',
+          ratio: '9:16',
+          seed: '0',
+          camera_fixed: 'false',
+          onProgress,
+          onSubmitted,
+        },
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await resultPromise;
+
+    expect(result).toMatchObject({
+      url: 'https://cdn.example.com/seedance-2.mp4',
+      format: 'mp4',
+      duration: 12,
+    });
+    expect(onSubmitted).toHaveBeenCalledWith('seedance-2-task', undefined);
+    expect(onProgress).toHaveBeenNthCalledWith(1, 5, 'queued');
+    expect(onProgress).toHaveBeenLastCalledWith(100, 'completed');
+    expect(requests[0]?.url).toBe('https://video.example.com/v1/videos');
+    expect(requests[0]?.init.method).toBe('POST');
+    expect(requests[0]?.init.headers).toMatchObject({
+      Authorization: 'Bearer sk-test',
+      'Content-Type': 'application/json',
+    });
+    expect(JSON.parse(String(requests[0]?.init.body))).toEqual({
+      model: 'doubao-seedance-2-0-260128',
+      content: [
+        { type: 'text', text: 'camera flies over a glass city' },
+        {
+          type: 'image_url',
+          image_url: { url: 'https://assets.example.com/ref.png' },
+          role: 'reference_image',
+        },
+        {
+          type: 'video_url',
+          video_url: { url: 'https://assets.example.com/ref.mp4' },
+          role: 'reference_video',
+        },
+        {
+          type: 'audio_url',
+          audio_url: { url: 'https://assets.example.com/ref.mp3' },
+          role: 'reference_audio',
+        },
+      ],
+      resolution: '1080p',
+      ratio: '9:16',
+      duration: 12,
+      generate_audio: true,
+      seed: 0,
+      camera_fixed: false,
+    });
+    expect(requests[1]?.url).toBe(
+      'https://video.example.com/v1/videos/seedance-2-task'
+    );
+  });
+
+  it('keeps fast and mini official IDs unchanged', async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({ url: String(input), init: init || {} });
+        return (init?.method || 'GET') === 'POST'
+          ? jsonResponse({ task_id: 'seedance-mini-task', status: 'queued' })
+          : jsonResponse({
+              task_id: 'seedance-mini-task',
+              status: 'succeeded',
+              video_url: 'https://cdn.example.com/mini.mp4',
+            });
+      }
+    ) as unknown as typeof fetch;
+
+    const resultPromise = seedance2VideoAdapter.generateVideo(
+      createContext(fetcher),
+      {
+        model: 'doubao-seedance-2-0-mini-260615',
+        prompt: 'small product turntable',
+        size: '720p',
+        duration: 4,
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await resultPromise;
+    const submitBody = JSON.parse(String(requests[0]?.init.body));
+
+    expect(result.url).toBe('https://cdn.example.com/mini.mp4');
+    expect(submitBody.model).toBe('doubao-seedance-2-0-mini-260615');
+    expect(submitBody).toMatchObject({
+      resolution: '720p',
+      ratio: '16:9',
+      duration: 4,
+      generate_audio: true,
+    });
+    expect(submitBody).not.toHaveProperty('watermark');
+  });
+
+  it('uses Seedance 2.5 duration and reference limits without 2.0-only controls', async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({ url: String(input), init: init || {} });
+        return (init?.method || 'GET') === 'POST'
+          ? jsonResponse({ id: 'seedance-25-task', status: 'queued' })
+          : jsonResponse({
+              id: 'seedance-25-task',
+              status: 'completed',
+              duration: 30,
+              metadata: { url: 'https://cdn.example.com/seedance-25.mp4' },
+            });
+      }
+    ) as unknown as typeof fetch;
+
+    const resultPromise = seedance2VideoAdapter.generateVideo(
+      createContext(fetcher),
+      {
+        model: 'doubao-seedance-2-5-260628',
+        prompt: 'long-form reference scene',
+        size: '1080p',
+        duration: 30,
+        referenceImages: ['https://assets.example.com/ref.png'],
+        params: {
+          ratio: '1:1',
+          input_videos: [
+            'https://assets.example.com/ref-1.mp4',
+            'https://assets.example.com/ref-2.mp4',
+            'https://assets.example.com/ref-3.mp4',
+            'https://assets.example.com/ref-4.mp4',
+          ],
+          input_audios: [
+            'https://assets.example.com/ref-1.mp3',
+            'https://assets.example.com/ref-2.mp3',
+            'https://assets.example.com/ref-3.mp3',
+            'https://assets.example.com/ref-4.mp3',
+          ],
+          seed: '7',
+          camera_fixed: 'true',
+          watermark: 'true',
+        },
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await expect(resultPromise).resolves.toMatchObject({
+      url: 'https://cdn.example.com/seedance-25.mp4',
+      duration: 30,
+    });
+
+    const submitBody = JSON.parse(String(requests[0]?.init.body));
+    expect(submitBody).toMatchObject({
+      model: 'doubao-seedance-2-5-260628',
+      ratio: '1:1',
+      duration: 30,
+    });
+    expect(submitBody.resolution).toBe('1080p');
+    expect(submitBody.watermark).toBe(true);
+    expect(submitBody.seed).toBeUndefined();
+    expect(submitBody.camera_fixed).toBeUndefined();
+    expect(
+      submitBody.content.filter(
+        (item: { type: string }) => item.type === 'video_url'
+      )
+    ).toHaveLength(4);
+    expect(
+      submitBody.content.filter(
+        (item: { type: string }) => item.type === 'audio_url'
+      )
+    ).toHaveLength(4);
+  });
+
+  it.each([
+    ['16:9', '16:9'],
+    ['16x9', '16:9'],
+    ['1280x720', '16:9'],
+    ['720x1280', '9:16'],
+    ['1024x1024', '1:1'],
+    ['4:3', '4:3'],
+    ['1:1', '1:1'],
+    ['3:4', '3:4'],
+    ['9:16', '9:16'],
+    ['21:9', '21:9'],
+    ['adaptive', 'adaptive'],
+  ])(
+    'normalizes Seedance 2.5 ratio %s before submission',
+    async (ratio, expectedRatio) => {
+      const requests: RequestInit[] = [];
+      const fetcher = vi.fn(
+        async (_input: RequestInfo | URL, init?: RequestInit) => {
+          requests.push(init || {});
+          return (init?.method || 'GET') === 'POST'
+            ? jsonResponse({ id: 'seedance-25-ratio-task', status: 'queued' })
+            : jsonResponse({
+                id: 'seedance-25-ratio-task',
+                status: 'completed',
+                duration: 4,
+                metadata: {
+                  url: 'https://cdn.example.com/seedance-25-ratio.mp4',
+                },
+              });
+        }
+      ) as unknown as typeof fetch;
+
+      const resultPromise = seedance2VideoAdapter.generateVideo(
+        createContext(fetcher),
+        {
+          model: 'doubao-seedance-2-5-260628',
+          prompt: 'ratio regression',
+          size: ratio,
+          duration: 4,
+        }
+      );
+
+      await vi.advanceTimersByTimeAsync(5000);
+      await expect(resultPromise).resolves.toMatchObject({
+        url: 'https://cdn.example.com/seedance-25-ratio.mp4',
+      });
+      const submitBody = JSON.parse(String(requests[0]?.body));
+      expect(submitBody.ratio).toBe(expectedRatio);
+      expect(submitBody.resolution).toBe('720p');
+    }
+  );
+
+  it('normalizes Auto to adaptive from explicit params', async () => {
+    const requests: RequestInit[] = [];
+    const fetcher = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push(init || {});
+        return (init?.method || 'GET') === 'POST'
+          ? jsonResponse({ id: 'seedance-25-auto-task', status: 'queued' })
+          : jsonResponse({
+              id: 'seedance-25-auto-task',
+              status: 'completed',
+              duration: 4,
+              metadata: { url: 'https://cdn.example.com/seedance-25-auto.mp4' },
+            });
+      }
+    ) as unknown as typeof fetch;
+
+    const resultPromise = seedance2VideoAdapter.generateVideo(
+      createContext(fetcher),
+      {
+        model: 'doubao-seedance-2-5-260628',
+        prompt: 'auto ratio regression',
+        duration: 4,
+        params: { ratio: 'Auto' },
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await expect(resultPromise).resolves.toMatchObject({
+      url: 'https://cdn.example.com/seedance-25-auto.mp4',
+    });
+    expect(JSON.parse(String(requests[0]?.body)).ratio).toBe('adaptive');
+  });
+
+  it('rejects Seedance 2.5 durations outside 4-30 seconds before transport', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-5-260628',
+        prompt: 'invalid duration',
+        duration: 3,
+      })
+    ).rejects.toThrow('4-30 秒整数');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a top-level provider message for Seedance submission errors', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ message: '请求参数无效，请检查后重试' }, 400)
+    ) as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-5-260628',
+        prompt: 'provider validation error',
+      })
+    ).rejects.toThrow('请求参数无效，请检查后重试');
+  });
+
+  it('submits multiple workflow media references and deduplicates legacy values', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ error: { message: 'captured' } }, 400)
+    ) as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'multiple canvas references',
+        params: {
+          input_video: 'https://assets.example.com/video-1.mp4',
+          input_videos: [
+            ' https://assets.example.com/video-1.mp4 ',
+            'https://assets.example.com/video-2.mp4',
+            'https://assets.example.com/video-3.mp4',
+          ],
+          input_audio: 'audio-material-1',
+          input_audios: [
+            ' audio-material-1 ',
+            'asset://audio-material-2',
+            'https://assets.example.com/audio-3.mp3',
+          ],
+        },
+      })
+    ).rejects.toThrow('captured');
+
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toMatchObject({
+      content: [
+        { type: 'text', text: 'multiple canvas references' },
+        {
+          type: 'video_url',
+          video_url: { url: 'https://assets.example.com/video-1.mp4' },
+          role: 'reference_video',
+        },
+        {
+          type: 'video_url',
+          video_url: { url: 'https://assets.example.com/video-2.mp4' },
+          role: 'reference_video',
+        },
+        {
+          type: 'video_url',
+          video_url: { url: 'https://assets.example.com/video-3.mp4' },
+          role: 'reference_video',
+        },
+        {
+          type: 'audio_url',
+          audio_url: { url: 'audio-material-1' },
+          role: 'reference_audio',
+        },
+        {
+          type: 'audio_url',
+          audio_url: { url: 'asset://audio-material-2' },
+          role: 'reference_audio',
+        },
+        {
+          type: 'audio_url',
+          audio_url: { url: 'https://assets.example.com/audio-3.mp3' },
+          role: 'reference_audio',
+        },
+      ],
+    });
+  });
+
+  it('keeps empty workflow media arrays equivalent to no references', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ error: { message: 'captured' } }, 400)
+    ) as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'no canvas media references',
+        params: { input_videos: [], input_audios: [] },
+      })
+    ).rejects.toThrow('captured');
+
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toMatchObject({
+      content: [{ type: 'text', text: 'no canvas media references' }],
+    });
+  });
+
+  it.each([
+    {
+      params: {
+        input_videos: 'https://assets.example.com/reference.mp4',
+      },
+      message: '参考视频必须为字符串数组',
+    },
+    {
+      params: { input_audios: ['audio-material-1', 2] },
+      message: '第 2 条参考音频必须为非空字符串',
+    },
+    {
+      params: {
+        input_videos: [
+          'https://assets.example.com/reference.mp4',
+          'http://127.0.0.1/private.mp4',
+        ],
+      },
+      message: '第 2 条参考视频仅支持公网 HTTP(S) 地址',
+    },
+    {
+      params: {
+        input_audios: [
+          'audio-material-1',
+          'blob:https://app.example.com/audio-2',
+        ],
+      },
+      message: '第 2 条参考音频仅支持 HTTP(S)',
+    },
+  ])(
+    'rejects invalid multi-reference input before submission: $message',
+    async ({ params, message }) => {
+      const fetcher = vi.fn() as unknown as typeof fetch;
+
+      await expect(
+        seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+          model: 'doubao-seedance-2-0-260128',
+          prompt: 'invalid multi-reference input',
+          params,
+        })
+      ).rejects.toThrow(message);
+      expect(fetcher).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    {
+      params: {
+        input_videos: [1, 2, 3, 4].map(
+          (index) => `https://assets.example.com/video-${index}.mp4`
+        ),
+      },
+      message: '参考视频最多支持 3 条',
+    },
+    {
+      params: {
+        input_audios: [1, 2, 3, 4].map((index) => `audio-material-${index}`),
+      },
+      message: '参考音频最多支持 3 条',
+    },
+  ])(
+    'rejects references beyond the Seedance 2.0 count boundary: $message',
+    async ({ params, message }) => {
+      const fetcher = vi.fn() as unknown as typeof fetch;
+
+      await expect(
+        seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+          model: 'doubao-seedance-2-0-260128',
+          prompt: 'too many references',
+          params,
+        })
+      ).rejects.toThrow(message);
+      expect(fetcher).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects aggregate inline audio data beyond the single-reference budget', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const firstPayload = 'A'.repeat(8 * 1024 * 1024);
+    const secondPayload = 'B'.repeat(8 * 1024 * 1024);
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'bounded inline audio references',
+        params: {
+          input_audios: [
+            `data:audio/mpeg;base64,${firstPayload}`,
+            `data:audio/mpeg;base64,${secondPayload}`,
+          ],
+        },
+      })
+    ).rejects.toThrow('音频 Data URL 合计不能超过 16 MiB');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('accepts official audio references but rejects browser-local media URLs', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ error: { message: 'stop after request capture' } }, 400)
+    ) as unknown as typeof fetch;
+    const validResult = seedance2VideoAdapter.generateVideo(
+      createContext(fetcher),
+      {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'asset reference',
+        params: { input_audio: ' audio-material-123 ' },
+      }
+    );
+
+    await expect(validResult).rejects.toThrow('stop after request capture');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toMatchObject({
+      content: [
+        { type: 'text', text: 'asset reference' },
+        {
+          type: 'audio_url',
+          audio_url: { url: 'audio-material-123' },
+          role: 'reference_audio',
+        },
+      ],
+    });
+
+    fetcher.mockClear();
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'audio data reference',
+        params: { input_audio: 'data:audio/mpeg;base64,ZmFrZQ==' },
+      })
+    ).rejects.toThrow('stop after request capture');
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toMatchObject({
+      content: [
+        { type: 'text', text: 'audio data reference' },
+        {
+          type: 'audio_url',
+          audio_url: { url: 'data:audio/mpeg;base64,ZmFrZQ==' },
+          role: 'reference_audio',
+        },
+      ],
+    });
+
+    fetcher.mockClear();
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'local reference',
+        params: { input_audio: 'blob:https://app.example.com/audio-123' },
+      })
+    ).rejects.toThrow(
+      'Seedance 2.0 参考音频仅支持 HTTP(S)、asset://、音频 Data URL 或素材 ID'
+    );
+    expect(fetcher).not.toHaveBeenCalled();
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'invalid audio data reference',
+        params: { input_audio: 'data:audio/mpeg;base64,%%%' },
+      })
+    ).rejects.toThrow('Seedance 2.0 参考音频仅支持');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('materializes a persisted virtual audio reference only at request time', async () => {
+    vi.useRealTimers();
+    getCachedBlob.mockResolvedValueOnce(
+      new Blob(['audio'], { type: 'audio/mpeg' })
+    );
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ error: { message: 'captured' } }, 400)
+    ) as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'virtual audio reference',
+        params: {
+          input_audio: '/__aitu_generated__/audio/content-reference.mp3',
+        },
+      })
+    ).rejects.toThrow('captured');
+
+    expect(getCachedBlob).toHaveBeenCalledWith(
+      '/__aitu_generated__/audio/content-reference.mp3'
+    );
+    const submitBody = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
+    expect(submitBody.content[1]).toMatchObject({
+      type: 'audio_url',
+      role: 'reference_audio',
+    });
+    expect(submitBody.content[1].audio_url.url).toMatch(
+      /^data:audio\/mpeg;base64,/
+    );
+  });
+
+  it('rejects a missing virtual audio cache before submission', async () => {
+    getCachedBlob.mockResolvedValueOnce(null);
+    const fetcher = vi.fn() as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'missing virtual audio reference',
+        params: { input_audio: '/__aitu_cache__/audio/missing.mp3' },
+      })
+    ).rejects.toThrow('本地参考音频缓存不可用');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized cached audio before materializing base64', async () => {
+    getCachedBlob.mockResolvedValueOnce({
+      size: 13 * 1024 * 1024,
+      type: 'audio/mpeg',
+    } as Blob);
+    const fetcher = vi.fn() as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'oversized cached audio',
+        params: {
+          input_audio: '/__aitu_cache__/audio/oversized.mp3',
+        },
+      })
+    ).rejects.toThrow('音频 Data URL 合计不能超过 16 MiB');
+
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('checks aggregate cached audio size before materializing any reference', async () => {
+    getCachedBlob
+      .mockResolvedValueOnce({
+        size: 7 * 1024 * 1024,
+        type: 'audio/mpeg',
+      } as Blob)
+      .mockResolvedValueOnce({
+        size: 7 * 1024 * 1024,
+        type: 'audio/mpeg',
+      } as Blob);
+    const fetcher = vi.fn() as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'aggregate cached audio',
+        params: {
+          input_audios: [
+            '/__aitu_cache__/audio/first.mp3',
+            '/__aitu_cache__/audio/second.mp3',
+          ],
+        },
+      })
+    ).rejects.toThrow('音频 Data URL 合计不能超过 16 MiB');
+
+    expect(getCachedBlob).toHaveBeenCalledTimes(2);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-public reference video addresses before submission', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'invalid reference video',
+        params: { input_video: 'asset://video-123' },
+      })
+    ).rejects.toThrow('Seedance 2.0 参考视频仅支持公网 HTTP(S) 地址');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy combined sizes as a compatibility fallback', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ error: { message: 'captured' } }, 400)
+    ) as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'legacy task',
+        size: '480p@21:9',
+        duration: 4,
+      })
+    ).rejects.toThrow('captured');
+
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toMatchObject({
+      resolution: '480p',
+      ratio: '21:9',
+      duration: 4,
+    });
+  });
+
+  it.each([
+    { duration: 3, message: '视频时长必须为 4-12 秒整数' },
+    { duration: 13, message: '视频时长必须为 4-12 秒整数' },
+    { duration: 4.5, message: '视频时长必须为 4-12 秒整数' },
+  ])('rejects invalid duration $duration before submission', async (entry) => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'duration boundary',
+        size: '720p',
+        duration: entry.duration,
+      })
+    ).rejects.toThrow(entry.message);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('backs off after transient poll errors and then recovers', async () => {
+    let pollCount = 0;
+    const fetcher = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if ((init?.method || 'GET') === 'POST') {
+          return jsonResponse({ id: 'retry-task', status: 'queued' });
+        }
+        pollCount += 1;
+        if (pollCount === 1) {
+          throw new Error('Load failed');
+        }
+        return jsonResponse({
+          id: 'retry-task',
+          status: 'completed',
+          metadata: { video_url: 'https://cdn.example.com/recovered.mp4' },
+        });
+      }
+    ) as unknown as typeof fetch;
+
+    const resultPromise = seedance2VideoAdapter.generateVideo(
+      createContext(fetcher),
+      {
+        model: 'doubao-seedance-2-0-fast-260128',
+        prompt: 'recover after temporary network error',
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(7500);
+    const result = await resultPromise;
+
+    expect(result.url).toBe('https://cdn.example.com/recovered.mp4');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(['completed', 'complete', 'succeeded', 'succeed', 'success', 'done'])(
+    'accepts terminal success status %s for Seedance 2.5',
+    async (status) => {
+      const fetcher = vi.fn(
+        async (_input: RequestInfo | URL, init?: RequestInit) =>
+          jsonResponse(
+            init?.method === 'POST'
+        ? { id: 'seedance-25-task', status: 'queued' }
+              : {
+                  id: 'seedance-25-task',
+                  status: status.toUpperCase(),
+                  metadata: {
+                    video_url: 'https://cdn.example.com/seedance-25.mp4',
+                  },
+                }
+          )
+    ) as unknown as typeof fetch;
+      const resultPromise = seedance2VideoAdapter.generateVideo(
+        createContext(fetcher),
+        {
+          model: 'doubao-seedance-2-5-260628',
+          prompt: 'terminal success',
+        }
+      );
+    await vi.advanceTimersByTimeAsync(5000);
+      expect((await resultPromise).url).toBe(
+        'https://cdn.example.com/seedance-25.mp4'
+      );
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it.each(['failed', 'failure', 'error', 'cancelled', 'canceled'])(
+    'does not retry terminal %s task states',
+    async (status) => {
+    const fetcher = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if ((init?.method || 'GET') === 'POST') {
+          return jsonResponse({ id: 'failed-task', status: 'queued' });
+        }
+        return jsonResponse({
+          id: 'failed-task',
+          status: status.toUpperCase(),
+          error: { message: 'upstream rejected prompt' },
+        });
+      }
+    ) as unknown as typeof fetch;
+
+    const resultPromise = seedance2VideoAdapter.generateVideo(
+      createContext(fetcher),
+      {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'terminal failure',
+      }
+    );
+    const rejection = expect(resultPromise).rejects.toThrow(
+      'upstream rejected prompt'
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await rejection;
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it('preserves immediate submission failures without requiring a task ID', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ status: 'failed', error: { message: 'quota exhausted' } })
+    ) as unknown as typeof fetch;
+
+    await expect(
+      seedance2VideoAdapter.generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'submission failure',
+      })
+    ).rejects.toThrow('quota exhausted');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails immediately for non-transient poll HTTP errors', async () => {
+    const fetcher = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) =>
+        (init?.method || 'GET') === 'POST'
+          ? new Response(JSON.stringify({ id: 'bad-task', status: 'queued' }), {
+              headers: { 'x-oneapi-request-id': 'site-submit' },
+            })
+          : jsonResponse({ error: { message: 'forbidden' } }, 403)
+    ) as unknown as typeof fetch;
+
+    const resultPromise = seedance2VideoAdapter.generateVideo(
+      createContext(fetcher),
+      {
+        model: 'doubao-seedance-2-0-260128',
+        prompt: 'forbidden poll',
+      }
+    );
+    const rejection = expect(resultPromise).rejects.toMatchObject({
+      message: 'forbidden',
+      diagnostics: { apiRequestId: 'site-submit', httpStatus: 403 },
+    });
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await rejection;
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Seedance 2.5 request parameters', () => {
+  it('preserves existing watermark and output format defaults', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ id: 'task', status: 'queued' })
+    );
+    await submitSeedance2Request(createContext(fetcher), {
+      model: 'doubao-seedance-2-5-260628',
+      prompt: 'red ball',
+    });
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+    expect(body).toMatchObject({
+      resolution: '480p',
+      ratio: '16:9',
+      duration: 4,
+      generate_audio: true,
+      watermark: false,
+      output_format: 'mp4',
+    });
+    expect(body).not.toHaveProperty('seed');
+    expect(body).not.toHaveProperty('camera_fixed');
+  });
+
+  it('converts selectable values into provider types', async () => {
+    const fetcher = vi.fn(async () =>
+      jsonResponse({ id: 'task', status: 'queued' })
+    );
+    await submitSeedance2Request(createContext(fetcher), {
+      model: 'doubao-seedance-2-5-260628',
+      prompt: 'red ball',
+      size: '480p',
+      params: {
+        generate_audio: 'false',
+        watermark: 'true',
+        output_format: 'mov',
+      },
+    });
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+    expect(body).toMatchObject({
+      generate_audio: false,
+      watermark: true,
+      output_format: 'mov',
+    });
+  });
+
+  it('ignores legacy draft and priority preferences', async () => {
+    const fetcher = vi.fn(async () => jsonResponse({ id: 'task' }));
+    await submitSeedance2Request(createContext(fetcher), {
+      model: 'doubao-seedance-2-5-260628', prompt: 'legacy values',
+      params: { draft: true, priority: 9 },
+    });
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+    expect(body).not.toHaveProperty('draft');
+    expect(body).not.toHaveProperty('priority');
+    expect(body).toMatchObject({ watermark: false, output_format: 'mp4' });
+  });
+
+  it.each([
+    [{ resolution: '4k' }, '分辨率'],
+    [{ output_format: 'avi' }, '输出格式'],
+    [{ watermark: 'invalid' }, '布尔值'],
+  ])(
+    'rejects invalid parameters before submission: %j',
+    async (params, error) => {
+      const fetcher = vi.fn();
+      await expect(
+        submitSeedance2Request(createContext(fetcher), {
+          model: 'doubao-seedance-2-5-260628',
+          prompt: 'red ball',
+          params,
+        })
+      ).rejects.toThrow(error);
+      expect(fetcher).not.toHaveBeenCalled();
+    }
+  );
+});
+
+
+describe('Seedance API-site submission IDs', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each([
+    { submitHeader: 'site-submit', taskBody: {}, expected: 'site-submit' },
+    { submitHeader: undefined, taskBody: {}, expected: undefined },
+    {
+      submitHeader: undefined,
+      taskBody: { original_request_id: 'site-original' },
+      expected: 'site-original',
+    },
+  ])(
+    'keeps the original API-site ID instead of a polling/upstream ID: $expected',
+    async ({ submitHeader, taskBody, expected }) => {
+      const onSubmitted = vi.fn();
+      const fetcher = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ id: 'remote-video', status: 'queued' }),
+            {
+              headers: submitHeader
+                ? { 'x-oneapi-request-id': submitHeader }
+                : {},
+            }
+          )
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              id: 'remote-video',
+              status: 'failed',
+              ...taskBody,
+              error: {
+                code: 'task_failed',
+                message: 'Rejected Request id: upstream-only',
+              },
+            }),
+            {
+              headers: {
+                'x-oneapi-request-id': 'poll-only',
+                'x-request-id': 'gateway-only',
+              },
+            }
+          )
+        );
+      const result = seedance2VideoAdapter
+        .generateVideo(createContext(fetcher), {
+          model: 'doubao-seedance-2-5-260628',
+          prompt: 'test',
+          duration: 4,
+          params: { onSubmitted },
+        })
+        .catch((error) => error);
+      await vi.advanceTimersByTimeAsync(5000);
+      const error = await result;
+      expect(error).toBeInstanceOf(Error);
+      expect(onSubmitted).toHaveBeenCalledWith('remote-video', submitHeader);
+      const saved = JSON.parse(
+        JSON.stringify(toGenerationTaskError(error, 'VIDEO_FAILED'))
+      );
+      expect(saved.details.apiRequestId).toBe(expected);
+      const details = getWorkflowFailureDetails(
+        {
+          id: 'workflow',
+          name: 'Video',
+          generationType: 'video',
+          prompt: '',
+          count: 1,
+          steps: [
+            {
+              id: 'video',
+              mcp: 'generate_video',
+              description: 'Video',
+              status: 'failed',
+              error: error.message,
+              errorDetails: saved,
+            },
+          ],
+        },
+        []
+      );
+      expect(details).toMatchObject({
+        requestId: expected,
+        remoteId: 'remote-video',
+        error: '[HTTP 200 · task_failed] Rejected',
+      });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it('captures the API-site ID of a rejected submission without polling', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { message: 'Denied (request id: upstream-id)' },
+        }),
+        { status: 403, headers: { 'x-oneapi-request-id': 'site-rejection' } }
+      )
+    );
+    const error = await seedance2VideoAdapter
+      .generateVideo(createContext(fetcher), {
+        model: 'doubao-seedance-2-5-260628',
+        prompt: 'test',
+        duration: 4,
+      })
+      .catch((error) => error);
+    expect(
+      toGenerationTaskError(error, 'VIDEO_FAILED').details.apiRequestId
+    ).toBe('site-rejection');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});

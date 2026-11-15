@@ -1,0 +1,1430 @@
+[
+  {
+    "id": "batch-image",
+    "theme": "light",
+    "width": 1180,
+    "height": 800,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 0,
+        "y": 120,
+        "width": 1180,
+        "height": 660,
+        "top": 120,
+        "right": 1180,
+        "bottom": 780,
+        "left": 0
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 1180,
+        "height": 660,
+        "top": 120,
+        "right": 1180,
+        "bottom": 780,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "批量出图工具",
+    "text": "删除选中\n插入选中图片\n下载选中图片\n上下文\n选择知识库笔记\n生成选中行\n0\n行已选\n0\n个待生成任务\n共 5 行 · 0 个排队/生成中 · 0 张已完成\n\t#\t\n提示词\n\t\n参数\n\t\n参考图片\n\t\n数量\n\t\n预览\n\n\n\t1\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t2\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t3\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t4\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t5\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n导出选中行\n导出全部\n\n提示：Enter 编辑/确认 | Tab 移动 | Ctrl+Z 撤销 | Ctrl+Y 重做 | 拖拽图片到行\n\n素材库\n上传图片\n暂无图片，请上传",
+    "controls": [
+      {
+        "tag": "BUTTON",
+        "label": "下载 Excel 模板"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "导入 Excel"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "批量导入参考图"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "反选任务行"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "选择知识库笔记"
+      },
+      {
+        "tag": "INPUT",
+        "label": "选择或输入模型"
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "导出全部"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "上传图片"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "prompt-history",
+    "theme": "light",
+    "width": 1180,
+    "height": 800,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 30,
+        "y": 120,
+        "width": 1120,
+        "height": 660,
+        "top": 120,
+        "right": 1150,
+        "bottom": 780,
+        "left": 30
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 1180,
+        "height": 660,
+        "top": 120,
+        "right": 1180,
+        "bottom": 780,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "我的提示词",
+    "text": "全部\n图片\n视频\n音频\n文本\nAgent\nPPT公共\nPPT页面\n共 0 条，已加载 0 条\n\t类型\t标题\t发送提示词\t标签\t结果\t时间\t操作\n暂无我的提示词\n点击提示词复制，勾选列选择，Shift 连选\n没有更多了",
+    "controls": [
+      {
+        "tag": "INPUT",
+        "label": "搜索标题、提示词、标签"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "新建提示词"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "刷新"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "图片"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "视频"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "音频"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "文本"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Agent"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "PPT公共"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "PPT页面"
+      },
+      {
+        "tag": "INPUT",
+        "label": "选择已加载提示词"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "music-player",
+    "theme": "light",
+    "width": 1180,
+    "height": 800,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 330,
+        "y": 130,
+        "width": 520,
+        "height": 640,
+        "top": 130,
+        "right": 850,
+        "bottom": 770,
+        "left": 330
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 1180,
+        "height": 660,
+        "top": 120,
+        "right": 1180,
+        "bottom": 780,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "音乐播放器",
+    "text": "当前播放\n未选择音频\n画布音频 · --:-- / --:--\n全部音频\n0\n全部语音\n0\n收藏\n0\n新建播放列表\n素材库音频\n0 首音频\n当前列表里还没有音频",
+    "controls": [
+      {
+        "tag": "BUTTON",
+        "label": "上一首"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "播放"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "下一首"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切换播放速度，当前1x"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切换播放模式，当前顺序播放"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切回播放控件"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部音频0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部语音0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "收藏0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "新建播放列表"
+      },
+      {
+        "tag": "INPUT",
+        "label": "搜索素材库音频"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "batch-image",
+    "theme": "dark",
+    "width": 1180,
+    "height": 800,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 0,
+        "y": 120,
+        "width": 1180,
+        "height": 660,
+        "top": 120,
+        "right": 1180,
+        "bottom": 780,
+        "left": 0
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 1180,
+        "height": 660,
+        "top": 120,
+        "right": 1180,
+        "bottom": 780,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "批量出图工具",
+    "text": "删除选中\n插入选中图片\n下载选中图片\n上下文\n选择知识库笔记\n生成选中行\n0\n行已选\n0\n个待生成任务\n共 5 行 · 0 个排队/生成中 · 0 张已完成\n\t#\t\n提示词\n\t\n参数\n\t\n参考图片\n\t\n数量\n\t\n预览\n\n\n\t1\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t2\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t3\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t4\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t5\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n导出选中行\n导出全部\n\n提示：Enter 编辑/确认 | Tab 移动 | Ctrl+Z 撤销 | Ctrl+Y 重做 | 拖拽图片到行\n\n素材库\n上传图片\n暂无图片，请上传",
+    "controls": [
+      {
+        "tag": "BUTTON",
+        "label": "下载 Excel 模板"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "导入 Excel"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "批量导入参考图"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "反选任务行"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "选择知识库笔记"
+      },
+      {
+        "tag": "INPUT",
+        "label": "选择或输入模型"
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "导出全部"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "上传图片"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "prompt-history",
+    "theme": "dark",
+    "width": 1180,
+    "height": 800,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 30,
+        "y": 120,
+        "width": 1120,
+        "height": 660,
+        "top": 120,
+        "right": 1150,
+        "bottom": 780,
+        "left": 30
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 1180,
+        "height": 660,
+        "top": 120,
+        "right": 1180,
+        "bottom": 780,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "我的提示词",
+    "text": "全部\n图片\n视频\n音频\n文本\nAgent\nPPT公共\nPPT页面\n共 0 条，已加载 0 条\n\t类型\t标题\t发送提示词\t标签\t结果\t时间\t操作\n暂无我的提示词\n点击提示词复制，勾选列选择，Shift 连选\n没有更多了",
+    "controls": [
+      {
+        "tag": "INPUT",
+        "label": "搜索标题、提示词、标签"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "新建提示词"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "刷新"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "图片"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "视频"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "音频"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "文本"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Agent"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "PPT公共"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "PPT页面"
+      },
+      {
+        "tag": "INPUT",
+        "label": "选择已加载提示词"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "music-player",
+    "theme": "dark",
+    "width": 1180,
+    "height": 800,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 330,
+        "y": 130,
+        "width": 520,
+        "height": 640,
+        "top": 130,
+        "right": 850,
+        "bottom": 770,
+        "left": 330
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 1180,
+        "height": 660,
+        "top": 120,
+        "right": 1180,
+        "bottom": 780,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "音乐播放器",
+    "text": "当前播放\n未选择音频\n画布音频 · --:-- / --:--\n全部音频\n0\n全部语音\n0\n收藏\n0\n新建播放列表\n素材库音频\n0 首音频\n当前列表里还没有音频",
+    "controls": [
+      {
+        "tag": "BUTTON",
+        "label": "上一首"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "播放"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "下一首"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切换播放速度，当前1x"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切换播放模式，当前顺序播放"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切回播放控件"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部音频0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部语音0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "收藏0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "新建播放列表"
+      },
+      {
+        "tag": "INPUT",
+        "label": "搜索素材库音频"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "batch-image",
+    "theme": "light",
+    "width": 900,
+    "height": 600,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 8,
+        "y": 120,
+        "width": 884,
+        "height": 460,
+        "top": 120,
+        "right": 892,
+        "bottom": 580,
+        "left": 8
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 900,
+        "height": 460,
+        "top": 120,
+        "right": 900,
+        "bottom": 580,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "批量出图工具",
+    "text": "删除选中\n插入选中图片\n下载选中图片\n上下文\n选择知识库笔记\n生成选中行\n0\n行已选\n0\n个待生成任务\n共 5 行 · 0 个排队/生成中 · 0 张已完成\n\t#\t\n提示词\n\t\n参数\n\t\n参考图片\n\t\n数量\n\t\n预览\n\n\n\t1\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t2\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t3\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t4\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t5\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n导出选中行\n导出全部\n\n提示：Enter 编辑/确认 | Tab 移动 | Ctrl+Z 撤销 | Ctrl+Y 重做 | 拖拽图片到行",
+    "controls": [
+      {
+        "tag": "BUTTON",
+        "label": "下载 Excel 模板"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "导入 Excel"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "批量导入参考图"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "反选任务行"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "选择知识库笔记"
+      },
+      {
+        "tag": "INPUT",
+        "label": "选择或输入模型"
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "导出全部"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "prompt-history",
+    "theme": "light",
+    "width": 900,
+    "height": 600,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 8,
+        "y": 120,
+        "width": 884,
+        "height": 460,
+        "top": 120,
+        "right": 892,
+        "bottom": 580,
+        "left": 8
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 900,
+        "height": 460,
+        "top": 120,
+        "right": 900,
+        "bottom": 580,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "我的提示词",
+    "text": "全部\n图片\n视频\n音频\n文本\nAgent\nPPT公共\nPPT页面\n共 0 条，已加载 0 条\n\t类型\t标题\t发送提示词\t标签\t结果\t时间\t操作\n暂无我的提示词\n点击提示词复制，勾选列选择，Shift 连选\n没有更多了",
+    "controls": [
+      {
+        "tag": "INPUT",
+        "label": "搜索标题、提示词、标签"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "新建提示词"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "刷新"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "图片"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "视频"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "音频"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "文本"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Agent"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "PPT公共"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "PPT页面"
+      },
+      {
+        "tag": "INPUT",
+        "label": "选择已加载提示词"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "music-player",
+    "theme": "light",
+    "width": 900,
+    "height": 600,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 190,
+        "y": 120,
+        "width": 520,
+        "height": 460,
+        "top": 120,
+        "right": 710,
+        "bottom": 580,
+        "left": 190
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 900,
+        "height": 460,
+        "top": 120,
+        "right": 900,
+        "bottom": 580,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "音乐播放器",
+    "text": "当前播放\n未选择音频\n画布音频 · --:-- / --:--\n全部音频\n0\n全部语音\n0\n收藏\n0\n新建播放列表\n素材库音频\n0 首音频\n当前列表里还没有音频",
+    "controls": [
+      {
+        "tag": "BUTTON",
+        "label": "上一首"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "播放"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "下一首"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切换播放速度，当前1x"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切换播放模式，当前顺序播放"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切回播放控件"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部音频0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部语音0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "收藏0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "新建播放列表"
+      },
+      {
+        "tag": "INPUT",
+        "label": "搜索素材库音频"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "batch-image",
+    "theme": "dark",
+    "width": 900,
+    "height": 600,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 8,
+        "y": 120,
+        "width": 884,
+        "height": 460,
+        "top": 120,
+        "right": 892,
+        "bottom": 580,
+        "left": 8
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 900,
+        "height": 460,
+        "top": 120,
+        "right": 900,
+        "bottom": 580,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "批量出图工具",
+    "text": "删除选中\n插入选中图片\n下载选中图片\n上下文\n选择知识库笔记\n生成选中行\n0\n行已选\n0\n个待生成任务\n共 5 行 · 0 个排队/生成中 · 0 张已完成\n\t#\t\n提示词\n\t\n参数\n\t\n参考图片\n\t\n数量\n\t\n预览\n\n\n\t1\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t2\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t3\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t4\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n\n\n\t5\t\n\t\n自动, 自动, 自动, 自动\n\t\n\t\n1\n\t\n-\n导出选中行\n导出全部\n\n提示：Enter 编辑/确认 | Tab 移动 | Ctrl+Z 撤销 | Ctrl+Y 重做 | 拖拽图片到行",
+    "controls": [
+      {
+        "tag": "BUTTON",
+        "label": "下载 Excel 模板"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "导入 Excel"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "批量导入参考图"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "反选任务行"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "选择知识库笔记"
+      },
+      {
+        "tag": "INPUT",
+        "label": "选择或输入模型"
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "INPUT",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "自动, 自动, 自动, 自动"
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": ""
+      },
+      {
+        "tag": "BUTTON",
+        "label": "导出全部"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "prompt-history",
+    "theme": "dark",
+    "width": 900,
+    "height": 600,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 8,
+        "y": 120,
+        "width": 884,
+        "height": 460,
+        "top": 120,
+        "right": 892,
+        "bottom": 580,
+        "left": 8
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 900,
+        "height": 460,
+        "top": 120,
+        "right": 900,
+        "bottom": 580,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "我的提示词",
+    "text": "全部\n图片\n视频\n音频\n文本\nAgent\nPPT公共\nPPT页面\n共 0 条，已加载 0 条\n\t类型\t标题\t发送提示词\t标签\t结果\t时间\t操作\n暂无我的提示词\n点击提示词复制，勾选列选择，Shift 连选\n没有更多了",
+    "controls": [
+      {
+        "tag": "INPUT",
+        "label": "搜索标题、提示词、标签"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "新建提示词"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "刷新"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "图片"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "视频"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "音频"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "文本"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Agent"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "PPT公共"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "PPT页面"
+      },
+      {
+        "tag": "INPUT",
+        "label": "选择已加载提示词"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  },
+  {
+    "id": "music-player",
+    "theme": "dark",
+    "width": 900,
+    "height": 600,
+    "external": false,
+    "errors": [],
+    "missing": [],
+    "geometry": {
+      "rect": {
+        "x": 190,
+        "y": 120,
+        "width": 520,
+        "height": 460,
+        "top": 120,
+        "right": 710,
+        "bottom": 580,
+        "left": 190
+      },
+      "host": {
+        "x": 0,
+        "y": 120,
+        "width": 900,
+        "height": 460,
+        "top": 120,
+        "right": 900,
+        "bottom": 580,
+        "left": 0
+      },
+      "inside": true
+    },
+    "title": "音乐播放器",
+    "text": "当前播放\n未选择音频\n画布音频 · --:-- / --:--\n全部音频\n0\n全部语音\n0\n收藏\n0\n新建播放列表\n素材库音频\n0 首音频\n当前列表里还没有音频",
+    "controls": [
+      {
+        "tag": "BUTTON",
+        "label": "上一首"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "播放"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "下一首"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切换播放速度，当前1x"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切换播放模式，当前顺序播放"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "切回播放控件"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部音频0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "全部语音0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "收藏0"
+      },
+      {
+        "tag": "BUTTON",
+        "label": "新建播放列表"
+      },
+      {
+        "tag": "INPUT",
+        "label": "搜索素材库音频"
+      }
+    ],
+    "blocked": [
+      "https://apistatus.tu-zi.com/api/history/aggregated",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/aitu/AiTu.png",
+      "https://tuziai.oss-cn-shenzhen.aliyuncs.com/linkme.png"
+    ],
+    "overflow": false,
+    "status": "opened"
+  }
+]

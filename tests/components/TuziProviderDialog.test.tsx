@@ -5,7 +5,7 @@ import {
 } from "@/lib/tuziToolCompatibility";
 import { toast } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, expect, it, vi } from "vitest";
 import {
@@ -92,6 +92,9 @@ it("adds directly from the actual account form while preserving the native trans
   const { onSaved } = setup();
   await waitFor(() =>
     expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "common.add" })).not.toBeDisabled(),
   );
   fireEvent.click(screen.getByRole("button", { name: "common.add" }));
   await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
@@ -182,6 +185,9 @@ it("shows preview failures and allows retry without closing the form", async () 
   await waitFor(() =>
     expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
   );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "common.add" })).not.toBeDisabled(),
+  );
   fireEvent.click(screen.getByRole("button", { name: "common.add" }));
   await waitFor(() =>
     expect(toast.error).toHaveBeenCalledWith(
@@ -195,9 +201,7 @@ it("shows preview failures and allows retry without closing the form", async () 
   expect(save).not.toHaveBeenCalled();
   expect(screen.getByLabelText("API Key")).toHaveValue(draft.key);
   await waitFor(() =>
-    expect(
-      screen.getByRole("button", { name: "common.add" }),
-    ).not.toBeDisabled(),
+    expect(screen.getByRole("button", { name: "common.add" })).not.toBeDisabled(),
   );
   fireEvent.click(screen.getByRole("button", { name: "common.add" }));
   await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
@@ -222,6 +226,7 @@ it("deduplicates saves, preserves input on failure and prepares a fresh plan on 
     expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
   );
   const button = screen.getByRole("button", { name: "common.add" });
+  await waitFor(() => expect(button).not.toBeDisabled());
   fireEvent.click(button);
   await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
   expect(button).toBeDisabled();
@@ -267,6 +272,7 @@ it("blocks duplicate submission and closing while preparing the transaction", as
     expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
   );
   const button = screen.getByRole("button", { name: "common.add" });
+  await waitFor(() => expect(button).not.toBeDisabled());
   fireEvent.click(button);
   await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
   expect(button).toBeDisabled();
@@ -298,6 +304,9 @@ it("does not start a write if the account form unmounts during preparation", asy
   await waitFor(() =>
     expect(screen.getByLabelText("API Key")).toHaveValue(draft.key),
   );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "common.add" })).not.toBeDisabled(),
+  );
   fireEvent.click(screen.getByRole("button", { name: "common.add" }));
   await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
   unmount();
@@ -323,4 +332,32 @@ it.each([
   ['测试"密钥\\A', '兔子线路-测试"密钥\\A'],
 ])("names a new provider from key %j", (keyName, expected) => {
   expect(tuziCreationPrefill({ ...draft, name: keyName })?.name).toBe(expected);
+});
+
+it("waits for Codex common config before allowing button or direct form submission", async () => {
+  let release!: () => void;
+  server.use(
+    http.post("http://tauri.local/get_common_config_snippet", async ({ request }) => {
+      const args = await request.json() as { appType: string };
+      if (args.appType === "codex") {
+        await new Promise<void>((resolve) => { release = resolve; });
+      }
+      return HttpResponse.json("");
+    }),
+  );
+  setup();
+  await waitFor(() => expect(release).toBeDefined());
+  const button = screen.getByRole("button", { name: "common.add" });
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  await act(async () => {
+    fireEvent.submit(document.getElementById("provider-form")!);
+  });
+  await waitFor(() => expect(button).toBeDisabled());
+  expect(preview).not.toHaveBeenCalled();
+  release();
+  await waitFor(() => expect(button).not.toBeDisabled());
+  fireEvent.click(button);
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  expect(preview.mock.calls[0][0].provider.meta.commonConfigEnabled).toBe(true);
 });

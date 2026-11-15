@@ -18,12 +18,14 @@ export function AccountDialog({
   children,
   footer,
   onClose,
+  drawer = false,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
+  drawer?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -35,7 +37,7 @@ export function AccountDialog({
     >
       <DialogContent
         zIndex="alert"
-        className="account-modal"
+        className={`account-modal ${drawer ? "account-drawer" : ""}`}
         {...(!description ? { "aria-describedby": undefined } : {})}
       >
         <DialogHeader className="relative pr-14">

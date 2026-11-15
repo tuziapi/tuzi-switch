@@ -1,0 +1,163 @@
+.creative-top-bar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  min-width: 0;
+  gap: 14px;
+  padding: 0 14px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  position: relative;
+  z-index: 30;
+}
+
+/* The native traffic lights keep their existing hit areas. */
+.creative-top-bar--mac {
+  padding-left: 84px;
+}
+.creative-top-bar--window-controls {
+  padding-right: 120px;
+}
+.creative-top-bar button {
+  -webkit-app-region: no-drag;
+}
+.creative-top-bar__brand {
+  flex-shrink: 0;
+}
+.creative-top-bar__brand button.tuzi-creative-navigation {
+  height: 32px;
+  margin: 0;
+  padding: 0 6px;
+  gap: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+}
+.creative-top-bar__brand button.tuzi-creative-navigation:hover {
+  background: hsl(var(--muted));
+}
+.creative-top-bar__brand .tuzi-navigation-icon {
+  color: hsl(var(--primary));
+}
+.creative-top-bar__divider {
+  width: 1px;
+  height: 17px;
+  flex-shrink: 0;
+  background: hsl(var(--border));
+}
+.creative-top-bar__tabs {
+  display: flex;
+  align-self: stretch;
+  align-items: stretch;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.creative-top-bar__tabs button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  white-space: nowrap;
+}
+.creative-top-bar__tabs button:hover {
+  color: hsl(var(--foreground));
+}
+.creative-top-bar__tabs button[aria-current="page"] {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+.creative-top-bar__tabs button[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: hsl(var(--primary));
+  border-radius: 2px 2px 0 0;
+}
+.creative-top-bar__drag {
+  flex: 1;
+  min-width: 24px;
+  align-self: stretch;
+}
+.creative-top-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+.creative-top-bar__settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 7px;
+  padding: 0 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: hsl(var(--muted-foreground));
+  height: 32px;
+  border-radius: 6px;
+}
+.creative-top-bar__settings:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.creative-top-bar .creative-chat-entry {
+  min-height: 29px;
+  padding: 4px 9px;
+  border-radius: 6px;
+}
+.creative-top-bar button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .creative-top-bar {
+    gap: 10px;
+    padding-right: 10px;
+  }
+  .creative-top-bar--window-controls {
+    padding-right: 120px;
+  }
+  .creative-top-bar__tabs {
+    gap: 12px;
+  }
+  .creative-top-bar__brand .tuzi-navigation-label {
+    display: none;
+  }
+}
+@media (max-width: 520px) {
+  .creative-top-bar {
+    gap: 7px;
+    padding-right: 8px;
+  }
+  .creative-top-bar--window-controls {
+    padding-right: 112px;
+  }
+  .creative-top-bar__divider,
+  .creative-top-bar__tabs button span {
+    display: none;
+  }
+  .creative-top-bar__tabs {
+    gap: 4px;
+  }
+  .creative-top-bar__tabs button {
+    padding: 0 7px;
+  }
+  .creative-top-bar__drag {
+    min-width: 8px;
+  }
+  .creative-top-bar__actions {
+    gap: 4px;
+  }
+}

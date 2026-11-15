@@ -1,0 +1,121 @@
+/**
+ * VideoModelOptions Component
+ *
+ * Dynamic parameter selection for video generation based on model configuration.
+ * Renders duration, size options and handles model-specific constraints.
+ */
+
+import React from 'react';
+import { Radio } from 'tdesign-react';
+import type { VideoModel, VideoModelConfig } from '../../../types/video.types';
+import { getVideoModelConfig } from '../../../constants/video-model-config';
+import './VideoModelOptions.scss';
+
+interface VideoModelOptionsProps {
+  model: VideoModel;
+  configOverride?: VideoModelConfig;
+  duration: string;
+  size: string;
+  onDurationChange: (duration: string) => void;
+  onSizeChange: (size: string) => void;
+  disabled?: boolean;
+}
+
+export const VideoModelOptions: React.FC<VideoModelOptionsProps> = ({
+  model,
+  configOverride,
+  duration,
+  size,
+  onDurationChange,
+  onSizeChange,
+  disabled = false,
+}) => {
+  const config = configOverride || getVideoModelConfig(model);
+  const durationOptions = config.durationOptions;
+  const sizeOptions = config.sizeOptions;
+  const isDurationValid = durationOptions.some((opt) => opt.value === duration);
+  const isSizeValid = sizeOptions.some((opt) => opt.value === size);
+  const normalizedDuration = isDurationValid ? duration : config.defaultDuration;
+  const normalizedSize = isSizeValid ? size : config.defaultSize;
+
+  // Convert duration options to RadioGroup format
+  const durationRadioOptions = durationOptions.map(opt => ({
+    label: opt.label,
+    value: opt.value,
+  }));
+
+  const sizeRadioOptions = sizeOptions.map(opt => ({
+    label: opt.label,
+    value: opt.value,
+  }));
+
+  return (
+    <div className="video-model-options">
+      {/* Duration selection */}
+      <div className="video-model-options__row">
+        <label className="video-model-options__label">时长</label>
+        <div className="video-model-options__control">
+          {durationOptions.length === 1 ? (
+            // Single option - show as text
+            <span className="video-model-options__fixed-value">
+              {durationOptions[0].label}
+            </span>
+          ) : (
+            // Multiple options - show as radio group
+            <Radio.Group
+              value={normalizedDuration}
+              onChange={(value) => {
+                const nextValue = value as string;
+                if (nextValue !== normalizedDuration) {
+                  onDurationChange(nextValue);
+                }
+              }}
+              disabled={disabled}
+              variant="default-filled"
+              size="small"
+            >
+              {durationRadioOptions.map(opt => (
+                <Radio.Button key={opt.value} value={opt.value}>
+                  {opt.label}
+                </Radio.Button>
+              ))}
+            </Radio.Group>
+          )}
+        </div>
+      </div>
+
+      {/* Size selection */}
+      <div className="video-model-options__row">
+        <label className="video-model-options__label">尺寸</label>
+        <div className="video-model-options__control">
+          {sizeOptions.length === 1 ? (
+            <span className="video-model-options__fixed-value">
+              {sizeOptions[0].label}
+            </span>
+          ) : (
+            <Radio.Group
+              value={normalizedSize}
+              onChange={(value) => {
+                const nextValue = value as string;
+                if (nextValue !== normalizedSize) {
+                  onSizeChange(nextValue);
+                }
+              }}
+              disabled={disabled}
+              variant="default-filled"
+              size="small"
+            >
+              {sizeRadioOptions.map(opt => (
+                <Radio.Button key={opt.value} value={opt.value}>
+                  {opt.label}
+                </Radio.Button>
+              ))}
+            </Radio.Group>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default VideoModelOptions;

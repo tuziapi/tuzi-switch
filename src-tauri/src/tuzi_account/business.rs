@@ -386,7 +386,36 @@ fn log(v: &Value) -> Result<Value, BusinessError> {
         }
     }
     .into();
-    d["error_message"] = Value::Null;
+    // Match the website's ordinary-user projection; never expose admin_info.
+    d["request_path"] = other["request_path"]
+        .as_str()
+        .map(Value::from)
+        .unwrap_or(Value::Null);
+    d["upstream_request_id"] = v["upstream_request_id"]
+        .as_str()
+        .map(Value::from)
+        .unwrap_or(Value::Null);
+    d["public_error_code"] = if result == "error" {
+        other["error_code"]
+            .as_str()
+            .map(Value::from)
+            .unwrap_or(Value::Null)
+    } else {
+        Value::Null
+    };
+    d["status_code"] = if result == "error" {
+        other["status_code"].clone()
+    } else {
+        Value::Null
+    };
+    d["error_message"] = if result == "error" {
+        v["content"]
+            .as_str()
+            .map(Value::from)
+            .unwrap_or(Value::Null)
+    } else {
+        Value::Null
+    };
     d["error_code"] = if result == "error" {
         let c = other["error_code"].as_str().unwrap_or("");
         Value::String(
@@ -790,11 +819,18 @@ impl AccountService {
 
     // Fixed origin, owned Key only. Listing does not reveal the secret to the
     // renderer or create/consume the one-use proof used by provider_save.
-    async fn key_model_catalog(
+    pub(super) async fn key_model_catalog(
         &self,
         generation: u64,
         token_id: &str,
     ) -> Result<Value, BusinessError> {
+        self.qualified_creative_key(generation, token_id).await.map(|(catalog, _)| catalog)
+    }
+
+    // Shared native qualification; no renderer reveal and no tool-save proof mutation.
+    pub(super) async fn qualified_creative_key(
+        &self, generation: u64, token_id: &str,
+    ) -> Result<(Value, zeroize::Zeroizing<String>), BusinessError> {
         let token = self.business_tokens(generation)?;
         let request = |method, suffix: &str| {
             self.http
@@ -843,10 +879,10 @@ impl AccountService {
         let items: Vec<_> = models.into_iter()
             .filter(|m| current_key["model_limits_enabled"] != true || limits.is_empty() || limits.contains(&m.id.as_str()))
             .map(|m| serde_json::json!({"model_name":m.id,"supported_endpoint_types":m.supported_endpoint_types,"endpoints":m.endpoints})).collect();
-        Ok(serde_json::json!({"items":items,"key":current_key}))
+        Ok((serde_json::json!({"items":items,"key":current_key}), secret))
     }
 
-    fn business_tokens(&self, generation: u64) -> Result<Tokens, BusinessError> {
+    pub(super) fn business_tokens(&self, generation: u64) -> Result<Tokens, BusinessError> {
         self.load();
         let i = self.inner.lock().unwrap();
         if i.record.generation != generation {
@@ -914,7 +950,8 @@ impl AccountService {
         if body.as_ref().is_some_and(|v| v.len() > max) {
             return Err(BusinessError::new("invalid_request", false));
         }
-        let readonly = request.method == "GET";
+        let readonly = request.method == "GET"
+            || (request.method == "POST" && request.path == "/account/model-performance/batch");
         let token = self.business_tokens(request.generation)?;
         if let Some(token_id) = request
             .path
@@ -1184,6 +1221,19 @@ pub async fn account_open_web(app: tauri::AppHandle, target: String) -> Result<(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn log_detail_projects_only_public_fields() {
+        let raw = serde_json::json!({"id":1,"type":6,"quota":0,"prompt_tokens":0,"completion_tokens":0,"upstream_request_id":"synthetic-upstream","content":"Public retry message","other":r#"{"request_path":"/v1/responses","error_code":"public_code","status_code":429,"admin_info":{"upstream_error":{"message":"PRIVATE_DIAGNOSTIC"}}}"#});
+        let projected = super::log(&raw).unwrap();
+        assert_eq!(projected["error_message"], "Public retry message");
+        assert_eq!(projected["public_error_code"], "public_code");
+        assert_eq!(projected["status_code"], 429);
+        assert_eq!(projected["request_path"], "/v1/responses");
+        assert_eq!(projected["upstream_request_id"], "synthetic-upstream");
+        assert!(!projected.to_string().contains("PRIVATE_DIAGNOSTIC"));
+        assert!(projected.get("other").is_none());
+    }
+
     #[test]
     fn key_suffix_is_mapped_to_a_suffix_pattern_without_accepting_full_secrets() {
         let mut request = BusinessRequest {

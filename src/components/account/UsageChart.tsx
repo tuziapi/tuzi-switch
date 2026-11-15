@@ -8,9 +8,11 @@ import { date } from "./BusinessShared";
 export function UsageChart({
   points,
   money,
+  label: chartLabel,
 }: {
   points: Usage["chart"];
   money?: Money;
+  label?: string;
 }) {
   const { t } = useTranslation();
   const gradient = useId();
@@ -35,7 +37,7 @@ export function UsageChart({
       <svg
         viewBox="0 0 560 190"
         role="img"
-        aria-label={t("account.visual.dailyTrend")}
+        aria-label={chartLabel ?? t("account.visual.dailyTrend")}
       >
         <defs>
           <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">

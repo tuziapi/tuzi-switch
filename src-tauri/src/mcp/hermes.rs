@@ -58,7 +58,7 @@ fn should_sync_hermes_mcp() -> bool {
 /// - `stdio`: output `command`, `args`, `env` (strip `type` field)
 /// - `sse`/`http`: output `url`, `headers` (strip `type` field)
 /// - Always add `enabled: true`
-fn convert_to_hermes_format(spec: &Value) -> Result<Value, AppError> {
+pub(super) fn convert_to_hermes_format(spec: &Value) -> Result<Value, AppError> {
     let obj = spec
         .as_object()
         .ok_or_else(|| AppError::McpValidation("MCP spec must be a JSON object".into()))?;
@@ -331,11 +331,10 @@ pub fn import_from_hermes(config: &mut MultiAppConfig) -> Result<usize, AppError
     }
 
     if !errors.is_empty() {
-        log::warn!(
-            "Import completed with {} failures: {:?}",
-            errors.len(),
-            errors
-        );
+        return Err(AppError::McpValidation(format!(
+            "该来源未导入，请修复无效条目后重试：{}",
+            errors.join("; ")
+        )));
     }
 
     Ok(changed)

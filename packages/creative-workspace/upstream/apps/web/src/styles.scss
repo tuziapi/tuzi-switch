@@ -1,0 +1,273 @@
+/* You can add global styles to this file, and also import other style files */
+
+/* Tailwind CSS 4.x 配置 */
+@import 'tailwindcss';
+@source '../**/*.{js,ts,jsx,tsx}';
+@source '../../packages/**/*.{js,ts,jsx,tsx}';
+
+/* Opentu 品牌全局样式 - 与 TDesign 主题保持一致 */
+@theme {
+  /* Tailwind 4.x 颜色定义 - 使用 Opentu 品牌色 */
+  --color-background: #ffffff;
+  --color-foreground: #171717;
+  --color-card: #ffffff;
+  --color-card-foreground: #171717;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #171717;
+  --color-primary: #F39C12;  /* Opentu 品牌橙色 */
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #5A4FCF;  /* Opentu 品牌紫色 */
+  --color-secondary-foreground: #ffffff;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #737373;
+  --color-accent: #f5f5f5;
+  --color-accent-foreground: #171717;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e5e5e5;
+  --color-input: #e5e5e5;
+  --color-ring: #F39C12;
+  --radius: 0.5rem;
+}
+
+:root {
+  /* 品牌色彩变量 - 与 TDesign 主题同步 */
+  --aitu-brand-primary: #F39C12;
+  --aitu-brand-primary-dark: #E67E22;
+  --aitu-brand-primary-darker: #D35400;
+  --aitu-brand-secondary: #5A4FCF;
+  --aitu-brand-secondary-light: #7B68EE;
+  --aitu-accent-create: #E91E63;
+  --aitu-accent-create-light: #F06292;
+
+  /* 中性色系 */
+  --aitu-neutral-900: #2D3436;
+  --aitu-neutral-600: #636E72;
+  --aitu-neutral-400: #B2BEC3;
+  --aitu-neutral-200: #F8F9FF;
+  --aitu-neutral-100: #FFFFFF;
+
+  /* 功能色彩 */
+  --aitu-success: #00B894;
+  --aitu-warning: #E67E22;
+  --aitu-error: #E91E63;
+
+  /* 渐变色 */
+  --aitu-gradient-primary: linear-gradient(135deg, #F39C12 0%, #E67E22 30%, #5A4FCF 70%, #E91E63 100%);
+  --aitu-gradient-brush: linear-gradient(135deg, #5A4FCF 0%, #7B68EE 50%, #E91E63 100%);
+
+  /* 统一 UI token：新 UI 优先使用这组变量 */
+  --aitu-ui-brand: var(--aitu-brand-primary);
+  --aitu-ui-brand-hover: var(--aitu-brand-primary-dark);
+  --aitu-ui-brand-active: var(--aitu-brand-primary-darker);
+  --aitu-ui-brand-text: #b45309;
+  --aitu-ui-brand-soft: rgba(243, 156, 18, 0.12);
+  --aitu-ui-brand-softer: rgba(243, 156, 18, 0.06);
+  --aitu-ui-brand-border: rgba(243, 156, 18, 0.52);
+  --aitu-ui-brand-border-soft: rgba(243, 156, 18, 0.28);
+  --aitu-ui-focus-ring: 0 0 0 3px rgba(243, 156, 18, 0.18);
+  --aitu-ui-selected-bg: rgba(243, 156, 18, 0.08);
+  --aitu-ui-hover-bg: #fffaf0;
+
+  --aitu-ui-surface: #ffffff;
+  --aitu-ui-surface-subtle: #f8fafc;
+  --aitu-ui-surface-muted: #f1f5f9;
+  --aitu-ui-surface-elevated: rgba(255, 255, 255, 0.92);
+  --aitu-ui-border-subtle: rgba(15, 23, 42, 0.06);
+  --aitu-ui-border: rgba(15, 23, 42, 0.1);
+  --aitu-ui-border-hover: rgba(15, 23, 42, 0.18);
+  --aitu-ui-text-primary: #1e293b;
+  --aitu-ui-text-secondary: #64748b;
+  --aitu-ui-text-tertiary: #94a3b8;
+  --aitu-ui-text-inverse: #ffffff;
+
+  --aitu-ui-success: #15803d;
+  --aitu-ui-success-soft: rgba(34, 197, 94, 0.12);
+  --aitu-ui-success-border: rgba(34, 197, 94, 0.28);
+  --aitu-ui-warning: #b45309;
+  --aitu-ui-warning-soft: rgba(245, 158, 11, 0.14);
+  --aitu-ui-warning-border: rgba(245, 158, 11, 0.32);
+  --aitu-ui-danger: var(--aitu-error);
+  --aitu-ui-danger-soft: rgba(233, 30, 99, 0.08);
+  --aitu-ui-danger-border: rgba(233, 30, 99, 0.24);
+
+  --aitu-ui-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --aitu-ui-shadow-hover: 0 8px 20px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(243, 156, 18, 0.18);
+  --aitu-ui-shadow-selected: 0 10px 24px rgba(243, 156, 18, 0.14), 0 0 0 1px rgba(243, 156, 18, 0.36);
+  --aitu-ui-shadow-popover: 0 16px 40px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --aitu-ui-shadow-soft: 0 2px 10px rgba(15, 23, 42, 0.06);
+}
+/* 在全局样式中设置 */
+:root {
+  color-scheme: light; /* 只支持浅色模式 */
+  --td-bg-color-page: #ffffff !important;
+  --td-bg-color-container: #f5f5f5 !important;
+  --td-text-color-primary: #333333 !important;
+  --td-text-color-secondary: #666666 !important;
+  --td-border-level-1-color: #e0e0e0 !important;
+  --td-border-level-2-color: #eeeeee !important;
+}
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Noto Sans', 'Noto Sans CJK SC', 'Microsoft Yahei', 'Hiragino Sans GB', Arial, sans-serif;
+    color: var(--aitu-neutral-900);
+    background-color: var(--aitu-neutral-100);
+}
+
+html,
+body {
+    height: 100%;
+    min-height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    /* 禁用触摸缩放 - 完全禁止 pinch-zoom */
+    touch-action: none;
+    -ms-touch-action: none;
+}
+
+#root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    /* 同样完全禁用触摸动作，防止页面缩放 */
+    touch-action: none;
+    -ms-touch-action: none;
+}
+
+/* 品牌色彩应用到常用元素 */
+a {
+  color: var(--aitu-brand-primary);
+  text-decoration: none;
+  
+  &:hover {
+    color: var(--aitu-brand-primary-dark);
+  }
+  
+  &:active {
+    color: var(--aitu-brand-primary-darker);
+  }
+}
+
+/* 选中文本的品牌色彩 */
+::selection {
+  background-color: rgba(243, 156, 18, 0.2);
+  color: var(--aitu-neutral-900);
+}
+
+::-moz-selection {
+  background-color: rgba(243, 156, 18, 0.2);
+  color: var(--aitu-neutral-900);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--aitu-neutral-200);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--aitu-neutral-400);
+  border-radius: 4px;
+  
+  &:hover {
+    background: var(--aitu-neutral-600);
+  }
+}
+
+
+.drawnix-console {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 0;
+    height: 200px;
+    width: 200px;
+    overflow: auto;
+    background-color: var(--aitu-neutral-900);
+    color: var(--aitu-neutral-100);
+    padding: 8px;
+    opacity: 0.5;
+    border-radius: 8px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 品牌渐变背景类 */
+.aitu-gradient-bg {
+  background: var(--aitu-gradient-primary);
+}
+
+.aitu-gradient-text {
+  background: var(--aitu-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 品牌按钮样式 */
+.aitu-button-primary {
+  background: var(--aitu-brand-primary);
+  color: white;
+  border: 1px solid var(--aitu-brand-primary);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: var(--aitu-brand-primary-dark);
+    border-color: var(--aitu-brand-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+  }
+  
+  &:active {
+    background: var(--aitu-brand-primary-darker);
+    border-color: var(--aitu-brand-primary-darker);
+    transform: translateY(0);
+  }
+}
+
+.aitu-button-secondary {
+  background: var(--aitu-brand-secondary);
+  color: white;
+  border: 1px solid var(--aitu-brand-secondary);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: var(--aitu-brand-secondary-light);
+    border-color: var(--aitu-brand-secondary-light);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(90, 79, 207, 0.3);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .drawnix-console {
+    width: 150px;
+    height: 150px;
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

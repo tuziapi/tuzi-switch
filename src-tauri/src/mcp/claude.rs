@@ -107,7 +107,10 @@ pub fn import_from_claude(config: &mut MultiAppConfig) -> Result<usize, AppError
     }
 
     if !errors.is_empty() {
-        log::warn!("导入完成，但有 {} 项失败: {:?}", errors.len(), errors);
+        return Err(AppError::McpValidation(format!(
+            "该来源未导入，请修复无效条目后重试：{}",
+            errors.join("; ")
+        )));
     }
 
     Ok(changed)

@@ -3,13 +3,18 @@
   flex: 1 0 auto;
   container: account / inline-size;
   --account-radius: 24px;
+  --account-workspace-width: 1320px;
+  --account-workspace-gutter: clamp(18px, 3vw, 36px);
 }
-.account-phase1 > .account-connection {
-  width: calc(100% - 48px);
-  max-width: 1192px;
+.account-shell.account-phase1 > .account-connection {
+  width: calc(100% - 2 * var(--account-workspace-gutter));
+  max-width: calc(
+    var(--account-workspace-width) - 2 * var(--account-workspace-gutter)
+  );
   flex-shrink: 0;
-  margin: 18px auto 0;
-  padding: 14px 18px;
+  min-height: 50px;
+  margin: 12px auto 0;
+  padding: 8px 14px;
   gap: 8px 12px;
   border: 1px solid hsl(var(--border) / 0.7);
   border-radius: 20px;
@@ -55,17 +60,28 @@
   font-weight: 400;
   font-size: 11px;
 }
-.account-connection .account-connection-hint {
-  order: 1;
-  flex-basis: 100%;
+.account-shell.account-phase1 .account-disconnect-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: hsl(var(--muted-foreground));
-  font-size: 11px;
 }
-.account-phase1 .account-content {
+.account-disconnect-help:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.account-shell.account-phase1 .account-content {
   flex-shrink: 0;
-  width: min(100%, 1240px);
-  padding: 24px 24px 36px;
-  gap: 16px;
+  width: min(100%, var(--account-workspace-width));
+  margin-inline: auto;
+  padding: 12px var(--account-workspace-gutter) 28px;
+  gap: 10px;
 }
 .account-phase1 .account-workspace-heading h2 {
   font-size: 18px;
@@ -110,10 +126,10 @@
   margin-top: -7px;
   padding-inline: 2px;
 }
-.account-phase1 .account-key-toolbar {
-  padding: 16px;
-  gap: 12px;
-  border: 1px solid hsl(var(--border) / 0.7);
+.account-shell.account-phase1 .account-key-toolbar {
+  padding: 0;
+  gap: 8px;
+  border: 0;
   border-radius: var(--account-radius);
   background: hsl(var(--card));
   align-items: center;
@@ -145,10 +161,14 @@
   margin-left: 0;
   padding-inline: 18px;
 }
-.account-phase1 .account-key-search-feedback {
-  margin-top: -8px;
-  margin-bottom: -8px;
+.account-shell.account-phase1 .account-key-search-feedback {
+  height: 24px;
+  margin-block: -6px;
   padding-inline: 3px;
+}
+.account-shell.account-phase1 .account-key-search-feedback button {
+  height: 24px;
+  padding-block: 0;
 }
 .account-phase1 .account-table-scroll {
   border-radius: var(--account-radius);
@@ -187,6 +207,7 @@
 }
 .account-phase1 .account-currency button {
   min-width: 58px;
+  border-radius: 999px;
 }
 .account-shell.account-disconnected {
   background: hsl(var(--background));
@@ -293,7 +314,7 @@
   border-radius: 18px;
 }
 @container account (max-width: 920px) {
-  .account-phase1 .account-key-toolbar {
+  .account-shell.account-phase1 .account-key-toolbar {
     flex-wrap: wrap;
   }
   .account-phase1 .account-key-filters {
@@ -320,13 +341,16 @@
     white-space: normal;
     padding-inline: 12px;
   }
-  .account-phase1 > .account-connection {
-    width: calc(100% - 32px);
-    margin-inline: auto;
-    padding: 14px;
+  .account-shell.account-phase1 > .account-connection,
+  .account-shell.account-phase1 .account-content {
+    --account-workspace-gutter: 16px;
   }
-  .account-phase1 .account-content {
-    padding: 20px 16px 28px;
+  .account-shell.account-phase1 > .account-connection {
+    margin-inline: auto;
+    padding: 8px 12px;
+  }
+  .account-shell.account-phase1 .account-content {
+    padding: 12px var(--account-workspace-gutter) 28px;
   }
   .account-phase1 .account-content > .account-metrics {
     gap: 10px;

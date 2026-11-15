@@ -23,6 +23,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setupGlobals.ts", "./tests/setupTests.ts"],
     globals: true,
+    exclude: ["**/node_modules/**", "**/dist/**", "packages/creative-workspace/**"],
     coverage: {
       reporter: ["text", "lcov"],
     },

@@ -1,0 +1,627 @@
+/* TDesign 主题配置 - 与 Opentu 品牌色彩保持一致 */
+
+/* 覆盖 TDesign 的 CSS 变量以匹配品牌色彩 */
+:root {
+  /* 主品牌色 - 橙金色系 */
+  --td-brand-color: #F39C12;
+  --td-brand-color-1: #FEF5E7;
+  --td-brand-color-2: #FDE68A;
+  --td-brand-color-3: #FBBF24;
+  --td-brand-color-4: #F59E0B;
+  --td-brand-color-5: #F39C12;
+  --td-brand-color-6: #E67E22;
+  --td-brand-color-7: #D35400;
+  --td-brand-color-8: #B45309;
+  --td-brand-color-9: #92400E;
+  --td-brand-color-10: #78350F;
+
+  /* 主要按钮和交互元素 */
+  --td-brand-color-hover: #E67E22;
+  --td-brand-color-focus: #F39C12;
+  --td-brand-color-active: #D35400;
+  --td-brand-color-disabled: #FDE68A;
+
+  /* 品牌色浅色版本 - 用于选中/高亮背景 */
+  --td-brand-color-light: rgba(243, 156, 18, 0.12);
+  --td-brand-color-light-hover: rgba(243, 156, 18, 0.18);
+  --td-brand-color-light-active: rgba(243, 156, 18, 0.24);
+
+  /* 成功色 - 保持TDesign默认或使用品牌绿色 */
+  --td-success-color: #00B894;
+  --td-success-color-hover: #00A085;
+  --td-success-color-active: #008B75;
+
+  /* 警告色 - 使用品牌橙色 */
+  --td-warning-color: #E67E22;
+  --td-warning-color-hover: #D35400;
+  --td-warning-color-active: #B45309;
+
+  /* 错误色 - 使用玫红色系 */
+  --td-error-color: #E91E63;
+  --td-error-color-hover: #C2185B;
+  --td-error-color-active: #AD1457;
+
+  /* 文本色彩 */
+  --td-text-color-primary: #2D3436;
+  --td-text-color-secondary: #636E72;
+  --td-text-color-placeholder: #B2BEC3;
+  --td-text-color-disabled: #DDD6FE;
+
+  /* 背景色 */
+  --td-bg-color-page: #FFFFFF;
+  --td-bg-color-container: #F8F9FF;
+  --td-bg-color-container-hover: #F1F5F9;
+  --td-bg-color-container-active: #E2E8F0;
+
+  /* 边框色 */
+  --td-border-level-1-color: #F1F5F9;
+  --td-border-level-2-color: #E2E8F0;
+
+  /* 阴影 */
+  --td-shadow-1: 0 1px 10px rgba(0, 0, 0, 0.05), 0 4px 5px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.12);
+  --td-shadow-2: 0 3px 14px 2px rgba(0, 0, 0, 0.05), 0 8px 10px 1px rgba(0, 0, 0, 0.06), 0 5px 5px -3px rgba(0, 0, 0, 0.1);
+  --td-shadow-3: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+
+  /* Aitu 统一 UI token：橙色用于主操作/选中/聚焦，灰阶用于结构和普通 hover */
+  --aitu-ui-brand: var(--td-brand-color);
+  --aitu-ui-brand-hover: var(--td-brand-color-hover);
+  --aitu-ui-brand-active: var(--td-brand-color-active);
+  --aitu-ui-brand-text: #b45309;
+  --aitu-ui-brand-soft: rgba(243, 156, 18, 0.12);
+  --aitu-ui-brand-softer: rgba(243, 156, 18, 0.06);
+  --aitu-ui-brand-border: rgba(243, 156, 18, 0.52);
+  --aitu-ui-brand-border-soft: rgba(243, 156, 18, 0.28);
+  --aitu-ui-focus-ring: 0 0 0 3px rgba(243, 156, 18, 0.18);
+  --aitu-ui-selected-bg: rgba(243, 156, 18, 0.08);
+  --aitu-ui-hover-bg: #fffaf0;
+
+  --aitu-ui-surface: #ffffff;
+  --aitu-ui-surface-subtle: #f8fafc;
+  --aitu-ui-surface-muted: #f1f5f9;
+  --aitu-ui-surface-elevated: rgba(255, 255, 255, 0.92);
+  --aitu-ui-border-subtle: rgba(15, 23, 42, 0.06);
+  --aitu-ui-border: rgba(15, 23, 42, 0.1);
+  --aitu-ui-border-hover: rgba(15, 23, 42, 0.18);
+  --aitu-ui-text-primary: #1e293b;
+  --aitu-ui-text-secondary: #64748b;
+  --aitu-ui-text-tertiary: #94a3b8;
+  --aitu-ui-text-inverse: #ffffff;
+
+  --aitu-ui-success: #15803d;
+  --aitu-ui-success-soft: rgba(34, 197, 94, 0.12);
+  --aitu-ui-success-border: rgba(34, 197, 94, 0.28);
+  --aitu-ui-warning: #b45309;
+  --aitu-ui-warning-soft: rgba(245, 158, 11, 0.14);
+  --aitu-ui-warning-border: rgba(245, 158, 11, 0.32);
+  --aitu-ui-danger: var(--td-error-color);
+  --aitu-ui-danger-soft: rgba(233, 30, 99, 0.08);
+  --aitu-ui-danger-border: rgba(233, 30, 99, 0.24);
+
+  --aitu-ui-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --aitu-ui-shadow-hover: 0 8px 20px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(243, 156, 18, 0.18);
+  --aitu-ui-shadow-selected: 0 10px 24px rgba(243, 156, 18, 0.14), 0 0 0 1px rgba(243, 156, 18, 0.36);
+  --aitu-ui-shadow-popover: 0 16px 40px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --aitu-ui-shadow-soft: 0 2px 10px rgba(15, 23, 42, 0.06);
+
+  /* 圆角 */
+  --td-radius-small: 0.25rem;
+  --td-radius-default: 0.375rem;
+  --td-radius-medium: 0.5rem;
+  --td-radius-large: 0.75rem;
+  --td-radius-extra-large: 1rem;
+
+  /* 字体 */
+  --td-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Noto Sans', 'Noto Sans CJK SC', 'Microsoft Yahei', 'Hiragino Sans GB', Arial, sans-serif;
+}
+
+/* 特定组件的品牌色彩定制 */
+.drawnix {
+  /* Button 组件 */
+  .t-button--theme-primary {
+    background: linear-gradient(135deg, var(--td-brand-color) 0%, var(--td-brand-color-6) 100%);
+    border-color: var(--td-brand-color);
+    
+    &:hover {
+      background: linear-gradient(135deg, var(--td-brand-color-hover) 0%, var(--td-brand-color-7) 100%);
+      border-color: var(--td-brand-color-hover);
+    }
+    
+    &:active {
+      background: var(--td-brand-color-active);
+      border-color: var(--td-brand-color-active);
+    }
+  }
+
+  /* Dialog 组件 */
+  .t-dialog__header {
+    border-bottom-color: var(--td-border-level-1-color);
+  }
+
+  .t-dialog__confirm {
+    background: var(--td-brand-color);
+    border-color: var(--td-brand-color);
+    
+    &:hover {
+      background: var(--td-brand-color-hover);
+      border-color: var(--td-brand-color-hover);
+    }
+  }
+
+  /* Input 组件 */
+  .t-input:focus {
+    border-color: var(--td-brand-color);
+    box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.2);
+  }
+
+  /* Tabs 组件 */
+  .t-tabs__nav-item.t-is-active {
+    color: var(--td-brand-color);
+  }
+
+  .t-tabs__nav-item.t-is-active::after {
+    background-color: var(--td-brand-color);
+  }
+
+  /* Switch 组件 */
+  .t-switch.t-is-checked {
+    background-color: var(--td-brand-color);
+  }
+
+  /* Radio 组件 */
+  .t-radio.t-is-checked .t-radio__input {
+    border-color: var(--td-brand-color);
+  }
+
+  .t-radio.t-is-checked .t-radio__input::after {
+    background-color: var(--td-brand-color);
+  }
+
+  /* Select 组件 */
+  .t-select__option.t-is-selected {
+    background-color: rgba(243, 156, 18, 0.1);
+    color: var(--td-brand-color);
+  }
+
+  /* Progress 组件 */
+  .t-progress__inner {
+    background: linear-gradient(90deg, var(--td-brand-color) 0%, var(--td-brand-color-6) 100%);
+  }
+
+  /* Loading 组件 */
+  .t-loading__spinner {
+    color: var(--td-brand-color);
+  }
+
+  /* Tag 组件 */
+  .t-tag--theme-primary {
+    background-color: rgba(243, 156, 18, 0.1);
+    color: var(--td-brand-color);
+    border-color: var(--td-brand-color-2);
+  }
+
+  /* Badge 组件 */
+  .t-badge {
+    background-color: var(--accent-create);
+  }
+
+  /* Notification 组件 */
+  .t-notification--theme-success .t-notification__icon {
+    color: var(--td-success-color);
+  }
+
+  .t-notification--theme-warning .t-notification__icon {
+    color: var(--td-warning-color);
+  }
+
+  .t-notification--theme-error .t-notification__icon {
+    color: var(--td-error-color);
+  }
+
+  /* Message 组件 */
+  .t-message--theme-success {
+    background-color: rgba(0, 184, 148, 0.1);
+    border-color: var(--td-success-color);
+  }
+
+  .t-message--theme-warning {
+    background-color: rgba(230, 126, 34, 0.1);
+    border-color: var(--td-warning-color);
+  }
+
+  .t-message--theme-error {
+    background-color: rgba(233, 30, 99, 0.1);
+    border-color: var(--td-error-color);
+  }
+
+  /* Slider 组件 - 精致样式 */
+  .t-slider__track {
+    background: linear-gradient(90deg, var(--td-brand-color) 0%, var(--td-brand-color-6) 100%);
+    height: 3px !important;
+    border-radius: 2px !important;
+  }
+
+  .t-slider__rail {
+    height: 3px !important;
+    border-radius: 2px !important;
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  .t-slider__button {
+    width: 12px !important;
+    height: 12px !important;
+    border: 1.5px solid var(--td-brand-color) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+    transition: transform 0.15s ease !important;
+
+    &:hover {
+      transform: scale(1.15);
+    }
+  }
+
+  /* DatePicker 组件 */
+  .t-date-picker__panel-date.t-is-selected {
+    background-color: var(--td-brand-color);
+  }
+
+  .t-date-picker__panel-date.t-is-selected:hover {
+    background-color: var(--td-brand-color-hover);
+  }
+
+  /* TimePicker 组件 */
+  .t-time-picker__panel-time.t-is-selected {
+    background-color: var(--td-brand-color);
+  }
+
+  /* Upload 组件 */
+  .t-upload__dragger:hover {
+    border-color: var(--td-brand-color);
+  }
+
+  /* Steps 组件 */
+  .t-steps-item.t-is-finish .t-steps-item__icon {
+    background-color: var(--td-brand-color);
+    border-color: var(--td-brand-color);
+  }
+
+  .t-steps-item.t-is-process .t-steps-item__icon {
+    background-color: var(--td-brand-color);
+    border-color: var(--td-brand-color);
+  }
+
+  /* Anchor 组件 */
+  .t-anchor__item.t-is-active .t-anchor__item-link {
+    color: var(--td-brand-color);
+  }
+
+  /* BackTop 组件 */
+  .t-back-top {
+    background-color: var(--td-brand-color);
+    
+    &:hover {
+      background-color: var(--td-brand-color-hover);
+    }
+  }
+}
+
+/* 全局 Checkbox 样式覆盖 - 橙色背景 + 白色勾选图标 */
+.t-checkbox {
+  &.t-is-checked,
+  &.t-is-indeterminate {
+    .t-checkbox__input {
+      background-color: var(--td-brand-color) !important;
+      border-color: var(--td-brand-color) !important;
+    }
+  }
+
+  .t-checkbox__input {
+    &::after {
+      border-color: #fff !important; // 确保全局勾选图标为白色
+    }
+  }
+}
+
+/* 深色模式适配 (如果需要) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --td-bg-color-page: #1a1a1a;
+    --td-bg-color-container: #2d2d2d;
+    --td-text-color-primary: #ffffff;
+    --td-text-color-secondary: #b3b3b3;
+    --td-border-level-1-color: #404040;
+    --td-border-level-2-color: #595959;
+  }
+}
+
+/* ============================================================================
+ * 移动端响应式适配 (Mobile Responsive Styles)
+ * ============================================================================ */
+
+/* 平板及以下 (max-width: 768px) */
+@media (max-width: 768px) {
+  /* Dialog 组件移动端适配 */
+  .t-dialog {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px !important;
+
+    &.t-dialog--mode-modal {
+      /* 模态对话框几乎全屏 */
+      width: calc(100vw - 32px) !important;
+      max-height: calc(100vh - 100px) !important;
+    }
+
+    /* Header 紧凑布局 */
+    .t-dialog__header {
+      padding: 12px 16px;
+
+      .t-dialog__header-content {
+        font-size: 16px;
+      }
+    }
+
+    /* Body 滚动支持 */
+    .t-dialog__body {
+      padding: 12px 16px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    /* Footer 固定在底部 */
+    .t-dialog__footer {
+      padding: 12px 16px;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    }
+
+    /* 按钮触控友好 */
+    .t-button {
+      min-height: 40px;
+      min-width: 80px;
+    }
+  }
+
+  /* Drawer 组件移动端适配 */
+  .t-drawer {
+    &.t-drawer--left,
+    &.t-drawer--right {
+      max-width: calc(100vw - 48px) !important;
+    }
+
+    .t-drawer__header {
+      padding: 12px 16px;
+    }
+
+    .t-drawer__body {
+      padding: 12px 16px;
+    }
+
+    .t-drawer__footer {
+      padding: 12px 16px;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    }
+  }
+
+  /* Popup/Popover 移动端适配 */
+  .t-popup,
+  .t-popover {
+    max-width: calc(100vw - 32px) !important;
+  }
+
+  /* Select 下拉菜单适配 */
+  .t-select__dropdown {
+    max-width: calc(100vw - 32px);
+    max-height: 50vh;
+  }
+
+  /* Input 组件触控优化 */
+  .t-input {
+    min-height: 40px;
+
+    .t-input__inner {
+      font-size: 16px; /* 防止 iOS 自动缩放 */
+    }
+  }
+
+  /* Textarea 组件触控优化 */
+  .t-textarea {
+    .t-textarea__inner {
+      font-size: 16px; /* 防止 iOS 自动缩放 */
+    }
+  }
+
+  /* Button 组件触控区域 */
+  .t-button {
+    min-height: 36px;
+    padding: 8px 16px;
+  }
+
+  /* Slider 组件触控优化 */
+  .t-slider {
+    .t-slider__button {
+      width: 20px !important;
+      height: 20px !important;
+    }
+
+    .t-slider__rail,
+    .t-slider__track {
+      height: 6px !important;
+    }
+  }
+}
+
+/* 移动端竖屏 (max-width: 640px) */
+@media (max-width: 640px) {
+  /* Dialog 全屏显示 */
+  .t-dialog {
+    &.t-dialog--mode-modal {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      height: 100vh !important;
+      max-height: 100vh !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+    }
+
+    .t-dialog__header {
+      padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    }
+
+    .t-dialog__body {
+      flex: 1;
+      max-height: none;
+    }
+  }
+
+  /* Drawer 全宽显示 */
+  .t-drawer {
+    &.t-drawer--left,
+    &.t-drawer--right {
+      width: 100vw !important;
+      max-width: 100vw !important;
+    }
+
+    .t-drawer__header {
+      padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    }
+  }
+
+  /* Message 提示位置调整 */
+  .t-message {
+    top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
+    max-width: calc(100vw - 32px);
+  }
+
+  /* Notification 提示位置调整 */
+  .t-notification {
+    max-width: calc(100vw - 32px);
+    right: 16px !important;
+    left: 16px !important;
+  }
+}
+
+/* 小屏移动端 (max-width: 480px) */
+@media (max-width: 480px) {
+  .t-dialog {
+    .t-dialog__header {
+      padding: 10px 12px;
+      padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+
+      .t-dialog__header-content {
+        font-size: 15px;
+      }
+    }
+
+    .t-dialog__body {
+      padding: 10px 12px;
+    }
+
+    .t-dialog__footer {
+      padding: 10px 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+
+      .t-button {
+        flex: 1;
+        min-width: calc(50% - 4px);
+      }
+    }
+  }
+
+  /* Select 组件紧凑 */
+  .t-select {
+    .t-input__inner {
+      font-size: 14px;
+    }
+  }
+
+  /* Tabs 组件紧凑 */
+  .t-tabs {
+    .t-tabs__nav-item {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+  }
+}
+
+/* ViewerJS 图片预览器移动端适配 */
+@media (max-width: 768px) {
+  .viewer-container {
+    // 底部区域允许滚动
+    .viewer-footer {
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+    }
+    
+    // 工具条容器
+    .viewer-toolbar {
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      max-width: 100vw !important;
+      
+      // 隐藏滚动条但保持滚动功能
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      &::-webkit-scrollbar {
+        display: none;
+      }
+      
+      > ul {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        white-space: nowrap !important;
+        padding: 6px 8px !important;
+        margin: 0 auto 5px !important;
+        
+        > li {
+          flex-shrink: 0 !important;
+          float: none !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+      }
+    }
+    
+    // 底部导航栏适配
+    .viewer-navbar {
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+    
+    .viewer-list {
+      display: flex !important;
+      flex-wrap: nowrap !important;
+      overflow-x: auto !important;
+      width: auto !important;
+    }
+    
+    // 缩小关闭按钮
+    .viewer-button {
+      width: 60px !important;
+      height: 60px !important;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .viewer-container {
+    .viewer-toolbar > ul > li {
+      width: 22px !important;
+      height: 22px !important;
+      margin: 0 1px !important;
+      
+      &::before {
+        margin: 1px !important;
+      }
+    }
+    
+    .viewer-button {
+      width: 50px !important;
+      height: 50px !important;
+    }
+  }
+}

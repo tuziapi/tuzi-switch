@@ -1,0 +1,120 @@
+{
+  "date": "2026-11-10",
+  "tasks": [
+    "UC-OMNI-VIDEO-01",
+    "UC-DISCUSS-CANVAS-01",
+    "UC-VIDEO-DRAG-01"
+  ],
+  "branch": "codex/opentu-text-chat",
+  "baselineHead": "efac7cc127f6c1da3703b12c39ca8fbb934df3f3",
+  "delivery": "/Users/sdy09/Documents/tuzi-switch-artifacts/gemini-omni-canvas-2026-11-10",
+  "binarySHA256": "ee8e931b5e59b5429a2ae43a7a92a2aa5ecc8e9decc9226f0b412b867a70f8da",
+  "verification": {
+    "creative": {
+      "files": 149,
+      "passed": 2439,
+      "log": "/tmp/tuzi-omni-creative-all-tests-final.log"
+    },
+    "hostAccountBridge": 42,
+    "modelRoutingFocused": 297,
+    "typecheck": "passed",
+    "creativeBuild": "passed",
+    "nativeBuild": "passed",
+    "codesign": "ad-hoc strict passed",
+    "chromium": {
+      "checks": [
+        "exact Omni ID appears under video with dedicated resolution choices",
+        "direct generation uses allowlisted JSON, authenticated content download and canvas cache",
+        "native media overlay forwards canvas dragging; 100×50 move persists and playback works",
+        "uploaded reference becomes an ordered image input with raw base64",
+        "discussion creates two separate task slots before completion; rabbit avatar loads",
+        "each completed video keeps its reserved slot; placeholders retire without duplicates",
+        "discussion previews two video tasks with pinned Omni model; both videos decode and land on canvas",
+        "reload preserves cached video playback without new generation"
+      ],
+      "errors": [],
+      "requests": "synthetic only",
+      "directRequest": {
+        "model": "gemini-omni-1.1-flash",
+        "seconds": "4",
+        "size": "1280x720",
+        "prompt": "SYNTHETIC：生成4秒山谷视频"
+      },
+      "referenceRequest": {
+        "model": "gemini-omni-1.1-flash",
+        "seconds": "4",
+        "size": "1280x720",
+        "input": [
+          {
+            "type": "text",
+            "text": "SYNTHETIC：根据参考图生成4秒视频"
+          },
+          {
+            "type": "image",
+            "mime_type": "image/png",
+            "data": "SYNTHETIC_BASE64_OMITTED"
+          }
+        ]
+      }
+    },
+    "webkit": {
+      "checks": [
+        "exact Omni ID appears under video with dedicated resolution choices",
+        "direct generation uses allowlisted JSON, authenticated content download and canvas cache",
+        "native media overlay forwards canvas dragging; 100×50 move persists and playback works",
+        "uploaded reference becomes an ordered image input with raw base64",
+        "discussion creates two separate task slots before completion; rabbit avatar loads",
+        "each completed video keeps its reserved slot; placeholders retire without duplicates",
+        "discussion previews two video tasks with pinned Omni model; both videos decode and land on canvas",
+        "reload preserves cached video playback without new generation"
+      ],
+      "errors": [],
+      "requests": "synthetic only",
+      "directRequest": {
+        "model": "gemini-omni-1.1-flash",
+        "seconds": "4",
+        "size": "1280x720",
+        "prompt": "SYNTHETIC：生成4秒山谷视频"
+      },
+      "referenceRequest": {
+        "model": "gemini-omni-1.1-flash",
+        "seconds": "4",
+        "size": "1280x720",
+        "input": [
+          {
+            "type": "text",
+            "text": "SYNTHETIC：根据参考图生成4秒视频"
+          },
+          {
+            "type": "image",
+            "mime_type": "image/png",
+            "data": "SYNTHETIC_BASE64_OMITTED"
+          }
+        ]
+      }
+    },
+    "existingCrossMediaChromium": 9,
+    "native": [
+      "existing canvas and discussions present",
+      "existing video drag observed",
+      "existing video playback advanced and paused",
+      "Omni 3–10 seconds and eight dimensions available",
+      "Rabbit avatar shown"
+    ],
+    "provenance": {
+      "total": 1624,
+      "upstream": 1522,
+      "local": 102
+    }
+  },
+  "limitations": [
+    "No paid model requests or real Omni generation this turn",
+    "No push, PR, release or production changes",
+    "Native existing video position changed during drag verification; exact original position restoration not claimed",
+    "Synthetic browser transport and native existing-media playback are distinct evidence"
+  ],
+  "initialFailures": [
+    "First full suite had missing VM discussion state stub and stale loading-copy expectations; corrected and full suite passed",
+    "Browser harness async model import, reference preparation, RAF drag and cached-video mount/source replacement timing corrected; final checks passed"
+  ]
+}

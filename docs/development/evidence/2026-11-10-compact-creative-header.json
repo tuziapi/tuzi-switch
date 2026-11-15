@@ -1,0 +1,311 @@
+{
+  "task": "UC-CREATIVE-HEADER-01",
+  "date": "2026-11-10",
+  "branch": "codex/opentu-text-chat",
+  "scope": "local only; no paid calls or release",
+  "typecheck": "passed",
+  "tests": {
+    "files": 2,
+    "passed": 27,
+    "log": "/tmp/tuzi-header-tests.log"
+  },
+  "browser": {
+    "chromium": {
+      "checks": [
+        {
+          "width": 1360,
+          "height": 900,
+          "theme": "light",
+          "bounds": {
+            "header": {
+              "x": 0,
+              "y": 0,
+              "width": 1360,
+              "height": 44,
+              "top": 0,
+              "right": 1360,
+              "bottom": 44,
+              "left": 0
+            },
+            "canvas": {
+              "x": 0,
+              "y": 44,
+              "width": 1360,
+              "height": 856,
+              "top": 44,
+              "right": 1360,
+              "bottom": 900,
+              "left": 0
+            },
+            "brand": {
+              "x": 84,
+              "y": 5.5,
+              "width": 108,
+              "height": 32,
+              "top": 5.5,
+              "right": 192,
+              "bottom": 37.5,
+              "left": 84
+            },
+            "overflow": false,
+            "duplicates": 1,
+            "legacy": 0
+          },
+          "settings": true,
+          "chatToggle": true,
+          "projects": true,
+          "accountRoundtrip": true
+        },
+        {
+          "width": 900,
+          "height": 650,
+          "theme": "light",
+          "bounds": {
+            "header": {
+              "x": 0,
+              "y": 0,
+              "width": 900,
+              "height": 44,
+              "top": 0,
+              "right": 900,
+              "bottom": 44,
+              "left": 0
+            },
+            "canvas": {
+              "x": 0,
+              "y": 44,
+              "width": 900,
+              "height": 606,
+              "top": 44,
+              "right": 900,
+              "bottom": 650,
+              "left": 0
+            },
+            "brand": {
+              "x": 84,
+              "y": 5.5,
+              "width": 108,
+              "height": 32,
+              "top": 5.5,
+              "right": 192,
+              "bottom": 37.5,
+              "left": 84
+            },
+            "overflow": false,
+            "duplicates": 1,
+            "legacy": 0
+          },
+          "settings": true,
+          "chatToggle": true,
+          "projects": true,
+          "accountRoundtrip": true
+        },
+        {
+          "width": 1360,
+          "height": 900,
+          "theme": "dark",
+          "bounds": {
+            "header": {
+              "x": 0,
+              "y": 0,
+              "width": 1360,
+              "height": 44,
+              "top": 0,
+              "right": 1360,
+              "bottom": 44,
+              "left": 0
+            },
+            "canvas": {
+              "x": 0,
+              "y": 44,
+              "width": 1360,
+              "height": 856,
+              "top": 44,
+              "right": 1360,
+              "bottom": 900,
+              "left": 0
+            },
+            "brand": {
+              "x": 84,
+              "y": 5.5,
+              "width": 108,
+              "height": 32,
+              "top": 5.5,
+              "right": 192,
+              "bottom": 37.5,
+              "left": 84
+            },
+            "overflow": false,
+            "duplicates": 1,
+            "legacy": 0
+          },
+          "settings": true,
+          "chatToggle": true,
+          "projects": true,
+          "accountRoundtrip": true
+        }
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "webkit": {
+      "checks": [
+        {
+          "width": 1360,
+          "height": 900,
+          "theme": "light",
+          "bounds": {
+            "header": {
+              "x": 0,
+              "y": 0,
+              "width": 1360,
+              "height": 44,
+              "top": 0,
+              "right": 1360,
+              "bottom": 44,
+              "left": 0
+            },
+            "canvas": {
+              "x": 0,
+              "y": 44,
+              "width": 1360,
+              "height": 856,
+              "top": 44,
+              "right": 1360,
+              "bottom": 900,
+              "left": 0
+            },
+            "brand": {
+              "x": 84,
+              "y": 5.5,
+              "width": 107.609375,
+              "height": 32,
+              "top": 5.5,
+              "right": 191.609375,
+              "bottom": 37.5,
+              "left": 84
+            },
+            "overflow": false,
+            "duplicates": 1,
+            "legacy": 0
+          },
+          "settings": true,
+          "chatToggle": true,
+          "projects": true,
+          "accountRoundtrip": true
+        },
+        {
+          "width": 900,
+          "height": 650,
+          "theme": "light",
+          "bounds": {
+            "header": {
+              "x": 0,
+              "y": 0,
+              "width": 900,
+              "height": 44,
+              "top": 0,
+              "right": 900,
+              "bottom": 44,
+              "left": 0
+            },
+            "canvas": {
+              "x": 0,
+              "y": 44,
+              "width": 900,
+              "height": 606,
+              "top": 44,
+              "right": 900,
+              "bottom": 650,
+              "left": 0
+            },
+            "brand": {
+              "x": 84,
+              "y": 5.5,
+              "width": 107.609375,
+              "height": 32,
+              "top": 5.5,
+              "right": 191.609375,
+              "bottom": 37.5,
+              "left": 84
+            },
+            "overflow": false,
+            "duplicates": 1,
+            "legacy": 0
+          },
+          "settings": true,
+          "chatToggle": true,
+          "projects": true,
+          "accountRoundtrip": true
+        },
+        {
+          "width": 1360,
+          "height": 900,
+          "theme": "dark",
+          "bounds": {
+            "header": {
+              "x": 0,
+              "y": 0,
+              "width": 1360,
+              "height": 44,
+              "top": 0,
+              "right": 1360,
+              "bottom": 44,
+              "left": 0
+            },
+            "canvas": {
+              "x": 0,
+              "y": 44,
+              "width": 1360,
+              "height": 856,
+              "top": 44,
+              "right": 1360,
+              "bottom": 900,
+              "left": 0
+            },
+            "brand": {
+              "x": 84,
+              "y": 5.5,
+              "width": 107.609375,
+              "height": 32,
+              "top": 5.5,
+              "right": 191.609375,
+              "bottom": 37.5,
+              "left": 84
+            },
+            "overflow": false,
+            "duplicates": 1,
+            "legacy": 0
+          },
+          "settings": true,
+          "chatToggle": true,
+          "projects": true,
+          "accountRoundtrip": true
+        }
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    }
+  },
+  "native": {
+    "build": "passed",
+    "buildLog": "/tmp/tuzi-header-native-final.log",
+    "signature": "ad-hoc deep/strict verified",
+    "opened": true,
+    "delivery": "/Users/sdy09/Documents/tuzi-switch-artifacts/compact-header-2026-11-10",
+    "binarySHA256": "d4acca7d5317b85ff242cefc10604e0e75dd296767884185467034d4dd350190",
+    "checks": [
+      "single compact header visibly present",
+      "assistant menu opens and closes",
+      "creative settings opens and closes",
+      "chat toggle opens and closes",
+      "original canvas and discussion preserved",
+      "no generation running before restart"
+    ],
+    "limits": [
+      "Window drag gesture exercised but OS displacement not independently measured",
+      "Windows/Linux native not tested",
+      "Local QA only; no paid model calls or production release"
+    ]
+  }
+}

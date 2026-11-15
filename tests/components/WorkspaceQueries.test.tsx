@@ -1,5 +1,8 @@
+import { createRef } from "react";
+import type { UnifiedMcpPanelHandle } from "@/components/mcp/UnifiedMcpPanel";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -52,6 +55,29 @@ describe("workspace query recovery", () => {
     expect(
       screen.getByRole("heading", { name: "Synthetic message retry" }),
     ).toBeInTheDocument();
+  });
+  it("keeps partial import recovery visible and refreshes successful entries before retry", async () => {
+    const read = vi.spyOn(mcpApi, "getAllServers").mockResolvedValue({});
+    const importFromApps = vi
+      .spyOn(mcpApi, "importFromApps")
+      .mockRejectedValueOnce(
+        new Error("成功来源已保存 1 项；失败来源未保存，可再次导入"),
+      )
+      .mockResolvedValueOnce(0);
+    const ref = createRef<UnifiedMcpPanelHandle>();
+    mount(<Mcp ref={ref} onOpenChange={() => {}} />);
+    await screen.findByText("mcp.unifiedPanel.noServers");
+    await act(async () => {
+      ref.current?.openImport();
+    });
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("成功来源已保存 1 项");
+    await waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(1));
+    fireEvent.click(within(alert).getByRole("button"));
+    await waitFor(() => expect(importFromApps).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
+    );
   });
   it("distinguishes failed MCP reads from an empty list and retries", async () => {
     const read = vi

@@ -1,0 +1,666 @@
+/**
+ * Asset Item Styles
+ * 统一素材项样式 - 支持网格、紧凑、列表三种视图模式
+ * 简洁素雅风格
+ */
+
+.asset-item {
+  position: relative;
+  box-sizing: border-box;
+  contain: layout paint;
+  isolation: isolate;
+  cursor: pointer;
+  background: var(--aitu-ui-surface, #ffffff);
+  border: 2px solid transparent;
+  overflow: hidden;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.2s ease;
+  user-select: none; // 防止 Shift 连选时文本被选中
+
+  &:hover {
+    border-color: var(--aitu-ui-brand-border-soft, rgba(243, 156, 18, 0.28));
+    background: var(--aitu-ui-hover-bg, #fffaf0);
+  }
+
+  &--selected {
+    border-color: var(--aitu-ui-brand-border, rgba(243, 156, 18, 0.52));
+    background-color: var(--aitu-ui-selected-bg, rgba(243, 156, 18, 0.08));
+    box-shadow: var(--aitu-ui-shadow-selected, 0 10px 24px rgba(243, 156, 18, 0.14));
+    z-index: 1; // 提升选中项层级，避免边框被覆盖
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: var(--aitu-ui-brand, #f39c12);
+    box-shadow: var(--aitu-ui-focus-ring, 0 0 0 3px rgba(243, 156, 18, 0.18));
+  }
+
+  &--selection-mode {
+    cursor: default;
+  }
+
+  // ========== 缩略图 ==========
+  &__thumbnail {
+    position: relative;
+    background: linear-gradient(
+      135deg,
+      var(--aitu-ui-surface-subtle, #f8fafc) 0%,
+      var(--aitu-ui-surface-muted, #f1f5f9) 100%
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  &__image,
+  &__video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+  }
+
+  &__audio-preview {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--aitu-ui-brand-soft, rgba(243, 156, 18, 0.12)) 0%, rgba(90, 79, 207, 0.1) 100%);
+    color: var(--aitu-ui-brand-text, #b45309);
+  }
+
+  // ========== 徽章 ==========
+  &__badges {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    gap: 6px;
+    z-index: 2;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+  }
+
+  &__type-badge {
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: var(--aitu-ui-surface-elevated, rgba(255, 255, 255, 0.92));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--aitu-ui-shadow-soft, 0 2px 10px rgba(15, 23, 42, 0.06));
+
+    svg {
+      color: var(--aitu-ui-text-secondary, #64748b);
+      width: 13px;
+      height: 13px;
+    }
+  }
+
+  &__ai-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--aitu-ui-brand-soft, rgba(243, 156, 18, 0.12));
+    color: var(--aitu-ui-brand-text, #b45309);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    line-height: 12px;
+
+    &--list {
+      flex-shrink: 0;
+      padding: 3px 6px;
+      font-size: 9px;
+    }
+  }
+
+  &__synced-badge {
+    padding: 4px 6px;
+    border-radius: 4px;
+    background: var(--aitu-ui-success-soft, rgba(34, 197, 94, 0.12));
+    color: var(--aitu-ui-success, #15803d);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 0 1px var(--aitu-ui-success-border, rgba(34, 197, 94, 0.28));
+    cursor: default;
+
+    svg {
+      width: 10px;
+      height: 10px;
+    }
+
+    &--list {
+      flex-shrink: 0;
+      padding: 4px 6px;
+      border-radius: 6px;
+      
+      svg {
+        width: 12px;
+        height: 12px;
+      }
+    }
+  }
+
+  &__subject-badge {
+    padding: 4px 7px;
+    border-radius: 4px;
+    background: var(--aitu-ui-surface-elevated, rgba(255, 255, 255, 0.92));
+    color: var(--aitu-ui-brand-text, #b45309);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 12px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    cursor: default;
+    box-shadow: inset 0 0 0 1px var(--aitu-ui-brand-border-soft, rgba(243, 156, 18, 0.28)), var(--aitu-ui-shadow-soft, 0 2px 10px rgba(15, 23, 42, 0.06));
+
+    svg {
+      width: 10px;
+      height: 10px;
+    }
+
+    &--list {
+      flex-shrink: 0;
+      padding: 3px 6px;
+      font-size: 10px;
+
+      svg {
+        width: 12px;
+        height: 12px;
+      }
+    }
+  }
+
+  &__cache-warning-badge {
+    padding: 4px 7px;
+    border-radius: 4px;
+    background: var(--aitu-ui-warning-soft, rgba(245, 158, 11, 0.14));
+    color: var(--aitu-ui-warning, #b45309);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 12px;
+    cursor: help;
+    box-shadow: inset 0 0 0 1px var(--aitu-ui-warning-border, rgba(245, 158, 11, 0.32));
+
+    &--list {
+      flex-shrink: 0;
+      padding: 3px 6px;
+      font-size: 10px;
+    }
+  }
+
+  // ========== 复选框 ==========
+  &__checkbox {
+    &--overlay {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 3;
+      padding: 0;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+      .t-checkbox {
+        margin: 0;
+        
+        .t-checkbox__input {
+          border-radius: 4px;
+          border-color: var(--aitu-ui-border, rgba(15, 23, 42, 0.1));
+          background: var(--aitu-ui-surface-elevated, rgba(255, 255, 255, 0.92));
+          width: 18px; // 统一尺寸
+          height: 18px;
+          box-shadow: var(--aitu-ui-shadow-soft, 0 2px 10px rgba(15, 23, 42, 0.06));
+          transition: all 0.2s ease;
+        }
+
+        &:hover .t-checkbox__input {
+          border-color: var(--aitu-ui-brand-border, rgba(243, 156, 18, 0.52));
+          transform: scale(1.05);
+        }
+
+        &.t-is-checked {
+          .t-checkbox__input {
+            background: var(--aitu-ui-brand, #f39c12) !important;
+            border-color: var(--aitu-ui-brand, #f39c12) !important;
+            box-shadow: var(--aitu-ui-focus-ring, 0 0 0 3px rgba(243, 156, 18, 0.18));
+          }
+        }
+      }
+    }
+
+    &--left {
+      flex-shrink: 0;
+    }
+  }
+
+  // ========== 预览按钮 ==========
+  &__preview-btn {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 4;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: var(--aitu-ui-surface-elevated, rgba(255, 255, 255, 0.92));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--aitu-ui-shadow-soft, 0 2px 10px rgba(15, 23, 42, 0.06));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+
+    svg {
+      color: var(--aitu-ui-text-primary, #1e293b);
+      width: 16px;
+      height: 16px;
+    }
+
+    &:hover {
+      background: var(--aitu-ui-surface, #ffffff);
+      box-shadow: var(--aitu-ui-shadow-hover, 0 8px 20px rgba(15, 23, 42, 0.08));
+
+      svg {
+        color: var(--aitu-ui-brand-text, #b45309);
+      }
+    }
+
+    &:active {
+      background: rgba(255, 255, 255, 0.98);
+    }
+  }
+
+  &:hover &__preview-btn,
+  &:focus-within &__preview-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  &__favorite-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 4;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--aitu-ui-surface-elevated, rgba(255, 255, 255, 0.92));
+    color: var(--aitu-ui-text-secondary, #64748b);
+    box-shadow: var(--aitu-ui-shadow-soft, 0 2px 10px rgba(15, 23, 42, 0.06));
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: scale(1.06);
+      color: var(--aitu-ui-danger, #e91e63);
+    }
+
+    &--active {
+      color: var(--aitu-ui-danger, #e91e63);
+      background: var(--aitu-ui-danger-soft, rgba(233, 30, 99, 0.08));
+    }
+
+    &--list {
+      position: relative;
+      top: auto;
+      right: auto;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+  }
+
+  // ========== 渐变遮罩和名称 ==========
+  &__overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 42%;
+    background: linear-gradient(180deg, transparent 0%, var(--aitu-ui-surface-elevated, rgba(255, 255, 255, 0.92)) 100%);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+  }
+
+  &__name-overlay {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    right: 14px;
+    color: var(--aitu-ui-text-primary, #1e293b);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  // ========== 列表模式信息区 ==========
+  &__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--aitu-ui-text-primary, #1e293b);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--aitu-ui-text-secondary, #64748b);
+  }
+
+  &__type {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    svg {
+      color: var(--aitu-ui-text-primary, #1e293b);
+    }
+  }
+
+  &__size,
+  &__date {
+    color: var(--aitu-ui-text-tertiary, #94a3b8);
+  }
+
+  // ========================================
+  // 视图模式：默认网格 (grid)
+  // ========================================
+  &--grid {
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+    box-shadow: var(--aitu-ui-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.06));
+
+    .asset-item__thumbnail {
+      width: 100%;
+      height: 100%;
+      border-radius: 14px;
+    }
+
+    &:hover {
+      .asset-item__overlay,
+      .asset-item__name-overlay {
+        opacity: 1;
+      }
+      
+      .asset-item__name-overlay {
+        transform: translateY(0);
+      }
+    }
+
+    &.asset-item--selection-mode:hover {
+      .asset-item__overlay,
+      .asset-item__name-overlay {
+        opacity: 0;
+      }
+    }
+  }
+
+  // ========================================
+  // 视图模式：紧凑网格 (compact)
+  // ========================================
+  &--compact {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    border-width: 1px;
+    box-shadow: var(--aitu-ui-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.06));
+
+    &.asset-item--selected {
+      border-width: 2px;
+    }
+
+    .asset-item__thumbnail {
+      width: 100%;
+      height: 100%;
+      border-radius: 6px;
+    }
+
+    .asset-item__checkbox--overlay {
+      top: 6px;
+      right: 6px;
+      border-radius: 6px;
+      padding: 1px;
+    }
+
+    .asset-item__badges {
+      top: 6px;
+      left: 6px;
+      gap: 4px;
+    }
+
+    .asset-item__type-badge {
+      padding: 3px 6px;
+      border-radius: 5px;
+
+      svg {
+        width: 10px;
+        height: 10px;
+      }
+    }
+
+    .asset-item__ai-badge {
+      padding: 3px 6px;
+      border-radius: 5px;
+      font-size: 8px;
+    }
+
+    .asset-item__preview-btn {
+      bottom: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+
+      svg {
+        width: 12px;
+        height: 12px;
+      }
+    }
+
+    .asset-item__favorite-btn {
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+    }
+  }
+
+  // ========================================
+  // 视图模式：列表 (list)
+  // ========================================
+  &--list {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px; // 调整内边距以对齐上方
+    border-radius: 8px; // 保持圆角，但减小间距
+    border: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+    box-shadow: var(--aitu-ui-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.06));
+    margin-bottom: 8px; // 增加间距避免重叠感，列表也可以有呼吸感
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      background: var(--aitu-ui-hover-bg, #fffaf0);
+      border-color: var(--aitu-ui-brand-border-soft, rgba(243, 156, 18, 0.28));
+      box-shadow: var(--aitu-ui-shadow-hover, 0 8px 20px rgba(15, 23, 42, 0.08));
+      z-index: 1;
+    }
+
+    &.asset-item--selected {
+      background: var(--aitu-ui-selected-bg, rgba(243, 156, 18, 0.08));
+      border-color: var(--aitu-ui-brand-border, rgba(243, 156, 18, 0.52));
+      box-shadow: var(--aitu-ui-shadow-selected, 0 10px 24px rgba(243, 156, 18, 0.14));
+      z-index: 2;
+    }
+
+    .asset-item__checkbox--left {
+      margin-right: 2px;
+    }
+
+    .asset-item__thumbnail {
+      flex-shrink: 0;
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      background: var(--aitu-ui-surface, #ffffff);
+      border: 1px solid var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+    }
+
+    .asset-item__info {
+      gap: 2px;
+    }
+
+    .asset-item__name {
+      font-size: 13.5px;
+      color: var(--aitu-ui-text-primary, #1e293b);
+    }
+
+    .asset-item__meta {
+      font-size: 11px;
+      color: var(--aitu-ui-text-tertiary, #94a3b8);
+    }
+
+    .asset-item__preview-btn {
+      position: relative;
+      bottom: auto;
+      right: auto;
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      margin-left: auto;
+    }
+
+    .asset-item__favorite-btn--list {
+      width: 28px;
+      height: 28px;
+      margin-left: 0;
+    }
+  }
+
+  // ========================================
+  // 移动端优化
+  // ========================================
+  @media (max-width: 767px) {
+    &:hover {
+      transform: none;
+    }
+
+    &--grid {
+      border-radius: 12px;
+
+      .asset-item__thumbnail {
+        border-radius: 10px;
+      }
+
+      .asset-item__badges {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        gap: 4px;
+      }
+
+      .asset-item__type-badge {
+        padding: 4px 8px;
+        border-radius: 6px;
+
+        svg {
+          width: 11px;
+          height: 11px;
+        }
+      }
+
+      .asset-item__ai-badge {
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 9px;
+        line-height: 11px;
+      }
+
+      .asset-item__name-overlay {
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        font-size: 12px;
+      }
+    }
+
+    &--compact {
+      border-radius: 6px;
+
+      .asset-item__thumbnail {
+        border-radius: 4px;
+      }
+    }
+
+    &--list {
+      padding: 10px 12px;
+      gap: 12px;
+      border-radius: 10px;
+
+      &:hover {
+        transform: none;
+      }
+
+      .asset-item__thumbnail {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+      }
+
+      .asset-item__name {
+        font-size: 13px;
+      }
+
+      .asset-item__meta {
+        gap: 8px;
+        font-size: 11px;
+      }
+
+      .asset-item__date {
+        display: none;
+      }
+
+      .asset-item__ai-badge--list {
+        padding: 3px 6px;
+        font-size: 8px;
+      }
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "task": "UC-DISCUSS-UI-03",
+  "date": "2026-11-10",
+  "browser": {
+    "chromium": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+        "closing unmounts transcript without cancelling the running request",
+        "main input streams model reasoning and reply into attached discussion",
+        "main input continues the same discussion context",
+        "planning failure creates no media tasks; explicit main-input resend succeeds",
+        "durable preview requires explicit confirmation before media dispatch",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+        "large dialog: preserved draft/DOM, model menu, history, focus trap, responsive size, Escape, send, media confirmation/location and stop",
+        "reload recovers board-linked discussion and messages",
+        "new discussion and history retain current-board association",
+        "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "webkit": {
+      "checks": [
+        "30px strip attached to the main composer",
+        "single input; attached edges; no sidebar; strip toggles; reading mode and scoped Escape",
+        "closing unmounts transcript without cancelling the running request",
+        "main input streams model reasoning and reply into attached discussion",
+        "main input continues the same discussion context",
+        "planning failure creates no media tasks; explicit main-input resend succeeds",
+        "durable preview requires explicit confirmation before media dispatch",
+        "one batch expands to exactly two image requests; cached chat previews and original canvas receive both results",
+        "980px and 760px windows: attached panel remains within viewport without horizontal overflow",
+        "large dialog: preserved draft/DOM, model menu, history, focus trap, responsive size, Escape, send, media confirmation/location and stop",
+        "reload recovers board-linked discussion and messages",
+        "new discussion and history retain current-board association",
+        "canvas wheel and Space drag work outside panel; panel scroll stays isolated; images do not move"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "codexChromium": {
+      "checks": [
+        "opening discussion retains the image model; planner uses an independent configured text model",
+        "failed connection retains the configured text-model route",
+        "Codex model selection, streamed summary, preview, pinned image execution model and canvas placement",
+        "stop cancels the local turn; failure remains on Codex with no silent fallback",
+        "disconnect restores the original configured text model and conversation context",
+        "narrow layout and discussion toggle still work"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    },
+    "codexWebkit": {
+      "checks": [
+        "opening discussion retains the image model; planner uses an independent configured text model",
+        "failed connection retains the configured text-model route",
+        "Codex model selection, streamed summary, preview, pinned image execution model and canvas placement",
+        "stop cancels the local turn; failure remains on Codex with no silent fallback",
+        "disconnect restores the original configured text model and conversation context",
+        "narrow layout and discussion toggle still work"
+      ],
+      "errors": [],
+      "requests": "synthetic only"
+    }
+  },
+  "dropdownUnitTests": 54,
+  "hostTypecheck": "passed",
+  "creativeBuild": "passed",
+  "productionBuild": "passed",
+  "native": {
+    "build": "release/app passed",
+    "signature": "ad-hoc strict verification passed",
+    "method": "CUA native app interactions and accessibility observations",
+    "checks": [
+      "large dialog opens",
+      "draft retained through shrink and expansion",
+      "Escape returns to strip with draft retained",
+      "close button returns to strip",
+      "test-only draft cleared and final dialog left open"
+    ],
+    "sha256": "e9127eb0c57604447db289781d237cec3d0d52316b5b6f1bb7ccfb1ea2819a8a",
+    "app": "/Users/sdy09/Documents/tuzi-switch-artifacts/discussion-dialog-2026-11-10/Tuzi Text Chat QA.app"
+  },
+  "paidRequests": 0,
+  "remotePublication": false,
+  "provenance": {
+    "status": "passed",
+    "reconstructedFiles": 1619,
+    "localFiles": 97
+  },
+  "diffCheck": "passed excluding generated patch context"
+}

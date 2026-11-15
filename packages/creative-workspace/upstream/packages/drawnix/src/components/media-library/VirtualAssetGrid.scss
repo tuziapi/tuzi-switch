@@ -1,0 +1,110 @@
+/**
+ * Virtual Asset Grid Styles
+ * 虚拟滚动网格样式 - 简洁素雅风格
+ */
+
+.virtual-asset-grid {
+  background: var(--aitu-ui-surface-subtle, #f8fafc);
+  transition: opacity 0.2s ease;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  position: relative;
+
+  &__row {
+    display: grid;
+    align-items: stretch;
+    box-sizing: border-box;
+
+    &--list {
+      display: block;
+    }
+  }
+
+  // 网格模式
+  &--grid {
+    .virtual-asset-grid__row {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+
+      > .asset-item {
+        flex: 0 0 auto;
+      }
+    }
+  }
+
+  // 紧凑模式
+  &--compact {
+    .virtual-asset-grid__row {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+
+      > .asset-item {
+        flex: 0 0 auto;
+      }
+    }
+  }
+
+  // 列表模式
+  &--list {
+    background: var(--aitu-ui-surface, #ffffff);
+
+    .virtual-asset-grid__row {
+      display: block;
+
+      > .asset-item {
+        width: 100%;
+      }
+    }
+  }
+
+  &__row {
+    &--grid,
+    &--compact {
+      justify-content: flex-start;
+    }
+  }
+
+  &--marquee-active {
+    cursor: crosshair;
+    user-select: none;
+  }
+
+  &__marquee {
+    position: absolute;
+    pointer-events: none;
+    border: 1px solid var(--aitu-ui-brand-border, rgba(243, 156, 18, 0.52));
+    background: var(--aitu-ui-brand-soft, rgba(243, 156, 18, 0.12));
+    box-shadow: var(--aitu-ui-focus-ring, 0 0 0 3px rgba(243, 156, 18, 0.18));
+    border-radius: 10px;
+    z-index: 5;
+  }
+
+  // 滚动容器样式
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--aitu-ui-border-subtle, rgba(15, 23, 42, 0.06));
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+
+    &:hover {
+      background: var(--aitu-ui-border-hover, rgba(15, 23, 42, 0.18));
+      background-clip: content-box;
+    }
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}

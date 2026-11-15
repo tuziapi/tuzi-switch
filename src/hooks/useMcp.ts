@@ -1,3 +1,4 @@
+import { trackOperation } from "@/lib/analytics";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { mcpApi } from "@/lib/api/mcp";
 import type { McpServer } from "@/types";
@@ -20,7 +21,17 @@ export function useAllMcpServers() {
 export function useUpsertMcpServer() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (server: McpServer) => mcpApi.upsertUnifiedServer(server),
+    mutationFn: (server: McpServer) =>
+      trackOperation(
+        "mcp",
+        queryClient.getQueryData<Record<string, McpServer>>(["mcp", "all"])?.[
+          server.id
+        ]
+          ? "edit"
+          : "add",
+        {},
+        () => mcpApi.upsertUnifiedServer(server),
+      ),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
     },
@@ -41,7 +52,10 @@ export function useToggleMcpApp() {
       serverId: string;
       app: AppId | NativeTool;
       enabled: boolean;
-    }) => mcpApi.toggleApp(serverId, app, enabled),
+    }) =>
+      trackOperation("mcp", enabled ? "enable" : "disable", { tool: app }, () =>
+        mcpApi.toggleApp(serverId, app, enabled),
+      ),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
     },
@@ -54,7 +68,8 @@ export function useToggleMcpApp() {
 export function useDeleteMcpServer() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => mcpApi.deleteUnifiedServer(id),
+    mutationFn: (id: string) =>
+      trackOperation("mcp", "delete", {}, () => mcpApi.deleteUnifiedServer(id)),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
     },
@@ -67,7 +82,8 @@ export function useDeleteMcpServer() {
 export function useImportMcpFromApps() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => mcpApi.importFromApps(),
+    mutationFn: () =>
+      trackOperation("mcp", "import", {}, () => mcpApi.importFromApps()),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
     },

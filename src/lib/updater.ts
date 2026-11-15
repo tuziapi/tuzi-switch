@@ -1,5 +1,13 @@
+import { checkAcceptanceUpdate, getUpdateBuildInfo } from "./acceptanceUpdater";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  fetchInstallerRelease,
+  installerUpdateFromRelease,
+  isNewerInstallerVersion,
+  parseInstallerVersion,
+} from "./installerUpdater";
+import { hasSignedRelease, validateSignedRelease } from "./signedRelease";
 
 // 可选导入：在未注册插件或非 Tauri 环境下，调用时会抛错，外层需做兜底
 // 我们按需加载并在运行时捕获错误，避免构建期类型问题
@@ -27,6 +35,8 @@ export interface UpdateInfo {
   availableVersion: string;
   notes?: string;
   pubDate?: string;
+  channel?: "stable" | "acceptance";
+  releaseUrl?: string;
 }
 
 export interface UpdateProgressEvent {
@@ -40,10 +50,14 @@ export interface UpdateHandle {
   notes?: string;
   date?: string;
   manual?: boolean;
+  // Validated, version-pinned manual links. Never used by signed updates.
+  downloadUrl?: string;
+  openDownloadPage?: () => Promise<void>;
   downloadAndInstall: (
     onProgress?: (e: UpdateProgressEvent) => void,
   ) => Promise<void>;
-  download?: () => Promise<void>;
+  download?: (onProgress?: (e: UpdateProgressEvent) => void) => Promise<void>;
+  close?: () => Promise<void>;
   install?: () => Promise<void>;
 }
 
@@ -77,32 +91,31 @@ function withTimeout<T>(
   });
 }
 
-function mapUpdateHandle(raw: Update): UpdateHandle {
+export function mapUpdateHandle(raw: Update): UpdateHandle {
+  const progress =
+    (onProgress?: (e: UpdateProgressEvent) => void) =>
+    (evt: import("@tauri-apps/plugin-updater").DownloadEvent) => {
+      onProgress?.({
+        event: evt.event,
+        ...(evt.event === "Started"
+          ? { total: evt.data.contentLength ?? 0, downloaded: 0 }
+          : {}),
+        ...(evt.event === "Progress"
+          ? { downloaded: evt.data.chunkLength }
+          : {}),
+      });
+    };
   return {
     version: raw.version ?? "",
     notes: raw.body,
     date: raw.date,
-    async downloadAndInstall(onProgress?: (e: UpdateProgressEvent) => void) {
-      await raw.downloadAndInstall((evt) => {
-        if (!onProgress) return;
-        const mapped: UpdateProgressEvent = {
-          event: evt.event,
-        };
-        if (evt.event === "Started") {
-          mapped.total = evt.data.contentLength ?? 0;
-          mapped.downloaded = 0;
-        } else if (evt.event === "Progress") {
-          mapped.downloaded = evt.data.chunkLength;
-        }
-        onProgress(mapped);
-      });
-    },
-    download: async () => {
-      await raw.download();
-    },
-    install: async () => {
-      await raw.install();
-    },
+    downloadAndInstall: (onProgress) =>
+      raw.downloadAndInstall(progress(onProgress)),
+    // download resolves only after the native updater verifies the signature.
+    download: (onProgress) =>
+      raw.download(progress(onProgress), { timeout: 600_000 }),
+    install: () => raw.install(),
+    close: () => raw.close(),
   };
 }
 
@@ -125,7 +138,7 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-async function openReleasePage(version?: string): Promise<void> {
+export async function openReleasePage(version?: string): Promise<void> {
   const tag = version
     ? version.startsWith("v")
       ? version
@@ -209,11 +222,76 @@ export async function checkForUpdate(
   | { status: "available"; info: UpdateInfo; update: UpdateHandle }
 > {
   const timeout = opts.timeout ?? 30000;
+  const build = await withTimeout(
+    getUpdateBuildInfo(),
+    timeout,
+    "Get update build identity timed out",
+  );
+  if (build.channel === "acceptance")
+    return checkAcceptanceUpdate(build, timeout);
+  if (build.channel !== "stable") throw new Error("Unknown update channel");
   const currentVersion = await withTimeout(
     getCurrentVersion(),
     timeout,
     "Get current app version timed out",
   ).catch(() => "");
+
+  if (build.repository === "tuziapi/tuzi-switch") {
+    // Release discovery prevents stale manifests from silently hiding new versions.
+    parseInstallerVersion(currentVersion);
+    const release = await fetchInstallerRelease(build, timeout);
+    if (!isNewerInstallerVersion(release.tag_name, currentVersion))
+      return { status: "up-to-date" };
+    if (!hasSignedRelease(release))
+      return installerUpdateFromRelease(
+        build,
+        currentVersion,
+        release,
+        timeout,
+      );
+
+    const { check } = await import("@tauri-apps/plugin-updater");
+    let expired = false;
+    let native: Update | null = null;
+    try {
+      native = await withTimeout(
+        check({ timeout }).then((update) => {
+          if (expired) void update?.close().catch(() => {});
+          return update;
+        }),
+        timeout,
+        "正式更新检查超时，请重试。",
+      );
+      if (
+        !native ||
+        native.version !== release.tag_name.slice(1) ||
+        native.currentVersion !== currentVersion
+      )
+        throw Error("更新清单与正式版本不一致，请稍后重新检查更新。");
+      validateSignedRelease(native.rawJson, release);
+      return {
+        status: "available",
+        info: {
+          currentVersion,
+          availableVersion: native.version,
+          notes: release.body ?? undefined,
+          pubDate: release.published_at,
+          channel: "stable",
+          releaseUrl: release.html_url,
+        },
+        update: mapUpdateHandle(native),
+      };
+    } catch (error) {
+      expired = true;
+      await native?.close().catch(() => {});
+      throw error; // A declared signed release never falls back to unsigned installation.
+    }
+  }
+
+  const integratedChannel = [
+    "tuziapi/tuzi-switch",
+    "AiW520/tuzi-switch",
+  ].includes(build.repository);
 
   let update: Update | null;
   try {
@@ -224,6 +302,7 @@ export async function checkForUpdate(
       "Tauri updater check timed out",
     );
   } catch (error) {
+    if (integratedChannel) throw error; // Never silently open a browser or bypass signing.
     console.warn(
       "Tauri updater check failed, falling back to GitHub release",
       error,
@@ -231,6 +310,7 @@ export async function checkForUpdate(
     return await checkGitHubReleaseFallback(currentVersion, timeout);
   }
   if (!update) {
+    if (integratedChannel) return { status: "up-to-date" };
     return await checkGitHubReleaseFallback(currentVersion, timeout);
   }
 

@@ -92,6 +92,9 @@ describe("Codex forms without environment variable inputs", () => {
     );
     expect(document.querySelector("#codexEnvKey")).toBeNull();
     expect(screen.queryByText("环境变量名")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
     const config = JSON.parse(submit.mock.calls[0][0].settingsConfig);
@@ -107,6 +110,9 @@ describe("Codex forms without environment variable inputs", () => {
       ),
     );
     expect(document.querySelector("#codexEnvKey")).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
     expect(savedRoute).toHaveBeenCalledWith(
@@ -130,6 +136,9 @@ describe("Codex forms without environment variable inputs", () => {
         "SYNTHETIC_MODEL_KEY",
       ),
     );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
     expect(savedRoute).toHaveBeenCalledWith(
@@ -151,6 +160,9 @@ describe("Codex forms without environment variable inputs", () => {
     const submit = setup(data("CUSTOM_CODEX_API_KEY"), true);
     const input = await screen.findByLabelText("API Key");
     await waitFor(() => expect(input).toHaveValue("SYNTHETIC_MODEL_KEY"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "保存" })).toBeEnabled(),

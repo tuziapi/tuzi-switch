@@ -1,0 +1,87 @@
+.confirm-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: 100%;
+  border-radius: 16px;
+  padding: 20px;
+  background: var(--aitu-ui-surface, #ffffff);
+  color: var(--aitu-ui-text-primary, #1e293b);
+  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.16);
+
+  &__title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--aitu-ui-text-primary, #1e293b);
+  }
+
+  &__description {
+    margin: 12px 0 0;
+    line-height: 1.6;
+    color: var(--aitu-ui-text-secondary, #64748b);
+    white-space: pre-wrap;
+  }
+
+  &__body {
+    margin-top: 12px;
+    color: var(--aitu-ui-text-primary, #1e293b);
+
+    p {
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    p + p {
+      margin-top: 8px;
+    }
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+
+    .t-button {
+      min-width: 72px;
+      font-weight: 500;
+    }
+
+    .t-button--variant-outline {
+      background: var(--aitu-ui-surface, #ffffff) !important;
+      border-color: var(
+        --aitu-ui-border-hover,
+        rgba(15, 23, 42, 0.18)
+      ) !important;
+      color: var(--aitu-ui-text-primary, #1e293b) !important;
+
+      .t-button__text {
+        color: inherit !important;
+      }
+
+      &:hover:not(.t-is-disabled) {
+        background: var(--aitu-ui-hover-bg, #fffaf0) !important;
+        border-color: var(
+          --aitu-ui-brand-border,
+          rgba(243, 156, 18, 0.52)
+        ) !important;
+        color: var(--aitu-ui-brand-text, #b45309) !important;
+      }
+    }
+
+    .t-button--theme-danger {
+      background: var(--aitu-ui-danger, #e91e63) !important;
+      border-color: var(--aitu-ui-danger, #e91e63) !important;
+      color: var(--aitu-ui-text-inverse, #ffffff) !important;
+
+      .t-button__text {
+        color: inherit !important;
+      }
+
+      &:hover:not(.t-is-disabled) {
+        background: #c2185b !important;
+        border-color: #c2185b !important;
+        color: var(--aitu-ui-text-inverse, #ffffff) !important;
+      }
+    }
+  }
+}

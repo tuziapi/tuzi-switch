@@ -13,7 +13,6 @@ import zh from "@/i18n/locales/zh.json";
 import { invoke } from "@tauri-apps/api/core";
 import { Keys } from "@/components/account/Keys";
 import { ConfigureTool } from "@/components/account/ConfigureTool";
-import { CurrencySwitcher } from "@/components/account/AccountCurrency";
 import {
   desktopRequest,
   disconnectedAccount,
@@ -73,14 +72,7 @@ const env = (data: unknown) => ({
     generated_at: 1,
   },
 });
-function setup(
-  element: React.ReactNode = (
-    <>
-      <CurrencySwitcher />
-      <Keys state={state} />
-    </>
-  ),
-) {
+function setup(element: React.ReactNode = <Keys state={state} />) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });

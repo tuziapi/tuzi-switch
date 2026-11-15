@@ -1,3 +1,4 @@
+import { beginOperation, errorOutcome, trackOperation } from "@/lib/analytics";
 import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -93,17 +94,34 @@ export function useAccount() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
-  const action = (run: () => Promise<AccountState>) => async () => {
-    const startedAt = eventSequence.current;
-    const next = await run();
-    const current = client.getQueryData<AccountState>(stateKey);
-    if (
-      !current ||
-      next.generation > current.generation ||
-      eventSequence.current === startedAt
-    )
-      accept(next);
-  };
+  const action =
+    (
+      run: () => Promise<AccountState>,
+      operation: "connect" | "check" | "disconnect",
+    ) =>
+    async () => {
+      const startedAt = eventSequence.current;
+      const finish = beginOperation("account", operation);
+      let next: AccountState;
+      try {
+        next = await run();
+        const success =
+          operation === "disconnect"
+            ? next.localCleared
+            : next.status === "connected" && !!next.identity && !next.error;
+        finish(success ? "success" : "failure", next.error);
+      } catch (error) {
+        finish(errorOutcome(error), error);
+        throw error;
+      }
+      const current = client.getQueryData<AccountState>(stateKey);
+      if (
+        !current ||
+        next.generation > current.generation ||
+        eventSequence.current === startedAt
+      )
+        accept(next);
+    };
   return {
     state:
       query.data ??
@@ -118,11 +136,13 @@ export function useAccount() {
           }
         : disconnectedAccount),
     isLoading: query.isLoading,
-    connect: (token: string) => action(() => accountApi.connect(token))(),
-    openTokenPage: accountApi.openTokenPage,
-    logout: action(accountApi.logout),
+    connect: (token: string) =>
+      action(() => accountApi.connect(token), "connect")(),
+    openTokenPage: () =>
+      trackOperation("account", "get_token", {}, accountApi.openTokenPage),
+    logout: action(accountApi.logout, "disconnect"),
     retry: async () => {
-      await action(accountApi.retry)();
+      await action(accountApi.retry, "check")();
       // Return the reconciled state, never a stale IPC success after logout.
       return client.getQueryData<AccountState>(stateKey)!;
     },

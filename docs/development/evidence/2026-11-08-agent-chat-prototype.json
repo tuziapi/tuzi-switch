@@ -1,0 +1,39 @@
+{
+  "task": "UC-AGENT-CHAT-01",
+  "date": "2026-11-08",
+  "scope": "local proposal and interactive mockup only",
+  "engines": [
+    "Chromium",
+    "WebKit"
+  ],
+  "viewports": [
+    1024,
+    736,
+    390
+  ],
+  "additionalChromiumWidth": 320,
+  "checks": [
+    "locate existing result",
+    "refill and cancel",
+    "referenced generation simulation",
+    "same result shown in chat and canvas",
+    "history search",
+    "discussion does not create image",
+    "stop simulation",
+    "retry canvas synchronization only",
+    "rename conversation",
+    "direct canvas image mode omits thought display",
+    "close and reopen",
+    "responsive layouts and dark appearance"
+  ],
+  "runtimeErrors": [],
+  "realModelRequests": 0,
+  "productionRuntimeModified": false,
+  "nativeBuildPerformed": false,
+  "notVerified": [
+    "real Agent integration",
+    "paid provider requests",
+    "native restart recovery",
+    "production performance"
+  ]
+}

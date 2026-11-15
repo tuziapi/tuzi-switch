@@ -1,0 +1,126 @@
+{
+  "verifiedAt": "2026-11-05T11:41:49Z",
+  "pages": [
+    {
+      "path": "index.html",
+      "status": 200,
+      "sha256": "349775dcac6cd284d1c0dc184e8cc3fc9d57aefcaf96fe890b2102332d3093a6"
+    },
+    {
+      "path": "download-SOURCE.json",
+      "status": 200,
+      "sha256": "7a6d65aa4817bab1d2f212fa1c3326904566d7d35819e653e464c91f93df4deb"
+    },
+    {
+      "path": "install.sh",
+      "status": 200,
+      "sha256": "561a527d84dc9d766b5d92301289bac75970ae7500ed866923f139913328fa1c"
+    },
+    {
+      "path": "tuzi-download-analytics.html",
+      "status": 200,
+      "sha256": "8d3ef99572f00d8826c49630c9ade6d082c8e3cb261d81f3dc458cd01460d389"
+    },
+    {
+      "path": "release.json",
+      "status": 200,
+      "sha256": "29914981290a5798c8bf4a7c9bc067e98219f12fbd910b5229eaa2a82c652666"
+    },
+    {
+      "path": "install-macos-v1.5.5.sh",
+      "status": 200,
+      "sha256": "4384f7885226c6cb7c1ea8b797141ad5e7ee542f09cc74ddb9c6d4fb0f7e4b49"
+    },
+    {
+      "path": "tuzi-switch.html",
+      "status": 200,
+      "sha256": "349775dcac6cd284d1c0dc184e8cc3fc9d57aefcaf96fe890b2102332d3093a6"
+    },
+    {
+      "path": "LICENSE.txt",
+      "status": 200,
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+    },
+    {
+      "path": "assets/tuzi-switch-BmVuSRr-.js",
+      "status": 200,
+      "sha256": "241dde9bab66a0890ae0a1bb07ca7d7f55a3696d256047dbe0b88bb8cc292cab"
+    },
+    {
+      "path": "assets/tuzi-switch-D32FSEU9.css",
+      "status": 200,
+      "sha256": "36e7c6fd79dbdb4186ba7b6af9235ac66141c1019df68297791a8ded64df1082"
+    },
+    {
+      "path": "tuzi-assistant-assets/icon.png",
+      "status": 200,
+      "sha256": "0ac46b55e71b60d46874ca24ded5a98228967753e9dc9333d52f4faa157cf9bc"
+    },
+    {
+      "path": "tuzi-assistant-assets/projects.png",
+      "status": 200,
+      "sha256": "e2de881f14cd73fe8d7066a3ff84744d697a5e3c5fc2d4efb9353451959c4caa"
+    },
+    {
+      "path": "tuzi-assistant-assets/tools.png",
+      "status": 200,
+      "sha256": "5bde352fcb30dac958ba4f130d2511d533bb5c53d01548db5cdea985e2e1feb9"
+    },
+    {
+      "path": "tuzi-assistant-assets/configuration.png",
+      "status": 200,
+      "sha256": "57f28915982f499f9e089ada427c76bedb5eeda97eedcee5e70648a1a0b0b2b1"
+    }
+  ],
+  "installers": [
+    {
+      "name": "tuzi-assistant-linux-x64.AppImage",
+      "status": 200,
+      "size": 102910456,
+      "sha256": "sha256:62cf5eabb795dff78aeb0b579717b259a2791b478a4f1c1834c1803f70b1d5d2",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.5/tuzi-assistant-linux-x64.AppImage"
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.deb",
+      "status": 200,
+      "size": 23722758,
+      "sha256": "sha256:ea5b911446b64cfd00ff000d30fe88a0433b689fba65b6e26de4a6e0bc54c8b6",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.5/tuzi-assistant-linux-x64.deb"
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.rpm",
+      "status": 200,
+      "size": 23722821,
+      "sha256": "sha256:520f2c23e04bd6ddda5e5e9bb68174bcf2d02631cdc7a7ab3ef0b89427ea4642",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.5/tuzi-assistant-linux-x64.rpm"
+    },
+    {
+      "name": "tuzi-assistant-macos-arm64.dmg",
+      "status": 200,
+      "size": 24395974,
+      "sha256": "sha256:54531432bde3ff059c09b34eaa03026c2d84f5c3313ebdff245eda7b35d336dc",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.5/tuzi-assistant-macos-arm64.dmg"
+    },
+    {
+      "name": "tuzi-assistant-macos-x64.dmg",
+      "status": 200,
+      "size": 25412686,
+      "sha256": "sha256:e0c84f7214286c2f971e76fe5d176140835e464d135520ed9c9328a5df7866a2",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.5/tuzi-assistant-macos-x64.dmg"
+    },
+    {
+      "name": "tuzi-assistant-windows-x64.exe",
+      "status": 200,
+      "size": 20313293,
+      "sha256": "sha256:e348485e03cb53eba1432b87ed898e7447f0235df11a43b43a697ebc8ca9aad9",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.5/tuzi-assistant-windows-x64.exe"
+    },
+    {
+      "name": "tuzi-assistant-windows-x64.msi",
+      "status": 200,
+      "size": 23625728,
+      "sha256": "sha256:d3a03a424eb3dfb864515140ff1547fba60fb8d3a04209fb272924d6fd34e7a3",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.5.5/tuzi-assistant-windows-x64.msi"
+    }
+  ]
+}

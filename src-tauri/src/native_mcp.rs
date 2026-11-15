@@ -27,7 +27,7 @@ impl NativeMcpTool {
             Self::Pi => home.join(".pi/agent/mcp.json"),
             Self::Mcode => home.join(".minimax/mcp.json"),
         };
-        #[cfg(not(feature = "local-preview"))]
+        #[cfg(not(feature = "isolated-profile"))]
         {
             let vars: &[&str] = match self {
                 Self::Grok => &[],
@@ -78,9 +78,25 @@ fn import_at_paths(
     let mut count = 0;
     let mut errors = Vec::new();
     let mut pending = std::collections::BTreeSet::new();
+    let mut receipts = Vec::new();
+    let mut sources = Vec::new();
+    let mut locks = Vec::new();
+    let mut targets = targets;
+    targets.sort_by(|a, b| a.1.cmp(&b.1));
+    for (_, path) in &targets {
+        if path.exists() {
+            locks.push(native_tools::file_lock(path).map_err(AppError::Message)?);
+        }
+    }
     for (tool, path) in targets {
         let bytes = native_tools::read_bytes(&path).map_err(AppError::Message)?;
         let Some(bytes) = bytes else { continue };
+        sources.push((path.clone(), bytes.clone()));
+        let mut receipt = if tool == NativeMcpTool::Pi {
+            Some(Receipt::read(&path)?)
+        } else {
+            None
+        };
         let text = std::str::from_utf8(&bytes)
             .map_err(|_| AppError::Message("MCP 配置不是 UTF-8".into()))?;
         let root: Value = if tool == NativeMcpTool::Grok {
@@ -159,8 +175,14 @@ fn import_at_paths(
                 }
             };
             tool.set_enabled(&mut server, enabled);
+            if let Some(receipt) = &mut receipt {
+                receipt.record(id, Some(native));
+            }
             pending.insert(id.clone());
             existing.insert(id.clone(), server);
+        }
+        if let Some(receipt) = receipt {
+            receipts.push(receipt.change()?);
         }
     }
     if errors.is_empty() {
@@ -168,7 +190,18 @@ fn import_at_paths(
             .into_iter()
             .map(|id| existing[&id].clone())
             .collect::<Vec<_>>();
-        state.db.save_mcp_servers_atomic(&servers)?;
+        write_changes(receipts, || {
+            for (path, bytes) in &sources {
+                if native_tools::read_bytes(path)
+                    .map_err(AppError::Message)?
+                    .as_ref()
+                    != Some(bytes)
+                {
+                    return Err(AppError::Message("导入来源已被外部修改，请重试".into()));
+                }
+            }
+            state.db.save_mcp_servers_atomic(&servers)
+        })?;
         Ok(count)
     } else {
         Err(AppError::Message(format!(
@@ -181,7 +214,7 @@ fn import_at_paths(
 const CONNECTION_FIELDS: &[&str] = &["type", "command", "args", "env", "cwd", "url", "headers"];
 
 /// Compare connection data without treating tool-owned fields as managed state.
-fn connection_matches(native: &Value, expected: &Value) -> bool {
+pub(crate) fn connection_matches(native: &Value, expected: &Value) -> bool {
     let (Some(native), Some(expected)) = (native.as_object(), expected.as_object()) else {
         return false;
     };
@@ -242,10 +275,10 @@ fn existing_entry(
     }
 }
 
-struct ChangeFile {
-    path: PathBuf,
-    before: Option<Vec<u8>>,
-    after: Vec<u8>,
+pub(crate) struct ChangeFile {
+    pub(crate) path: PathBuf,
+    pub(crate) before: Option<Vec<u8>>,
+    pub(crate) after: Vec<u8>,
 }
 
 fn rollback(written: &[ChangeFile]) -> Result<(), String> {
@@ -298,13 +331,36 @@ pub(crate) fn commit<T>(
             ));
         }
     }
-    commit_at_paths(previous, next, targets, save)
+    let legacy = crate::mcp::transaction::targets(previous, next);
+    // Codex MCP shares config.toml with the aggregation overlay journal.
+    // Hold the mode guard through the entire transaction so a mode transition
+    // cannot capture or restore a configuration while MCP is rewriting it.
+    let _mode_operation = crate::aggregation::read_operation().map_err(AppError::Message)?;
+    if legacy
+        .iter()
+        .any(|(app, _)| *app == crate::app_config::AppType::Codex)
+    {
+        crate::aggregation::ensure_inactive("codex").map_err(|_| {
+            AppError::Message("Exit aggregation before changing Codex MCP configuration".into())
+        })?;
+    }
+    commit_all_at_paths(previous, next, targets, legacy, save)
 }
 
 fn commit_at_paths<T>(
     previous: Option<&McpServer>,
     next: Option<&McpServer>,
+    targets: Vec<(PathBuf, NativeMcpTool, bool, bool)>,
+    save: impl FnOnce() -> Result<T, AppError>,
+) -> Result<T, AppError> {
+    commit_all_at_paths(previous, next, targets, Vec::new(), save)
+}
+
+fn commit_all_at_paths<T>(
+    previous: Option<&McpServer>,
+    next: Option<&McpServer>,
     mut targets: Vec<(PathBuf, NativeMcpTool, bool, bool)>,
+    legacy: Vec<(crate::app_config::AppType, PathBuf)>,
     save: impl FnOnce() -> Result<T, AppError>,
 ) -> Result<T, AppError> {
     let _guard = native_tools::LOCK
@@ -315,17 +371,50 @@ fn commit_at_paths<T>(
         return Err(AppError::Message("多个工具的 MCP 配置路径相同".into()));
     }
     let mut locks = Vec::new();
-    for (path, _, _, _) in &targets {
+    let mut paths: Vec<_> = targets
+        .iter()
+        .map(|t| &t.0)
+        .chain(legacy.iter().map(|t| &t.1))
+        .collect();
+    paths.sort();
+    if paths.windows(2).any(|p| p[0] == p[1]) {
+        return Err(AppError::Message("多个工具的 MCP 配置路径相同".into()));
+    }
+    for path in paths {
         locks.push(native_tools::file_lock(path).map_err(AppError::Message)?);
     }
     let mut changes = Vec::new();
+    for (app, path) in legacy {
+        changes.push(crate::mcp::transaction::prepare(
+            &app, &path, previous, next,
+        )?);
+    }
     for (path, tool, was_enabled, enabled) in targets {
         let before = native_tools::read_bytes(&path).map_err(AppError::Message)?;
         let server = next.or(previous).expect("target has a server");
         let existing =
             existing_entry(tool, before.as_deref(), &server.id).map_err(AppError::Message)?;
-        let managed_pi =
-            tool == NativeMcpTool::Pi && previous.is_some_and(|server| server.apps.pi_managed);
+        // Database flags are portable intent, never proof of local ownership.
+        let receipt = if tool == NativeMcpTool::Pi {
+            Some(Receipt::read(&path)?)
+        } else {
+            None
+        };
+        let owned_pi = receipt
+            .as_ref()
+            .is_some_and(|r| r.owns(&server.id, existing.as_ref()));
+        let managed_pi = tool == NativeMcpTool::Pi && owned_pi;
+        if tool == NativeMcpTool::Pi && existing.is_some() && !owned_pi {
+            return Err(AppError::Message(format!(
+                "{} 中的 Pi MCP 尚未在本机认领，请先导入后再管理",
+                path.display()
+            )));
+        }
+        // A portable disabled Pi record does not imply a local file exists.
+        // Deleting it only removes database intent; there is nothing to rewrite.
+        if tool == NativeMcpTool::Pi && existing.is_none() && !was_enabled && next.is_none() {
+            continue;
+        }
         let expected = if was_enabled || managed_pi {
             &previous.unwrap().server
         } else {
@@ -384,12 +473,25 @@ fn commit_at_paths<T>(
             after = serde_json::to_vec_pretty(&root)
                 .map_err(|_| AppError::Message("无法编码 Pi MCP 配置".into()))?;
         }
+        if let Some(mut receipt) = receipt {
+            let entry =
+                existing_entry(tool, Some(&after), &server.id).map_err(AppError::Message)?;
+            receipt.record(&server.id, entry.as_ref());
+            changes.push(receipt.change()?);
+        }
         changes.push(ChangeFile {
             path,
             before,
             after,
         });
     }
+    write_changes(changes, save)
+}
+
+pub(crate) fn write_changes<T>(
+    changes: Vec<ChangeFile>,
+    save: impl FnOnce() -> Result<T, AppError>,
+) -> Result<T, AppError> {
     let mut written = Vec::new();
     let result = (|| {
         for change in changes {
@@ -401,6 +503,17 @@ fn commit_at_paths<T>(
             }
             native_tools::private_write(&change.path, &change.after).map_err(AppError::Message)?;
             written.push(change);
+        }
+        for change in &written {
+            if native_tools::read_bytes(&change.path)
+                .map_err(AppError::Message)?
+                .as_deref()
+                != Some(change.after.as_slice())
+            {
+                return Err(AppError::Message(
+                    "MCP 配置在写入后被外部修改，未提交数据库".into(),
+                ));
+            }
         }
         save()
     })();
@@ -696,6 +809,10 @@ mod tests {
             br#"{"mcpServers":{"fixture":{"command":"fixture","enabled":false,"timeout":3}}}"#,
         )
         .unwrap();
+        let state = crate::store::AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        import_at_paths(&state, vec![(NativeMcpTool::Pi, path.clone())]).unwrap();
         commit_at_paths(
             Some(&server),
             None,
@@ -705,6 +822,36 @@ mod tests {
         .unwrap();
         let value: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
         assert!(value["mcpServers"].get("fixture").is_none());
+    }
+
+    #[test]
+    fn deleting_portable_disabled_pi_without_local_entry_only_commits_database() {
+        for before in [
+            None,
+            Some(br#"{"mcpServers":{"other":{"command":"keep"}}}"#.as_slice()),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("pi.json");
+            if let Some(bytes) = before {
+                fs::write(&path, bytes).unwrap();
+            }
+            let mut server = fixture();
+            server.apps.pi = false;
+            let saved = std::cell::Cell::new(false);
+            commit_at_paths(
+                Some(&server),
+                None,
+                vec![(path.clone(), NativeMcpTool::Pi, false, false)],
+                || {
+                    saved.set(true);
+                    Ok(())
+                },
+            )
+            .unwrap();
+            assert!(saved.get());
+            assert_eq!(native_tools::read_bytes(&path).unwrap().as_deref(), before);
+            assert!(!path.with_file_name(".pi.json.tuzi-ownership.json").exists());
+        }
     }
 
     #[test]
@@ -880,5 +1027,88 @@ mod tests {
             &json!({"url":"https://example.invalid"}),
             &expected
         ));
+    }
+}
+
+/// Local receipt is deliberately outside SQLite, SQL exports, and WebDAV. Only
+/// explicit import or a successful write can claim a Pi entry on this path.
+struct Receipt {
+    path: PathBuf,
+    before: Option<Vec<u8>>,
+    value: Value,
+}
+impl Receipt {
+    fn read(config: &std::path::Path) -> Result<Self, AppError> {
+        let path = config.with_file_name(format!(
+            ".{}.tuzi-ownership.json",
+            config
+                .file_name()
+                .ok_or_else(|| AppError::Message("Invalid MCP path".into()))?
+                .to_string_lossy()
+        ));
+        let before = native_tools::read_bytes(&path).map_err(AppError::Message)?;
+        let parent = config
+            .parent()
+            .ok_or_else(|| AppError::Message("Invalid MCP path".into()))?;
+        let parent = parent
+            .canonicalize()
+            .map_err(|_| AppError::Message("Cannot resolve MCP directory".into()))?;
+        let identity = parent
+            .join(config.file_name().unwrap())
+            .to_string_lossy()
+            .to_string();
+        let value = if let Some(bytes) = &before {
+            let value: Value = serde_json::from_slice(bytes)
+                .map_err(|_| AppError::Message("Pi 本机归属记录无效，请先修复该记录".into()))?;
+            if value["path"] == identity && value["entries"].is_object() {
+                value
+            } else {
+                json!({"path": identity, "entries": {}})
+            }
+        } else {
+            json!({"path": identity, "entries": {}})
+        };
+        Ok(Self {
+            path,
+            before,
+            value,
+        })
+    }
+    fn fingerprint(entry: &Value) -> String {
+        use sha2::{Digest, Sha256};
+        // Do not copy credentials into the receipt, and allow unrelated native
+        // metadata to change while still detecting connection/state conflicts.
+        let fields: std::collections::BTreeMap<_, _> = CONNECTION_FIELDS
+            .iter()
+            .chain(std::iter::once(&"enabled"))
+            .filter_map(|key| entry.get(*key).map(|value| (*key, value)))
+            .collect();
+        format!(
+            "{:x}",
+            Sha256::digest(serde_json::to_vec(&fields).expect("JSON fields"))
+        )
+    }
+    fn owns(&self, id: &str, entry: Option<&Value>) -> bool {
+        entry.is_some_and(|v| {
+            self.value["entries"][id].as_str() == Some(Self::fingerprint(v).as_str())
+        })
+    }
+    fn record(&mut self, id: &str, entry: Option<&Value>) {
+        let entries = self.value["entries"]
+            .as_object_mut()
+            .expect("validated receipt");
+        if let Some(entry) = entry {
+            entries.insert(id.into(), json!(Self::fingerprint(entry)));
+        } else {
+            entries.remove(id);
+        }
+    }
+    fn change(self) -> Result<ChangeFile, AppError> {
+        Ok(ChangeFile {
+            path: self.path,
+            before: self.before,
+            after: serde_json::to_vec_pretty(&self.value)
+                .map_err(|_| AppError::Message("Cannot encode Pi receipt".into()))?,
+        })
     }
 }

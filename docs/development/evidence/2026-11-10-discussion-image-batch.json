@@ -1,0 +1,165 @@
+{
+  "task": "UC-DISCUSS-BATCH-01",
+  "date": "2026-11-10",
+  "baseline": "efac7cc127f6c1da3703b12c39ca8fbb934df3f3",
+  "branch": "codex/opentu-text-chat",
+  "scope": "local existing discussion image planning bug fix",
+  "rootCause": "A group-level generate-five-images prompt was repeated for five single-image queue items.",
+  "changes": [
+    "shared per-image planning guidance for configured text and Codex",
+    "conservative batch-command guard before preview and before old ready-plan dispatch",
+    "distinct numbered preview rows and explicit same-prompt variants"
+  ],
+  "unitTests": {
+    "files": 4,
+    "passed": 79,
+    "log": "/tmp/tuzi-batch-plan-unit.log"
+  },
+  "browser": {
+    "chromium": {
+      "crossMedia": {
+        "checks": [
+          "opening discussion retains the image model; planner uses an independent configured text model",
+          "observed multi-image prompt is rejected before preview and any media request",
+          "five preview rows preserve five distinct prompts through actual image request serialization",
+          "image: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "video: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "audio: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "text: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "ready plan survives reload; cancellation creates no tasks",
+          "explicit exit restores direct generation and closes discussion"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "codex": {
+        "checks": [
+          "opening discussion retains the image model; planner uses an independent configured text model",
+          "failed connection retains the configured text-model route",
+          "Codex model selection, streamed summary, preview, pinned image execution model and canvas placement",
+          "Codex rejects the observed batch prompt; explicit replan previews and sends five separate image prompts without fallback",
+          "stop cancels the local turn; failure remains on Codex with no silent fallback",
+          "disconnect restores the original configured text model and conversation context",
+          "narrow layout and discussion toggle still work"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "imageRequests": [
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "樱花校园的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        },
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "霓虹街道的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        },
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "奇幻森林的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        },
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "海边日落的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        },
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "星空山巅的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        }
+      ]
+    },
+    "webkit": {
+      "crossMedia": {
+        "checks": [
+          "opening discussion retains the image model; planner uses an independent configured text model",
+          "observed multi-image prompt is rejected before preview and any media request",
+          "five preview rows preserve five distinct prompts through actual image request serialization",
+          "image: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "video: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "audio: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "text: preview, correct planner/execution models, single dispatch, result and canvas placement",
+          "ready plan survives reload; cancellation creates no tasks",
+          "explicit exit restores direct generation and closes discussion"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "codex": {
+        "checks": [
+          "opening discussion retains the image model; planner uses an independent configured text model",
+          "failed connection retains the configured text-model route",
+          "Codex model selection, streamed summary, preview, pinned image execution model and canvas placement",
+          "Codex rejects the observed batch prompt; explicit replan previews and sends five separate image prompts without fallback",
+          "stop cancels the local turn; failure remains on Codex with no silent fallback",
+          "disconnect restores the original configured text model and conversation context",
+          "narrow layout and discussion toggle still work"
+        ],
+        "errors": [],
+        "requests": "synthetic only"
+      },
+      "imageRequests": [
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "樱花校园的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        },
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "霓虹街道的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        },
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "奇幻森林的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        },
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "海边日落的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        },
+        {
+          "model": "gpt-image-2.5-sunburst",
+          "prompt": "星空山巅的动漫壁纸，细腻日系风格，单幅完整画面，不分屏、不拼贴、无分镜。",
+          "n": 1
+        }
+      ]
+    }
+  },
+  "typecheck": "passed",
+  "creativeBuild": "passed",
+  "previewBuild": "passed",
+  "provenance": {
+    "originalFiles": 1522,
+    "localFiles": 97,
+    "reconstructedFiles": 1619
+  },
+  "nativeBuild": "release/app passed",
+  "paidRequests": 0,
+  "realGeneration": "not verified",
+  "limitations": [
+    "semantic guard is conservative and not a general intent classifier",
+    "real provider adherence to planning/image instructions requires separately authorized evaluation"
+  ],
+  "published": false,
+  "native": {
+    "app": "/Users/sdy09/Documents/tuzi-switch-artifacts/discussion-batch-2026-11-10/Tuzi Text Chat QA.app",
+    "sha256": "a71fe1f10f58151711608312d7b031669161a613a6c7374d45da82626ffa60d3",
+    "signature": "ad-hoc deep strict verification passed",
+    "pid": 36091,
+    "checks": [
+      "prior discussion restored",
+      "original completed five-task group and canvas results retained",
+      "new same-prompt variant label visible on prior plan",
+      "expanded discussion opened with empty composer",
+      "no new planning or media request initiated"
+    ],
+    "method": "CUA native accessibility",
+    "codex": "session-scoped connection resets on restart; left disconnected"
+  }
+}

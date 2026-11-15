@@ -1,0 +1,373 @@
+/**
+ * ViewNavigation Styles
+ *
+ * 视图导航组件样式 - 简洁白色主题
+ */
+
+@import '../../styles/z-index';
+
+.view-navigation {
+  position: fixed;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  transition: right 0.3s ease-out;
+  user-select: none;
+
+  // 缩放控制区域
+  &__zoom {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: #fff;
+    border-radius: 20px;
+    padding: 4px 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1);
+  }
+
+  // 缩放按钮（减号/加号）
+  &__zoom-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    transition: all 0.15s ease;
+
+    &:hover {
+      color: #5a4fcf;
+      background: rgba(90, 79, 207, 0.08);
+    }
+
+    &:active {
+      transform: scale(0.92);
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  // 缩放百分比显示
+  &__zoom-percent {
+    min-width: 44px;
+    height: 28px;
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    transition: all 0.15s ease;
+
+    &:hover {
+      color: #5a4fcf;
+      background: rgba(90, 79, 207, 0.08);
+    }
+  }
+
+  // Minimap 展开按钮
+  &__minimap-toggle {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    transition: all 0.2s ease;
+    margin-left: 2px;
+
+    &:hover {
+      color: #5a4fcf;
+      background: rgba(90, 79, 207, 0.08);
+    }
+
+    &:active {
+      transform: scale(0.92);
+    }
+
+    svg {
+      width: 14px;
+      height: 14px;
+      transition: transform 0.2s ease;
+    }
+
+    // 展开状态 - 箭头向上
+    &--expanded {
+      svg {
+        transform: rotate(180deg);
+      }
+    }
+  }
+
+  // Minimap 容器
+  &__minimap {
+    animation: slideDown 0.2s ease-out;
+    position: relative;
+
+    // 重置 minimap 的默认定位，让它跟随父容器
+    .minimap {
+      position: relative !important;
+      top: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      left: auto !important;
+    }
+
+    // 强制使用白色主题
+    .minimap__content {
+      background: #fff !important;
+      border: 1px solid rgba(0, 0, 0, 0.08) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+      position: relative;
+    }
+
+    // 预览框样式
+    .minimap__preview {
+      background: #fff;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+  }
+}
+
+// 缩放菜单样式（Portal 渲染到 body，需要全局样式）
+.view-navigation-zoom-menu {
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  min-width: 140px;
+
+  .zoom-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    font-size: 14px;
+    color: #333;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: rgba(90, 79, 207, 0.08);
+      color: #5a4fcf;
+    }
+
+    .zoom-menu-item__label {
+      flex: 1;
+      text-align: left;
+    }
+
+    .zoom-menu-item__shortcut {
+      font-size: 12px;
+      color: #999;
+      margin-left: 16px;
+    }
+  }
+}
+
+// 动画
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// ============================================================================
+// Responsive Styles
+// ============================================================================
+
+// 平板及以下 (max-width: 768px)
+@media (max-width: 768px) {
+  .view-navigation {
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    z-index: 4005;
+
+    &__zoom {
+      padding: 2px 4px;
+      border-radius: 16px;
+    }
+
+    // 确保触控友好的按钮尺寸 (最小44px)
+    &__zoom-btn {
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    &__zoom-percent {
+      min-width: 44px;
+      height: 36px;
+      font-size: 12px;
+      padding: 0 4px;
+    }
+
+    &__minimap-toggle {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+
+      svg {
+        width: 14px;
+        height: 14px;
+      }
+    }
+
+    &__minimap {
+      .minimap__content {
+        transform: scale(0.8);
+        transform-origin: top right;
+      }
+    }
+  }
+}
+
+// 移动端竖屏 (max-width: 640px)
+@media (max-width: 640px) {
+  .view-navigation {
+    top: calc(env(safe-area-inset-top, 0px) + 6px);
+    gap: 4px;
+
+    &__zoom {
+      padding: 2px 2px;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    &__zoom-btn {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+
+      svg {
+        width: 14px;
+        height: 14px;
+      }
+    }
+
+    &__zoom-percent {
+      min-width: 40px;
+      height: 32px;
+      font-size: 11px;
+      padding: 0 2px;
+    }
+
+    // 移动端隐藏 minimap toggle 按钮，节省空间
+    &__minimap-toggle {
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+
+      svg {
+        width: 12px;
+        height: 12px;
+      }
+    }
+
+    // 移动端 minimap 缩小更多
+    &__minimap {
+      .minimap__content {
+        transform: scale(0.7);
+        transform-origin: top right;
+      }
+    }
+  }
+}
+
+// 小屏移动端 (max-width: 480px)
+@media (max-width: 480px) {
+  .view-navigation {
+    &__zoom {
+      padding: 1px 1px;
+    }
+
+    &__zoom-btn {
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+
+      svg {
+        width: 12px;
+        height: 12px;
+      }
+    }
+
+    &__zoom-percent {
+      min-width: 36px;
+      height: 28px;
+      font-size: 10px;
+      padding: 0 1px;
+    }
+
+    // 小屏幕 minimap toggle 更紧凑
+    &__minimap-toggle {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+
+      svg {
+        width: 10px;
+        height: 10px;
+      }
+    }
+
+    // 小屏幕 minimap 缩小
+    &__minimap {
+      .minimap__content {
+        transform: scale(0.6);
+        transform-origin: top right;
+      }
+    }
+  }
+}
+
+// 缩放菜单响应式
+@media (max-width: 640px) {
+  .view-navigation-zoom-menu {
+    min-width: 120px;
+    padding: 2px;
+
+    .zoom-menu-item {
+      padding: 10px 10px; // 增加触控区域
+      font-size: 13px;
+
+      .zoom-menu-item__shortcut {
+        display: none; // 移动端隐藏快捷键提示
+      }
+    }
+  }
+}

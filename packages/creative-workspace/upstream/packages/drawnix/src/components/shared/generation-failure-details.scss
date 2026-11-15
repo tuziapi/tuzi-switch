@@ -1,0 +1,94 @@
+.generation-failure-details {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 400;
+  user-select: text;
+
+  &__row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+  }
+  &__label {
+    color: #9b6666;
+  }
+  &__value {
+    display: flex;
+    align-items: start;
+    gap: 6px;
+    min-width: 0;
+    color: #475569;
+    > span {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    &--error {
+      color: #dc2626;
+    }
+  }
+  &__copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    margin-top: -2px;
+    border: 1px solid #ecdcdc;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.8);
+    color: #947070;
+    cursor: pointer;
+    &:hover {
+      color: #b91c1c;
+      background: #fff;
+    }
+    &:focus-visible {
+      outline: 2px solid #ef4444;
+      outline-offset: 2px;
+    }
+  }
+}
+
+// Native SVG cards inherit the same restrained palette in either desktop theme.
+.image-generation-anchor-desktop-fallback,
+.native-generation-failure-details {
+  --failure-surface: #ffffff;
+  --failure-border: #dde2e5;
+  --failure-text: #34434a;
+  --failure-muted: #68747b;
+  --failure-danger: #b34d42;
+  --failure-action: #356859;
+  --failure-action-text: #ffffff;
+
+  [role='button']:hover > rect {
+    filter: brightness(0.96);
+  }
+  [role='button']:focus-visible {
+    outline: 2px solid var(--failure-action);
+    outline-offset: 3px;
+    border-radius: 7px;
+  }
+}
+
+.creative-root[data-theme='dark'] {
+  .image-generation-anchor-desktop-fallback,
+  .native-generation-failure-details {
+    --failure-surface: #292d2b;
+    --failure-border: #474f4b;
+    --failure-text: #e0e6e2;
+    --failure-muted: #acb6b0;
+    --failure-danger: #efa99e;
+    --failure-action: #a6c8b8;
+    --failure-action-text: #20382d;
+  }
+}

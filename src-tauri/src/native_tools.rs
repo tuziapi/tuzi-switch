@@ -37,7 +37,7 @@ impl NativeTool {
             Self::Pi => home.join(".pi/agent/models.json"),
             Self::Mcode => home.join(".minimax/config.yaml"),
         };
-        #[cfg(not(feature = "local-preview"))]
+        #[cfg(not(feature = "isolated-profile"))]
         {
             let vars: &[&str] = match self {
                 Self::Grokbuild => &[],
@@ -552,11 +552,10 @@ fn apply_transaction(
         can_restore: true,
     })
 }
-pub(crate) struct FileLock(PathBuf);
-impl Drop for FileLock {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir(&self.0);
-    }
+// Keep the sidecar inode stable. The OS releases its advisory lock even when
+// the process exits without running Drop; unlinking it would allow two owners.
+pub(crate) struct FileLock {
+    _file: fs::File,
 }
 pub(crate) fn file_lock(path: &Path) -> Result<FileLock, String> {
     let parent = path.parent().ok_or("Invalid path")?;
@@ -570,9 +569,31 @@ pub(crate) fn file_lock(path: &Path) -> Result<FileLock, String> {
         }
     }
     let lock = PathBuf::from(format!("{}.lock", path.display()));
-    fs::create_dir(&lock)
+    match fs::symlink_metadata(&lock) {
+        Ok(meta) if meta.is_dir() && !meta.file_type().is_symlink() => {
+            // Legacy locks contain no owner information. Never reclaim one while
+            // an older app could still be writing; give an explicit recovery path.
+            return Err(format!("检测到旧版配置锁目录：{}。请退出所有旧版兔子助手，确认没有配置写入后删除此空目录，再重试；工具配置未改动。", lock.display()));
+        }
+        Ok(meta) if !meta.is_file() || meta.file_type().is_symlink() => {
+            return Err(format!("配置锁必须是普通文件：{}", lock.display()));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(format!("无法读取配置锁：{}", lock.display())),
+    }
+    let mut options = fs::OpenOptions::new();
+    options.read(true).write(true).create(true).truncate(false);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(&lock)
+        .map_err(|_| format!("无法打开配置锁：{}", lock.display()))?;
+    file.try_lock()
         .map_err(|_| "Tool configuration is busy; retry after the other writer finishes")?;
-    Ok(FileLock(lock))
+    Ok(FileLock { _file: file })
 }
 #[tauri::command]
 pub fn native_tool_read(tool: NativeTool) -> Result<Snapshot, String> {
@@ -790,6 +811,50 @@ fn restore(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn file_lock_recovers_after_process_exit() {
+        const CHILD_PATH: &str = "TUZI_FILE_LOCK_TEST_PATH";
+        if let Some(path) = std::env::var_os(CHILD_PATH) {
+            let path = std::path::PathBuf::from(path);
+            if std::env::var("TUZI_FILE_LOCK_TEST_MODE").unwrap() == "contend" {
+                assert!(super::file_lock(&path).is_err());
+                return;
+            }
+            let _held = super::file_lock(&path).expect("child lock");
+            // Simulate termination without Drop, with an OS-held lock.
+            std::process::exit(0);
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let child = |mode: &str| {
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "native_tools::tests::file_lock_recovers_after_process_exit", "--test-threads=1"])
+                .env(CHILD_PATH, &path)
+                .env("TUZI_FILE_LOCK_TEST_MODE", mode)
+                .status().expect("run lock child")
+        };
+        let first = super::file_lock(&path).unwrap();
+        assert!(super::file_lock(&path).is_err());
+        assert!(child("contend").success());
+        drop(first);
+        assert!(child("exit").success());
+        let _recovered = super::file_lock(&path).expect("lock after abrupt exit");
+    }
+
+    #[test]
+    fn legacy_lock_requires_explicit_recovery_and_preserves_configuration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(&path, b"synthetic-original").unwrap();
+        let lock = dir.path().join("config.json.lock");
+        std::fs::create_dir(&lock).unwrap();
+        assert!(super::file_lock(&path).err().unwrap().contains("旧版配置锁"));
+        assert!(lock.is_dir());
+        assert_eq!(std::fs::read(&path).unwrap(), b"synthetic-original");
+        std::fs::remove_dir(&lock).unwrap();
+        let _recovered = super::file_lock(&path).unwrap();
+    }
+
     use super::*;
     fn config(tool: NativeTool) -> Value {
         match tool {

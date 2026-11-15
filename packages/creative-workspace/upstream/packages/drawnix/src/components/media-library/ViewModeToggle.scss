@@ -1,0 +1,43 @@
+/**
+ * View Mode Toggle Styles
+ * 视图模式切换样式 - 简洁素雅风格
+ */
+
+.view-mode-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--aitu-ui-surface-muted, #f1f5f9);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 1px;
+
+  &__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--aitu-ui-text-tertiary, #94a3b8);
+    transition: all 0.15s ease;
+
+    svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    &:hover:not(&--active) {
+      background: var(--aitu-ui-brand-softer, rgba(243, 156, 18, 0.06));
+      color: var(--aitu-ui-text-secondary, #64748b);
+    }
+
+    &--active {
+      background: var(--aitu-ui-surface, #ffffff);
+      color: var(--aitu-ui-text-primary, #1e293b);
+      box-shadow: var(--aitu-ui-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.06));
+    }
+  }
+}

@@ -1,6 +1,11 @@
-import { FilterBar } from "./BusinessShared";
+import { Search } from "lucide-react";
+import { ModelIcon } from "./ModelIcon";
+import { ModelFilters, billingLabels } from "./ModelFilters";
+import { AccountErrorBoundary } from "./AccountErrorBoundary";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { type AccountState } from "@/lib/api/account";
+import { desktopRequest, type AccountState } from "@/lib/api/account";
 import type {
   DesktopError,
   DesktopKey,
@@ -9,11 +14,12 @@ import type {
   Page,
   Performance,
 } from "@/lib/api/desktop";
-import { useDesktop } from "@/lib/query/desktop";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { date, Field, Pager, QueryState } from "./BusinessShared";
+import { useAccountRead, useDesktop } from "@/lib/query/desktop";
+import { date, Pager, QueryState } from "./BusinessShared";
 import { PricingDetails } from "./PricingDetails";
+import { AccountDialog } from "./AccountDialog";
+import { useAccountViewState } from "./AccountViewState";
+
 export function ModelsPage({
   state,
   performance = false,
@@ -24,51 +30,74 @@ export function ModelsPage({
   onConfigure?: (key: DesktopKey, model?: DesktopPricing) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const description = (model: DesktopPricing) => {
-    try {
-      const translations: unknown = JSON.parse(model.description_i18n);
-      if (translations && typeof translations === "object") {
-        const entry = (translations as Record<string, unknown>)[i18n.language];
-        if (typeof entry === "string") return entry;
-      }
-    } catch {
-      /* Legacy descriptions may omit translations. */
-    }
-    return model.description;
-  };
-  const [page, setPage] = useState(1),
-    [filters, setFilters] = useState<Record<string, string>>({}),
-    [snapshot, setSnapshot] = useState<string | undefined>(),
-    [selected, setSelected] = useState<DesktopPricing | null>(null),
-    [hours, setHours] = useState(24),
-    [keyId, setKeyId] = useState("");
+  const prefix = performance ? "performance" : "models";
+  const [page, setPage] = useAccountViewState(`${prefix}.page`, 1);
+  const [filters, setFilters] = useAccountViewState<Record<string, string>>(
+    `${prefix}.filters`,
+    {},
+  );
+  const [draft, setDraft] = useAccountViewState<Record<string, string>>(
+    `${prefix}.draft`,
+    filters,
+  );
+  const [snapshot, setSnapshot] = useAccountViewState<string | undefined>(
+    `${prefix}.snapshot`,
+    undefined,
+  );
+  const [selected, setSelected] = useState<DesktopPricing | null>(null);
+  const [hours, setHours] = useAccountViewState(`${prefix}.hours`, 24);
+  const [keyId, setKeyId] = useState("");
+  const [keyPage, setKeyPage] = useState(1);
   const models = useDesktop<Models>(
     state,
     "/account/models",
-    { ...filters, page, snapshot_id: page > 1 ? snapshot : undefined },
+    {
+      ...filters,
+      page,
+      page_size: performance ? 6 : 12,
+      snapshot_id: page > 1 ? snapshot : undefined,
+    },
     300000,
   );
   const keys = useDesktop<Page<DesktopKey>>(
     selected && onConfigure ? state : { ...state, identity: null },
     "/account/keys",
-    { page: 1, page_size: 100, status: 1 },
+    { page: keyPage, page_size: 100, status: 1 },
   );
-  useEffect(() => {
-    if (performance && !selected && models.data?.data.items[0])
-      setSelected(models.data.data.items[0]);
-  }, [performance, selected, models.data]);
-  const quality = useDesktop<Performance>(
-    selected ? state : { ...state, identity: null },
-    "/account/model-performance",
-    {
-      model: selected?.model_name,
-      hours,
-      resolution: "30m",
-      group: filters.group,
-    },
+  const modelNames =
+    models.data?.data.items.map((model) => model.model_name) ?? [];
+  const quality = useAccountRead(
+    performance && modelNames.length ? state : { ...state, identity: null },
+    "/account/model-performance/batch",
+    { models: JSON.stringify(modelNames), hours, group: filters.group },
+    (signal) =>
+      desktopRequest<Performance[]>(
+        {
+          method: "POST",
+          path: "/account/model-performance/batch",
+          generation: state.generation,
+          body: {
+            models: modelNames,
+            ...(filters.group ? { groups: [filters.group] } : {}),
+            hours,
+            resolution: "30m",
+          },
+        },
+        signal,
+      ),
     60000,
     performance,
   );
+  useEffect(() => {
+    if ((draft.search ?? "") === (filters.search ?? "")) return;
+    const timer = setTimeout(() => {
+      setFilters((previous) => ({ ...previous, search: draft.search ?? "" }));
+      setPage(1);
+      setSnapshot(undefined);
+      setSelected(null);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [draft.search, filters.search]);
   useEffect(() => {
     const data = models.data?.data;
     if (data) {
@@ -78,7 +107,7 @@ export function ModelsPage({
       }
       setSnapshot(data.snapshot_id);
     }
-  }, [models.data, page]);
+  }, [models.data]);
   useEffect(() => {
     if (
       (models.error as unknown as DesktopError)?.code === "snapshot_changed"
@@ -88,8 +117,30 @@ export function ModelsPage({
       setSelected(null);
     }
   }, [models.error]);
-  const filter = (k: string, v: string) => {
-    setFilters((f) => ({ ...f, [k]: v }));
+  const description = (model: DesktopPricing) => {
+    try {
+      const translations = JSON.parse(model.description_i18n);
+      if (translations && typeof translations[i18n.language] === "string")
+        return translations[i18n.language];
+    } catch {
+      /* Plain legacy description remains available. */
+    }
+    return model.description;
+  };
+  const priceSummary = (model: DesktopPricing) =>
+    model.pricing_unavailable
+      ? t("account.business.priceUnavailable")
+      : model.billing_expr ||
+          model.conditional_task_pricing ||
+          model.task_per_second_pricing
+        ? t("account.business.complexPrice")
+        : t("account.business.priceFields", {
+            price: model.model_price ?? "—",
+            ratio: model.model_ratio ?? "—",
+            completion: model.completion_ratio ?? "—",
+          });
+  const query = () => {
+    setFilters({ ...draft });
     setSnapshot(undefined);
     setPage(1);
     setSelected(null);
@@ -98,106 +149,52 @@ export function ModelsPage({
     <div
       className={`account-models-page ${performance ? "is-performance" : ""}`}
     >
-      <p className="account-notice">{t("account.business.accountPrices")}</p>
-      <FilterBar visible={performance ? 1 : 3}>
-        {[
-          "search",
-          "group",
-          "quota_type",
-          "endpoint_type",
-          "vendor",
-          "tag",
-          "models",
-        ].map((k) => (
-          <Field
-            key={k}
-            label={t(`account.business.modelFilter.${k}`)}
-            value={filters[k] ?? ""}
-            onChange={(v) => filter(k, v)}
-          />
-        ))}
-      </FilterBar>
-      <QueryState query={models} />
-      <div
-        className={
-          performance
-            ? "account-model-grid account-performance-models"
-            : "account-model-grid"
-        }
+      <form
+        className="account-model-controls"
+        onSubmit={(e) => {
+          e.preventDefault();
+          query();
+        }}
       >
-        {models.data?.data.items.map((m) => (
-          <article
-            key={m.model_name}
-            className={`account-card account-model-card ${selected?.model_name === m.model_name ? "is-selected" : ""}`}
-          >
-            <div className="account-model-heading">
-              <h3>{m.model_name}</h3>
-              <span className="account-badge">{m.vendor_id || "—"}</span>
-            </div>
-            <details className="account-model-copy" open={!performance}>
-              <summary>{t("account.visual.modelInfo")}</summary>
-              <p>
-                {description(m)} {m.tags && `· ${m.tags}`}
-              </p>
-              <p className="account-model-endpoints">
-                {m.enable_groups.join(", ")} ·{" "}
-                {m.supported_endpoint_types.join(", ")}
-              </p>
-              <p>
-                {t("account.business.billingMode")}:{" "}
-                {m.billing_mode ?? m.quota_type} ·{" "}
-                {t("account.business.priceVersion")}: {m.pricing_version ?? "—"}
-              </p>
-              <p>
-                {m.pricing_unavailable
-                  ? t("account.business.priceUnavailable")
-                  : m.billing_expr ||
-                      m.conditional_task_pricing ||
-                      m.task_per_second_pricing
-                    ? t("account.business.complexPrice")
-                    : t("account.business.priceFields", {
-                        price: m.model_price ?? "—",
-                        ratio: m.model_ratio ?? "—",
-                        completion: m.completion_ratio ?? "—",
-                      })}
-              </p>
-              {m.billing_expr && <code>{m.billing_expr}</code>}
-            </details>
-            <Button
-              variant="outline"
-              aria-pressed={selected?.model_name === m.model_name}
-              onClick={() => {
-                setSelected(m);
-                setKeyId("");
-              }}
-            >
-              {t("account.business.details")}
-            </Button>
-          </article>
-        ))}
-      </div>
-      {models.data?.data.items.length === 0 && (
-        <p className="account-empty">{t("account.business.empty")}</p>
-      )}
-      {models.data && (
-        <Pager
-          page={page}
-          more={models.data.data.pagination.has_more}
-          onChange={(p) => {
-            setPage(p);
+        <label className="account-model-search">
+          <Search size={16} aria-hidden="true" />
+          <span className="sr-only">
+            {t("account.business.modelFilter.search")}
+          </span>
+          <input
+            aria-label={t("account.business.modelFilter.search")}
+            placeholder={t("account.business.modelFilter.search")}
+            value={draft.search ?? ""}
+            onChange={(event) =>
+              setDraft((previous) => ({
+                ...previous,
+                search: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <ModelFilters
+          meta={models.data?.data.pricing_meta ?? {}}
+          values={filters}
+          status={performance}
+          onChange={(key, value) => {
+            setDraft((previous) => ({ ...previous, [key]: value }));
+            setFilters((previous) => ({
+              ...previous,
+              [key]: value,
+              search: draft.search ?? "",
+            }));
+            setPage(1);
+            setSnapshot(undefined);
             setSelected(null);
           }}
-        />
-      )}
-      {selected && (
-        <section className="account-card account-model-detail">
-          <header className="account-model-detail-heading">
-            <h3>{selected.model_name}</h3>
-            <label>
-              {t("account.business.window")}
+        >
+          {performance && (
+            <label className="account-window-select">
+              <span>{t("account.business.window")}</span>
               <select
                 value={hours}
-                onChange={(e) => setHours(Number(e.target.value))}
+                onChange={(event) => setHours(Number(event.target.value))}
               >
                 {[1, 6, 24].map((h) => (
                   <option key={h} value={h}>
@@ -206,64 +203,232 @@ export function ModelsPage({
                 ))}
               </select>
             </label>
-          </header>
-          <details className="account-data-details" open={!performance}>
-            <summary>{t("account.business.effectivePrice")}</summary>
-            <PricingDetails
-              model={selected}
-              meta={models.data?.data.pricing_meta ?? {}}
-              group={filters.group}
-            />
-          </details>
-          <QueryState query={quality} />
-          {quality.data && (
-            <>
-              <Metrics metric={quality.data.data.aggregate} />
-              {quality.data.data.groups.map((g) => (
-                <div className="account-performance-group" key={g.group}>
-                  <h4>{g.group}</h4>
-                  <Metrics metric={g} />
-                </div>
-              ))}
-            </>
           )}
-          {onConfigure && (
-            <>
-              <QueryState query={keys} />
-              <label>
-                {t("account.business.selectKey")}
-                <select
-                  value={keyId}
-                  onChange={(e) => setKeyId(e.target.value)}
+        </ModelFilters>
+        <div className="account-inline-actions">
+          {Object.values(draft).some(Boolean) && (
+            <Button
+              type="button"
+              variant="link"
+              onClick={() => {
+                setDraft({});
+                setFilters({});
+                setPage(1);
+                setSnapshot(undefined);
+              }}
+            >
+              清空筛选
+            </Button>
+          )}
+          <Button type="submit" disabled={models.isFetching}>
+            {t("account.workspace.query")}
+          </Button>
+          <Button
+            variant="outline"
+            type="button"
+            disabled={models.isFetching || quality.isFetching}
+            onClick={() => {
+              void models.refetch();
+              if (performance && modelNames.length) void quality.refetch();
+            }}
+          >
+            {t("account.business.refresh")}
+          </Button>
+        </div>
+      </form>
+      <QueryState query={models} showUpdated={false} />
+      {performance ? (
+        <>
+          <QueryState query={quality} showUpdated={false} />
+          <div className="account-status-grid">
+            {models.data?.data.items.map((model) => {
+              const result = quality.data?.data.find(
+                (item) => item.model_name === model.model_name,
+              );
+              return (
+                <article
+                  className="account-card account-status-card"
+                  key={model.model_name}
                 >
-                  <option value="">—</option>
-                  {keys.data?.data.items.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.name} {k.masked_key}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <div className="account-model-heading">
+                    <ModelIcon name={model.model_name} />
+                    <h3>{model.model_name}</h3>
+                    {typeof model.hot_rank === "number" &&
+                      model.hot_rank > 0 && (
+                        <span className="account-badge">
+                          热门 #{model.hot_rank}
+                        </span>
+                      )}
+                  </div>
+                  {result ? (
+                    <Metrics metric={result.aggregate} hours={hours} />
+                  ) : (
+                    <p className="account-subtle">
+                      {quality.isLoading
+                        ? t("account.business.loading")
+                        : "暂无状态数据"}
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div className="account-model-grid">
+          {models.data?.data.items.map((model) => (
+            <article
+              key={model.model_name}
+              className="account-card account-model-card"
+            >
+              <div className="account-model-heading">
+                <ModelIcon name={model.model_name} />
+                <h3>{model.model_name}</h3>
+                <span className="account-badge">
+                  {billingLabels[String(model.quota_type)] ?? "—"}
+                </span>
+              </div>
+              <p className="account-model-description">{description(model)}</p>
+              <p className="account-model-endpoints">
+                {model.supported_endpoint_types.join(" · ") || "—"}
+              </p>
+              <p>{priceSummary(model)}</p>
               <Button
-                disabled={!keyId}
+                variant="outline"
                 onClick={() => {
-                  const k = keys.data?.data.items.find((k) => k.id === keyId);
-                  if (k) onConfigure(k, selected);
+                  setSelected(model);
+                  setKeyId("");
+                  setKeyPage(1);
                 }}
               >
-                {t("account.business.configure")}
+                {t("account.business.details")}
               </Button>
-            </>
-          )}
-          <Button onClick={() => setSelected(null)}>
-            {t("account.business.close")}
-          </Button>
-        </section>
+            </article>
+          ))}
+        </div>
+      )}
+      {models.data?.data.items.length === 0 && (
+        <p className="account-empty">{t("account.workspace.noModels")}</p>
+      )}
+      {models.data && (
+        <Pager
+          page={page}
+          total={models.data.data.pagination.total}
+          pageSize={models.data.data.pagination.page_size}
+          more={models.data.data.pagination.has_more}
+          onChange={(value) => {
+            setPage(value);
+            setSelected(null);
+          }}
+        />
+      )}
+      {!performance && selected && (
+        <AccountDialog
+          drawer
+          title={selected.model_name}
+          footer={
+            onConfigure && (
+              <div className="account-model-configure">
+                <QueryState query={keys} showUpdated={false} />
+                <label>
+                  {t("account.business.selectKey")}
+                  <select
+                    value={keyId}
+                    onChange={(e) => setKeyId(e.target.value)}
+                  >
+                    <option value="">—</option>
+                    {keys.data?.data.items.map((key) => (
+                      <option key={key.id} value={key.id}>
+                        {key.name} {key.masked_key}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {keys.data && (keyPage > 1 || keys.data.data.has_more) && (
+                  <Pager
+                    page={keyPage}
+                    more={keys.data.data.has_more}
+                    onChange={(value) => {
+                      setKeyPage(value);
+                      setKeyId("");
+                    }}
+                  />
+                )}
+                <Button
+                  disabled={!keyId}
+                  onClick={() => {
+                    const key = keys.data?.data.items.find(
+                      (item) => item.id === keyId,
+                    );
+                    if (key) {
+                      onConfigure(key, selected);
+                      setSelected(null);
+                    }
+                  }}
+                >
+                  {t("account.business.configure")}
+                </Button>
+              </div>
+            )
+          }
+          onClose={() => setSelected(null)}
+        >
+          <AccountErrorBoundary key={selected.model_name}>
+            <div className="account-model-detail">
+              <section className="account-model-intro">
+                <div className="account-model-identity">
+                  <span className="account-model-icon-tile">
+                    <ModelIcon name={selected.model_name} />
+                  </span>
+                  <div>
+                    <span className="account-badge">
+                      {billingLabels[String(selected.quota_type)] ??
+                        selected.billing_mode ??
+                        "—"}
+                    </span>
+                    {description(selected) && <p>{description(selected)}</p>}
+                  </div>
+                </div>
+                {selected.tags && (
+                  <div className="account-model-tags">
+                    {selected.tags
+                      .split(/[,，]/)
+                      .filter(Boolean)
+                      .map((tag) => (
+                        <span className="account-badge" key={tag}>
+                          {tag.trim()}
+                        </span>
+                      ))}
+                  </div>
+                )}
+              </section>
+              <div className="account-model-price-section">
+                {selected.pricing_unavailable && (
+                  <p className="account-subtle">
+                    {t("account.business.priceUnavailable")}
+                  </p>
+                )}
+                <PricingDetails
+                  model={selected}
+                  meta={models.data?.data.pricing_meta ?? {}}
+                />
+              </div>
+            </div>
+          </AccountErrorBoundary>
+        </AccountDialog>
       )}
     </div>
   );
 }
-function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
+function Metrics({
+  metric: m,
+  hours,
+}: {
+  metric: Performance["aggregate"];
+  hours: number | string;
+}) {
+  const value = (n: number | null, unit: string) =>
+    n != null && Number.isFinite(n) ? `${n.toFixed(2)}${unit}` : "—";
   const { t } = useTranslation();
   return (
     <div className="account-performance-metrics">
@@ -275,17 +440,34 @@ function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
         {m.latest_sample_ts ? date(m.latest_sample_ts) : "—"} · {m.sample_level}
         /{m.ttft_sample_level}
       </p>
-      <p className="account-quality-values">
-        {t("account.business.latency")} {m.avg_latency_ms ?? "—"} ms · TTFT{" "}
-        {m.avg_ttft_ms ?? "—"} ms · {m.avg_tps ?? "—"} token/s ·{" "}
-        {t("account.business.successRate")} {m.success_rate ?? "—"}%
-      </p>
+      <dl className="account-quality-values">
+        {[
+          [t("account.business.latency"), value(m.avg_latency_ms, " ms")],
+          ["TTFT", value(m.avg_ttft_ms, " ms")],
+          [t("account.business.successRate"), value(m.success_rate, "%")],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
       <figure className="account-timeline">
-        <figcaption>{t("account.visual.series")}</figcaption>
+        <figcaption>最近 {hours} 小时成功率 · 每格 30 分钟</figcaption>
         <div>
+          {m.half_hour_series.length === 0 && (
+            <span
+              className="account-no-samples"
+              title={t("account.business.noSamples")}
+              aria-label={t("account.business.noSamples")}
+            />
+          )}
           {m.half_hour_series.map((point) => (
             <span
               key={point.ts}
+              tabIndex={0}
+              role="img"
+              aria-label={`${date(point.ts)} · ${point.has_samples ? value(point.success_rate, "%") : t("account.business.noSamples")}`}
               className={
                 point.has_samples && point.success_rate != null
                   ? "has-samples"
@@ -301,55 +483,13 @@ function Metrics({ metric: m }: { metric: Performance["aggregate"] }) {
                     }
                   : undefined
               }
-              title={`${date(point.ts)} · ${point.has_samples ? `${point.success_rate ?? "—"}%` : t("account.business.noSamples")}`}
+              data-tooltip={`${date(point.ts)} · ${point.has_samples ? value(point.success_rate, "%") : t("account.business.noSamples")}`}
+              title={`${date(point.ts)} · ${point.has_samples ? value(point.success_rate, "%") : t("account.business.noSamples")}`}
             />
           ))}
         </div>
         <p>{t("account.visual.seriesHint")}</p>
       </figure>
-      <details className="account-data-details">
-        <summary>{t("account.visual.details")}</summary>
-        <h4>{t("account.business.historical")}</h4>
-        <dl>
-          {Object.entries(m.historical_values ?? {}).map(([key, value]) => (
-            <div key={key}>
-              <dt>{key}</dt>
-              <dd>
-                {typeof value === "number" && key.includes("timestamp")
-                  ? date(value)
-                  : typeof value === "object" && value
-                    ? `${value.value} (${date(value.ts)})`
-                    : String(value ?? "—")}
-              </dd>
-            </div>
-          ))}
-        </dl>
-        <h4>{t("account.visual.series")}</h4>
-        <div className="account-table-scroll">
-          <table>
-            <thead>
-              <tr>
-                {["time", "latency", "ttft", "throughput", "successRate"].map(
-                  (key) => (
-                    <th key={key}>{t(`account.visual.${key}`)}</th>
-                  ),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {m.half_hour_series.map((p) => (
-                <tr key={p.ts}>
-                  <td>{date(p.ts)}</td>
-                  <td>{p.avg_latency_ms ?? "—"} ms</td>
-                  <td>{p.avg_ttft_ms ?? "—"} ms</td>
-                  <td>{p.avg_tps ?? "—"} token/s</td>
-                  <td>{p.success_rate ?? "—"}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
     </div>
   );
 }

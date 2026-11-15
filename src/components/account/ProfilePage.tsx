@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { type AccountState } from "@/lib/api/account";
 import type { Profile, ProfileWrite } from "@/lib/api/desktop";
 import { useDesktop } from "@/lib/query/desktop";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Check,
@@ -16,15 +16,18 @@ export function ProfilePage({
   state,
   canWrite,
   personalAllowed = true,
+  onEditState,
 }: {
   state: AccountState;
   canWrite: boolean;
   personalAllowed?: boolean;
+  onEditState?: (dirty: boolean, busy: boolean) => void;
 }) {
   const { t } = useTranslation();
   const query = useDesktop<Profile>(state, "/account/profile", {}, 60000);
   const [form, setForm] = useState<ProfileWrite | null>(null);
   const { write, busy, error, clear } = useWrite(state);
+  const saving = useRef(false);
   const readForm = (p: Profile): ProfileWrite => ({
     display_name: p.display_name,
     language: p.language,
@@ -35,6 +38,15 @@ export function ProfilePage({
   useEffect(() => {
     if (query.data && !form) setForm(readForm(query.data.data));
   }, [query.data, form]);
+  const dirty =
+    !!form &&
+    !!query.data &&
+    Object.entries(form).some(
+      ([key, value]) => value !== query.data!.data[key as keyof ProfileWrite],
+    );
+  useEffect(() => {
+    onEditState?.(dirty || !!error?.outcomeUnknown, busy);
+  }, [dirty, busy, error?.outcomeUnknown, onEditState]);
   const verify = async () => {
     const result = await query.refetch();
     if (!result.error && result.data) {
@@ -43,16 +55,26 @@ export function ProfilePage({
     }
   };
   const save = async () => {
-    if (!form || !query.data || error?.outcomeUnknown) return;
+    if (
+      !canWrite ||
+      saving.current ||
+      !form ||
+      !query.data ||
+      error?.outcomeUnknown
+    )
+      return;
     const body = Object.fromEntries(
       Object.entries(form).filter(
         ([k, v]) => v !== query.data!.data[k as keyof ProfileWrite],
       ),
     );
     if (!Object.keys(body).length) return;
-    const p = await write<Profile>("PATCH", "/account/profile", body);
-    if (p) {
-      await verify();
+    saving.current = true;
+    try {
+      const p = await write<Profile>("PATCH", "/account/profile", body);
+      if (p) await verify();
+    } finally {
+      saving.current = false;
     }
   };
   return (
@@ -123,6 +145,7 @@ export function ProfilePage({
             <Button
               variant="outline"
               type="button"
+              disabled={busy}
               onClick={() => void verify()}
             >
               {t("account.business.verify")}

@@ -201,27 +201,5 @@ pub async fn toggle_mcp_app(
 /// 从所有应用导入 MCP 服务器（复用已有的导入逻辑）
 #[tauri::command]
 pub async fn import_mcp_from_apps(state: State<'_, AppState>) -> Result<usize, String> {
-    let mut total = 0;
-    let mut errors = Vec::new();
-    for (name, result) in [
-        ("Claude", McpService::import_from_claude(&state)),
-        ("Codex", McpService::import_from_codex(&state)),
-        ("Gemini", McpService::import_from_gemini(&state)),
-        ("OpenCode", McpService::import_from_opencode(&state)),
-        ("Hermes", McpService::import_from_hermes(&state)),
-        ("新工具", McpService::import_from_native_tools(&state)),
-    ] {
-        match result {
-            Ok(count) => total += count,
-            Err(error) => errors.push(format!("{name}: {error}")),
-        }
-    }
-    if errors.is_empty() {
-        Ok(total)
-    } else {
-        Err(format!(
-            "部分导入已完成（其他来源新增 {total} 项）；{}",
-            errors.join("; ")
-        ))
-    }
+    McpService::import_all(&state).map_err(|e| e.to_string())
 }

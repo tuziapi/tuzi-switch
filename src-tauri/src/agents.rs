@@ -27,12 +27,12 @@ impl AgentTool {
         }
     }
     fn root(self) -> PathBuf {
-        #[cfg(feature = "local-preview")]
+        #[cfg(feature = "isolated-profile")]
         let base = match self {
             Self::Claude => crate::config::get_home_dir().join(".claude"),
             Self::Opencode => crate::config::get_home_dir().join(".config/opencode"),
         };
-        #[cfg(not(feature = "local-preview"))]
+        #[cfg(not(feature = "isolated-profile"))]
         let base = match self {
             Self::Claude => crate::config::get_claude_config_dir(),
             Self::Opencode => crate::opencode_config::get_opencode_dir(),
