@@ -343,3 +343,12 @@ Linux `43704088017`补CORS后仍未进入native下载，保留失败结果。随
 后续测试源码e68cb404新增signed-macos-upgrade.py，既有signed_candidate_macos_probe_only输入（默认false）扩展为原字节签名升级子集。固定两份已批准候选，不重新签名。以用户已有AX权限操作普通更新按钮，临时本机TLS/hosts用于版本发现，原应用与自行重启子进程继承仅loopback网络沙箱；结束恢复hosts和临时CA。实际签名下载、三类下载失败、同目录重试、正常退出、自动重启、目标app全部文件与签名归档逐字节相等、欢迎确认保留均须独立断言。没有修改正式安装包、启用调试构建、绕过TCC或手动启动升级目标。
 
 Python、Node语法、actionlint、沙箱profile语法及diff检查通过。run43706872126已启动，真实结果未到前不记通过。此子集仍不覆盖有效包系统安装失败、旧版手动过渡、原生IPC运行身份及完整创作迁移。
+
+
+## 已复现的 Linux 依赖与安装失败提示修正（待重建候选）
+
+正式RPM在最小Fedora实际启动时缺xdg-mime，证明不能依赖桌面环境预装。src-tauri/tauri.conf.json为DEB/RPM显式增加xdg-utils；已核对当前tauri-cli-v2.10.1的interface/rust.rs，显式depends会与自动GTK/WebKit依赖合并，不会覆盖默认运行库。现有Linux升级权限失败截图也显示Mac专用DMG提示；updateSession复用已有isMac检测，其他平台改为检查目录写权限/系统安装授权后重新下载，不改变安装状态机或重试行为。
+
+15项更新检查/状态机定向测试、宿主类型检查和diff检查通过。首次tauri info因当前shell缺Rust工具链PATH误读Cargo.toml最低版本；显式使用已安装1.95工具链后确认锁定tauri2.10.3与JS2.10.1配对，配置可解析，无依赖变更。独立Python JSON Schema验证器未安装，未冒称该验证通过；已检查CLI自带schema中两个depends的string[]类型。没有新增应用数据字段或迁移。
+
+这两项改变最终应用/打包配置，因此43699923173的证据只适用于原候选；最终发行候选必须重新构建、由用户逐次批准正式签名并复验，不能沿用旧包通过结论。当前仍未发布。

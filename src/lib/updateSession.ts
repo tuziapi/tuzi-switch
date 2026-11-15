@@ -1,4 +1,5 @@
 import type { UpdateHandle, UpdateProgressEvent } from "./updater";
+import { isMac } from "./platform";
 
 export type InstallPhase =
   | "idle"
@@ -94,8 +95,9 @@ export class UpdateSession {
           ? { error: "更新已安装，自动重启失败。请退出并重新打开兔子助手。" }
           : {
               phase: "error",
-              error:
-                "安装未完成，请重新下载后重试。若从 DMG 中运行，请先将兔子助手安装到“应用程序”。",
+              error: isMac()
+                ? "安装未完成，请重新下载后重试。若从 DMG 中运行，请先将兔子助手安装到“应用程序”。"
+                : "安装未完成，请检查安装目录的写入权限及系统安装授权，然后重新下载重试。",
             },
       );
     } finally {
