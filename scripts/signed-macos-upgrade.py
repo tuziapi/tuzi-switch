@@ -326,6 +326,41 @@ finally:
             os.kill(app_pid,signal.SIGTERM)
         except ProcessLookupError:
             pass
+    if trusted:
+        fingerprint=capture([openssl,'x509','-in',str(lab/'ca.crt'),'-noout','-fingerprint','-sha1'],text=True).strip().split('=')[-1].replace(':','')
+        try:
+            # Removal/import requires an interactive authorization on these
+            # disposable runners. Revoke only this ephemeral CA instead; keep
+            # its explicit deny record until GitHub discards the host.
+            curl=['/usr/bin/curl','-q','--silent','--show-error','--noproxy','*',
+                  '--connect-timeout','5','--max-time','10','--output','/dev/null',
+                  'https://github.com/tuziapi/tuzi-switch/releases/latest/download/latest.json']
+            if server and (lab/'server.ready').exists():
+                before=subprocess.run(curl,capture_output=True,timeout=15)
+                assert before.returncode==0, 'TLS positive control failed before CA revocation'
+                report['testCaTrustedBeforeRevocation']=True
+            run(['sudo','security','add-trusted-cert','-d','-r','deny','-k',
+                 '/Library/Keychains/System.keychain',str(lab/'ca.crt')],capture_output=True,timeout=30)
+            revoked=lab/'admin-trust-revoked.plist'
+            run(['sudo','security','trust-settings-export','-d',str(revoked)],capture_output=True)
+            revoked_settings=plistlib.loads(capture(['sudo','cat',str(revoked)]))
+            matching=[key for key in revoked_settings['trustList'] if key.upper()==fingerprint]
+            assert len(matching)==1
+            record=revoked_settings['trustList'].pop(matching[0])
+            assert record['trustSettings']==[{'result':3}], 'Expected unconditional synthetic CA distrust'
+            assert trust_restore and revoked_settings==plistlib.loads(trust_restore.read_bytes()), 'Unrelated admin trust changed'
+            report['unrelatedAdminTrustPreserved']=True
+            if server and (lab/'server.ready').exists():
+                after=subprocess.run(curl,capture_output=True,timeout=15)
+                assert after.returncode==60, 'Revoked synthetic CA did not produce certificate rejection'
+                report['testCaRejectedAfterRevocation']=True
+            report['testCaDenyRecordRetainedUntilRunnerDisposal']=True
+        except (subprocess.SubprocessError,OSError,AssertionError,KeyError) as error:
+            report.setdefault('cleanupErrors',[]).append('Synthetic CA revocation: '+repr(error))
+        try:
+            run(['sudo','security','delete-certificate','-Z',fingerprint,'/Library/Keychains/System.keychain'],capture_output=True,timeout=30)
+        except subprocess.SubprocessError as error:
+            report.setdefault('cleanupErrors',[]).append('Synthetic certificate deletion: '+repr(error))
     if (lab/'server.pid').exists():
         subprocess.run(['sudo','kill', (lab/'server.pid').read_text().strip()],check=False,timeout=15)
     if server:
@@ -333,25 +368,9 @@ finally:
     if hosts_changed:
         run(['sudo','tee','/etc/hosts'],input=original_hosts,stdout=subprocess.DEVNULL)
         run(['sudo','dscacheutil','-flushcache'])
-    if trusted:
-        fingerprint=capture([openssl,'x509','-in',str(lab/'ca.crt'),'-noout','-fingerprint','-sha1'],text=True).strip().split('=')[-1].replace(':','')
-        commands=[(['sudo','security','trust-settings-import','-d',str(trust_restore)]
-                   if trust_restore else ['sudo','security','remove-trusted-cert','-d',str(lab/'ca.crt')]),
-                  ['sudo','security','delete-certificate','-Z',fingerprint,'/Library/Keychains/System.keychain']]
-        for command in commands:
-            try:
-                run(command,capture_output=True,stdin=subprocess.DEVNULL,timeout=30)
-            except subprocess.SubprocessError as error:
-                report.setdefault('cleanupErrors',[]).append(str(error))
-        if trust_restore and not report.get('cleanupErrors'):
-            try:
-                restored=lab/'admin-trust-restored.plist'
-                run(['sudo','security','trust-settings-export','-d',str(restored)],capture_output=True)
-                assert plistlib.loads(capture(['sudo','cat',str(restored)]))==plistlib.loads(trust_restore.read_bytes())
-                report['adminTrustRestored']=True
-            except (subprocess.SubprocessError,OSError,AssertionError) as error:
-                report.setdefault('cleanupErrors',[]).append('Admin trust verification: '+repr(error))
-        (output/'results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+    for name in ['ca.key','tls.key']:
+        (lab/name).unlink(missing_ok=True)
+    (output/'results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     if mount:
         subprocess.run(['hdiutil','detach',mount],check=False,stdout=subprocess.DEVNULL,timeout=30)
 

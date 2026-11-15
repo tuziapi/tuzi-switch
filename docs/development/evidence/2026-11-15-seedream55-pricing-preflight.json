@@ -1,0 +1,42 @@
+{
+  "kind": "anonymous-pricing-preflight",
+  "fetchedAt": "2026-11-15T11:30:48.961460+00:00",
+  "endpoint": "https://api.tu-zi.com/api/pricing/models?models=doubao-seedream-5-5-261028",
+  "responseSha256": "bda06b964bffa93d66486efe242bb9c91f50b03d5c75740660702f60d4628550",
+  "model": {
+    "model_name": "doubao-seedream-5-5-261028",
+    "billing_mode": "tiered_expr",
+    "billing_expr": "v2:output_image_count <= 0 ? tier(\"no_output\", output_image_count * 0.0) : (upper(param(\"size\")) == \"1K\" || upper(param(\"size\")) == \"1.5K\" || (imagePixels(param(\"size\")) > 0 && imagePixels(param(\"size\")) <= 2610000)) ? tier(\"请求≤261万像素（1K/1.5K）\", (input_image_count * 0.05 + output_image_count * 0.13) / 7) : tier(\"请求>261万像素（2K/auto）\", (input_image_count * 0.05 + output_image_count * 0.23) / 7)",
+    "quota_type": 1,
+    "enable_groups": [
+      "原价分组",
+      "官方优惠",
+      "default"
+    ]
+  },
+  "snapshot": {
+    "pricing_version": null,
+    "snapshot_id": "sha256:2e95f5b29527b12a132050679a2d0fc2441cebd78148fa0b9fe705ff0902ddfc",
+    "algorithm_version": "pricing-catalog-v3-public-hotness",
+    "schema_version": "pricing-models-v1"
+  },
+  "authenticated": false,
+  "paidCallsExecuted": 0,
+  "budgetCny": 5,
+  "budgetConfirmed": false,
+  "reason": "Dedicated key identity and effective user/group/model pricing not confirmed. Anonymous pricing cannot authorize paid execution.",
+  "plannedCalls": [
+    {
+      "kind": "transparent-generation",
+      "count": 1,
+      "maxOutputImages": 1
+    },
+    {
+      "kind": "layer-decomposition-with-ocr",
+      "count": 1,
+      "maxInputImages": 1,
+      "maxOutputImagesIncludingBase": 3
+    }
+  ],
+  "automaticRetry": false
+}
