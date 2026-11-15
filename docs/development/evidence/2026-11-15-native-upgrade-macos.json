@@ -1,0 +1,177 @@
+{
+  "kind": "isolated-native-smoke",
+  "platform": "darwin-aarch64",
+  "signingKey": "ephemeral-test-key",
+  "officialAcceptance": false,
+  "results": [
+    {
+      "scenario": "tampered-signature",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "The signature verification failed",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "missing-package",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "`Download request failed with status: 404 Not Found`",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "invalid-archive",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 32
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "installRejected": true,
+            "error": "invalid gzip header",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "same-version",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "downgrade",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "upgrade-and-restart",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 26129651
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    }
+  ],
+  "scope": "macOS ARM64 full application native updater with synthetic data; not official release-byte acceptance",
+  "baseCommit": "ca378b869422b18f7b11c72b735ee8990dfb6a8b",
+  "sourceState": "UP-03 worktree during implementation; exact final source will be verified in test-repository runs"
+}

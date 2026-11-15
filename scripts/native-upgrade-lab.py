@@ -37,7 +37,8 @@ def main():
     root.mkdir(parents=True, exist_ok=True)
     os.chmod(root, 0o700)
     env = dict(os.environ)
-    env['CARGO_TARGET_DIR'] = str(root / 'target')
+    env.setdefault('CARGO_TARGET_DIR', str(root / 'target'))
+    target_dir = Path(env['CARGO_TARGET_DIR'])
     env['APPLE_SIGNING_IDENTITY'] = '-'
     env['APPIMAGE_EXTRACT_AND_RUN'] = '1'
     env['WEBKIT_DISABLE_DMABUF_RENDERER'] = '1'
@@ -75,7 +76,7 @@ def main():
         command(cli + ['build', '--features', 'updater-acceptance', '--bundles', bundle, '--config', str(config_file)], env, root / f'build-{version}.log')
         if saved.exists():
             raise SystemExit(f'Refusing to overwrite previous test app: {saved}')
-        bundles = root / 'target/release/bundle'
+        bundles = target_dir / 'release/bundle'
         if platform == 'macos':
             shutil.copytree(bundles / 'macos/Tuzi Update QA.app', saved, symlinks=True)
         else:
@@ -97,6 +98,17 @@ def main():
     corrupt.write_bytes(archive.read_bytes() + b'SYNTHETIC TAMPER')
 
     class Handler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == '/interrupted.tar.gz':
+                self.send_response(200)
+                self.send_header('Content-Length', str(archive.stat().st_size))
+                self.end_headers()
+                self.wfile.write(archive.read_bytes()[:1024])
+                self.wfile.flush()
+                self.close_connection = True
+                return
+            super().do_GET()
+
         def log_message(self, *args):
             pass
     handler = functools.partial(Handler, directory=str(root))
@@ -105,26 +117,37 @@ def main():
     base = f'http://127.0.0.1:{server.server_port}'
     target = ('darwin-aarch64' if os.uname().machine == 'arm64' else 'darwin-x86_64') if platform == 'macos' else {'windows': 'windows-x86_64', 'linux': 'linux-x86_64'}[platform]
     results = []
+    retry_case = None
     try:
         for name, mode, asset, version in [
             ('tampered-signature', 'download-error', corrupt, '0.0.2'),
+            ('interrupted-download', 'download-error', root / 'interrupted.tar.gz', '0.0.2'),
             ('missing-package', 'download-error', root / 'absent.tar.gz', '0.0.2'),
             ('install-failure', 'install-error', archive if platform == 'linux' else invalid, '0.0.2'),
             ('same-version', 'no-update', archive, '0.0.1'),
             ('downgrade', 'no-update', archive, '0.0.0'),
             ('upgrade-and-restart', 'upgrade', archive, '0.0.2'),
+            ('retry-after-signature-rejection', 'upgrade', archive, '0.0.2'),
         ]:
-            case = root / 'runs' / f'{name}-{time.time_ns()}'
-            (case / 'home').mkdir(parents=True)
-            if platform == 'macos':
+            retry = name == 'retry-after-signature-rejection'
+            case = retry_case if retry else root / 'runs' / f'{name}-{time.time_ns()}'
+            if name == 'tampered-signature':
+                retry_case = case
+            if retry:
+                (case / 'events.jsonl').rename(case / 'rejected-events.jsonl')
+                executable = next((case / 'Tuzi Update QA.app/Contents/MacOS').iterdir()) if platform == 'macos' else case / 'installed' / ('tu-zi-switch.exe' if platform == 'windows' else 'Tuzi Update QA.AppImage')
+                app = case / 'installed' if platform != 'macos' else case / 'Tuzi Update QA.app'
+            else:
+                (case / 'home').mkdir(parents=True)
+            if not retry and platform == 'macos':
                 app = case / 'Tuzi Update QA.app'
                 shutil.copytree(root / 'app-0.0.1.app', app, symlinks=True)
                 executable = next((app / 'Contents/MacOS').iterdir())
-            elif platform == 'windows':
+            elif not retry and platform == 'windows':
                 app = case / 'installed'
                 command([str(root / 'app-0.0.1.exe'), '/S', f'/D={app}'], env, case / 'initial-install.log')
                 executable = app / 'tu-zi-switch.exe'
-            else:
+            elif not retry:
                 app = case / 'installed'
                 app.mkdir()
                 executable = app / 'Tuzi Update QA.AppImage'

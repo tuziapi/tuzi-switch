@@ -104,23 +104,29 @@ async fn execute(app: &tauri::AppHandle, root: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    let provider = crate::provider::Provider::with_id(
-        "SYNTHETIC-UPGRADE".into(),
-        "SYNTHETIC upgrade preservation".into(),
-        json!({"synthetic":true,"value":"preserve-me"}),
-        None,
-    );
-    app.state::<crate::AppState>()
-        .db
-        .save_provider("claude", &provider)
-        .map_err(|e| e.to_string())?;
-    for name in [
-        ".claude/upgrade-fixture.json",
-        ".tuzi-switch/upgrade-project.json",
-    ] {
-        let file = home.join(name);
-        fs::create_dir_all(file.parent().unwrap()).map_err(|e| e.to_string())?;
-        fs::write(file, "SYNTHETIC preservation fixture\n").map_err(|e| e.to_string())?;
+    if root.join("seeded").exists() {
+        verify_data(app, &home)?;
+    } else {
+        let provider = crate::provider::Provider::with_id(
+            "SYNTHETIC-UPGRADE".into(),
+            "SYNTHETIC upgrade preservation".into(),
+            json!({"synthetic":true,"value":"preserve-me"}),
+            None,
+        );
+        app.state::<crate::AppState>()
+            .db
+            .save_provider("claude", &provider)
+            .map_err(|e| e.to_string())?;
+        for name in [
+            ".claude/upgrade-fixture.json",
+            ".tuzi-switch/upgrade-project.json",
+        ] {
+            let file = home.join(name);
+            fs::create_dir_all(file.parent().unwrap()).map_err(|e| e.to_string())?;
+            fs::write(file, "SYNTHETIC preservation fixture\n").map_err(|e| e.to_string())?;
+        }
+        fs::write(root.join("seeded"), "SYNTHETIC fixture initialized")
+            .map_err(|e| e.to_string())?;
     }
     let updater = app
         .updater_builder()
