@@ -1,14 +1,23 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Layers } from "lucide-react";
+import { Layers, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  useUniversalProviderSave,
+  universalSyncFailedTools,
+} from "./useUniversalProviderSave";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { UniversalProviderCard } from "./UniversalProviderCard";
 import { UniversalProviderFormModal } from "./UniversalProviderFormModal";
 import { universalProvidersApi } from "@/lib/api";
 import type { UniversalProvider, UniversalProvidersMap } from "@/types";
 
-export function UniversalProviderPanel() {
+export function UniversalProviderPanel({
+  showAddAction = true,
+}: {
+  showAddAction?: boolean;
+}) {
   const { t } = useTranslation();
 
   // 状态
@@ -50,64 +59,12 @@ export function UniversalProviderPanel() {
     loadProviders();
   }, [loadProviders]);
 
-  // 添加/编辑供应商
-  const handleSave = useCallback(
-    async (provider: UniversalProvider) => {
-      try {
-        await universalProvidersApi.upsert(provider);
+  const handleSave = useUniversalProviderSave(loadProviders);
 
-        // 新建模式下自动同步到各应用
-        if (!editingProvider) {
-          await universalProvidersApi.sync(provider.id);
-        }
-
-        toast.success(
-          editingProvider
-            ? t("universalProvider.updated", {
-                defaultValue: "统一供应商已更新",
-              })
-            : t("universalProvider.addedAndSynced", {
-                defaultValue: "统一供应商已添加并同步",
-              }),
-        );
-        loadProviders();
-        setEditingProvider(null);
-      } catch (error) {
-        console.error("Failed to save universal provider:", error);
-        toast.error(
-          t("universalProvider.saveError", {
-            defaultValue: "保存统一供应商失败",
-          }),
-        );
-      }
-    },
-    [editingProvider, loadProviders, t],
-  );
-
-  // 保存并同步供应商
-  const handleSaveAndSync = useCallback(
-    async (provider: UniversalProvider) => {
-      try {
-        await universalProvidersApi.upsert(provider);
-        await universalProvidersApi.sync(provider.id);
-        toast.success(
-          t("universalProvider.savedAndSynced", {
-            defaultValue: "已保存并同步到所有应用",
-          }),
-        );
-        loadProviders();
-        setEditingProvider(null);
-      } catch (error) {
-        console.error("Failed to save and sync universal provider:", error);
-        toast.error(
-          t("universalProvider.saveAndSyncError", {
-            defaultValue: "保存并同步失败",
-          }),
-        );
-      }
-    },
-    [loadProviders, t],
-  );
+  const handleAdd = useCallback(() => {
+    setEditingProvider(null);
+    setIsFormOpen(true);
+  }, []);
 
   // 删除供应商
   const handleDelete = useCallback(async () => {
@@ -146,6 +103,7 @@ export function UniversalProviderPanel() {
         t("universalProvider.syncError", {
           defaultValue: "同步统一供应商失败",
         }),
+        { description: universalSyncFailedTools(error) },
       );
     } finally {
       setSyncConfirm({ open: false, id: "", name: "" });
@@ -174,25 +132,13 @@ export function UniversalProviderPanel() {
         name: `${provider.name} copy`,
         createdAt: Date.now(),
       };
-      try {
-        await universalProvidersApi.upsert(duplicated);
-        await universalProvidersApi.sync(duplicated.id);
-        toast.success(
-          t("universalProvider.duplicatedAndSynced", {
-            defaultValue: "统一供应商已复制并同步",
-          }),
-        );
-        loadProviders();
-      } catch (error) {
-        console.error("Failed to duplicate universal provider:", error);
-        toast.error(
-          t("universalProvider.duplicateError", {
-            defaultValue: "复制统一供应商失败",
-          }),
-        );
+      if (!(await handleSave(duplicated))) {
+        // Continue retrying the same copy after a partial save/sync failure.
+        setEditingProvider(duplicated);
+        setIsFormOpen(true);
       }
     },
-    [loadProviders, t],
+    [handleSave],
   );
 
   // 打开编辑
@@ -219,7 +165,7 @@ export function UniversalProviderPanel() {
   return (
     <div className="space-y-4">
       {/* 头部 */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Layers className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">
           {t("universalProvider.title", { defaultValue: "统一供应商" })}
@@ -227,13 +173,19 @@ export function UniversalProviderPanel() {
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           {providerList.length}
         </span>
+        {showAddAction && (
+          <Button onClick={handleAdd} className="ml-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            {t("universalProvider.add")}
+          </Button>
+        )}
       </div>
 
       {/* 描述 */}
       <p className="text-sm text-muted-foreground">
         {t("universalProvider.description", {
           defaultValue:
-            "统一供应商可以同时管理 Claude、Codex 和 Gemini 的配置。修改后会自动同步到所有启用的应用。",
+            "统一管理 Claude Code、Codex 和 Gemini CLI 的服务地址、API Key 与模型。保存后同步到所选工具；新建不会自动切换当前供应商。",
         })}
       </p>
 
@@ -252,9 +204,16 @@ export function UniversalProviderPanel() {
           </p>
           <p className="mt-1 text-xs text-muted-foreground/70">
             {t("universalProvider.emptyHint", {
-              defaultValue: "点击下方「添加统一供应商」按钮创建一个",
+              defaultValue:
+                "添加一次服务地址和 API Key，分别设置三个工具使用的模型。",
             })}
           </p>
+          {showAddAction && (
+            <Button onClick={handleAdd} variant="outline" className="mt-4">
+              <Plus className="mr-2 h-4 w-4" />
+              {t("universalProvider.add")}
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -279,7 +238,7 @@ export function UniversalProviderPanel() {
           setEditingProvider(null);
         }}
         onSave={handleSave}
-        onSaveAndSync={handleSaveAndSync}
+        onSaveAndSync={handleSave}
         editingProvider={editingProvider}
       />
 

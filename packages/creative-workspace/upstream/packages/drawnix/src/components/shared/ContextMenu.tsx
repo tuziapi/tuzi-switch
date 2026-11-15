@@ -64,6 +64,8 @@ interface ContextMenuProps<TPayload> {
   onClose: () => void;
   className?: string;
   zIndex?: number;
+  /** Canvas layout can emit delayed scroll events after opening a menu. */
+  closeOnScroll?: boolean;
 }
 
 function resolveMaybeValue<TValue, TPayload>(
@@ -353,6 +355,7 @@ export function ContextMenu<TPayload>({
   onClose,
   className,
   zIndex = 10000,
+  closeOnScroll = true,
 }: ContextMenuProps<TPayload>) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -385,7 +388,13 @@ export function ContextMenu<TPayload>({
 
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('scroll', onClose, true);
+    if (closeOnScroll) document.addEventListener('scroll', onClose, true);
+    else {
+      // Keep menus anchored to their opening point during layout adjustments;
+      // explicit scrolling/panning still dismisses before the viewport moves.
+      document.addEventListener('wheel', onClose, { capture: true, passive: true });
+      document.addEventListener('touchmove', onClose, { capture: true, passive: true });
+    }
     window.addEventListener('resize', onClose);
     document.addEventListener('keydown', handleEscape);
 
@@ -393,10 +402,12 @@ export function ContextMenu<TPayload>({
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('scroll', onClose, true);
+      document.removeEventListener('wheel', onClose, true);
+      document.removeEventListener('touchmove', onClose, true);
       window.removeEventListener('resize', onClose);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [onClose, state]);
+  }, [onClose, state, closeOnScroll]);
 
   if (!state) {
     return null;

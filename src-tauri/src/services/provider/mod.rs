@@ -524,6 +524,8 @@ mod tests {
         result
     }
 
+    include!("universal_tests.rs");
+
     fn openclaw_provider(id: &str) -> Provider {
         Provider {
             id: id.to_string(),
@@ -3575,6 +3577,7 @@ impl ProviderService {
         state: &AppState,
         provider: UniversalProvider,
     ) -> Result<bool, AppError> {
+        let _operation = OperationGuard::acquire()?;
         // 保存统一供应商
         state.db.save_universal_provider(&provider)?;
 
@@ -3582,84 +3585,159 @@ impl ProviderService {
     }
 
     /// 删除统一供应商
+    /// Delete all linked rows, including previously disabled tools, after checking active use.
     pub fn delete_universal(state: &AppState, id: &str) -> Result<bool, AppError> {
+        let _mode_operation = crate::aggregation::read_operation().map_err(AppError::Message)?;
         let _operation = OperationGuard::acquire()?;
-        // 获取统一供应商（用于删除生成的子供应商）
-        let provider = state.db.get_universal_provider(id)?;
-
-        // 删除统一供应商
-        state.db.delete_universal_provider(id)?;
-
-        // 删除生成的子供应商
-        if let Some(p) = provider {
-            if p.apps.claude {
-                let claude_id = format!("universal-claude-{id}");
-                let _ = state.db.delete_provider("claude", &claude_id);
-            }
-            if p.apps.codex {
-                let codex_id = format!("universal-codex-{id}");
-                let _ = state.db.delete_provider("codex", &codex_id);
-            }
-            if p.apps.gemini {
-                let gemini_id = format!("universal-gemini-{id}");
-                let _ = state.db.delete_provider("gemini", &gemini_id);
+        let apps = [AppType::Claude, AppType::Codex, AppType::Gemini];
+        for app in &apps {
+            let child_id = format!("universal-{}-{id}", app.as_str());
+            crate::aggregation::ensure_inactive(app.as_str()).map_err(AppError::Message)?;
+            if crate::settings::get_current_provider(app).as_deref() == Some(child_id.as_str())
+                || state.db.get_current_provider(app.as_str())?.as_deref()
+                    == Some(child_id.as_str())
+            {
+                return Err(AppError::Message(
+                    "请先切换正在使用的关联供应商，再删除统一供应商".into(),
+                ));
             }
         }
-
-        Ok(true)
+        for app in &apps {
+            let child_id = format!("universal-{}-{id}", app.as_str());
+            state.db.delete_provider(app.as_str(), &child_id)?;
+        }
+        state.db.delete_universal_provider(id)
     }
 
-    /// 同步统一供应商到各应用
+    /// Sync tools independently, using the existing projection for live configs,
+    /// proxy backups and Codex credential transactions.
     pub fn sync_universal_to_apps(state: &AppState, id: &str) -> Result<bool, AppError> {
+        let _mode_operation = crate::aggregation::read_operation().map_err(AppError::Message)?;
+        let _operation = OperationGuard::acquire()?;
         let provider = state
             .db
             .get_universal_provider(id)?
-            .ok_or_else(|| AppError::Message(format!("统一供应商 {id} 不存在")))?;
-
-        // 同步到 Claude
-        if let Some(mut claude_provider) = provider.to_claude_provider() {
-            // 合并已有配置
-            if let Some(existing) = state.db.get_provider_by_id(&claude_provider.id, "claude")? {
-                let mut merged = existing.settings_config.clone();
-                Self::merge_json(&mut merged, &claude_provider.settings_config);
-                claude_provider.settings_config = merged;
+            .ok_or_else(|| AppError::Message("统一供应商不存在".into()))?;
+        let children = [
+            (AppType::Claude, provider.to_claude_provider()),
+            (AppType::Codex, provider.to_codex_provider()),
+            (AppType::Gemini, provider.to_gemini_provider()),
+        ];
+        let mut failures = Vec::new();
+        for (app, child) in children {
+            if Self::sync_universal_child(state, &app, id, child).is_err() {
+                // Raw config/parser errors may contain credentials.
+                failures.push(app.as_str().to_owned());
             }
-            state.db.save_provider("claude", &claude_provider)?;
-        } else {
-            // 如果禁用了 Claude，删除对应的子供应商
-            let claude_id = format!("universal-claude-{id}");
-            let _ = state.db.delete_provider("claude", &claude_id);
         }
+        if failures.is_empty() {
+            Ok(true)
+        } else {
+            Err(AppError::Message(format!(
+                "统一供应商已保存，以下工具未完成同步：{}。请检查工具配置、聚合模式，或先切换正在使用的供应商后重试。",
+                failures.join("、")
+            )))
+        }
+    }
 
-        // 同步到 Codex
-        if let Some(mut codex_provider) = provider.to_codex_provider() {
-            // 合并已有配置
-            if let Some(existing) = state.db.get_provider_by_id(&codex_provider.id, "codex")? {
-                let mut merged = existing.settings_config.clone();
-                Self::merge_json(&mut merged, &codex_provider.settings_config);
-                codex_provider.settings_config = merged;
+    fn sync_universal_child(
+        state: &AppState,
+        app: &AppType,
+        parent_id: &str,
+        child: Option<Provider>,
+    ) -> Result<(), AppError> {
+        let id = format!("universal-{}-{parent_id}", app.as_str());
+        let existing = state.db.get_provider_by_id(&id, app.as_str())?;
+        let Some(mut child) = child else {
+            if existing.is_some() {
+                Self::delete(state, app.clone(), &id)?;
             }
-            state.db.save_provider("codex", &codex_provider)?;
-        } else {
-            let codex_id = format!("universal-codex-{id}");
-            let _ = state.db.delete_provider("codex", &codex_id);
-        }
-
-        // 同步到 Gemini
-        if let Some(mut gemini_provider) = provider.to_gemini_provider() {
-            // 合并已有配置
-            if let Some(existing) = state.db.get_provider_by_id(&gemini_provider.id, "gemini")? {
-                let mut merged = existing.settings_config.clone();
-                Self::merge_json(&mut merged, &gemini_provider.settings_config);
-                gemini_provider.settings_config = merged;
+            return Ok(());
+        };
+        crate::aggregation::ensure_inactive(app.as_str()).map_err(AppError::Message)?;
+        if let Some(existing) = existing {
+            let mut patch = child.settings_config.clone();
+            if matches!(app, AppType::Codex) {
+                if let (Some(before), Some(after)) = (
+                    existing
+                        .settings_config
+                        .get("config")
+                        .and_then(Value::as_str),
+                    patch.get("config").and_then(Value::as_str),
+                ) {
+                    let mut target = before
+                        .parse::<toml_edit::DocumentMut>()
+                        .map_err(|_| AppError::Config("现有 Codex 配置格式错误".into()))?;
+                    let source = after
+                        .parse::<toml_edit::DocumentMut>()
+                        .map_err(|_| AppError::Config("统一 Codex 配置格式错误".into()))?;
+                    live::merge_toml_table_like(target.as_table_mut(), source.as_table());
+                    patch["config"] = Value::String(target.to_string());
+                }
             }
-            state.db.save_provider("gemini", &gemini_provider)?;
+            let mut merged = existing.settings_config.clone();
+            Self::merge_json(&mut merged, &patch);
+            child.settings_config = merged;
+            if matches!(app, AppType::Codex)
+                && codex_provider_env_key(&existing).is_none()
+                && codex_provider_env_key(&child).is_none()
+            {
+                // Legacy universal rows contain auth.OPENAI_API_KEY only. The
+                // current writer intentionally preserves official auth.json,
+                // so allocate a private credential reference before updating.
+                let env_key = next_legacy_codex_provider_env_key(&state.db, &child.id)?;
+                let config = child.settings_config["config"]
+                    .as_str()
+                    .ok_or_else(|| AppError::Config("Invalid Codex config".into()))?;
+                child.settings_config["config"] = Value::String(
+                    crate::codex_config::set_codex_active_provider_env_key(config, Some(&env_key))?,
+                );
+            }
+            child.meta = existing.meta;
+            child.created_at = existing.created_at;
+            child.sort_index = existing.sort_index;
+            child.in_failover_queue = existing.in_failover_queue;
+            if matches!(app, AppType::Codex) {
+                let target = child.clone();
+                crate::services::tuzi_provider::codex_transaction::run(state, &target, || {
+                    Self::update_universal_child(state, app, child)
+                })?;
+            } else {
+                Self::update_universal_child(state, app, child)?;
+            }
         } else {
-            let gemini_id = format!("universal-gemini-{id}");
-            let _ = state.db.delete_provider("gemini", &gemini_id);
+            // Ordinary add may activate the first provider. Batch creation only
+            // creates list entries; activation remains an explicit user action.
+            Self::validate_provider_settings(app, &child)?;
+            state.db.save_provider(app.as_str(), &child)?;
         }
+        Ok(())
+    }
 
-        Ok(true)
+    fn update_universal_child(
+        state: &AppState,
+        app: &AppType,
+        mut child: Provider,
+    ) -> Result<(), AppError> {
+        Self::normalize_provider_if_claude(app, &mut child);
+        if matches!(app, AppType::Codex) {
+            let submitted = child.clone();
+            let id = child.id.clone();
+            normalize_codex_managed_provider_for_storage(&state.db, &mut child, Some(&id))?;
+            migrate_codex_provider_credential(Some(&submitted), &child)?;
+            persist_codex_submitted_key(&mut child)?;
+        }
+        Self::validate_provider_settings(app, &child)?;
+        normalize_provider_common_config_for_storage(&state.db, app, &mut child)?;
+        state.db.save_provider(app.as_str(), &child)?;
+        if crate::settings::get_effective_current_provider(&state.db, app)?.as_deref()
+            == Some(child.id.as_str())
+        {
+            // This projection also preserves a stopped proxy's takeover and
+            // updates its restore backup, instead of replacing the live route.
+            Self::sync_current_provider_for_app(state, app.clone())?;
+        }
+        Ok(())
     }
 
     /// 递归合并 JSON：base 为底，patch 覆盖同名字段

@@ -767,7 +767,7 @@ export const Image: React.FC<ImageProps> = (props: ImageProps) => {
   if (isVideo) {
     return (
       <div ref={rootRef} style={{ width: '100%', height: '100%' }}>
-        <NativeMediaOverlay><Video
+        <NativeMediaOverlay elementId={props.element.id}><Video
           videoItem={{
             url: props.imageItem.url,
             width: props.imageItem.width,

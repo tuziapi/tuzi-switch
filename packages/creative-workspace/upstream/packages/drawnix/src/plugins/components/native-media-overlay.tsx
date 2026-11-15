@@ -5,8 +5,10 @@ import { isNativeRenderEnvironment } from "../../utils/tauri-env";
 /** WebKit does not reliably composite HTML media inside SVG foreignObject. */
 export function NativeMediaOverlay({
   children,
+  elementId,
 }: {
   children: React.ReactNode;
+  elementId?: string;
 }) {
   const anchor = useRef<HTMLDivElement>(null);
   const [host, setHost] = useState<HTMLDivElement | null>(null);
@@ -18,6 +20,7 @@ export function NativeMediaOverlay({
     if (!foreignObject || !board || !svg) return;
     const layer = document.createElement("div");
     layer.dataset.nativeMediaOverlay = "true";
+    if (elementId) layer.dataset.canvasMediaId = elementId;
     layer.style.cssText =
       "position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:auto;";
     board.appendChild(layer);
@@ -39,6 +42,7 @@ export function NativeMediaOverlay({
     const forwardDrag = (event: PointerEvent) => {
       if (forwardedEvents.has(event)) return;
       if (event.type === 'pointerdown') {
+        if (event.button !== 0) return;
         if (!(event.target instanceof Element) || !event.target.closest('[data-canvas-media-drag]')) return;
         finishRelease();
         draggingPointer = event.pointerId;
@@ -106,7 +110,7 @@ export function NativeMediaOverlay({
       window.removeEventListener("resize", schedule);
       layer.remove();
     };
-  }, []);
+  }, [elementId]);
   return (
     <div
       ref={anchor}

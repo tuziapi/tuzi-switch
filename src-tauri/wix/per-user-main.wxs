@@ -11,10 +11,18 @@
     <?error Unsupported value of sys.BUILDARCH=$(sys.BUILDARCH)?>
 <?endif?>
 
+<!-- Display branding is independent of the existing install and registry identity.
+     zh-CN in tauri.conf.json supplies a codepage that can encode these labels. -->
+<?if "{{product_name}}" = "tuzi switch" ?>
+    <?define TuziDisplayName = "兔子助手" ?>
+<?else?>
+    <?define TuziDisplayName = "{{product_name}}" ?>
+<?endif?>
+
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Product
             Id="*"
-            Name="{{product_name}}"
+            Name="$(var.TuziDisplayName)"
             UpgradeCode="{{upgrade_code}}"
             Language="!(loc.TauriLanguage)"
             Manufacturer="{{manufacturer}}"
@@ -111,7 +119,10 @@
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="DesktopFolder" Name="Desktop">
                 <Component Id="ApplicationShortcutDesktop" Guid="*">
-                    <Shortcut Id="ApplicationDesktopShortcut" Name="{{product_name}}" Description="Runs {{product_name}}" Target="[!Path]" WorkingDirectory="INSTALLDIR" />
+                    <Shortcut Id="ApplicationDesktopShortcut" Name="$(var.TuziDisplayName)" Description="Runs $(var.TuziDisplayName)" Target="[!Path]" WorkingDirectory="INSTALLDIR" />
+                    <?if "{{product_name}}" = "tuzi switch" ?>
+                    <RemoveFile Id="RemoveLegacyDesktopShortcut" Name="tuzi switch.lnk" On="install" />
+                    <?endif?>
                     <RemoveFolder Id="DesktopFolder" On="uninstall" />
                     <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Desktop Shortcut" Type="integer" Value="1" KeyPath="yes" />
                 </Component>
@@ -178,10 +189,13 @@
             <Component Id="CMP_UninstallShortcut" Guid="*">
 
                 <Shortcut Id="UninstallShortcut"
-						  Name="Uninstall {{product_name}}"
-						  Description="Uninstalls {{product_name}}"
+						  Name="Uninstall $(var.TuziDisplayName)"
+						  Description="Uninstalls $(var.TuziDisplayName)"
 						  Target="[System64Folder]msiexec.exe"
 						  Arguments="/x [ProductCode]" />
+                <?if "{{product_name}}" = "tuzi switch" ?>
+                <RemoveFile Id="RemoveLegacyUninstallShortcut" Name="Uninstall tuzi switch.lnk" On="install" />
+                <?endif?>
 
                 <RemoveFile Id="RemoveUserProgramsFiles" Directory="TauriLocalAppDataPrograms" Name="*" On="uninstall" />
                 <RemoveFolder Id="RemoveUserProgramsFolder" Directory="TauriLocalAppDataPrograms" On="uninstall" />
@@ -201,13 +215,16 @@
         <DirectoryRef Id="ApplicationProgramsFolder">
             <Component Id="ApplicationShortcut" Guid="*">
                 <Shortcut Id="ApplicationStartMenuShortcut"
-                    Name="{{product_name}}"
-                    Description="Runs {{product_name}}"
+                    Name="$(var.TuziDisplayName)"
+                    Description="Runs $(var.TuziDisplayName)"
                     Target="[!Path]"
                     Icon="ProductIcon"
                     WorkingDirectory="INSTALLDIR">
                     <ShortcutProperty Key="System.AppUserModel.ID" Value="{{bundle_id}}"/>
                 </Shortcut>
+                <?if "{{product_name}}" = "tuzi switch" ?>
+                <RemoveFile Id="RemoveLegacyStartMenuShortcut" Name="tuzi switch.lnk" On="install" />
+                <?endif?>
                 <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
                 <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Start Menu Shortcut" Type="integer" Value="1" KeyPath="yes"/>
            </Component>

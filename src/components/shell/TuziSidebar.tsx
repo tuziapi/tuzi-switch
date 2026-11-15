@@ -14,7 +14,6 @@ import {
   Network,
   Shield,
   SlidersHorizontal,
-  Sparkles,
   Wrench,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -136,8 +135,8 @@ export function TuziSidebar({
       >
         {!collapsed && (
           <div className="flex min-w-0 items-center gap-2.5 px-1">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
-              <Sparkles className="h-4 w-4" />
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+              <TuziAccountIcon size={32} />
             </span>
             <div className="min-w-0">
               <div className="truncate text-[14px] font-semibold">兔子助手</div>

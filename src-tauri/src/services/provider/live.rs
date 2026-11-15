@@ -610,7 +610,7 @@ fn merge_toml_item(target: &mut Item, source: &Item) {
     *target = source.clone();
 }
 
-fn merge_toml_table_like(target: &mut dyn TableLike, source: &dyn TableLike) {
+pub(super) fn merge_toml_table_like(target: &mut dyn TableLike, source: &dyn TableLike) {
     for (key, source_item) in source.iter() {
         match target.get_mut(key) {
             Some(target_item) => merge_toml_item(target_item, source_item),

@@ -6729,6 +6729,11 @@
       "path": "packages/drawnix/src/services/tuzi-video-request.ts",
       "origin": "assistant-integration",
       "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/components/CanvasImageContextMenu.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "Regression coverage for canvas image/video menus, native overlay targeting and delayed WebKit scroll dismissal"
     }
   ],
   "integration": {

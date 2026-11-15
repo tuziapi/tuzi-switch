@@ -12,6 +12,8 @@ const config = {
   },
 };
 if (process.argv.includes("--desktop-product-name"))
+  // Stable Windows registry/install identity and Linux package name. Windows
+  // templates separately display 兔子助手; do not rename this upgrade identity.
   config.productName = "tuzi switch";
 if (process.argv.includes("--unsigned"))
   config.bundle = { createUpdaterArtifacts: false };

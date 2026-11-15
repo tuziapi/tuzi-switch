@@ -48,7 +48,12 @@
     "windows": {
       "wix": {
         "upgradeCode": "9462cc07-4102-53d3-9279-a97d4fe6a920",
-        "template": "wix/per-user-main.wxs"
+        "template": "wix/per-user-main.wxs",
+        "language": "zh-CN"
+      },
+      "nsis": {
+        "template": "nsis/installer.nsi",
+        "languages": ["SimpChinese", "English"]
       }
     },
     "linux": {

@@ -1,13 +1,12 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FullScreenPanel } from "@/components/common/FullScreenPanel";
-import type { Provider, CustomEndpoint, UniversalProvider } from "@/types";
+import type { Provider, CustomEndpoint } from "@/types";
 import type { AppId } from "@/lib/api";
-import { universalProvidersApi } from "@/lib/api";
+import { useUniversalProviderSave } from "@/components/universal/useUniversalProviderSave";
 import {
   ProviderForm,
   type ProviderFormValues,
@@ -59,31 +58,18 @@ export function AddProviderDialog({
     useState<UniversalProviderPreset | null>(null);
   const [isFormSubmitting, setIsFormSubmitting] = useState(false);
 
+  const saveUniversalProvider = useUniversalProviderSave();
   const handleUniversalProviderSave = useCallback(
-    async (provider: UniversalProvider) => {
-      try {
-        await universalProvidersApi.upsert(provider);
-        toast.success(
-          t("universalProvider.addSuccess", {
-            defaultValue: "统一供应商添加成功",
-          }),
-        );
+    async (provider: Parameters<typeof saveUniversalProvider>[0]) => {
+      const success = await saveUniversalProvider(provider);
+      if (success) {
         setUniversalFormOpen(false);
         setSelectedUniversalPreset(null);
         onOpenChange(false);
-      } catch (error) {
-        console.error(
-          "[AddProviderDialog] Failed to save universal provider",
-          error,
-        );
-        toast.error(
-          t("universalProvider.addFailed", {
-            defaultValue: "统一供应商添加失败",
-          }),
-        );
       }
+      return success;
     },
-    [t, onOpenChange],
+    [saveUniversalProvider, onOpenChange],
   );
 
   const handleUniversalFormClose = useCallback(() => {
@@ -342,7 +328,7 @@ export function AddProviderDialog({
           </TabsContent>
 
           <TabsContent value="universal" className="mt-0">
-            <UniversalProviderPanel />
+            <UniversalProviderPanel showAddAction={false} />
           </TabsContent>
         </Tabs>
       ) : (

@@ -31,6 +31,7 @@ import {
   type AgentChange,
 } from "@/lib/api/agents";
 import { UniversalProviderPanel } from "@/components/universal/UniversalProviderPanel";
+import { universalProviderPreviewIPC } from "./universal-provider-fixture";
 import { WorkspaceScope } from "@/components/shell/WorkspaceScope";
 import {
   WorkspaceAuthPage,
@@ -205,6 +206,7 @@ mockIPC(
       mcpFixture.fixture.apps[app] = enabled;
       return;
     }
+    if (params.has("universal-qa") && command.includes("universal_provider")) return universalProviderPreviewIPC(command, args as Record<string, unknown>);
     if (["get_prompts", "get_universal_providers"].includes(command)) return {};
     if (
       [
@@ -419,7 +421,7 @@ function Canvas() {
           />
         );
       case "universal":
-        return <UniversalProviderPanel />;
+        return <div className="px-6 pt-4"><UniversalProviderPanel /></div>;
       default:
         return (
           <p className="px-6 text-muted-foreground">

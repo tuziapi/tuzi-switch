@@ -702,11 +702,12 @@ pub fn sync_universal_provider(
     id: String,
 ) -> Result<bool, String> {
     let result =
-        ProviderService::sync_universal_to_apps(state.inner(), &id).map_err(|e| e.to_string())?;
+        ProviderService::sync_universal_to_apps(state.inner(), &id).map_err(|e| e.to_string());
 
+    // Partial success can change other tool lists even when one tool fails.
     emit_universal_provider_synced(&app, "sync", &id);
 
-    Ok(result)
+    result
 }
 
 #[tauri::command]

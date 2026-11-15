@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, RefreshCw, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,8 +20,12 @@ import {
 interface UniversalProviderFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (provider: UniversalProvider) => void;
-  onSaveAndSync?: (provider: UniversalProvider) => void;
+  onSave: (
+    provider: UniversalProvider,
+  ) => Promise<boolean | void> | boolean | void;
+  onSaveAndSync?: (
+    provider: UniversalProvider,
+  ) => Promise<boolean | void> | boolean | void;
   editingProvider?: UniversalProvider | null;
   initialPreset?: UniversalProviderPreset | null;
 }
@@ -35,6 +40,14 @@ export function UniversalProviderFormModal({
 }: UniversalProviderFormModalProps) {
   const { t } = useTranslation();
   const isEditMode = !!editingProvider;
+
+  const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
+  // Keep the ID stable after a successful save followed by a failed sync.
+  const draftId = useRef("");
+  const closeForm = useCallback(() => {
+    if (!submitLock.current) onClose();
+  }, [onClose]);
 
   // 表单状态
   const [selectedPreset, setSelectedPreset] =
@@ -61,6 +74,11 @@ export function UniversalProviderFormModal({
 
   // 初始化表单
   useEffect(() => {
+    if (!isOpen) return;
+    draftId.current = editingProvider?.id || crypto.randomUUID();
+    setShowApiKey(false);
+    setSyncConfirmOpen(false);
+    setPendingProvider(null);
     if (editingProvider) {
       // 编辑模式：加载现有数据
       setName(editingProvider.name);
@@ -148,9 +166,9 @@ export function UniversalProviderFormModal({
     const model = models.codex?.model || "gpt-6-astra";
     const reasoningEffort = models.codex?.reasoningEffort || "high";
     // 确保 base_url 以 /v1 结尾（Codex 使用 OpenAI 兼容 API）
-    const codexBaseUrl = baseUrl.endsWith("/v1")
-      ? baseUrl
-      : `${baseUrl.replace(/\/+$/, "")}/v1`;
+    const trimmedUrl = baseUrl.trim().replace(/\/+$/, "");
+    const originOnly = /^[a-z][a-z0-9+.-]*:\/\/[^/]+$/i.test(trimmedUrl);
+    const codexBaseUrl = originOnly ? `${trimmedUrl}/v1` : trimmedUrl;
     const configToml = `model_provider = "newapi"
 model = "${model}"
 model_reasoning_effort = "${reasoningEffort}"
@@ -182,65 +200,6 @@ requires_openai_auth = false`;
     };
   }, [geminiEnabled, baseUrl, apiKey, models.gemini]);
 
-  // 提交表单
-  const handleSubmit = useCallback(() => {
-    if (!name.trim() || !baseUrl.trim() || !apiKey.trim()) {
-      return;
-    }
-
-    const provider: UniversalProvider = editingProvider
-      ? {
-          ...editingProvider,
-          name: name.trim(),
-          baseUrl: baseUrl.trim(),
-          apiKey: apiKey.trim(),
-          websiteUrl: websiteUrl.trim() || undefined,
-          notes: notes.trim() || undefined,
-          apps: {
-            claude: claudeEnabled,
-            codex: codexEnabled,
-            gemini: geminiEnabled,
-          },
-          models,
-        }
-      : createUniversalProviderFromPreset(
-          selectedPreset || universalProviderPresets[0],
-          crypto.randomUUID(),
-          baseUrl.trim(),
-          apiKey.trim(),
-          name.trim(),
-        );
-
-    // 如果是新建，更新应用启用状态和模型
-    if (!editingProvider) {
-      provider.apps = {
-        claude: claudeEnabled,
-        codex: codexEnabled,
-        gemini: geminiEnabled,
-      };
-      provider.models = models;
-      provider.websiteUrl = websiteUrl.trim() || undefined;
-      provider.notes = notes.trim() || undefined;
-    }
-
-    onSave(provider);
-    onClose();
-  }, [
-    editingProvider,
-    name,
-    baseUrl,
-    apiKey,
-    websiteUrl,
-    notes,
-    claudeEnabled,
-    codexEnabled,
-    geminiEnabled,
-    models,
-    selectedPreset,
-    onSave,
-    onClose,
-  ]);
-
   // 构建 provider 对象的辅助函数
   const buildProvider = useCallback((): UniversalProvider | null => {
     if (!name.trim() || !baseUrl.trim() || !apiKey.trim()) {
@@ -264,7 +223,7 @@ requires_openai_auth = false`;
         }
       : createUniversalProviderFromPreset(
           selectedPreset || universalProviderPresets[0],
-          crypto.randomUUID(),
+          draftId.current,
           baseUrl.trim(),
           apiKey.trim(),
           name.trim(),
@@ -306,35 +265,70 @@ requires_openai_auth = false`;
     setSyncConfirmOpen(true);
   }, [buildProvider, onSaveAndSync]);
 
-  // 确认保存并同步
-  const confirmSaveAndSync = useCallback(() => {
-    if (!pendingProvider || !onSaveAndSync) return;
+  const submitProvider = useCallback(
+    async (
+      provider: UniversalProvider | null,
+      save: UniversalProviderFormModalProps["onSave"],
+    ) => {
+      if (!provider || submitLock.current) return;
+      submitLock.current = true;
+      setSubmitting(true);
+      setSyncConfirmOpen(false);
+      try {
+        const result = await save(provider);
+        if (result !== false) onClose();
+      } catch {
+        toast.error(t("universalProvider.saveError"));
+      } finally {
+        submitLock.current = false;
+        setSubmitting(false);
+        setPendingProvider(null);
+      }
+    },
+    [onClose, t],
+  );
 
-    onSaveAndSync(pendingProvider);
-    setSyncConfirmOpen(false);
-    setPendingProvider(null);
-    onClose();
-  }, [pendingProvider, onSaveAndSync, onClose]);
+  const handleSubmit = () => submitProvider(buildProvider(), onSave);
+  const confirmSaveAndSync = () => {
+    if (onSaveAndSync) void submitProvider(pendingProvider, onSaveAndSync);
+  };
 
   const footer = (
     <>
-      <Button variant="outline" onClick={onClose}>
+      <Button variant="outline" onClick={closeForm} disabled={submitting}>
         {t("common.cancel", { defaultValue: "取消" })}
       </Button>
       {isEditMode && onSaveAndSync ? (
         <Button
           onClick={handleSaveAndSyncClick}
-          disabled={!name.trim() || !baseUrl.trim() || !apiKey.trim()}
+          disabled={
+            submitting ||
+            !name.trim() ||
+            !baseUrl.trim() ||
+            !apiKey.trim() ||
+            !(claudeEnabled || codexEnabled || geminiEnabled)
+          }
         >
-          <RefreshCw className="mr-1.5 h-4 w-4" />
+          {submitting ? (
+            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-1.5 h-4 w-4" />
+          )}
           {t("universalProvider.saveAndSync", { defaultValue: "保存并同步" })}
         </Button>
       ) : (
         <Button
           onClick={handleSubmit}
-          disabled={!name.trim() || !baseUrl.trim() || !apiKey.trim()}
+          disabled={
+            submitting ||
+            !name.trim() ||
+            !baseUrl.trim() ||
+            !apiKey.trim() ||
+            !(claudeEnabled || codexEnabled || geminiEnabled)
+          }
         >
-          {t("common.add", { defaultValue: "添加" })}
+          {submitting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+          {t("universalProvider.addAndSync")}
         </Button>
       )}
     </>
@@ -348,10 +342,13 @@ requires_openai_auth = false`;
           ? t("universalProvider.edit", { defaultValue: "编辑统一供应商" })
           : t("universalProvider.add", { defaultValue: "添加统一供应商" })
       }
-      onClose={onClose}
+      onClose={closeForm}
       footer={footer}
     >
-      <div className="space-y-6">
+      <fieldset disabled={submitting} className="min-w-0 space-y-6">
+        <p className="text-sm text-muted-foreground">
+          {t("universalProvider.description")}
+        </p>
         {/* 预设选择（仅新建模式） */}
         {!isEditMode && (
           <div className="space-y-3">
@@ -692,7 +689,7 @@ requires_openai_auth = false`;
             )}
           </div>
         )}
-      </div>
+      </fieldset>
 
       {/* 保存并同步确认弹窗 */}
       <ConfirmDialog

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import {
   PlaitBoard,
+  getElementById,
   getHitElementByPoint,
   toHostPoint,
   toViewBoxPoint,
@@ -27,10 +28,16 @@ import {
 import { MessagePlugin } from "../utils/message-plugin";
 import { isVideoElement } from "../plugins/with-video";
 import { isAudioElement } from "../data/audio";
+import { smartDownload } from "../utils/download-utils";
 import { useI18n } from "../i18n";
 import "./canvas-image-context-menu.scss";
 
-type Target = { id: string; url: string; prompt: string };
+type Target = {
+  id: string;
+  url: string;
+  prompt: string;
+  kind: "image" | "video";
+};
 
 export function CanvasImageContextMenu({
   board,
@@ -46,24 +53,37 @@ export function CanvasImageContextMenu({
   useEffect(() => {
     if (!board) return;
     const host = PlaitBoard.getBoardContainer(board);
-    const imageAt = (event: MouseEvent) => {
-      const target = event.target as Element;
+    const mediaAt = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
       if (
-        !target.closest(".board-host-svg, .board-active-svg") ||
         target.closest(
           'input, textarea, [contenteditable="true"], .plait-tool-container',
         )
       )
         return;
-      const hit = getHitElementByPoint(
-        board,
-        toViewBoxPoint(board, toHostPoint(board, event.clientX, event.clientY)),
+      // Desktop video is portaled beside the SVG. Resolve its actual element,
+      // not the image geometrically underneath the player or the old selection.
+      const overlay = target.closest<HTMLElement>(
+        "[data-native-media-overlay]",
       );
+      if (!overlay && !target.closest(".board-host-svg, .board-active-svg"))
+        return;
+      const hit = overlay
+        ? overlay.dataset.canvasMediaId
+          ? getElementById(board, overlay.dataset.canvasMediaId)
+          : undefined
+        : getHitElementByPoint(
+            board,
+            toViewBoxPoint(
+              board,
+              toHostPoint(board, event.clientX, event.clientY),
+            ),
+          );
       if (
         !hit ||
         !PlaitDrawElement.isDrawElement(hit) ||
         !PlaitDrawElement.isImage(hit) ||
-        isVideoElement(hit) ||
         isAudioElement(hit)
       )
         return;
@@ -71,12 +91,12 @@ export function CanvasImageContextMenu({
       return hit;
     };
     const blockDrawing = (event: MouseEvent) => {
-      if (event.button !== 2 || !imageAt(event)) return;
+      if (event.button !== 2 || !mediaAt(event)) return;
       event.preventDefault();
       event.stopPropagation();
     };
     const handler = (event: MouseEvent) => {
-      const hit = imageAt(event);
+      const hit = mediaAt(event);
       if (!hit) return;
       event.preventDefault();
       event.stopPropagation();
@@ -90,6 +110,7 @@ export function CanvasImageContextMenu({
         id: hit.id,
         url: hit.url,
         prompt,
+        kind: isVideoElement(hit) ? "video" : "image",
       });
     };
     const pointerEvents = [
@@ -116,7 +137,9 @@ export function CanvasImageContextMenu({
         ".canvas-image-menu button:not(:disabled)",
       ),
     ];
-    const frame = requestAnimationFrame(() => getItems()[0]?.focus());
+    const frame = requestAnimationFrame(() =>
+      getItems()[0]?.focus({ preventScroll: true }),
+    );
     const navigate = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -144,7 +167,7 @@ export function CanvasImageContextMenu({
             ? items.length - 1
             : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) %
               items.length;
-      items[index].focus();
+      items[index].focus({ preventScroll: true });
     };
     document.addEventListener("keydown", navigate, true);
     return () => {
@@ -156,19 +179,28 @@ export function CanvasImageContextMenu({
   const run = async (action: CanvasImageAction | "prompt", target: Target) => {
     if (busy.current) return;
     busy.current = true;
-    const message = MessagePlugin.loading(
-      zh ? "正在处理图片…" : "Processing image…",
-      0,
-    );
+    const message = MessagePlugin.loading(zh ? "正在处理…" : "Processing…", 0);
     try {
       const result =
         action === "prompt"
           ? (await copyImagePrompt(target.prompt), "copied")
-          : await runCanvasImageAction(
-              action,
-              target.url,
-              `image-${target.id}`,
-            );
+          : target.kind === "video"
+            ? (
+                await smartDownload([
+                  {
+                    url: target.url,
+                    type: "video",
+                    filename: `video-${target.id}`,
+                  },
+                ])
+              ).downloadedCount > 0
+              ? "saved"
+              : "cancelled"
+            : await runCanvasImageAction(
+                action,
+                target.url,
+                `image-${target.id}`,
+              );
       if (result !== "cancelled")
         MessagePlugin.success(
           result === "copied"
@@ -184,46 +216,72 @@ export function CanvasImageContextMenu({
                   ? "已发起下载"
                   : "Download started"
                 : zh
-                  ? "图片已保存"
-                  : "Image saved",
+                  ? target.kind === "video"
+                    ? "视频已保存"
+                    : "图片已保存"
+                  : target.kind === "video"
+                    ? "Video saved"
+                    : "Image saved",
         );
     } catch (error) {
       MessagePlugin.error(
         error instanceof Error
           ? error.message
           : zh
-            ? "图片操作失败，请重试"
-            : "Image operation failed",
+            ? "操作失败，请重试"
+            : "Media operation failed",
       );
     } finally {
       MessagePlugin.close(message);
       busy.current = false;
     }
   };
-  const items: ContextMenuEntry<Target>[] = [
-    {
-      key: "copy",
-      label: zh ? "复制图片" : "Copy image",
-      icon: <Copy size={16} />,
-      onSelect: (t) => void run("copy", t),
-    },
+  const items = (target: Target): ContextMenuEntry<Target>[] => [
+    ...(target.kind === "image"
+      ? ([
+          {
+            key: "copy",
+            label: zh ? "复制图片" : "Copy image",
+            icon: <Copy size={16} />,
+            onSelect: (t) => void run("copy", t),
+          },
+        ] as ContextMenuEntry<Target>[])
+      : []),
     {
       key: "save",
-      label: zh ? "图片另存为…" : "Save image as…",
+      label:
+        target.kind === "video"
+          ? zh
+            ? "视频另存为…"
+            : "Save video as…"
+          : zh
+            ? "图片另存为…"
+            : "Save image as…",
       icon: <Download size={16} />,
       onSelect: (t) => void run("save", t),
     },
-    {
-      key: "reveal",
-      label: zh ? "显示图片文件" : "Show image file",
-      icon: <FolderOpen size={16} />,
-      disabled: !getAssistantAccount()?.imageAction,
-      onSelect: (t) => void run("reveal", t),
-    },
+    ...(target.kind === "image"
+      ? ([
+          {
+            key: "reveal",
+            label: zh ? "显示图片文件" : "Show image file",
+            icon: <FolderOpen size={16} />,
+            disabled: !getAssistantAccount()?.imageAction,
+            onSelect: (t) => void run("reveal", t),
+          },
+        ] as ContextMenuEntry<Target>[])
+      : []),
     { key: "divider", type: "divider" },
     {
       key: "preview",
-      label: zh ? "预览原图" : "Preview image",
+      label:
+        target.kind === "video"
+          ? zh
+            ? "预览视频"
+            : "Preview video"
+          : zh
+            ? "预览原图"
+            : "Preview image",
       icon: <ScanSearch size={16} />,
       onSelect: (t) => onPreview(t.id),
     },
@@ -241,6 +299,7 @@ export function CanvasImageContextMenu({
       items={items}
       onClose={close}
       className="canvas-image-menu"
+      closeOnScroll={false}
     />
   );
 }

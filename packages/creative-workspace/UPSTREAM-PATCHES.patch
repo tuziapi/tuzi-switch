@@ -831,12 +831,238 @@ index 0000000..63201d3
 +- [x] Verify batch/tool UI behavior with synthetic data.
 +- [x] Verify context menu and generation after integration; finish renderer build.
 +- [x] Regenerate and verify provenance, record results and commit locally.
+diff --git a/packages/drawnix/src/components/CanvasImageContextMenu.test.tsx b/packages/drawnix/src/components/CanvasImageContextMenu.test.tsx
+new file mode 100644
+index 0000000..abc2f3b
+--- /dev/null
++++ b/packages/drawnix/src/components/CanvasImageContextMenu.test.tsx
+@@ -0,0 +1,220 @@
++import React from "react";
++import {
++  cleanup,
++  fireEvent,
++  render,
++  screen,
++  waitFor,
++} from "@testing-library/react";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { CanvasImageContextMenu } from "./CanvasImageContextMenu";
++
++const mock = vi.hoisted(() => ({
++  hit: vi.fn(),
++  imageAction: vi.fn(),
++  download: vi.fn(),
++  copyPrompt: vi.fn(),
++  success: vi.fn(),
++  error: vi.fn(),
++  preview: vi.fn(),
++  host: null as HTMLElement | null,
++}));
++vi.mock("@plait/core", () => ({
++  PlaitBoard: { getBoardContainer: () => mock.host },
++  getHitElementByPoint: mock.hit,
++  getElementById: (board: any, id: string) =>
++    board.children.find((e: any) => e.id === id),
++  toHostPoint: (_: unknown, x: number, y: number) => [x, y],
++  toViewBoxPoint: (_: unknown, point: unknown) => point,
++}));
++vi.mock("@plait/draw", () => ({
++  PlaitDrawElement: {
++    isDrawElement: (e: any) => e.type === "image",
++    isImage: (e: any) => e.type === "image",
++  },
++}));
++vi.mock("../i18n", () => ({ useI18n: () => ({ language: "zh" }) }));
++vi.mock("../data/audio", () => ({
++  isAudioElement: (e: any) => e.type === "audio",
++}));
++vi.mock("../services/assistant-account", () => ({
++  getAssistantAccount: () => ({ imageAction: mock.imageAction }),
++}));
++vi.mock("../utils/canvas-image-actions", () => ({
++  runCanvasImageAction: mock.imageAction,
++  copyImagePrompt: mock.copyPrompt,
++}));
++vi.mock("../utils/download-utils", () => ({ smartDownload: mock.download }));
++vi.mock("../utils/message-plugin", () => ({
++  MessagePlugin: {
++    loading: vi.fn(),
++    close: vi.fn(),
++    success: mock.success,
++    error: mock.error,
++  },
++}));
++const image = {
++  id: "picture",
++  type: "image",
++  url: "/original.png",
++  generationPrompt: "image prompt",
++};
++const video = {
++  id: "movie",
++  type: "image",
++  url: "/original.mp4",
++  isVideo: true,
++  generationPrompt: "video prompt",
++};
++let svg: SVGElement;
++let overlay: HTMLDivElement;
++function mount() {
++  return render(
++    <CanvasImageContextMenu
++      board={{ children: [image, video] } as any}
++      onPreview={mock.preview}
++    />,
++  );
++}
++function open(element: Element) {
++  fireEvent.contextMenu(element, { clientX: 120, clientY: 140, button: 2 });
++}
++beforeEach(() => {
++  vi.clearAllMocks();
++  mock.imageAction.mockResolvedValue("saved");
++  mock.download.mockResolvedValue({ downloadedCount: 1 });
++  mock.hit.mockReturnValue(image);
++  mock.host = document.createElement("div");
++  mock.host.innerHTML =
++    '<svg class="board-host-svg"></svg><div data-native-media-overlay="true" data-canvas-media-id="movie"><div data-canvas-media-drag="true"></div><video controls></video></div>';
++  document.body.append(mock.host);
++  svg = mock.host.querySelector("svg")!;
++  overlay = mock.host.querySelector("[data-native-media-overlay]")!;
++});
++afterEach(() => {
++  cleanup();
++  mock.host?.remove();
++});
++describe("canvas media context menu", () => {
++  it("survives delayed canvas layout scrolling but dismisses when the user scrolls", () => {
++    mount();
++    open(svg);
++    fireEvent.scroll(mock.host!);
++    expect(screen.getByRole("menu")).toBeTruthy();
++    fireEvent.wheel(mock.host!, { deltaY: 40 });
++    expect(screen.queryByRole("menu")).toBeNull();
++  });
++  it("keeps all five original image actions and binds them to the clicked image", async () => {
++    mount();
++    open(svg);
++    expect(screen.getAllByRole("menuitem")).toHaveLength(5);
++    fireEvent.click(screen.getByText("图片另存为…"));
++    await waitFor(() =>
++      expect(mock.imageAction).toHaveBeenCalledWith(
++        "save",
++        image.url,
++        "image-picture",
++      ),
++    );
++    expect(mock.download).not.toHaveBeenCalled();
++  });
++  it.each(["[data-canvas-media-drag]", "video", null])(
++    "opens native video menu on %s without targeting the image beneath",
++    async (selector) => {
++      mount();
++      open(selector ? overlay.querySelector(selector)! : overlay);
++      expect(screen.getAllByRole("menuitem")).toHaveLength(3);
++      fireEvent.click(screen.getByText("视频另存为…"));
++      await waitFor(() =>
++        expect(mock.download).toHaveBeenCalledWith([
++          { url: video.url, type: "video", filename: "video-movie" },
++        ]),
++      );
++      expect(mock.imageAction).not.toHaveBeenCalled();
++    },
++  );
++  it("opens a video rendered inside SVG and previews its ID", () => {
++    mock.hit.mockReturnValue(video);
++    mount();
++    open(svg);
++    fireEvent.click(screen.getByText("预览视频"));
++    expect(mock.preview).toHaveBeenCalledWith("movie");
++  });
++  it("copies the video prompt", async () => {
++    mount();
++    open(overlay);
++    fireEvent.click(screen.getByText("复制提示词"));
++    await waitFor(() =>
++      expect(mock.copyPrompt).toHaveBeenCalledWith("video prompt"),
++    );
++  });
++  it("does not report success after video save is cancelled", async () => {
++    mock.download.mockResolvedValue({ downloadedCount: 0 });
++    mount();
++    open(overlay);
++    fireEvent.click(screen.getByText("视频另存为…"));
++    await waitFor(() => expect(mock.download).toHaveBeenCalled());
++    expect(mock.success).not.toHaveBeenCalled();
++  });
++  it("reports a video save error instead of falling back to image export", async () => {
++    mock.download.mockRejectedValue(new Error("Original missing"));
++    mount();
++    open(overlay);
++    fireEvent.click(screen.getByText("视频另存为…"));
++    await waitFor(() =>
++      expect(mock.error).toHaveBeenCalledWith("Original missing"),
++    );
++    expect(mock.imageAction).not.toHaveBeenCalled();
++  });
++  it("blocks right-button drawing on native media but preserves left-click playback", () => {
++    const listener = vi.fn();
++    overlay.addEventListener("mousedown", listener);
++    mount();
++    expect(fireEvent.mouseDown(overlay, { button: 2 })).toBe(false);
++    expect(listener).not.toHaveBeenCalled();
++    fireEvent.mouseDown(overlay, { button: 0 });
++    expect(listener).toHaveBeenCalledOnce();
++  });
++  it("ignores a stale overlay without falling through to another media item", () => {
++    overlay.dataset.canvasMediaId = "deleted";
++    mount();
++    open(overlay);
++    expect(screen.queryByRole("menu")).toBeNull();
++  });
++  it.each([
++    "input",
++    "textarea",
++    "div[contenteditable]",
++    ".plait-tool-container",
++  ])("preserves native menus on %s", (selector) => {
++    const target = document.createElement(
++      selector.startsWith("input")
++        ? "input"
++        : selector === "textarea"
++          ? "textarea"
++          : "div",
++    );
++    if (selector.includes("contenteditable"))
++      target.setAttribute("contenteditable", "true");
++    if (selector.startsWith(".")) target.className = selector.slice(1);
++    svg.append(target);
++    mount();
++    open(target);
++    expect(screen.queryByRole("menu")).toBeNull();
++  });
++  it("does not fall back to the selection when right-clicking blank canvas", () => {
++    mock.hit.mockReturnValue(undefined);
++    mount();
++    open(svg);
++    expect(screen.queryByRole("menu")).toBeNull();
++  });
++  it("replaces the image menu on a second right click, then dismisses on Escape", () => {
++    mount();
++    open(svg);
++    open(overlay);
++    expect(screen.queryByText("复制图片")).toBeNull();
++    expect(screen.getByText("预览视频")).toBeTruthy();
++    fireEvent.keyDown(document, { key: "Escape" });
++    expect(screen.queryByRole("menu")).toBeNull();
++  });
++});
 diff --git a/packages/drawnix/src/components/CanvasImageContextMenu.tsx b/packages/drawnix/src/components/CanvasImageContextMenu.tsx
 new file mode 100644
-index 0000000..8ecf48c
+index 0000000..30ec507
 --- /dev/null
 +++ b/packages/drawnix/src/components/CanvasImageContextMenu.tsx
-@@ -0,0 +1,246 @@
+@@ -0,0 +1,305 @@
 +import { useEffect, useRef } from "react";
 +import {
 +  Copy,
@@ -847,6 +1073,7 @@ index 0000000..8ecf48c
 +} from "lucide-react";
 +import {
 +  PlaitBoard,
++  getElementById,
 +  getHitElementByPoint,
 +  toHostPoint,
 +  toViewBoxPoint,
@@ -866,10 +1093,16 @@ index 0000000..8ecf48c
 +import { MessagePlugin } from "../utils/message-plugin";
 +import { isVideoElement } from "../plugins/with-video";
 +import { isAudioElement } from "../data/audio";
++import { smartDownload } from "../utils/download-utils";
 +import { useI18n } from "../i18n";
 +import "./canvas-image-context-menu.scss";
 +
-+type Target = { id: string; url: string; prompt: string };
++type Target = {
++  id: string;
++  url: string;
++  prompt: string;
++  kind: "image" | "video";
++};
 +
 +export function CanvasImageContextMenu({
 +  board,
@@ -885,24 +1118,37 @@ index 0000000..8ecf48c
 +  useEffect(() => {
 +    if (!board) return;
 +    const host = PlaitBoard.getBoardContainer(board);
-+    const imageAt = (event: MouseEvent) => {
-+      const target = event.target as Element;
++    const mediaAt = (event: MouseEvent) => {
++      const target = event.target;
++      if (!(target instanceof Element)) return;
 +      if (
-+        !target.closest(".board-host-svg, .board-active-svg") ||
 +        target.closest(
 +          'input, textarea, [contenteditable="true"], .plait-tool-container',
 +        )
 +      )
 +        return;
-+      const hit = getHitElementByPoint(
-+        board,
-+        toViewBoxPoint(board, toHostPoint(board, event.clientX, event.clientY)),
++      // Desktop video is portaled beside the SVG. Resolve its actual element,
++      // not the image geometrically underneath the player or the old selection.
++      const overlay = target.closest<HTMLElement>(
++        "[data-native-media-overlay]",
 +      );
++      if (!overlay && !target.closest(".board-host-svg, .board-active-svg"))
++        return;
++      const hit = overlay
++        ? overlay.dataset.canvasMediaId
++          ? getElementById(board, overlay.dataset.canvasMediaId)
++          : undefined
++        : getHitElementByPoint(
++            board,
++            toViewBoxPoint(
++              board,
++              toHostPoint(board, event.clientX, event.clientY),
++            ),
++          );
 +      if (
 +        !hit ||
 +        !PlaitDrawElement.isDrawElement(hit) ||
 +        !PlaitDrawElement.isImage(hit) ||
-+        isVideoElement(hit) ||
 +        isAudioElement(hit)
 +      )
 +        return;
@@ -910,12 +1156,12 @@ index 0000000..8ecf48c
 +      return hit;
 +    };
 +    const blockDrawing = (event: MouseEvent) => {
-+      if (event.button !== 2 || !imageAt(event)) return;
++      if (event.button !== 2 || !mediaAt(event)) return;
 +      event.preventDefault();
 +      event.stopPropagation();
 +    };
 +    const handler = (event: MouseEvent) => {
-+      const hit = imageAt(event);
++      const hit = mediaAt(event);
 +      if (!hit) return;
 +      event.preventDefault();
 +      event.stopPropagation();
@@ -929,6 +1175,7 @@ index 0000000..8ecf48c
 +        id: hit.id,
 +        url: hit.url,
 +        prompt,
++        kind: isVideoElement(hit) ? "video" : "image",
 +      });
 +    };
 +    const pointerEvents = [
@@ -955,7 +1202,9 @@ index 0000000..8ecf48c
 +        ".canvas-image-menu button:not(:disabled)",
 +      ),
 +    ];
-+    const frame = requestAnimationFrame(() => getItems()[0]?.focus());
++    const frame = requestAnimationFrame(() =>
++      getItems()[0]?.focus({ preventScroll: true }),
++    );
 +    const navigate = (event: KeyboardEvent) => {
 +      if (event.key === "Escape") {
 +        event.preventDefault();
@@ -983,7 +1232,7 @@ index 0000000..8ecf48c
 +            ? items.length - 1
 +            : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) %
 +              items.length;
-+      items[index].focus();
++      items[index].focus({ preventScroll: true });
 +    };
 +    document.addEventListener("keydown", navigate, true);
 +    return () => {
@@ -995,19 +1244,28 @@ index 0000000..8ecf48c
 +  const run = async (action: CanvasImageAction | "prompt", target: Target) => {
 +    if (busy.current) return;
 +    busy.current = true;
-+    const message = MessagePlugin.loading(
-+      zh ? "正在处理图片…" : "Processing image…",
-+      0,
-+    );
++    const message = MessagePlugin.loading(zh ? "正在处理…" : "Processing…", 0);
 +    try {
 +      const result =
 +        action === "prompt"
 +          ? (await copyImagePrompt(target.prompt), "copied")
-+          : await runCanvasImageAction(
-+              action,
-+              target.url,
-+              `image-${target.id}`,
-+            );
++          : target.kind === "video"
++            ? (
++                await smartDownload([
++                  {
++                    url: target.url,
++                    type: "video",
++                    filename: `video-${target.id}`,
++                  },
++                ])
++              ).downloadedCount > 0
++              ? "saved"
++              : "cancelled"
++            : await runCanvasImageAction(
++                action,
++                target.url,
++                `image-${target.id}`,
++              );
 +      if (result !== "cancelled")
 +        MessagePlugin.success(
 +          result === "copied"
@@ -1023,46 +1281,72 @@ index 0000000..8ecf48c
 +                  ? "已发起下载"
 +                  : "Download started"
 +                : zh
-+                  ? "图片已保存"
-+                  : "Image saved",
++                  ? target.kind === "video"
++                    ? "视频已保存"
++                    : "图片已保存"
++                  : target.kind === "video"
++                    ? "Video saved"
++                    : "Image saved",
 +        );
 +    } catch (error) {
 +      MessagePlugin.error(
 +        error instanceof Error
 +          ? error.message
 +          : zh
-+            ? "图片操作失败，请重试"
-+            : "Image operation failed",
++            ? "操作失败，请重试"
++            : "Media operation failed",
 +      );
 +    } finally {
 +      MessagePlugin.close(message);
 +      busy.current = false;
 +    }
 +  };
-+  const items: ContextMenuEntry<Target>[] = [
-+    {
-+      key: "copy",
-+      label: zh ? "复制图片" : "Copy image",
-+      icon: <Copy size={16} />,
-+      onSelect: (t) => void run("copy", t),
-+    },
++  const items = (target: Target): ContextMenuEntry<Target>[] => [
++    ...(target.kind === "image"
++      ? ([
++          {
++            key: "copy",
++            label: zh ? "复制图片" : "Copy image",
++            icon: <Copy size={16} />,
++            onSelect: (t) => void run("copy", t),
++          },
++        ] as ContextMenuEntry<Target>[])
++      : []),
 +    {
 +      key: "save",
-+      label: zh ? "图片另存为…" : "Save image as…",
++      label:
++        target.kind === "video"
++          ? zh
++            ? "视频另存为…"
++            : "Save video as…"
++          : zh
++            ? "图片另存为…"
++            : "Save image as…",
 +      icon: <Download size={16} />,
 +      onSelect: (t) => void run("save", t),
 +    },
-+    {
-+      key: "reveal",
-+      label: zh ? "显示图片文件" : "Show image file",
-+      icon: <FolderOpen size={16} />,
-+      disabled: !getAssistantAccount()?.imageAction,
-+      onSelect: (t) => void run("reveal", t),
-+    },
++    ...(target.kind === "image"
++      ? ([
++          {
++            key: "reveal",
++            label: zh ? "显示图片文件" : "Show image file",
++            icon: <FolderOpen size={16} />,
++            disabled: !getAssistantAccount()?.imageAction,
++            onSelect: (t) => void run("reveal", t),
++          },
++        ] as ContextMenuEntry<Target>[])
++      : []),
 +    { key: "divider", type: "divider" },
 +    {
 +      key: "preview",
-+      label: zh ? "预览原图" : "Preview image",
++      label:
++        target.kind === "video"
++          ? zh
++            ? "预览视频"
++            : "Preview video"
++          : zh
++            ? "预览原图"
++            : "Preview image",
 +      icon: <ScanSearch size={16} />,
 +      onSelect: (t) => onPreview(t.id),
 +    },
@@ -1080,6 +1364,7 @@ index 0000000..8ecf48c
 +      items={items}
 +      onClose={close}
 +      className="canvas-image-menu"
++      closeOnScroll={false}
 +    />
 +  );
 +}
@@ -9022,10 +9307,19 @@ index 85c440c..5f28060 100644
        </WinBoxWindow>
        <ModelDiscoveryDialog
 diff --git a/packages/drawnix/src/components/shared/ContextMenu.tsx b/packages/drawnix/src/components/shared/ContextMenu.tsx
-index 2e9c458..0c85379 100644
+index 2e9c458..4c6df69 100644
 --- a/packages/drawnix/src/components/shared/ContextMenu.tsx
 +++ b/packages/drawnix/src/components/shared/ContextMenu.tsx
-@@ -89,15 +89,17 @@ function clampPosition(
+@@ -64,6 +64,8 @@ interface ContextMenuProps<TPayload> {
+   onClose: () => void;
+   className?: string;
+   zIndex?: number;
++  /** Canvas layout can emit delayed scroll events after opening a menu. */
++  closeOnScroll?: boolean;
+ }
+ 
+ function resolveMaybeValue<TValue, TPayload>(
+@@ -89,15 +91,17 @@ function clampPosition(
    x: number,
    y: number,
    width: number,
@@ -9046,7 +9340,7 @@ index 2e9c458..0c85379 100644
    );
  
    return {
-@@ -131,7 +133,14 @@ function ContextMenuPanel<TPayload>({
+@@ -131,7 +135,14 @@ function ContextMenuPanel<TPayload>({
      if (!element) return;
  
      const rect = element.getBoundingClientRect();
@@ -9062,7 +9356,44 @@ index 2e9c458..0c85379 100644
      if (next.x !== position.x || next.y !== position.y) {
        setPosition(next);
      }
-@@ -407,6 +416,6 @@ export function ContextMenu<TPayload>({
+@@ -344,6 +355,7 @@ export function ContextMenu<TPayload>({
+   onClose,
+   className,
+   zIndex = 10000,
++  closeOnScroll = true,
+ }: ContextMenuProps<TPayload>) {
+   const rootRef = useRef<HTMLDivElement>(null);
+ 
+@@ -376,7 +388,13 @@ export function ContextMenu<TPayload>({
+ 
+     document.addEventListener('mousedown', handlePointerDown);
+     document.addEventListener('contextmenu', handleContextMenu);
+-    document.addEventListener('scroll', onClose, true);
++    if (closeOnScroll) document.addEventListener('scroll', onClose, true);
++    else {
++      // Keep menus anchored to their opening point during layout adjustments;
++      // explicit scrolling/panning still dismisses before the viewport moves.
++      document.addEventListener('wheel', onClose, { capture: true, passive: true });
++      document.addEventListener('touchmove', onClose, { capture: true, passive: true });
++    }
+     window.addEventListener('resize', onClose);
+     document.addEventListener('keydown', handleEscape);
+ 
+@@ -384,10 +402,12 @@ export function ContextMenu<TPayload>({
+       document.removeEventListener('mousedown', handlePointerDown);
+       document.removeEventListener('contextmenu', handleContextMenu);
+       document.removeEventListener('scroll', onClose, true);
++      document.removeEventListener('wheel', onClose, true);
++      document.removeEventListener('touchmove', onClose, true);
+       window.removeEventListener('resize', onClose);
+       document.removeEventListener('keydown', handleEscape);
+     };
+-  }, [onClose, state]);
++  }, [onClose, state, closeOnScroll]);
+ 
+   if (!state) {
+     return null;
+@@ -407,6 +427,6 @@ export function ContextMenu<TPayload>({
          className={className}
        />
      </div>,
@@ -17839,7 +18170,7 @@ index 35d13c8..9633535 100644
 +  });
  });
 diff --git a/packages/drawnix/src/plugins/components/image.tsx b/packages/drawnix/src/plugins/components/image.tsx
-index f9203d1..f84983d 100644
+index f9203d1..0982d9c 100644
 --- a/packages/drawnix/src/plugins/components/image.tsx
 +++ b/packages/drawnix/src/plugins/components/image.tsx
 @@ -9,6 +9,7 @@ import {
@@ -17883,7 +18214,7 @@ index f9203d1..f84983d 100644
      return (
        <div ref={rootRef} style={{ width: '100%', height: '100%' }}>
 -        <Video
-+        <NativeMediaOverlay><Video
++        <NativeMediaOverlay elementId={props.element.id}><Video
            videoItem={{
              url: props.imageItem.url,
              width: props.imageItem.width,
@@ -17955,10 +18286,10 @@ index d8822e6..86180ed 100644
      foreignObject.style.visibility = previousVisibility;
 diff --git a/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx b/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx
 new file mode 100644
-index 0000000..959a1a7
+index 0000000..ef211f7
 --- /dev/null
 +++ b/packages/drawnix/src/plugins/components/native-media-overlay.test.tsx
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,105 @@
 +import React from "react";
 +import { act, cleanup, render, fireEvent } from "@testing-library/react";
 +import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18014,7 +18345,7 @@ index 0000000..959a1a7
 +    fo.append(target);
 +    const click = vi.fn();
 +    const view = render(
-+      <NativeMediaOverlay>
++      <NativeMediaOverlay elementId="synthetic-video">
 +        <><button onClick={click}>Play</button><div data-canvas-media-drag="true">Drag</div></>
 +      </NativeMediaOverlay>,
 +      { container: target },
@@ -18023,12 +18354,15 @@ index 0000000..959a1a7
 +      "[data-native-media-overlay]",
 +    )!;
 +    expect(layer.style.transform).toBe("matrix(2,0,0,2,60,80)");
++    expect(layer.dataset.canvasMediaId).toBe("synthetic-video");
 +    expect(fo.querySelector("button")).toBeNull();
 +    layer.querySelector("button")!.click();
 +    expect(click).toHaveBeenCalledOnce();
 +    const down = vi.fn();
 +    svg.addEventListener('pointerdown', down);
 +    fireEvent.pointerDown(layer.querySelector('button')!);
++    expect(down).not.toHaveBeenCalled();
++    fireEvent.pointerDown(layer.querySelector('[data-canvas-media-drag]')!, { button: 2, buttons: 2 });
 +    expect(down).not.toHaveBeenCalled();
 +    fireEvent.pointerDown(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 120, clientY: 80, buttons: 1, pointerId: 7 });
 +    expect(down).toHaveBeenCalledOnce();
@@ -18063,10 +18397,10 @@ index 0000000..959a1a7
 +});
 diff --git a/packages/drawnix/src/plugins/components/native-media-overlay.tsx b/packages/drawnix/src/plugins/components/native-media-overlay.tsx
 new file mode 100644
-index 0000000..e7f5fb0
+index 0000000..1e0e574
 --- /dev/null
 +++ b/packages/drawnix/src/plugins/components/native-media-overlay.tsx
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,123 @@
 +import React, { useLayoutEffect, useRef, useState } from "react";
 +import { createPortal } from "react-dom";
 +import { isNativeRenderEnvironment } from "../../utils/tauri-env";
@@ -18074,8 +18408,10 @@ index 0000000..e7f5fb0
 +/** WebKit does not reliably composite HTML media inside SVG foreignObject. */
 +export function NativeMediaOverlay({
 +  children,
++  elementId,
 +}: {
 +  children: React.ReactNode;
++  elementId?: string;
 +}) {
 +  const anchor = useRef<HTMLDivElement>(null);
 +  const [host, setHost] = useState<HTMLDivElement | null>(null);
@@ -18087,6 +18423,7 @@ index 0000000..e7f5fb0
 +    if (!foreignObject || !board || !svg) return;
 +    const layer = document.createElement("div");
 +    layer.dataset.nativeMediaOverlay = "true";
++    if (elementId) layer.dataset.canvasMediaId = elementId;
 +    layer.style.cssText =
 +      "position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:auto;";
 +    board.appendChild(layer);
@@ -18108,6 +18445,7 @@ index 0000000..e7f5fb0
 +    const forwardDrag = (event: PointerEvent) => {
 +      if (forwardedEvents.has(event)) return;
 +      if (event.type === 'pointerdown') {
++        if (event.button !== 0) return;
 +        if (!(event.target instanceof Element) || !event.target.closest('[data-canvas-media-drag]')) return;
 +        finishRelease();
 +        draggingPointer = event.pointerId;
@@ -18175,7 +18513,7 @@ index 0000000..e7f5fb0
 +      window.removeEventListener("resize", schedule);
 +      layer.remove();
 +    };
-+  }, []);
++  }, [elementId]);
 +  return (
 +    <div
 +      ref={anchor}
@@ -18336,6 +18674,26 @@ index cf5d638..828d2c8 100644
        const selectionRect = RectangleClient.getRectangleByPoints([
          selection.anchor,
          selection.focus,
+diff --git a/packages/drawnix/src/plugins/with-video.ts b/packages/drawnix/src/plugins/with-video.ts
+index 3aa077c..273ea0e 100644
+--- a/packages/drawnix/src/plugins/with-video.ts
++++ b/packages/drawnix/src/plugins/with-video.ts
+@@ -71,7 +71,7 @@ export function isVideoElement(element: any): boolean {
+ 
+   // 检查 URL hash 标识符（用于 ObjectURL 的视频识别）
+   // 格式：blob:http://...#video
+-  if (url.includes('#video')) {
++  if (url.includes('#video') || url.includes('#merged-video-')) {
+     return true;
+   }
+ 
+@@ -96,4 +96,4 @@ export function handleVideoElementClick(element: any, event: MouseEvent) {
+     }
+   }
+   return false;
+-}
+\ No newline at end of file
++}
 diff --git a/packages/drawnix/src/plugins/with-workzone.test.ts b/packages/drawnix/src/plugins/with-workzone.test.ts
 index 7e8dd54..771821f 100644
 --- a/packages/drawnix/src/plugins/with-workzone.test.ts

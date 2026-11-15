@@ -71,7 +71,7 @@ export function isVideoElement(element: any): boolean {
 
   // 检查 URL hash 标识符（用于 ObjectURL 的视频识别）
   // 格式：blob:http://...#video
-  if (url.includes('#video')) {
+  if (url.includes('#video') || url.includes('#merged-video-')) {
     return true;
   }
 

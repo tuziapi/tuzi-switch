@@ -1,5 +1,9 @@
 # ADR-009：兔子助手显示名称与既有安装身份兼容
 
+## 2026-11-11 显示名与安装身份分离（UC-WIN-BRAND-01）
+
+用户截图确认 Windows 桌面仍为 `tuzi switch`。本轮保留 R01 确认的 UpgradeCode、安装/注册表路径及发布脚本内部产品名，NSIS/WiX 模板单独将可见名称设为“兔子助手”。MSI 指定 zh-CN 解决中文代码页；NSIS 使用 Unicode 模板并检查旧快捷方式目标后迁移。无账户/数据迁移，不改下载资产名。源码检查不替代 Windows 安装、升级、卸载验收；用户已暂停发布，本轮不发布。详见 [修复记录](../2026-11-11-canvas-menu-and-windows-brand.md)。
+
 ## 2026-10-21 正式 Windows 发行身份核正（R01）
 
 首次发布流水线暴露 MSI light.exe 打包失败。下文旧中文名推导只针对未覆盖的本地配置，遗漏 `scripts/tauri-release-config.cjs --desktop-product-name` 从 v1.3.1 起实际将 Windows/Linux 产品名覆盖为 `tuzi switch`。因此正式 MSI 旧身份应为 UUIDv5 DNS(`tuzi switch.exe.app.x64`) = `9462cc07-4102-53d3-9279-a97d4fe6a920`，安装目录及注册表路径由模板 `{{product_name}}` 取实际发行名称。

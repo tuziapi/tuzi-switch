@@ -53,7 +53,7 @@ describe("native media overlay", () => {
     fo.append(target);
     const click = vi.fn();
     const view = render(
-      <NativeMediaOverlay>
+      <NativeMediaOverlay elementId="synthetic-video">
         <><button onClick={click}>Play</button><div data-canvas-media-drag="true">Drag</div></>
       </NativeMediaOverlay>,
       { container: target },
@@ -62,12 +62,15 @@ describe("native media overlay", () => {
       "[data-native-media-overlay]",
     )!;
     expect(layer.style.transform).toBe("matrix(2,0,0,2,60,80)");
+    expect(layer.dataset.canvasMediaId).toBe("synthetic-video");
     expect(fo.querySelector("button")).toBeNull();
     layer.querySelector("button")!.click();
     expect(click).toHaveBeenCalledOnce();
     const down = vi.fn();
     svg.addEventListener('pointerdown', down);
     fireEvent.pointerDown(layer.querySelector('button')!);
+    expect(down).not.toHaveBeenCalled();
+    fireEvent.pointerDown(layer.querySelector('[data-canvas-media-drag]')!, { button: 2, buttons: 2 });
     expect(down).not.toHaveBeenCalled();
     fireEvent.pointerDown(layer.querySelector('[data-canvas-media-drag]')!, { clientX: 120, clientY: 80, buttons: 1, pointerId: 7 });
     expect(down).toHaveBeenCalledOnce();
