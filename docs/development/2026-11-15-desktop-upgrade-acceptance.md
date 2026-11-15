@@ -271,3 +271,11 @@ MSI临时密钥实验43689414375 attempt1于08:27:20 UTC自行失败，取消请
 Linux预检43698634342已验证正式候选摘要/签名并由dpkg成功安装1.6.2；尚未启动应用，独立用户不能穿过runner私有工作目录读取脚本，且继承了runner的XDG_RUNTIME_DIR。改为只复制测试脚本到独立/tmp目录，并为tuziqa创建0700运行目录；不放开runner目录或读取其凭证。补显式安装DEB声明的libappindicator3-1，避免依赖runner预装状态。原失败保留，未记UI/原生身份通过。
 
 43699005552在apt准备阶段失败：libayatana-appindicator3-1与libappindicator3-1互斥；首轮已经证明Ayatana包可满足本候选dpkg依赖，不能同时显式安装两者。恢复只安装Ayatana实现，保留独立用户路径与运行目录修正；未改候选包或绕过dpkg依赖检查。
+
+## MSI八场景attempt2及Windows创作升级子集独立核验
+
+MSI run43689414375 attempt2/job132753425896成功；artifact14155520289完整归档SHA256/ZIP CRC、八项终态、Some(Msi)、两次0.0.1→0.0.2自动重启、数据保留与同安装目录失败重试已核对。临时密钥七种格式实验现均通过；MSI的install-failure是已签无效二进制格式拒绝，不是有效包的系统安装失败，不能替代该正式门禁。见evidence/2026-11-15-native-43689414375-msi.json。
+
+Windows run43697704283/f68b3735两格式15项断言、完整归档SHA256/ZIP CRC、三代运行身份、正式签名与实际自动重启独立核验通过。旧1.6.0通过真实UI/原生HTTP生成的画板/图片/任务在1.6.2手动过渡后保留；1.6.2真实Seedream5.5菜单执行透明PNG及三层OCR，1.6.3自动重启后元素/OCR/未知字段/任务/缓存像素保留。原生模型请求唯一ch=3，模型列表无ch；旧1.6.0实测ch=0，证明此前桌面消费归因确有缺口。供应商仅本机合成HTTPS，无生产消费或付费调用。见evidence/2026-11-15-signed-43697704283-nsis.json与-msi.json。
+
+截图额外审查发现：快速分层替换源图后，原生成占位卡可能永久停留“正在加载结果”。数据和像素断言通过不覆盖该显示问题，已在两份证据reviewObservations保留。源码定位为新图层未继承已有generationTaskId/generationAnchorId，导致占位控制器找不到已完成的结果；新增真实Plait变换回归在修复前失败，原构建的浏览器回归也实际复现。此问题修复后必须重建签署候选并重新验收，当前旧候选不能直接发布。
