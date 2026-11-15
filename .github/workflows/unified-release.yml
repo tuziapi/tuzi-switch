@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: unified-release
+  group: unified-release-${{ inputs.native_upgrade_lab_only && 'native-lab' || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
   cancel-in-progress: false
 
 env:
