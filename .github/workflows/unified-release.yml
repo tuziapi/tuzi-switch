@@ -38,6 +38,10 @@ on:
         description: Include published 1.6.0 and 1.6.1 manual transitions before the signed Windows upgrade
         type: boolean
         default: false
+      signed_candidate_macos_probe_only:
+        description: Inspect unchanged signed Mac UI control in disposable hosted runners; never publish
+        type: boolean
+        default: false
       signed_candidate_linux_probe_only:
         description: Test signed Linux candidate UI and package upgrades in offline disposable users; never publish
         type: boolean
@@ -51,7 +55,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: unified-release-${{ inputs.signed_candidate_linux_probe_only && 'signed-linux-probe' || inputs.signed_candidate_windows_only && 'signed-windows' || inputs.native_upgrade_lab_only && (inputs.native_upgrade_packages_only && 'native-packages' || 'native-lab') || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
+  group: unified-release-${{ inputs.signed_candidate_macos_probe_only && 'signed-macos-probe' || inputs.signed_candidate_linux_probe_only && 'signed-linux-probe' || inputs.signed_candidate_windows_only && 'signed-windows' || inputs.native_upgrade_lab_only && (inputs.native_upgrade_packages_only && 'native-packages' || 'native-lab') || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
   cancel-in-progress: false
 
 env:
@@ -62,15 +66,22 @@ env:
   TUZI_OFFICIAL_TEST_CANDIDATE: ${{ inputs.official_candidate && '1' || '0' }}
 
 jobs:
+  signed-candidate-macos:
+    if: inputs.signed_candidate_macos_probe_only && github.repository == 'AiW520/tuzi-switch'
+    uses: ./.github/workflows/signed-candidate-macos.yml
+    permissions:
+      contents: read
+      actions: read
+
   signed-candidate-linux:
-    if: inputs.signed_candidate_linux_probe_only && github.repository == 'AiW520/tuzi-switch'
+    if: inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && github.repository == 'AiW520/tuzi-switch'
     uses: ./.github/workflows/signed-candidate-linux.yml
     permissions:
       contents: read
       actions: read
 
   signed-candidate-windows:
-    if: inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && github.repository == 'AiW520/tuzi-switch'
+    if: inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && github.repository == 'AiW520/tuzi-switch'
     uses: ./.github/workflows/signed-candidate-windows.yml
     with:
       manual_transition: ${{ inputs.signed_candidate_windows_manual_transition || false }}
@@ -79,7 +90,7 @@ jobs:
       actions: read
 
   native-upgrade-lab:
-    if: inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && github.repository == 'AiW520/tuzi-switch'
+    if: inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && github.repository == 'AiW520/tuzi-switch'
     uses: ./.github/workflows/native-upgrade-lab.yml
     with:
       windows_only: ${{ inputs.native_upgrade_windows_only || false }}
@@ -88,14 +99,14 @@ jobs:
       rpm_only: ${{ inputs.native_upgrade_rpm_only || false }}
 
   signing-preflight:
-    if: inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch')
+    if: inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch')
     uses: ./.github/workflows/channel-updater-preflight.yml
     secrets:
       UPDATER_KEY: ${{ github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY || secrets.TUZI_UPDATER_PRIVATE_KEY }}
       UPDATER_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
 
   verify:
-    if: ${{ !inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
+    if: ${{ !inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
     runs-on: ubuntu-22.04
     outputs:
       tag: ${{ steps.identity.outputs.tag }}
