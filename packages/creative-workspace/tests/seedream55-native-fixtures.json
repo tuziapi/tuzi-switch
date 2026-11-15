@@ -1,0 +1,620 @@
+[
+  {
+    "name": "minimal",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw"
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "explicit false",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "stream": false,
+      "watermark": false,
+      "layer_decomposition": false
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "rgba text to image",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "background": "transparent",
+      "output_format": "png"
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "auto jpeg",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "background": "auto",
+      "output_format": "jpeg"
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "rgba ten references",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "background": "transparent",
+      "image": [
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png"
+      ]
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "base64 reference",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": "data:image/png;base64,AAAA"
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "one point five k",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "size": "1.5K"
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "min pixels",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "size": "1280x720"
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "above max pixels",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "size": "2160x2160"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "maximum area",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "size": "2150x2150"
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "layers default",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "image": "https://example.test/ref.png",
+      "layer_decomposition": true
+    },
+    "valid": true,
+    "maximum": 30
+  },
+  {
+    "name": "layers 2",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "image": [
+        "https://example.test/ref.png"
+      ],
+      "layer_decomposition": true,
+      "size": "auto",
+      "layer_decomposition_options": {
+        "max_images": 2,
+        "text_recognition": false
+      }
+    },
+    "valid": true,
+    "maximum": 2
+  },
+  {
+    "name": "layers 30",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "image": [
+        "https://example.test/ref.png"
+      ],
+      "layer_decomposition": true,
+      "size": "auto",
+      "layer_decomposition_options": {
+        "max_images": 30,
+        "text_recognition": false
+      }
+    },
+    "valid": true,
+    "maximum": 30
+  },
+  {
+    "name": "layers 100",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "image": [
+        "https://example.test/ref.png"
+      ],
+      "layer_decomposition": true,
+      "size": "auto",
+      "layer_decomposition_options": {
+        "max_images": 100,
+        "text_recognition": false
+      }
+    },
+    "valid": true,
+    "maximum": 100
+  },
+  {
+    "name": "ocr enabled",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": "https://example.test/ref.png",
+      "layer_decomposition": true,
+      "layer_decomposition_options": {
+        "text_recognition": true
+      }
+    },
+    "valid": true,
+    "maximum": 30
+  },
+  {
+    "name": "unused layer options",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition": false,
+      "layer_decomposition_options": {
+        "max_images": 100,
+        "text_recognition": false
+      }
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "safety identifier",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "safety_identifier": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "valid": true,
+    "maximum": 1
+  },
+  {
+    "name": "streaming",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "stream": true
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "string boolean",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "watermark": "false"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "null boolean",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "watermark": null
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "null options",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": null
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "array options",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": []
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "unknown layer option",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "unknown": 1
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "null max",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "max_images": null
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "zero max",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "max_images": 0
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "small max",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "max_images": 1
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "large max",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "max_images": 101
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "fraction max",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "max_images": 2.5
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "string max",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "max_images": "30"
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "null ocr",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "text_recognition": null
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "numeric ocr",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition_options": {
+        "text_recognition": 0
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "fast mode",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "optimize_prompt_options": {
+        "mode": "fast"
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "null optimization",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "optimize_prompt_options": null
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "null mode",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "optimize_prompt_options": {
+        "mode": null
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "rgba jpeg",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "background": "transparent",
+      "output_format": "jpeg"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "unknown background",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "background": "blue"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "layers background",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": "https://example.test/ref.png",
+      "layer_decomposition": true,
+      "background": "auto"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "layers two references",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": [
+        "https://example.test/1.png",
+        "https://example.test/2.png"
+      ],
+      "layer_decomposition": true
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "layers no image",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "layer_decomposition": true
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "layers pixels",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": "https://example.test/ref.png",
+      "layer_decomposition": true,
+      "size": "2048x2048"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "generation auto size",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "size": "auto"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "4k",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "size": "4K"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "eleven references",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": [
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png",
+        "https://example.test/ref.png"
+      ]
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "empty image array",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": []
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "invalid URL",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": "file:///tmp/a.png"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "object image",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "image": {
+        "url": "https://example.test/a.png"
+      }
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "empty prompt",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": ""
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "group generation",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "sequential_image_generation": "auto"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "search",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "tools": []
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "long identifier",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "safety_identifier": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "non ascii identifier",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "safety_identifier": "用户"
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "null identifier",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "safety_identifier": null
+    },
+    "valid": false,
+    "maximum": 0
+  },
+  {
+    "name": "printable safety identifier with space",
+    "request": {
+      "model": "doubao-seedream-5-5-261028",
+      "prompt": "draw",
+      "safety_identifier": "customer hash"
+    },
+    "valid": true,
+    "maximum": 1
+  }
+]

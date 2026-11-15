@@ -1,0 +1,5 @@
+- [x] Add exact model and validated generation controls.
+- [x] Add provider-specific layer limits, OCR and metadata preservation.
+- [x] Expose layer settings and OCR results from the real toolbar.
+- [x] Verify shared API fixtures, wire requests, metadata and existing regressions.
+- [x] Record local versus live validation and outstanding release gates.

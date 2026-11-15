@@ -39,6 +39,9 @@ export interface SemanticLayerMetadata {
   description: string;
   boundingBox: LayerArtifact['boundingBox'];
   confidence?: number;
+  background?: unknown;
+  textRecognition?: unknown;
+  providerMetadata?: Record<string, unknown>;
   hidden?: boolean;
 }
 
@@ -117,6 +120,15 @@ function createLayerElement(
     zIndex: artifact.zIndex,
     name: artifact.name,
     description: artifact.description,
+    ...(artifact.background === undefined
+      ? {}
+      : { background: structuredClone(artifact.background) }),
+    ...(artifact.textRecognition === undefined
+      ? {}
+      : { textRecognition: structuredClone(artifact.textRecognition) }),
+    ...(artifact.providerMetadata === undefined
+      ? {}
+      : { providerMetadata: structuredClone(artifact.providerMetadata) }),
     boundingBox: {
       absolute: [...artifact.boundingBox.absolute],
       normalized: [...artifact.boundingBox.normalized],
@@ -216,7 +228,10 @@ export function getSemanticLayerMetadata(
 export async function exportSemanticLayerGroup(
   board: PlaitBoard,
   providerGroupId: string,
-  options: { filename?: string; onProgress?: (progress: number) => void } = {}
+  options: {
+    filename?: string;
+    onProgress?: (progress: number) => void;
+  } = {}
 ): Promise<void> {
   const group = board.children.find(
     (element) =>

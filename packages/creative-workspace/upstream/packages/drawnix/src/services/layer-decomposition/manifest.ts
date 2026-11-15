@@ -8,7 +8,7 @@ import type {
 
 function cloneManifestItem(artifact: LayerArtifact): LayerManifestItem {
   return {
-    ...artifact,
+    ...structuredClone(artifact),
     kind: artifact.zIndex === 0 ? 'background' : 'foreground',
     boundingBox: {
       absolute: [...artifact.boundingBox.absolute],

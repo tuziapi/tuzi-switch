@@ -1,3 +1,7 @@
+import {
+  SEEDREAM55_MODEL_ID,
+  validateSeedream55,
+} from '../model-adapters/seedream55';
 import { blobToDataUrl, normalizeImageDataUrl } from '@aitu/utils';
 import {
   getAdapterContextFromSettings,
@@ -58,7 +62,7 @@ function getLayerCapability(
   const modelId = (requestedModelId || context.binding?.modelId || '')
     .trim()
     .toLowerCase();
-  if (modelId === SEEDREAM_LAYER_MODEL_ID) {
+  if (modelId === SEEDREAM_LAYER_MODEL_ID || modelId === SEEDREAM55_MODEL_ID) {
     return { enabled: true };
   }
 
@@ -93,9 +97,8 @@ async function sourceToDataUrl(
   signal?.throwIfAborted();
   let blob: Blob | null = null;
   if (isVirtualMediaUrl(source)) {
-    blob = await unifiedCacheService.getCachedImageBlobWithThumbnailFallback(
-      source
-    );
+    blob =
+      await unifiedCacheService.getCachedImageBlobWithThumbnailFallback(source);
   }
   if (!blob) {
     const response = await fetch(source, { signal, cache: 'no-store' });
@@ -154,7 +157,7 @@ export function parseGeneratedArtifactInspection(
           number,
           number,
           number,
-          number
+          number,
         ];
         const area =
           (normalized[2] - normalized[0]) * (normalized[3] - normalized[1]);
@@ -308,7 +311,7 @@ function parseProviderCandidates(content: string): ProviderCandidate[] {
               number,
               number,
               number,
-              number
+              number,
             ],
             confidence,
           },
@@ -369,12 +372,12 @@ export async function createConfiguredProviderCandidatePrompt(
                         : ''
                     }`
                   : targetName
-                  ? `优先定位这张图片中名为“${targetName}”的可见主体${
-                      targetDescription ? `（${targetDescription}）` : ''
-                    }，忽略纯背景。`
-                  : '只识别可以从画面中完整抠出并独立移动的实体前景对象。' +
-                    '严禁返回背景、窗户、窗框、栏杆、天空、墙面、地板、建筑和城市景观；' +
-                    '严禁把背景纹理、阴影、反射或被画面边缘截断的局部区域当成对象。') +
+                    ? `优先定位这张图片中名为“${targetName}”的可见主体${
+                        targetDescription ? `（${targetDescription}）` : ''
+                      }，忽略纯背景。`
+                    : '只识别可以从画面中完整抠出并独立移动的实体前景对象。' +
+                      '严禁返回背景、窗户、窗框、栏杆、天空、墙面、地板、建筑和城市景观；' +
+                      '严禁把背景纹理、阴影、反射或被画面边缘截断的局部区域当成对象。') +
                 '只返回 JSON：{"objects":[{"name":"名称","description":"简述",' +
                 '"bbox":[x1,y1,x2,y2],"confidence":0.0}]}。' +
                 `bbox 使用 0 到 1000 的归一化坐标，最多 ${maxCandidates} 个对象。`,
@@ -405,9 +408,13 @@ export async function createConfiguredProviderCandidatePrompt(
   }
 }
 
-function normalizeProviderLayerPayload(
+export function normalizeProviderLayerPayload(
   payload: unknown,
-  options: { trustedModel?: boolean } = {}
+  options: {
+    trustedModel?: boolean;
+    seedream55?: boolean;
+    maxImages?: number;
+  } = {}
 ): LayerDecompositionResponse {
   if (!payload || typeof payload !== 'object') {
     throw new LayerDecompositionProviderUnsupportedError(
@@ -418,16 +425,22 @@ function normalizeProviderLayerPayload(
   const rawData = Array.isArray(record.data)
     ? record.data
     : Array.isArray(
-        (record.output as Record<string, unknown> | undefined)?.data
-      )
-    ? ((record.output as Record<string, unknown>).data as unknown[])
-    : null;
+          (record.output as Record<string, unknown> | undefined)?.data
+        )
+      ? ((record.output as Record<string, unknown>).data as unknown[])
+      : null;
   if (!rawData || rawData.length < 2) {
     throw new LayerDecompositionProviderUnsupportedError(
       '当前图片模型只返回普通图片，不支持真实图层分层'
     );
   }
 
+  if (
+    record.error ||
+    (options.maxImages !== undefined && rawData.length > options.maxImages)
+  ) {
+    throw new Error('分层响应失败或超过请求的图层数量上限');
+  }
   const groupId =
     typeof record.id === 'string' && record.id.trim()
       ? record.id.trim()
@@ -438,6 +451,7 @@ function normalizeProviderLayerPayload(
       throw new LayerDecompositionProviderUnsupportedError('图层响应格式无效');
     }
     const item = entry as Record<string, unknown>;
+    if (item.error) throw new Error('分层包含失败结果，未写入画布');
     const rawImage = item.url || item.image_url || item.b64_json;
     if (typeof rawImage !== 'string' || !rawImage.trim()) {
       throw new LayerDecompositionProviderUnsupportedError('图层缺少图片内容');
@@ -447,6 +461,9 @@ function normalizeProviderLayerPayload(
         '当前模型返回的是普通多图，不是带 z_index 的真实图层'
       );
     }
+    // Media bytes/locations are already represented by the durable layer URL.
+    // Keep response extensions without duplicating large Base64 images in every manifest.
+    const { url: _url, image_url: _imageUrl, b64_json: _base64, ...metadata } = item;
     const zIndex = item.z_index as number;
     const boundingBox = item.bounding_box;
     const isBackground = zIndex === 0;
@@ -454,16 +471,16 @@ function normalizeProviderLayerPayload(
       boundingBox && typeof boundingBox === 'object'
         ? boundingBox
         : isBackground
-        ? {
-            absolute: [
-              0,
-              0,
-              responseSize?.width || 1,
-              responseSize?.height || 1,
-            ],
-            normalized: [0, 0, 1000, 1000],
-          }
-        : null;
+          ? {
+              absolute: [
+                0,
+                0,
+                responseSize?.width || 1,
+                responseSize?.height || 1,
+              ],
+              normalized: [0, 0, 1000, 1000],
+            }
+          : null;
     if (!normalizedBoundingBox) {
       throw new LayerDecompositionProviderUnsupportedError(
         '图层缺少 bounding_box，无法安全写入画布'
@@ -471,14 +488,25 @@ function normalizeProviderLayerPayload(
     }
     return {
       url: normalizeImageDataUrl(rawImage),
+      ...(options.seedream55
+        ? {
+            ...(item.background === undefined
+              ? {}
+              : { background: item.background }),
+            ...(item.text_recognition === undefined
+              ? {}
+              : { text_recognition: item.text_recognition }),
+            provider_metadata: structuredClone(metadata),
+          }
+        : {}),
       z_index: zIndex,
       bounding_box: normalizedBoundingBox,
       name:
         typeof item.name === 'string'
           ? item.name
           : isBackground
-          ? 'background'
-          : `layer-${zIndex}`,
+            ? 'background'
+            : `layer-${zIndex}`,
       description: typeof item.description === 'string' ? item.description : '',
       ...(typeof item.confidence === 'number'
         ? { confidence: item.confidence }
@@ -491,25 +519,30 @@ function normalizeProviderLayerPayload(
       '图层响应缺少 z_index=0 底图'
     );
   }
-  return parseLayerDecompositionResponse({
-    group_id: groupId,
-    data: normalizedData,
-    width:
-      typeof record.width === 'number' ? record.width : responseSize?.width,
-    height:
-      typeof record.height === 'number' ? record.height : responseSize?.height,
-    quality:
-      record.quality && typeof record.quality === 'object'
-        ? record.quality
-        : options.trustedModel
-        ? { ssim: 1, channel_error_rate: 0, passed: true }
-        : undefined,
-    decisions: [
-      ...(Array.isArray(record.decisions) ? record.decisions : []),
-      ...(options.trustedModel ? ['provider_native_decomposition'] : []),
-    ],
-    result_kind: 'inference',
-  });
+  return parseLayerDecompositionResponse(
+    {
+      group_id: groupId,
+      data: normalizedData,
+      width:
+        typeof record.width === 'number' ? record.width : responseSize?.width,
+      height:
+        typeof record.height === 'number'
+          ? record.height
+          : responseSize?.height,
+      quality:
+        record.quality && typeof record.quality === 'object'
+          ? record.quality
+          : options.trustedModel && !options.seedream55
+            ? { ssim: 1, channel_error_rate: 0, passed: true }
+            : undefined,
+      decisions: [
+        ...(Array.isArray(record.decisions) ? record.decisions : []),
+        ...(options.trustedModel ? ['provider_native_decomposition'] : []),
+      ],
+      result_kind: 'inference',
+    },
+    options.seedream55 ? (options.maxImages ?? 30) - 1 : undefined
+  );
 }
 
 function readProviderImageSize(
@@ -588,12 +621,12 @@ export async function decomposeWithConfiguredImageProvider(
     modelContext.binding?.protocol === 'openai.images.generations'
       ? modelContext
       : hasExplicitLayerModel && activeContext
-      ? activeContext
-      : activeContext?.binding?.protocol === 'openai.images.generations'
-      ? activeContext
-      : modelContext.baseUrl
-      ? modelContext
-      : activeContext || modelContext;
+        ? activeContext
+        : activeContext?.binding?.protocol === 'openai.images.generations'
+          ? activeContext
+          : modelContext.baseUrl
+            ? modelContext
+            : activeContext || modelContext;
   const capability = getLayerCapability(context, requestedModelId);
   if (!capability?.enabled) return null;
   if (
@@ -627,6 +660,18 @@ export async function decomposeWithConfiguredImageProvider(
     watermark: false,
   };
   if (request.prompt) payload.prompt = request.prompt;
+  const seedream55 = requestedModelId.toLowerCase() === SEEDREAM55_MODEL_ID;
+  if (seedream55) {
+    payload.size = request.size ?? 'auto';
+    payload.output_format = request.outputFormat ?? 'png';
+    payload.layer_decomposition_options = {
+      max_images: request.maxLayers + 1,
+      ...(request.textRecognition === undefined
+        ? {}
+        : { text_recognition: request.textRecognition }),
+    };
+    validateSeedream55(payload);
+  }
   const response = await sendAdapterRequest(context, {
     path:
       capability.path || context.binding?.submitPath || '/images/generations',
@@ -654,7 +699,11 @@ export async function decomposeWithConfiguredImageProvider(
   });
   const result = requireNativeProviderQuality(
     normalizeProviderLayerPayload(await readProviderResponseJson(response), {
-      trustedModel: requestedModelId.toLowerCase() === SEEDREAM_LAYER_MODEL_ID,
+      trustedModel:
+        requestedModelId.toLowerCase() === SEEDREAM_LAYER_MODEL_ID ||
+        seedream55,
+      seedream55,
+      ...(seedream55 ? { maxImages: request.maxLayers + 1 } : {}),
     })
   );
   options.onProgress?.({

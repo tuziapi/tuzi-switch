@@ -13,6 +13,9 @@ export interface LayerArtifact {
   name: string;
   description: string;
   confidence?: number;
+  background?: unknown;
+  textRecognition?: unknown;
+  providerMetadata?: Record<string, unknown>;
 }
 
 export interface LayerDecompositionRequest {
@@ -20,6 +23,9 @@ export interface LayerDecompositionRequest {
   prompt?: string;
   mode?: Exclude<LayerDecompositionMode, 'bbox'>;
   maxLayers: number;
+  size?: 'auto' | '1K' | '1.5K' | '2K';
+  textRecognition?: boolean;
+  outputFormat?: 'png' | 'jpeg';
 }
 
 export interface LayerDecompositionRequestPayload {

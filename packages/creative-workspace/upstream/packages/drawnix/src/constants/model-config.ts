@@ -779,6 +779,11 @@ export const IMAGE_MODEL_MORE_OPTIONS: ModelConfig[] = [
     tags: ['seedream', 'pro'],
   },
   {
+    id: 'doubao-seedream-5-5-261028', label: 'Seedream 5.5', shortLabel: 'Seedream 5.5', shortCode: 'sd55',
+    description: 'Seedream 5.5：1K/1.5K/2K、透明背景、图层与 OCR', type: 'image',
+    vendor: ModelVendor.DOUBAO, supportsTools: false, imageDefaults: IMAGE_2K_DEFAULT_PARAMS, tags: ['seedream'],
+  },
+  {
     id: 'seedream-v4',
     label: 'Seedream V4',
     shortLabel: 'Seedream V4',
@@ -2179,6 +2184,7 @@ const SEEDREAM_IMAGE_MODEL_IDS = [
   'doubao-seedream-4-5-251128',
   'doubao-seedream-5-0-260128',
   'doubao-seedream-5-0-pro-260628',
+  'doubao-seedream-5-5-261028',
 ];
 
 /** 支持独立分辨率档位的 GPT Image 2.5 模型。 */
@@ -3445,6 +3451,21 @@ export const IMAGE_PARAMS: ParamConfig[] = [
     compatibleTags: ['seedream'],
     modelType: 'image',
   },
+  {
+    id: 'seedream_quality', label: '分辨率', shortLabel: '分辨率', valueType: 'enum',
+    options: [{ value: '1k', label: '1K' }, { value: '1.5k', label: '1.5K' }, { value: '2k', label: '2K' }],
+    defaultValue: '2k', compatibleModels: ['doubao-seedream-5-5-261028'], modelType: 'image',
+  },
+  {
+    id: 'background', label: '图片背景', shortLabel: '背景', valueType: 'enum',
+    options: [{ value: 'auto', label: '自动' }, { value: 'transparent', label: '透明（PNG）' }, { value: 'opaque', label: '不透明' }],
+    defaultValue: 'auto', compatibleModels: ['doubao-seedream-5-5-261028'], modelType: 'image',
+  },
+  {
+    id: 'output_format', label: '图片格式', shortLabel: '格式', valueType: 'enum',
+    options: [{ value: 'png', label: 'PNG' }, { value: 'jpeg', label: 'JPEG（不支持透明）' }],
+    defaultValue: 'png', compatibleModels: ['doubao-seedream-5-5-261028'], modelType: 'image',
+  },
   // Seedream 4.0/4.5 图片质量（2K/4K）
   {
     id: 'seedream_quality',
@@ -3746,7 +3767,8 @@ export function getCompatibleParams(modelId: string): ParamConfig[] {
       const supportsTransparent = param.options?.some(
         (option) => option.value === 'transparent'
       );
-      return supportsTransparent === isGPTImage25ModelId(normalizedModelId);
+      return param.compatibleModels.some((id) => isGPTImage2ModelId(id) || isGPTImage25ModelId(id))
+        && supportsTransparent === isGPTImage25ModelId(normalizedModelId);
     }
     return idMatched || tagMatched;
   });

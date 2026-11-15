@@ -4,6 +4,7 @@ import type {
   ImageModelAdapter,
 } from './types';
 import { getFileExtension, normalizeImageDataUrl } from '@aitu/utils';
+import { SEEDREAM55_MODEL_ID, seedream55GenerationBody } from './seedream55';
 import { registerModelAdapter } from './registry';
 import { sendAdapterRequest } from './context';
 import { readProviderResponseJson } from '../provider-routing';
@@ -13,6 +14,7 @@ const SEEDREAM_MODELS = [
   'doubao-seedream-4-0-250828',
   'doubao-seedream-4-5-251128',
   DEFAULT_SEEDREAM_MODEL,
+  SEEDREAM55_MODEL_ID,
   'doubao-seedream-5-0-pro-260628',
 ];
 
@@ -91,8 +93,8 @@ const resolveSeedreamSize = (
     quality === '4k'
       ? ASPECT_RATIO_TO_SIZE_4K
       : quality === '3k'
-      ? ASPECT_RATIO_TO_SIZE_3K
-      : ASPECT_RATIO_TO_SIZE_2K;
+        ? ASPECT_RATIO_TO_SIZE_3K
+        : ASPECT_RATIO_TO_SIZE_2K;
 
   // 先查比例映射表
   const mapped = sizeMap[size];
@@ -105,8 +107,8 @@ const resolveSeedreamSize = (
   return quality === '4k'
     ? '4096x4096'
     : quality === '3k'
-    ? '3072x3072'
-    : '2048x2048';
+      ? '3072x3072'
+      : '2048x2048';
 };
 
 const resolveBaseUrl = (context: AdapterContext): string => {
@@ -132,7 +134,7 @@ export const seedreamImageAdapter: ImageModelAdapter = {
     const quality = (request.params?.seedream_quality as string) || '2k';
     const size = resolveSeedreamSize(request.size, quality);
 
-    const body: Record<string, unknown> = {
+    let body: Record<string, unknown> = {
       model,
       prompt: request.prompt,
       // Inline bytes can be persisted without fetching a signed, non-CORS URL.
@@ -150,6 +152,8 @@ export const seedreamImageAdapter: ImageModelAdapter = {
           ? request.referenceImages[0]
           : request.referenceImages;
     }
+
+    if (model === SEEDREAM55_MODEL_ID) body = seedream55GenerationBody(request);
 
     const baseUrl = resolveBaseUrl(context);
     const response = await sendAdapterRequest(
@@ -178,9 +182,17 @@ export const seedreamImageAdapter: ImageModelAdapter = {
       throw new Error(errMsg);
     }
 
-    const result = await readProviderResponseJson<Record<string, any>>(
-      response
-    );
+    const result =
+      await readProviderResponseJson<Record<string, any>>(response);
+
+    if (
+      model === SEEDREAM55_MODEL_ID &&
+      (!Array.isArray(result?.data) ||
+        result.data.length !== 1 ||
+        result.data[0]?.error)
+    ) {
+      throw new Error('Seedream 5.5 普通生图必须完整返回一张图片');
+    }
 
     // 提取图片 URL（支持多图）
     if (result?.data && Array.isArray(result.data) && result.data.length > 0) {

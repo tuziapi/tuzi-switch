@@ -1,3 +1,5 @@
+import { decomposeWithConfiguredImageProvider } from '../../services/layer-decomposition/provider';
+import { SEEDREAM55_MODEL_ID } from '../../services/model-adapters/seedream55';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, MessagePlugin, Progress } from 'tdesign-react';
 import { Layers3, X } from 'lucide-react';
@@ -22,6 +24,7 @@ interface LayerDecompositionDialogProps {
   imageUrl: string;
   language: 'zh' | 'en';
   automatic?: boolean;
+  providerModelId?: string;
   onClose: () => void;
 }
 
@@ -71,6 +74,14 @@ function parseBoundingBox(
   return coordinates as LayerBoundingBoxTuple;
 }
 
+function recognizedText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  if (typeof record.text === 'string') return record.text;
+  return Array.isArray(record.lines) ? record.lines.map(recognizedText).filter(Boolean).join('\n') : '';
+}
+
 export const LayerDecompositionDialog: React.FC<
   LayerDecompositionDialogProps
 > = ({
@@ -80,13 +91,19 @@ export const LayerDecompositionDialog: React.FC<
   imageUrl,
   language,
   automatic = false,
+  providerModelId,
   onClose,
 }) => {
   const { board: activeBoard } = useDrawnix();
   const [mode, setMode] = useState<LayerDecompositionMode>('auto');
   const [prompt, setPrompt] = useState('');
   const [bbox, setBbox] = useState(['0', '0', '1000', '1000']);
-  const [maxLayers, setMaxLayers] = useState(16);
+  const seedream55 = providerModelId === SEEDREAM55_MODEL_ID;
+  const [maxLayers, setMaxLayers] = useState(seedream55 ? 29 : 16);
+  const [textRecognition, setTextRecognition] = useState(false);
+  const [layerSize, setLayerSize] = useState<'auto' | '1K' | '1.5K' | '2K'>(
+    'auto'
+  );
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState('queued');
@@ -154,7 +171,7 @@ export const LayerDecompositionDialog: React.FC<
   const cancel = useCallback(async () => {
     const taskId = taskIdRef.current;
     abortRef.current?.abort();
-    if (taskId && processing) {
+    if (taskId && taskId !== 'provider' && processing) {
       try {
         await createLayerDecompositionApiClient().cancel(taskId);
       } catch {
@@ -211,6 +228,8 @@ export const LayerDecompositionDialog: React.FC<
           createLayerDecompositionApiClient(),
           controller.signal
         );
+        controller.signal.throwIfAborted();
+        ensureSourceIsActive();
         if (response.resultKind === 'test') {
           MessagePlugin.warning(
             isZh
@@ -267,8 +286,8 @@ export const LayerDecompositionDialog: React.FC<
           error instanceof Error
             ? error.message
             : isZh
-            ? '图片分层失败'
-            : 'Layer decomposition failed'
+              ? '图片分层失败'
+              : 'Layer decomposition failed'
         );
         if (automatic) close();
       } finally {
@@ -299,18 +318,40 @@ export const LayerDecompositionDialog: React.FC<
       return;
     }
     taskIdRef.current = null;
-    await runTask((client, signal) =>
-      client.decompose(
-        {
-          image: imageUrl,
-          ...(targetPrompt ? { prompt: targetPrompt } : {}),
-          mode: mode === 'auto' ? 'auto' : 'prompt',
-          maxLayers,
-        },
-        { signal, onProgress: handleProgress }
-      )
-    );
-  }, [buildPrompt, handleProgress, imageUrl, maxLayers, mode, runTask]);
+    await runTask(async (client, signal) => {
+      const request = {
+        image: imageUrl,
+        ...(targetPrompt ? { prompt: targetPrompt } : {}),
+        mode: mode === 'auto' ? ('auto' as const) : ('prompt' as const),
+        maxLayers,
+        ...(seedream55 ? { size: layerSize, textRecognition } : {}),
+      };
+      if (seedream55) {
+        const response = await decomposeWithConfiguredImageProvider(request, {
+          modelId: SEEDREAM55_MODEL_ID,
+          signal,
+          onProgress: handleProgress,
+        });
+        if (!response)
+          throw new Error('请先配置可调用 Seedream 5.5 的图片服务');
+        return response;
+      }
+      return client.decompose(request, {
+        signal,
+        onProgress: handleProgress,
+      });
+    });
+  }, [
+    buildPrompt,
+    handleProgress,
+    imageUrl,
+    maxLayers,
+    mode,
+    runTask,
+    seedream55,
+    layerSize,
+    textRecognition,
+  ]);
 
   useEffect(() => {
     if (!open || !automatic || autoStartedRef.current) return;
@@ -424,19 +465,19 @@ export const LayerDecompositionDialog: React.FC<
   const primaryAction = result
     ? applyResult
     : needsCorrection
-    ? correct
-    : submit;
+      ? correct
+      : submit;
   const primaryLabel = result
     ? isZh
       ? '应用到画布'
       : 'Apply to canvas'
     : needsCorrection
-    ? isZh
-      ? '提交修正'
-      : 'Submit correction'
-    : isZh
-    ? '开始分层'
-    : 'Create layers';
+      ? isZh
+        ? '提交修正'
+        : 'Submit correction'
+      : isZh
+        ? '开始分层'
+        : 'Create layers';
 
   return (
     <ConfirmDialog
@@ -469,8 +510,8 @@ export const LayerDecompositionDialog: React.FC<
                   ? '取消任务'
                   : 'Cancel task'
                 : isZh
-                ? '取消'
-                : 'Cancel'}
+                  ? '取消'
+                  : 'Cancel'}
             </Button>
           </div>
         ) : (
@@ -485,8 +526,8 @@ export const LayerDecompositionDialog: React.FC<
                   ? '取消任务'
                   : 'Cancel task'
                 : isZh
-                ? '取消'
-                : 'Cancel'}
+                  ? '取消'
+                  : 'Cancel'}
             </Button>
             <Button
               theme="primary"
@@ -576,7 +617,7 @@ export const LayerDecompositionDialog: React.FC<
             <input
               type="range"
               min={1}
-              max={16}
+              max={seedream55 ? 99 : 16}
               step={1}
               value={maxLayers}
               disabled={processing}
@@ -585,6 +626,41 @@ export const LayerDecompositionDialog: React.FC<
           </label>
         )}
 
+        {seedream55 && !result && (
+          <div className="layer-decomposition-dialog__field">
+            <label>
+              {isZh ? '分层尺寸' : 'Layer size'}
+              <select
+                aria-label={isZh ? '分层尺寸' : 'Layer size'}
+                value={layerSize}
+                disabled={processing}
+                onChange={(event) =>
+                  setLayerSize(event.target.value as typeof layerSize)
+                }
+              >
+                {['auto', '1K', '1.5K', '2K'].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={textRecognition}
+                disabled={processing}
+                onChange={(event) => setTextRecognition(event.target.checked)}
+              />
+              {isZh ? '识别图层文字（OCR）' : 'Recognize layer text (OCR)'}
+            </label>
+            <span>
+              {isZh
+                ? `最多返回 ${maxLayers + 1} 张图片（含底图），按服务商规则计费`
+                : `Up to ${maxLayers + 1} images including the base; provider pricing applies`}
+            </span>
+          </div>
+        )}
         {!automatic && needsCorrection && !result && (
           <div className="layer-decomposition-dialog__correction">
             <strong>
@@ -651,16 +727,45 @@ export const LayerDecompositionDialog: React.FC<
             <span>
               {isZh ? '图层数量' : 'Layers'}: {result.layers.length + 1}
             </span>
-            <span>SSIM: {result.quality?.ssim?.toFixed(4) ?? '-'}</span>
+            {!seedream55 && <><span>SSIM: {result.quality?.ssim?.toFixed(4) ?? '-'}</span>
             <span>
               {isZh ? '通道误差' : 'Channel error'}:{' '}
               {result.quality?.channelErrorRate === undefined
                 ? '-'
                 : `${(result.quality.channelErrorRate * 100).toFixed(3)}%`}
-            </span>
+            </span></>}
           </div>
         )}
 
+        {seedream55 && result && (
+          <div className="layer-decomposition-dialog__field">
+            <span>
+              {isZh
+                ? '请检查分层效果后再应用到画布'
+                : 'Review the layers before applying them to the canvas'}
+            </span>
+            {[result.background, ...result.layers]
+              .filter((layer) => layer.textRecognition !== undefined)
+              .map((layer) => (
+                <details key={layer.zIndex}>
+                  <summary>{layer.name} · OCR</summary>
+                  <pre
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      overflowWrap: 'anywhere',
+                    }}
+                  >
+                    {recognizedText(layer.textRecognition) || (isZh ? '文字结构已保存，可导出图层清单查看' : 'Text structure saved; export the layer manifest to inspect it')}
+                  </pre>
+                </details>
+              ))}
+            <span>
+              {isZh
+                ? 'OCR 和图层扩展信息将随画布及图层清单保存'
+                : 'OCR and layer metadata are saved with the canvas and manifest'}
+            </span>
+          </div>
+        )}
         {processing && (
           <div
             className="layer-decomposition-dialog__progress"

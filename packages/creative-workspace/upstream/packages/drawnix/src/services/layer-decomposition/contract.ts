@@ -250,11 +250,25 @@ function parseArtifact(
       true
     ),
     ...(confidence === undefined ? {} : { confidence }),
+    ...(item.background === undefined
+      ? {}
+      : { background: structuredClone(item.background) }),
+    ...(item.text_recognition === undefined
+      ? {}
+      : { textRecognition: structuredClone(item.text_recognition) }),
+    ...(item.provider_metadata === undefined
+      ? {}
+      : {
+          providerMetadata: structuredClone(
+            requireRecord(item.provider_metadata, `${path}.provider_metadata`)
+          ),
+        }),
   };
 }
 
 export function parseLayerDecompositionResponse(
-  value: unknown
+  value: unknown,
+  maxForegroundLayers = MAX_DECOMPOSITION_FOREGROUND_LAYERS
 ): LayerDecompositionResponse {
   const response = requireRecord(value, 'response');
   const groupId = requireString(
@@ -291,10 +305,10 @@ export function parseLayerDecompositionResponse(
     );
   }
   const layers = artifacts.filter((artifact) => artifact.zIndex !== 0);
-  if (layers.length > MAX_DECOMPOSITION_FOREGROUND_LAYERS) {
+  if (layers.length > maxForegroundLayers) {
     invalid(
       'response.data',
-      `must not contain more than ${MAX_DECOMPOSITION_FOREGROUND_LAYERS} foreground layers`
+      `must not contain more than ${maxForegroundLayers} foreground layers`
     );
   }
   const zIndexes = new Set<number>();
@@ -342,8 +356,8 @@ export function parseLayerDecompositionResponse(
           qualityRecord.channel_error_within_one_ratio !== undefined
             ? 'response.quality.channel_error_within_one_ratio'
             : qualityRecord.channel_error_rate === undefined
-            ? 'response.quality.channelErrorRate'
-            : 'response.quality.channel_error_rate'
+              ? 'response.quality.channelErrorRate'
+              : 'response.quality.channel_error_rate'
         );
   if (ssim !== undefined && (ssim < 0 || ssim > 1)) {
     invalid('response.quality.ssim', 'must be within 0..1');
@@ -358,8 +372,8 @@ export function parseLayerDecompositionResponse(
     qualityRecord?.passed === undefined
       ? undefined
       : qualityRecord.passed === true || qualityRecord.passed === false
-      ? qualityRecord.passed
-      : invalid('response.quality.passed', 'must be boolean');
+        ? qualityRecord.passed
+        : invalid('response.quality.passed', 'must be boolean');
   const resultKind = response.result_kind;
   if (
     resultKind !== undefined &&
@@ -372,17 +386,20 @@ export function parseLayerDecompositionResponse(
     response.decisions === undefined
       ? undefined
       : !Array.isArray(response.decisions)
-      ? invalid('response.decisions', 'must be an array of strings')
-      : response.decisions.length > 32
-      ? invalid('response.decisions', 'must not contain more than 32 decisions')
-      : response.decisions.map((decision, index) =>
-          requireString(
-            decision,
-            `response.decisions[${index}]`,
-            256,
-            false
-          )
-        );
+        ? invalid('response.decisions', 'must be an array of strings')
+        : response.decisions.length > 32
+          ? invalid(
+              'response.decisions',
+              'must not contain more than 32 decisions'
+            )
+          : response.decisions.map((decision, index) =>
+              requireString(
+                decision,
+                `response.decisions[${index}]`,
+                256,
+                false
+              )
+            );
 
   return {
     groupId,

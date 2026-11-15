@@ -73,3 +73,14 @@ describe('Seedream durable image responses', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 });
+
+it('Seedream 5.5 sends transparent generation and rejects partial results without retry',async()=>{
+  send.mockResolvedValue(new Response(JSON.stringify({data:[{url:'https://example.test/a.png'}]})));
+  await seedreamImageAdapter.generateImage({baseUrl:'https://api.example.test/v1'}, {
+    model:'doubao-seedream-5-5-261028',prompt:'rabbit',params:{background:'transparent',output_format:'png',watermark:false},
+  });
+  expect(JSON.parse(send.mock.calls[0][1].body)).toMatchObject({background:'transparent',output_format:'png',watermark:false,size:'2K'});
+  send.mockResolvedValue(new Response(JSON.stringify({data:[{url:'https://example.test/a.png',error:{code:'failed'}}]})));
+  await expect(seedreamImageAdapter.generateImage({baseUrl:'https://api.example.test/v1'}, {model:'doubao-seedream-5-5-261028',prompt:'rabbit'})).rejects.toThrow(/一张图片/);
+  expect(send).toHaveBeenCalledTimes(2);
+});

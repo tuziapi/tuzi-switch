@@ -1,3 +1,5 @@
+import { LayerDecompositionDialog } from '../../layer-decomposition';
+import { SEEDREAM55_MODEL_ID } from '../../../services/model-adapters/seedream55';
 import { getAssistantAccount } from '../../../services/assistant-account';
 import { resizeCanvasImage } from '../../../services/canvas-operations/resize-canvas-image';
 import Stack from '../../stack';
@@ -249,6 +251,7 @@ export const PopupToolbar = () => {
 
   // 图片编辑器状态
   const [showImageEditor, setShowImageEditor] = useState(false);
+  const [seedreamLayerSource, setSeedreamLayerSource] = useState<{board: PlaitBoard; id: string; url: string} | null>(null);
   const [editingImageBinding, setEditingImageBinding] = useState<CanvasBoardBinding | null>(null);
   const [imageToolMode, setImageToolMode] = useState<ImageToolMode | null>(null);
   const imageToolSelectionKey = selectedElements.map(element => element.id).join(',');
@@ -1887,6 +1890,16 @@ export const PopupToolbar = () => {
               />
             )}
             {state.hasLayerDecomposition && (
+              <ToolButton type="icon" icon={<Ungroup size={16} />} visible={true}
+                tooltip={language === 'zh' ? 'Seedream 5.5 分层 / OCR' : 'Seedream 5.5 Layers / OCR'}
+                aria-label={language === 'zh' ? 'Seedream 5.5 分层 / OCR' : 'Seedream 5.5 Layers / OCR'}
+                onPointerUp={() => {
+                  const image = selectedElements[0];
+                  if (PlaitDrawElement.isDrawElement(image) && PlaitDrawElement.isImage(image) && image.url)
+                    setSeedreamLayerSource({ board, id: image.id, url: image.url });
+                }} />
+            )}
+            {state.hasLayerDecomposition && (
               <ToolButton
                 className="ai-layer-decomposition"
                 key="ai-layer-decomposition"
@@ -2759,6 +2772,12 @@ export const PopupToolbar = () => {
             }
           }}
         />
+      )}
+
+      {seedreamLayerSource && (
+        <LayerDecompositionDialog open board={seedreamLayerSource.board} sourceElementId={seedreamLayerSource.id}
+          imageUrl={seedreamLayerSource.url} language={language === 'zh' ? 'zh' : 'en'}
+          providerModelId={SEEDREAM55_MODEL_ID} onClose={() => setSeedreamLayerSource(null)} />
       )}
 
       {imageToolMode && state.hasImageEdit && selectedElements[0] && <Suspense fallback={null}>
