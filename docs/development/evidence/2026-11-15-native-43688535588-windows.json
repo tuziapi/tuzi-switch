@@ -1,0 +1,373 @@
+{
+  "kind": "isolated-native-smoke",
+  "platform": "windows-x86_64",
+  "signingKey": "ephemeral-test-key",
+  "officialAcceptance": false,
+  "results": [
+    {
+      "scenario": "tampered-signature",
+      "status": "passed",
+      "events": [
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": false
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 4228,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\tampered-signature-1794728110226824800\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "The signature verification failed",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\tampered-signature-1794728110226824800"
+    },
+    {
+      "scenario": "retry-after-signature-rejection",
+      "status": "passed",
+      "events": [
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": false
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 8156,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\tampered-signature-1794728110226824800\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 22707959
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "cleanup-started",
+          "detail": {}
+        },
+        {
+          "event": "cleanup-completed",
+          "detail": {}
+        },
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": true
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 1184,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\tampered-signature-1794728110226824800\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\tampered-signature-1794728110226824800"
+    },
+    {
+      "scenario": "interrupted-download",
+      "status": "passed",
+      "events": [
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": false
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 1932,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\interrupted-download-1794728120271519100\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "error decoding response body",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\interrupted-download-1794728120271519100"
+    },
+    {
+      "scenario": "missing-package",
+      "status": "passed",
+      "events": [
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": false
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 2456,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\missing-package-1794728123019291900\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "`Download request failed with status: 404 Not Found`",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\missing-package-1794728123019291900"
+    },
+    {
+      "scenario": "install-failure",
+      "status": "passed",
+      "events": [
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": false
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 9804,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\install-failure-1794728125731715900\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 32
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "installRejected": true,
+            "error": "invalid updater binary format",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\install-failure-1794728125731715900"
+    },
+    {
+      "scenario": "same-version",
+      "status": "passed",
+      "events": [
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": false
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 2000,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\same-version-1794728128499607700\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\same-version-1794728128499607700"
+    },
+    {
+      "scenario": "downgrade",
+      "status": "passed",
+      "events": [
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": false
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 9436,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\downgrade-1794728131209955900\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\downgrade-1794728131209955900"
+    },
+    {
+      "scenario": "upgrade-and-restart",
+      "status": "passed",
+      "events": [
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": false
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 7748,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\upgrade-and-restart-1794728133923793000\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 22707959
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "cleanup-started",
+          "detail": {}
+        },
+        {
+          "event": "cleanup-completed",
+          "detail": {}
+        },
+        {
+          "event": "profile-restored",
+          "detail": {
+            "environmentRecovered": true
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 2640,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\upgrade-and-restart-1794728133923793000\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\upgrade-and-restart-1794728133923793000"
+    }
+  ],
+  "repository": "AiW520/tuzi-switch",
+  "runId": "43688535588",
+  "applicationCommit": "1e46b8e6e5bb99d4559dd6475dda032280a6a471",
+  "artifactId": "14151724836",
+  "artifactSha256": "84a37077a5b7643ed171f8967fab61f63d6b3565d7b6f92991b189ed3283d38d",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "installerType": "nsis",
+  "scope": "Windows NSIS eight-scenario temporary-key isolated test; not official candidate acceptance"
+}
