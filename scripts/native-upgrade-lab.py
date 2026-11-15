@@ -25,6 +25,15 @@ def command(args, env, log):
         subprocess.run(args, cwd=ROOT, env=env, stdout=out, stderr=out, check=True)
 
 
+def remove_msi_fixture(package, env, log):
+    # Only the isolated QA package is removed, on a disposable hosted runner.
+    with log.open('ab') as out:
+        result = subprocess.run(['msiexec', '/x', str(package), '/qn', '/norestart'],
+                                env=env, stdout=out, stderr=out)
+    if result.returncode not in (0, 1605, 1614):
+        raise RuntimeError(f'QA MSI uninstall failed: {result.returncode}')
+
+
 def process_alive(pid):
     if sys.platform == 'win32':
         import ctypes
@@ -101,10 +110,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True)
     parser.add_argument('--skip-build', action='store_true')
+    parser.add_argument('--build-only', action='store_true')
+    parser.add_argument('--installer', choices=['app', 'nsis', 'msi', 'appimage', 'deb', 'rpm'])
     options = parser.parse_args()
     platform = {'darwin': 'macos', 'win32': 'windows', 'linux': 'linux'}.get(sys.platform)
     if not platform:
         raise SystemExit('Unsupported native platform')
+    bundle = options.installer or {'macos': 'app', 'windows': 'nsis', 'linux': 'appimage'}[platform]
+    if bundle not in {'macos': ['app'], 'windows': ['nsis', 'msi'], 'linux': ['appimage', 'deb', 'rpm']}[platform]:
+        raise SystemExit('Installer does not match this operating system')
+    if bundle in ('msi', 'deb', 'rpm') and not (
+        os.environ.get('GITHUB_ACTIONS') == 'true'
+        and os.environ.get('GITHUB_REPOSITORY') == 'AiW520/tuzi-switch'
+    ):
+        raise SystemExit('System package experiments require the disposable test-repository runner')
     root = Path(options.output).resolve()
     root.mkdir(parents=True, exist_ok=True)
     os.chmod(root, 0o700)
@@ -115,8 +134,7 @@ def main():
     env['APPIMAGE_EXTRACT_AND_RUN'] = '1'
     env['WEBKIT_DISABLE_DMABUF_RENDERER'] = '1'
     env['WEBKIT_DISABLE_COMPOSITING_MODE'] = '1'
-    suffix = {'macos': '.app', 'windows': '.exe', 'linux': '.AppImage'}[platform]
-    bundle = {'macos': 'app', 'windows': 'nsis', 'linux': 'appimage'}[platform]
+    suffix = {'app': '.app', 'nsis': '.exe', 'msi': '.msi', 'appimage': '.AppImage', 'deb': '.deb', 'rpm': '.rpm'}[bundle]
     env['TUZI_SWITCH_RELEASE_REPOSITORY'] = 'tuziapi/tuzi-switch'
     env['VITE_RELEASE_REPOSITORY'] = 'tuziapi/tuzi-switch'
     cli = ['node', str(ROOT / 'node_modules/@tauri-apps/cli/tauri.js')]
@@ -142,6 +160,8 @@ def main():
             'plugins': {'deep-link': {'desktop': {'schemes': ['tuziswitch-update-qa']}},
                         'updater': {'pubkey': pubkey, 'endpoints': [], 'dangerousInsecureTransportProtocol': True}},
         }
+        if bundle in ('deb', 'rpm'):
+            config['mainBinaryName'] = 'tuzi-update-qa'
         config_file = root / f'config-{version}.json'
         config_file.write_text(json.dumps(config))
         print(f'Building isolated application {version}', flush=True)
@@ -155,11 +175,15 @@ def main():
             shutil.copytree(bundles / 'macos/Tuzi Update QA.app', saved, symlinks=True)
         else:
             # Both versions share the Cargo cache; select this version explicitly.
-            pattern = f'*_{version}_*-setup.exe' if platform == 'windows' else f'*_{version}_*.AppImage'
+            pattern = (f'*_{version}_*-setup.exe' if bundle == 'nsis' else
+                       f'*-{version}-*.rpm' if bundle == 'rpm' else f'*_{version}_*{suffix}')
             produced = list((bundles / bundle).glob(pattern))
             if len(produced) != 1:
                 raise RuntimeError('Expected exactly one native installer')
             shutil.copy2(produced[0], saved)
+    if options.build_only:
+        print(f'Built both {bundle} laboratory packages; no installation was tested.', flush=True)
+        return
     archive = root / ('update.tar.gz' if platform == 'macos' else f'update{suffix}')
     if platform == 'macos':
         with tarfile.open(archive, 'w:gz') as out:
@@ -198,16 +222,16 @@ def main():
             ('tampered-signature', 'download-error', corrupt, '0.0.2'),
             ('interrupted-download', 'download-error', root / 'interrupted.tar.gz', '0.0.2'),
             ('missing-package', 'download-error', root / 'absent.tar.gz', '0.0.2'),
-            ('install-failure', 'install-error', archive if platform == 'linux' else invalid, '0.0.2'),
+            ('install-failure', 'install-error', archive if bundle == 'appimage' else invalid, '0.0.2'),
             ('same-version', 'no-update', archive, '0.0.1'),
             ('downgrade', 'no-update', archive, '0.0.0'),
             ('upgrade-and-restart', 'upgrade', archive, '0.0.2'),
             ('retry-after-signature-rejection', 'upgrade', archive, '0.0.2'),
     ]
-    if platform == 'windows':
-        # NSIS has one registered install directory for this identity. Retry
-        # before another scenario installs it elsewhere; never reinstall the
-        # rejected app merely to repair the test's registration state.
+    if bundle in ('nsis', 'msi', 'deb', 'rpm'):
+        # System package identities have one registered installation. Retry
+        # before another scenario resets it; never reinstall the rejected app
+        # merely to repair the test's registration state.
         scenarios.insert(1, scenarios.pop())
     try:
         for name, mode, asset, version in scenarios:
@@ -217,7 +241,9 @@ def main():
                 retry_case = case
             if retry:
                 (case / 'events.jsonl').rename(case / 'rejected-events.jsonl')
-                executable = next((case / 'Tuzi Update QA.app/Contents/MacOS').iterdir()) if platform == 'macos' else case / 'installed' / ('tu-zi-switch.exe' if platform == 'windows' else 'Tuzi Update QA.AppImage')
+                executable = (Path('/usr/bin/tuzi-update-qa') if bundle in ('deb', 'rpm') else
+                    next((case / 'Tuzi Update QA.app/Contents/MacOS').iterdir()) if platform == 'macos' else
+                    case / 'installed' / ('tu-zi-switch.exe' if platform == 'windows' else 'Tuzi Update QA.AppImage'))
                 app = case / 'installed' if platform != 'macos' else case / 'Tuzi Update QA.app'
             else:
                 (case / 'home').mkdir(parents=True)
@@ -227,19 +253,31 @@ def main():
                 executable = next((app / 'Contents/MacOS').iterdir())
             elif not retry and platform == 'windows':
                 app = case / 'installed'
-                command([str(root / 'app-0.0.1.exe'), '/S', f'/D={app}'], env, case / 'initial-install.log')
+                if bundle == 'msi':
+                    for previous in ['0.0.2', '0.0.1']:
+                        remove_msi_fixture(root / f'app-{previous}.msi', env, case / 'initial-install.log')
+                    command(['msiexec', '/i', str(root / 'app-0.0.1.msi'), '/qn', '/norestart',
+                             f'INSTALLDIR={app}'], env, case / 'initial-install.log')
+                else:
+                    command([str(root / 'app-0.0.1.exe'), '/S', f'/D={app}'], env, case / 'initial-install.log')
                 executable = app / 'tu-zi-switch.exe'
+            elif not retry and bundle in ('deb', 'rpm'):
+                app = Path('/usr/bin')
+                executable = app / 'tuzi-update-qa'
+                installer = ['sudo', 'dpkg', '-i'] if bundle == 'deb' else ['sudo', 'rpm', '-U', '--oldpackage']
+                command(installer + [str(root / f'app-0.0.1{suffix}')], env, case / 'initial-install.log')
             elif not retry:
                 app = case / 'installed'
                 app.mkdir()
                 executable = app / 'Tuzi Update QA.AppImage'
                 shutil.copy2(root / 'app-0.0.1.AppImage', executable)
                 executable.chmod(0o755)
-                if mode == 'install-error':
+                if mode == 'install-error' and bundle == 'appimage':
                     app.chmod(0o555)
             before_hash = hashlib.sha256(executable.read_bytes()).hexdigest()
             signature = Path(str(invalid if asset == invalid else archive) + '.sig').read_text().strip()
-            manifest = {'version': version, 'platforms': {target: {'url': f'{base}/{asset.name}', 'signature': signature}}}
+            manifest_target = target if platform == 'macos' else f'{target}-{bundle}'
+            manifest = {'version': version, 'platforms': {manifest_target: {'url': f'{base}/{asset.name}', 'signature': signature}}}
             manifest_file = root / f'{name}.json'
             manifest_file.write_text(json.dumps(manifest))
             # no-update target differs from the running version, so it cannot be
@@ -268,7 +306,8 @@ def main():
                     if process.poll() is None:
                         process.terminate()
                     raise RuntimeError(f'{name} failed: {terminal}; logs: {case}')
-                expected_bundle = {'macos': 'Some(App)', 'windows': 'Some(Nsis)', 'linux': 'Some(AppImage)'}[platform]
+                expected_bundle = {'app': 'Some(App)', 'nsis': 'Some(Nsis)', 'msi': 'Some(Msi)',
+                                   'appimage': 'Some(AppImage)', 'deb': 'Some(Deb)', 'rpm': 'Some(Rpm)'}[bundle]
                 starts = [e for e in events if e['event'] == 'started']
                 if not starts or any(e['detail'].get('bundleType') != expected_bundle for e in starts):
                     raise RuntimeError(f'{name}: installed app did not retain its native installer type')
@@ -290,14 +329,14 @@ def main():
                 time.sleep(0.1)
             if any(process_alive(pid) for pid in pids):
                 raise RuntimeError(f'{name}: native application did not exit after reporting success')
-            if platform == 'linux':
+            if bundle == 'appimage':
                 app.chmod(0o755)
             if mode != 'upgrade' and hashlib.sha256(executable.read_bytes()).hexdigest() != before_hash:
                 raise RuntimeError(f'{name}: failed update modified installed executable')
             result = {'scenario': name, 'status': 'passed', 'events': events, 'directory': str(case)}
             results.append(result)
             (root / 'results.json').write_text(json.dumps({'kind': 'isolated-native-smoke', 'platform': target,
-                'signingKey': 'ephemeral-test-key', 'officialAcceptance': False, 'results': results}, indent=2))
+                'installerType': bundle, 'signingKey': 'ephemeral-test-key', 'officialAcceptance': False, 'results': results}, indent=2))
         print(f'{len(results)} real native scenarios passed; official channel acceptance remains separate.', flush=True)
     finally:
         server.shutdown()

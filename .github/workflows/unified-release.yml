@@ -22,6 +22,10 @@ on:
         description: Only diagnose the Windows NSIS restart environment; no signing or release
         type: boolean
         default: false
+      native_upgrade_packages_only:
+        description: Test MSI, DEB and RPM with their actual package managers; never publish
+        type: boolean
+        default: false
       signing_preflight_only:
         description: Only verify the official signing key; do not build or publish
         type: boolean
@@ -31,7 +35,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: unified-release-${{ inputs.native_upgrade_lab_only && 'native-lab' || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
+  group: unified-release-${{ inputs.native_upgrade_lab_only && (inputs.native_upgrade_packages_only && 'native-packages' || 'native-lab') || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
   cancel-in-progress: false
 
 env:
@@ -48,6 +52,7 @@ jobs:
     with:
       windows_only: ${{ inputs.native_upgrade_windows_only || false }}
       windows_environment_probe_only: ${{ inputs.windows_environment_probe_only || false }}
+      package_installers_only: ${{ inputs.native_upgrade_packages_only || false }}
 
   signing-preflight:
     if: inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch')

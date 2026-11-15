@@ -9,6 +9,9 @@ on:
       windows_environment_probe_only:
         type: boolean
         default: false
+      package_installers_only:
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       windows_only:
@@ -17,10 +20,13 @@ on:
       windows_environment_probe_only:
         type: boolean
         default: false
+      package_installers_only:
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: native-upgrade-lab-${{ github.ref }}
+  group: native-upgrade-lab-${{ inputs.package_installers_only && 'packages' || 'default' }}-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   windows-environment-probe:
@@ -44,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.windows_only && '["windows-latest"]' || '["macos-15","macos-15-intel","windows-latest","ubuntu-22.04"]') }}
+        include: ${{ fromJSON(inputs.package_installers_only && '[{"os":"windows-latest","installer":"msi"},{"os":"ubuntu-22.04","installer":"deb"},{"os":"ubuntu-22.04","installer":"rpm"}]' || inputs.windows_only && '[{"os":"windows-latest","installer":"nsis"}]' || '[{"os":"macos-15","installer":"app"},{"os":"macos-15-intel","installer":"app"},{"os":"windows-latest","installer":"nsis"},{"os":"ubuntu-22.04","installer":"appimage"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -81,20 +87,34 @@ jobs:
           cargo test --release --locked --manifest-path src-tauri/Cargo.toml --lib --features updater-acceptance -- desktop_attribution creative_http::tests tuzi_account::creative::tests updater_acceptance::launch_profile_tests --test-threads=1
       - name: Install, reject corrupt packages, upgrade and restart isolated apps
         shell: bash
+        env:
+          LAB_INSTALLER: ${{ matrix.installer }}
         run: |
-          if [[ "$RUNNER_OS" == Linux ]]; then
-            xvfb-run -a python3 scripts/native-upgrade-lab.py --output "$RUNNER_TEMP/tuzi-upgrade-lab"
+          set -euo pipefail
+          if [[ "$LAB_INSTALLER" == rpm ]]; then
+            python3 scripts/native-upgrade-lab.py --installer rpm --build-only --output "$RUNNER_TEMP/tuzi-upgrade-lab"
+            docker run --rm --init \
+              -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE:ro" \
+              -v "$RUNNER_TEMP/tuzi-upgrade-lab:$RUNNER_TEMP/tuzi-upgrade-lab" \
+              -w "$GITHUB_WORKSPACE" \
+              -e GITHUB_ACTIONS=true -e GITHUB_REPOSITORY=AiW520/tuzi-switch \
+              -e LAB_ROOT="$RUNNER_TEMP/tuzi-upgrade-lab" \
+              fedora:43 bash scripts/native-upgrade-rpm-container.sh
+          elif [[ "$RUNNER_OS" == Linux ]]; then
+            xvfb-run -a python3 scripts/native-upgrade-lab.py --installer "$LAB_INSTALLER" --output "$RUNNER_TEMP/tuzi-upgrade-lab"
           else
-            python3 scripts/native-upgrade-lab.py --output "$RUNNER_TEMP/tuzi-upgrade-lab"
+            python3 scripts/native-upgrade-lab.py --installer "$LAB_INSTALLER" --output "$RUNNER_TEMP/tuzi-upgrade-lab"
           fi
       - name: Upload native evidence (never keys or synthetic credentials)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: native-upgrade-${{ matrix.os }}
+          name: native-upgrade-${{ matrix.os }}${{ inputs.package_installers_only && format('-{0}', matrix.installer) || '' }}
           path: |
             ${{ runner.temp }}/tuzi-upgrade-lab/results.json
             ${{ runner.temp }}/tuzi-upgrade-lab/build-*.log
+            ${{ runner.temp }}/tuzi-upgrade-lab/runtime-os-release.txt
+            ${{ runner.temp }}/tuzi-upgrade-lab/xvfb.log
             ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/*events.jsonl
             ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/*process.log
             ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/initial-install.log

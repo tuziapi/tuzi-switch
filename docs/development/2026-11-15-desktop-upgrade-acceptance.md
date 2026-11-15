@@ -172,3 +172,12 @@ run43679153103最终失败：Mac Intel也完成八场景；Windows NSIS前六场
 修复仅限updater-acceptance实验构建：Windows启动时从唯一显式参数恢复隔离目录，必须有固定合成标记、场景文件、目录内可执行文件和直属home，已有环境不能冲突；在任何应用存储初始化前执行。标记按固定字节写入，避免Windows文本换行转换。Mac/Linux保留原启动方式，正式包不包含入口。Windows重试移至篡改拒绝后立即进行，保留同安装目录与数据，避免后续场景改变NSIS单一注册安装路径；不重装旧包或手工启动新版。
 
 本机release四项目录校验通过（合法空格路径、缺标记/外部程序、相对路径/缺场景、home符号链接外逃）。Python编译、修改模块格式与工作流静态检查通过。完整Windows升级、自动重启与失败重试仍须云端复验，未标通过；正式候选实装门禁保持未通过。
+
+
+## MSI、DEB、RPM安装类型补验准备
+
+新增native_upgrade_packages_only/package_installers_only布尔输入（默认false），仅测试库选择MSI、DEB和RPM三个独立作业，输出installerType区分证据，不触发正式签名或发布。系统包实验仅允许GitHub测试库运行；使用QA身份、合成数据和临时签名，原安装器自动重启，不向正式包加入测试入口。
+
+MSI使用真实msiexec，独立场景间卸载已知QA包；签名拒绝后的重试紧接原场景且不重装。DEB在Ubuntu通过真实dpkg和插件提权安装；RPM在Fedora43独立容器中运行真实rpm，检查依赖，不使用--nodeps或伪装包管理器。包管理器场景保留独立home，验证运行时安装类型；清单只提供对应安装类型键，避免通用fallback掩盖选择错误。RPM构建与运行分离，build-only不能记为安装通过。新CLI参数installer/skip-build/build-only分别记录明确边界。
+
+本机Python编译、Shell语法、工作流actionlint及diff检查通过；各系统实装结果待云端运行。NSIS目录恢复复验43688535588仍独立运行，以实际SHA记证据。
