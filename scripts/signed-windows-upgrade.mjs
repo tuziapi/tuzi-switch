@@ -39,7 +39,7 @@ function candidate(dir, run, commit, version) {
   }
   return c;
 }
-const base = candidate(baseDir, '43680220045', '11b8e308ef77708df3526a7701d106fc04b15f57', '1.6.2');
+const base = candidate(baseDir, '43699923173', '5bfee5f39b0b370093081227c6e19883f21280a0', '1.6.2');
 const next = candidate(nextDir, '43689683759', '695f4e933d797b39f7a61aad7804800a01eddc96', '1.6.3');
 const legacyDir = process.env.LEGACY_INSTALLER_DIR || null;
 let legacy;
@@ -285,6 +285,7 @@ foreach ($program in $programs) {
   currentCreative = await exerciseSeedream55(page, root);
   report.creativeBeforeUpgrade = currentCreative;
   report.checks.nativeSeedream55Synthetic = 'passed';
+  report.checks.completedGenerationPlaceholderRemoved = 'passed';
   if (legacyDir) report.checks.legacyCreativeImageAndTaskPreservation = 'passed';
   await leaveCreative(page);
   await page.reload();

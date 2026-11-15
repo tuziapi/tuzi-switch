@@ -53,10 +53,17 @@ with (root / 'driver.log').open('w') as log:
             except OSError:
                 time.sleep(0.1)
         created = request('POST', '/session', {'capabilities': {'alwaysMatch': {
-            'browserName': 'MiniBrowser', 'webkitgtk:browserOptions': {'binary': executable}}}})
+            'webkitgtk:browserOptions': {'binary': executable, 'args': []}}}})
         session = created['sessionId']
         prefix = '/session/' + session
         request('POST', prefix + '/timeouts', {'script': 30000})
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            ready = request('POST', prefix + '/execute/sync', {'script': 'return Boolean(window.__TAURI_INTERNALS__ && document.body)', 'args': []})
+            if ready:
+                break
+            time.sleep(0.2)
+        assert ready, 'Actual application document must load before native IPC checks'
         identity = request('POST', prefix + '/execute/async', {'script': '''
 const done = arguments[arguments.length - 1];
 Promise.all([

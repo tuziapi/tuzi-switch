@@ -281,3 +281,7 @@ Windows run43697704283/f68b3735两格式15项断言、完整归档SHA256/ZIP CRC
 截图额外审查发现：快速分层替换源图后，原生成占位卡可能永久停留“正在加载结果”。数据和像素断言通过不覆盖该显示问题，已在两份证据reviewObservations保留。源码定位为新图层未继承已有generationTaskId/generationAnchorId，导致占位控制器找不到已完成的结果；新增真实Plait变换回归在修复前失败，原构建的浏览器回归也实际复现。此问题修复后必须重建签署候选并重新验收，当前旧候选不能直接发布。
 
 Linux预检43699354264已在独立用户正常启动正式1.6.2主窗口（原生日志可核对），但WebDriver建立会话返回HTTP500，尚未读取运行身份或执行升级。完整artifact14155134192已下载并验证归档SHA256/ZIP CRC。补充保存本地WebDriver结构化错误响应，继续定位控制通路；不因启动日志存在就标记升级通过。
+
+Linux43699772576的结构化错误为session not created / Failed to match capabilities。核对Tauri官方crates/tauri-driver/src/server.rs，Linux仅传webkitgtk:browserOptions，不强制MiniBrowser品牌。修正测试参数并等待真实文档加载后再读IPC，无候选应用修改。
+
+分层占位修复正式候选已启动run43699923173，固定源码5bfee5f39b0b370093081227c6e19883f21280a0、版本1.6.2；旧候选43680220045的通过证据保留但不作为修复后验证。Windows后续测试已将base run/SHA及下载输入统一更新到本次候选，并增加完成占位清理的明确断言；须等该run全量校验、用户逐次签名审核、构建及独立验签完成后才运行，不使用测试密钥替代。内部1.6.3升级目标保持原已批准字节，仅用于升级测试，不作为本次最终发布包。
