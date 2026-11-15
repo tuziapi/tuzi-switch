@@ -1,4 +1,4 @@
-name: Installed signed macOS candidate control probe
+name: Real signed macOS candidate upgrade
 on:
   workflow_call:
 permissions:
@@ -16,7 +16,7 @@ jobs:
           - os: macos-15-intel
             platform: macos-x64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,43 +29,34 @@ jobs:
           repository: AiW520/tuzi-switch
           run-id: 43699923173
           github-token: ${{ github.token }}
-      - name: Verify approved immutable source and signed Mac bytes
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          path: ${{ runner.temp }}/signed-target
+          repository: AiW520/tuzi-switch
+          run-id: 43689683759
+          github-token: ${{ github.token }}
+      - name: Verify approved immutable sources and both Mac signatures
         env:
           GH_TOKEN: ${{ github.token }}
-          CANDIDATE_PLATFORM: ${{ matrix.platform }}
         run: |
           gh api repos/AiW520/tuzi-switch/actions/runs/43699923173 > "$RUNNER_TEMP/base-run.json"
-          node --input-type=module <<'JS'
-          import fs from 'node:fs'; import path from 'node:path';
-          import assert from 'node:assert/strict'; import {createHash} from 'node:crypto';
-          import {verifySignature} from './scripts/updater-assets.mjs';
-          const dir=path.join(process.env.RUNNER_TEMP,'signed-base');
-          const c=JSON.parse(fs.readFileSync(path.join(dir,'candidate.json')));
-          const r=JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP,'base-run.json')));
-          assert.equal(r.conclusion,'success'); assert.equal(r.head_sha,c.commit);
-          assert.equal(r.path,'.github/workflows/unified-release.yml');
-          assert.equal(c.commit,'5bfee5f39b0b370093081227c6e19883f21280a0');
-          assert.equal(c.repository,'AiW520/tuzi-switch'); assert.equal(c.releaseRepository,'tuziapi/tuzi-switch');
-          assert.equal(c.runId,'43699923173'); assert.equal(c.tag,'v1.6.2');
-          const key=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).plugins.updater.pubkey;
-          assert.equal(createHash('sha256').update(key.trim()).digest('hex'),c.publicKeySha256);
-          for(const [name,digest] of Object.entries(c.files)) {
-            assert.equal(path.basename(name),name);
-            assert.equal(createHash('sha256').update(fs.readFileSync(path.join(dir,name))).digest('hex'),digest);
-          }
-          const file=path.join(dir,'tuzi-assistant-'+process.env.CANDIDATE_PLATFORM+'.app.tar.gz');
-          verifySignature(fs.readFileSync(file),fs.readFileSync(file+'.sig','utf8'),key);
-          JS
-      - name: Launch real installed app and inspect existing UI permissions
+          gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
+          node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP" macos
+      - name: Exercise original installed app with existing Accessibility permissions
         env:
           CANDIDATE_PLATFORM: ${{ matrix.platform }}
-        run: python3 scripts/signed-macos-driver-probe.py "$RUNNER_TEMP/signed-base" "$RUNNER_TEMP/signed-macos/evidence" "$CANDIDATE_PLATFORM"
+        run: |
+          export TUZI_TEST_OPENSSL="$(brew --prefix openssl@3)/bin/openssl"
+          python3 scripts/signed-macos-upgrade.py "$RUNNER_TEMP/signed-base" "$RUNNER_TEMP/signed-target" "$RUNNER_TEMP/signed-macos/evidence" "$CANDIDATE_PLATFORM"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: signed-installed-macos-probe-${{ matrix.platform }}
+          name: signed-installed-macos-${{ matrix.platform }}
           path: |
             ${{ runner.temp }}/signed-macos/evidence/results.json
             ${{ runner.temp }}/signed-macos/evidence/application.log
             ${{ runner.temp }}/signed-macos/evidence/*.png
+            ${{ runner.temp }}/signed-macos/evidence/*.ax.txt
+            ${{ runner.temp }}/signed-macos/evidence/server.log
           if-no-files-found: warn

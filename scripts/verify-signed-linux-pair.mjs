@@ -1,10 +1,12 @@
-// Verify both immutable candidates before any installed Linux UI experiment.
+// Verify both immutable candidates before an installed desktop UI experiment.
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { verifySignature } from './updater-assets.mjs';
 const root = process.argv[2];
+const platform = process.argv[3] ?? 'linux';
+assert.ok(['linux', 'macos'].includes(platform));
 const key = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')).plugins.updater.pubkey;
 for (const [folder, runFile, id, sha, version] of [
   ['signed-base', 'base-run.json', '43699923173', '5bfee5f39b0b370093081227c6e19883f21280a0', '1.6.2'],
@@ -25,9 +27,11 @@ for (const [folder, runFile, id, sha, version] of [
     assert.equal(path.basename(name), name);
     assert.equal(createHash('sha256').update(fs.readFileSync(path.join(dir, name))).digest('hex'), digest);
   }
-  for (const extension of ['deb', 'AppImage', 'rpm']) {
-    const file = path.join(dir, 'tuzi-assistant-linux-x64.' + extension);
+  for (const name of platform === 'linux'
+    ? ['deb', 'AppImage', 'rpm'].map(extension => 'tuzi-assistant-linux-x64.' + extension)
+    : ['macos-arm64', 'macos-x64'].map(arch => 'tuzi-assistant-' + arch + '.app.tar.gz')) {
+    const file = path.join(dir, name);
     verifySignature(fs.readFileSync(file), fs.readFileSync(file + '.sig', 'utf8'), key);
   }
 }
-console.log('Both signed Linux candidates match their approved runs, source, all bytes and signatures');
+console.log('Both signed desktop candidates match their approved runs, source, all bytes and signatures');

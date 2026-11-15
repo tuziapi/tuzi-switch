@@ -39,7 +39,7 @@ on:
         type: boolean
         default: false
       signed_candidate_macos_probe_only:
-        description: Inspect unchanged signed Mac UI control in disposable hosted runners; never publish
+        description: Test unchanged signed Mac UI and automatic upgrades in disposable hosted runners; never publish
         type: boolean
         default: false
       signed_candidate_linux_probe_only:
