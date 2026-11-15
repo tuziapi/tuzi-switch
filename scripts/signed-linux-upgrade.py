@@ -1,16 +1,16 @@
-"""Exercise unchanged signed DEB bytes through the actual installed WebKit UI.
+"""Exercise unchanged signed Linux bytes through the actual installed WebKit UI.
 
 Only runs as root on the disposable test-repository runner. The app remains an
 unprivileged, network-blocked user. Discovery/TLS are local; signatures and the
 package manager are real. This is a subset, never a release acceptance record.
 """
-import base64
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import socket
 import ssl
 import subprocess
@@ -25,7 +25,9 @@ assert sys.platform == 'linux' and os.geteuid() == 0
 assert os.environ.get('GITHUB_ACTIONS') == 'true'
 assert os.environ.get('GITHUB_REPOSITORY') == 'AiW520/tuzi-switch'
 assert os.environ.get('RUNNER_ENVIRONMENT') == 'github-hosted'
-base_dir, target_dir, output = map(Path, sys.argv[1:])
+base_dir, target_dir, output = map(Path, sys.argv[1:4])
+installer = sys.argv[4] if len(sys.argv) > 4 else 'deb'
+assert installer in ['deb', 'appimage']
 base = json.loads((base_dir / 'candidate.json').read_text())
 target = json.loads((target_dir / 'candidate.json').read_text())
 assert (base['runId'], base['commit'], base['tag']) == ('43699923173', '5bfee5f39b0b370093081227c6e19883f21280a0', 'v1.6.2')
@@ -39,10 +41,16 @@ output.mkdir(parents=True, exist_ok=True)
 lab = output.parent
 username = 'tuziupgrade'
 uid = int(subprocess.check_output(['id', '-u', username]))
+gid = int(subprocess.check_output(['id', '-g', username]))
 assert not (Path('/home') / username / '.tuzi-switch').exists(), 'Fresh disposable user required'
-executable = Path('/usr/bin/tu-zi-switch')
-asset = 'tuzi-assistant-linux-x64.deb'
-report = dict(kind='real-installed-linux-subset', officialAcceptance=False, installerType='deb',
+executable = Path('/usr/bin/tu-zi-switch') if installer == 'deb' else lab/'installed'/'Tuzi.AppImage'
+asset = 'tuzi-assistant-linux-x64.' + ('deb' if installer == 'deb' else 'AppImage')
+if installer == 'appimage':
+    executable.parent.mkdir()
+    shutil.copyfile(base_dir/asset, executable)
+    executable.chmod(0o755)
+    executable.parent.chmod(0o555)
+report = dict(kind='real-installed-linux-subset', officialAcceptance=False, installerType=installer,
               discovery='synthetic-local-https', signingKey='new-official-channel-key',
               base=base, target=target, checks={}, requests=[], remaining=[
                   'published-old-version-manual-transition', 'creative-project-migration',
@@ -66,8 +74,15 @@ def application_processes():
         if not proc.name.isdigit():
             continue
         try:
-            if proc.stat().st_uid == uid and str((proc / 'exe').readlink()).removesuffix(' (deleted)') == str(executable):
+            if proc.stat().st_uid != uid:
+                continue
+            process_exe = str((proc/'exe').readlink()).removesuffix(' (deleted)')
+            if installer == 'deb' and process_exe == str(executable):
                 found.append(int(proc.name))
+            elif installer == 'appimage' and Path(process_exe).name == 'tu-zi-switch':
+                process_environment = (proc/'environ').read_bytes().split(b'\0')
+                if ('APPIMAGE=' + str(executable)).encode() in process_environment:
+                    found.append(int(proc.name))
         except (FileNotFoundError, PermissionError, ProcessLookupError):
             pass
     return found
@@ -174,7 +189,7 @@ class Handler(BaseHTTPRequestHandler):
         if host == 'api.github.com' and self.path == '/repos/tuziapi/tuzi-switch/releases/latest':
             release = dict(tag_name=target['tag'], draft=False, prerelease=False,
                            html_url='https://github.com/tuziapi/tuzi-switch/releases/tag/' + target['tag'],
-                           published_at='2026-11-15T00:00:00Z', body='SYNTHETIC discovery for signed DEB testing',
+                           published_at='2026-11-15T00:00:00Z', body='SYNTHETIC discovery for signed ' + installer + ' testing',
                            assets=[dict(name=name, state='uploaded', size=(target_dir/name).stat().st_size,
                                         digest='sha256:' + digest,
                                         browser_download_url='https://github.com/tuziapi/tuzi-switch/releases/download/' + target['tag'] + '/' + name)
@@ -234,6 +249,8 @@ try:
     # No application/IPC overrides or insecure TLS flags. Only documented WebKit automation.
     app_env = ['TAURI_WEBVIEW_AUTOMATION=true', 'WEBKIT_DISABLE_DMABUF_RENDERER=1',
                'WEBKIT_DISABLE_COMPOSITING_MODE=1', 'XDG_RUNTIME_DIR=' + str(lab/'runtime')]
+    if installer == 'appimage':
+        app_env.append('APPIMAGE_EXTRACT_AND_RUN=1')
     log = (output/'driver.log').open('w')
     driver = subprocess.Popen(['sudo', '-H', '-u', username, 'env', '-i', 'HOME=/home/' + username,
                               'USER=' + username, 'PATH=/usr/bin:/bin', *app_env,
@@ -272,20 +289,30 @@ localStorage.setItem('SYNTHETIC-SIGNED-LINUX','preserve-me');done(true)},e=>done
     wait_for(lambda: buttons(['重启并更新']), 'Native signature did not verify', 120)
     screenshot('03-signature-verified')
     # Valid signed package, actual denied OS privileges. No invalid-format substitute.
+    if installer == 'appimage':
+        assert subprocess.run(['sudo', '-u', username, 'test', '-w', str(executable.parent)]).returncode != 0
     click(['重启并更新'])
     wait_for(lambda: buttons(['重新下载']), 'Expected package-manager permission failure', 60)
     assert digest_executable() == before_hash
     identity('1.6.2', base['commit'])
-    permission_diagnostics = (output/'driver.log').read_text(errors='replace')
-    denial = re.findall(r'[^\n]*(?:not in the sudoers|a password is required|a terminal is required|no tty present|No authentication agent)[^\n]*', permission_diagnostics, flags=re.IGNORECASE)
-    assert denial, 'Installation rejection must include actual OS authorization diagnostics'
-    report['installPermissionDiagnostics'] = denial
+    if installer == 'deb':
+        permission_diagnostics = (output/'driver.log').read_text(errors='replace')
+        denial = re.findall(r'[^\n]*(?:not in the sudoers|a password is required|a terminal is required|no tty present|No authentication agent)[^\n]*', permission_diagnostics, flags=re.IGNORECASE)
+        assert denial, 'Installation rejection must include actual OS authorization diagnostics'
+        report['installPermissionDiagnostics'] = denial
+    else:
+        report['installPermissionDiagnostics'] = ['Root-owned directory mode 0555; actual unprivileged test -w was denied; signed bytes and running old process remained unchanged.']
     report['checks']['validPackageInstallPermissionDenied'] = 'passed'
     screenshot('04-install-permission-denied')
     # Grant only the real updater dpkg command on this disposable user/VM, then retry.
-    sudoers.write_text(username + ' ALL=(root) NOPASSWD: /usr/bin/dpkg -i /tmp/tauri_rpm_update*/package.rpm\n')
-    sudoers.chmod(0o440)
-    subprocess.run(['visudo', '-cf', str(sudoers)], check=True, stdout=subprocess.DEVNULL)
+    if installer == 'deb':
+        sudoers.write_text(username + ' ALL=(root) NOPASSWD: /usr/bin/dpkg -i /tmp/tauri_rpm_update*/package.rpm\n')
+        sudoers.chmod(0o440)
+        subprocess.run(['visudo', '-cf', str(sudoers)], check=True, stdout=subprocess.DEVNULL)
+    else:
+        os.chown(executable.parent, uid, gid)
+        executable.parent.chmod(0o755)
+        assert subprocess.run(['sudo', '-u', username, 'test', '-w', str(executable.parent)]).returncode == 0
     click(['重新下载'])
     wait_for(lambda: buttons(['重启并更新']), 'Retry signature did not verify', 120)
     click(['重启并更新'])
@@ -308,6 +335,9 @@ preference:localStorage.getItem('SYNTHETIC-SIGNED-LINUX')}),e=>done({error:Strin
     assert preserved['providers'][fixture['id']]['name'] == fixture['name']
     assert preserved['preference'] == 'preserve-me'
     report['finalExecutableSha256'] = digest_executable()
+    if installer == 'appimage':
+        assert report['initialExecutableSha256'] == base['files'][asset]
+        assert report['finalExecutableSha256'] == target['files'][asset]
     report['checks'].update({k: 'passed' for k in ['download', 'nativeSignature', 'install', 'automaticRestart', 'version', 'sqliteProviderAndWebviewPreference', 'sameInstallationRetry']})
     screenshot('05-automatically-restarted')
     report['subsetStatus'] = 'passed'
@@ -324,10 +354,11 @@ window.__TAURI_INTERNALS__.invoke('plugin:updater|check',{timeout:10000}).then(r
             report['diagnosticError'] = str(diagnostic)
     raise
 finally:
-    package_owner = subprocess.run(['dpkg-query', '-S', str(executable)], capture_output=True, text=True).stdout.strip()
-    report['installedPackageOwner'] = package_owner
-    if package_owner:
-        report['finalPackageVersion'] = subprocess.run(['dpkg-query', '-W', '-f=${Version}', package_owner.split(': ')[0]], capture_output=True, text=True).stdout
+    if installer == 'deb':
+        package_owner = subprocess.run(['dpkg-query', '-S', str(executable)], capture_output=True, text=True).stdout.strip()
+        report['installedPackageOwner'] = package_owner
+        if package_owner:
+            report['finalPackageVersion'] = subprocess.run(['dpkg-query', '-W', '-f=${Version}', package_owner.split(': ')[0]], capture_output=True, text=True).stdout
     if server:
         server.shutdown()
         server.server_close()

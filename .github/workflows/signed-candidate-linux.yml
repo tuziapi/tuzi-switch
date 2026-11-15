@@ -9,6 +9,10 @@ jobs:
     if: github.repository == 'AiW520/tuzi-switch'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        installer: [deb, appimage]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -58,8 +62,10 @@ jobs:
               assert.equal(path.basename(name),name);
               assert.equal(createHash('sha256').update(fs.readFileSync(path.join(dir,name))).digest('hex'),digest);
             }
-            const file=path.join(dir,'tuzi-assistant-linux-x64.deb');
-            verifySignature(fs.readFileSync(file),fs.readFileSync(file+'.sig','utf8'),key);
+            for(const extension of ['deb','AppImage']) {
+              const file=path.join(dir,'tuzi-assistant-linux-x64.'+extension);
+              verifySignature(fs.readFileSync(file),fs.readFileSync(file+'.sig','utf8'),key);
+            }
           }
           JS
       - name: Install candidate and create offline disposable desktop user
@@ -94,10 +100,12 @@ jobs:
           # verifies denied privileges then the real updater's sudo fallback.
           ! command -v zenity
           ! command -v kdialog
-      - name: Exercise real signed DEB UI, failures, install and automatic restart
+      - name: Exercise real signed Linux UI, failures, install and automatic restart
+        env:
+          INSTALLER_TYPE: ${{ matrix.installer }}
         run: |
           sudo env GITHUB_ACTIONS=true GITHUB_REPOSITORY=AiW520/tuzi-switch RUNNER_ENVIRONMENT=github-hosted \
-            python3 scripts/signed-linux-upgrade.py "$RUNNER_TEMP/signed-base" "$RUNNER_TEMP/signed-target" /tmp/tuzi-signed-linux-upgrade/evidence
+            python3 scripts/signed-linux-upgrade.py "$RUNNER_TEMP/signed-base" "$RUNNER_TEMP/signed-target" /tmp/tuzi-signed-linux-upgrade/evidence "$INSTALLER_TYPE"
       - name: Stop disposable applications and restore network rules
         if: always()
         run: |
@@ -111,7 +119,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: signed-installed-linux-driver-probe
+          name: signed-installed-linux-driver-probe-${{ matrix.installer }}
           path: |
             /tmp/tuzi-signed-linux-probe/evidence/results.json
             /tmp/tuzi-signed-linux-probe/evidence/driver.log
@@ -120,7 +128,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: signed-installed-linux-deb
+          name: signed-installed-linux-${{ matrix.installer }}
           path: |
             /tmp/tuzi-signed-linux-upgrade/evidence/results.json
             /tmp/tuzi-signed-linux-upgrade/evidence/driver.log
