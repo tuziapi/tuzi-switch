@@ -31,6 +31,32 @@
       ]
     },
     {
+      "scenario": "interrupted-download",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "error decoding response body",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
       "scenario": "missing-package",
       "status": "passed",
       "events": [
@@ -57,7 +83,7 @@
       ]
     },
     {
-      "scenario": "invalid-archive",
+      "scenario": "install-failure",
       "status": "passed",
       "events": [
         {
@@ -169,9 +195,53 @@
           }
         }
       ]
+    },
+    {
+      "scenario": "retry-after-signature-rejection",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 26129651
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ]
     }
   ],
   "scope": "macOS ARM64 full application native updater with synthetic data; not official release-byte acceptance",
   "baseCommit": "ca378b869422b18f7b11c72b735ee8990dfb6a8b",
-  "sourceState": "UP-03 worktree during implementation; exact final source will be verified in test-repository runs"
+  "sourceState": "Local binaries built during UP-03 implementation; expanded eight-scenario runner at ce7d9ab0f5bc3d18afc6f01c013cb4c722175187 used --skip-build. Not final-commit or official candidate-byte acceptance."
 }

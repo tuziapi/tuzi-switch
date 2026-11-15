@@ -9,6 +9,12 @@ export const platforms = [
   "windows-x64",
   "linux-x64",
 ];
+export const installerTypes = {
+  "macos-arm64": ["app"],
+  "macos-x64": ["app"],
+  "windows-x64": ["nsis", "msi"],
+  "linux-x64": ["appimage", "deb", "rpm"],
+};
 const checks = [
   "download",
   "signature",
@@ -119,6 +125,17 @@ export function verify(dir, evidence, expected) {
       !checks.every((key) => p.checks?.[key] === "passed")
     )
       fail(`Incomplete real upgrade acceptance: ${name}`);
+    const installers = p.installers;
+    if (!Array.isArray(installers) || installers.length !== installerTypes[name].length)
+      fail(`All shipped installer types require native acceptance: ${name}`);
+    for (const type of installerTypes[name]) {
+      const matches = installers.filter((i) => i.type === type);
+      const installation = matches[0];
+      if (matches.length !== 1 || installation.status !== "passed"
+        || !installation.evidence?.trim()
+        || !checks.every((key) => installation.checks?.[key] === "passed"))
+        fail(`Incomplete installer acceptance: ${name}/${type}`);
+    }
   }
   return c;
 }

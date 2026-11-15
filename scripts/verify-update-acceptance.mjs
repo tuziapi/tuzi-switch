@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { candidate, verify, platforms } from "./update-acceptance.mjs";
+import { candidate, verify, platforms, installerTypes } from "./update-acceptance.mjs";
 
 function fixture(fn) {
   const dir = fs.mkdtempSync(
@@ -50,6 +50,14 @@ function fixture(fn) {
         ),
       })),
     };
+    for (const p of evidence.platforms) {
+      p.installers = installerTypes[p.platform].map((type) => ({
+        type,
+        status: "passed",
+        evidence: "SYNTHETIC INSTALLER TEST RECORD",
+        checks: { ...p.checks },
+      }));
+    }
     fn(dir, evidence, c);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -92,5 +100,18 @@ test("rejects changed evidence file list, downgrade and missing analytics check"
       const copy = structuredClone(e);
       change(copy);
       assert.throws(() => verify(d, copy, c));
+    }
+  }));
+test("rejects missing installer types and untested install paths", () =>
+  fixture((d, e, c) => {
+    for (const change of [
+      (x) => delete x.platforms[0].installers,
+      (x) => x.platforms[2].installers.pop(),
+      (x) => (x.platforms[3].installers[2] = x.platforms[3].installers[0]),
+      (x) => (x.platforms[2].installers[1].checks.restart = "pending"),
+    ]) {
+      const copy = structuredClone(e);
+      change(copy);
+      assert.throws(() => verify(d, copy, c), /installer/i);
     }
   }));

@@ -13,7 +13,7 @@
 
 1. 统一构建流水线只生成签名候选包；push tag 也不再自动发布。候选文件记录仓库、源码 SHA、run、版本及每个文件 SHA256。缺密钥/签名/平台产物继续失败。
 2. 独立 `promote-desktop-release.yml` 只接受正式 main 上的人工触发，核对候选 run、tag、源码、签名和每个已测试文件的 SHA256；从原 run 下载候选文件，绝不重新打包被测试的安装包。版本必须严格递增，不重写已发布版本。
-3. 发布必须有 `docs/development/update-acceptance/v<version>.json` 的已审阅真实验收记录。四个平台均要求从较旧版本安装升级，包含下载、签名、安装、重启、版本、数据保留、坏包、网络故障、安装失败、重试和经营归因。合成 UI、单元、构建成功、临时测试密钥的原生实验均不能代填 passed。
+3. 发布必须有 `docs/development/update-acceptance/v<version>.json` 的已审阅真实验收记录。四个平台及其全部安装类型（macOS app、Windows NSIS/MSI、Linux AppImage/DEB/RPM）均要求从较旧版本安装升级，包含下载、签名、安装、重启、版本、数据保留、坏包、网络故障、安装失败、重试和经营归因。合成 UI、单元、构建成功、临时测试密钥的原生实验均不能代填 passed。
 4. 原来正式应用中可由命令行直接绕过交互触发安装的验证入口移入 `updater-acceptance` feature（依赖 isolated-profile），并要求固定 QA 应用身份、独立 home、loopback 地址。正式构建不包含该入口。
 5. 新 `native-upgrade-lab.py` 构建0.0.1/0.0.2两个隔离应用，使用临时测试签名，通过真实插件下载、验签、替换与重启。验证真实应用数据库中的合成供应商及外部合成文件保留；失败场景校验旧可执行文件哈希不变。结果为原生实验，不是正式候选包验收。
 
@@ -30,13 +30,13 @@ Umami 页面/操作统计仍保留，属于尽力上报，不等于 API 经营/�
 - CI `native_upgrade_lab_only`：bool，默认false；仅测试库调用隔离实验，其他构建/发布跳过。
 - 原 `signing_preflight_only`：默认false；扩展到两仓各自现有公私钥配对，互不复制凭证；不得与正式发布组合。
 - 原 `publish` 输入移除，发布改用独立流程的必填 `tag`、`candidate_run_id`。旧手工命令必须更新，不能绕过验收。
-- candidate/evidence `schemaVersion=1`；仓库、commit、runId、tag、files 必须全部填写并与候选相同；证据另含 status、signingKey、reviewer、completedAt及四平台记录。缺失/待验收即拒绝。
+- candidate/evidence `schemaVersion=1`；仓库、commit、runId、tag、files 必须全部填写并与候选相同；证据另含 status、signingKey、reviewer、completedAt及四平台记录；每个平台必须补齐 installers 数组，包含该平台全部 type、status、evidence、checks。缺失/待验收即拒绝。
 - `updater-acceptance` 默认关闭；QA应用标识 `com.tuziswitch.desktop.update-qa`，工具 home 与真实安装分离，临时私钥不提交或上传。
 
 ## 验证记录（持续更新）
 
 - 宿主全量：99文件839测试通过；类型检查、完整 renderer 构建通过。
-- 候选绑定与签名脚本：10测试通过。首次 node:test 文件被 Vitest 扫描而产生1个空suite，改为独立 verify 脚本命名后完整重跑通过。
+- 候选绑定与签名脚本：11测试通过（含逐安装类型漏验拒绝）。首次 node:test 文件被 Vitest 扫描而产生1个空suite，改为独立 verify 脚本命名后完整重跑通过。
 - API `go test ./middleware ./model -run 'TestClient(Channel|Source)' -count=1` 通过，仅本机合成数据。
 - 原生构建、实装实验、测试库四平台流程及签名配对：执行中，结果后续追加；正式密钥、正式旧包到候选包、四平台正式验收及发布均未完成。
 
@@ -47,7 +47,9 @@ Umami 页面/操作统计仍保留，属于尽力上报，不等于 API 经营/�
 ## 首轮本机结果与候选版本
 
 - 候选版本设置为1.6.2，package/Tauri/Cargo/Cargo.lock同步；直接编辑版本，不执行会自动推送的npm version/postversion，不创建正式tag。
-- 本机 macOS ARM64 完整原生应用6场景通过：签名篡改拒绝、下载404、验签成功但归档损坏拒绝、同版本、降级，以及0.0.1→0.0.2下载验签/安装/自动重启/数据保留。证据见 [本机实验](evidence/2026-11-15-native-upgrade-macos.json)。该构建为实现过程中的隔离应用，不是正式候选字节验收。
+- 本机 macOS ARM64 完整原生应用8场景通过：签名篡改拒绝、下载中断、下载404、验签成功但归档损坏拒绝、同版本、降级、0.0.1→0.0.2下载验签/安装/自动重启/数据保留，以及验签失败后在同一安装目录重试成功。证据见 [本机实验](evidence/2026-11-15-native-upgrade-macos.json)。该构建为实现过程中的隔离应用，不是正式候选字节验收。
 - 正式release编译配置的原生归因6项、手动HTTP6项、账户原生HTTP/媒体13项通过（筛选有交集，不合并计数）。账户请求在真实本机HTTP服务端断言唯一ch=3，手动请求同时核对字节体和认证Header不变。
 - 测试库run `43668308038` 成功，使用其现有Secret实际签署合成探针并通过该库现有公钥验证，10项签名/候选校验通过；没有读取/替换正式私钥。
 - 四平台首轮实验在补充下载中断/同安装重试与编译缓存复用后主动取消，随后只在更新后的测试分支重跑。取消的run不算通过。
+
+- 补充收紧：Windows/Linux 实验按版本精确选择安装包，避免共享构建目录的新旧包混选；正式验收门禁逐项要求 NSIS/MSI 和 AppImage/DEB/RPM，不能以单一安装格式代表整个平台。当前隔离实验仅覆盖 NSIS/AppImage，不宣称另三种安装格式通过。

@@ -80,7 +80,9 @@ def main():
         if platform == 'macos':
             shutil.copytree(bundles / 'macos/Tuzi Update QA.app', saved, symlinks=True)
         else:
-            produced = list((bundles / bundle).glob('*-setup.exe' if platform == 'windows' else '*.AppImage'))
+            # Both versions share the Cargo cache; select this version explicitly.
+            pattern = f'*_{version}_*-setup.exe' if platform == 'windows' else f'*_{version}_*.AppImage'
+            produced = list((bundles / bundle).glob(pattern))
             if len(produced) != 1:
                 raise RuntimeError('Expected exactly one native installer')
             shutil.copy2(produced[0], saved)
