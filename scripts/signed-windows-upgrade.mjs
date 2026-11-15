@@ -42,13 +42,19 @@ function candidate(dir, run, commit, version) {
 const base = candidate(baseDir, '43699923173', '5bfee5f39b0b370093081227c6e19883f21280a0', '1.6.2');
 const next = candidate(nextDir, '43689683759', '695f4e933d797b39f7a61aad7804800a01eddc96', '1.6.3');
 const legacyDir = process.env.LEGACY_INSTALLER_DIR || null;
+const legacyVersion = process.env.LEGACY_VERSION || '1.6.0';
+const legacySources = {
+  '1.6.0': { manifestSha256: 'ab7eb20f36407dfa80631f855cf68633f7876ee5b7b72b930326579c15ec6599', commit: '21cad50c7f5b916b94bccf39c6d594724241bfb1' },
+  '1.6.1': { manifestSha256: 'd53747e8c479ebad6cadba2046627f871d59f12c2696521a787f0d723d16a19f', commit: '7c13bc943a4b7116af15593ec0ac18af0ba9727f' },
+};
 let legacy;
 if (legacyDir) {
+  assert.ok(Object.hasOwn(legacySources, legacyVersion));
   const manifestBytes = fs.readFileSync(path.join(legacyDir, 'manifest-windows-x64.json'));
-  assert.equal(sha(manifestBytes), 'ab7eb20f36407dfa80631f855cf68633f7876ee5b7b72b930326579c15ec6599');
+  assert.equal(sha(manifestBytes), legacySources[legacyVersion].manifestSha256);
   legacy = JSON.parse(manifestBytes);
-  assert.equal(legacy.repository, 'tuziapi/tuzi-switch'); assert.equal(legacy.version, '1.6.0');
-  assert.equal(legacy.commit, '21cad50c7f5b916b94bccf39c6d594724241bfb1');
+  assert.equal(legacy.repository, 'tuziapi/tuzi-switch'); assert.equal(legacy.version, legacyVersion);
+  assert.equal(legacy.commit, legacySources[legacyVersion].commit);
   for (const file of legacy.files) {
     assert.equal(path.basename(file.file), file.file);
     assert.equal(sha(fs.readFileSync(path.join(legacyDir, file.file))), file.sha256);
@@ -180,7 +186,7 @@ foreach ($program in $programs) {
         const body = JSON.parse(Buffer.concat(chunks).toString());
         const response = syntheticModelResponse(body);
         const channels = url.searchParams.getAll('ch');
-        if (activeVersion !== '1.6.0') assert.deepEqual(channels, ['3'], 'Official native model request must identify desktop channel once');
+        if (activeVersion === '1.6.2' || activeVersion === '1.6.3') assert.deepEqual(channels, ['3'], 'Official native model request must identify desktop channel once');
         report.creativeRequests.push({ version: activeVersion, path: url.pathname, channels, body, syntheticAuthorizationMatched: true });
         res.end(JSON.stringify(response)); return;
       } catch (error) {
@@ -241,10 +247,10 @@ foreach ($program in $programs) {
   }
   if (legacyDir) {
     manualInstall(legacyDir);
-    activeVersion = '1.6.0';
+    activeVersion = legacyVersion;
     const old = manualLaunch();
-    const oldPage = await connect('1.6.0', 60000);
-    report.legacyIdentity = await identity(oldPage, '1.6.0', legacy.commit);
+    const oldPage = await connect(legacyVersion, 60000);
+    report.legacyIdentity = await identity(oldPage, legacyVersion, legacy.commit);
     await acknowledgeWelcome(oldPage);
     await seed(oldPage);
     await assertPreserved(oldPage);
@@ -278,7 +284,7 @@ foreach ($program in $programs) {
     await assertPreserved(page);
     await verifyCreativePreserved(page, legacyCreative, root, 'manual-transition');
     assert.notEqual(beforeHash, report.legacyExecutableSha256);
-    report.manualTransition = { status: 'passed', fromVersion: '1.6.0', toVersion: '1.6.2', publishedSource: legacy, sqliteProviderAndWebviewPreference: 'passed' };
+    report.manualTransition = { status: 'passed', fromVersion: legacyVersion, toVersion: '1.6.2', publishedSource: legacy, sqliteProviderAndWebviewPreference: 'passed' };
     report.checks.manualTransition = 'passed';
     report.remaining = report.remaining.filter(check => check !== 'older-official-manual-transition');
   } else await seed(page);

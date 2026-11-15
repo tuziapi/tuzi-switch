@@ -17,6 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         installer: [nsis, msi]
+        legacy: ${{ inputs.manual_transition && fromJSON('["1.6.0","1.6.1"]') || fromJSON('["none"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,8 +60,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          LEGACY_VERSION: ${{ matrix.legacy }}
         run: |
-          gh release download v1.6.0 -R tuziapi/tuzi-switch --dir "$RUNNER_TEMP/signed-legacy" --pattern 'tuzi-assistant-windows-x64.exe' --pattern 'tuzi-assistant-windows-x64.msi' --pattern 'manifest-windows-x64.json'
+          gh release download "v$LEGACY_VERSION" -R tuziapi/tuzi-switch --dir "$RUNNER_TEMP/signed-legacy" --pattern 'tuzi-assistant-windows-x64.exe' --pattern 'tuzi-assistant-windows-x64.msi' --pattern 'manifest-windows-x64.json'
       - name: Install browser control client only
         shell: bash
         run: npm install --prefix "$RUNNER_TEMP/tuzi-candidate-tools" --ignore-scripts --no-package-lock playwright-core@1.55.1
@@ -68,6 +70,7 @@ jobs:
         shell: pwsh
         env:
           INSTALLER_TYPE: ${{ matrix.installer }}
+          LEGACY_VERSION: ${{ matrix.legacy }}
           LEGACY_INSTALLER_DIR: ${{ inputs.manual_transition && format('{0}/signed-legacy', runner.temp) || '' }}
         run: |
           $env:PLAYWRIGHT_MODULE = Join-Path $env:RUNNER_TEMP 'tuzi-candidate-tools/node_modules/playwright-core'
@@ -77,7 +80,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: signed-installed-windows-${{ matrix.installer }}
+          name: signed-installed-windows-${{ matrix.installer }}-from-${{ matrix.legacy }}
           path: |
             ${{ runner.temp }}/signed-windows-evidence/results.json
             ${{ runner.temp }}/signed-windows-evidence/*.png

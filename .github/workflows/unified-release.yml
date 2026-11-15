@@ -35,7 +35,7 @@ on:
         type: boolean
         default: false
       signed_candidate_windows_manual_transition:
-        description: Include the published 1.6.0 to 1.6.2 manual transition before the signed Windows upgrade
+        description: Include published 1.6.0 and 1.6.1 manual transitions before the signed Windows upgrade
         type: boolean
         default: false
       signed_candidate_linux_probe_only:
