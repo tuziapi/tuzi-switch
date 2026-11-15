@@ -73,10 +73,17 @@ function walk(dir) {
       e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)],
     );
 }
-function signArtifact(target) {
+export function signArtifact(target) {
   const keyPath = process.env.TAURI_SIGNING_PRIVATE_KEY;
   if (!keyPath || !fs.existsSync(keyPath))
     throw Error("Missing updater signing key file");
+  // Build accepts a key file in this variable, but signer treats it as an
+  // inline key and rejects it alongside --private-key-path. Keep the build
+  // environment intact and pass exactly one key source to the child signer.
+  const env = { ...process.env };
+  delete env.TAURI_SIGNING_PRIVATE_KEY;
+  delete env.TAURI_SIGNING_PRIVATE_KEY_PATH;
+  env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ??= "";
   const result = spawnSync(
     process.execPath,
     [
@@ -85,11 +92,9 @@ function signArtifact(target) {
       "sign",
       "-f",
       keyPath,
-      "-p",
-      process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? "",
       target,
     ],
-    { stdio: "pipe" },
+    { stdio: "pipe", env },
   );
   if (result.status !== 0)
     throw Error(`Could not sign ${path.basename(target)}`);
