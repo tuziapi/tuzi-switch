@@ -240,6 +240,11 @@ fn macos_tray_icon() -> Option<Image<'static>> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(feature = "updater-acceptance")]
+    if let Err(error) = updater_acceptance::restore_launch_profile() {
+        eprintln!("Isolated updater profile rejected: {error}");
+        std::process::exit(2);
+    }
     // 设置 panic hook，在应用崩溃时记录日志到 <app_config_dir>/crash.log（默认 ~/.tuzi-switch/crash.log）
     panic_hook::setup_panic_hook();
 

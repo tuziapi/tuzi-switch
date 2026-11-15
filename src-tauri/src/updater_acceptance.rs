@@ -13,6 +13,82 @@ struct Scenario {
     mode: String,
 }
 
+const PROFILE_MARKER: &str = "SYNTHETIC updater laboratory profile\n";
+
+fn validate_launch_profile(
+    root: &Path,
+    executable: &Path,
+) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+    if !root.is_absolute() {
+        return Err("Laboratory profile must be absolute".into());
+    }
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    if fs::read_to_string(root.join(".updater-lab-profile")).map_err(|e| e.to_string())?
+        != PROFILE_MARKER
+        || !root.join("scenario.json").is_file()
+    {
+        return Err("Missing synthetic laboratory profile marker".into());
+    }
+    let home = root
+        .join("home")
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    let executable = executable.canonicalize().map_err(|e| e.to_string())?;
+    if home.parent() != Some(root.as_path()) || !executable.starts_with(&root) {
+        return Err("Laboratory executable and home must remain inside the profile".into());
+    }
+    Ok((root, home))
+}
+
+/// NSIS RunAsUser rebuilds the environment when dropping administrator rights.
+/// Restore only the explicitly marked test profile, before any app storage opens.
+/// This function and its argument are absent from production builds.
+pub fn restore_launch_profile() -> Result<(), String> {
+    // AppImage runs its inner executable outside the installation directory;
+    // only Windows RunAsUser needs this environment restoration.
+    if !cfg!(target_os = "windows") {
+        return Ok(());
+    }
+    let args: Vec<_> = std::env::args().collect();
+    if !args
+        .iter()
+        .any(|arg| arg == "--tuzi-verify-updater-install")
+    {
+        return Ok(());
+    }
+    let supplied: Vec<_> = args
+        .iter()
+        .filter_map(|arg| arg.strip_prefix("--tuzi-updater-qa-root="))
+        .collect();
+    if supplied.len() != 1 {
+        return Err("Expected one explicit laboratory profile argument".into());
+    }
+    let executable = std::env::current_exe().map_err(|e| e.to_string())?;
+    let (root, home) = validate_launch_profile(Path::new(supplied[0]), &executable)?;
+    let recovered = std::env::var_os("TUZI_UPDATER_QA_ROOT").is_none()
+        || std::env::var_os("CC_SWITCH_TEST_HOME").is_none();
+    for (name, expected) in [
+        ("TUZI_UPDATER_QA_ROOT", &root),
+        ("CC_SWITCH_TEST_HOME", &home),
+    ] {
+        if let Some(previous) = std::env::var_os(name) {
+            if Path::new(&previous)
+                .canonicalize()
+                .map_err(|e| e.to_string())?
+                != *expected
+            {
+                return Err("Conflicting laboratory profile environment".into());
+            }
+        }
+        std::env::set_var(name, expected);
+    }
+    record(
+        &root,
+        "profile-restored",
+        json!({"environmentRecovered":recovered}),
+    )
+}
+
 fn record(root: &Path, event: &str, detail: serde_json::Value) -> Result<(), String> {
     let mut file = fs::OpenOptions::new()
         .create(true)
@@ -219,4 +295,55 @@ pub fn run(app: &tauri::AppHandle) {
             app.exit(2);
         }
     });
+}
+
+#[cfg(test)]
+mod launch_profile_tests {
+    use super::*;
+
+    fn fixture() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("profile with spaces");
+        fs::create_dir_all(root.join("home")).unwrap();
+        fs::write(root.join(".updater-lab-profile"), PROFILE_MARKER).unwrap();
+        fs::write(root.join("scenario.json"), "{}").unwrap();
+        let exe = root.join("synthetic.exe");
+        fs::write(&exe, "SYNTHETIC").unwrap();
+        (temp, root, exe)
+    }
+
+    #[test]
+    fn accepts_marked_profile_with_spaces() {
+        let (_temp, root, exe) = fixture();
+        let (validated, home) = validate_launch_profile(&root, &exe).unwrap();
+        assert_eq!(validated, root.canonicalize().unwrap());
+        assert_eq!(home, root.join("home").canonicalize().unwrap());
+    }
+
+    #[test]
+    fn rejects_missing_marker_and_outside_executable() {
+        let (temp, root, exe) = fixture();
+        let outside = temp.path().join("outside.exe");
+        fs::write(&outside, "SYNTHETIC").unwrap();
+        assert!(validate_launch_profile(&root, &outside).is_err());
+        fs::remove_file(root.join(".updater-lab-profile")).unwrap();
+        assert!(validate_launch_profile(&root, &exe).is_err());
+    }
+
+    #[test]
+    fn rejects_relative_profile_and_missing_scenario() {
+        let (_temp, root, exe) = fixture();
+        assert!(validate_launch_profile(Path::new("relative"), &exe).is_err());
+        fs::remove_file(root.join("scenario.json")).unwrap();
+        assert!(validate_launch_profile(&root, &exe).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_home_symlink_outside_profile() {
+        let (temp, root, exe) = fixture();
+        fs::remove_dir(root.join("home")).unwrap();
+        std::os::unix::fs::symlink(temp.path(), root.join("home")).unwrap();
+        assert!(validate_launch_profile(&root, &exe).is_err());
+    }
 }

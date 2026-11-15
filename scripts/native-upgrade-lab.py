@@ -194,8 +194,7 @@ def main():
     target = ('darwin-aarch64' if os.uname().machine == 'arm64' else 'darwin-x86_64') if platform == 'macos' else {'windows': 'windows-x86_64', 'linux': 'linux-x86_64'}[platform]
     results = []
     retry_case = None
-    try:
-        for name, mode, asset, version in [
+    scenarios = [
             ('tampered-signature', 'download-error', corrupt, '0.0.2'),
             ('interrupted-download', 'download-error', root / 'interrupted.tar.gz', '0.0.2'),
             ('missing-package', 'download-error', root / 'absent.tar.gz', '0.0.2'),
@@ -204,7 +203,14 @@ def main():
             ('downgrade', 'no-update', archive, '0.0.0'),
             ('upgrade-and-restart', 'upgrade', archive, '0.0.2'),
             ('retry-after-signature-rejection', 'upgrade', archive, '0.0.2'),
-        ]:
+    ]
+    if platform == 'windows':
+        # NSIS has one registered install directory for this identity. Retry
+        # before another scenario installs it elsewhere; never reinstall the
+        # rejected app merely to repair the test's registration state.
+        scenarios.insert(1, scenarios.pop())
+    try:
+        for name, mode, asset, version in scenarios:
             retry = name == 'retry-after-signature-rejection'
             case = retry_case if retry else root / 'runs' / f'{name}-{time.time_ns()}'
             if name == 'tampered-signature':
@@ -240,10 +246,13 @@ def main():
             # mistaken for the post-restart branch in the native verifier.
             scenario = {'endpoint': f'{base}/{manifest_file.name}', 'version': '0.0.2', 'mode': mode}
             (case / 'scenario.json').write_text(json.dumps(scenario))
+            if not retry:
+                (case / '.updater-lab-profile').write_bytes(b'SYNTHETIC updater laboratory profile\n')
             launch_env = {**env, 'CC_SWITCH_TEST_HOME': str(case / 'home'), 'TUZI_UPDATER_QA_ROOT': str(case)}
             print(f'Running real native scenario: {name}', flush=True)
             with (case / ('retry-process.log' if retry else 'process.log')).open('wb') as log:
-                process = subprocess.Popen([str(executable), '--tuzi-verify-updater-install'], env=launch_env, stdout=log, stderr=log)
+                process = subprocess.Popen([str(executable), '--tuzi-verify-updater-install',
+                    f'--tuzi-updater-qa-root={case}'], env=launch_env, stdout=log, stderr=log)
                 deadline = time.monotonic() + 180
                 events = []
                 while time.monotonic() < deadline:
@@ -263,6 +272,10 @@ def main():
                 starts = [e for e in events if e['event'] == 'started']
                 if not starts or any(e['detail'].get('bundleType') != expected_bundle for e in starts):
                     raise RuntimeError(f'{name}: installed app did not retain its native installer type')
+                if platform == 'windows' and mode == 'upgrade':
+                    restored = [e for e in events if e['event'] == 'profile-restored']
+                    if len(restored) != 2:
+                        raise RuntimeError(f'{name}: original and restarted profiles were not both validated')
                 try:
                     process.wait(timeout=10)
                 except subprocess.TimeoutExpired:

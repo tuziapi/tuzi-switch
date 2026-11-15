@@ -78,7 +78,7 @@ jobs:
       - name: Native transport attribution regression
         shell: bash
         run: |
-          cargo test --release --locked --manifest-path src-tauri/Cargo.toml --lib --features updater-acceptance -- desktop_attribution creative_http::tests tuzi_account::creative::tests --test-threads=1
+          cargo test --release --locked --manifest-path src-tauri/Cargo.toml --lib --features updater-acceptance -- desktop_attribution creative_http::tests tuzi_account::creative::tests updater_acceptance::launch_profile_tests --test-threads=1
       - name: Install, reject corrupt packages, upgrade and restart isolated apps
         shell: bash
         run: |

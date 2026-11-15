@@ -1,0 +1,28 @@
+{
+  "kind": "windows-nsis-environment-diagnostic",
+  "officialUpgradeAcceptance": false,
+  "administratorToken": true,
+  "shellWindowPresent": true,
+  "sessionId": 2,
+  "nsisVersion": "3.11",
+  "restartHelperVersion": "0.5.3",
+  "installerExitCode": 0,
+  "helperReturn": "0",
+  "directChild": {
+    "environmentPreserved": true,
+    "argumentCount": 1
+  },
+  "restartedChildPresent": true,
+  "restartedChild": {
+    "environmentPreserved": false,
+    "argumentCount": 1
+  },
+  "repository": "AiW520/tuzi-switch",
+  "runId": "43687587858",
+  "applicationCommit": "7a8cd2338686c47e64845bba9ed4fedcee47f3c8",
+  "artifactId": "14150539832",
+  "artifactSha256": "eca8be93af621700a7a4bdd7d8c0507c799f772fac10974473377c2a252baeba",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "scope": "Synthetic pinned NSIS helper diagnostic; not an application upgrade or official candidate acceptance"
+}
