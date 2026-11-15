@@ -62,9 +62,13 @@ if (legacyDir) {
 }
 
 const executable = path.join(root, 'installed', 'tu-zi-switch.exe');
+const installerTemp = path.join(root, 'installer-temp');
+fs.mkdirSync(installerTemp, { recursive: true });
 const env = { ...process.env, TUZI_SIGNED_LAB_ROOT: root, TUZI_SIGNED_LAB_EXE: executable };
 // No build/repository token is passed to the installed desktop process.
 const appEnv = { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9222' };
+appEnv.TEMP = installerTemp;
+appEnv.TMP = installerTemp;
 for (const key of Object.keys(appEnv)) if (/TOKEN|SECRET|PASSWORD|PRIVATE_KEY/i.test(key)) delete appEnv[key];
 delete appEnv.CC_SWITCH_TEST_HOME; delete appEnv.TUZI_UPDATER_QA_ROOT;
 function powershell(script) {
@@ -314,6 +318,42 @@ foreach ($program in $programs) {
   await dialog.getByRole('button', { name: '重新下载', exact: true }).click();
   await dialog.getByRole('button', { name: '重启并更新', exact: true }).waitFor({ timeout: 120000 });
   await page.screenshot({ path: path.join(root, '03-native-signature-verified.png') });
+  // The valid signed payload must also survive a real OS failure while staging
+  // its installer. Only the dedicated test temp directory loses create rights.
+  // This does not claim coverage of failure inside the external NSIS/MSI process.
+  powershell(String.raw`
+$ErrorActionPreference='Stop'
+$directory=Join-Path $env:TUZI_SIGNED_LAB_ROOT 'installer-temp'
+$acl=Get-Acl -LiteralPath $directory
+$acl.Sddl | Set-Content (Join-Path $env:TUZI_SIGNED_LAB_ROOT 'installer-temp-acl.original')
+$sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$rule=[System.Security.AccessControl.FileSystemAccessRule]::new($sid,[System.Security.AccessControl.FileSystemRights]::CreateDirectories,[System.Security.AccessControl.InheritanceFlags]::None,[System.Security.AccessControl.PropagationFlags]::None,[System.Security.AccessControl.AccessControlType]::Deny)
+$acl.AddAccessRule($rule)
+Set-Acl -LiteralPath $directory -AclObject $acl
+$denied=$false
+try { [System.IO.Directory]::CreateDirectory((Join-Path $directory 'must-be-denied')) | Out-Null }
+catch [System.UnauthorizedAccessException] { $denied=$true }
+if (-not $denied) { throw 'Test temp directory did not reject OS directory creation' }
+`);
+  await dialog.getByRole('button', { name: '重启并更新', exact: true }).click();
+  await dialog.getByRole('button', { name: '重新下载', exact: true }).waitFor({ timeout: 30000 });
+  await identity(page, '1.6.2', base.commit);
+  assert.equal(sha(fs.readFileSync(executable)), beforeHash);
+  assert.match(await dialog.innerText(), /安装未完成/);
+  await page.screenshot({ path: path.join(root, '03-valid-package-staging-denied.png') });
+  powershell(String.raw`
+$ErrorActionPreference='Stop'
+$directory=Join-Path $env:TUZI_SIGNED_LAB_ROOT 'installer-temp'
+$saved=(Get-Content (Join-Path $env:TUZI_SIGNED_LAB_ROOT 'installer-temp-acl.original') -Raw).Trim()
+$acl=Get-Acl -LiteralPath $directory
+$acl.SetSecurityDescriptorSddlForm($saved)
+Set-Acl -LiteralPath $directory -AclObject $acl
+if ((Get-Acl -LiteralPath $directory).Sddl -ne $saved) { throw 'Installer temp ACL restoration failed' }
+`);
+  report.checks.validSignedPackageStagingPermissionDenied = 'passed';
+  report.installerFailureScope = 'OS denies temporary installer directory creation after signature verification; application remains alive. External installer failure remains unverified.';
+  await dialog.getByRole('button', { name: '重新下载', exact: true }).click();
+  await dialog.getByRole('button', { name: '重启并更新', exact: true }).waitFor({ timeout: 120000 });
   await dialog.getByRole('button', { name: '重启并更新', exact: true }).click();
   activeVersion = '1.6.3';
   // No manual launch here: the native updater/installer must restart the app.
@@ -369,6 +409,14 @@ $root=$env:TUZI_SIGNED_LAB_ROOT
 $cleanupErrors=@()
 $operations=@({
 Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:TUZI_SIGNED_LAB_EXE } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}, {
+$saved=Join-Path $root 'installer-temp-acl.original'
+if (Test-Path $saved) {
+ $directory=Join-Path $root 'installer-temp'
+ $acl=Get-Acl -LiteralPath $directory
+ $acl.SetSecurityDescriptorSddlForm((Get-Content $saved -Raw).Trim())
+ Set-Acl -LiteralPath $directory -AclObject $acl
+}
 }, {
 if (Test-Path (Join-Path $root 'hosts.original')) { Copy-Item (Join-Path $root 'hosts.original') (Join-Path $env:SystemRoot 'System32/drivers/etc/hosts') -Force; Clear-DnsClientCache }
 }, {

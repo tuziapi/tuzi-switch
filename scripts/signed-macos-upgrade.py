@@ -329,8 +329,8 @@ finally:
     if trusted:
         fingerprint=capture([openssl,'x509','-in',str(lab/'ca.crt'),'-noout','-fingerprint','-sha1'],text=True).strip().split('=')[-1].replace(':','')
         try:
-            # Removal/import requires an interactive authorization on these
-            # disposable runners. Revoke only this ephemeral CA instead; keep
+            # Removal/import timed out on these disposable runners. Revoke
+            # only this ephemeral CA instead; keep
             # its explicit deny record until GitHub discards the host.
             curl=['/usr/bin/curl','-q','--silent','--show-error','--noproxy','*',
                   '--connect-timeout','5','--max-time','10','--output','/dev/null',
@@ -347,7 +347,7 @@ finally:
             matching=[key for key in revoked_settings['trustList'] if key.upper()==fingerprint]
             assert len(matching)==1
             record=revoked_settings['trustList'].pop(matching[0])
-            assert record['trustSettings']==[{'result':3}], 'Expected unconditional synthetic CA distrust'
+            assert record['trustSettings']==[{'kSecTrustSettingsResult':3}], 'Expected unconditional synthetic CA distrust'
             assert trust_restore and revoked_settings==plistlib.loads(trust_restore.read_bytes()), 'Unrelated admin trust changed'
             report['unrelatedAdminTrustPreserved']=True
             if server and (lab/'server.ready').exists():
