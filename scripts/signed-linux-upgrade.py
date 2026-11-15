@@ -289,7 +289,10 @@ except Exception as error:
             report['diagnosticError'] = str(diagnostic)
     raise
 finally:
-    report['finalPackageVersion'] = subprocess.run(['dpkg-query', '-W', '-f=${Version}', 'tu-zi-switch'], capture_output=True, text=True).stdout
+    package_owner = subprocess.run(['dpkg-query', '-S', str(executable)], capture_output=True, text=True).stdout.strip()
+    report['installedPackageOwner'] = package_owner
+    if package_owner:
+        report['finalPackageVersion'] = subprocess.run(['dpkg-query', '-W', '-f=${Version}', package_owner.split(': ')[0]], capture_output=True, text=True).stdout
     if server:
         server.shutdown()
         server.server_close()
