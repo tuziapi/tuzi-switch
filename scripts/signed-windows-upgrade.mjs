@@ -40,6 +40,20 @@ function candidate(dir, run, commit, version) {
 }
 const base = candidate(baseDir, '43680220045', '11b8e308ef77708df3526a7701d106fc04b15f57', '1.6.2');
 const next = candidate(nextDir, '43689683759', '695f4e933d797b39f7a61aad7804800a01eddc96', '1.6.3');
+const legacyDir = process.env.LEGACY_INSTALLER_DIR || null;
+let legacy;
+if (legacyDir) {
+  const manifestBytes = fs.readFileSync(path.join(legacyDir, 'manifest-windows-x64.json'));
+  assert.equal(sha(manifestBytes), 'ab7eb20f36407dfa80631f855cf68633f7876ee5b7b72b930326579c15ec6599');
+  legacy = JSON.parse(manifestBytes);
+  assert.equal(legacy.repository, 'tuziapi/tuzi-switch'); assert.equal(legacy.version, '1.6.0');
+  assert.equal(legacy.commit, '21cad50c7f5b916b94bccf39c6d594724241bfb1');
+  for (const file of legacy.files) {
+    assert.equal(path.basename(file.file), file.file);
+    assert.equal(sha(fs.readFileSync(path.join(legacyDir, file.file))), file.sha256);
+  }
+}
+
 const executable = path.join(root, 'installed', 'tu-zi-switch.exe');
 const env = { ...process.env, TUZI_SIGNED_LAB_ROOT: root, TUZI_SIGNED_LAB_EXE: executable };
 // No build/repository token is passed to the installed desktop process.
@@ -161,28 +175,76 @@ foreach ($program in $programs) {
     res.writeHead(404); res.end();
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(443, '127.0.0.1', resolve); });
-  const installArgs = installer === 'msi' ? ['msiexec', '/i', path.resolve(baseDir, assetName), '/qn', '/norestart', `INSTALLDIR=${path.dirname(executable)}`]
-    : [path.resolve(baseDir, assetName), '/S', `/D=${path.dirname(executable)}`];
-  const installed = spawnSync(installArgs[0], installArgs.slice(1), { env: appEnv, encoding: 'utf8', timeout: 180000 });
-  assert.equal(installed.status, 0, `Initial installer failed: ${installed.stderr}`);
-  assert.ok(fs.existsSync(executable));
+  const fixture = { id: 'SYNTHETIC-SIGNED-UPGRADE', name: 'SYNTHETIC signed upgrade preservation', settingsConfig: { env: { ANTHROPIC_AUTH_TOKEN: 'SYNTHETIC-NO-REAL-CREDENTIAL', ANTHROPIC_BASE_URL: 'https://synthetic.invalid' } } };
+  function manualInstall(dir) {
+    const args = installer === 'msi' ? ['msiexec', '/i', path.resolve(dir, assetName), '/qn', '/norestart', `INSTALLDIR=${path.dirname(executable)}`]
+      : [path.resolve(dir, assetName), '/S', `/D=${path.dirname(executable)}`];
+    const installed = spawnSync(args[0], args.slice(1), { env: appEnv, encoding: 'utf8', timeout: 180000 });
+    assert.equal(installed.status, 0, `Manual installer failed: ${installed.stderr}`);
+    assert.ok(fs.existsSync(executable));
+  }
+  function manualLaunch() {
+    const process = spawn(executable, [], { env: appEnv, stdio: 'ignore', detached: true });
+    process.unref(); return process;
+  }
+  async function acknowledgeWelcome(page) {
+    const welcome = page.getByRole('button', { name: /^(Got it|我知道了)$/ });
+    const visible = await welcome.waitFor({ timeout: 10000 }).then(() => true, () => false);
+    if (visible) await welcome.click();
+  }
+  async function seed(page) {
+    await page.evaluate(async provider => {
+      await window.__TAURI_INTERNALS__.invoke('add_provider', { app: 'claude', provider, addToLive: false });
+      localStorage.setItem('SYNTHETIC-SIGNED-UPGRADE', 'preserve-me');
+    }, fixture);
+  }
+  async function assertPreserved(page) {
+    const restored = await page.evaluate(async () => ({
+      providers: await window.__TAURI_INTERNALS__.invoke('get_providers', { app: 'claude' }),
+      preference: localStorage.getItem('SYNTHETIC-SIGNED-UPGRADE'),
+    }));
+    assert.deepEqual(restored.providers[fixture.id].settingsConfig, fixture.settingsConfig);
+    assert.equal(restored.providers[fixture.id].name, fixture.name);
+    assert.equal(restored.preference, 'preserve-me');
+  }
+  if (legacyDir) {
+    manualInstall(legacyDir);
+    const old = manualLaunch();
+    const oldPage = await connect('1.6.0', 60000);
+    report.legacyIdentity = await identity(oldPage, '1.6.0', legacy.commit);
+    await acknowledgeWelcome(oldPage);
+    await seed(oldPage);
+    await assertPreserved(oldPage);
+    report.legacyExecutableSha256 = sha(fs.readFileSync(executable));
+    await oldPage.screenshot({ path: path.join(root, '00-published-legacy-before-transition.png') });
+    // Use the ordinary close behavior with close-to-tray disabled in this synthetic profile.
+    await oldPage.evaluate(async () => {
+      const settings = await window.__TAURI_INTERNALS__.invoke('get_settings');
+      await window.__TAURI_INTERNALS__.invoke('save_settings', { settings: { ...settings, minimizeToTrayOnClose: false } });
+    });
+    await oldPage.evaluate(() => window.__TAURI_INTERNALS__.invoke('plugin:window|close', { label: 'main' })).catch(() => {});
+    const stopDeadline = Date.now() + 30000;
+    while (old.exitCode === null && Date.now() < stopDeadline) await delay(200);
+    assert.equal(old.exitCode, 0, 'Published old app must close normally before manual transition');
+    report.legacyExitCode = old.exitCode;
+    await browser.close(); browser = undefined;
+  }
+  manualInstall(baseDir);
   const beforeHash = sha(fs.readFileSync(executable));
   report.initialExecutableSha256 = beforeHash;
-  const initial = spawn(executable, [], { env: appEnv, stdio: 'ignore', detached: true });
+  const initial = manualLaunch();
   report.initialPid = initial.pid;
   initial.on('exit', (code, signal) => { report.initialExit = { code, signal }; });
-  initial.unref();
   let page = await connect('1.6.2', 60000);
   report.baseIdentity = await identity(page, '1.6.2', base.commit);
-  const welcome = page.getByRole('button', { name: /^(Got it|我知道了)$/ });
-  const hasWelcome = await welcome.waitFor({ timeout: 10000 }).then(() => true, () => false);
-  if (hasWelcome) await welcome.click();
-  const fixture = { id: 'SYNTHETIC-SIGNED-UPGRADE', name: 'SYNTHETIC signed upgrade preservation', settingsConfig: { env: { ANTHROPIC_AUTH_TOKEN: 'SYNTHETIC-NO-REAL-CREDENTIAL', ANTHROPIC_BASE_URL: 'https://synthetic.invalid' } } };
-  await page.evaluate(async provider => {
-    await window.__TAURI_INTERNALS__.invoke('add_provider', { app: 'claude', provider, addToLive: false });
-    localStorage.setItem('SYNTHETIC-SIGNED-UPGRADE', 'preserve-me');
-    localStorage.setItem('i18nextLng', 'zh');
-  }, fixture);
+  await acknowledgeWelcome(page);
+  if (legacyDir) {
+    await assertPreserved(page);
+    assert.notEqual(beforeHash, report.legacyExecutableSha256);
+    report.manualTransition = { status: 'passed', fromVersion: '1.6.0', toVersion: '1.6.2', publishedSource: legacy, sqliteProviderAndWebviewPreference: 'passed' };
+    report.checks.manualTransition = 'passed';
+    report.remaining = report.remaining.filter(check => check !== 'older-official-manual-transition');
+  } else await seed(page);
   await page.reload();
   await page.getByRole('button', { name: /查看更新|View update/i }).first().click({ timeout: 60000 });
   const dialog = page.getByRole('dialog').filter({ hasText: '1.6.3' });

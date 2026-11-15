@@ -239,3 +239,13 @@ Fedora43真实rpm实验八场景通过；artifact14153490733归档SHA256/ZIP CRC
 固定候选为43680220045/11b8e308的1.6.2与43689683759/695f4e93的1.6.3，测试过程中未重编、重签或修改安装包；仅版本发现为本地合成HTTPS。完整证据见evidence/2026-11-15-signed-43694716475-nsis.json与evidence/2026-11-15-signed-43694716475-msi.json。保持officialAcceptance=false：旧正式版手动过渡、有效包安装失败、完整创作项目迁移、经营归因及其他平台正式实装尚未完成。
 
 MSI临时密钥实验43689414375 attempt1于08:27:20 UTC自行失败，取消请求到达前已结束；GitHub annotation明确“hosted runner lost communication with the server”，job日志和artifact未留存，不能推断产品安装失败原因。仅重跑该MSI job，attempt2为132753425896；未重复DEB/RPM。
+
+## 正式1.6.3完整候选独立核验
+
+完整下载verified-release artifact14152951863（339235181字节），续传完成后校验整体SHA256 48685ace6b6f0398dd1d4dce9f5e7e97185d82ae1ecec770c47151e2ba496e50、ZIP CRC、23个候选文件摘要、七个手动安装文件的四平台manifest、七个新正式公钥签名、九个更新目标及源码归档复现，全部通过。见evidence/2026-11-15-candidate-43689683759-integrity.json。该1.6.3仅作已批准的内部升级目标，未发布。
+
+## 旧正式版手动过渡补验准备
+
+新增signed_candidate_windows_manual_transition布尔输入（默认false），仅signed_candidate_windows_only路径传入reusable manual_transition（默认false）。开启后下载正式已发布v1.6.0的Windows两包和manifest，固定manifest SHA256 ab7eb20f36407dfa80631f855cf68633f7876ee5b7b72b930326579c15ec6599、正式commit21cad50c及安装包摘要；只读正式Release，不修改线上附件。
+
+在一次性runner先真实安装/启动1.6.0、通过普通IPC保存合成供应商和WebView偏好，关闭托盘最小化选项后走正常窗口退出；要求原进程exit0。再用真实1.6.2安装器手动过渡，核查精确身份和原数据保留，不重新种入fixture；随后继续既有1.6.2→1.6.3正式签名升级及三种失败重试。仍不手工启动1.6.3。仅新增测试选项和LEGACY_INSTALLER_DIR测试环境变量，无业务/数据库字段。node语法、actionlint、diff检查通过，真实结果待运行。

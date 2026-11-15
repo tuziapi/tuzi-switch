@@ -34,6 +34,10 @@ on:
         description: Limit the native laboratory to the Fedora RPM installer
         type: boolean
         default: false
+      signed_candidate_windows_manual_transition:
+        description: Include the published 1.6.0 to 1.6.2 manual transition before the signed Windows upgrade
+        type: boolean
+        default: false
       signed_candidate_windows_only:
         description: Test approved 1.6.2 to 1.6.3 signed installer bytes in disposable Windows sessions; never publish
         type: boolean
@@ -57,6 +61,8 @@ jobs:
   signed-candidate-windows:
     if: inputs.signed_candidate_windows_only && github.repository == 'AiW520/tuzi-switch'
     uses: ./.github/workflows/signed-candidate-windows.yml
+    with:
+      manual_transition: ${{ inputs.signed_candidate_windows_manual_transition || false }}
     permissions:
       contents: read
       actions: read

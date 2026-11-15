@@ -1,6 +1,10 @@
 name: Real signed Windows candidate upgrade
 on:
   workflow_call:
+    inputs:
+      manual_transition:
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -50,6 +54,13 @@ jobs:
           repository: AiW520/tuzi-switch
           run-id: 43689683759
           github-token: ${{ github.token }}
+      - name: Download the immutable published manual-transition source
+        if: inputs.manual_transition
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v1.6.0 -R tuziapi/tuzi-switch --dir "$RUNNER_TEMP/signed-legacy" --pattern 'tuzi-assistant-windows-x64.exe' --pattern 'tuzi-assistant-windows-x64.msi' --pattern 'manifest-windows-x64.json'
       - name: Install browser control client only
         shell: bash
         run: npm install --prefix "$RUNNER_TEMP/tuzi-candidate-tools" --ignore-scripts --no-package-lock playwright-core@1.55.1
@@ -57,6 +68,7 @@ jobs:
         shell: pwsh
         env:
           INSTALLER_TYPE: ${{ matrix.installer }}
+          LEGACY_INSTALLER_DIR: ${{ inputs.manual_transition && format('{0}/signed-legacy', runner.temp) || '' }}
         run: |
           $env:PLAYWRIGHT_MODULE = Join-Path $env:RUNNER_TEMP 'tuzi-candidate-tools/node_modules/playwright-core'
           node scripts/signed-windows-upgrade.mjs (Join-Path $env:RUNNER_TEMP 'signed-base') (Join-Path $env:RUNNER_TEMP 'signed-target') (Join-Path $env:RUNNER_TEMP 'signed-windows-evidence') $env:INSTALLER_TYPE
