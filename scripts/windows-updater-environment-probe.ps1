@@ -28,8 +28,9 @@ $archive = Join-Path $root 'nsis.zip'
 Invoke-WebRequest 'https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip' -OutFile $archive
 if ((Get-FileHash $archive -Algorithm SHA1).Hash -ne 'EF7FF767E5CBD9EDD22ADD3A32C9B8F4500BB10D') { throw 'NSIS checksum mismatch' }
 Expand-Archive $archive (Join-Path $root 'toolchain')
-$compiler = @(Get-ChildItem (Join-Path $root 'toolchain') -Filter makensis.exe -Recurse)
+$compiler = @(Get-ChildItem (Join-Path $root 'toolchain') -Filter makensis.exe -Recurse | Where-Object { $_.Directory.Name -ne 'Bin' })
 if ($compiler.Count -ne 1) { throw 'Expected one NSIS compiler' }
+$compilerPath = $compiler[0].FullName
 $plugins = Join-Path $root 'plugins'
 New-Item -ItemType Directory -Path $plugins | Out-Null
 $helper = Join-Path $plugins 'nsis_tauri_utils.dll'
@@ -73,7 +74,7 @@ SectionEnd
 $script | Set-Content (Join-Path $root 'probe.nsi')
 Push-Location $root
 try {
-  & $compiler[0].FullName /V2 probe.nsi
+  & $compilerPath /V2 probe.nsi
   if ($LASTEXITCODE -ne 0) { throw 'NSIS probe compilation failed' }
   $process = Start-Process (Join-Path $root 'restart-probe.exe') -PassThru -Wait
   $report.installerExitCode = $process.ExitCode
