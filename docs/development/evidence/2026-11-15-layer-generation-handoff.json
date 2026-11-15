@@ -1,0 +1,56 @@
+{
+  "kind": "layer-generation-handoff-regression",
+  "officialAcceptance": false,
+  "syntheticProviderOnly": true,
+  "beforeFix": {
+    "realInstalledCandidateRun": "43697704283",
+    "unitRegression": "failed as expected: replacement layers not recognized as ready",
+    "browserRegression": "failed as expected: completed generation placeholder remains after source replacement"
+  },
+  "afterFix": {
+    "creativeTests": 2683,
+    "typecheck": "passed",
+    "creativeBuild": "passed",
+    "chromium": {
+      "kind": "synthetic-transport-browser",
+      "engine": "chromium",
+      "generation": true,
+      "transparentPngRequest": true,
+      "layers": 3,
+      "ocr": true,
+      "ocrTextVisible": true,
+      "duplicateUrlLayers": true,
+      "reloadPreserved": true,
+      "completedPlaceholderRemoved": true,
+      "liveProvider": false
+    },
+    "webkit": {
+      "kind": "synthetic-transport-browser",
+      "engine": "webkit",
+      "generation": true,
+      "transparentPngRequest": true,
+      "layers": 3,
+      "ocr": true,
+      "ocrTextVisible": true,
+      "duplicateUrlLayers": true,
+      "reloadPreserved": true,
+      "completedPlaceholderRemoved": true,
+      "liveProvider": false
+    }
+  },
+  "provenance": {
+    "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+    "originalFiles": 1523,
+    "localFiles": 116,
+    "reconstructedFiles": 1639,
+    "patchBytes": 1424903
+  },
+  "remaining": [
+    "rebuild-and-sign-fixed-official-candidate",
+    "repeat-installed-candidate-acceptance",
+    "other-platform-official-upgrades",
+    "valid-package-os-installation-failure",
+    "production-business-records",
+    "live-provider-quality-and-billing"
+  ]
+}

@@ -145,6 +145,12 @@ function createLayerElement(
     url: artifact.url,
     groupId,
     angle,
+    // Replacing a just-generated image must keep its result association until
+    // every layer paints, so the existing generation placeholder can finish.
+    ...(typeof source.generationTaskId === 'string'
+      ? { generationTaskId: source.generationTaskId } : {}),
+    ...(typeof source.generationAnchorId === 'string'
+      ? { generationAnchorId: source.generationAnchorId } : {}),
     ...(typeof source.opacity === 'number' ? { opacity: source.opacity } : {}),
     metadata: {
       ...(source.metadata || {}),

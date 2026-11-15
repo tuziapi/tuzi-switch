@@ -103,6 +103,7 @@ async function configure(p) {
     await p.screenshot({path:output+'/seedream55-ocr.png'});
     await dialog.getByRole('button',{name:/应用|插入/}).click();
     await until(async()=>(await records(p,'aitu-workspace','boards')).find(b=>b.id===original.id)?.elements.filter(e=>e.metadata?.semanticLayer).length===3,'layer metadata not saved');
+    await until(async()=>(await records(p,'aitu-workspace','boards')).find(b=>b.id===original.id)?.elements.every(e=>e.type!=='generation-anchor'),'completed generation placeholder remains after source replacement');
     await p.reload();await p.locator('.plait-board-container').waitFor();
     const restored=(await records(p,'aitu-workspace','boards')).find(b=>b.id===original.id);
     const layers=restored.elements.filter(e=>e.metadata?.semanticLayer);
@@ -111,7 +112,9 @@ async function configure(p) {
     assert.equal(layers[2].metadata.semanticLayer.providerMetadata.future_extension.preserve,true);
     const manifest=restored.elements.find(e=>e.metadata?.semanticLayerGroup)?.metadata.semanticLayerGroup.manifest;
     assert.equal(manifest.layers.length,3);assert.equal(manifest.layers[1].textRecognition.text,'你好 1');
-    fs.writeFileSync(output+'/seedream55-results.json',JSON.stringify({kind:'synthetic-transport-browser',engine,generation:true,transparentPngRequest:true,layers:3,ocr:true,ocrTextVisible:true,duplicateUrlLayers:true,reloadPreserved:true,liveProvider:false},null,2));
+    assert.ok(restored.elements.every(e=>e.type!=='generation-anchor'),'completed placeholder must not reappear after reload');
+    await p.screenshot({path:output+'/seedream55-reloaded.png'});
+    fs.writeFileSync(output+'/seedream55-results.json',JSON.stringify({kind:'synthetic-transport-browser',engine,generation:true,transparentPngRequest:true,layers:3,ocr:true,ocrTextVisible:true,duplicateUrlLayers:true,reloadPreserved:true,completedPlaceholderRemoved:true,liveProvider:false},null,2));
     console.log('Seedream 5.5 real UI + generation + layer/OCR + canvas reload passed (synthetic HTTP boundary)');
   } catch(error){await p.screenshot({path:output+'/seedream55-failure.png'});fs.writeFileSync(output+'/failure-dom.txt',await p.locator('body').innerText());throw error;} finally {await browser.close();}
 })();

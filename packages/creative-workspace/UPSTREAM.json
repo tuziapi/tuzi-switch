@@ -4903,6 +4903,10 @@
       "sha256": "bd9387e40890219e0dcf149ab7ec811b1eec67386ca660fb826c33d0f73f6491"
     },
     {
+      "path": "packages/drawnix/src/services/video-api-service.test.ts",
+      "sha256": "52ccba7934879683be03de4df7e30f8b4b5d6a84176e3b4843ea21dcdc9d940b"
+    },
+    {
       "path": "packages/drawnix/src/services/video-api-service.ts",
       "sha256": "2f1fe55583844064c482d845eb291339501a739af54c118aa8fdf5e60256eb69"
     },
@@ -6665,6 +6669,66 @@
       "path": "packages/drawnix/src/services/assistant-creation-setup.test.ts",
       "reason": "Desktop send-time configuration handoff; preserves drafts and reuses host creative settings.",
       "origin": "assistant-integration"
+    },
+    {
+      "path": "openspec/changes/add-seedream55-desktop/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit a986a3d03c8d1bd84214e8916d8378b314d6bc2d; retained in reconstruction patch"
+    },
+    {
+      "path": "openspec/changes/add-seedream55-desktop/specs/seedream55/spec.md",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit a986a3d03c8d1bd84214e8916d8378b314d6bc2d; retained in reconstruction patch"
+    },
+    {
+      "path": "openspec/changes/add-seedream55-desktop/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit a986a3d03c8d1bd84214e8916d8378b314d6bc2d; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/ParametersDropdown.kling.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/__tests__/tuzi-video-workflow.test.ts",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/constants/tuzi-video-models.ts",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/mcp/tools/tuzi-video-generation.test.ts",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/services/model-adapters/seedream55.ts",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit a986a3d03c8d1bd84214e8916d8378b314d6bc2d; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/services/tuzi-video-advanced.test.ts",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/services/tuzi-video-media.ts",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/services/tuzi-video-request.test.ts",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
+    },
+    {
+      "path": "packages/drawnix/src/services/tuzi-video-request.ts",
+      "origin": "assistant-integration",
+      "reason": "Introduced after pinned baseline in tracked repository commit e5313891c3ffc5c0a57dfaef5c7bc170cda0dbce; retained in reconstruction patch"
     }
   ],
   "integration": {

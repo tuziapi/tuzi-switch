@@ -23,3 +23,11 @@ API HEAD `28443ae853a24165b23638a8b98d3ad96ddba4f0`，对应 `docs/2026-11-11-se
 - 真实供应商权限、生成效果、透明像素和实际OCR准确率/计费没有付费联调，不能标为真实模型验收通过；最终签名安装包与跨平台实装验收见UP-03。未发布。
 
 OpenSpec记录：`packages/creative-workspace/upstream/openspec/changes/add-seedream55-desktop/`。本机未安装openspec CLI，已人工核对需求/Scenario格式，不声称CLI验证通过。
+
+## 正式Windows包补验与分层后占位残留修复
+
+43697704283的NSIS/MSI实际安装包完成普通UI→原生HTTP→透明PNG→三图层/OCR→正式签名自动升级→画板/任务/图层元数据/透明像素恢复，15项子集通过；本机合成供应商，非真实模型效果验收。截图审查发现快速分层替换原图后，原生成占位卡未结束。真实Plait变换测试及原构建Chrome均复现；修复让图层继承已有generationTaskId/generationAnchorId，只在原图已有字符串关联时保留，无新增存储schema或对导入图片伪造任务关联。
+
+新增回归验证全部图层真正绘制就绪后才完成旧任务占位，以及JSON重载后的关联；导入图片无关联继续保持。17项定向、160文件2683项创作全量、宿主类型及创作构建通过；Chrome/WebKit实际生图/分层/OCR/保存重载均验证占位消失且重载不复现。原生候选测试也加入此必需断言，旧候选不会被误记完整业务通过。见evidence/2026-11-15-layer-generation-handoff.json。修复后的正式签名候选须重新构建与实装验收，不能用前一候选通过证据替代。
+
+补丁重建检查发现此前PR#73视频及Seedream新增12条源码/规范路径未登记在UPSTREAM.json，已按实际引入commit补登记并重建完整补丁，1523原始文件+116本地文件=1639文件逐字节还原通过。生成的统一diff保留其必需空白上下文，不按普通源码尾空格规则改写；普通修改通过git diff --check，补丁独立通过git apply --check及全部文件字节比对。未更改原opentu源码仓库。

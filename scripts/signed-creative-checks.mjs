@@ -153,6 +153,7 @@ export async function exerciseSeedream55(page, output) {
   await page.screenshot({ path: path.join(output, '07-native-seedream55-ocr.png') });
   await dialog.getByRole('button', { name: /应用|插入/ }).click();
   await until(async () => (await records(page, 'aitu-workspace', 'boards')).some(b => b.elements.filter(e => e.metadata?.semanticLayer).length === 3), 'Native layer metadata was not saved');
+  await until(async () => (await records(page, 'aitu-workspace', 'boards')).every(b => b.elements.every(e => e.type !== 'generation-anchor')), 'Completed generation placeholder remains after source replacement');
   const saved = await snapshot(page);
   const layers = saved.boards.flatMap(b => b.elements).filter(e => e.metadata?.semanticLayer);
   assert.equal(layers.length, 3);
