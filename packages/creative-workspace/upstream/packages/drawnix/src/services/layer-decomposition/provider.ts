@@ -608,6 +608,11 @@ export async function decomposeWithConfiguredImageProvider(
       item => item.id === explicitProfileId && item.enabled !== false
     );
     if (!profile) throw new Error('原图使用的图片服务已不可用，请重新配置分层服务');
+    // Validate the selected profile itself before the legacy route resolver
+    // can substitute another profile's default endpoint or credential.
+    if (!profile.baseUrl.trim() || !profile.apiKey.trim()) {
+      throw new Error('原图使用的图片服务缺少调用配置，请重新配置分层服务');
+    }
   }
   const modelRoute = resolveInvocationRoute('image', explicitProfileId
     ? createModelRef(explicitProfileId, requestedModelId) : requestedModelId);
@@ -618,8 +623,7 @@ export async function decomposeWithConfiguredImageProvider(
     'image',
     createModelRef(modelRoute.profileId, requestedModelId)
   );
-  if (explicitProfileId && (!modelContext.baseUrl ||
-    (modelContext.authType !== 'none' && !modelContext.apiKey?.trim()))) {
+  if (explicitProfileId && (!modelContext.baseUrl || !modelContext.apiKey?.trim())) {
     throw new Error('原图使用的图片服务缺少调用配置，请重新配置分层服务');
   }
   const activeContext =

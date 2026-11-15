@@ -5,6 +5,7 @@ import { providerTransport } from '../upstream/packages/drawnix/src/services/pro
 import { decomposeWithConfiguredImageProvider } from '../upstream/packages/drawnix/src/services/layer-decomposition/provider';
 import { SEEDREAM55_MODEL_ID } from '../upstream/packages/drawnix/src/services/model-adapters/seedream55';
 
+const capabilities = { supportsModelsEndpoint: true, supportsText: false, supportsImage: true, supportsVideo: false, supportsAudio: false, supportsTools: false };
 const request = { image: 'data:image/png;base64,c3ludGhldGlj', maxLayers: 2, size: '1K' as const, textRecognition: true };
 const options = { modelId: SEEDREAM55_MODEL_ID, profileId: 'synthetic-source' };
 const response = { data: [0, 1, 2].map(z => ({
@@ -17,9 +18,10 @@ describe('layer source provider isolation with real settings routing', () => {
   beforeEach(async () => {
     await settingsManager.waitForInitialization();
     await settingsManager.updateSettings({
+      gemini: { ...settingsManager.getSettings().gemini, baseUrl: 'https://legacy.example.test/v1', apiKey: 'sk-SYNTHETIC-LEGACY' },
       providerProfiles: [
-        { id: 'synthetic-default', name: 'Unrelated default', providerType: 'openai-compatible', baseUrl: 'https://wrong.example.test/v1', apiKey: 'sk-SYNTHETIC-WRONG', enabled: true },
-        { id: 'synthetic-source', name: 'Source provider', providerType: 'openai-compatible', baseUrl: 'https://source.example.test/v1', apiKey: 'sk-SYNTHETIC-SOURCE', enabled: true },
+        { id: 'synthetic-default', name: 'Unrelated default', providerType: 'openai-compatible', authType: 'bearer', capabilities, baseUrl: 'https://wrong.example.test/v1', apiKey: 'sk-SYNTHETIC-WRONG', enabled: true },
+        { id: 'synthetic-source', name: 'Source provider', providerType: 'openai-compatible', authType: 'bearer', capabilities, baseUrl: 'https://source.example.test/v1', apiKey: 'sk-SYNTHETIC-SOURCE', enabled: true },
       ],
       invocationPresets: [{ id: 'synthetic', name: 'Synthetic', isDefault: true,
         image: { defaultModelRef: { profileId: 'synthetic-default', modelId: 'gpt-image-2.5-sunburst' } },

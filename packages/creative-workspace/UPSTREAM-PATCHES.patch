@@ -21552,7 +21552,7 @@ index 81595dc..7454e2b 100644
      boundingBox: {
        absolute: [...artifact.boundingBox.absolute],
 diff --git a/packages/drawnix/src/services/layer-decomposition/provider.ts b/packages/drawnix/src/services/layer-decomposition/provider.ts
-index db8e66d..d0d3885 100644
+index db8e66d..0bcbab7 100644
 --- a/packages/drawnix/src/services/layer-decomposition/provider.ts
 +++ b/packages/drawnix/src/services/layer-decomposition/provider.ts
 @@ -1,3 +1,7 @@
@@ -21787,7 +21787,7 @@ index db8e66d..d0d3885 100644
  }
  
  function readProviderImageSize(
-@@ -563,18 +596,34 @@ export async function decomposeWithConfiguredImageProvider(
+@@ -563,18 +596,38 @@ export async function decomposeWithConfiguredImageProvider(
      signal?: AbortSignal;
      onProgress?: (progress: LayerDecompositionProgress) => void;
      modelId?: string;
@@ -21804,6 +21804,11 @@ index db8e66d..d0d3885 100644
 +      item => item.id === explicitProfileId && item.enabled !== false
 +    );
 +    if (!profile) throw new Error('原图使用的图片服务已不可用，请重新配置分层服务');
++    // Validate the selected profile itself before the legacy route resolver
++    // can substitute another profile's default endpoint or credential.
++    if (!profile.baseUrl.trim() || !profile.apiKey.trim()) {
++      throw new Error('原图使用的图片服务缺少调用配置，请重新配置分层服务');
++    }
 +  }
 +  const modelRoute = resolveInvocationRoute('image', explicitProfileId
 +    ? createModelRef(explicitProfileId, requestedModelId) : requestedModelId);
@@ -21814,8 +21819,7 @@ index db8e66d..d0d3885 100644
      'image',
      createModelRef(modelRoute.profileId, requestedModelId)
    );
-+  if (explicitProfileId && (!modelContext.baseUrl ||
-+    (modelContext.authType !== 'none' && !modelContext.apiKey?.trim()))) {
++  if (explicitProfileId && (!modelContext.baseUrl || !modelContext.apiKey?.trim())) {
 +    throw new Error('原图使用的图片服务缺少调用配置，请重新配置分层服务');
 +  }
    const activeContext =
@@ -21824,7 +21828,7 @@ index db8e66d..d0d3885 100644
        ? getAdapterContextFromSettings(
            'image',
            createModelRef(activeRoute.profileId, requestedModelId)
-@@ -585,15 +634,15 @@ export async function decomposeWithConfiguredImageProvider(
+@@ -585,15 +638,15 @@ export async function decomposeWithConfiguredImageProvider(
    // keep the active image provider endpoint and credentials instead of
    // accidentally falling back to the unrelated legacy image endpoint.
    const context =
@@ -21847,7 +21851,7 @@ index db8e66d..d0d3885 100644
    const capability = getLayerCapability(context, requestedModelId);
    if (!capability?.enabled) return null;
    if (
-@@ -627,6 +676,18 @@ export async function decomposeWithConfiguredImageProvider(
+@@ -627,6 +680,18 @@ export async function decomposeWithConfiguredImageProvider(
      watermark: false,
    };
    if (request.prompt) payload.prompt = request.prompt;
@@ -21866,7 +21870,7 @@ index db8e66d..d0d3885 100644
    const response = await sendAdapterRequest(context, {
      path:
        capability.path || context.binding?.submitPath || '/images/generations',
-@@ -654,7 +715,11 @@ export async function decomposeWithConfiguredImageProvider(
+@@ -654,7 +719,11 @@ export async function decomposeWithConfiguredImageProvider(
    });
    const result = requireNativeProviderQuality(
      normalizeProviderLayerPayload(await readProviderResponseJson(response), {
