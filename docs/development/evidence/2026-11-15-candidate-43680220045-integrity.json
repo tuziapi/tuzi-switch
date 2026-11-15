@@ -1,0 +1,155 @@
+{
+  "kind": "official-candidate-static-integrity",
+  "repository": "AiW520/tuzi-switch",
+  "releaseRepository": "tuziapi/tuzi-switch",
+  "runId": "43680220045",
+  "applicationCommit": "11b8e308ef77708df3526a7701d106fc04b15f57",
+  "version": "1.6.2",
+  "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+  "delivery": "manual-key-transition",
+  "publicationFiles": [
+    "SHA256SUMS",
+    "manifest-linux-x64.json",
+    "manifest-macos-arm64.json",
+    "manifest-macos-x64.json",
+    "manifest-windows-x64.json",
+    "tuzi-assistant-linux-x64.AppImage",
+    "tuzi-assistant-linux-x64.deb",
+    "tuzi-assistant-linux-x64.rpm",
+    "tuzi-assistant-macos-arm64.dmg",
+    "tuzi-assistant-macos-x64.dmg",
+    "tuzi-assistant-source.tar.gz",
+    "tuzi-assistant-windows-x64.exe",
+    "tuzi-assistant-windows-x64.msi"
+  ],
+  "candidateMetadataSha256": "119b477562755e384c77a3c118a4f67cbeb09f1fdcccf47861069f1a6c6b0cfe",
+  "files": {
+    "SHA256SUMS": "1021297b585fdc749501712989026a51cfd4e608bbc74bb13a827a56260c6421",
+    "latest.json": "87a6099e8d72e89a17a9dc796ec478e56fea1abf7ea71466f5361e95767df5c2",
+    "manifest-linux-x64.json": "73f29f41096f6d80d1e274635e2336f4aa94482e711c4fa826fe6099e0e8e4c1",
+    "manifest-macos-arm64.json": "697a4f496939d56dee299b5196231797be0c53cfa400078258244cdd528a4020",
+    "manifest-macos-x64.json": "b45bd2089a1d9345c783fd8fc8f89ac0c93c7b4d52643d90bd9bf263189d4e7b",
+    "manifest-windows-x64.json": "5c3f942f33d22349337d202fffc47d2f18029eefb4ce18a716d70a41d2327891",
+    "tuzi-assistant-linux-x64.AppImage": "255be272d43a13d9495c800bf8d9d8c9e625d8393f97c2259dc0767287b2993e",
+    "tuzi-assistant-linux-x64.AppImage.sig": "bf16863c8eb09c024f3dae676b2b5e5b328ff7279a024223225ec42935ff3008",
+    "tuzi-assistant-linux-x64.deb": "03523be40891d30f4657193a56a4b14beb43f95ee2cc927f1c49d6990eb76c6f",
+    "tuzi-assistant-linux-x64.deb.sig": "53ed0d45b5088217b402116ff6521454bc2d54f1e826cc6ee15e143e6791ecc5",
+    "tuzi-assistant-linux-x64.rpm": "2def3d37655fd41c143b2ceefeaa628f5cbf5b884cc9c8cfc9f50ddf0f85cdb8",
+    "tuzi-assistant-linux-x64.rpm.sig": "03af367162f5dee7f799393636491f26a17bb8c2a2dbcb4a0eebba3ea28b2d78",
+    "tuzi-assistant-macos-arm64.app.tar.gz": "eefff0f320660a2184a06f021248fbd7df3ac0211a99e0b7f61ca2a8255e7355",
+    "tuzi-assistant-macos-arm64.app.tar.gz.sig": "9e23191980c83ec40d7d78045f34129c6b3db53c8875220b4bc416f3b0c51978",
+    "tuzi-assistant-macos-arm64.dmg": "251938f6d2831c2749eef4a6055c504a90ba44453b6c53732fb8ca843cc4804f",
+    "tuzi-assistant-macos-x64.app.tar.gz": "3e3ebe6117e154ea59aa42870ea987c7d131e96bdb127dd0eccc9347e9a6e773",
+    "tuzi-assistant-macos-x64.app.tar.gz.sig": "222cebf597e51a8666e0dea111696b28da96220bf3019e904f7d7d3872d9cba3",
+    "tuzi-assistant-macos-x64.dmg": "8e3d3f0fad7edd29d36c8bd00eced6c1ad56c0948c72670fc04bac604c55b6dc",
+    "tuzi-assistant-source.tar.gz": "b6526fdf957376ec87bc9e4d1d3e3c7e7b34ec736e0f288f1ade1c79b8ca51ed",
+    "tuzi-assistant-windows-x64.exe": "35d29195b1db0156bf1073c1906c5a7be6bf005c8b666d59f834b30c259c2ddd",
+    "tuzi-assistant-windows-x64.exe.sig": "582443955692d19d6a6c8fc7653784d7d9b5d8e608f7ceacfe4656b3288928ae",
+    "tuzi-assistant-windows-x64.msi": "da7dcbf2c96f0020f7d1ea7cbac0286de66d917ffc31cb9567085d700502f6c3",
+    "tuzi-assistant-windows-x64.msi.sig": "dabec2cbfa319158e87798476a05e1f070d72bd6438409c317afb6c1d37dfef1"
+  },
+  "all23CandidateFileHashesVerified": true,
+  "sevenDirectInstallerManifestsVerified": true,
+  "sevenUpdaterSignaturesVerified": true,
+  "publicationAllowlistCount": 13,
+  "fourPlatformArtifacts": [
+    {
+      "id": "14149830038",
+      "name": "release-windows-x64",
+      "sha256": "000160e87b7addfe37999634fd48a6ab57b420bc98e1d27ab7d04395ce8b7c1d",
+      "fullArchiveSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "id": "14148856775",
+      "name": "release-linux-x64",
+      "sha256": "d6eed10a53084bb8981f63dc9aba8146f9f9bdfe72626b74f0279e42975c77a4",
+      "fullArchiveSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "id": "14148684758",
+      "name": "release-macos-x64",
+      "sha256": "5b31cd5e36b4677731d3bbb7e7773a3f06706237e64e6d672362ee99d5558aa3",
+      "fullArchiveSha256Verified": true,
+      "zipCrcVerified": true
+    },
+    {
+      "id": "14149720861",
+      "name": "release-macos-arm64",
+      "sha256": "1e1b7b807f14706ae05ae231edb1d8258b814976c293a22891b7d7f8a8cdeb38",
+      "fullArchiveSha256Verified": true,
+      "zipCrcVerified": true
+    }
+  ],
+  "assembledArtifactWholeArchiveDigestVerified": false,
+  "sourceArchiveReproducedLocallyWithIdenticalSha256": true,
+  "macosStaticChecks": [
+    {
+      "kind": "candidate-static-integrity",
+      "runId": "43680220045",
+      "applicationCommit": "11b8e308ef77708df3526a7701d106fc04b15f57",
+      "repository": "AiW520/tuzi-switch",
+      "releaseRepository": "tuziapi/tuzi-switch",
+      "version": "1.6.2",
+      "platform": "macos-arm64",
+      "installerSha256": "251938f6d2831c2749eef4a6055c504a90ba44453b6c53732fb8ca843cc4804f",
+      "architecture": "arm64",
+      "updaterArchiveSignatureVerified": true,
+      "officialUpdaterEndpointEmbedded": true,
+      "newOfficialPublicKeyEmbedded": true,
+      "productionQaCommandAbsent": true,
+      "dmgAndUpdaterArchiveFilesMatch": 4,
+      "executed": false,
+      "officialUpgradeAcceptance": false
+    },
+    {
+      "kind": "candidate-static-integrity",
+      "runId": "43680220045",
+      "applicationCommit": "11b8e308ef77708df3526a7701d106fc04b15f57",
+      "repository": "AiW520/tuzi-switch",
+      "releaseRepository": "tuziapi/tuzi-switch",
+      "version": "1.6.2",
+      "platform": "macos-x64",
+      "installerSha256": "8e3d3f0fad7edd29d36c8bd00eced6c1ad56c0948c72670fc04bac604c55b6dc",
+      "architecture": "x86_64",
+      "updaterArchiveSignatureVerified": true,
+      "officialUpdaterEndpointEmbedded": true,
+      "newOfficialPublicKeyEmbedded": true,
+      "productionQaCommandAbsent": true,
+      "dmgAndUpdaterArchiveFilesMatch": 4,
+      "executed": false,
+      "officialUpgradeAcceptance": false
+    }
+  ],
+  "linuxPackageStaticChecks": [
+    {
+      "installerType": "deb",
+      "elf": true,
+      "bundleMarker": "__TAURI_BUNDLE_TYPE_VAR_DEB",
+      "officialPublicKeyEmbedded": true,
+      "officialUpdaterEndpointEmbedded": true,
+      "productionQaCommandAbsent": true,
+      "executableSha256": "28bfdde814a4f29de5e0e000e5373d52ec784de67a08c6bf2e9e7202bcf618d3",
+      "executed": false
+    },
+    {
+      "installerType": "rpm",
+      "elf": true,
+      "bundleMarker": "__TAURI_BUNDLE_TYPE_VAR_RPM",
+      "officialPublicKeyEmbedded": true,
+      "officialUpdaterEndpointEmbedded": true,
+      "productionQaCommandAbsent": true,
+      "executableSha256": "1b705257878f6e60455e92eba81d31592af2452f52f5c03fdffdeb400fb19d33",
+      "executed": false
+    }
+  ],
+  "allFourBuildLogsFreeOfMissingBundleTypeWarnings": true,
+  "officialInstallUpgradeAcceptance": false,
+  "published": false,
+  "limitations": [
+    "Static verification does not prove installation, restart or data preservation.",
+    "The assembled ZIP was selectively read; its 23 payload files were independently reconstructed from fully verified platform artifacts and a byte-identical local source archive.",
+    "No passing release acceptance record has been created."
+  ]
+}

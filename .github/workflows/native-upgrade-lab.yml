@@ -6,9 +6,15 @@ on:
       windows_only:
         type: boolean
         default: false
+      windows_environment_probe_only:
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       windows_only:
+        type: boolean
+        default: false
+      windows_environment_probe_only:
         type: boolean
         default: false
 permissions:
@@ -17,8 +23,23 @@ concurrency:
   group: native-upgrade-lab-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  windows-environment-probe:
+    if: inputs.windows_environment_probe_only && github.repository == 'AiW520/tuzi-switch'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose the pinned NSIS restart helper
+        shell: pwsh
+        run: ./scripts/windows-updater-environment-probe.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-updater-environment-probe
+          path: ${{ runner.temp }}/tuzi-nsis-environment-probe/*.json
+          if-no-files-found: warn
   native-upgrade:
-    if: github.repository == 'AiW520/tuzi-switch'
+    if: github.repository == 'AiW520/tuzi-switch' && !inputs.windows_environment_probe_only
     timeout-minutes: 90
     strategy:
       fail-fast: false

@@ -18,6 +18,10 @@ on:
         description: Limit the isolated native laboratory to Windows
         type: boolean
         default: false
+      windows_environment_probe_only:
+        description: Only diagnose the Windows NSIS restart environment; no signing or release
+        type: boolean
+        default: false
       signing_preflight_only:
         description: Only verify the official signing key; do not build or publish
         type: boolean
@@ -43,6 +47,7 @@ jobs:
     uses: ./.github/workflows/native-upgrade-lab.yml
     with:
       windows_only: ${{ inputs.native_upgrade_windows_only || false }}
+      windows_environment_probe_only: ${{ inputs.windows_environment_probe_only || false }}
 
   signing-preflight:
     if: inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch')
