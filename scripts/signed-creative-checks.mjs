@@ -160,6 +160,9 @@ export async function exerciseSeedream55(page, output) {
   assert.equal(layers[2].metadata.semanticLayer.providerMetadata.future_extension.preserve, true);
   const manifest = saved.boards.flatMap(b => b.elements).find(e => e.metadata?.semanticLayerGroup)?.metadata.semanticLayerGroup.manifest;
   assert.equal(manifest.layers.length, 3); assert.equal(manifest.layers[1].textRecognition.text, '你好 1');
-  saved.pixelElementId = element.id;
+  // Applying layers replaces the source image. Inspect a surviving layer,
+  // while the snapshot above still verifies every persisted element exactly.
+  saved.pixelElementId = layers[0].id;
+  assert.ok(saved.boards.some(b => b.elements.some(e => e.id === saved.pixelElementId)));
   return saved;
 }

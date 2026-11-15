@@ -161,8 +161,14 @@ foreach ($program in $programs) {
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
     if (url.hostname === 'api.tu-zi.com') {
       try {
-        assert.equal(req.headers.authorization, 'Bearer sk-SYNTHETIC-GENERATION');
         res.setHeader('Content-Type', 'application/json');
+        // The account's public connectivity probe is unrelated to model auth.
+        if (req.method === 'GET' && url.pathname === '/api/status') {
+          assert.equal(req.headers.authorization, undefined);
+          assert.equal(url.searchParams.has('ch'), false);
+          res.end(JSON.stringify({ success: true, data: { system_name: 'SYNTHETIC local status' } })); return;
+        }
+        assert.equal(req.headers.authorization, 'Bearer sk-SYNTHETIC-GENERATION');
         if (req.method === 'GET' && url.pathname === '/v1/models') {
           assert.equal(url.searchParams.has('ch'), false, 'Metadata requests must not be attributed as consumption');
           report.creativeRequests.push({ version: activeVersion, path: url.pathname, syntheticAuthorizationMatched: true });
