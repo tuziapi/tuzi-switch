@@ -13,6 +13,7 @@ mod codex_state_db;
 mod commands;
 mod config;
 mod creative_http;
+mod creative_attribution;
 mod creative_codex;
 mod creative_images;
 mod creative_media;
@@ -47,6 +48,8 @@ mod tuzi_account;
 mod tray;
 mod usage_script;
 mod web_hot_update;
+#[cfg(feature = "updater-acceptance")]
+mod updater_acceptance;
 
 pub use app_config::{AppType, InstalledSkill, McpApps, McpServer, MultiAppConfig, SkillApps};
 pub use codex_config::{
@@ -82,7 +85,6 @@ use tauri::image::Image;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::RunEvent;
 use tauri::{Emitter, Manager};
-use tauri_plugin_updater::UpdaterExt;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 fn redact_url_for_log(url_str: &str) -> String {
@@ -117,55 +119,6 @@ fn redact_url_for_log(url_str: &str) -> String {
             }
         }
     }
-}
-
-fn should_verify_updater_install() -> bool {
-    std::env::args().any(|arg| arg == "--tuzi-verify-updater-install")
-}
-
-fn run_updater_install_verification(app: &tauri::AppHandle) {
-    if !should_verify_updater_install() {
-        return;
-    }
-
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let result = async {
-            let updater = app.updater().map_err(|err| err.to_string())?;
-            let Some(update) = updater.check().await.map_err(|err| err.to_string())? else {
-                return Err("没有可用更新".to_string());
-            };
-
-            println!("TUZI_UPDATER_VERIFY_AVAILABLE={}", update.version);
-            update
-                .download_and_install(
-                    |downloaded, total| {
-                        println!(
-                            "TUZI_UPDATER_VERIFY_PROGRESS downloaded={downloaded} total={}",
-                            total.unwrap_or_default()
-                        );
-                    },
-                    || {
-                        println!("TUZI_UPDATER_VERIFY_DOWNLOAD_FINISHED");
-                    },
-                )
-                .await
-                .map_err(|err| err.to_string())?;
-            Ok::<(), String>(())
-        }
-        .await;
-
-        match result {
-            Ok(()) => {
-                println!("TUZI_UPDATER_VERIFY_INSTALLED=1");
-                app.exit(0);
-            }
-            Err(err) => {
-                eprintln!("TUZI_UPDATER_VERIFY_ERROR={err}");
-                app.exit(2);
-            }
-        }
-    });
 }
 
 /// 统一处理 tuziswitch:// 深链接 URL
@@ -390,7 +343,6 @@ pub fn run() {
                     log::warn!("初始化 Updater 插件失败，已跳过：{e}");
                 }
             }
-            run_updater_install_verification(app.handle());
             // 初始化日志（单文件输出到 <app_config_dir>/logs/tuzi-switch.log）
             {
                 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
@@ -1621,6 +1573,10 @@ pub fn run() {
         .expect("error while running tauri application");
 
     app.run(|app_handle, event| {
+        #[cfg(feature = "updater-acceptance")]
+        if matches!(event, RunEvent::Ready) {
+            updater_acceptance::run(app_handle);
+        }
         // 处理退出请求（所有平台）
         if let RunEvent::ExitRequested { api, code, .. } = &event {
             if *code == Some(tauri::RESTART_EXIT_CODE) {

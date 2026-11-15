@@ -1,0 +1,118 @@
+name: Publish accepted desktop candidate
+run-name: "发布已验收安装包 · ${{ inputs.tag }}"
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version already tested, e.g. v1.6.2
+        required: true
+        type: string
+      candidate_run_id:
+        description: Successful Unified desktop release run containing the tested bytes
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: unified-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main' && github.repository == 'tuziapi/tuzi-switch'
+    runs-on: ubuntu-22.04
+    environment: github-pages
+    permissions:
+      contents: write
+      actions: read
+      pages: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Resolve the immutable candidate and matching tag
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" > /tmp/candidate-run.json
+          gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" > /tmp/candidate-tag.json
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const run=JSON.parse(fs.readFileSync('/tmp/candidate-run.json'));
+          const tag=JSON.parse(fs.readFileSync('/tmp/candidate-tag.json'));
+          if(run.conclusion!=='success' || run.path!=='.github/workflows/unified-release.yml'
+            || run.head_sha!==tag.sha || run.repository.full_name!==process.env.GITHUB_REPOSITORY)
+            throw Error('Candidate run, repository and version tag must match');
+          fs.appendFileSync(process.env.GITHUB_ENV,`CANDIDATE_SHA=${run.head_sha}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,`sha=${run.head_sha}\n`);
+          JS
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+          path: release-assets
+      - name: Require reviewed real upgrade evidence for exactly these files
+        run: node scripts/update-acceptance.mjs verify release-assets "docs/development/update-acceptance/${RELEASE_TAG}.json"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          path: candidate-source
+      - name: Reverify installer identity and signatures without rebuilding
+        working-directory: candidate-source
+        env:
+          GITHUB_SHA: ${{ steps.source.outputs.sha }}
+          GITHUB_RUN_ID: ${{ inputs.candidate_run_id }}
+          TUZI_SWITCH_RELEASE_REPOSITORY: tuziapi/tuzi-switch
+        run: |
+          python3 scripts/verify-release-assets.py ../release-assets
+          node scripts/updater-assets.mjs verify-manifest ../release-assets
+      - name: Require an increasing version and an unpublished tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/latest-release.json
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {compareVersions} from './scripts/update-acceptance.mjs';
+          const latest=JSON.parse(fs.readFileSync('/tmp/latest-release.json')).tag_name;
+          if(!/^v\d+\.\d+\.\d+$/.test(latest) || compareVersions(process.env.RELEASE_TAG.slice(1),latest.slice(1))<=0)
+            throw Error('Published versions must strictly increase');
+          JS
+          gh api "repos/$GITHUB_REPOSITORY/pages" > /tmp/pages.json
+          node -e 'if(require("/tmp/pages.json").build_type!=="workflow") throw Error("Pages must use GitHub Actions")'
+          if gh release view "$RELEASE_TAG" --json isDraft > /tmp/existing-release.json 2>/dev/null; then
+            node -e 'if(!require("/tmp/existing-release.json").isDraft) throw Error("Published releases are immutable")'
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --title "兔子助手 $RELEASE_TAG" --notes-file "candidate-source/docs/releases/$RELEASE_TAG.md" --draft --latest=false
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest --notes-file "candidate-source/docs/releases/$RELEASE_TAG.md"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - run: pnpm install --frozen-lockfile
+        working-directory: candidate-source
+      - run: pnpm build:download
+        working-directory: candidate-source
+        env:
+          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ steps.source.outputs.sha }}/packages/download-page
+      - name: Include source and public metadata
+        working-directory: candidate-source
+        run: |
+          cp packages/download-page/dist/tuzi-switch.html packages/download-page/dist/index.html
+          cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/dist/
+          cp ../release-assets/tuzi-assistant-source.tar.gz packages/download-page/dist/source.tar.gz
+          touch packages/download-page/dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: candidate-source/packages/download-page/dist
+      - uses: actions/deploy-pages@v4

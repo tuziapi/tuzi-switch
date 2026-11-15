@@ -6,12 +6,12 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
-      signing_preflight_only:
-        description: Only verify the official signing key; do not build or publish
+      native_upgrade_lab_only:
+        description: Run isolated native upgrade tests in the test repository; never publish
         type: boolean
         default: false
-      publish:
-        description: Publish verified installers and deploy the download page (version tag only)
+      signing_preflight_only:
+        description: Only verify the official signing key; do not build or publish
         type: boolean
         default: false
 
@@ -29,15 +29,19 @@ env:
   VITE_RELEASE_REPOSITORY: ${{ github.repository }}
 
 jobs:
+  native-upgrade-lab:
+    if: inputs.native_upgrade_lab_only && github.repository == 'AiW520/tuzi-switch'
+    uses: ./.github/workflows/native-upgrade-lab.yml
+
   signing-preflight:
-    if: inputs.signing_preflight_only && github.repository == 'tuziapi/tuzi-switch'
-    uses: ./.github/workflows/official-updater-preflight.yml
+    if: inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch')
+    uses: ./.github/workflows/channel-updater-preflight.yml
     secrets:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      UPDATER_KEY: ${{ github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY || secrets.TUZI_UPDATER_PRIVATE_KEY }}
+      UPDATER_PASSWORD: ${{ github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
 
   verify:
-    if: ${{ !inputs.signing_preflight_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
+    if: ${{ !inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
     runs-on: ubuntu-22.04
     outputs:
       tag: ${{ steps.identity.outputs.tag }}
@@ -46,7 +50,7 @@ jobs:
       - name: Verify version identity
         id: identity
         env:
-          PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+          PUBLISH: "false"
         run: node scripts/verify-release-identity.mjs
       - name: Require the existing channel signing key
         shell: bash
@@ -74,7 +78,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - run: python3 scripts/test_release_assets.py
-      - run: node --test scripts/verify-updater-assets.mjs
+      - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
       - run: pnpm test:creative
@@ -239,80 +243,11 @@ jobs:
           cd release-assets
           sha256sum tuzi-assistant-* > SHA256SUMS
           sha256sum -c SHA256SUMS
+      - name: Bind all candidate files to this source and run
+        run: node scripts/update-acceptance.mjs candidate release-assets
       - uses: actions/upload-artifact@v4
         with:
           name: verified-release
           path: release-assets/*
           if-no-files-found: error
           retention-days: 30
-
-  publish:
-    needs: [verify, assemble]
-    if: ${{ !inputs.signing_preflight_only && (github.event_name == 'push' || inputs.publish) }}
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: verified-release
-          path: release-assets
-      - name: Verify Pages configuration before publishing
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/pages" > /tmp/pages.json
-          node -e 'if (require("/tmp/pages.json").build_type !== "workflow") throw Error("Configure repository Pages source as GitHub Actions before publishing")'
-      - name: Restore verified release notes
-        run: cp "docs/releases/${GITHUB_REF_NAME}.md" /tmp/release-notes.md
-      - name: Publish complete installation files
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/latest-release.json
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          const latest = JSON.parse(fs.readFileSync('/tmp/latest-release.json')).tag_name;
-          const parts = s => s.replace(/^v/, '').split('.').map(Number);
-          const a = parts(process.env.RELEASE_TAG), b = parts(latest);
-          for (let i=0;i<3;i++) { if (a[i] < b[i]) throw Error('Refusing release rollback'); if(a[i] > b[i]) break; }
-          JS
-          if gh release view "$RELEASE_TAG" --json isDraft >/tmp/existing-release.json 2>/dev/null; then
-            node -e 'if(!require("/tmp/existing-release.json").isDraft) throw Error("Published releases are immutable; rerun page publication separately")'
-          else
-            gh release create "$RELEASE_TAG" --verify-tag --title "兔子助手 $RELEASE_TAG" --notes-file /tmp/release-notes.md --draft --latest=false
-          fi
-          gh release upload "$RELEASE_TAG" release-assets/* --clobber
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest --notes-file /tmp/release-notes.md
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: '9'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build:download
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
-      - name: Include source and checksums on public download page
-        run: |
-          cp packages/download-page/dist/tuzi-switch.html packages/download-page/dist/index.html
-          cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/dist/
-          cp release-assets/tuzi-assistant-source.tar.gz packages/download-page/dist/source.tar.gz
-          touch packages/download-page/dist/.nojekyll
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: packages/download-page/dist
-      - uses: actions/deploy-pages@v4
-        id: deployment

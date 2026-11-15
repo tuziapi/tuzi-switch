@@ -64,6 +64,7 @@ async fn connected() -> (Arc<AccountService>, Fixture, tokio::task::JoinHandle<(
                 Json(json!({"data":items})).into_response()
             },
             "/v1/images/generations" => {
+                assert_eq!(uri.query(), Some(format!("ch={}", crate::creative_attribution::channel()).as_str()));
                 *f.submissions.lock().unwrap() += 1;
                 f.entered.notify_one();
                 match mode {
@@ -73,8 +74,8 @@ async fn connected() -> (Arc<AccountService>, Fixture, tokio::task::JoinHandle<(
                     _ => Json(json!({"data":[{"b64_json":"c3ludGhldGlj"}]})).into_response(),
                 }
             },
-            _ if mode == "media" && MEDIA_ACTIONS.iter().any(|a| a.method == method.as_str() && a.path.replace("{taskId}", "synthetic-task_1") == uri.to_string()) => {
-                f.requests.lock().unwrap().push((method.to_string(), uri.to_string(), body.to_vec()));
+            _ if mode == "media" && MEDIA_ACTIONS.iter().any(|a| a.method == method.as_str() && a.path.replace("{taskId}", "synthetic-task_1") == uri.to_string().split("&ch=").next().unwrap().split("?ch=").next().unwrap()) => {
+                f.requests.lock().unwrap().push((method.to_string(), uri.to_string().split("&ch=").next().unwrap().split("?ch=").next().unwrap().to_string(), body.to_vec()));
                 Json(json!({"task_id":"synthetic-task_1","status":"SUCCESS"})).into_response()
             },
             _ => panic!("Unexpected fixture path: {}", uri.path()),

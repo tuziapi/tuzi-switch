@@ -1,0 +1,71 @@
+name: Native upgrade laboratory
+run-name: "隔离真实升级验收 · ${{ github.ref_name }}"
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  group: native-upgrade-lab-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native-upgrade:
+    if: github.repository == 'AiW520/tuzi-switch'
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel, windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux libraries and virtual display
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev xvfb
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.95'
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:renderer
+      - name: Native transport attribution regression
+        shell: bash
+        run: |
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib desktop_attribution -- --test-threads=1
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib creative_http::tests -- --test-threads=1
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib tuzi_account::creative::tests -- --test-threads=1
+      - name: Install, reject corrupt packages, upgrade and restart isolated apps
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            xvfb-run -a python3 scripts/native-upgrade-lab.py --output "$RUNNER_TEMP/tuzi-upgrade-lab"
+          else
+            python3 scripts/native-upgrade-lab.py --output "$RUNNER_TEMP/tuzi-upgrade-lab"
+          fi
+      - name: Upload native evidence (never keys or synthetic credentials)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-upgrade-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/tuzi-upgrade-lab/results.json
+            ${{ runner.temp }}/tuzi-upgrade-lab/build-*.log
+            ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/events.jsonl
+            ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/process.log
+            ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/initial-install.log
+          if-no-files-found: warn

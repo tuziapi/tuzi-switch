@@ -158,3 +158,12 @@ async fn connection_failure_is_distinct_from_unknown_response() {
     drop(listener);
     assert_eq!(execute(request(&url), |_| Ok(())).await.unwrap_err(), "creative_connection_failed");
 }
+
+#[test]
+fn native_manual_request_uses_desktop_attribution_and_preserves_body() {
+    let input = request("https://api.tu-zi.com/v1/images/generations?ch=1&%63h=2&sig=a+b%2F");
+    let output = prepare(&input, &reqwest::Client::new()).unwrap().build().unwrap();
+    assert_eq!(output.url().query().unwrap(), format!("sig=a+b%2F&ch={}",crate::creative_attribution::channel()));
+    assert_eq!(output.body().unwrap().as_bytes().unwrap(), [0,1,255,128]);
+    assert_eq!(output.headers()["authorization"], "Bearer sk-synthetic-manual");
+}

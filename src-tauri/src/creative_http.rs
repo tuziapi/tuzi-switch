@@ -53,7 +53,7 @@ fn prepare(
     }
     let mut builder = client.request(
         reqwest::Method::from_bytes(request.method.as_bytes()).map_err(|_| "invalid_method")?,
-        url,
+        crate::creative_attribution::apply(url, false),
     );
     for (name, value) in &request.headers {
         let lower = name.to_ascii_lowercase();

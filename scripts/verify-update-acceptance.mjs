@@ -1,0 +1,96 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { candidate, verify, platforms } from "./update-acceptance.mjs";
+
+function fixture(fn) {
+  const dir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "SYNTHETIC-upgrade-evidence-"),
+  );
+  try {
+    fs.writeFileSync(
+      path.join(dir, "latest.json"),
+      JSON.stringify({ version: "1.6.2" }),
+    );
+    fs.writeFileSync(path.join(dir, "package.tar.gz"), "SYNTHETIC package");
+    const c = candidate(dir, {
+      GITHUB_REPOSITORY: "tuziapi/tuzi-switch",
+      GITHUB_SHA: "a".repeat(40),
+      GITHUB_RUN_ID: "123",
+    });
+    const evidence = {
+      ...c,
+      status: "passed",
+      signingKey: "existing-channel-key",
+      reviewer: "SYNTHETIC UNIT TEST ONLY",
+      completedAt: "2026-11-15T00:00:00Z",
+      platforms: platforms.map((platform) => ({
+        platform,
+        kind: "real-installed-app",
+        status: "passed",
+        fromVersion: "1.6.1",
+        toVersion: "1.6.2",
+        evidence: "SYNTHETIC TEST RECORD",
+        checks: Object.fromEntries(
+          [
+            "download",
+            "signature",
+            "install",
+            "restart",
+            "version",
+            "dataPreservation",
+            "corruptPackage",
+            "networkFailure",
+            "installFailure",
+            "retry",
+            "businessAttribution",
+          ].map((k) => [k, "passed"]),
+        ),
+      })),
+    };
+    fn(dir, evidence, c);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+test("accepts reviewed evidence for identical candidate bytes", () =>
+  fixture((d, e, c) => assert.equal(verify(d, e, c).commit, c.commit)));
+test("rejects rebuilt or modified packages", () =>
+  fixture((d, e, c) => {
+    fs.writeFileSync(path.join(d, "package.tar.gz"), "changed");
+    assert.throws(() => verify(d, e, c), /checksum/);
+  }));
+test("rejects missing, duplicate, mocked and untested platforms", () =>
+  fixture((d, e, c) => {
+    for (const change of [
+      (x) => x.platforms.pop(),
+      (x) => (x.platforms[0].kind = "mock"),
+      (x) => (x.platforms[0].checks.restart = "pending"),
+      (x) => (x.platforms[0] = x.platforms[1]),
+      (x) => (x.signingKey = "ephemeral-test-key"),
+      (x) => (x.status = "pending"),
+    ]) {
+      const copy = structuredClone(e);
+      change(copy);
+      assert.throws(() => verify(d, copy, c));
+    }
+  }));
+test("rejects source, repository, run and version substitutions", () =>
+  fixture((d, e, c) => {
+    for (const key of ["repository", "commit", "runId", "tag"])
+      assert.throws(() => verify(d, { ...e, [key]: "other" }, c), /mismatch/);
+  }));
+test("rejects changed evidence file list, downgrade and missing analytics check", () =>
+  fixture((d, e, c) => {
+    for (const change of [
+      (x) => delete x.files["package.tar.gz"],
+      (x) => (x.platforms[0].fromVersion = "1.6.2"),
+      (x) => delete x.platforms[0].checks.businessAttribution,
+    ]) {
+      const copy = structuredClone(e);
+      change(copy);
+      assert.throws(() => verify(d, copy, c));
+    }
+  }));

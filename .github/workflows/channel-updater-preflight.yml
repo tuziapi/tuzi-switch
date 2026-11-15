@@ -1,0 +1,40 @@
+name: Verify existing channel signing key
+on:
+  workflow_call:
+    secrets:
+      UPDATER_KEY:
+        required: true
+      UPDATER_PASSWORD:
+        required: false
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      TUZI_SWITCH_RELEASE_REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9'
+      - run: pnpm install --frozen-lockfile
+      - name: Sign synthetic bytes and verify against the existing channel public key
+        shell: bash
+        env:
+          UPDATER_KEY: ${{ secrets.UPDATER_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.UPDATER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$UPDATER_KEY" ]]; then echo 'Missing channel key'; exit 1; fi
+          umask 077
+          KEY_PATH="$(mktemp "$RUNNER_TEMP/tuzi-channel-key.XXXXXX")"
+          trap 'rm -f "$KEY_PATH"' EXIT
+          printf '%s' "$UPDATER_KEY" > "$KEY_PATH"
+          export TAURI_SIGNING_PRIVATE_KEY="$KEY_PATH"
+          node scripts/updater-assets.mjs check-key
+      - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs

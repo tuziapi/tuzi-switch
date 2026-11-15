@@ -124,7 +124,7 @@ export function collect(source, output, name) {
     signArtifact(target);
   }
 }
-export function manifest(dir, env = process.env) {
+export function manifest(dir, env = process.env, write = true) {
   const version = JSON.parse(
     fs.readFileSync(path.join(root, "package.json"), "utf8"),
   ).version;
@@ -169,6 +169,19 @@ export function manifest(dir, env = process.env) {
     pub_date: new Date().toISOString(),
     platforms,
   };
+  if (!write) {
+    const existing = JSON.parse(
+      fs.readFileSync(path.join(dir, "latest.json"), "utf8"),
+    );
+    if (
+      existing.version !== result.version ||
+      existing.notes !== result.notes ||
+      !Number.isFinite(Date.parse(existing.pub_date)) ||
+      JSON.stringify(existing.platforms) !== JSON.stringify(result.platforms)
+    )
+      throw Error("Candidate updater manifest mismatch");
+    return existing;
+  }
   fs.writeFileSync(
     path.join(dir, "latest.json"),
     JSON.stringify(result, null, 2) + "\n",
@@ -182,5 +195,7 @@ if (
   if (process.argv[2] === "check-key") checkKey();
   else if (process.argv[2] === "collect") collect(...process.argv.slice(3));
   else if (process.argv[2] === "manifest") manifest(process.argv[3]);
+  else if (process.argv[2] === "verify-manifest")
+    manifest(process.argv[3], process.env, false);
   else throw Error("Expected collect or manifest");
 }

@@ -702,7 +702,10 @@ async fn execute(
                 .http
                 .request(
                     reqwest::Method::from_bytes(method.as_bytes()).map_err(|_| "invalid_method")?,
-                    format!("{}{path}", service.origin),
+                    crate::creative_attribution::apply(
+                        reqwest::Url::parse(&format!("{}{path}", service.origin)).map_err(|_| "invalid_url")?,
+                        true,
+                    ),
                 )
                 .bearer_auth(secret.as_str())
                 .header("X-Request-Id", upstream_id)
