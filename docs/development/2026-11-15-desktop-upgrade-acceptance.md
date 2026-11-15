@@ -231,3 +231,11 @@ Fedora43真实rpm实验八场景通过；artifact14153490733归档SHA256/ZIP CRC
 43693664668：三个loopback地址都拒绝连接；进程诊断显示WebView2未收到调试参数且9222没有监听。应用正常显示窗口，清理已无错误。依据Microsoft WebView2 CreateCoreWebView2EnvironmentWithOptions文档，追加仅针对com.tuziswitch.desktop/tu-zi-switch.exe的临时AdditionalBrowserArguments注册表覆盖，保留并恢复原值；只使用remote-debugging-port，入站也阻断非loopback。无需修改正式候选或禁用TLS；后续实跑验证能否连接。
 
 43694284150的临时注册表覆盖生效，已通过实际IPC读取1.6.2正式ID、stable渠道、正式仓库与11b8e308精确commit。随后“View update”被首次欢迎弹窗挡住；已人工查看failure.png，补充正常点击Got it/我知道了，保留真实UI操作，不强制穿透遮罩。升级尚未开始，继续复验。
+
+## 正式签名Windows原字节升级子集43694716475通过
+
+测试源码82c03942，NSIS/MSI两个job全部成功。分别完整下载artifact14154057482与14154007800，归档SHA256、ZIP CRC及10项断言独立复核通过：真实应用拒绝篡改包、截断下载与404，随后同安装目录重试；下载验签、安装、由安装器自动重启、版本/ID/正式渠道/精确commit及SQLite合成供应商与WebView偏好保留均通过。旧进程实际exit0，无手工启动1.6.3，临时环境清理无错误。两个格式分别实际请求.exe/.msi载荷，没有用NSIS替代MSI。已查看重启后截图。
+
+固定候选为43680220045/11b8e308的1.6.2与43689683759/695f4e93的1.6.3，测试过程中未重编、重签或修改安装包；仅版本发现为本地合成HTTPS。完整证据见evidence/2026-11-15-signed-43694716475-nsis.json与evidence/2026-11-15-signed-43694716475-msi.json。保持officialAcceptance=false：旧正式版手动过渡、有效包安装失败、完整创作项目迁移、经营归因及其他平台正式实装尚未完成。
+
+MSI临时密钥实验43689414375 attempt1于08:27:20 UTC自行失败，取消请求到达前已结束；GitHub annotation明确“hosted runner lost communication with the server”，job日志和artifact未留存，不能推断产品安装失败原因。仅重跑该MSI job，attempt2为132753425896；未重复DEB/RPM。
