@@ -47,7 +47,7 @@ const appEnv = { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remot
 for (const key of Object.keys(appEnv)) if (/TOKEN|SECRET|PASSWORD|PRIVATE_KEY/i.test(key)) delete appEnv[key];
 delete appEnv.CC_SWITCH_TEST_HOME; delete appEnv.TUZI_UPDATER_QA_ROOT;
 function powershell(script) {
-  const result = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { env, encoding: 'utf8' });
+  const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-OutputFormat', 'Text', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { env, encoding: 'utf8' });
   if (result.status !== 0) throw Error(result.stderr || `PowerShell exited ${result.status}`);
   return result.stdout.trim();
 }
@@ -97,6 +97,7 @@ async function identity(page, version, commit) {
 try {
   powershell(String.raw`
 $ErrorActionPreference='Stop'
+Import-Module Microsoft.PowerShell.Security
 $root=$env:TUZI_SIGNED_LAB_ROOT
 $hosts=Join-Path $env:SystemRoot 'System32/drivers/etc/hosts'
 Copy-Item $hosts (Join-Path $root 'hosts.original')
@@ -203,6 +204,7 @@ foreach ($program in $programs) {
   try {
     powershell(String.raw`
 $ErrorActionPreference='Stop'
+Import-Module Microsoft.PowerShell.Security
 $root=$env:TUZI_SIGNED_LAB_ROOT
 Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:TUZI_SIGNED_LAB_EXE } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 if (Test-Path (Join-Path $root 'hosts.original')) { Copy-Item (Join-Path $root 'hosts.original') (Join-Path $env:SystemRoot 'System32/drivers/etc/hosts') -Force; Clear-DnsClientCache }
