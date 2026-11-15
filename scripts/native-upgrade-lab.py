@@ -50,6 +50,53 @@ def process_alive(pid):
         return False
 
 
+def failure_diagnostics(case, process, executable, before_hash, events):
+    """Capture only laboratory process/file state, never credentials or env."""
+    report = {
+        'launcherPid': process.pid,
+        'launcherExitCode': process.poll(),
+        'observedProcesses': [
+            {'pid': pid, 'alive': process_alive(pid)}
+            for pid in sorted({e['detail']['pid'] for e in events
+                               if e['event'] == 'started' and 'pid' in e['detail']})
+        ],
+        'executableExists': executable.exists(),
+        'beforeSha256': before_hash,
+    }
+    try:
+        report['afterSha256'] = hashlib.sha256(executable.read_bytes()).hexdigest()
+    except OSError as error:
+        report['executableReadError'] = str(error)
+    if sys.platform == 'win32':
+        # Restrict the inventory to the laboratory app/installer and descendants.
+        # Command lines and environment are deliberately excluded.
+        script = r'''
+$all = @(Get-CimInstance Win32_Process)
+$selected = @($all | Where-Object {
+  $_.Name -eq 'tu-zi-switch.exe' -or
+  $_.ExecutablePath -like '*tuzi-upgrade-lab*' -or
+  $_.ExecutablePath -like '*tauri-updater*'
+})
+do {
+  $ids = @($selected.ProcessId)
+  $children = @($all | Where-Object { $_.ParentProcessId -in $ids -and $_.ProcessId -notin $ids })
+  $selected += $children
+} while ($children.Count -gt 0)
+@($selected | ForEach-Object {
+  $proc = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
+  [PSCustomObject]@{pid=$_.ProcessId; parentPid=$_.ParentProcessId;
+    name=$_.Name; executable=$_.ExecutablePath; windowTitle=$proc.MainWindowTitle}
+}) | ConvertTo-Json -Depth 3 -Compress
+'''
+        try:
+            completed = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', script],
+                                       capture_output=True, text=True, timeout=20, check=True)
+            report['windowsProcesses'] = json.loads(completed.stdout or '[]')
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            report['processInspectionError'] = type(error).__name__
+    (case / 'failure-diagnostics.json').write_text(json.dumps(report, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True)
@@ -208,6 +255,7 @@ def main():
                     time.sleep(0.25)
                 terminal = next((e for e in events if e['event'] in ('passed', 'failed')), None)
                 if not terminal or terminal['event'] != 'passed':
+                    failure_diagnostics(case, process, executable, before_hash, events)
                     if process.poll() is None:
                         process.terminate()
                     raise RuntimeError(f'{name} failed: {terminal}; logs: {case}')

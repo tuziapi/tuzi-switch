@@ -1,0 +1,227 @@
+{
+  "kind": "isolated-native-smoke",
+  "platform": "windows-x86_64",
+  "signingKey": "ephemeral-test-key",
+  "officialAcceptance": false,
+  "results": [
+    {
+      "scenario": "tampered-signature",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 8748,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\tampered-signature-1794720780858368600\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "The signature verification failed",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "interrupted-download",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 4944,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\interrupted-download-1794720787139163400\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "error decoding response body",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "missing-package",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 5388,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\missing-package-1794720790518364900\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "`Download request failed with status: 404 Not Found`",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "install-failure",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6984,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\install-failure-1794720793815648100\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 32
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "installRejected": true,
+            "error": "invalid updater binary format",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "same-version",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 9372,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\same-version-1794720797156438600\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "downgrade",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 8012,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\downgrade-1794720800446150300\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "upgrade-and-restart",
+      "status": "failed",
+      "reason": "Timed out after 180 seconds without a terminal native event; root cause not established",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 4444,
+            "bundleType": "Some(Nsis)",
+            "executable": "D:\\a\\_temp\\tuzi-upgrade-lab\\runs\\upgrade-and-restart-1794720803717917300\\installed\\tu-zi-switch.exe"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 22703544
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "retry-after-signature-rejection",
+      "status": "not-run",
+      "reason": "Previous upgrade scenario failed"
+    }
+  ],
+  "repository": "AiW520/tuzi-switch",
+  "runId": "43679153103",
+  "applicationCommit": "485ec1d1a4b4a643ca4bb1cf1f2769832c389b4f",
+  "artifactId": "14148716270",
+  "artifactSha256": "c3d6043fa744d826708af02c5bef537ec9e52a0964a9c8198fbf81e8eeb581ff",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "scope": "Windows NSIS isolated experiment failed; not official candidate acceptance"
+}

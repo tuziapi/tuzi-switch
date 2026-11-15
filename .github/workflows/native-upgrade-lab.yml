@@ -2,7 +2,15 @@ name: Native upgrade laboratory
 run-name: "隔离真实升级验收 · ${{ github.ref_name }}"
 on:
   workflow_dispatch:
+    inputs:
+      windows_only:
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      windows_only:
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -15,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, macos-15-intel, windows-latest, ubuntu-22.04]
+        os: ${{ fromJSON(inputs.windows_only && '["windows-latest"]' || '["macos-15","macos-15-intel","windows-latest","ubuntu-22.04"]') }}
     runs-on: ${{ matrix.os }}
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -69,4 +77,5 @@ jobs:
             ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/*events.jsonl
             ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/*process.log
             ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/initial-install.log
+            ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/failure-diagnostics.json
           if-no-files-found: warn

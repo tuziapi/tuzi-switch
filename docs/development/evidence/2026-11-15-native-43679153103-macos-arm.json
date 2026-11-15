@@ -1,0 +1,301 @@
+{
+  "kind": "isolated-native-smoke",
+  "platform": "darwin-aarch64",
+  "signingKey": "ephemeral-test-key",
+  "officialAcceptance": false,
+  "results": [
+    {
+      "scenario": "tampered-signature",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 68899,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/tampered-signature-1794720553489101000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "The signature verification failed",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "interrupted-download",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 68929,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/interrupted-download-1794720555357506000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "error decoding response body",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "missing-package",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 68956,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/missing-package-1794720555945866000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "`Download request failed with status: 404 Not Found`",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "install-failure",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 68982,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/install-failure-1794720556444812000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 32
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "installRejected": true,
+            "error": "invalid gzip header",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "same-version",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 69009,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/same-version-1794720556959634000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "downgrade",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 69035,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/downgrade-1794720557456967000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "upgrade-and-restart",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 69062,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/upgrade-and-restart-1794720557946123000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 26298182
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 69109,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/upgrade-and-restart-1794720557946123000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "retry-after-signature-rejection",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 69111,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/tampered-signature-1794720553489101000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 26298182
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 69134,
+            "bundleType": "Some(App)",
+            "executable": "/Users/runner/work/_temp/tuzi-upgrade-lab/runs/tampered-signature-1794720553489101000/Tuzi Update QA.app/Contents/MacOS/tu-zi-switch"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    }
+  ],
+  "repository": "AiW520/tuzi-switch",
+  "runId": "43679153103",
+  "applicationCommit": "485ec1d1a4b4a643ca4bb1cf1f2769832c389b4f",
+  "artifactId": "14148173451",
+  "artifactSha256": "b2ebbe48eb4097e4f8d3616ce65c91dde2e1c2a70957e9996f18c0bc91cb3eed",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "runtimeBundleTypeVerified": true,
+  "scope": "macOS ARM app only; not official candidate acceptance"
+}

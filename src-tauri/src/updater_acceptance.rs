@@ -138,9 +138,20 @@ async fn execute(app: &tauri::AppHandle, root: &Path) -> Result<(), String> {
         .updater_builder()
         .endpoints(vec![endpoint])
         .map_err(|e| e.to_string())?
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|e| e.to_string())?;
+        .timeout(Duration::from_secs(15));
+    // Preserve the plugin's real cleanup; only record its boundaries in the
+    // isolated acceptance build so a failed handoff cannot look like a pass.
+    #[cfg(target_os = "windows")]
+    let updater = {
+        let app = app.clone();
+        let root = root.to_path_buf();
+        updater.on_before_exit(move || {
+            let _ = record(&root, "cleanup-started", json!({}));
+            app.cleanup_before_exit();
+            let _ = record(&root, "cleanup-completed", json!({}));
+        })
+    };
+    let updater = updater.build().map_err(|e| e.to_string())?;
     let update = updater.check().await.map_err(|e| e.to_string())?;
     if scenario.mode == "no-update" {
         if update.is_some() {

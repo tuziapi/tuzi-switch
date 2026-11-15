@@ -14,6 +14,10 @@ on:
         description: Run isolated native upgrade tests in the test repository; never publish
         type: boolean
         default: false
+      native_upgrade_windows_only:
+        description: Limit the isolated native laboratory to Windows
+        type: boolean
+        default: false
       signing_preflight_only:
         description: Only verify the official signing key; do not build or publish
         type: boolean
@@ -37,6 +41,8 @@ jobs:
   native-upgrade-lab:
     if: inputs.native_upgrade_lab_only && github.repository == 'AiW520/tuzi-switch'
     uses: ./.github/workflows/native-upgrade-lab.yml
+    with:
+      windows_only: ${{ inputs.native_upgrade_windows_only || false }}
 
   signing-preflight:
     if: inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch')

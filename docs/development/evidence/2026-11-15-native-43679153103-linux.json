@@ -1,0 +1,301 @@
+{
+  "kind": "isolated-native-smoke",
+  "platform": "linux-x86_64",
+  "signingKey": "ephemeral-test-key",
+  "officialAcceptance": false,
+  "results": [
+    {
+      "scenario": "tampered-signature",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 12537,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_e0bfcb051eaff06a5d9cfb3b5c5f2bd7/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "The signature verification failed",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "interrupted-download",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 12625,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_e0bfcb051eaff06a5d9cfb3b5c5f2bd7/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "error decoding response body",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "missing-package",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 12687,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_e0bfcb051eaff06a5d9cfb3b5c5f2bd7/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "`Download request failed with status: 404 Not Found`",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "install-failure",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 12747,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_e0bfcb051eaff06a5d9cfb3b5c5f2bd7/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 105277944
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "installRejected": true,
+            "error": "Permission denied (os error 13)",
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "same-version",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 12807,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_e0bfcb051eaff06a5d9cfb3b5c5f2bd7/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "downgrade",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 12863,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_e0bfcb051eaff06a5d9cfb3b5c5f2bd7/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "upgrade-and-restart",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 12929,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_e0bfcb051eaff06a5d9cfb3b5c5f2bd7/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 105277944
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 12994,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_0998db7de55ee77ba83647fcc9be99a4/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "retry-after-signature-rejection",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 13052,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_e0bfcb051eaff06a5d9cfb3b5c5f2bd7/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 105277944
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 13113,
+            "bundleType": "Some(AppImage)",
+            "executable": "/tmp/appimage_extracted_0998db7de55ee77ba83647fcc9be99a4/usr/bin/tu-zi-switch"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ]
+    }
+  ],
+  "repository": "AiW520/tuzi-switch",
+  "runId": "43679153103",
+  "applicationCommit": "485ec1d1a4b4a643ca4bb1cf1f2769832c389b4f",
+  "artifactId": "14148257465",
+  "artifactSha256": "0f6890e3b37f4a35db8d2a8c78d595f4ab87d62a11f8d4d10669ca2899f8c177",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "runtimeBundleTypeVerified": true,
+  "scope": "AppImage only; not DEB/RPM or official candidate acceptance"
+}

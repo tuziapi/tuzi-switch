@@ -1,0 +1,89 @@
+{
+  "kind": "synthetic-api-attribution-regression",
+  "apiCommit": "28443ae853a24165b23638a8b98d3ad96ddba4f0",
+  "command": "env -u TEST_CLIENT_CHANNEL_DSN -u TEST_CLIENT_CHANNEL_DIALECT go test -json ./middleware ./model -run 'TestClient(Channel|Source|RequestCounters)' -count=1",
+  "completedAt": "2026-11-15T05:35:42.035184+00:00",
+  "logSha256": "47fa4965849eeeb6d4d1bfbc983258c721501372c72984ad78192c21f258d0f0",
+  "topLevelPassed": 14,
+  "topLevelSkipped": 1,
+  "tests": [
+    {
+      "package": "github.com/QuantumNous/new-api/middleware",
+      "test": "TestClientChannelPreservesOpaqueQueriesAndBody",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelDatabaseIntegration",
+      "result": "skip"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelSchemaMigrationPreservesDataAndIsIdempotent",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelSQLiteCleanupRollsBackOnDependentView",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelEpochPersistsAndExcludesHistoryAndLateRefunds",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelSchemaRejectsIncompleteDraftColumns",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelDropIndexSQLAcrossDatabases",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelSchemaRejectsWrongReadIndex",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientSourceAnalysisDeduplicatesRequestsAndSeparatesChannels",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientRequestCountersDoNotInferHistoricalOrigin",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientRequestCountersClassifyInterruptedConsumeLogs",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientSourceMidjourneyStateAndRefundDeduplicate",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientSourceConsumePersistenceKeepsSnapshot",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelHistoryStaysExcludedAfterRebuildAndLateCompletion",
+      "result": "pass"
+    },
+    {
+      "package": "github.com/QuantumNous/new-api/model",
+      "test": "TestClientChannelAnalysisFiltersPaginationAndBuckets",
+      "result": "pass"
+    }
+  ],
+  "externalDatabaseIntegration": false,
+  "productionRecordsVerified": false,
+  "liveProvider": false
+}
