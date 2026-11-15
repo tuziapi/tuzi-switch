@@ -1,20 +1,23 @@
 import { compressImageBlob } from '@aitu/utils';
-import { GEMINI_OMNI_DURATIONS, GEMINI_OMNI_MODEL_ID, GEMINI_OMNI_SIZES } from '../utils/gemini-omni-model';
+import { getGeminiOmniVideoMetadata, GEMINI_OMNI_MODEL_ID, GEMINI_OMNI_SIZES, isGeminiOmniModel } from '../utils/gemini-omni-model';
 import { readKeepOriginalImageEnabled } from './reference-image-settings';
 
 /** Our gateway accepts JSON; the Mux interaction transport stays on the server. */
 export async function buildGeminiOmniVideoBody(form: FormData, signal?: AbortSignal): Promise<string> {
+  const model = String(form.get('model') || GEMINI_OMNI_MODEL_ID).trim();
+  if (!isGeminiOmniModel(model)) throw new Error('Gemini Omni 视频模型无效');
   const prompt = String(form.get('prompt') || '').trim();
-  const seconds = String(form.get('seconds') || '4');
+  const metadata = getGeminiOmniVideoMetadata(model);
+  const seconds = String(form.get('seconds') || metadata.defaultDuration);
   const size = String(form.get('size') || '1280x720');
   if (!prompt) throw new Error('请填写视频提示词');
-  if (!GEMINI_OMNI_DURATIONS.includes(seconds)) throw new Error('Gemini Omni 视频时长须为 3–10 秒整数');
+  if (!metadata.allowedDurations?.includes(seconds)) throw new Error('Gemini Omni 视频时长须为 3–15 秒整数');
   if (!GEMINI_OMNI_SIZES.some(option => option.value === size))
     throw new Error('Gemini Omni 请选择 360P、720P、1080P 或 4K 的横屏/竖屏尺寸');
   const references = form.getAll('input_reference');
   if (references.length > 10) throw new Error('Gemini Omni 最多支持 10 张参考图');
   // Explicit allowlist: never forward Veo/Sora watermark or arbitrary old params.
-  const body: Record<string, unknown> = { model: GEMINI_OMNI_MODEL_ID, seconds, size };
+  const body: Record<string, unknown> = { model, seconds, size };
   if (!references.length) body.prompt = prompt;
   else {
     const input: Record<string, string>[] = [{ type: 'text', text: prompt }];

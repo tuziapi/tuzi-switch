@@ -4,6 +4,7 @@ import {
   ModelVendor,
   type ModelConfig,
 } from '../../constants/model-config';
+import { getTuziVideoModelConfig } from '../../constants/tuzi-video-models';
 import type { PricingEndpointInfo } from '../../utils/model-pricing-types';
 import {
   getSeedance2Capabilities,
@@ -18,7 +19,7 @@ import {
 import { isTuziCompatibleBaseUrl } from './tuzi-api-endpoints';
 import { inferAllBindingHintsFromEndpoints } from './endpoint-binding-inference';
 import { getSunoV2Action, isSunoV2Model } from '../suno-v2';
-import { isGeminiOmniModel, GEMINI_OMNI_VIDEO_METADATA } from '../../utils/gemini-omni-model';
+import { isGeminiOmniModel, getGeminiOmniVideoMetadata } from '../../utils/gemini-omni-model';
 import type { ProviderModelBinding, ProviderProfileSnapshot } from './types';
 
 function buildBindingId(
@@ -146,6 +147,9 @@ function isStandardKlingVideoModel(model: ModelConfig): boolean {
   }
 
   const lowerId = model.id.toLowerCase();
+  if (lowerId === 'kling-4.0') {
+    return false;
+  }
   return (
     lowerId === 'kling_video' ||
     /^kling-v\d(?:[-.]\d+)?$/.test(lowerId) ||
@@ -622,13 +626,14 @@ function inferVideoBindings(
   model: ModelConfig
 ): ProviderModelBinding[] {
   const bindings: ProviderModelBinding[] = [];
+  const tuziConfig = getTuziVideoModelConfig(model.id);
 
-  if (isGeminiOmniModel(model.id)) {
+  if (isGeminiOmniModel(model.id) && !tuziConfig) {
     return [buildBinding(profile, model, {
       protocol: 'openai.async.video', requestSchema: 'gemini.omni.video.json',
       responseSchema: 'openai.async.task', submitPath: '/videos',
       pollPathTemplate: '/videos/{taskId}', baseUrlStrategy: 'ensure-v1',
-      metadata: { video: GEMINI_OMNI_VIDEO_METADATA },
+      metadata: { video: getGeminiOmniVideoMetadata(model.id) },
       priority: 700, confidence: 'high', source: 'template',
     })];
   }
@@ -682,6 +687,7 @@ function inferVideoBindings(
   if (isHappyHorseModel(model)) {
     bindings.push(
       buildBinding(profile, model, {
+        baseUrlStrategy: tuziConfig ? 'ensure-v1' : undefined,
         protocol: 'happyhorse.video',
         requestSchema: 'happyhorse.video.json',
         responseSchema: 'happyhorse.video.task',
@@ -755,15 +761,28 @@ function inferVideoBindings(
 
     bindings.push(
       buildBinding(profile, model, {
+        baseUrlStrategy: tuziConfig ? 'ensure-v1' : undefined,
         protocol: 'openai.async.video',
-        requestSchema: isSeedance2Model(model)
+        requestSchema: tuziConfig
+          ? 'tuzi.video.generation-json'
+          : isSeedance2Model(model)
           ? 'doubao.seedance-2.video.content-json'
           : 'openai.video.form-input-reference',
         responseSchema: 'openai.async.task',
         submitPath: '/videos',
         pollPathTemplate: '/videos/{taskId}',
         metadata:
-          seedance2Metadata ||
+          (tuziConfig
+            ? {
+                video: {
+                  allowedDurations: [...tuziConfig.durationOptions.map((option) => option.value), ...(model.id === 'wan3.0-video' ? ['-1'] : [])],
+                  defaultDuration: tuziConfig.defaultDuration,
+                  durationField: model.id === 'wan3.0-video' ? 'duration' : 'seconds',
+                  strictDurationValidation: true,
+                  downloadPathTemplate: '/videos/{taskId}/content',
+                },
+              }
+            : undefined) || seedance2Metadata ||
           (isSoraModel(model) && isOfficialOpenAIProfile(profile)
             ? {
                 video: {
