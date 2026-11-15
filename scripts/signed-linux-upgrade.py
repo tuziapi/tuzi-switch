@@ -74,18 +74,24 @@ def application_processes():
     for proc in Path('/proc').iterdir():
         if not proc.name.isdigit():
             continue
+        selected = False
         try:
-            if proc.stat().st_uid != uid:
+            # /proc directory ownership can become root for non-dumpable
+            # processes; the actual effective UID is recorded in status.
+            uids = re.search(r'^Uid:\s+(\d+)\s+(\d+)', (proc/'status').read_text(), re.MULTILINE)
+            if not uids or int(uids.group(2)) != uid:
                 continue
+            selected = True
             process_exe = str((proc/'exe').readlink()).removesuffix(' (deleted)')
-            if installer != 'appimage' and process_exe == str(executable):
+            if installer != 'appimage' and process_exe == str(executable.resolve()):
                 found.append(int(proc.name))
             elif installer == 'appimage' and Path(process_exe).name == 'tu-zi-switch':
                 process_environment = (proc/'environ').read_bytes().split(b'\0')
                 if ('APPIMAGE=' + str(executable)).encode() in process_environment:
                     found.append(int(proc.name))
-        except (FileNotFoundError, PermissionError, ProcessLookupError):
-            pass
+        except (FileNotFoundError, PermissionError, ProcessLookupError) as error:
+            if selected:
+                report.setdefault('processInspectionErrors', {})[proc.name] = str(error)
     return found
 
 
@@ -368,6 +374,9 @@ window.__TAURI_INTERNALS__.invoke('plugin:updater|check',{timeout:10000}).then(r
             report['diagnosticError'] = str(diagnostic)
     raise
 finally:
+    # Keep the original failure evidence even if a minimal image lacks a
+    # cleanup utility. The disposable container is also removed by Docker.
+    (output/'results.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     if installer == 'deb':
         package_owner = subprocess.run(['dpkg-query', '-S', str(executable)], capture_output=True, text=True).stdout.strip()
         report['installedPackageOwner'] = package_owner

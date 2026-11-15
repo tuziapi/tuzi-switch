@@ -138,7 +138,7 @@ jobs:
       - name: Exercise unchanged RPM in offline disposable Fedora user
         run: |
           mkdir "$RUNNER_TEMP/signed-rpm"
-          docker run --rm --init --cap-add NET_ADMIN \
+          docker run --rm --init --cap-add NET_ADMIN --cap-add SYS_PTRACE \
             -v "$GITHUB_WORKSPACE:/work:ro" \
             -v "$RUNNER_TEMP/signed-base:/base:ro" \
             -v "$RUNNER_TEMP/signed-target:/target:ro" \

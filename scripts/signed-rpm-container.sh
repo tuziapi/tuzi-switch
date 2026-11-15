@@ -8,7 +8,7 @@ test -f /base/tuzi-assistant-linux-x64.rpm
 test -f /target/tuzi-assistant-linux-x64.rpm
 dnf install -y python3 xorg-x11-server-Xvfb webkit2gtk4.1 '*/WebKitWebDriver' \
   gtk3 libappindicator-gtk3 librsvg2 openssl sudo shadow-utils dbus-x11 \
-  ImageMagick iptables-nft google-noto-sans-cjk-fonts desktop-file-utils
+  ImageMagick iptables-nft google-noto-sans-cjk-fonts desktop-file-utils procps-ng
 # Resolve and install genuine package dependencies; never use --nodeps.
 dnf install -y /base/tuzi-assistant-linux-x64.rpm
 useradd --create-home --shell /bin/bash tuziupgrade
