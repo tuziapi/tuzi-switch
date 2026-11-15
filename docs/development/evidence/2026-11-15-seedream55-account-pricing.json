@@ -1,0 +1,54 @@
+{
+  "kind": "authenticated-exact-model-pricing-preflight",
+  "checkedAt": "2026-11-15T12:29:29.735445+00:00",
+  "statusCheckedAt": "2026-11-15T12:26:05.105435+00:00",
+  "pricingResponseSha256": "369e249b04d1259949dcbe1959713ef73ba3dc023a56fd92405461dabc4d8f05",
+  "statusResponseSha256": "29d2abf3ba3e4f2c38a806b2821ec551945c46d66fab17064e5b11afb3c5ae7b",
+  "model": "doubao-seedream-5-5-261028",
+  "authorizedKeyName": "奶酪",
+  "requestedGroup": "default",
+  "effectiveGroup": "官方优惠",
+  "billingMode": "tiered_expr",
+  "billingExpression": "v2:output_image_count <= 0 ? tier(\"no_output\", output_image_count * 0.0) : (upper(param(\"size\")) == \"1K\" || upper(param(\"size\")) == \"1.5K\" || (imagePixels(param(\"size\")) > 0 && imagePixels(param(\"size\")) <= 2610000)) ? tier(\"请求≤261万像素（1K/1.5K）\", (input_image_count * 0.05 + output_image_count * 0.13) / 7) : tier(\"请求>261万像素（2K/auto）\", (input_image_count * 0.05 + output_image_count * 0.23) / 7)",
+  "groupRatio": 7,
+  "groupDiscountRatio": 1,
+  "userGroupMultiplier": null,
+  "userModelDiscountRatio": null,
+  "userModelPricing": null,
+  "status": {
+    "quota_per_unit": 500000,
+    "usd_exchange_rate": 0.7,
+    "custom_currency_exchange_rate": 0.7,
+    "quota_display_type": "USD",
+    "custom_currency_symbol": "¥"
+  },
+  "paidCallsExecuted": 1,
+  "automaticRetry": false,
+  "maximumAuthorizedCny": 5,
+  "plannedCalls": [
+    {
+      "kind": "transparent-png",
+      "size": "1K",
+      "inputImages": 0,
+      "maximumOutputImages": 1
+    },
+    {
+      "kind": "layer-decomposition-with-ocr",
+      "size": "1K",
+      "inputImages": 1,
+      "maximumOutputImagesIncludingBase": 3
+    }
+  ],
+  "executionStatus": "transparent-generation-success-layer-request-not-submitted",
+  "notes": [
+    "No credentials, account identity, or unrelated account records are retained.",
+    "Pricing is a preflight, not a receipt or evidence of a completed paid call.",
+    "Recheck the same exact-model price before execution; do not automatically retry either paid request."
+  ],
+  "uiSubmissionCount": 1,
+  "maximumProjectedUsd": 0.5700000000000001,
+  "maximumProjectedCnyAtSiteRate": 0.399,
+  "submissionObservedAt": "2026-11-15T12:30:29.846929+00:00",
+  "actualChargedCny": 0.091,
+  "remainingAuthorizedCalls": 1
+}

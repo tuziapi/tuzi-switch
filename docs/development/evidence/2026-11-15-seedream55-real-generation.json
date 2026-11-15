@@ -1,0 +1,32 @@
+{
+  "kind": "real-seedream55-transparent-generation",
+  "installedSourceCommit": "a3e2a39153d27275609d9ab16539dc22c77ea06f",
+  "model": "doubao-seedream-5-5-261028",
+  "requestId": "202611151230112103995358268d9d6GhyPFsR0",
+  "paidCallsExecuted": 1,
+  "transparentGeneration": "passed",
+  "layerDecomposition": "not-submitted",
+  "ocr": "not-tested",
+  "quota": 65000,
+  "chargedCnyAtSiteRate": 0.091,
+  "listClientChannel": 3,
+  "detailClientChannelObserved": 0,
+  "listResponseSha256": "9f1b73222b013af35929a05ba9902f96d5c2cecb49e0af80f0870305f1f89782",
+  "detailResponseSha256": "1d407c47cfdcdf1c612546aba1f77d77a69474b023ede3c0643cfdf88a671914",
+  "pngSha256": "0d43e77517fb6e78e6be0eaf29988e1dbcac0d6533072852a06ebaab05bd547c",
+  "pixels": {
+    "width": 1024,
+    "height": 1024,
+    "mode": "RGBA",
+    "transparent": 750483,
+    "semiTransparent": 21336,
+    "opaque": 276757
+  },
+  "automaticRetry": false,
+  "releaseAcceptance": "not-passed",
+  "notes": [
+    "Details omit Ch during API DTO conversion; durable list contains ch=3.",
+    "No credentials or unrelated account records retained.",
+    "Local fixes require a new installer and do not retroactively change the tested source identity."
+  ]
+}

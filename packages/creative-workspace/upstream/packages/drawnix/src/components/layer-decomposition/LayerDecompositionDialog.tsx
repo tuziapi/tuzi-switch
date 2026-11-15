@@ -5,6 +5,7 @@ import { Button, MessagePlugin, Progress } from 'tdesign-react';
 import { Layers3, X } from 'lucide-react';
 import type { PlaitBoard } from '@plait/core';
 import { ConfirmDialog } from '../dialog/ConfirmDialog';
+import { RetryImage } from '../retry-image';
 import { useDrawnix } from '../../hooks/use-drawnix';
 import {
   createLayerDecompositionApiClient,
@@ -541,10 +542,20 @@ export const LayerDecompositionDialog: React.FC<
       }
     >
       <div className="layer-decomposition-dialog__body">
-        <img
+        <RetryImage
           src={imageUrl}
-          alt=""
+          alt={isZh ? '待分层原图' : 'Source image for layers'}
           className="layer-decomposition-dialog__preview"
+          eager
+          preferCachedBlob
+          showSkeleton={false}
+          maxRetries={2}
+          loadTimeoutMs={20000}
+          fallback={
+            <div role="status" className="layer-decomposition-dialog__preview">
+              {isZh ? '原图预览暂不可用' : 'Source preview is unavailable'}
+            </div>
+          }
         />
 
         {!automatic && !result && !needsCorrection && (
