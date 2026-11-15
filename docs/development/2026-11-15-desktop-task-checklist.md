@@ -66,3 +66,5 @@ Linux依赖及非Mac安装失败提示修复后，新候选43708139009 / ee807c0
 Linux六组证据为evidence/2026-11-15-linux-signed-43707335991-{deb,appimage,rpm}-{160,161}.json；六个归档SHA/CRC和12项检查均已独立核对。旧进程通过普通窗口关闭并观察消失，WebDriver未提供exit code，不声称exit0；截图部分含淡入动画，不算稳定视觉验收。
 
 Mac前两轮43706872126（取消，内部子集已失败）、43707701973（失败）及第三轮Intel失败均归档于evidence/2026-11-15-macos-signed-<run>-<arch>-failed.json。未发生目标包安装，不能当更新签名或安装通过。
+
+后续43709169781两架构升级本体10项及精确文件核验通过，但信任清理失败导致job失败。证据：[ARM](evidence/2026-11-15-macos-signed-43709169781-arm64-cleanup-failed.json)、[Intel](evidence/2026-11-15-macos-signed-43709169781-x64-cleanup-failed.json)。真实供应商只读[核价预检](evidence/2026-11-15-seedream55-pricing-preflight.json)已留档；实际测试Key价格未确认，付费调用0次。
