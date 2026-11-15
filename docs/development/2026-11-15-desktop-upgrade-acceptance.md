@@ -92,3 +92,13 @@ gh workflow run unified-release.yml -R AiW520/tuzi-switch --ref codex/verified-d
 新公钥 SHA256：`8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5`；本机已使用新私钥实际签署合成探针并通过新公钥验证。旧公钥及备份缺失原因保留在 `scripts/updater-key-transition.json`，首个过渡版本为1.6.2。不得将此次结果称为旧公钥配对成功。受保护云端预检和手动过渡的发布门禁仍继续实施/验证，未发布。
 
 新增策略字段 schemaVersion/repository/firstVersion/delivery/oldPublicKeySha256/publicKeySha256/authorizedAt/reason 全部填写；它是构建/交付策略，不是账户或数据库字段。过渡版安装包将携带新公钥，旧版需一次手动安装；不得向旧公钥客户端宣称可直接自动升级。
+
+## 新密钥云端通过与过渡门禁（2026-11-15）
+
+用户人工批准受保护环境后，run `43671613743`（源码 `f6e942ed2dc4b009471e2191e80e18bbe7bb17ae`）成功，使用新正式密钥签署合成探针并验签。不是旧密钥恢复，也不是正式安装包验收。
+
+候选/证据 schemaVersion 更新为2，新增必填 `delivery`、`publicKeySha256`、`publicationFiles`。正式1.6.2由策略自动判定 `manual-key-transition`；仅公开七个直接安装包、来源清单、源码及其SHA256SUMS，不公开latest.json、.sig或app.tar.gz。候选内部仍保留全部签名供核验。发布逐字节复制白名单文件，拒绝草稿中残留的额外附件；以后的版本恢复正常签名清单发布。测试库自身渠道仍使用既有测试密钥。
+
+过渡验收必须使用 `new-official-channel-key`，逐平台/安装类型填写旧版→1.6.2 `method=manual-install` 及安装/重启/版本/数据/归因检查，并分别提供 `signedUpgrade`：真实1.6.2→更高版本，绑定新公钥摘要、目标包SHA256、源码commit与全部故障/重试检查。后续新密钥自动升级没有实测时，门禁仍拒绝发布。不生成虚假的正式通过记录。
+
+首轮云端源码ce7d9ab0：Mac ARM64实验成功，Windows因新旧安装包混选失败（0505b136已修正）；Linux前7场景成功，第8重试未启动。下载事件/进程日志表明升级重启后的新进程退出卡在窗口状态保存，并拦截下一次单实例启动。将窗口状态保存移回事件循环线程，避免窗口状态缓存锁与跨线程窗口查询互相等待；实验新增进程PID记录及真正退出检查，保留首次/重试两份日志。修复结果以新运行另记，原失败不改写成通过。

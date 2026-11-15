@@ -1597,9 +1597,12 @@ pub fn run() {
             log::info!("收到用户主动退出请求 (code={code:?})，开始清理...");
             api.prevent_exit();
 
+            // Window-state holds its cache mutex while querying native windows.
+            // Keep this on the event-loop thread: a worker waiting for a window
+            // query can otherwise deadlock with a window event taking that mutex.
+            save_window_state_before_exit(app_handle);
             let app_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                save_window_state_before_exit(&app_handle);
                 cleanup_before_exit(&app_handle).await;
                 log::info!("清理完成，退出应用");
 

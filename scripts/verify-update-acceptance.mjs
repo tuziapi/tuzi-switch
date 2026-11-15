@@ -3,16 +3,22 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { candidate, verify, platforms, installerTypes } from "./update-acceptance.mjs";
+import {
+  candidate,
+  verify,
+  platforms,
+  installerTypes,
+  stagePublication,
+} from "./update-acceptance.mjs";
 
-function fixture(fn) {
+function fixture(fn, version = "1.6.3") {
   const dir = fs.mkdtempSync(
     path.join(os.tmpdir(), "SYNTHETIC-upgrade-evidence-"),
   );
   try {
     fs.writeFileSync(
       path.join(dir, "latest.json"),
-      JSON.stringify({ version: "1.6.2" }),
+      JSON.stringify({ version }),
     );
     fs.writeFileSync(path.join(dir, "package.tar.gz"), "SYNTHETIC package");
     const c = candidate(dir, {
@@ -31,7 +37,7 @@ function fixture(fn) {
         kind: "real-installed-app",
         status: "passed",
         fromVersion: "1.6.1",
-        toVersion: "1.6.2",
+        toVersion: version,
         evidence: "SYNTHETIC TEST RECORD",
         checks: Object.fromEntries(
           [
@@ -94,7 +100,7 @@ test("rejects changed evidence file list, downgrade and missing analytics check"
   fixture((d, e, c) => {
     for (const change of [
       (x) => delete x.files["package.tar.gz"],
-      (x) => (x.platforms[0].fromVersion = "1.6.2"),
+      (x) => (x.platforms[0].fromVersion = x.platforms[0].toVersion),
       (x) => delete x.platforms[0].checks.businessAttribution,
     ]) {
       const copy = structuredClone(e);
@@ -115,3 +121,53 @@ test("rejects missing installer types and untested install paths", () =>
       assert.throws(() => verify(d, copy, c), /installer/i);
     }
   }));
+
+test("manual transition excludes native update metadata and requires subsequent signed upgrade evidence", () =>
+  fixture((d, e, c) => {
+    assert.equal(c.delivery, "manual-key-transition");
+    assert.ok(!c.publicationFiles.includes("latest.json"));
+    assert.throws(() => verify(d, e, c));
+    e.signingKey = "new-official-channel-key";
+    for (const p of e.platforms) {
+      p.method = "manual-install";
+      for (const i of p.installers) {
+        i.method = "manual-install";
+        i.signedUpgrade = {
+          kind: "real-installed-app",
+          status: "passed",
+          fromVersion: "1.6.2",
+          toVersion: "1.6.3",
+          publicKeySha256: c.publicKeySha256,
+          artifactSha256: "b".repeat(64),
+          commit: "c".repeat(40),
+          evidence: "SYNTHETIC NEXT UPGRADE",
+          checks: { ...i.checks },
+        };
+      }
+    }
+    assert.equal(verify(d, e, c).delivery, "manual-key-transition");
+    const output = path.join(
+      os.tmpdir(),
+      `SYNTHETIC-publication-${Date.now()}`,
+    );
+    try {
+      stagePublication(d, output);
+      assert.ok(!fs.existsSync(path.join(output, "latest.json")));
+    } finally {
+      fs.rmSync(output, { recursive: true, force: true });
+    }
+    for (const mutate of [
+      (x) => delete x.platforms[0].installers[0].signedUpgrade,
+      (x) =>
+        (x.platforms[0].installers[0].signedUpgrade.publicKeySha256 =
+          "f".repeat(64)),
+      (x) =>
+        (x.platforms[0].installers[0].signedUpgrade.checks.signature =
+          "pending"),
+      (x) => x.publicationFiles.push("latest.json"),
+    ]) {
+      const copy = structuredClone(e);
+      mutate(copy);
+      assert.throws(() => verify(d, copy, c));
+    }
+  }, "1.6.2"));

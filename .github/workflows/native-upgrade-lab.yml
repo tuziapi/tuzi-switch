@@ -67,7 +67,7 @@ jobs:
           path: |
             ${{ runner.temp }}/tuzi-upgrade-lab/results.json
             ${{ runner.temp }}/tuzi-upgrade-lab/build-*.log
-            ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/events.jsonl
-            ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/process.log
+            ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/*events.jsonl
+            ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/*process.log
             ${{ runner.temp }}/tuzi-upgrade-lab/runs/*/initial-install.log
           if-no-files-found: warn

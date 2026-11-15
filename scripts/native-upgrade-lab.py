@@ -25,6 +25,31 @@ def command(args, env, log):
         subprocess.run(args, cwd=ROOT, env=env, stdout=out, stderr=out, check=True)
 
 
+def process_alive(pid):
+    if sys.platform == 'win32':
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = kernel.OpenProcess(0x00100000, False, pid)
+        if not handle:
+            return False
+        try:
+            return kernel.WaitForSingleObject(handle, 0) == 258
+        finally:
+            kernel.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+        if sys.platform == 'linux':
+            stat = Path(f'/proc/{pid}/stat')
+            if stat.exists() and stat.read_text().split(') ')[1].startswith('Z'):
+                return False
+        return True
+    except ProcessLookupError:
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True)
@@ -168,7 +193,7 @@ def main():
             (case / 'scenario.json').write_text(json.dumps(scenario))
             launch_env = {**env, 'CC_SWITCH_TEST_HOME': str(case / 'home'), 'TUZI_UPDATER_QA_ROOT': str(case)}
             print(f'Running real native scenario: {name}', flush=True)
-            with (case / 'process.log').open('wb') as log:
+            with (case / ('retry-process.log' if retry else 'process.log')).open('wb') as log:
                 process = subprocess.Popen([str(executable), '--tuzi-verify-updater-install'], env=launch_env, stdout=log, stderr=log)
                 deadline = time.monotonic() + 180
                 events = []
@@ -189,6 +214,15 @@ def main():
                 except subprocess.TimeoutExpired:
                     process.terminate()
                     raise RuntimeError(f'{name}: old process did not exit')
+            # AppImage/installer launchers can exit before the restarted application.
+            # Wait for every observed native PID, so the next case cannot be
+            # swallowed by a still-running single-instance owner.
+            pids = {e['detail']['pid'] for e in events if e['event'] == 'started' and 'pid' in e['detail']}
+            exit_deadline = time.monotonic() + 30
+            while any(process_alive(pid) for pid in pids) and time.monotonic() < exit_deadline:
+                time.sleep(0.1)
+            if any(process_alive(pid) for pid in pids):
+                raise RuntimeError(f'{name}: native application did not exit after reporting success')
             if platform == 'linux':
                 app.chmod(0o755)
             if mode != 'upgrade' and hashlib.sha256(executable.read_bytes()).hexdigest() != before_hash:

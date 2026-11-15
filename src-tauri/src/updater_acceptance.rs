@@ -80,7 +80,7 @@ async fn execute(app: &tauri::AppHandle, root: &Path) -> Result<(), String> {
     record(
         root,
         "started",
-        json!({"version":version,"executable":std::env::current_exe().map_err(|e|e.to_string())?}),
+        json!({"version":version,"pid":std::process::id(),"executable":std::env::current_exe().map_err(|e|e.to_string())?}),
     )?;
     if version == scenario.version {
         let history = fs::read_to_string(root.join("events.jsonl")).map_err(|e| e.to_string())?;
