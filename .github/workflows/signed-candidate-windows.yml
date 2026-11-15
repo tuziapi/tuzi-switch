@@ -1,0 +1,72 @@
+name: Real signed Windows candidate upgrade
+on:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  installed-candidate:
+    if: github.repository == 'AiW520/tuzi-switch'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        installer: [nsis, msi]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify the approved immutable source pair
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/AiW520/tuzi-switch/actions/runs/43680220045 > "$RUNNER_TEMP/base-run.json"
+          gh api repos/AiW520/tuzi-switch/actions/runs/43689683759 > "$RUNNER_TEMP/target-run.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import assert from 'node:assert/strict';
+          for (const [file,sha] of [['base-run.json','11b8e308ef77708df3526a7701d106fc04b15f57'],['target-run.json','695f4e933d797b39f7a61aad7804800a01eddc96']]) {
+            const r=JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP,file)));
+            assert.equal(r.conclusion,'success'); assert.equal(r.head_sha,sha);
+            assert.equal(r.path,'.github/workflows/unified-release.yml');
+          }
+          JS
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          path: ${{ runner.temp }}/signed-base
+          repository: AiW520/tuzi-switch
+          run-id: 43680220045
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          path: ${{ runner.temp }}/signed-target
+          repository: AiW520/tuzi-switch
+          run-id: 43689683759
+          github-token: ${{ github.token }}
+      - name: Install browser control client only
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/tuzi-candidate-tools" --ignore-scripts --no-package-lock playwright-core@1.55.1
+      - name: Exercise actual installed UI and official signatures
+        shell: pwsh
+        env:
+          INSTALLER_TYPE: ${{ matrix.installer }}
+        run: |
+          $env:PLAYWRIGHT_MODULE = Join-Path $env:RUNNER_TEMP 'tuzi-candidate-tools/node_modules/playwright-core'
+          node scripts/signed-windows-upgrade.mjs (Join-Path $env:RUNNER_TEMP 'signed-base') (Join-Path $env:RUNNER_TEMP 'signed-target') (Join-Path $env:RUNNER_TEMP 'signed-windows-evidence') $env:INSTALLER_TYPE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload observed evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-installed-windows-${{ matrix.installer }}
+          path: |
+            ${{ runner.temp }}/signed-windows-evidence/results.json
+            ${{ runner.temp }}/signed-windows-evidence/*.png
+          if-no-files-found: warn

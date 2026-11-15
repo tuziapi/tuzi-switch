@@ -195,3 +195,19 @@ MSI使用真实msiexec，独立场景间卸载已知QA包；签名拒绝后的�
 源码1e46b8e6e5bb99d4559dd6475dda032280a6a471，27项原生回归通过，八项真实NSIS场景全部通过。artifact14151724836完整SHA256与ZIP CRC核验通过。逐项复核运行时Some(Nsis)；升级与同目录重试均有0.0.1→0.0.2、真实cleanup完成、两次profile-restored（原进程false、新进程true）、重启和合成数据保留。签名拒绝与重试使用同一目录，没有重装旧包或手工启动新版。见[完整事件证据](evidence/2026-11-15-native-43688535588-windows.json)。
 
 此结果修复并关闭NSIS隔离实验的环境丢失问题，历史失败不删除。临时测试密钥实验仍不是正式候选验收；MSI/DEB/RPM的43689414375独立运行。用户已批准1.6.3内部目标43689683759的受保护签名，四平台构建中，未发布。
+
+## DEB补验通过与RPM实验恢复修正
+
+43689414375的DEB job132736678007八场景全部通过，artifact14152656698完整SHA256与ZIP CRC及每项事件已独立核验。两次升级均为实际Some(Deb)、0.0.1→0.0.2自动重启和数据保留；签名拒绝与重试共用同一目录。安装失败项实际为已签名的非法包格式被拒绝，不宣称覆盖所有系统安装权限错误。见evidence/2026-11-15-native-43689414375-deb.json。
+
+同run的RPM在interrupted-download场景准备旧包时rpm返回2，随后证据上传因目录权限失败，不能把此前场景当作全部通过。Fedora qa原UID1000与宿主不同，chown后的0700目录不能由宿主runner读取；现使用挂载目录原属主UID创建qa。初始安装失败会输出合成包安装诊断；复位安装补--replacepkgs，真实插件升级仍使用原rpm -U。尚无原RPM stderr，因此同版本冲突仅为待验证原因。原失败记录保留。
+
+新增native_upgrade_rpm_only布尔输入（默认false）及reusable rpm_only（dispatch/call均默认false），仅在native_upgrade_lab_only路径生效；为true时仅运行Fedora RPM，优先于packages/windows筛选。未新增业务字段、契约或数据库字段。
+
+## 原字节正式签名Windows实装子集
+
+signed_candidate_windows_only新增布尔输入，默认false。只在测试仓库启用独立NSIS/MSI jobs，互斥其他候选/签名/发布任务。固定下载43680220045（1.6.2，11b8e308）与已批准43689683759（1.6.3，695f4e93）的verified-release；要求run成功、精确SHA、工作流身份、全部文件摘要与正式公钥签名匹配。不重编应用，不访问私钥，无新签名审批。
+
+一次性Windows runner安装原始候选字节，合成HTTPS发现映射仅在runner内；临时TLS证书和hosts映射于finally恢复。应用和WebView2出站防火墙限制为loopback，不携带CI token。通过实际WebView2 UI点击下载、拒绝篡改/中断/404、同安装目录重试、重启更新；仅初次手工启动1.6.2，必须由安装器启动1.6.3。原生IPC核查版本、ID、正式渠道、源码commit，核对SQLite合成供应商和WebView偏好保留。清理失败同样判失败，报告不上传TLS私钥或原环境。
+
+脚本只产出real-installed-app-subset且officialAcceptance=false；尚不覆盖旧正式版手动过渡、有效安装包系统安装失败、完整创作项目迁移、经营归因或全平台审阅。语法、Python编译、shell语法、actionlint与diff检查通过；Windows实际结果待运行。无新增应用持久化字段，无发布。

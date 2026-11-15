@@ -10,6 +10,7 @@ test -f "$LAB_ROOT/app-0.0.2.rpm"
 if [[ "${1:-}" == --run ]]; then
   cat /etc/os-release > "$LAB_ROOT/runtime-os-release.txt"
   export DISPLAY=:99
+  dbus-update-activation-environment DISPLAY
   Xvfb "$DISPLAY" -screen 0 1280x900x24 -nolisten tcp > "$LAB_ROOT/xvfb.log" 2>&1 &
   display_pid=$!
   trap 'kill "$display_pid" 2>/dev/null || true' EXIT
@@ -29,7 +30,10 @@ fi
 
 dnf install -y python3 nodejs xorg-x11-server-Xvfb \
   webkit2gtk4.1 gtk3 libappindicator-gtk3 librsvg2 openssl sudo shadow-utils dbus-x11
-useradd --create-home qa
+# Keep the mounted evidence readable by its host runner even after failures.
+lab_uid=$(stat -c '%u' "$LAB_ROOT")
+test "$lab_uid" -ne 0
+useradd --create-home --uid "$lab_uid" --non-unique qa
 printf '%s\n' 'qa ALL=(root) NOPASSWD: /usr/bin/rpm' > /etc/sudoers.d/tuzi-updater-lab
 chmod 0440 /etc/sudoers.d/tuzi-updater-lab
 chown -R qa:qa "$LAB_ROOT"

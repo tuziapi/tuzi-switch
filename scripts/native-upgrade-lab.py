@@ -264,8 +264,13 @@ def main():
             elif not retry and bundle in ('deb', 'rpm'):
                 app = Path('/usr/bin')
                 executable = app / 'tuzi-update-qa'
-                installer = ['sudo', 'dpkg', '-i'] if bundle == 'deb' else ['sudo', 'rpm', '-U', '--oldpackage']
-                command(installer + [str(root / f'app-0.0.1{suffix}')], env, case / 'initial-install.log')
+                installer = ['sudo', 'dpkg', '-i'] if bundle == 'deb' else ['sudo', 'rpm', '-U', '--oldpackage', '--replacepkgs']
+                try:
+                    command(installer + [str(root / f'app-0.0.1{suffix}')], env, case / 'initial-install.log')
+                except subprocess.CalledProcessError:
+                    # Only synthetic package-install diagnostics, never signing output.
+                    print((case / 'initial-install.log').read_text(errors='replace'), flush=True)
+                    raise
             elif not retry:
                 app = case / 'installed'
                 app.mkdir()

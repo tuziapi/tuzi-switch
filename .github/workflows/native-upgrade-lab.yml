@@ -9,6 +9,9 @@ on:
       windows_environment_probe_only:
         type: boolean
         default: false
+      rpm_only:
+        type: boolean
+        default: false
       package_installers_only:
         type: boolean
         default: false
@@ -18,6 +21,9 @@ on:
         type: boolean
         default: false
       windows_environment_probe_only:
+        type: boolean
+        default: false
+      rpm_only:
         type: boolean
         default: false
       package_installers_only:
@@ -50,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.package_installers_only && '[{"os":"windows-latest","installer":"msi"},{"os":"ubuntu-22.04","installer":"deb"},{"os":"ubuntu-22.04","installer":"rpm"}]' || inputs.windows_only && '[{"os":"windows-latest","installer":"nsis"}]' || '[{"os":"macos-15","installer":"app"},{"os":"macos-15-intel","installer":"app"},{"os":"windows-latest","installer":"nsis"},{"os":"ubuntu-22.04","installer":"appimage"}]') }}
+        include: ${{ fromJSON(inputs.rpm_only && '[{"os":"ubuntu-22.04","installer":"rpm"}]' || inputs.package_installers_only && '[{"os":"windows-latest","installer":"msi"},{"os":"ubuntu-22.04","installer":"deb"},{"os":"ubuntu-22.04","installer":"rpm"}]' || inputs.windows_only && '[{"os":"windows-latest","installer":"nsis"}]' || '[{"os":"macos-15","installer":"app"},{"os":"macos-15-intel","installer":"app"},{"os":"windows-latest","installer":"nsis"},{"os":"ubuntu-22.04","installer":"appimage"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -109,7 +115,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: native-upgrade-${{ matrix.os }}${{ inputs.package_installers_only && format('-{0}', matrix.installer) || '' }}
+          name: native-upgrade-${{ matrix.os }}${{ (inputs.package_installers_only || inputs.rpm_only) && format('-{0}', matrix.installer) || '' }}
           path: |
             ${{ runner.temp }}/tuzi-upgrade-lab/results.json
             ${{ runner.temp }}/tuzi-upgrade-lab/build-*.log

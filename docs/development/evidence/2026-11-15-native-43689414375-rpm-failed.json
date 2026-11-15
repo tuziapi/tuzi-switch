@@ -1,0 +1,14 @@
+{
+  "kind": "isolated-native-smoke-failure",
+  "officialAcceptance": false,
+  "repository": "AiW520/tuzi-switch",
+  "runId": "43689414375",
+  "jobId": "132736678083",
+  "applicationCommit": "be14c5982fdd0fdcbdd313923ed14619facb1c77",
+  "installerType": "rpm",
+  "failure": "Fixture rpm -U --oldpackage returned status 2 when preparing interrupted-download, after the retry scenario. Exact rpm stderr unavailable because evidence upload failed.",
+  "uploadFailure": "EACCES on lab root: Fedora qa UID 1000 changed ownership of mounted runner directory with mode 0700.",
+  "jobLogSha256": "7298254d3aedbd453e7e5403e7be5b5daf20d6c152bf7199912872a2b774cdbd",
+  "passed": false,
+  "next": "Preserve runner UID in Fedora, expose initial-install diagnostics, allow explicit same-version fixture reset; rerun RPM only."
+}

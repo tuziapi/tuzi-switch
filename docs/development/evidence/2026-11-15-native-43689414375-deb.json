@@ -1,0 +1,309 @@
+{
+  "kind": "isolated-native-smoke",
+  "platform": "linux-x86_64",
+  "installerType": "deb",
+  "signingKey": "ephemeral-test-key",
+  "officialAcceptance": false,
+  "results": [
+    {
+      "scenario": "tampered-signature",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6258,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "The signature verification failed",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/tampered-signature-1794728353515658510"
+    },
+    {
+      "scenario": "retry-after-signature-rejection",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6327,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 26095672
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 6399,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/tampered-signature-1794728353515658510"
+    },
+    {
+      "scenario": "interrupted-download",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6475,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "error decoding response body",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/interrupted-download-1794728432178525003"
+    },
+    {
+      "scenario": "missing-package",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6546,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "downloadRejected": true,
+            "error": "`Download request failed with status: 404 Not Found`",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/missing-package-1794728458477721335"
+    },
+    {
+      "scenario": "install-failure",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6615,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 32
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "installRejected": true,
+            "error": "invalid updater binary format",
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/install-failure-1794728475207403779"
+    },
+    {
+      "scenario": "same-version",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6693,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/same-version-1794728501443120556"
+    },
+    {
+      "scenario": "downgrade",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6766,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "noUpdate": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/downgrade-1794728527685281346"
+    },
+    {
+      "scenario": "upgrade-and-restart",
+      "status": "passed",
+      "events": [
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.1",
+            "pid": 6840,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "available",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "verified",
+          "detail": {
+            "bytes": 26095672
+          }
+        },
+        {
+          "event": "install-started",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "installed",
+          "detail": {
+            "version": "0.0.2"
+          }
+        },
+        {
+          "event": "started",
+          "detail": {
+            "version": "0.0.2",
+            "pid": 6910,
+            "bundleType": "Some(Deb)",
+            "executable": "/usr/bin/tuzi-update-qa"
+          }
+        },
+        {
+          "event": "passed",
+          "detail": {
+            "version": "0.0.2",
+            "restarted": true,
+            "dataPreserved": true
+          }
+        }
+      ],
+      "directory": "/home/runner/work/_temp/tuzi-upgrade-lab/runs/upgrade-and-restart-1794728553990424175"
+    }
+  ],
+  "repository": "AiW520/tuzi-switch",
+  "runId": "43689414375",
+  "applicationCommit": "be14c5982fdd0fdcbdd313923ed14619facb1c77",
+  "artifactId": "14152656698",
+  "artifactSha256": "01a8c18d2739fb1e07e503a0773b59f33e2faec83080180e64820a165ddde537",
+  "archiveSha256Verified": true,
+  "zipCrcVerified": true,
+  "scope": "DEB eight-scenario temporary-key isolated test; not official candidate acceptance"
+}
