@@ -241,7 +241,9 @@ def creative_record():
                 store=connection.execute("SELECT id FROM ObjectStoreInfo WHERE name='boards'").fetchone()
                 if not store:
                     continue
-                for key,value in connection.execute('SELECT key,value FROM Records WHERE objectStoreID=?',(store[0],)):
+                for store_id,key,value in connection.execute('SELECT objectStoreID,key,value FROM Records NOT INDEXED'):
+                    if store_id!=store[0]:
+                        continue
                     data=bytes(value)
                     if creative_title.encode() in data or creative_title.encode('utf-16-le') in data:
                         image_present=b'image' in data or 'image'.encode('utf-16-le') in data
@@ -266,6 +268,10 @@ def create_creative_fixture():
     # Native image import, not direct IndexedDB insertion or a synthetic app.
     image_path=lab/'SYNTHETIC-migration.png'
     image_path.write_bytes(base64.b64decode(PNG))
+    if button(['不再提示']):
+        click(['不再提示'])
+    if button(['展开工具栏']):
+        click(['展开工具栏'])
     press_label('图片 — Cmd+U')
     wait_for(lambda: 'sheet ' in tree(),'Native image picker did not open')
     ax('keystroke "g" using {command down, shift down}')
