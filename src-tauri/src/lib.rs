@@ -1230,6 +1230,7 @@ pub fn run() {
             creative_http::check_update_ready,
             creative_images::creative_image_action,
             creative_media::creative_save_media,
+            creative_media::creative_video_action,
             creative_http::creative_manual_cancel,
             tuzi_account::creative::creative_account_bindings,
             tuzi_account::creative::creative_account_bind,

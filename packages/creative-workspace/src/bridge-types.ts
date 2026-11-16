@@ -40,6 +40,11 @@ export interface CreativeAccountBridge {
     name?: string,
   ) => Promise<"copied" | "saved" | "revealed" | "cancelled">;
   copyText?: (text: string) => Promise<void>;
+  /** Materialize original video and copy its file, copy its path, or reveal it. */
+  videoAction?: (
+    action: "copy" | "copy-path" | "reveal",
+    blob: Blob,
+  ) => Promise<"copied" | "path-copied" | "revealed">;
   /** Save original media through a native dialog; no caller-controlled path. */
   saveMedia?: (
     blob: Blob,

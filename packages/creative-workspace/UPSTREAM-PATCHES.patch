@@ -1462,10 +1462,10 @@ index 0000000..63201d3
 +- [x] Regenerate and verify provenance, record results and commit locally.
 diff --git a/packages/drawnix/src/components/CanvasImageContextMenu.test.tsx b/packages/drawnix/src/components/CanvasImageContextMenu.test.tsx
 new file mode 100644
-index 0000000..abc2f3b
+index 0000000..c0670f5
 --- /dev/null
 +++ b/packages/drawnix/src/components/CanvasImageContextMenu.test.tsx
-@@ -0,0 +1,220 @@
+@@ -0,0 +1,265 @@
 +import React from "react";
 +import {
 +  cleanup,
@@ -1480,7 +1480,8 @@ index 0000000..abc2f3b
 +const mock = vi.hoisted(() => ({
 +  hit: vi.fn(),
 +  imageAction: vi.fn(),
-+  download: vi.fn(),
++  videoAction: vi.fn(),
++  nativeVideo: true,
 +  copyPrompt: vi.fn(),
 +  success: vi.fn(),
 +  error: vi.fn(),
@@ -1506,13 +1507,18 @@ index 0000000..abc2f3b
 +  isAudioElement: (e: any) => e.type === "audio",
 +}));
 +vi.mock("../services/assistant-account", () => ({
-+  getAssistantAccount: () => ({ imageAction: mock.imageAction }),
++  getAssistantAccount: () => ({
++    imageAction: mock.imageAction,
++    videoAction: mock.nativeVideo ? mock.videoAction : undefined,
++  }),
 +}));
 +vi.mock("../utils/canvas-image-actions", () => ({
 +  runCanvasImageAction: mock.imageAction,
 +  copyImagePrompt: mock.copyPrompt,
 +}));
-+vi.mock("../utils/download-utils", () => ({ smartDownload: mock.download }));
++vi.mock("../utils/download-utils", () => ({
++  runCanvasVideoAction: mock.videoAction,
++}));
 +vi.mock("../utils/message-plugin", () => ({
 +  MessagePlugin: {
 +    loading: vi.fn(),
@@ -1549,8 +1555,9 @@ index 0000000..abc2f3b
 +}
 +beforeEach(() => {
 +  vi.clearAllMocks();
++  mock.nativeVideo = true;
 +  mock.imageAction.mockResolvedValue("saved");
-+  mock.download.mockResolvedValue({ downloadedCount: 1 });
++  mock.videoAction.mockResolvedValue("saved");
 +  mock.hit.mockReturnValue(image);
 +  mock.host = document.createElement("div");
 +  mock.host.innerHTML =
@@ -1584,23 +1591,61 @@ index 0000000..abc2f3b
 +        "image-picture",
 +      ),
 +    );
-+    expect(mock.download).not.toHaveBeenCalled();
++    expect(mock.videoAction).not.toHaveBeenCalled();
 +  });
 +  it.each(["[data-canvas-media-drag]", "video", null])(
 +    "opens native video menu on %s without targeting the image beneath",
 +    async (selector) => {
 +      mount();
 +      open(selector ? overlay.querySelector(selector)! : overlay);
-+      expect(screen.getAllByRole("menuitem")).toHaveLength(3);
++      expect(screen.getAllByRole("menuitem")).toHaveLength(6);
 +      fireEvent.click(screen.getByText("视频另存为…"));
 +      await waitFor(() =>
-+        expect(mock.download).toHaveBeenCalledWith([
-+          { url: video.url, type: "video", filename: "video-movie" },
-+        ]),
++        expect(mock.videoAction).toHaveBeenCalledWith(
++          "save",
++          video.url,
++          "video-movie",
++        ),
 +      );
 +      expect(mock.imageAction).not.toHaveBeenCalled();
 +    },
 +  );
++  it.each([
++    ["复制视频文件", "copy", "copied"],
++    ["显示视频文件", "reveal", "revealed"],
++    ["复制文件路径", "copy-path", "path-copied"],
++  ])("%s targets the clicked video original", async (label, action, result) => {
++    mock.videoAction.mockResolvedValue(result);
++    mount();
++    open(overlay);
++    fireEvent.click(screen.getByText(label));
++    await waitFor(() =>
++      expect(mock.videoAction).toHaveBeenCalledWith(
++        action,
++        video.url,
++        "video-movie",
++      ),
++    );
++    expect(mock.imageAction).not.toHaveBeenCalled();
++    expect(mock.success).toHaveBeenCalled();
++  });
++  it("disables desktop file operations when the host does not support them", () => {
++    mock.nativeVideo = false;
++    mount();
++    open(overlay);
++    for (const label of ["复制视频文件", "显示视频文件", "复制文件路径"])
++      expect(
++        (screen.getByRole("menuitem", { name: label }) as HTMLButtonElement)
++          .disabled,
++      ).toBe(true);
++    expect(
++      (
++        screen.getByRole("menuitem", {
++          name: "视频另存为…",
++        }) as HTMLButtonElement
++      ).disabled,
++    ).toBe(false);
++  });
 +  it("opens a video rendered inside SVG and previews its ID", () => {
 +    mock.hit.mockReturnValue(video);
 +    mount();
@@ -1617,15 +1662,15 @@ index 0000000..abc2f3b
 +    );
 +  });
 +  it("does not report success after video save is cancelled", async () => {
-+    mock.download.mockResolvedValue({ downloadedCount: 0 });
++    mock.videoAction.mockResolvedValue("cancelled");
 +    mount();
 +    open(overlay);
 +    fireEvent.click(screen.getByText("视频另存为…"));
-+    await waitFor(() => expect(mock.download).toHaveBeenCalled());
++    await waitFor(() => expect(mock.videoAction).toHaveBeenCalled());
 +    expect(mock.success).not.toHaveBeenCalled();
 +  });
 +  it("reports a video save error instead of falling back to image export", async () => {
-+    mock.download.mockRejectedValue(new Error("Original missing"));
++    mock.videoAction.mockRejectedValue(new Error("Original missing"));
 +    mount();
 +    open(overlay);
 +    fireEvent.click(screen.getByText("视频另存为…"));
@@ -1688,10 +1733,10 @@ index 0000000..abc2f3b
 +});
 diff --git a/packages/drawnix/src/components/CanvasImageContextMenu.tsx b/packages/drawnix/src/components/CanvasImageContextMenu.tsx
 new file mode 100644
-index 0000000..30ec507
+index 0000000..1ecd603
 --- /dev/null
 +++ b/packages/drawnix/src/components/CanvasImageContextMenu.tsx
-@@ -0,0 +1,305 @@
+@@ -0,0 +1,336 @@
 +import { useEffect, useRef } from "react";
 +import {
 +  Copy,
@@ -1699,6 +1744,7 @@ index 0000000..30ec507
 +  FolderOpen,
 +  ScanSearch,
 +  TextQuote,
++  Link,
 +} from "lucide-react";
 +import {
 +  PlaitBoard,
@@ -1722,7 +1768,7 @@ index 0000000..30ec507
 +import { MessagePlugin } from "../utils/message-plugin";
 +import { isVideoElement } from "../plugins/with-video";
 +import { isAudioElement } from "../data/audio";
-+import { smartDownload } from "../utils/download-utils";
++import { runCanvasVideoAction } from "../utils/download-utils";
 +import { useI18n } from "../i18n";
 +import "./canvas-image-context-menu.scss";
 +
@@ -1870,7 +1916,10 @@ index 0000000..30ec507
 +    };
 +  }, [contextMenu, close]);
 +
-+  const run = async (action: CanvasImageAction | "prompt", target: Target) => {
++  const run = async (
++    action: CanvasImageAction | "copy-path" | "prompt",
++    target: Target,
++  ) => {
 +    if (busy.current) return;
 +    busy.current = true;
 +    const message = MessagePlugin.loading(zh ? "正在处理…" : "Processing…", 0);
@@ -1879,43 +1928,47 @@ index 0000000..30ec507
 +        action === "prompt"
 +          ? (await copyImagePrompt(target.prompt), "copied")
 +          : target.kind === "video"
-+            ? (
-+                await smartDownload([
-+                  {
-+                    url: target.url,
-+                    type: "video",
-+                    filename: `video-${target.id}`,
-+                  },
-+                ])
-+              ).downloadedCount > 0
-+              ? "saved"
-+              : "cancelled"
-+            : await runCanvasImageAction(
++            ? await runCanvasVideoAction(
 +                action,
 +                target.url,
-+                `image-${target.id}`,
-+              );
++                `video-${target.id}`,
++              )
++            : action === "copy-path"
++              ? "cancelled"
++              : await runCanvasImageAction(
++                  action,
++                  target.url,
++                  `image-${target.id}`,
++                );
 +      if (result !== "cancelled")
 +        MessagePlugin.success(
-+          result === "copied"
++          result === "path-copied"
 +            ? zh
-+              ? "已复制，可直接粘贴"
-+              : "Copied, ready to paste"
-+            : result === "revealed"
++              ? "已复制视频文件路径"
++              : "Video file path copied"
++            : result === "copied"
 +              ? zh
-+                ? "已在文件管理器中显示图片"
-+                : "Image revealed in file manager"
-+              : result === "download-started"
++                ? target.kind === "video" && action === "copy"
++                  ? "已复制视频文件，可粘贴到文件夹或支持文件的应用"
++                  : "已复制，可直接粘贴"
++                : "Copied, ready to paste"
++              : result === "revealed"
 +                ? zh
-+                  ? "已发起下载"
-+                  : "Download started"
-+                : zh
 +                  ? target.kind === "video"
-+                    ? "视频已保存"
-+                    : "图片已保存"
-+                  : target.kind === "video"
-+                    ? "Video saved"
-+                    : "Image saved",
++                    ? "已在文件管理器中显示视频"
++                    : "已在文件管理器中显示图片"
++                  : "File revealed in file manager"
++                : result === "download-started"
++                  ? zh
++                    ? "已发起下载"
++                    : "Download started"
++                  : zh
++                    ? target.kind === "video"
++                      ? "视频已保存"
++                      : "图片已保存"
++                    : target.kind === "video"
++                      ? "Video saved"
++                      : "Image saved",
 +        );
 +    } catch (error) {
 +      MessagePlugin.error(
@@ -1940,7 +1993,15 @@ index 0000000..30ec507
 +            onSelect: (t) => void run("copy", t),
 +          },
 +        ] as ContextMenuEntry<Target>[])
-+      : []),
++      : ([
++          {
++            key: "copy",
++            label: zh ? "复制视频文件" : "Copy video file",
++            icon: <Copy size={16} />,
++            disabled: !getAssistantAccount()?.videoAction,
++            onSelect: (t) => void run("copy", t),
++          },
++        ] as ContextMenuEntry<Target>[])),
 +    {
 +      key: "save",
 +      label:
@@ -1964,7 +2025,22 @@ index 0000000..30ec507
 +            onSelect: (t) => void run("reveal", t),
 +          },
 +        ] as ContextMenuEntry<Target>[])
-+      : []),
++      : ([
++          {
++            key: "reveal",
++            label: zh ? "显示视频文件" : "Show video file",
++            icon: <FolderOpen size={16} />,
++            disabled: !getAssistantAccount()?.videoAction,
++            onSelect: (t) => void run("reveal", t),
++          },
++          {
++            key: "copy-path",
++            label: zh ? "复制文件路径" : "Copy file path",
++            icon: <Link size={16} />,
++            disabled: !getAssistantAccount()?.videoAction,
++            onSelect: (t) => void run("copy-path", t),
++          },
++        ] as ContextMenuEntry<Target>[])),
 +    { key: "divider", type: "divider" },
 +    {
 +      key: "preview",
@@ -40202,10 +40278,10 @@ index b306aab..eb031a4 100644
 +  );
 +});
 diff --git a/packages/drawnix/src/utils/__tests__/download-utils.test.ts b/packages/drawnix/src/utils/__tests__/download-utils.test.ts
-index 571a4f2..031528b 100644
+index 571a4f2..76ff6c1 100644
 --- a/packages/drawnix/src/utils/__tests__/download-utils.test.ts
 +++ b/packages/drawnix/src/utils/__tests__/download-utils.test.ts
-@@ -2,10 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+@@ -2,10 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  import { AssetSource, AssetType, type Asset } from '../../types/asset.types';
  import { TaskStatus, TaskType, type Task } from '../../types/task.types';
  import type { AudioDownloadMetadata } from '../audio-id3';
@@ -40216,13 +40292,45 @@ index 571a4f2..031528b 100644
    smartDownload,
 +  downloadMediaFile,
 +  downloadAsZip,
++  runCanvasVideoAction,
  } from '../download-utils';
  
  const {
-@@ -101,6 +104,28 @@ function createTask(overrides: Partial<Task> = {}): Task {
+@@ -101,6 +105,59 @@ function createTask(overrides: Partial<Task> = {}): Task {
  }
  
  describe('download-utils', () => {
++  it.each(['copy', 'copy-path', 'reveal'] as const)('uses cached original video for %s even if remote URL expired', async (action) => {
++    vi.stubGlobal('fetch', vi.fn());
++    const original = new Blob(['original-mp4'], { type: 'video/mp4' });
++    getCachedBlobMock.mockResolvedValue(original);
++    const videoAction = vi.fn().mockResolvedValue(action === 'reveal' ? 'revealed' : action === 'copy-path' ? 'path-copied' : 'copied');
++    setAssistantAccount({ videoAction } as any);
++    await runCanvasVideoAction(action, 'https://expired.synthetic.invalid/video.mp4');
++    expect(videoAction).toHaveBeenCalledWith(action, original);
++    expect(fetch).not.toHaveBeenCalled();
++  });
++  it('reports missing virtual video without fetching a thumbnail or regenerating', async () => {
++    vi.stubGlobal('fetch', vi.fn());
++    getCachedBlobMock.mockResolvedValue(null);
++    const videoAction = vi.fn();
++    setAssistantAccount({ videoAction } as any);
++    await expect(runCanvasVideoAction('copy', '/__aitu_cache__/video/missing.mp4')).rejects.toThrow('缓存');
++    expect(videoAction).not.toHaveBeenCalled();
++    expect(fetch).not.toHaveBeenCalled();
++  });
++  it('rejects oversized cached video before IPC', async () => {
++    getCachedBlobMock.mockResolvedValue({ size: 128 * 1024 * 1024 + 1 } as Blob);
++    const videoAction = vi.fn();
++    setAssistantAccount({ videoAction } as any);
++    await expect(runCanvasVideoAction('reveal', '/__aitu_cache__/video/huge.mp4')).rejects.toThrow('128 MB');
++    expect(videoAction).not.toHaveBeenCalled();
++  });
++  it('does not claim file copy when the browser host has no native capability', async () => {
++    setAssistantAccount(undefined);
++    await expect(runCanvasVideoAction('copy', '/__aitu_cache__/video/1.mp4')).rejects.toThrow('桌面客户端');
++    expect(getCachedBlobMock).not.toHaveBeenCalled();
++  });
 +  it.each([['gif', 'image/gif'], ['svg', 'image/svg+xml']])(
 +    'downloads original cached %s bytes and corrects a stale PNG extension', async (extension, mime) => {
 +      const original = new Blob(['original-media'], { type: mime });
@@ -40248,7 +40356,7 @@ index 571a4f2..031528b 100644
    beforeEach(() => {
      downloadFileMock.mockReset();
      openInNewTabMock.mockReset();
-@@ -112,9 +137,56 @@ describe('download-utils', () => {
+@@ -112,9 +169,56 @@ describe('download-utils', () => {
    });
  
    afterEach(() => {
@@ -40305,7 +40413,7 @@ index 571a4f2..031528b 100644
    it('为素材库音频构建带封面的下载项', () => {
      const item = buildAssetDownloadItem(
        createAsset({
-@@ -240,7 +312,7 @@ describe('download-utils', () => {
+@@ -240,7 +344,7 @@ describe('download-utils', () => {
            filename: 'missing.mp4',
          },
        ])
@@ -41398,7 +41506,7 @@ index 42c7c72..a7734ec 100644
  
  function shouldUseHttpAssetProtocol(): boolean {
 diff --git a/packages/drawnix/src/utils/download-utils.ts b/packages/drawnix/src/utils/download-utils.ts
-index 0d9525a..ccc6406 100644
+index 0d9525a..44074f5 100644
 --- a/packages/drawnix/src/utils/download-utils.ts
 +++ b/packages/drawnix/src/utils/download-utils.ts
 @@ -26,6 +26,8 @@ import {
@@ -41459,7 +41567,7 @@ index 0d9525a..ccc6406 100644
  }
  
  async function pickDesktopSavePath(filename: string): Promise<string | null> {
-@@ -484,17 +504,17 @@ function replaceFilenameExtension(filename: string, extension: string): string {
+@@ -484,23 +504,44 @@ function replaceFilenameExtension(filename: string, extension: string): string {
  }
  
  async function readDownloadBlob(item: BatchDownloadItem): Promise<Blob> {
@@ -41480,7 +41588,34 @@ index 0d9525a..ccc6406 100644
    if (!response.ok) {
      throw new Error(`Failed to fetch ${assetUrl}: ${response.status}`);
    }
-@@ -667,7 +687,8 @@ export async function downloadAsZip(
+   return response.blob();
+ }
+ 
++/** Desktop file actions use the same original bytes as video export. */
++export async function runCanvasVideoAction(
++  action: 'copy' | 'copy-path' | 'reveal' | 'save',
++  url: string,
++  name?: string,
++) {
++  if (action === 'save') {
++    const result = await smartDownload([{ url, type: 'video', filename: name }]);
++    return result.downloadedCount > 0 ? 'saved' as const : 'cancelled' as const;
++  }
++  const native = getAssistantAccount()?.videoAction;
++  if (!native) throw new Error('请在兔子助手桌面客户端中操作视频文件。');
++  // Remote results may already have an offline copy. Never use a poster or
++  // regenerate a video when its virtual cache entry is missing.
++  const cached = await unifiedCacheService.getCachedBlob(url, { allowNetwork: false });
++  const blob = cached?.size ? cached : await readDownloadBlob({ url, type: 'video' });
++  if (!blob.size || blob.size > 128 * 1024 * 1024)
++    throw new Error('视频为空或超过 128 MB，无法处理。');
++  return native(action, blob);
++}
++
+ function resolveDownloadExtension(
+   primaryValue: string | undefined,
+   fallbackExtension: string,
+@@ -667,7 +708,8 @@ export async function downloadAsZip(
    const zip = new JSZip();
    const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
    const finalZipName = zipFilename || `aitu_download_${timestamp}.zip`;
@@ -41490,7 +41625,7 @@ index 0d9525a..ccc6406 100644
    const desktopZipPath = isDesktop
      ? await pickDesktopSavePath(finalZipName)
      : null;
-@@ -742,7 +763,12 @@ export async function downloadAsZip(
+@@ -742,7 +784,12 @@ export async function downloadAsZip(
    const content = await zip.generateAsync({ type: 'blob' }, (metadata) => {
      reportProgress(onProgress, 50 + metadata.percent / 2);
    });
@@ -41504,7 +41639,7 @@ index 0d9525a..ccc6406 100644
      await writeBlobToDesktopPath(desktopZipPath, content);
    } else {
      downloadFromBlob(content, finalZipName);
-@@ -775,6 +801,25 @@ export async function smartDownload(
+@@ -775,6 +822,25 @@ export async function smartDownload(
      const assetUrl =
        item.type === 'image' ? normalizeImageDataUrl(item.url) : item.url;
  

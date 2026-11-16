@@ -5,6 +5,7 @@ import {
   FolderOpen,
   ScanSearch,
   TextQuote,
+  Link,
 } from "lucide-react";
 import {
   PlaitBoard,
@@ -28,7 +29,7 @@ import {
 import { MessagePlugin } from "../utils/message-plugin";
 import { isVideoElement } from "../plugins/with-video";
 import { isAudioElement } from "../data/audio";
-import { smartDownload } from "../utils/download-utils";
+import { runCanvasVideoAction } from "../utils/download-utils";
 import { useI18n } from "../i18n";
 import "./canvas-image-context-menu.scss";
 
@@ -176,7 +177,10 @@ export function CanvasImageContextMenu({
     };
   }, [contextMenu, close]);
 
-  const run = async (action: CanvasImageAction | "prompt", target: Target) => {
+  const run = async (
+    action: CanvasImageAction | "copy-path" | "prompt",
+    target: Target,
+  ) => {
     if (busy.current) return;
     busy.current = true;
     const message = MessagePlugin.loading(zh ? "正在处理…" : "Processing…", 0);
@@ -185,43 +189,47 @@ export function CanvasImageContextMenu({
         action === "prompt"
           ? (await copyImagePrompt(target.prompt), "copied")
           : target.kind === "video"
-            ? (
-                await smartDownload([
-                  {
-                    url: target.url,
-                    type: "video",
-                    filename: `video-${target.id}`,
-                  },
-                ])
-              ).downloadedCount > 0
-              ? "saved"
-              : "cancelled"
-            : await runCanvasImageAction(
+            ? await runCanvasVideoAction(
                 action,
                 target.url,
-                `image-${target.id}`,
-              );
+                `video-${target.id}`,
+              )
+            : action === "copy-path"
+              ? "cancelled"
+              : await runCanvasImageAction(
+                  action,
+                  target.url,
+                  `image-${target.id}`,
+                );
       if (result !== "cancelled")
         MessagePlugin.success(
-          result === "copied"
+          result === "path-copied"
             ? zh
-              ? "已复制，可直接粘贴"
-              : "Copied, ready to paste"
-            : result === "revealed"
+              ? "已复制视频文件路径"
+              : "Video file path copied"
+            : result === "copied"
               ? zh
-                ? "已在文件管理器中显示图片"
-                : "Image revealed in file manager"
-              : result === "download-started"
+                ? target.kind === "video" && action === "copy"
+                  ? "已复制视频文件，可粘贴到文件夹或支持文件的应用"
+                  : "已复制，可直接粘贴"
+                : "Copied, ready to paste"
+              : result === "revealed"
                 ? zh
-                  ? "已发起下载"
-                  : "Download started"
-                : zh
                   ? target.kind === "video"
-                    ? "视频已保存"
-                    : "图片已保存"
-                  : target.kind === "video"
-                    ? "Video saved"
-                    : "Image saved",
+                    ? "已在文件管理器中显示视频"
+                    : "已在文件管理器中显示图片"
+                  : "File revealed in file manager"
+                : result === "download-started"
+                  ? zh
+                    ? "已发起下载"
+                    : "Download started"
+                  : zh
+                    ? target.kind === "video"
+                      ? "视频已保存"
+                      : "图片已保存"
+                    : target.kind === "video"
+                      ? "Video saved"
+                      : "Image saved",
         );
     } catch (error) {
       MessagePlugin.error(
@@ -246,7 +254,15 @@ export function CanvasImageContextMenu({
             onSelect: (t) => void run("copy", t),
           },
         ] as ContextMenuEntry<Target>[])
-      : []),
+      : ([
+          {
+            key: "copy",
+            label: zh ? "复制视频文件" : "Copy video file",
+            icon: <Copy size={16} />,
+            disabled: !getAssistantAccount()?.videoAction,
+            onSelect: (t) => void run("copy", t),
+          },
+        ] as ContextMenuEntry<Target>[])),
     {
       key: "save",
       label:
@@ -270,7 +286,22 @@ export function CanvasImageContextMenu({
             onSelect: (t) => void run("reveal", t),
           },
         ] as ContextMenuEntry<Target>[])
-      : []),
+      : ([
+          {
+            key: "reveal",
+            label: zh ? "显示视频文件" : "Show video file",
+            icon: <FolderOpen size={16} />,
+            disabled: !getAssistantAccount()?.videoAction,
+            onSelect: (t) => void run("reveal", t),
+          },
+          {
+            key: "copy-path",
+            label: zh ? "复制文件路径" : "Copy file path",
+            icon: <Link size={16} />,
+            disabled: !getAssistantAccount()?.videoAction,
+            onSelect: (t) => void run("copy-path", t),
+          },
+        ] as ContextMenuEntry<Target>[])),
     { key: "divider", type: "divider" },
     {
       key: "preview",
