@@ -152,6 +152,19 @@ def execute(script, async_=False, args=None):
 def element_action(element, value):
     key='element-6066-11e4-a52e-4f735466cecf'
     assert key in element, 'Actual WebDriver element reference required'
+    previous=None
+    stable_samples=0
+    def stable():
+        nonlocal previous,stable_samples
+        box=execute('''const e=arguments[0],r=e.getBoundingClientRect();
+const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+return e.isConnected && (hit===e || e.contains(hit)) ? [r.x,r.y,r.width,r.height] : null;''', args=[element])
+        stable_samples=stable_samples+1 if box and box==previous else 0
+        previous=box
+        return stable_samples>=3
+    # Unlike Playwright, WebKitWebDriver does not wait for the host's arrival
+    # animation. A click during that transform can hit the neighboring tab.
+    wait_for(stable,'Native control did not become stable and unobscured',30)
     route='/session/'+session+'/element/'+element[key]
     if value is None:
         request('POST', route+'/click', {})
