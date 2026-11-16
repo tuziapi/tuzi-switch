@@ -1,8 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
-  request: vi.fn(), codex: vi.fn(), image: vi.fn(), video: vi.fn(), audio: vi.fn(), text: vi.fn(), cancel: vi.fn(), attachment: vi.fn(),
+  context: vi.fn(), request: vi.fn(), codex: vi.fn(), image: vi.fn(), video: vi.fn(), audio: vi.fn(), text: vi.fn(), cancel: vi.fn(), attachment: vi.fn(),
   tasks: [] as any[], listeners: new Set<(e: any) => void>(),
 }));
+vi.mock('./canvas-context', () => ({ prepareCanvasContext: mocks.context }));
 vi.mock('./discussion-canvas', () => ({ reserveDiscussionCanvas: () => ({ ids: [], assertCurrent() {}, bind() {}, finish() {} }) }));
 vi.mock('./request', () => ({ requestTextChat: mocks.request }));
 vi.mock('./local-codex', () => ({ requestCodexDiscussion: mocks.codex }));
@@ -257,4 +258,122 @@ it('preserves explicit collage composition and same-prompt variations exactly', 
   await requestDiscussion(request());
   expect(mocks.image.mock.calls.map(([a])=>a.prompt)).toEqual([prompt,prompt]);
   expect(mocks.image.mock.calls.every(([a])=>a.count===1)).toBe(true);
+});
+
+it.each([false, true])(
+  "forwards actual canvas sheets and metadata to backend (Codex=%s)",
+  async (codex) => {
+    const context = {
+      boardId: "original-board",
+      revision: "a".repeat(64),
+      summary: "unselected image b at 200,0",
+      notice: "video1 0s 1s 2s; no audio",
+      images: ["data:image/jpeg;base64,YQ=="],
+      references: { images: [], graphics: [], videos: ["/video.mp4"] },
+    };
+    mocks.context.mockResolvedValue(context);
+    const response = {
+      content: JSON.stringify({
+        content: "计划已整理",
+        next: [],
+        canvasActions: [{ op: "move", ids: ["b"], dx: 20, dy: 0 }],
+      }),
+      reasoning: "",
+      finishReason: "stop",
+    };
+    mocks.request.mockResolvedValue(response);
+    mocks.codex.mockResolvedValue(response);
+    const onCanvasContext = vi.fn(async () => {}),
+      onCanvasPlan = vi.fn(async () => "已移动，支持撤销");
+    const r = {
+      ...request(),
+      turns: [{ role: "user" as const, content: "把图片移动20" }],
+      onCanvasContext,
+      onCanvasPlan,
+      ...(codex ? { codex: { model: "synthetic" } } : {}),
+      context: {
+        selection: {
+          images: [],
+          graphics: [],
+          texts: [],
+          videos: ["/video.mp4"],
+        },
+      },
+    };
+    const result = await planDiscussion(r);
+    const sent = (codex ? mocks.codex : mocks.request).mock.calls[0][0];
+    expect(sent.turns.at(-1).images).toEqual(context.images);
+    expect(sent.turns.at(-1).content).toContain(context.summary);
+    expect(onCanvasContext).toHaveBeenCalledWith(context);
+    expect(onCanvasPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        revision: context.revision,
+        boardId: context.boardId,
+      }),
+      true,
+    );
+    expect(result.content).toContain("已移动，支持撤销");
+    expect(mocks.image).not.toHaveBeenCalled();
+  },
+);
+it("reuses saved reference media on follow-up and persists before model submission", async () => {
+  const refs = { images: [], graphics: [], videos: ["/prior.mp4"] };
+  mocks.context.mockResolvedValue({
+    boardId: "original-board",
+    revision: "a".repeat(64),
+    summary: "current",
+    notice: "sampling",
+    images: [],
+    references: refs,
+  });
+  reply(JSON.stringify({ content: "ok", next: [] }));
+  const onCanvasContext = vi.fn(async () => {
+    throw new Error("disk full");
+  });
+  await expect(
+    planDiscussion({
+      ...request(),
+      previousCanvasContext: {
+        boardId: "original-board",
+        revision: "a".repeat(64),
+        summary: "old",
+        notice: "",
+        images: [],
+        references: refs,
+      },
+      onCanvasContext,
+    }),
+  ).rejects.toThrow("disk full");
+  expect(mocks.context.mock.calls[0][1]).toEqual(refs);
+  expect(mocks.request).not.toHaveBeenCalled();
+});
+it("destructive plan remains pending and malformed canvas plan cannot submit generation", async () => {
+  mocks.context.mockResolvedValue({
+    boardId: "original-board",
+    revision: "a".repeat(64),
+    summary: "board",
+    notice: "",
+    images: [],
+  });
+  const onCanvasPlan = vi.fn(async () => "等待确认"),
+    onCanvasContext = vi.fn(async () => {});
+  reply(
+    JSON.stringify({
+      content: "删除计划",
+      next: [],
+      canvasActions: [{ op: "delete", ids: ["a"] }],
+    }),
+  );
+  await planDiscussion({ ...request(), onCanvasContext, onCanvasPlan });
+  expect(onCanvasPlan.mock.calls[0][1]).toBe(false);
+  reply(
+    JSON.stringify({
+      content: "bad",
+      next: [step()],
+      canvasActions: [{ op: "run_shell", ids: ["a"] }],
+    }),
+  );
+  const r = { ...request(), onCanvasContext, onCanvasPlan };
+  await expect(planDiscussion(r)).rejects.toThrow();
+  expect(r.onPlan).not.toHaveBeenCalled();
 });

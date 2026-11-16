@@ -1057,3 +1057,5 @@
 .text-chat-avatar { width: 28px; height: 28px; flex: 0 0 28px; object-fit: contain; border-radius: 9px; padding: 3px; background: #fff; border: 1px solid var(--tc-line); box-sizing: border-box; }
 .text-chat-author-model { font-size: 11px; color: var(--tc-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .text-chat-author > strong { flex-shrink: 0; }
+
+.text-chat-canvas-context { display: block; margin-top: 8px; white-space: pre-wrap; font-size: 12px; line-height: 1.5; opacity: .8; overflow-wrap: anywhere; }

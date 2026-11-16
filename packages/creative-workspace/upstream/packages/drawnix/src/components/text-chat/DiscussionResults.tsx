@@ -10,6 +10,7 @@ import { useMediaUrl } from "../../hooks/useMediaCache";
 import { textChatRuntime } from "../../services/text-chat/runtime";
 import { discussionTargetLabels } from "../../services/text-chat/discussion-plan";
 import { TextMarkdown, copyChatText } from "./TextMarkdown";
+import { isVideoElement } from "../../plugins/with-video";
 import { scrollToPoint } from "../../utils/selection-utils";
 
 function DiscussionMedia({
@@ -110,9 +111,122 @@ export function DiscussionResults({
       setNotice((e as Error).message);
     }
   };
-  if (!tasks.length && !link.plan) return null;
+  const decideCanvas = async (execute: boolean) => {
+    if (!sessionId || !messageId) return;
+    try {
+      await textChatRuntime.decideCanvasPlan(sessionId, messageId, execute);
+    } catch (error) {
+      setNotice((error as Error).message);
+    }
+  };
+  const targetLabel = (id: string) => {
+    if (!board || workspaceService.getState().currentBoardId !== link.boardId)
+      return id;
+    const index = board.children.findIndex((element) => element.id === id);
+    if (index < 0) return `${id}（已不在画布）`;
+    const element = board.children[index];
+    const kind = isVideoElement(element)
+      ? "视频"
+      : element.type === "image"
+        ? "图片"
+        : element.text
+          ? "文字"
+          : "元素";
+    const name = String(
+      element.name ||
+        element.title ||
+        element.generationPrompt ||
+        element.text?.children?.[0]?.text ||
+        "",
+    ).slice(0, 50);
+    return `画布第 ${index + 1} 项 · ${kind}${name ? `「${name}」` : ""}`;
+  };
+  const actionLabels = {
+    locate: "定位",
+    move: "移动",
+    arrange: "排列",
+    scale: "缩放",
+    copy: "复制",
+    set_text: "编辑文字",
+    delete: "删除",
+    replace: "替换媒体",
+  };
+  if (!tasks.length && !link.plan && !link.canvasPlan) return null;
   return (
-    <section className="discussion-results" aria-label="讨论生成任务">
+    <section
+      className="discussion-results"
+      aria-label="讨论生成任务"
+      onMouseDown={(event) => {
+        // Blurring the attached composer changes its height between down/up in WebKit.
+        // Preserve that focus until the click is delivered; keyboard activation is unchanged.
+        if (
+          event.button === 0 &&
+          (event.target as Element).closest("button") &&
+          document.activeElement?.matches('[data-testid="ai-input-textarea"]')
+        )
+          event.preventDefault();
+      }}
+    >
+      {link.canvasPlan && (
+        <div className="discussion-plan" data-testid="canvas-edit-plan">
+          <strong>
+            {
+              {
+                ready: "待确认的画布操作",
+                started: "正在执行画布操作",
+                applied: "画布操作已完成，可撤销恢复",
+                cancelled: "画布操作已取消",
+                error: "画布操作未完成，请查看提示后重新发送",
+              }[link.canvasPlan.status]
+            }
+          </strong>
+          <ol>
+            {link.canvasPlan.actions.map((action, index) => (
+              <li key={index}>
+                <strong>
+                  {actionLabels[action.op]} · {action.ids.length} 个元素
+                </strong>
+                <small title={action.ids.join("、")}>
+                  目标：{action.ids.map(targetLabel).join("、")}
+                </small>
+                {action.op === "set_text" && <p>{action.text}</p>}
+                {(action.op === "move" || action.op === "copy") && (
+                  <p>
+                    横向 {action.dx}，纵向 {action.dy}
+                  </p>
+                )}
+                {action.op === "scale" && <p>缩放至 {action.scale} 倍</p>}
+                {action.op === "arrange" && (
+                  <p>
+                    {action.columns} 列，间距 {action.gap}
+                  </p>
+                )}
+                {action.op === "replace" && (
+                  <p>使用元素：{targetLabel(action.sourceId!)}</p>
+                )}
+              </li>
+            ))}
+          </ol>
+          {link.canvasPlan.status === "ready" && (
+            <div className="discussion-plan__actions">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void decideCanvas(false)}
+              >
+                取消操作
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void decideCanvas(true)}
+              >
+                确认修改画布
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {link.plan && (
         <div className="discussion-plan" data-testid="discussion-plan">
           <div className="discussion-plan__heading">

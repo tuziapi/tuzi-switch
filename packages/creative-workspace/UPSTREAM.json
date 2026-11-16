@@ -6893,6 +6893,51 @@
       "path": "packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar-position.test.ts",
       "origin": "desktop-canvas-integration",
       "reason": "Regress desktop header/editor collision discovered during PR338/339 integration UI verification"
+    },
+    {
+      "path": "openspec/changes/add-discussion-canvas-awareness/design.md",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "openspec/changes/add-discussion-canvas-awareness/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "openspec/changes/add-discussion-canvas-awareness/specs/agent-discussion/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "openspec/changes/add-discussion-canvas-awareness/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-context.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-context.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-control.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-control.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-schema.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
     }
   ],
   "integration": {

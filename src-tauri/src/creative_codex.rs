@@ -326,7 +326,14 @@ fn validate(request: &CodexRequest) -> Result<(), String> {
 }
 
 fn plan_schema() -> Value {
-    json!({"type":"object","additionalProperties":false,"required":["content","next"],"properties":{
+    json!({"type":"object","additionalProperties":false,"required":["content","next","canvasActions"],"properties":{
+        "canvasActions":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["op","ids","dx","dy","scale","columns","gap","text","sourceId"],"properties":{
+            "op":{"type":"string","enum":["locate","move","arrange","scale","copy","set_text","delete","replace"]},
+            "ids":{"type":"array","items":{"type":"string"}},
+            "dx":{"type":["number","null"]},"dy":{"type":["number","null"]},"scale":{"type":["number","null"]},
+            "columns":{"type":["integer","null"]},"gap":{"type":["number","null"]},
+            "text":{"type":["string","null"]},"sourceId":{"type":["string","null"]}
+        }}},
         "content":{"type":"string"},"next":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["mcp","args"],"properties":{
             "mcp":{"type":"string","enum":["generate_image","generate_video","generate_audio","generate_text"]},
             "args":{"type":"object","additionalProperties":false,"required":["prompt","count"],"properties":{"prompt":{"type":"string"},"count":{"type":"integer"}}}
@@ -374,7 +381,7 @@ fn run_with_rpc(
     let started = rpc.call(30, "thread/start", json!({
         "model":request.model,"cwd":rpc.cwd,"ephemeral":true,"sandbox":"read-only","approvalPolicy":"never",
         "config":{"mcp_servers":disabled_mcp},
-        "baseInstructions":"You are a creative discussion planner. Use only the supplied conversation and images. Do not use tools, execute commands, read files or generate media. Return the requested JSON plan. Generation is performed by the host only after user confirmation."
+        "baseInstructions":"You are a creative discussion planner. Use only the supplied conversation and images. Do not use tools, execute commands, read files or generate media. Return the requested JSON plan, including canvasActions (empty for ordinary discussion). Canvas actions reference supplied element IDs and are validated and applied by the host; never claim they already happened. Generation is performed by the host only after user confirmation."
     }), cancel)?;
     if started
         .get("model")
@@ -603,13 +610,18 @@ for line in sys.stdin:
  if method=='initialized': continue
  if method=='initialize': value={}
  elif method=='config/read': value={'config':{'model':'synthetic','mcp_servers':{'must-disable':{'enabled':True}}}}
- elif method=='model/list': value={'data':[{'id':'synthetic','model':'synthetic','supportedReasoningEfforts':[],'inputModalities':['text']}],'nextCursor':None}
+ elif method=='model/list': value={'data':[{'id':'synthetic','model':'synthetic','supportedReasoningEfforts':[],'inputModalities':['text','image']}],'nextCursor':None}
  elif method=='thread/start':
   assert r['params']['config']['mcp_servers']['must-disable']['enabled']==False
   assert r['params']['ephemeral']==True and r['params']['approvalPolicy']=='never'
   value={'thread':{'id':'thread-qa'},'model':'synthetic'}
  elif method=='turn/start':
   assert r['params']['outputSchema']['additionalProperties']==False
+  if mode=='images':
+   assert len(r['params']['input'])==6
+   assert r['params']['input'][0]['type']=='text'
+   assert all(v['type']=='image' and v['url']=='data:image/jpeg;base64,YQ==' for v in r['params']['input'][1:])
+   assert 'canvasActions' in r['params']['outputSchema']['required']
   if mode=='drop': sys.exit(0)
   emit({'method':'item/reasoning/summaryTextDelta','params':{'threadId':'thread-qa','turnId':'turn-qa','delta':'summary'}})
   emit({'id':i,'result':{'turn':{'id':'turn-qa'}}})
@@ -690,6 +702,20 @@ for line in sys.stdin:
             "{\"content\":\"final\",\"next\":[]}"
         );
         assert!(!format!("{events:?}").contains("LEAK"));
+    }
+    #[test]
+    #[cfg(unix)]
+    fn sampled_video_sheets_are_real_image_inputs_with_canvas_schema() {
+        let (rpc, _dir) = fake_rpc("images");
+        let mut request = fake_request();
+        request.images = vec!["data:image/jpeg;base64,YQ==".to_string(); 5];
+        run_with_rpc(&request, &AtomicBool::new(false), |_| Ok(()), rpc).unwrap();
+        let schema = plan_schema();
+        let actions = &schema["properties"]["canvasActions"]["items"];
+        assert_eq!(actions["additionalProperties"], false);
+        assert_eq!(actions["required"].as_array().unwrap().len(), 9);
+        assert!(actions["properties"].get("url").is_none());
+        assert!(actions["properties"].get("command").is_none());
     }
     #[test]
     #[cfg(unix)]

@@ -1,3 +1,8 @@
+import { validateCanvasPlan, type CanvasEditPlan } from "./canvas-schema";
+import {
+  validateCanvasContext,
+  type DiscussionCanvasContext,
+} from "./canvas-schema";
 import type { ChatSession } from "../../types/chat.types";
 import type { TextSnapshot, TextTurn } from "./protocol";
 import { validateAttachmentRefs, type TextAttachmentRef } from "./attachments";
@@ -6,6 +11,7 @@ import { validateDiscussionPlan, type DiscussionPlan } from "./discussion-plan";
 
 export interface DiscussionLink {
   plan?: DiscussionPlan;
+  canvasPlan?: CanvasEditPlan;
   boardId: string;
   runId: string;
   taskIds: string[];
@@ -14,6 +20,7 @@ export interface DiscussionLink {
 }
 export interface TextMessage extends TextSnapshot {
   origin?: "canvas" | "sidebar";
+  canvasContext?: DiscussionCanvasContext;
   discussion?: DiscussionLink;
   attachments?: TextAttachmentRef[];
   id: string;
@@ -76,23 +83,55 @@ export function restoreTextConversation(
   )
     throw new Error("文本会话格式或版本不受支持，请保留原数据并更新客户端。");
   const state = session.textChat;
-  if ((state.executionMode !== undefined && !["chat", "agent"].includes(state.executionMode)) ||
-      (state.linkedBoardId !== undefined && (typeof state.linkedBoardId !== "string" || !state.linkedBoardId.trim())) ||
-      (state.executionMode === "agent" && !state.linkedBoardId))
+  if (
+    (state.executionMode !== undefined &&
+      !["chat", "agent"].includes(state.executionMode)) ||
+    (state.linkedBoardId !== undefined &&
+      (typeof state.linkedBoardId !== "string" ||
+        !state.linkedBoardId.trim())) ||
+    (state.executionMode === "agent" && !state.linkedBoardId)
+  )
     throw new Error("讨论会话画板绑定无效，请保留原数据。");
   for (const m of state.messages) {
+    if (m.canvasContext !== undefined) {
+      validateCanvasContext(m.canvasContext);
+      if (m.canvasContext.boardId !== state.linkedBoardId)
+        throw new Error("画布参考属于其他画板。");
+    }
+    if (m.discussion?.canvasPlan !== undefined) {
+      validateCanvasPlan(m.discussion.canvasPlan);
+      if (m.discussion.canvasPlan.boardId !== state.linkedBoardId)
+        throw new Error("画布操作属于其他画板。");
+    }
     if (m.discussion?.plan !== undefined) {
       validateDiscussionPlan(m.discussion.plan);
-      if ((m.discussion.plan.status === "ready" && (m.discussion.submission !== "not_started" || m.discussion.taskIds.length)) ||
-          (m.discussion.plan.status === "started" && m.discussion.submission !== "started")) throw new Error("讨论计划提交状态无效。");
+      if (
+        (m.discussion.plan.status === "ready" &&
+          (m.discussion.submission !== "not_started" ||
+            m.discussion.taskIds.length)) ||
+        (m.discussion.plan.status === "started" &&
+          m.discussion.submission !== "started")
+      )
+        throw new Error("讨论计划提交状态无效。");
     }
-    if (m.origin !== undefined && !["canvas", "sidebar"].includes(m.origin)) throw new Error("消息来源无效。");
-    if (m.discussion !== undefined && (!m.discussion || typeof m.discussion.boardId !== "string" || !m.discussion.boardId ||
-        typeof m.discussion.runId !== "string" || !m.discussion.runId ||
-        m.discussion.boardId !== state.linkedBoardId || !Array.isArray(m.discussion.taskIds) ||
-        (m.discussion.submission !== undefined && !["not_started", "started"].includes(m.discussion.submission)) ||
-        (m.discussion.submission === "not_started" && m.discussion.taskIds.length > 0) ||
-        m.discussion.taskIds.length > 10 || m.discussion.taskIds.some(id => typeof id !== "string" || !id)))
+    if (m.origin !== undefined && !["canvas", "sidebar"].includes(m.origin))
+      throw new Error("消息来源无效。");
+    if (
+      m.discussion !== undefined &&
+      (!m.discussion ||
+        typeof m.discussion.boardId !== "string" ||
+        !m.discussion.boardId ||
+        typeof m.discussion.runId !== "string" ||
+        !m.discussion.runId ||
+        m.discussion.boardId !== state.linkedBoardId ||
+        !Array.isArray(m.discussion.taskIds) ||
+        (m.discussion.submission !== undefined &&
+          !["not_started", "started"].includes(m.discussion.submission)) ||
+        (m.discussion.submission === "not_started" &&
+          m.discussion.taskIds.length > 0) ||
+        m.discussion.taskIds.length > 10 ||
+        m.discussion.taskIds.some((id) => typeof id !== "string" || !id))
+    )
       throw new Error("讨论任务引用无效，请保留原数据。");
   }
   if (session.textChat.draftAttachments !== undefined)
@@ -111,6 +150,17 @@ export function restoreTextConversation(
       messages: session.textChat.messages.map((m) => ({
         ...m,
         reasoning: m.reasoning || "",
+        ...(m.discussion?.canvasPlan?.status === "started"
+          ? {
+              discussion: {
+                ...m.discussion,
+                canvasPlan: {
+                  ...m.discussion.canvasPlan,
+                  status: "error" as const,
+                },
+              },
+            }
+          : {}),
         ...(["pending", "streaming"].includes(m.status)
           ? {
               status: "interrupted" as const,
@@ -127,11 +177,23 @@ export function conversationContext(
   userId: string,
 ): TextTurn[] {
   const turns: TextTurn[] = [];
+  const currentIndex = messages.findIndex((m) => m.id === userId);
+  const latestContextId = messages
+    .slice(0, currentIndex + 1)
+    .filter((m) => m.role === "user" && m.canvasContext)
+    .at(-1)?.id;
   for (const message of messages) {
     if (message.role !== "user") continue;
     turns.push({
       role: "user",
-      content: message.content,
+      content:
+        message.content +
+        (message.canvasContext
+          ? `\n[本轮参考范围] ${message.canvasContext.notice}`
+          : ""),
+      ...(message.id === latestContextId && message.canvasContext?.images.length
+        ? { images: message.canvasContext.images, canvasSnapshot: true }
+        : {}),
       ...(message.attachments?.length
         ? { attachments: message.attachments }
         : {}),
@@ -153,7 +215,11 @@ export function conversationContext(
 
 /** Only explicit, durable pre-submission failures can be replayed. */
 export function canRetryDiscussion(message: TextMessage): boolean {
-  return Boolean(!message.discussion?.plan && message.discussion?.submission === "not_started" &&
-    message.discussion.taskIds.length === 0 &&
-    ["error", "interrupted", "stopped"].includes(message.status));
+  return Boolean(
+    !message.discussion?.plan &&
+      !message.discussion?.canvasPlan &&
+      message.discussion?.submission === "not_started" &&
+      message.discussion.taskIds.length === 0 &&
+      ["error", "interrupted", "stopped"].includes(message.status),
+  );
 }
