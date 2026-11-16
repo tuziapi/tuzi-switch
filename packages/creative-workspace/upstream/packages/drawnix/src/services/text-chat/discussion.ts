@@ -1,3 +1,11 @@
+import type { DiscussionCanvasContext } from "./canvas-schema";
+import {
+  canvasControlInstruction,
+  validateCanvasPlan,
+  needsCanvasConfirmation,
+  type CanvasAction,
+  type CanvasEditPlan,
+} from "./canvas-schema";
 import { agentExecutor } from "../agent/agent-executor";
 import {
   generateSystemPrompt,
@@ -63,6 +71,9 @@ export interface DiscussionRequest extends TextChatRequest {
   link: DiscussionLink;
   messageId: string;
   context?: DiscussionSubmission["context"];
+  previousCanvasContext?: DiscussionCanvasContext;
+  onCanvasContext?: (context: DiscussionCanvasContext) => Promise<void>;
+  onCanvasPlan?: (plan: CanvasEditPlan, automatic: boolean) => Promise<string>;
   onPlan: (plan: DiscussionPlan) => Promise<void>;
   onTasks: (ids: string[]) => Promise<void>;
   onBeforeSubmit: () => Promise<void>;
@@ -250,7 +261,26 @@ export async function requestDiscussion(
       throw new Error("附件不属于当前会话。");
     if (record.dataUrl) uploadedImages.push(record.dataUrl);
   }
-  const canvasImages = [...selection.images, ...selection.graphics];
+  const previousRefs = request.previousCanvasContext?.references;
+  const hasNewRefs =
+    selection.images.length +
+      selection.graphics.length +
+      selection.videos.length +
+      uploadedImages.length >
+    0;
+  const contextRefs = hasNewRefs
+    ? { ...selection, images: [...selection.images, ...uploadedImages] }
+    : previousRefs || selection;
+  const canvasContext = request.onCanvasContext
+    ? await (
+        await import("./canvas-context")
+      ).prepareCanvasContext(request.link.boardId, contextRefs, signal)
+    : undefined;
+  if (canvasContext) await request.onCanvasContext!(canvasContext);
+  const canvasImages = canvasContext?.images || [
+    ...selection.images,
+    ...selection.graphics,
+  ];
   selection.images = [...selection.images, ...uploadedImages];
   const knownImages = [...selection.images, ...selection.graphics];
   const knowledge = context?.knowledgeContextRefs?.length
@@ -267,9 +297,12 @@ export async function requestDiscussion(
     {
       role: "system" as const,
       content:
-        (request.codex ? "你是画布创作讨论助手。通过自然语言帮助用户完善创意，并将明确的创作请求整理为结构化计划。只使用本轮允许的生成类型；图片/视频/音频由宿主确认后生成，不能自行执行。" : generateSystemPrompt()) +
+        (request.codex
+          ? "你是画布创作讨论助手。通过自然语言帮助用户完善创意，并将明确的创作请求整理为结构化计划。只使用本轮允许的生成类型；图片/视频/音频由宿主确认后生成，不能自行执行。"
+          : generateSystemPrompt()) +
         instruction +
         discussionImagePlanningInstruction +
+        (canvasContext ? canvasControlInstruction : "") +
         (context?.targetType
           ? `\n本轮仅规划 generate_${context.targetType}，使用已选${discussionTargetLabels[context.targetType]}模型 ${models[context.targetType]}。不能切换类型或模型。`
           : "") +
@@ -283,6 +316,7 @@ export async function requestDiscussion(
   let snapshot: TextSnapshot = { content: "", reasoning: "" };
   const calls: ToolCall[] = [];
   let validatedPlan = false;
+  let canvasActions: CanvasAction[] = [];
   const result = await agentExecutor.execute(
     {
       userInstruction: prompt,
@@ -307,7 +341,9 @@ export async function requestDiscussion(
       messages: turns.map((t) => ({ role: t.role, content: t.content })),
       onToolCall: (call) => calls.push(call),
       complete: async () => {
-        const raw = await (request.codex ? requestCodexDiscussion : requestTextChat)({
+        const raw = await (
+          request.codex ? requestCodexDiscussion : requestTextChat
+        )({
           ...request,
           turns: turns.map((turn, index) =>
             index === turns.length - 1
@@ -316,10 +352,26 @@ export async function requestDiscussion(
                   content:
                     turn.content +
                     userContext +
+                    (canvasContext ? `\n${canvasContext.summary}` : "") +
                     (knowledge ? `\n${knowledge}` : ""),
                   images: canvasImages,
+                  ...(canvasContext
+                    ? {
+                        attachments: turn.attachments?.filter(
+                          (a) => a.kind !== "image",
+                        ),
+                      }
+                    : {}),
                 }
-              : turn,
+              : canvasContext
+                ? {
+                    ...turn,
+                    images: undefined,
+                    attachments: turn.attachments?.filter(
+                      (a) => a.kind !== "image",
+                    ),
+                  }
+                : turn,
           ),
           onUpdate: (value) => {
             snapshot = { ...value, content: discussionProse(value.content) };
@@ -360,12 +412,33 @@ export async function requestDiscussion(
               arguments: step.args,
             })),
           );
+          if (plan.canvasActions !== undefined) {
+            if (!Array.isArray(plan.canvasActions))
+              throw new Error("画布操作格式无效。");
+            if (plan.canvasActions.length) {
+              if (!canvasContext || !request.onCanvasPlan)
+                throw new Error("当前讨论未读取画布，不能执行编辑。");
+              validateCanvasPlan({
+                version: 1,
+                boardId: request.link.boardId,
+                revision: canvasContext.revision,
+                status: "ready",
+                actions: plan.canvasActions,
+              });
+              canvasActions = plan.canvasActions;
+            }
+          }
           validatedPlan = true;
         } else if (parseToolCalls(clean).length) {
           throw new Error("生成计划不是完整 JSON，本次未提交任务。");
         }
         snapshot = { ...raw, content: discussionProse(raw.content) };
-        return raw.content;
+        return clean.startsWith("{")
+          ? JSON.stringify({
+              content: JSON.parse(clean).content,
+              next: JSON.parse(clean).next,
+            })
+          : raw.content;
       },
     },
   );
@@ -419,6 +492,19 @@ export async function requestDiscussion(
     validateDiscussionPlan(plan);
     await request.onPlan(plan);
   }
+  if (canvasActions.length && canvasContext && request.onCanvasPlan) {
+    const feedback = await request.onCanvasPlan(
+      {
+        version: 1,
+        boardId: request.link.boardId,
+        revision: canvasContext.revision,
+        status: "ready",
+        actions: canvasActions,
+      },
+      !needsCanvasConfirmation(canvasActions, prompt),
+    );
+    snapshot.content += `\n\n${feedback}`;
+  }
   request.onUpdate(snapshot);
   return snapshot;
 }
@@ -457,7 +543,13 @@ export async function executeDiscussionPlan(
       if (!routePlan) throw new Error("当前音频模型缺少可用接口。");
       const controls = { ...step.params };
       // Each planned prompt must survive prior free-text entries in the parameter panel.
-      for (const key of ['prompt', 'gpt_description_prompt', 'sound', 'content']) delete controls[key];
+      for (const key of [
+        "prompt",
+        "gpt_description_prompt",
+        "sound",
+        "content",
+      ])
+        delete controls[key];
       params = isSunoNativeModel(step.model)
         ? buildSunoNativeInputParams(
             step.model,
@@ -480,7 +572,11 @@ export async function executeDiscussionPlan(
     return { step, params };
   });
   const { reserveDiscussionCanvas } = await import("./discussion-canvas");
-  const canvas = reserveDiscussionCanvas(plan, request.link.boardId, request.link.runId);
+  const canvas = reserveDiscussionCanvas(
+    plan,
+    request.link.boardId,
+    request.link.runId,
+  );
   const taskIds: string[] = [];
   const total = plan.steps.reduce((n, s) => n + s.count, 0);
   try {

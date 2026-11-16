@@ -1,0 +1,23 @@
+{
+  "engine": "webkit",
+  "checks": [
+    "synthetic-picture: unselected/selected, edge/center/bottom, right-click does not mutate canvas",
+    "synthetic-video: unselected/selected, edge/center/bottom, right-click does not mutate canvas",
+    "image copy uses clicked original",
+    "second right-click retargets image menu to video; video prompt copied",
+    "video original reaches native media save, never image decoder",
+    "复制视频文件: original video bytes reach native file action",
+    "显示视频文件: original video bytes reach native file action",
+    "复制文件路径: original video bytes reach native file action",
+    "video preview opens and dismisses",
+    "playing video and native player controls have media menu; playback preserved",
+    "left drag still moves video 60×35; menu works after drag",
+    "overlapping pictures target topmost element",
+    "native overlay targets visible video, not geometrically overlapping image",
+    "image and video menus survive zoom changes",
+    "menus survive canvas panning",
+    "text input and blank canvas do not receive stale media menu",
+    "navigation header uses loaded rabbit brand"
+  ],
+  "errors": []
+}

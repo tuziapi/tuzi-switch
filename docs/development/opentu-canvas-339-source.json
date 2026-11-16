@@ -1,0 +1,451 @@
+{
+  "task": "UC-CANVAS-339",
+  "date": "2026-11-16",
+  "branch": "codex/integrate-canvas-generation-339",
+  "desktopBase": "c299b8df5d03a69afa96b637a1370ebdf3e00f29",
+  "source": {
+    "threadId": "01a1c98c-5c80-7f11-ab13-8c7344e32bb0",
+    "threadTitle": "拉取 develop 分支最新代码",
+    "head": "debc11bc56b59c0e06dc8185ae529668a8245cfb",
+    "base": "73f6e925df2edd3723bef358a21fd51b48492f12",
+    "featureCommit": "5ea9eec5d7c9b230a41c56cf54d5e554d8f80be9",
+    "prs": {
+      "338": "merged into develop",
+      "339": "open at inspection; includes edit/copy/delete"
+    },
+    "ci339": "Vite build failed: JavaScript heap out of memory; not treated as passed"
+  },
+  "merge": {
+    "clean": 43,
+    "automatic": 7,
+    "conflictsResolved": 10,
+    "paths": [
+      {
+        "path": "docs/qa-canvas-generation-nodes.md",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "docs/qa-canvas-reroll.md",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "openspec/changes/add-canvas-reroll-and-reference-connections/design.md",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "openspec/changes/add-canvas-reroll-and-reference-connections/proposal.md",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "openspec/changes/add-canvas-reroll-and-reference-connections/specs/ai-input-generation/spec.md",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "openspec/changes/add-canvas-reroll-and-reference-connections/specs/canvas-generation-inputs/spec.md",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "openspec/changes/add-canvas-reroll-and-reference-connections/tasks.md",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "openspec/changes/add-canvas-reroll-and-reference-connections/validation.md",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.prefill-images.test.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.reroll.test.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/ai-input-bar/__tests__/workflow-converter.test.ts",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/ai-input-bar/ai-input-bar.scss",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/ai-input-bar/target-bound-taskbar-state.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/auto-complete-shape-picker/auto-complete-shape-picker.scss",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/auto-complete-shape-picker/auto-complete-shape-picker.tsx",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/task-queue/TaskItem.tsx",
+        "status": "merged",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/task-queue/TaskQueuePanel.tsx",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/toolbar/popup-toolbar/generation-node-actions.test.tsx",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/components/toolbar/popup-toolbar/generation-node-actions.tsx",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.scss",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/data/embedded-media.ts",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/drawnix.tsx",
+        "status": "merged",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts",
+        "status": "merged",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/hooks/useAutoCompleteShapePicker.test.tsx",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/hooks/useAutoCompleteShapePicker.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/hooks/useAutoInsertToCanvas.ts",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/hooks/useGenerationNodeDraft.test.tsx",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/hooks/useGenerationNodeDraft.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/mcp/tools/canvas-insertion.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/mcp/tools/image-generation.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/mcp/tools/video-generation.ts",
+        "status": "merged",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/plugins/canvas-association-line.test.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/plugins/canvas-association-line.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/plugins/with-arrow-line-auto-complete-extend.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/plugins/with-generation-node.test.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/plugins/with-generation-node.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/ai-input-ui-events.ts",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/services/canvas-operations/canvas-insertion.test.ts",
+        "status": "merged",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/services/canvas-operations/canvas-insertion.ts",
+        "status": "merged",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/services/canvas-operations/image-generation-references.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/services/canvas-operations/media-quick-insert.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/services/generation-node-thumbnail.test.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/generation-node-thumbnail.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/generation-node.test.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/generation-node.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/image-generation-recipe.test.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/image-generation-recipe.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/image-reference-ports.test.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/image-reference-ports.ts",
+        "status": "clean",
+        "targetExists": false,
+        "sourceBaseExists": false
+      },
+      {
+        "path": "packages/drawnix/src/services/media-generation/image-generation-service.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/services/media-generation/types.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/services/media-generation/video-generation-service.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/services/workflow-engine/engine.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/styles/index.scss",
+        "status": "merged",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/types/shared/core.types.ts",
+        "status": "conflict",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/utils/__tests__/image-task-prefill.test.ts",
+        "status": "conflict",
+        "targetExists": false,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/utils/frame-insertion-utils.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      },
+      {
+        "path": "packages/drawnix/src/utils/image-task-prefill.ts",
+        "status": "clean",
+        "targetExists": true,
+        "sourceBaseExists": true
+      }
+    ]
+  },
+  "fixes": [
+    "Preserve desktop attached-discussion state and draft across card editing",
+    "Route restored/reroll input to image generation even with discussion enabled",
+    "Retain image reference/mask params through remote acceptance and completion; keep cancel/video cleanup",
+    "Place near-top canvas toolbars below selection to avoid desktop header"
+  ],
+  "verification": {
+    "creative": {
+      "files": 174,
+      "tests": 2782,
+      "result": "passed"
+    },
+    "host": {
+      "files": 101,
+      "tests": 851,
+      "result": "passed"
+    },
+    "postFixFocused": {
+      "discussionRerollLineageTests": 26,
+      "storageWriterTests": 24,
+      "result": "passed",
+      "toolbarDiscussionTests": 10
+    },
+    "typecheck": "host passed",
+    "rendererBuild": "passed",
+    "nativeBuild": {
+      "result": "passed",
+      "target": "aarch64-apple-darwin release",
+      "duration": "5m10s",
+      "bundled": false,
+      "installed": false,
+      "log": "/tmp/tuzi-canvas339-native-complete.log"
+    },
+    "uiProvider": "synthetic.invalid fixture only; no paid requests",
+    "ui": [
+      "drag source port to create image card",
+      "edit/copy/delete and undo/redo",
+      "refresh preserves card prompt and reference",
+      "remove reference and undo restores it",
+      "card submission creates image",
+      "adjust restores original prompt/reference after reload",
+      "adjust submission bypasses enabled discussion",
+      "reroll creates one additional result",
+      "discussion draft restored after card close",
+      "top card toolbar avoids header/editor and copy/delete remain clickable"
+    ],
+    "splitOcr": "not repeated per user instruction",
+    "uiErrorsAfterFinalReload": [],
+    "provenance": {
+      "sourceRevision": "f36267808b131c416e6d6efebce3259692ee40f8",
+      "originalFiles": 1524,
+      "localFiles": 143,
+      "reconstructedFiles": 1667,
+      "patchBytes": 1793019
+    },
+    "screenshot": {
+      "path": "docs/development/canvas-generation-evidence/integrated-card.jpg",
+      "sha256": "b48a4505b3e3748f3210ae9715fd1ec71e4f4f7ca78b715f7e1fc9c2acb566cb"
+    }
+  },
+  "publication": {
+    "pushed": false,
+    "published": false,
+    "installed": false,
+    "previousRelease": "v1.6.2 remains unchanged"
+  }
+}

@@ -69,6 +69,7 @@ function getImageSizeOptions(): string[] {
 export interface ImageGenerationParams {
   /** 图片描述提示词 */
   prompt: string;
+  generationNodeId?: string;
   /** 图片尺寸，格式如 '1x1', '16x9', '9x16' */
   size?: string;
   /** 分辨率档位（用于 GPT Image / Gemini 等模型） */
@@ -325,6 +326,7 @@ function getImageQueueConfig(params: ImageGenerationParams) {
         assetMetadata: params.assetMetadata,
         knowledgeContextRefs: params.knowledgeContextRefs,
         canvasAssociations: params.canvasAssociations,
+        generationNodeId: params.generationNodeId,
         comicCreatorAction: params.comicCreatorAction,
         comicCreatorRecordId: params.comicCreatorRecordId,
         comicCreatorPageId: params.comicCreatorPageId,

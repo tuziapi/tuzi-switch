@@ -3,7 +3,7 @@ const fixture = {
   fail: false,
   probeFail: false,
   hold: false,
-  calls: [] as { model: string; prompt: string }[],
+  calls: [] as { model: string; prompt: string; images: string[] }[],
   cancelled: new Set<string>(),
   content: JSON.stringify({
     content: "Codex 已整理生成计划，请确认。",
@@ -46,6 +46,7 @@ export async function localCodexPreviewIPC(command: string, args: any) {
   fixture.calls.push({
     model: args.request.model,
     prompt: args.request.prompt,
+    images: args.request.images,
   });
   args.onEvent.onmessage({ type: "ready" });
   if (fixture.fail) throw "codex_connection_lost";

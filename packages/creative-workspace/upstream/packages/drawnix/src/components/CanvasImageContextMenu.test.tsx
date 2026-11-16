@@ -12,7 +12,8 @@ import { CanvasImageContextMenu } from "./CanvasImageContextMenu";
 const mock = vi.hoisted(() => ({
   hit: vi.fn(),
   imageAction: vi.fn(),
-  download: vi.fn(),
+  videoAction: vi.fn(),
+  nativeVideo: true,
   copyPrompt: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
@@ -38,13 +39,18 @@ vi.mock("../data/audio", () => ({
   isAudioElement: (e: any) => e.type === "audio",
 }));
 vi.mock("../services/assistant-account", () => ({
-  getAssistantAccount: () => ({ imageAction: mock.imageAction }),
+  getAssistantAccount: () => ({
+    imageAction: mock.imageAction,
+    videoAction: mock.nativeVideo ? mock.videoAction : undefined,
+  }),
 }));
 vi.mock("../utils/canvas-image-actions", () => ({
   runCanvasImageAction: mock.imageAction,
   copyImagePrompt: mock.copyPrompt,
 }));
-vi.mock("../utils/download-utils", () => ({ smartDownload: mock.download }));
+vi.mock("../utils/download-utils", () => ({
+  runCanvasVideoAction: mock.videoAction,
+}));
 vi.mock("../utils/message-plugin", () => ({
   MessagePlugin: {
     loading: vi.fn(),
@@ -81,8 +87,9 @@ function open(element: Element) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mock.nativeVideo = true;
   mock.imageAction.mockResolvedValue("saved");
-  mock.download.mockResolvedValue({ downloadedCount: 1 });
+  mock.videoAction.mockResolvedValue("saved");
   mock.hit.mockReturnValue(image);
   mock.host = document.createElement("div");
   mock.host.innerHTML =
@@ -116,23 +123,61 @@ describe("canvas media context menu", () => {
         "image-picture",
       ),
     );
-    expect(mock.download).not.toHaveBeenCalled();
+    expect(mock.videoAction).not.toHaveBeenCalled();
   });
   it.each(["[data-canvas-media-drag]", "video", null])(
     "opens native video menu on %s without targeting the image beneath",
     async (selector) => {
       mount();
       open(selector ? overlay.querySelector(selector)! : overlay);
-      expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+      expect(screen.getAllByRole("menuitem")).toHaveLength(6);
       fireEvent.click(screen.getByText("视频另存为…"));
       await waitFor(() =>
-        expect(mock.download).toHaveBeenCalledWith([
-          { url: video.url, type: "video", filename: "video-movie" },
-        ]),
+        expect(mock.videoAction).toHaveBeenCalledWith(
+          "save",
+          video.url,
+          "video-movie",
+        ),
       );
       expect(mock.imageAction).not.toHaveBeenCalled();
     },
   );
+  it.each([
+    ["复制视频文件", "copy", "copied"],
+    ["显示视频文件", "reveal", "revealed"],
+    ["复制文件路径", "copy-path", "path-copied"],
+  ])("%s targets the clicked video original", async (label, action, result) => {
+    mock.videoAction.mockResolvedValue(result);
+    mount();
+    open(overlay);
+    fireEvent.click(screen.getByText(label));
+    await waitFor(() =>
+      expect(mock.videoAction).toHaveBeenCalledWith(
+        action,
+        video.url,
+        "video-movie",
+      ),
+    );
+    expect(mock.imageAction).not.toHaveBeenCalled();
+    expect(mock.success).toHaveBeenCalled();
+  });
+  it("disables desktop file operations when the host does not support them", () => {
+    mock.nativeVideo = false;
+    mount();
+    open(overlay);
+    for (const label of ["复制视频文件", "显示视频文件", "复制文件路径"])
+      expect(
+        (screen.getByRole("menuitem", { name: label }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(true);
+    expect(
+      (
+        screen.getByRole("menuitem", {
+          name: "视频另存为…",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+  });
   it("opens a video rendered inside SVG and previews its ID", () => {
     mock.hit.mockReturnValue(video);
     mount();
@@ -149,15 +194,15 @@ describe("canvas media context menu", () => {
     );
   });
   it("does not report success after video save is cancelled", async () => {
-    mock.download.mockResolvedValue({ downloadedCount: 0 });
+    mock.videoAction.mockResolvedValue("cancelled");
     mount();
     open(overlay);
     fireEvent.click(screen.getByText("视频另存为…"));
-    await waitFor(() => expect(mock.download).toHaveBeenCalled());
+    await waitFor(() => expect(mock.videoAction).toHaveBeenCalled());
     expect(mock.success).not.toHaveBeenCalled();
   });
   it("reports a video save error instead of falling back to image export", async () => {
-    mock.download.mockRejectedValue(new Error("Original missing"));
+    mock.videoAction.mockRejectedValue(new Error("Original missing"));
     mount();
     open(overlay);
     fireEvent.click(screen.getByText("视频另存为…"));

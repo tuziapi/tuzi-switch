@@ -521,6 +521,27 @@ async function readDownloadBlob(item: BatchDownloadItem): Promise<Blob> {
   return response.blob();
 }
 
+/** Desktop file actions use the same original bytes as video export. */
+export async function runCanvasVideoAction(
+  action: 'copy' | 'copy-path' | 'reveal' | 'save',
+  url: string,
+  name?: string,
+) {
+  if (action === 'save') {
+    const result = await smartDownload([{ url, type: 'video', filename: name }]);
+    return result.downloadedCount > 0 ? 'saved' as const : 'cancelled' as const;
+  }
+  const native = getAssistantAccount()?.videoAction;
+  if (!native) throw new Error('请在兔子助手桌面客户端中操作视频文件。');
+  // Remote results may already have an offline copy. Never use a poster or
+  // regenerate a video when its virtual cache entry is missing.
+  const cached = await unifiedCacheService.getCachedBlob(url, { allowNetwork: false });
+  const blob = cached?.size ? cached : await readDownloadBlob({ url, type: 'video' });
+  if (!blob.size || blob.size > 128 * 1024 * 1024)
+    throw new Error('视频为空或超过 128 MB，无法处理。');
+  return native(action, blob);
+}
+
 function resolveDownloadExtension(
   primaryValue: string | undefined,
   fallbackExtension: string,

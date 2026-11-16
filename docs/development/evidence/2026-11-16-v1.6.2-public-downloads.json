@@ -1,0 +1,241 @@
+{
+  "checkedAt": "2026-11-16T08:12:40.387562+00:00",
+  "version": "1.6.2",
+  "pageCommit": "ed5dbfec2a95c81fb58b60d44eb72d6e2a667875",
+  "pageFiles": [
+    {
+      "path": "LICENSE.txt",
+      "bytes": 34523,
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "assets/tuzi-switch-C2v_jdMH.js",
+      "bytes": 174150,
+      "sha256": "b6a8c2f508531e9dfad4f2bee5e66fb6b53b8c11c09a2c437a174412bbd7d4bc",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "assets/tuzi-switch-D32FSEU9.css",
+      "bytes": 18880,
+      "sha256": "36e7c6fd79dbdb4186ba7b6af9235ac66141c1019df68297791a8ded64df1082",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "download-SOURCE.json",
+      "bytes": 2842,
+      "sha256": "87bdc82eb2842065a0bf47bc015f22d478da6ba78da509d16d78b24ad8361876",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "index.html",
+      "bytes": 605,
+      "sha256": "e2d9d788f01856029425499fe179947bdd4e21cc8266d892dd5e95096558e21b",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "install-macos-v1.5.5.sh",
+      "bytes": 9541,
+      "sha256": "4384f7885226c6cb7c1ea8b797141ad5e7ee542f09cc74ddb9c6d4fb0f7e4b49",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "install-macos-v1.5.6.sh",
+      "bytes": 9541,
+      "sha256": "06c4932d60768acc2bb8f9e7a0929f3c8884b2e054874a154856ca01082b80f6",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "install-macos-v1.5.7.sh",
+      "bytes": 9541,
+      "sha256": "d961d779546e20aa088f0b8b505c1c2b617a1357007dacbb60ae2f4d839a95d8",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "install-macos-v1.6.0.sh",
+      "bytes": 9541,
+      "sha256": "8b815171738be8417163a50cc85e59d59c959275ccc86779b7631e746fe625c3",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "install-macos-v1.6.1.sh",
+      "bytes": 9541,
+      "sha256": "a1cfe907c72f4a5fedb82142d4b204c1eedbb72b884616911fa0f7ff3d388ecf",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "install-macos-v1.6.2.sh",
+      "bytes": 9541,
+      "sha256": "7bf1dc2fc7d4dcbcc7f5345823339f71c5ba73b2a69c1cd48991464ca0d9fb21",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "install.sh",
+      "bytes": 1896,
+      "sha256": "63a0a9301b5a8a4d28855b74947105bd6004b25511b42097e6591c3168cd6180",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "release.json",
+      "bytes": 2923,
+      "sha256": "8937eb813803852675af58927527c88fc2fdb00f64ac131ff719339bfa64416b",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "tuzi-assistant-assets/configuration.png",
+      "bytes": 95500,
+      "sha256": "57f28915982f499f9e089ada427c76bedb5eeda97eedcee5e70648a1a0b0b2b1",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "tuzi-assistant-assets/icon.png",
+      "bytes": 123307,
+      "sha256": "0ac46b55e71b60d46874ca24ded5a98228967753e9dc9333d52f4faa157cf9bc",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "tuzi-assistant-assets/projects.png",
+      "bytes": 53433,
+      "sha256": "e2de881f14cd73fe8d7066a3ff84744d697a5e3c5fc2d4efb9353451959c4caa",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "tuzi-assistant-assets/tools.png",
+      "bytes": 78751,
+      "sha256": "5bde352fcb30dac958ba4f130d2511d533bb5c53d01548db5cdea985e2e1feb9",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "tuzi-download-analytics.html",
+      "bytes": 1416,
+      "sha256": "8d3ef99572f00d8826c49630c9ade6d082c8e3cb261d81f3dc458cd01460d389",
+      "wholeFileVerified": true
+    },
+    {
+      "path": "tuzi-switch.html",
+      "bytes": 605,
+      "sha256": "e2d9d788f01856029425499fe179947bdd4e21cc8266d892dd5e95096558e21b",
+      "wholeFileVerified": true
+    }
+  ],
+  "publicAssets": [
+    {
+      "name": "manifest-linux-x64.json",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/manifest-linux-x64.json",
+      "status": 200,
+      "digest": "sha256:658c8d1b7971c2affc40492c00df904f8060a925295e90d2a5d8d364432a8fdf",
+      "wholeFileVerified": true,
+      "downloadPrefixVerified": true,
+      "bytesRead": 904
+    },
+    {
+      "name": "manifest-macos-arm64.json",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/manifest-macos-arm64.json",
+      "status": 200,
+      "digest": "sha256:0c47cd2d4bed8cbb9d42b51b22ac1e110a701d85050c9089f45f45fd9f9ee6e8",
+      "wholeFileVerified": true,
+      "downloadPrefixVerified": true,
+      "bytesRead": 562
+    },
+    {
+      "name": "manifest-macos-x64.json",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/manifest-macos-x64.json",
+      "status": 200,
+      "digest": "sha256:38f1748890fa6c76abea42cbdd259b6fcd972c4d8ba95150d093c1808f78d651",
+      "wholeFileVerified": true,
+      "downloadPrefixVerified": true,
+      "bytesRead": 559
+    },
+    {
+      "name": "manifest-windows-x64.json",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/manifest-windows-x64.json",
+      "status": 200,
+      "digest": "sha256:8f7847ae4a75d07a17f5ea6e512759ce2d3abe1383609b36722ba07108993c76",
+      "wholeFileVerified": true,
+      "downloadPrefixVerified": true,
+      "bytesRead": 758
+    },
+    {
+      "name": "SHA256SUMS",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/SHA256SUMS",
+      "status": 200,
+      "digest": "sha256:58dc5e0e40800cba1111eb6dec721c2b081edcf52eb5455ddb23da7454308e6f",
+      "wholeFileVerified": true,
+      "downloadPrefixVerified": true,
+      "bytesRead": 1135
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.AppImage",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-linux-x64.AppImage",
+      "status": 206,
+      "digest": "sha256:a60f5392af9eedbeceabeb806f8049ed706c4b2939d63ce56ef990728c707b7c",
+      "wholeFileVerified": false,
+      "downloadPrefixVerified": true,
+      "bytesRead": 64
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.deb",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-linux-x64.deb",
+      "status": 206,
+      "digest": "sha256:02dc580239f80d84b0afbaf672c18b9d84839aa9c2cb16ae0d8321572e9acdad",
+      "wholeFileVerified": false,
+      "downloadPrefixVerified": true,
+      "bytesRead": 64
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.rpm",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-linux-x64.rpm",
+      "status": 206,
+      "digest": "sha256:0daae45ce1f30f3a314eb72b2b986021530cfaa74052b744b40c532c13879e00",
+      "wholeFileVerified": false,
+      "downloadPrefixVerified": true,
+      "bytesRead": 64
+    },
+    {
+      "name": "tuzi-assistant-macos-arm64.dmg",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-macos-arm64.dmg",
+      "status": 206,
+      "digest": "sha256:419b6d1e0703328c3a24bde7e698d40144ee291b1068f70b44e13fa31ca23310",
+      "wholeFileVerified": false,
+      "downloadPrefixVerified": true,
+      "bytesRead": 64
+    },
+    {
+      "name": "tuzi-assistant-macos-x64.dmg",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-macos-x64.dmg",
+      "status": 206,
+      "digest": "sha256:17a51ab4d769da9bb58c9996116dace1f3df34104b9773d4cd0d952673b80fdc",
+      "wholeFileVerified": false,
+      "downloadPrefixVerified": true,
+      "bytesRead": 64
+    },
+    {
+      "name": "tuzi-assistant-source.tar.gz",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-source.tar.gz",
+      "status": 206,
+      "digest": "sha256:397a3fc0b45523ca0c7c3fdea6b187880322c1a349b8e4c495461508e331c8b2",
+      "wholeFileVerified": false,
+      "downloadPrefixVerified": true,
+      "bytesRead": 64
+    },
+    {
+      "name": "tuzi-assistant-windows-x64.exe",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-windows-x64.exe",
+      "status": 206,
+      "digest": "sha256:0ed3f8aa921c1ad4e2ca4a8719176872a2b920e0e0cb1d4afb082021369d378e",
+      "wholeFileVerified": false,
+      "downloadPrefixVerified": true,
+      "bytesRead": 64
+    },
+    {
+      "name": "tuzi-assistant-windows-x64.msi",
+      "publicUrl": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-windows-x64.msi",
+      "status": 206,
+      "digest": "sha256:3a301dfcc221dd8ab417ab74903eb47e17135d19245c2d063882a707519d5484",
+      "wholeFileVerified": false,
+      "downloadPrefixVerified": true,
+      "bytesRead": 64
+    }
+  ],
+  "all13GitHubAssetDigestsMatchCandidate": true
+}

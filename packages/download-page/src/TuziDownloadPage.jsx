@@ -61,8 +61,8 @@ const platforms = [
 ];
 const faqs = [
   [
-    "v1.6.1 更新了什么？",
-    "修复 Windows、macOS 和 Linux 共用的手动更新下载入口，增加复制安装包链接和版本下载页；Windows 优化系统浏览器调用。保留创作讨论、批量计划、可选本地 Codex、附件及画布多媒体功能。旧版按钮报错时，请从本页手动安装 1.6.1。",
+    "v1.6.2 更新了什么？",
+    "完善应用内签名更新、安装失败提示和重试，更新提醒位于画布左上角。补齐 Seedream 5.5 生图、透明背景、分层与 OCR 适配及桌面消费来源记录。本版更换自动更新密钥，旧版需退出应用并手动安装一次 1.6.2；后续版本使用新密钥验签更新。",
   ],
   [
     "Mac 提示无法验证开发者或应用打不开怎么办？",
@@ -160,6 +160,8 @@ export function TuziDownloadView({
       matchMedia("(prefers-color-scheme: dark)").matches,
   );
   const { release, loading, error, retry } = useRelease();
+  const manualKeyTransition =
+    release?.repository === "tuziapi/tuzi-switch" && release.tag === "v1.6.2";
   const installCommand = macosInstallCommand(release);
   const pinnedInstallCommand = macosInstallCommand(release, { pinned: true });
   const tracker = useRef(null),
@@ -659,10 +661,12 @@ export function TuziDownloadView({
                     )
                   : t("安装包尚未进行开发者签名，系统可能提示无法验证发布者。")}
               </p>
-              {manualInstallOnly && (
+              {(manualInstallOnly || manualKeyTransition) && (
                 <p className="td-cache-notice">
                   {t(
-                    installCommand
+                    manualKeyTransition
+                      ? "1.6.2 更换了自动更新密钥。请先保存创作、退出旧版，再手动安装一次；保留原应用数据目录。后续更新使用新密钥验签。"
+                      : installCommand
                       ? "本次提供完整安装包。请下载对应安装包或使用 Mac 安装脚本，保存创作并退出旧版后手动安装。应用内签名自动安装暂不可用。"
                       : "本次提供完整安装包。请下载对应系统的正式安装包，保存创作并退出旧版后手动安装。应用内签名自动安装暂不可用。",
                   )}

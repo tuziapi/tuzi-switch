@@ -56,7 +56,7 @@ fs.mkdirSync(out, { recursive: true });
     await dismiss();
   }
   const imageLabels = ['复制图片', '图片另存为…', '显示图片文件', '预览原图', '复制提示词'];
-  const videoLabels = ['视频另存为…', '预览视频', '复制提示词'];
+  const videoLabels = ['复制视频文件', '视频另存为…', '显示视频文件', '复制文件路径', '预览视频', '复制提示词'];
   try {
     await page.goto(`${base}/ui04.html?canvas=1&page=creative`);
     await page.getByRole('navigation', { name: '创作导航' }).getByRole('button', { name: '自由画布', exact: true }).click();
@@ -101,6 +101,14 @@ fs.mkdirSync(out, { recursive: true });
     assert((await page.evaluate(() => window.__creativeMediaFixture.sizes[0])) > 1000);
     assert.equal((await page.evaluate(() => window.__creativeImageFixture.calls.filter(x => x.command === 'creative_image_action'))).length, 1);
     checks.push('video original reaches native media save, never image decoder');
+    for (const [index, label] of ['复制视频文件', '显示视频文件', '复制文件路径'].entries()) {
+      await openAt('synthetic-video');
+      await menu.getByRole('menuitem', { name: label, exact: true }).click();
+      await page.waitForFunction(n => window.__creativeVideoFixture?.sizes.length === n, index + 1);
+      assert.equal(await page.evaluate(n => window.__creativeVideoFixture.sizes[n], index),
+        fs.statSync(path.join(__dirname, 'fixtures/synthetic-video.mp4')).size);
+      checks.push(`${label}: original video bytes reach native file action`);
+    }
     await openAt('synthetic-video');
     await menu.getByRole('menuitem', { name: '预览视频', exact: true }).click();
     await page.locator('.unified-viewer').waitFor();

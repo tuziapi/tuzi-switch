@@ -5,6 +5,7 @@ child inherit a loopback-only sandbox. Discovery is synthetic; packages are not.
 """
 import hashlib
 import base64
+import ctypes
 from signed_candidate_identity import verify_candidate
 from signed_creative_webdriver import PNG
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,7 +21,7 @@ import subprocess
 import sys
 import tarfile
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 assert sys.platform == 'darwin'
 assert os.environ.get('GITHUB_ACTIONS') == 'true'
@@ -54,6 +55,8 @@ def serve(target_dir, lab, asset):
         def do_GET(self):
             route = urlsplit(self.path).path
             host = self.headers.get('Host', '').split(':')[0]
+            if host == 'api.tu-zi.com':
+                return self.creative()
             mode = (lab/'mode').read_text().strip()
             with (lab/'requests.jsonl').open('a') as log:
                 log.write(json.dumps(dict(host=host, path=route, mode=mode))+'\n')
@@ -91,6 +94,46 @@ def serve(target_dir, lab, asset):
             self.send_header('Content-Length',str(len(content)))
             self.end_headers()
             self.wfile.write(content)
+
+        def do_POST(self):
+            if self.headers.get('Host', '').split(':')[0] == 'api.tu-zi.com':
+                return self.creative()
+            self.send_error(404)
+
+        def creative(self):
+            url=urlsplit(self.path)
+            try:
+                if url.path == '/api/status':
+                    assert self.command == 'GET'
+                    result={'success':True,'data':{'system_name':'SYNTHETIC Mac lab'}}
+                else:
+                    assert self.headers.get('Authorization') == 'Bearer sk-SYNTHETIC-GENERATION'
+                    if url.path == '/v1/models':
+                        assert self.command == 'GET'
+                        result={'data':[dict(id='gpt-image-2.5-sunburst',supported_endpoint_types=['image-generation'],
+                            endpoints={'image-generation':{'path':'/v1/images/generations','method':'POST'}})]}
+                    else:
+                        assert self.command == 'POST' and url.path == '/v1/images/generations'
+                        length=int(self.headers.get('Content-Length','0'))
+                        assert 0 < length < 1024*1024
+                        body=json.loads(self.rfile.read(length))
+                        assert not body.get('layer_decomposition_options'), 'No repeat splitting tests'
+                        channels=parse_qs(url.query).get('ch',[])
+                        assert channels == ['3'], 'Official native generation must carry exactly one ch=3'
+                        assert body['model']=='gpt-image-2.5-sunburst'
+                        result={'data':[{'url':'data:image/png;base64,'+PNG}]}
+                        with (lab/'creative-requests.jsonl').open('a') as log:
+                            log.write(json.dumps(dict(version=(lab/'creative-version').read_text(),model=body['model'],
+                                channels=channels,syntheticAuthorizationMatched=True,layers=False))+'\n')
+                content=json.dumps(result).encode()
+                self.send_response(200)
+                self.send_header('Content-Type','application/json')
+                self.send_header('Content-Length',str(len(content)))
+                self.end_headers(); self.wfile.write(content)
+            except Exception as error:
+                with (lab/'creative-errors.jsonl').open('a') as log:
+                    log.write(json.dumps(dict(path=url.path,error=repr(error)))+'\n')
+                self.send_error(500,'Synthetic provider rejected native request')
 
     server = ThreadingHTTPServer(('127.0.0.1',443),Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -177,6 +220,25 @@ def tree():
     return ax('return entire contents of front window of p')
 
 
+def pointer_click(x, y):
+    # System Events' coordinate click does not reliably emit mouseMoved.
+    # The canvas upload shortcut explicitly requires its pointer-move state.
+    class Point(ctypes.Structure):
+        _fields_=[('x',ctypes.c_double),('y',ctypes.c_double)]
+    cg=ctypes.CDLL('/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics')
+    cf=ctypes.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
+    cg.CGEventCreateMouseEvent.argtypes=[ctypes.c_void_p,ctypes.c_uint32,Point,ctypes.c_uint32]
+    cg.CGEventCreateMouseEvent.restype=ctypes.c_void_p
+    cg.CGEventPost.argtypes=[ctypes.c_uint32,ctypes.c_void_p]
+    cf.CFRelease.argtypes=[ctypes.c_void_p]
+    for event_type in [5,1,2]:  # moved, left down, left up
+        event=cg.CGEventCreateMouseEvent(None,event_type,Point(x,y),0)
+        assert event, 'Native pointer event could not be created'
+        cg.CGEventPost(0,event)
+        cf.CFRelease(event)
+        time.sleep(.15)
+
+
 def button(names,press=False):
     labels='{'+','.join(json.dumps(s,ensure_ascii=False) for s in names)+'}'
     body='''set labels to LABELS
@@ -217,7 +279,7 @@ def press_label(label, prefix=False):
     comparison=('starts with ' if prefix else 'is ')+literal
     body='''repeat with itemRef in (get entire contents of front window of p)
 try
-if role of itemRef is in {"AXButton", "AXRadioButton", "AXPopUpButton"} then
+if role of itemRef is in {"AXButton", "AXRadioButton", "AXPopUpButton", "AXCheckBox"} then
 if name of itemRef COMPARISON then
 perform action "AXPress" of itemRef
 return true
@@ -278,7 +340,8 @@ def create_creative_fixture():
     # existing moving-point guard, then use its actual Cmd+U command.
     bounds=ax('return {position of front window of p, size of front window of p}')
     x,y,w,h=map(float,bounds.split(', '))
-    ax('click at {'+str(int(x+w*.85))+', '+str(int(y+h*.25))+'}\nkey code 32 using command down')
+    pointer_click(int(x+w*.85),int(y+h*.25))
+    ax('key code 32 using command down')
     # WebKit's file input uses a standalone NSOpenPanel on current macOS;
     # it is not always exposed as an AXSheet. Open may be disabled until a
     # file is selected, so inspect its presence plus the enabled Cancel.
@@ -288,8 +351,9 @@ def create_creative_fixture():
     ax('keystroke "g" using {command down, shift down}')
     time.sleep(1)
     ax('keystroke '+json.dumps(str(image_path))+'\nkey code 36')
-    time.sleep(1)
-    ax('key code 36')
+    # Intel runners may still be navigating when the next Return arrives.
+    # Wait for the real file selection to enable Open, then press that button.
+    click(['Open','打开'])
     wait_for(creative_record,'Imported image was not persisted')
     screenshot('00-legacy-creative-image')
     press_label('兔子助手导航')
@@ -304,7 +368,64 @@ def assert_creative_preserved(saved, label):
     click(['opentu 创作'])
     click(['我的项目'])
     press_label(creative_title,prefix=True)
+    # Collapsed toolbars intentionally omit the task-queue control. The
+    # composer and imported canvas image are present in either toolbar state.
+    wait_for(lambda: 'text area ' in tree() and 'image 1 of group opentu' in tree(),
+             'Creative canvas and imported image did not finish loading')
     screenshot('06-creative-preserved-'+label)
+    press_label('兔子助手导航')
+    click(['Codex'])
+
+
+def native_business_attribution(version, configure=False):
+    stage('native synthetic generation attribution '+version)
+    (lab/'creative-version').write_text(version)
+    click(['opentu 创作'])
+    wait_for(lambda: 'text area ' in tree(),'Creative canvas not ready for native attribution')
+    if configure:
+        click(['创作配置'])
+        press_label('手动配置')
+        body='''repeat with itemRef in (get entire contents of front window of p)
+try
+if subrole of itemRef is "AXSecureTextField" then
+set value of attribute "AXFocused" of itemRef to true
+keystroke "a" using command down
+keystroke "sk-SYNTHETIC-GENERATION"
+return true
+end if
+end try
+end repeat
+return false'''
+        wait_for(lambda: ax(body)=='true','Manual synthetic API key input missing')
+        screenshot('07-synthetic-provider-configured')
+        click(['保存'])
+        wait_for(lambda: not button(['保存']),'Provider settings did not close')
+    ax('key code 53')
+    body='''repeat with itemRef in (get entire contents of front window of p)
+try
+if role of itemRef is "AXTextArea" then
+set value of attribute "AXFocused" of itemRef to true
+keystroke "a" using command down
+keystroke "SYNTHETIC Mac native attribution VERSION"
+return true
+end if
+end try
+end repeat
+return false'''.replace('VERSION',version)
+    wait_for(lambda: ax(body)=='true','Canvas prompt input missing')
+    screenshot('08-before-native-generation-'+version)
+    before=(lab/'creative-requests.jsonl').read_text().splitlines() if (lab/'creative-requests.jsonl').exists() else []
+    click(['发送生成请求','Send generation request'])
+    def receipt():
+        if not (lab/'creative-requests.jsonl').exists():
+            return None
+        rows=[json.loads(line) for line in (lab/'creative-requests.jsonl').read_text().splitlines()]
+        assert len(rows)<=len(before)+1, 'Unexpected automatic duplicate generation'
+        return rows[-1] if len(rows)==len(before)+1 and rows[-1]['version']==version else None
+    result=wait_for(receipt,'Native generation did not reach isolated provider')
+    # Receipt proves native request attribution, not a paid provider result.
+    report.setdefault('nativeBusinessRequests',[]).append(result)
+    screenshot('09-native-attribution-'+version)
     press_label('兔子助手导航')
     click(['Codex'])
 
@@ -358,7 +479,7 @@ try:
     run([openssl,'req','-x509','-newkey','rsa:2048','-nodes','-days','1','-keyout',str(lab/'ca.key'),
          '-out',str(lab/'ca.crt'),'-subj','/CN=SYNTHETIC Tuzi Mac Lab CA','-addext','basicConstraints=critical,CA:TRUE'],capture_output=True)
     run([openssl,'req','-newkey','rsa:2048','-nodes','-keyout',str(lab/'tls.key'),'-out',str(lab/'tls.csr'),'-subj','/CN=github.com'],capture_output=True)
-    (lab/'tls.ext').write_text('basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:github.com,DNS:api.github.com\n')
+    (lab/'tls.ext').write_text('basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:github.com,DNS:api.github.com,DNS:api.tu-zi.com\n')
     run([openssl,'x509','-req','-in',str(lab/'tls.csr'),'-CA',str(lab/'ca.crt'),'-CAkey',str(lab/'ca.key'),
          '-CAserial',str(lab/'ca.srl'),'-CAcreateserial','-out',str(lab/'tls.crt'),'-days','1','-sha256','-extfile',str(lab/'tls.ext')],capture_output=True)
     (lab/'ca.key').chmod(0o600); (lab/'tls.key').chmod(0o600)
@@ -377,7 +498,7 @@ try:
     trust_restore.write_bytes(plistlib.dumps(trust_settings))
     stage('prepare loopback discovery')
     hosts_changed=True
-    run(['sudo','tee','/etc/hosts'],input=original_hosts+b'\n127.0.0.1 github.com api.github.com\n',stdout=subprocess.DEVNULL)
+    run(['sudo','tee','/etc/hosts'],input=original_hosts+b'\n127.0.0.1 github.com api.github.com api.tu-zi.com\n',stdout=subprocess.DEVNULL)
     run(['sudo','dscacheutil','-flushcache'])
     (lab/'mode').write_text('normal')
     server_log=(output/'server.log').open('w')
@@ -444,6 +565,9 @@ try:
         report['remaining'].remove('published-old-version-manual-transition')
         assert_creative_preserved(legacy_creative,'manual-transition')
         report['checks']['legacyCreativeImageProjectPreservation']='passed'
+        native_business_attribution('1.6.2',configure=True)
+        # Wait for the app's own persistence after the synthetic request.
+        time.sleep(5)
         before_upgrade_creative=wait_for(creative_record,'Project absent before signed upgrade')
     else:
         click(['Got it','我知道了'])
@@ -502,6 +626,10 @@ try:
     if legacy_dir:
         assert_creative_preserved(before_upgrade_creative,'signed-upgrade')
         report['checks']['creativeImageProjectPreservation']='passed'
+        native_business_attribution('1.6.3')
+        report['checks']['nativeBusinessAttribution']='passed'
+        report['remaining'].remove('creative-project-migration')
+        report['remaining'].remove('native-runtime-IPC-identity')
     report['checks'].update({k:'passed' for k in ['download','nativeSignature','install','automaticRestart',
         'exactSignedTargetBytes','welcomePreferencePreserved','sameInstallationRetry']})
     report['subsetStatus']='passed'
@@ -514,6 +642,8 @@ except Exception as error:
         report['diagnosticError']=str(diagnostic)
     raise
 finally:
+    if (lab/'creative-errors.jsonl').exists():
+        report['creativeServerErrors']=[json.loads(line) for line in (lab/'creative-errors.jsonl').read_text().splitlines()]
     if (lab/'requests.jsonl').exists():
         report['requests']=[json.loads(line) for line in (lab/'requests.jsonl').read_text().splitlines()]
     (output/'results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')

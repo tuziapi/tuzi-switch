@@ -76,6 +76,8 @@ function harness(initialSelection = [first, second]) {
   };
   runInNewContext(compiled, {
     exports,
+    getAutoCompleteState: () => ({}),
+    isGenerationNode: () => false,
     React,
     useEffect,
     useLayoutEffect,

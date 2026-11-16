@@ -1,0 +1,791 @@
+{
+  "schemaVersion": 2,
+  "repository": "AiW520/tuzi-switch",
+  "releaseRepository": "tuziapi/tuzi-switch",
+  "commit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "runId": "43804959005",
+  "tag": "v1.6.2",
+  "files": {
+    "SHA256SUMS": "58dc5e0e40800cba1111eb6dec721c2b081edcf52eb5455ddb23da7454308e6f",
+    "latest.json": "06b689bc1d31f546c3cac2889c497d75c9c8471dc20d8bcc50bf13029392696a",
+    "manifest-linux-x64.json": "658c8d1b7971c2affc40492c00df904f8060a925295e90d2a5d8d364432a8fdf",
+    "manifest-macos-arm64.json": "0c47cd2d4bed8cbb9d42b51b22ac1e110a701d85050c9089f45f45fd9f9ee6e8",
+    "manifest-macos-x64.json": "38f1748890fa6c76abea42cbdd259b6fcd972c4d8ba95150d093c1808f78d651",
+    "manifest-windows-x64.json": "8f7847ae4a75d07a17f5ea6e512759ce2d3abe1383609b36722ba07108993c76",
+    "tuzi-assistant-linux-x64.AppImage": "a60f5392af9eedbeceabeb806f8049ed706c4b2939d63ce56ef990728c707b7c",
+    "tuzi-assistant-linux-x64.AppImage.sig": "f76ffd540f52fffeaebf2a8589157a7c2deeec755e3d40dfb51554eabd6c8f85",
+    "tuzi-assistant-linux-x64.deb": "02dc580239f80d84b0afbaf672c18b9d84839aa9c2cb16ae0d8321572e9acdad",
+    "tuzi-assistant-linux-x64.deb.sig": "ebbd7a7595728a45507b24da458cd38eb1a2d216cf5cb7e6e7d01b4f07eaf1aa",
+    "tuzi-assistant-linux-x64.rpm": "0daae45ce1f30f3a314eb72b2b986021530cfaa74052b744b40c532c13879e00",
+    "tuzi-assistant-linux-x64.rpm.sig": "0640b0e385d35f12b80eba012d8dfb1c0a966ae5a5f62b23d03d9160f1fc9f21",
+    "tuzi-assistant-macos-arm64.app.tar.gz": "82b452cbee509c3a37df0e0292e1837c92bcda5282a7e23d9cf2647912454baf",
+    "tuzi-assistant-macos-arm64.app.tar.gz.sig": "d2cac582a90461917efed63fb27d317389541686000a85f835f3886d03a195ff",
+    "tuzi-assistant-macos-arm64.dmg": "419b6d1e0703328c3a24bde7e698d40144ee291b1068f70b44e13fa31ca23310",
+    "tuzi-assistant-macos-x64.app.tar.gz": "43140ca462c4840d36c6ae9d5a9cefaff4e4456230bd84774033b5e7a9db59ad",
+    "tuzi-assistant-macos-x64.app.tar.gz.sig": "dff927d5b07edd219475d2d1bebf07fd5643506cafa4b89b77c775f84819b46a",
+    "tuzi-assistant-macos-x64.dmg": "17a51ab4d769da9bb58c9996116dace1f3df34104b9773d4cd0d952673b80fdc",
+    "tuzi-assistant-source.tar.gz": "397a3fc0b45523ca0c7c3fdea6b187880322c1a349b8e4c495461508e331c8b2",
+    "tuzi-assistant-windows-x64.exe": "0ed3f8aa921c1ad4e2ca4a8719176872a2b920e0e0cb1d4afb082021369d378e",
+    "tuzi-assistant-windows-x64.exe.sig": "6a9e813499c2a8979b5100a9a0caaf21d4b18b1f0261d5353dc92650cdd56770",
+    "tuzi-assistant-windows-x64.msi": "3a301dfcc221dd8ab417ab74903eb47e17135d19245c2d063882a707519d5484",
+    "tuzi-assistant-windows-x64.msi.sig": "798ba1c1162c530a665497d03659903587919b3ed09684100d137f1f3577ea2f"
+  },
+  "delivery": "manual-key-transition",
+  "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+  "publicationFiles": [
+    "SHA256SUMS",
+    "manifest-linux-x64.json",
+    "manifest-macos-arm64.json",
+    "manifest-macos-x64.json",
+    "manifest-windows-x64.json",
+    "tuzi-assistant-linux-x64.AppImage",
+    "tuzi-assistant-linux-x64.deb",
+    "tuzi-assistant-linux-x64.rpm",
+    "tuzi-assistant-macos-arm64.dmg",
+    "tuzi-assistant-macos-x64.dmg",
+    "tuzi-assistant-source.tar.gz",
+    "tuzi-assistant-windows-x64.exe",
+    "tuzi-assistant-windows-x64.msi"
+  ],
+  "status": "passed",
+  "signingKey": "new-official-channel-key",
+  "reviewer": "Codex: reviewed immutable installed-app artifacts and real receipt; user confirmed image splitting on 2026-11-16",
+  "completedAt": "2026-11-16T08:02:28.784821+00:00",
+  "platforms": [
+    {
+      "platform": "macos-arm64",
+      "kind": "real-installed-app",
+      "status": "passed",
+      "method": "manual-install",
+      "fromVersion": "1.6.1",
+      "toVersion": "1.6.2",
+      "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-macos-upgrade.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json; docs/development/evidence/2026-11-16-candidate-43804959005-macos-attribution.json",
+      "checks": {
+        "download": "passed",
+        "install": "passed",
+        "restart": "passed",
+        "version": "passed",
+        "dataPreservation": "passed",
+        "businessAttribution": "passed"
+      },
+      "installers": [
+        {
+          "type": "app",
+          "status": "passed",
+          "method": "manual-install",
+          "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-macos-upgrade.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json; docs/development/evidence/2026-11-16-candidate-43804959005-macos-attribution.json",
+          "checks": {
+            "download": "passed",
+            "install": "passed",
+            "restart": "passed",
+            "version": "passed",
+            "dataPreservation": "passed",
+            "businessAttribution": "passed"
+          },
+          "sourceVersions": [
+            "1.6.0",
+            "1.6.1"
+          ],
+          "sourceEvidence": [
+            {
+              "fromVersion": "1.6.1",
+              "runId": "43824656794",
+              "artifact": "signed-installed-macos-macos-arm64-from-1.6.1",
+              "resultSha256": "ffaac9b660768c3de793030762ac4ea136e31acd1c0a8ce3647f3bf71530d810",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageProjectPreservation": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validSignedPackageStagingPermissionDenied": "passed",
+                "creativeImageProjectPreservation": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "exactSignedTargetBytes": "passed",
+                "welcomePreferencePreserved": "passed",
+                "sameInstallationRetry": "passed"
+              }
+            },
+            {
+              "fromVersion": "1.6.0",
+              "runId": "43824656794",
+              "artifact": "signed-installed-macos-macos-arm64-from-1.6.0",
+              "resultSha256": "ec292e35ea33dbe492e189cd0381dea28d15dcf846d97ee8c569e8d561f50542",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageProjectPreservation": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validSignedPackageStagingPermissionDenied": "passed",
+                "creativeImageProjectPreservation": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "exactSignedTargetBytes": "passed",
+                "welcomePreferencePreserved": "passed",
+                "sameInstallationRetry": "passed"
+              }
+            }
+          ],
+          "signedUpgrade": {
+            "kind": "real-installed-app",
+            "status": "passed",
+            "fromVersion": "1.6.2",
+            "toVersion": "1.6.3",
+            "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+            "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+            "artifactSha256": "5791348a6a965e47367389c48bd7b34e70b76f02cf299ad5a1356b7c44f045ce",
+            "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-macos-upgrade.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json; docs/development/evidence/2026-11-16-candidate-43804959005-macos-attribution.json",
+            "checks": {
+              "download": "passed",
+              "signature": "passed",
+              "install": "passed",
+              "restart": "passed",
+              "version": "passed",
+              "dataPreservation": "passed",
+              "corruptPackage": "passed",
+              "networkFailure": "passed",
+              "installFailure": "passed",
+              "retry": "passed",
+              "businessAttribution": "passed"
+            },
+            "publiclyPublished": false
+          }
+        }
+      ]
+    },
+    {
+      "platform": "macos-x64",
+      "kind": "real-installed-app",
+      "status": "passed",
+      "method": "manual-install",
+      "fromVersion": "1.6.1",
+      "toVersion": "1.6.2",
+      "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-macos-upgrade.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json; docs/development/evidence/2026-11-16-candidate-43804959005-macos-attribution.json",
+      "checks": {
+        "download": "passed",
+        "install": "passed",
+        "restart": "passed",
+        "version": "passed",
+        "dataPreservation": "passed",
+        "businessAttribution": "passed"
+      },
+      "installers": [
+        {
+          "type": "app",
+          "status": "passed",
+          "method": "manual-install",
+          "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-macos-upgrade.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json; docs/development/evidence/2026-11-16-candidate-43804959005-macos-attribution.json",
+          "checks": {
+            "download": "passed",
+            "install": "passed",
+            "restart": "passed",
+            "version": "passed",
+            "dataPreservation": "passed",
+            "businessAttribution": "passed"
+          },
+          "sourceVersions": [
+            "1.6.0",
+            "1.6.1"
+          ],
+          "sourceEvidence": [
+            {
+              "fromVersion": "1.6.1",
+              "runId": "43824656794",
+              "artifact": "signed-installed-macos-macos-x64-from-1.6.1",
+              "resultSha256": "9481206bc7960fbaa9b5c21d629653790ae551180455304a2f4b5e00024bfafb",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageProjectPreservation": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validSignedPackageStagingPermissionDenied": "passed",
+                "creativeImageProjectPreservation": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "exactSignedTargetBytes": "passed",
+                "welcomePreferencePreserved": "passed",
+                "sameInstallationRetry": "passed"
+              }
+            },
+            {
+              "fromVersion": "1.6.0",
+              "runId": "43824656794",
+              "artifact": "signed-installed-macos-macos-x64-from-1.6.0",
+              "resultSha256": "c2641e5a2e72598129b8800e5aed50abe3e0394dcacb6cc8bdd841343475917f",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageProjectPreservation": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validSignedPackageStagingPermissionDenied": "passed",
+                "creativeImageProjectPreservation": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "exactSignedTargetBytes": "passed",
+                "welcomePreferencePreserved": "passed",
+                "sameInstallationRetry": "passed"
+              }
+            }
+          ],
+          "signedUpgrade": {
+            "kind": "real-installed-app",
+            "status": "passed",
+            "fromVersion": "1.6.2",
+            "toVersion": "1.6.3",
+            "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+            "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+            "artifactSha256": "5bc447ff69db3698a2f6c17d66db940eeb1eb0551d2e3bfc3caa3bb3e1046f67",
+            "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-macos-upgrade.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json; docs/development/evidence/2026-11-16-candidate-43804959005-macos-attribution.json",
+            "checks": {
+              "download": "passed",
+              "signature": "passed",
+              "install": "passed",
+              "restart": "passed",
+              "version": "passed",
+              "dataPreservation": "passed",
+              "corruptPackage": "passed",
+              "networkFailure": "passed",
+              "installFailure": "passed",
+              "retry": "passed",
+              "businessAttribution": "passed"
+            },
+            "publiclyPublished": false
+          }
+        }
+      ]
+    },
+    {
+      "platform": "windows-x64",
+      "kind": "real-installed-app",
+      "status": "passed",
+      "method": "manual-install",
+      "fromVersion": "1.6.1",
+      "toVersion": "1.6.2",
+      "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-windows.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+      "checks": {
+        "download": "passed",
+        "install": "passed",
+        "restart": "passed",
+        "version": "passed",
+        "dataPreservation": "passed",
+        "businessAttribution": "passed"
+      },
+      "installers": [
+        {
+          "type": "nsis",
+          "status": "passed",
+          "method": "manual-install",
+          "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-windows.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+          "checks": {
+            "download": "passed",
+            "install": "passed",
+            "restart": "passed",
+            "version": "passed",
+            "dataPreservation": "passed",
+            "businessAttribution": "passed"
+          },
+          "sourceVersions": [
+            "1.6.0",
+            "1.6.1"
+          ],
+          "sourceEvidence": [
+            {
+              "fromVersion": "1.6.1",
+              "runId": "43818958453",
+              "artifact": "signed-installed-windows-nsis-from-1.6.1",
+              "resultSha256": "85110bd2a10b359312637a9b3efffa016c11ed86977b7df7eb7bc41a04965df1",
+              "checks": {
+                "manualTransition": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "completedGenerationPlaceholderRemoved": "passed",
+                "legacyCreativeImageAndTaskPreservation": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validSignedPackageStagingPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            },
+            {
+              "fromVersion": "1.6.0",
+              "runId": "43818958453",
+              "artifact": "signed-installed-windows-nsis-from-1.6.0",
+              "resultSha256": "338c4456453a61c67d1e17667b09ac62487b38c17042ef5d2dc8c9766bc99efb",
+              "checks": {
+                "manualTransition": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "completedGenerationPlaceholderRemoved": "passed",
+                "legacyCreativeImageAndTaskPreservation": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validSignedPackageStagingPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            }
+          ],
+          "signedUpgrade": {
+            "kind": "real-installed-app",
+            "status": "passed",
+            "fromVersion": "1.6.2",
+            "toVersion": "1.6.3",
+            "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+            "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+            "artifactSha256": "c0924e6bc79220b9ed1ff1972d84f348678bc215dfb835b35ca5c941b42c8878",
+            "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-windows.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+            "checks": {
+              "download": "passed",
+              "signature": "passed",
+              "install": "passed",
+              "restart": "passed",
+              "version": "passed",
+              "dataPreservation": "passed",
+              "corruptPackage": "passed",
+              "networkFailure": "passed",
+              "installFailure": "passed",
+              "retry": "passed",
+              "businessAttribution": "passed"
+            },
+            "publiclyPublished": false,
+            "attributionScope": "Official 1.6.2 native requests were observed with ch=3; their image/task/layer records survived signed upgrade. No new paid call on internal 1.6.3."
+          }
+        },
+        {
+          "type": "msi",
+          "status": "passed",
+          "method": "manual-install",
+          "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-windows.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+          "checks": {
+            "download": "passed",
+            "install": "passed",
+            "restart": "passed",
+            "version": "passed",
+            "dataPreservation": "passed",
+            "businessAttribution": "passed"
+          },
+          "sourceVersions": [
+            "1.6.0",
+            "1.6.1"
+          ],
+          "sourceEvidence": [
+            {
+              "fromVersion": "1.6.0",
+              "runId": "43818958453",
+              "artifact": "signed-installed-windows-msi-from-1.6.0",
+              "resultSha256": "6250875803b9281ec8dc247e7573f2942d2731ccb34ea163723e20e92e0f0e03",
+              "checks": {
+                "manualTransition": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "completedGenerationPlaceholderRemoved": "passed",
+                "legacyCreativeImageAndTaskPreservation": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validSignedPackageStagingPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            },
+            {
+              "fromVersion": "1.6.1",
+              "runId": "43818958453",
+              "artifact": "signed-installed-windows-msi-from-1.6.1",
+              "resultSha256": "d0fdccba1f9e0375c3184fa1fb65952eea284ff35877060dde734e8d6fb9d2f6",
+              "checks": {
+                "manualTransition": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "completedGenerationPlaceholderRemoved": "passed",
+                "legacyCreativeImageAndTaskPreservation": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validSignedPackageStagingPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            }
+          ],
+          "signedUpgrade": {
+            "kind": "real-installed-app",
+            "status": "passed",
+            "fromVersion": "1.6.2",
+            "toVersion": "1.6.3",
+            "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+            "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+            "artifactSha256": "08e06d4b26dd736a023447d09fe64cb4d3db1733adfe12eaaad2a22e72888e49",
+            "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-windows.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+            "checks": {
+              "download": "passed",
+              "signature": "passed",
+              "install": "passed",
+              "restart": "passed",
+              "version": "passed",
+              "dataPreservation": "passed",
+              "corruptPackage": "passed",
+              "networkFailure": "passed",
+              "installFailure": "passed",
+              "retry": "passed",
+              "businessAttribution": "passed"
+            },
+            "publiclyPublished": false,
+            "attributionScope": "Official 1.6.2 native requests were observed with ch=3; their image/task/layer records survived signed upgrade. No new paid call on internal 1.6.3."
+          }
+        }
+      ]
+    },
+    {
+      "platform": "linux-x64",
+      "kind": "real-installed-app",
+      "status": "passed",
+      "method": "manual-install",
+      "fromVersion": "1.6.1",
+      "toVersion": "1.6.2",
+      "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-linux.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+      "checks": {
+        "download": "passed",
+        "install": "passed",
+        "restart": "passed",
+        "version": "passed",
+        "dataPreservation": "passed",
+        "businessAttribution": "passed"
+      },
+      "installers": [
+        {
+          "type": "appimage",
+          "status": "passed",
+          "method": "manual-install",
+          "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-linux.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+          "checks": {
+            "download": "passed",
+            "install": "passed",
+            "restart": "passed",
+            "version": "passed",
+            "dataPreservation": "passed",
+            "businessAttribution": "passed"
+          },
+          "sourceVersions": [
+            "1.6.0",
+            "1.6.1"
+          ],
+          "sourceEvidence": [
+            {
+              "fromVersion": "1.6.1",
+              "runId": "43820565887",
+              "artifact": "signed-installed-linux-appimage-1.6.1",
+              "resultSha256": "cbdf493c207edc5894c7222fd25b70f5be5fa7437e27d7258e404ca93c02dbfe",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageTaskPreservation": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validPackageInstallPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            },
+            {
+              "fromVersion": "1.6.0",
+              "runId": "43820565887",
+              "artifact": "signed-installed-linux-appimage-1.6.0",
+              "resultSha256": "73a490d48a9c629e1c5f7ecb508177dc82194f8ea39e273d2a96a99adc7183cd",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageTaskPreservation": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validPackageInstallPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            }
+          ],
+          "signedUpgrade": {
+            "kind": "real-installed-app",
+            "status": "passed",
+            "fromVersion": "1.6.2",
+            "toVersion": "1.6.3",
+            "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+            "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+            "artifactSha256": "5556369b5f6b8d054a46c8ab688ab3a1dfd85e814d97f0a29fb116d014c2e8b0",
+            "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-linux.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+            "checks": {
+              "download": "passed",
+              "signature": "passed",
+              "install": "passed",
+              "restart": "passed",
+              "version": "passed",
+              "dataPreservation": "passed",
+              "corruptPackage": "passed",
+              "networkFailure": "passed",
+              "installFailure": "passed",
+              "retry": "passed",
+              "businessAttribution": "passed"
+            },
+            "publiclyPublished": false,
+            "attributionScope": "Official 1.6.2 native requests were observed with ch=3; their image/task/layer records survived signed upgrade. No new paid call on internal 1.6.3."
+          }
+        },
+        {
+          "type": "deb",
+          "status": "passed",
+          "method": "manual-install",
+          "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-linux.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+          "checks": {
+            "download": "passed",
+            "install": "passed",
+            "restart": "passed",
+            "version": "passed",
+            "dataPreservation": "passed",
+            "businessAttribution": "passed"
+          },
+          "sourceVersions": [
+            "1.6.0",
+            "1.6.1"
+          ],
+          "sourceEvidence": [
+            {
+              "fromVersion": "1.6.1",
+              "runId": "43820565887",
+              "artifact": "signed-installed-linux-deb-1.6.1",
+              "resultSha256": "bcb5b42274f9f69938ff2e3a0ba107fd2b57952d90c11c5de56ec2076285db8a",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageTaskPreservation": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validPackageInstallPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            },
+            {
+              "fromVersion": "1.6.0",
+              "runId": "43820565887",
+              "artifact": "signed-installed-linux-deb-1.6.0",
+              "resultSha256": "eeca0033c174d96005255d15eb49c6bd95440f4ada47fab0e0fc9aeb58beb711",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageTaskPreservation": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validPackageInstallPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            }
+          ],
+          "signedUpgrade": {
+            "kind": "real-installed-app",
+            "status": "passed",
+            "fromVersion": "1.6.2",
+            "toVersion": "1.6.3",
+            "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+            "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+            "artifactSha256": "a92f738f70bd5dc39523d452e774bae451c33c2c5025b2d0bac98542c8b806c8",
+            "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-linux.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+            "checks": {
+              "download": "passed",
+              "signature": "passed",
+              "install": "passed",
+              "restart": "passed",
+              "version": "passed",
+              "dataPreservation": "passed",
+              "corruptPackage": "passed",
+              "networkFailure": "passed",
+              "installFailure": "passed",
+              "retry": "passed",
+              "businessAttribution": "passed"
+            },
+            "publiclyPublished": false,
+            "attributionScope": "Official 1.6.2 native requests were observed with ch=3; their image/task/layer records survived signed upgrade. No new paid call on internal 1.6.3."
+          }
+        },
+        {
+          "type": "rpm",
+          "status": "passed",
+          "method": "manual-install",
+          "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-linux.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+          "checks": {
+            "download": "passed",
+            "install": "passed",
+            "restart": "passed",
+            "version": "passed",
+            "dataPreservation": "passed",
+            "businessAttribution": "passed"
+          },
+          "sourceVersions": [
+            "1.6.0",
+            "1.6.1"
+          ],
+          "sourceEvidence": [
+            {
+              "fromVersion": "1.6.0",
+              "runId": "43820565887",
+              "artifact": "signed-installed-linux-rpm-1.6.0",
+              "resultSha256": "f7e7156d14b26e92e4bcbc095dea0c84886d0c0adfb4a226b6a73efa8aa7c3bb",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageTaskPreservation": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validPackageInstallPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            },
+            {
+              "fromVersion": "1.6.1",
+              "runId": "43820565887",
+              "artifact": "signed-installed-linux-rpm-1.6.1",
+              "resultSha256": "cb8ac072148096d7f788f12861bf462a926bfbd9a2bffed9dd2744193ec54d36",
+              "checks": {
+                "publishedLegacyManualTransition": "passed",
+                "legacyCreativeImageTaskPreservation": "passed",
+                "nativeSeedream55Synthetic": "passed",
+                "corrupt": "passed",
+                "interrupted": "passed",
+                "missing": "passed",
+                "validPackageInstallPermissionDenied": "passed",
+                "download": "passed",
+                "nativeSignature": "passed",
+                "install": "passed",
+                "automaticRestart": "passed",
+                "version": "passed",
+                "sqliteProviderAndWebviewPreference": "passed",
+                "sameInstallationRetry": "passed",
+                "creativeImageLayerOcrTaskPreservation": "passed",
+                "installedDesktopAttributionSynthetic": "passed"
+              }
+            }
+          ],
+          "signedUpgrade": {
+            "kind": "real-installed-app",
+            "status": "passed",
+            "fromVersion": "1.6.2",
+            "toVersion": "1.6.3",
+            "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+            "commit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+            "artifactSha256": "03b31e4051e4b27097bb8c16dd2f4d23a6029a7326c8d15d7aeb6781d5cf75ef",
+            "evidence": "docs/development/evidence/2026-11-16-candidate-43804959005-linux.json; docs/development/evidence/2026-11-16-generation-8060ac8d-receipt.json",
+            "checks": {
+              "download": "passed",
+              "signature": "passed",
+              "install": "passed",
+              "restart": "passed",
+              "version": "passed",
+              "dataPreservation": "passed",
+              "corruptPackage": "passed",
+              "networkFailure": "passed",
+              "installFailure": "passed",
+              "retry": "passed",
+              "businessAttribution": "passed"
+            },
+            "publiclyPublished": false,
+            "attributionScope": "Official 1.6.2 native requests were observed with ch=3; their image/task/layer records survived signed upgrade. No new paid call on internal 1.6.3."
+          }
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "updateDiscovery": "Synthetic isolated HTTPS; original official-key signed package bytes installed and restarted by actual application.",
+    "macosData": "Complete serialized UI-created image project and welcome preference; local installed 8060ac8d real generated image saved and restored.",
+    "windowsLinuxData": "Synthetic generated image/layer/OCR/task records, pixels, provider settings and preferences.",
+    "installFailure": "OS staging-directory permission denial (Mac/Windows); isolated installed-directory/package failure (Linux), followed by same-installation retry. Not exhaustive privileged installer failure coverage.",
+    "provider": "One real paid Seedream 5.5 transparent image on installed ARM candidate, saved and restored; source ch=3 confirmed by settled receipt. Other architectures use synthetic provider.",
+    "imageSplitting": "Accepted by user; no repeat split/OCR requests after user instructed stopping.",
+    "notClaimed": [
+      "Apple notarization or Developer ID",
+      "Windows Authenticode",
+      "Every historical project format or arbitrary system failure",
+      "Deployment of the separate API single-detail source-field change"
+    ]
+  }
+}

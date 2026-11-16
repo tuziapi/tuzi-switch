@@ -107,6 +107,7 @@ const MessageView = memo(function MessageView({
         {message.origin === "canvas" && <small className="text-chat-status">来自画布主输入框</small>}
         <TextAttachments attachments={message.attachments} />
         {message.content}
+        {message.canvasContext && <small className="text-chat-canvas-context">{message.canvasContext.notice}</small>}
       </div>
     );
   const generating = ["pending", "streaming"].includes(message.status);

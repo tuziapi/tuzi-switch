@@ -13,7 +13,7 @@ import {
 } from "./nativeStream";
 import { requestCreativeManual } from "./manualTransport";
 import { nativeImageAction } from "./imageActions";
-import { nativeSaveMedia } from "./mediaSave";
+import { nativeSaveMedia, nativeVideoAction } from "./mediaSave";
 import { nativeLocalCodex } from "./localCodex";
 import { selectCreativeMediaAction } from "./mediaActions";
 
@@ -179,6 +179,10 @@ export function createCreativeAccountBridge(
     saveMedia:
       typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
         ? nativeSaveMedia
+        : undefined,
+    videoAction:
+      typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+        ? nativeVideoAction
         : undefined,
     copyText:
       typeof window !== "undefined" && "__TAURI_INTERNALS__" in window

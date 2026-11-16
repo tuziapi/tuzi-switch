@@ -1,0 +1,118 @@
+{
+  "id": 446749293,
+  "tag_name": "v1.6.2",
+  "target_commitish": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-11-16T08:07:47Z",
+  "html_url": "https://github.com/tuziapi/tuzi-switch/releases/tag/v1.6.2",
+  "assets": [
+    {
+      "id": 753993953,
+      "name": "manifest-linux-x64.json",
+      "size": 904,
+      "state": "uploaded",
+      "digest": "sha256:658c8d1b7971c2affc40492c00df904f8060a925295e90d2a5d8d364432a8fdf",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/manifest-linux-x64.json"
+    },
+    {
+      "id": 753993949,
+      "name": "manifest-macos-arm64.json",
+      "size": 562,
+      "state": "uploaded",
+      "digest": "sha256:0c47cd2d4bed8cbb9d42b51b22ac1e110a701d85050c9089f45f45fd9f9ee6e8",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/manifest-macos-arm64.json"
+    },
+    {
+      "id": 753993947,
+      "name": "manifest-macos-x64.json",
+      "size": 559,
+      "state": "uploaded",
+      "digest": "sha256:38f1748890fa6c76abea42cbdd259b6fcd972c4d8ba95150d093c1808f78d651",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/manifest-macos-x64.json"
+    },
+    {
+      "id": 753993950,
+      "name": "manifest-windows-x64.json",
+      "size": 758,
+      "state": "uploaded",
+      "digest": "sha256:8f7847ae4a75d07a17f5ea6e512759ce2d3abe1383609b36722ba07108993c76",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/manifest-windows-x64.json"
+    },
+    {
+      "id": 753993952,
+      "name": "SHA256SUMS",
+      "size": 1135,
+      "state": "uploaded",
+      "digest": "sha256:58dc5e0e40800cba1111eb6dec721c2b081edcf52eb5455ddb23da7454308e6f",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/SHA256SUMS"
+    },
+    {
+      "id": 753994015,
+      "name": "tuzi-assistant-linux-x64.AppImage",
+      "size": 105269752,
+      "state": "uploaded",
+      "digest": "sha256:a60f5392af9eedbeceabeb806f8049ed706c4b2939d63ce56ef990728c707b7c",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-linux-x64.AppImage"
+    },
+    {
+      "id": 753994029,
+      "name": "tuzi-assistant-linux-x64.deb",
+      "size": 26094722,
+      "state": "uploaded",
+      "digest": "sha256:02dc580239f80d84b0afbaf672c18b9d84839aa9c2cb16ae0d8321572e9acdad",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-linux-x64.deb"
+    },
+    {
+      "id": 753994037,
+      "name": "tuzi-assistant-linux-x64.rpm",
+      "size": 26098513,
+      "state": "uploaded",
+      "digest": "sha256:0daae45ce1f30f3a314eb72b2b986021530cfaa74052b744b40c532c13879e00",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-linux-x64.rpm"
+    },
+    {
+      "id": 753994038,
+      "name": "tuzi-assistant-macos-arm64.dmg",
+      "size": 26777499,
+      "state": "uploaded",
+      "digest": "sha256:419b6d1e0703328c3a24bde7e698d40144ee291b1068f70b44e13fa31ca23310",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-macos-arm64.dmg"
+    },
+    {
+      "id": 753994039,
+      "name": "tuzi-assistant-macos-x64.dmg",
+      "size": 27806086,
+      "state": "uploaded",
+      "digest": "sha256:17a51ab4d769da9bb58c9996116dace1f3df34104b9773d4cd0d952673b80fdc",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-macos-x64.dmg"
+    },
+    {
+      "id": 753996149,
+      "name": "tuzi-assistant-source.tar.gz",
+      "size": 26043265,
+      "state": "uploaded",
+      "digest": "sha256:397a3fc0b45523ca0c7c3fdea6b187880322c1a349b8e4c495461508e331c8b2",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-source.tar.gz"
+    },
+    {
+      "id": 753996190,
+      "name": "tuzi-assistant-windows-x64.exe",
+      "size": 22704362,
+      "state": "uploaded",
+      "digest": "sha256:0ed3f8aa921c1ad4e2ca4a8719176872a2b920e0e0cb1d4afb082021369d378e",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-windows-x64.exe"
+    },
+    {
+      "id": 753996199,
+      "name": "tuzi-assistant-windows-x64.msi",
+      "size": 26013696,
+      "state": "uploaded",
+      "digest": "sha256:3a301dfcc221dd8ab417ab74903eb47e17135d19245c2d063882a707519d5484",
+      "browser_download_url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.2/tuzi-assistant-windows-x64.msi"
+    }
+  ],
+  "candidateRunId": "43804959005",
+  "candidateCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "all13PublishedAssetDigestsMatchCandidate": true
+}

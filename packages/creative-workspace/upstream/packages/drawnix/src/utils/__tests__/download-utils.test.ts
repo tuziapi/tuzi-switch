@@ -9,6 +9,7 @@ import {
   smartDownload,
   downloadMediaFile,
   downloadAsZip,
+  runCanvasVideoAction,
 } from '../download-utils';
 
 const {
@@ -104,6 +105,37 @@ function createTask(overrides: Partial<Task> = {}): Task {
 }
 
 describe('download-utils', () => {
+  it.each(['copy', 'copy-path', 'reveal'] as const)('uses cached original video for %s even if remote URL expired', async (action) => {
+    vi.stubGlobal('fetch', vi.fn());
+    const original = new Blob(['original-mp4'], { type: 'video/mp4' });
+    getCachedBlobMock.mockResolvedValue(original);
+    const videoAction = vi.fn().mockResolvedValue(action === 'reveal' ? 'revealed' : action === 'copy-path' ? 'path-copied' : 'copied');
+    setAssistantAccount({ videoAction } as any);
+    await runCanvasVideoAction(action, 'https://expired.synthetic.invalid/video.mp4');
+    expect(videoAction).toHaveBeenCalledWith(action, original);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('reports missing virtual video without fetching a thumbnail or regenerating', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    getCachedBlobMock.mockResolvedValue(null);
+    const videoAction = vi.fn();
+    setAssistantAccount({ videoAction } as any);
+    await expect(runCanvasVideoAction('copy', '/__aitu_cache__/video/missing.mp4')).rejects.toThrow('缓存');
+    expect(videoAction).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('rejects oversized cached video before IPC', async () => {
+    getCachedBlobMock.mockResolvedValue({ size: 128 * 1024 * 1024 + 1 } as Blob);
+    const videoAction = vi.fn();
+    setAssistantAccount({ videoAction } as any);
+    await expect(runCanvasVideoAction('reveal', '/__aitu_cache__/video/huge.mp4')).rejects.toThrow('128 MB');
+    expect(videoAction).not.toHaveBeenCalled();
+  });
+  it('does not claim file copy when the browser host has no native capability', async () => {
+    setAssistantAccount(undefined);
+    await expect(runCanvasVideoAction('copy', '/__aitu_cache__/video/1.mp4')).rejects.toThrow('桌面客户端');
+    expect(getCachedBlobMock).not.toHaveBeenCalled();
+  });
   it.each([['gif', 'image/gif'], ['svg', 'image/svg+xml']])(
     'downloads original cached %s bytes and corrects a stale PNG extension', async (extension, mime) => {
       const original = new Blob(['original-media'], { type: mime });

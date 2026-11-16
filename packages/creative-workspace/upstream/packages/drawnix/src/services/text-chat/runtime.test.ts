@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("../chat-storage-service", () => ({ chatStorageService: {} }));
 vi.mock("./request", () => ({ requestTextChat: vi.fn() }));
 const discussionMock = vi.hoisted(() => ({ request: vi.fn(), execute: vi.fn() }));
+const canvasMock = vi.hoisted(() => vi.fn(() => "画布已修改"));
+vi.mock("./canvas-control", () => ({ executeCanvasEdits: canvasMock }));
 const setupGate = vi.hoisted(() => vi.fn(() => true));
 vi.mock('../assistant-creation-setup', () => ({ ensureAssistantCreationConfigured: setupGate }));
 vi.mock("./discussion", () => ({ requestDiscussion: discussionMock.request, executeDiscussionPlan: discussionMock.execute }));
@@ -381,4 +383,147 @@ it('validates restored plan counts, routes and submission states', async () => {
     const s={...session,textChat:{...session.textChat,messages:[{id:'m',role:'assistant',content:'preview',status:'complete',discussion:{boardId:'board',runId:'run',taskIds:[],submission:'not_started',plan}}]}};
     expect(()=>restoreTextConversation(s as any)).toThrow();
   }
+});
+
+const canvasPlan = {
+  version: 1 as const,
+  boardId: "board",
+  revision: "a".repeat(64),
+  status: "ready" as const,
+  actions: [{ op: "move" as const, ids: ["a"], dx: 10, dy: 0 }],
+};
+it("persists canvas input and preserves both plans; direct edits run exactly once", async () => {
+  canvasMock.mockClear();
+  const { runtime, db, records } = setup();
+  const id = await runtime.ensureDiscussion("board", model);
+  discussionMock.request.mockImplementation(async (r: any) => {
+    await r.onCanvasContext({
+      boardId: "board",
+      revision: "a".repeat(64),
+      summary: "unselected b",
+      notice: "5 frames",
+      images: ["data:image/jpeg;base64,YQ=="],
+    });
+    expect(records.get(id).textChat.messages[0].canvasContext.notice).toBe(
+      "5 frames",
+    );
+    await r.onPlan({
+      version: 1,
+      status: "ready",
+      steps: [
+        {
+          type: "image",
+          prompt: "synthetic",
+          count: 1,
+          model: model.modelId,
+          modelRef: model,
+          referenceImages: [],
+        },
+      ],
+    });
+    canvasMock.mockImplementationOnce(() => {
+      expect(
+        records.get(id).textChat.messages.at(-1).discussion.canvasPlan.status,
+      ).toBe("started");
+      return "已移动";
+    });
+    await r.onCanvasPlan(canvasPlan, true);
+    return { content: "done", reasoning: "" };
+  });
+  await runtime.send(id, "移动图片");
+  const message = runtime.getSnapshot().sessions[0].textChat.messages.at(-1)!;
+  expect(message.discussion?.plan?.status).toBe("ready");
+  expect(message.discussion?.canvasPlan?.status).toBe("applied");
+  expect(canvasMock).toHaveBeenCalledTimes(1);
+  await expect(
+    runtime.decideCanvasPlan(id, message.id, true),
+  ).rejects.toThrow();
+  const recovered = new TextChatRuntime(db);
+  await recovered.initialize();
+  expect(
+    recovered.getSnapshot().sessions[0].textChat.messages[0].canvasContext
+      ?.images,
+  ).toEqual(["data:image/jpeg;base64,YQ=="]);
+});
+it("confirmation gates edits, cancels without execution, and duplicate confirmation cannot replay", async () => {
+  canvasMock.mockClear();
+  const { runtime } = setup();
+  const id = await runtime.ensureDiscussion("board", model);
+  discussionMock.request.mockImplementation(async (r: any) => {
+    await r.onCanvasPlan(
+      { ...canvasPlan, actions: [{ op: "delete", ids: ["a"] }] },
+      false,
+    );
+    return { content: "pending", reasoning: "" };
+  });
+  await runtime.send(id, "删除图片");
+  const message = runtime.getSnapshot().sessions[0].textChat.messages.at(-1)!;
+  expect(canvasMock).not.toHaveBeenCalled();
+  await Promise.all([
+    runtime.decideCanvasPlan(id, message.id, true),
+    runtime.decideCanvasPlan(id, message.id, true),
+  ]);
+  expect(canvasMock).toHaveBeenCalledTimes(1);
+  await runtime.send(id, "删除另一张");
+  const second = runtime.getSnapshot().sessions[0].textChat.messages.at(-1)!;
+  await runtime.decideCanvasPlan(id, second.id, false);
+  expect(canvasMock).toHaveBeenCalledTimes(1);
+});
+it("restores started edits as uncertain without mutating backup or replaying", () => {
+  const original: any = {
+    id: "s",
+    title: "synthetic",
+    kind: "text",
+    textChat: {
+      version: 1,
+      executionMode: "agent",
+      linkedBoardId: "board",
+      messages: [
+        {
+          id: "a",
+          role: "assistant",
+          content: "plan",
+          status: "complete",
+          discussion: {
+            boardId: "board",
+            runId: "r",
+            taskIds: [],
+            canvasPlan: { ...canvasPlan, status: "started" },
+          },
+        },
+      ],
+    },
+  };
+  const restored = restoreTextConversation(original);
+  expect(restored.textChat.messages[0].discussion?.canvasPlan?.status).toBe(
+    "error",
+  );
+  expect(original.textChat.messages[0].discussion.canvasPlan.status).toBe(
+    "started",
+  );
+  expect(() =>
+    restoreTextConversation({
+      ...original,
+      textChat: { ...original.textChat, linkedBoardId: "other" },
+    }),
+  ).toThrow();
+});
+
+it('does not mutate canvas when persisting started fails', async () => {
+  canvasMock.mockClear();
+  const {runtime,db}=setup();const id=await runtime.ensureDiscussion('board',model);
+  const save=db.saveTextSession.getMockImplementation()!;
+  db.saveTextSession.mockImplementation(async s=>{if(s.textChat.messages.at(-1)?.discussion?.canvasPlan?.status==='started') throw new Error('synthetic disk full');return save(s);});
+  discussionMock.request.mockImplementation(async(r:any)=>{await r.onCanvasPlan(canvasPlan,true);return {content:'done',reasoning:''};});
+  await runtime.send(id,'移动图片');
+  expect(canvasMock).not.toHaveBeenCalled();
+  expect(runtime.getSnapshot().sessions[0].textChat.messages.at(-1)).toMatchObject({status:'error',discussion:{canvasPlan:{status:'error'}}});
+});
+it('cancel during started persistence prevents execution', async()=>{
+  canvasMock.mockClear();const {runtime,db}=setup();const id=await runtime.ensureDiscussion('board',model);
+  const save=db.saveTextSession.getMockImplementation()!;
+  db.saveTextSession.mockImplementation(async s=>{if(s.textChat.messages.at(-1)?.discussion?.canvasPlan?.status==='started') runtime.stop(id);return save(s);});
+  discussionMock.request.mockImplementation(async(r:any)=>{await r.onCanvasPlan(canvasPlan,true);return {content:'done',reasoning:''};});
+  await runtime.send(id,'移动图片');expect(canvasMock).not.toHaveBeenCalled();
+  expect(runtime.getSnapshot().sessions[0].textChat.messages.at(-1)?.status).toBe('stopped');
 });

@@ -351,6 +351,7 @@ describe('batch submission preparation lifecycle', () => {
           await yieldBatchPreparationPaint();
           if (scenario === 'switch-before-preflight') boardRef.current = createBoard([]);
         },
+        restoreOriginalInputs: false, submittedGenerationNode: null,
         effectiveGenerationType: 'image', effectiveSelectedCount: 4, submittedBoard: board,
         effectivePrompt: 'synthetic', effectiveSelectedModel: 'synthetic', effectiveSelectedModelRef: undefined,
         effectiveSelectedParams: {}, submittedFrameInfo: null,

@@ -409,7 +409,8 @@ describe('canvas insertion service metadata binding', () => {
         {
           type: 'image',
           content: 'first.png',
-          metadata: { prompt: 'first prompt', generationTaskId: 'task-first' },
+          metadata: { prompt: 'first prompt', generationTaskId: 'task-first', generationNodeId: 'generation-first',
+            imageGenerationRecipe: { version: 1, id: 'task-first', input: { generationType: 'image', prompt: 'first prompt', images: [] } } },
         },
       ],
     });
@@ -439,6 +440,8 @@ describe('canvas insertion service metadata binding', () => {
     ).toMatchObject({
       generationPrompt: 'first prompt',
       generationTaskId: 'task-first',
+      generationNodeId: 'generation-first',
+      imageGenerationRecipe: { version: 1, id: 'task-first', input: { generationType: 'image', prompt: 'first prompt', images: [] } },
     });
     expect(
       board.children.find((item) => item.id === 'image-second')

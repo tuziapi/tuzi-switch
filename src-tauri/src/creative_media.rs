@@ -1,8 +1,97 @@
 //! Explicit media export. Accepts bounded binary content, never a URL or path.
 use base64::{engine::general_purpose::STANDARD, Engine};
+use std::{path::PathBuf, sync::Mutex};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 
 const MAX_BYTES: usize = 128 * 1024 * 1024;
+static VIDEO_OPERATIONS: Mutex<()> = Mutex::new(());
+// Retain clipboard ownership on Linux after the IPC call returns.
+static CLIPBOARD: Mutex<Option<arboard::Clipboard>> = Mutex::new(None);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum VideoAction {
+    Copy,
+    CopyPath,
+    Reveal,
+}
+
+fn video_action(value: &str) -> Result<VideoAction, String> {
+    match value {
+        "copy" => Ok(VideoAction::Copy),
+        "copy-path" => Ok(VideoAction::CopyPath),
+        "reveal" => Ok(VideoAction::Reveal),
+        _ => Err("不支持的视频操作".into()),
+    }
+}
+
+fn video_root() -> PathBuf {
+    #[cfg(feature = "isolated-profile")]
+    let directory = crate::config::get_home_dir().join("Videos");
+    #[cfg(not(feature = "isolated-profile"))]
+    let directory =
+        dirs::video_dir().unwrap_or_else(|| crate::config::get_home_dir().join("Videos"));
+    directory.join("兔子助手")
+}
+
+fn copy_video_path(path: &std::path::Path, action: VideoAction) -> Result<(), String> {
+    let mut clipboard = CLIPBOARD.lock().map_err(|_| "剪贴板正忙，请重试")?;
+    if clipboard.is_none() {
+        *clipboard = Some(arboard::Clipboard::new().map_err(|_| "无法访问系统剪贴板")?);
+    }
+    let clipboard = clipboard.as_mut().unwrap();
+    match action {
+        VideoAction::Copy => clipboard.set().file_list(&[path]),
+        VideoAction::CopyPath => clipboard.set_text(path.to_string_lossy().into_owned()),
+        VideoAction::Reveal => return Err("不支持的剪贴板操作".into()),
+    }
+    .map_err(|_| "复制视频失败，请检查剪贴板权限或使用另存为".into())
+}
+
+#[tauri::command]
+pub async fn creative_video_action(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    request: tauri::ipc::Request<'_>,
+) -> Result<String, String> {
+    if window.label() != "main" {
+        return Err("仅主窗口可操作创作视频".into());
+    }
+    let action = video_action(
+        request
+            .headers()
+            .get("x-media-action")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or(""),
+    )?;
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(bytes) if bytes.len() <= MAX_BYTES => bytes.clone(),
+        _ => return Err("视频数据无效或超过 128 MB".into()),
+    };
+    let extension = media_extension(&bytes, "video")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _lock = VIDEO_OPERATIONS
+            .lock()
+            .map_err(|_| "视频操作正忙，请重试")?;
+        let path = crate::creative_images::ensure_export_copy(&video_root(), &bytes, extension)?;
+        if action == VideoAction::Reveal {
+            app.opener().reveal_item_in_dir(&path).map_err(|_| {
+                "视频已保存，但无法打开文件管理器，请到系统视频目录的“兔子助手”文件夹查看"
+            })?;
+            Ok("revealed".into())
+        } else {
+            copy_video_path(&path, action)?;
+            Ok(if action == VideoAction::Copy {
+                "copied"
+            } else {
+                "path-copied"
+            }
+            .into())
+        }
+    })
+    .await
+    .map_err(|_| "视频操作未完成，请重试".to_string())?
+}
 
 fn media_extension(bytes: &[u8], kind: &str) -> Result<&'static str, String> {
     if bytes.is_empty() || bytes.len() > MAX_BYTES {
@@ -84,6 +173,54 @@ pub async fn creative_save_media(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accepts_only_explicit_video_actions() {
+        assert_eq!(video_action("copy").unwrap(), VideoAction::Copy);
+        assert_eq!(video_action("copy-path").unwrap(), VideoAction::CopyPath);
+        assert_eq!(video_action("reveal").unwrap(), VideoAction::Reveal);
+        for value in ["", "delete", "/tmp/other", "save"] {
+            assert!(video_action(value).is_err());
+        }
+    }
+
+    #[test]
+    fn video_copy_is_reused_recreated_and_protects_user_edits() {
+        let bytes = include_bytes!("../../tests/visual/fixtures/synthetic-video.mp4");
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("兔子助手");
+        let ensure = || crate::creative_images::ensure_export_copy(&root, bytes, "mp4").unwrap();
+        let first = ensure();
+        assert_eq!(std::fs::read(&first).unwrap(), bytes);
+        assert_eq!(ensure(), first);
+        std::fs::remove_file(&first).unwrap();
+        assert_eq!(ensure(), first);
+        let edited = vec![42; bytes.len()];
+        std::fs::write(&first, &edited).unwrap();
+        let second = ensure();
+        assert_ne!(first, second);
+        assert_eq!(std::fs::read(&first).unwrap(), edited);
+        assert_eq!(std::fs::read(&second).unwrap(), bytes);
+        assert_eq!(ensure(), second);
+    }
+
+    /// Explicit opt-in: touches the real OS clipboard, never runs in normal CI.
+    #[test]
+    #[ignore = "requires an interactive desktop and changes the system clipboard"]
+    fn real_video_file_and_path_clipboard_roundtrip() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("视频 空格-test.mp4");
+        let bytes = include_bytes!("../../tests/visual/fixtures/synthetic-video.mp4");
+        std::fs::write(&path, bytes).unwrap();
+        copy_video_path(&path, VideoAction::Copy).unwrap();
+        let mut reader = arboard::Clipboard::new().unwrap();
+        let files = reader.get().file_list().unwrap();
+        assert_eq!(files, vec![path.canonicalize().unwrap()]);
+        assert_eq!(std::fs::read(&files[0]).unwrap(), bytes);
+        copy_video_path(&path, VideoAction::CopyPath).unwrap();
+        assert_eq!(reader.get_text().unwrap(), path.to_string_lossy());
+        reader.clear().unwrap();
+    }
 
     #[test]
     fn exports_original_mp4_and_wav_with_truthful_extensions() {

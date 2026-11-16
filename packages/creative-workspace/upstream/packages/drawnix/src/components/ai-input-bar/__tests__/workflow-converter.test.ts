@@ -1,3 +1,4 @@
+import { buildGPTImageGenerationBody } from '../../../services/model-adapters/gpt-image-adapter';
 // @vitest-environment jsdom
 import { beforeAll, describe, it, expect, vi } from 'vitest';
 import {
@@ -15,6 +16,8 @@ import {
 import type { ParsedGenerationParams } from '../../../utils/ai-input-parser';
 import type { CanvasAssociationRef } from '../../../types/task.types';
 import { buildBoundTargetGenerationParams } from '../target-bound-taskbar-state';
+import { buildImageTaskAIInputPrefillData, buildImageRerollPrefillData } from '../../../utils/image-task-prefill';
+import { TaskType, TaskStatus } from '../../../types/task.types';
 import { initializeMCP } from '../../../mcp';
 
 vi.hoisted(() => {
@@ -136,7 +139,34 @@ describe('workflow-converter', () => {
   });
 
   describe('convertDirectGenerationToWorkflow', () => {
+    it('keeps Flash controls and reference images across separately expanded batch steps', () => {
+      const workflow = convertDirectGenerationToWorkflow(createMockParams({
+        modelId: 'doubao-seedream-5-0-flash-260915', count: 2, size: '1.5K',
+        extraParams: { background: 'transparent', output_format: 'png', watermark: 'false', optimize_prompt_mode: 'standard' },
+      }), ['https://example.com/alpha.png']);
+      expect(workflow.steps).toHaveLength(2);
+      for (const step of workflow.steps) {
+        expect(step.args).toMatchObject({ model: 'doubao-seedream-5-0-flash-260915', size: '1.5K',
+          referenceImages: ['https://example.com/alpha.png'], params: { background: 'transparent', output_format: 'png', watermark: 'false', optimize_prompt_mode: 'standard' } });
+        expect(step.args.params).not.toHaveProperty('n');
+      }
+    });
     describe('图片生成场景', () => {
+      it('preserves original inputs and output parameters through reroll workflow construction', () => {
+        const input = buildImageRerollPrefillData(buildImageTaskAIInputPrefillData({
+          id: 'source-task', type: TaskType.IMAGE, status: TaskStatus.COMPLETED, createdAt: 1, updatedAt: 1,
+          params: { prompt: 'original', model: 'gpt-image-2', referenceImages: ['/a.png', '/b.png', '/c.png'],
+            batchTotal: 4, outputFormat: 'webp', outputCompression: 0, background: 'transparent', params: { seed: 123 } },
+        }));
+        const workflow = convertDirectGenerationToWorkflow(createMockParams({
+          modelId: input.model!, prompt: input.prompt, count: input.count!, extraParams: input.params,
+        }), input.images!.map((image) => image.url));
+        expect(workflow.steps).toHaveLength(1);
+        expect(workflow.steps[0].args).toMatchObject({ referenceImages: ['/a.png', '/b.png', '/c.png'], sourceTaskId: 'source-task' });
+        const body = buildGPTImageGenerationBody({ model: 'gpt-image-2', prompt: 'original', params: workflow.steps[0].args.params as Record<string, unknown> });
+        expect(body).toMatchObject({ background: 'transparent', output_format: 'webp', output_compression: 0 });
+        expect(workflow.steps[0].args.params).not.toHaveProperty('seed');
+      });
       it('应该正确转换单张图片生成请求', () => {
         const params = createMockParams({
           generationType: 'image',
