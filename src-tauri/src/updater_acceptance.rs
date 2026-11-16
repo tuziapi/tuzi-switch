@@ -262,7 +262,7 @@ async fn execute(app: &tauri::AppHandle, root: &Path) -> Result<(), String> {
     let bytes = downloaded.map_err(|e| e.to_string())?;
     record(root, "verified", json!({"bytes":bytes.len()}))?;
     record(root, "install-started", json!({"version":update.version}))?;
-    #[cfg(feature = "claude-local-poc")]
+    #[cfg(feature = "claude-desktop-local")]
     crate::claude_local_integration::begin_shutdown()?;
     let installed = update.install(bytes);
     if scenario.mode == "install-error" {

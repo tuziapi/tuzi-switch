@@ -13,15 +13,16 @@ const deferred = () => {
 function setup(download = vi.fn().mockResolvedValue(undefined)) {
   const install = vi.fn().mockResolvedValue(undefined),
     prepare = vi.fn().mockResolvedValue(undefined),
-    restart = vi.fn().mockResolvedValue(undefined);
+    restart = vi.fn().mockResolvedValue(undefined),
+    release = vi.fn().mockResolvedValue(undefined);
   const handle: UpdateHandle = {
     version: "1.5.2",
     download,
     install,
     downloadAndInstall: vi.fn(),
   };
-  const session = new UpdateSession(handle, vi.fn(), prepare, restart);
-  return { session, handle, download, install, prepare, restart };
+  const session = new UpdateSession(handle, vi.fn(), prepare, restart, release);
+  return { session, handle, download, install, prepare, restart, release };
 }
 describe("download first, explicit guarded install", () => {
   it("does not install on download completion; Finished alone is not verified", async () => {
@@ -80,6 +81,7 @@ describe("download first, explicit guarded install", () => {
     expect(x.install).not.toHaveBeenCalled();
     expect(x.session.state.error).toBe("生成中");
     expect(x.session.state.phase).toBe("ready");
+    expect(x.release).not.toHaveBeenCalled();
     x.prepare.mockResolvedValue(undefined);
     await x.session.installAndRestart();
     expect(x.install).toHaveBeenCalledTimes(1);
@@ -108,5 +110,35 @@ describe("download first, explicit guarded install", () => {
     await x.session.installAndRestart();
     expect(x.session.state.phase).toBe("error");
     expect(x.restart).not.toHaveBeenCalled();
+    expect(x.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds the native reservation throughout install and releases it after restart failure", async () => {
+    const x = setup(),
+      pending = deferred();
+    await x.session.download();
+    x.install.mockReturnValue(pending.promise);
+    x.restart.mockRejectedValue(Error("restart failed"));
+    const operation = x.session.installAndRestart();
+    await vi.waitFor(() => expect(x.install).toHaveBeenCalledOnce());
+    expect(x.release).not.toHaveBeenCalled();
+    pending.resolve();
+    await operation;
+    expect(x.release).toHaveBeenCalledOnce();
+    expect(x.release.mock.invocationCallOrder[0]).toBeGreaterThan(
+      x.restart.mock.invocationCallOrder[0],
+    );
+    expect(x.session.state.phase).toBe("installed");
+  });
+
+  it("reports reservation cleanup failure without leaving UI permanently busy", async () => {
+    const x = setup();
+    await x.session.download();
+    x.release.mockRejectedValueOnce(Error("IPC unavailable"));
+    await x.session.installAndRestart();
+    expect(x.session.state.error).toContain("更新状态清理失败");
+    await x.session.installAndRestart();
+    expect(x.prepare).toHaveBeenCalledTimes(2);
+    expect(x.install).toHaveBeenCalledTimes(1);
   });
 });

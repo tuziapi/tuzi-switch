@@ -131,6 +131,7 @@ mockIPC(async (command, args: any) => {
     log("原生检查");
     return;
   }
+  if (command === "release_update_reservation") return;
   if (command === "plugin:updater|install") {
     log("安装");
     installs++;

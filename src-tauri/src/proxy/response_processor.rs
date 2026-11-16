@@ -838,7 +838,7 @@ mod tests {
 
     fn build_state(db: Arc<Database>) -> ProxyState {
         ProxyState {
-            #[cfg(feature = "claude-local-poc")]
+            #[cfg(feature = "claude-desktop-local")]
             local_session: Arc::default(),
             db: db.clone(),
             config: Arc::new(RwLock::new(ProxyConfig::default())),

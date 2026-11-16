@@ -20,7 +20,7 @@ mod health;
 pub mod http_client;
 pub mod hyper_client;
 pub(crate) mod json_canonical;
-#[cfg(feature = "claude-local-poc")]
+#[cfg(feature = "claude-desktop-local")]
 pub(crate) mod local_session;
 pub mod log_codes;
 pub mod model_mapper;
@@ -61,5 +61,5 @@ pub use types::{ProxyConfig, ProxyServerInfo, ProxyStatus};
 #[allow(unused_imports)]
 pub(crate) use types::*;
 
-#[cfg(all(test, feature = "claude-local-poc"))]
+#[cfg(all(test, feature = "claude-desktop-local"))]
 mod local_session_tests;

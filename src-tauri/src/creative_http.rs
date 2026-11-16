@@ -222,5 +222,16 @@ pub fn check_update_ready(
         Err("P0 实验构建不支持自动安装更新，请使用独立正式版完成更新。".into())
     }
     #[cfg(not(feature = "claude-local-poc"))]
-    Ok(())
+    {
+        #[cfg(feature = "claude-desktop-local")]
+        crate::claude_local_integration::begin_update()?;
+        Ok(())
+    }
+}
+
+/// Release the launch reservation if the updater returns to the running app.
+#[tauri::command]
+pub fn release_update_reservation() {
+    #[cfg(feature = "claude-desktop-local")]
+    crate::claude_local_integration::release_update();
 }

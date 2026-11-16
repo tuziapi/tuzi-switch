@@ -5,7 +5,7 @@ mod app_store;
 mod auto_launch;
 mod capabilities;
 mod claude_desktop_config;
-#[cfg(feature = "claude-local-poc")]
+#[cfg(feature = "claude-desktop-local")]
 mod claude_local_integration;
 mod claude_mcp;
 mod claude_plugin;
@@ -1230,6 +1230,7 @@ pub fn run() {
             creative_codex::creative_codex_chat,
             creative_codex::creative_codex_cancel,
             creative_http::check_update_ready,
+            creative_http::release_update_reservation,
             creative_images::creative_image_action,
             creative_media::creative_save_media,
             creative_media::creative_video_action,
@@ -1589,7 +1590,7 @@ pub fn run() {
         }
         // 处理退出请求（所有平台）
         if let RunEvent::ExitRequested { api, code, .. } = &event {
-            #[cfg(feature = "claude-local-poc")]
+            #[cfg(feature = "claude-desktop-local")]
             if code.is_some() && *code != Some(tauri::RESTART_EXIT_CODE) {
                 if let Err(message) = claude_local_integration::begin_shutdown() {
                     api.prevent_exit();

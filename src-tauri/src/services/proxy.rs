@@ -38,7 +38,7 @@ const CLAUDE_MODEL_OVERRIDE_ENV_KEYS: [&str; 6] = [
 
 #[derive(Clone)]
 pub struct ProxyService {
-    #[cfg(feature = "claude-local-poc")]
+    #[cfg(feature = "claude-desktop-local")]
     pub(crate) local_session: Arc<crate::proxy::local_session::LocalSession>,
     lifecycle: Arc<tokio::sync::Mutex<()>>,
     db: Arc<Database>,
@@ -57,7 +57,7 @@ pub struct HotSwitchOutcome {
 impl ProxyService {
     pub fn new(db: Arc<Database>) -> Self {
         Self {
-            #[cfg(feature = "claude-local-poc")]
+            #[cfg(feature = "claude-desktop-local")]
             local_session: Arc::default(),
             lifecycle: Arc::default(),
             db,
@@ -224,7 +224,7 @@ impl ProxyService {
             app_handle,
             self.image_auth_token.clone(),
         );
-        #[cfg(feature = "claude-local-poc")]
+        #[cfg(feature = "claude-desktop-local")]
         let server = server.with_local_session(self.local_session.clone());
         let info = server
             .start()
@@ -749,14 +749,14 @@ impl ProxyService {
     }
 
     fn ensure_local_idle(&self) -> Result<(), String> {
-        #[cfg(feature = "claude-local-poc")]
+        #[cfg(feature = "claude-desktop-local")]
         if self.local_session.active() {
             return Err("请先退出 Claude 并停止兼容会话，再关闭或修改网关".into());
         }
         Ok(())
     }
 
-    #[cfg(feature = "claude-local-poc")]
+    #[cfg(feature = "claude-desktop-local")]
     pub(crate) async fn bind_local(
         &self,
         provider: Provider,
@@ -779,7 +779,7 @@ impl ProxyService {
         Ok((info, token))
     }
 
-    #[cfg(feature = "claude-local-poc")]
+    #[cfg(feature = "claude-desktop-local")]
     pub(crate) async fn release_local(&self) {
         let _guard = self.lifecycle.lock().await;
         self.local_session.clear();
@@ -2091,7 +2091,7 @@ impl ProxyService {
                 app_handle,
                 self.image_auth_token.clone(),
             );
-            #[cfg(feature = "claude-local-poc")]
+            #[cfg(feature = "claude-desktop-local")]
             let new_server = new_server.with_local_session(self.local_session.clone());
             new_server
                 .start()

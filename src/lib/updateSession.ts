@@ -32,6 +32,7 @@ export class UpdateSession {
     private notify: (state: InstallState) => void,
     private prepare: () => Promise<void>,
     private relaunch: () => Promise<void>,
+    private release: () => Promise<void> = async () => {},
   ) {}
   private set(change: Partial<InstallState>) {
     this.state = { ...this.state, ...change };
@@ -101,7 +102,15 @@ export class UpdateSession {
             },
       );
     } finally {
-      this.busy = false;
+      try {
+        await this.release();
+      } catch {
+        this.set({
+          error: "更新状态清理失败，请退出并重新打开兔子助手后继续。",
+        });
+      } finally {
+        this.busy = false;
+      }
     }
   }
 }

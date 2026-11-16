@@ -18,8 +18,10 @@ doctest = false
 [features]
 default = []
 test-hooks = []
-# P0 opt-in laboratory. Never enabled in release workflows.
-claude-local-poc = ["dep:claude-local", "claude-local/dictation", "dep:fs2", "isolated-profile"]
+# Optional integration; release workflows remain unchanged until acceptance.
+claude-desktop-local = ["dep:claude-local", "claude-local/dictation", "dep:fs2"]
+# P0 keeps its existing independent app and data identity.
+claude-local-poc = ["claude-desktop-local", "isolated-profile"]
 # Isolate user data without enabling debug-only loopback fixtures.
 isolated-profile = []
 local-preview = ["isolated-profile"]

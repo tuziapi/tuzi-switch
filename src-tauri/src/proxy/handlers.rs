@@ -136,7 +136,7 @@ pub async fn handle_claude_desktop_models(
     Ok(Json(response))
 }
 
-#[cfg(feature = "claude-local-poc")]
+#[cfg(feature = "claude-desktop-local")]
 pub async fn handle_claude_local_messages(
     State(state): State<ProxyState>,
     request: axum::extract::Request,
@@ -154,7 +154,7 @@ pub async fn handle_claude_local_messages(
     .await
 }
 
-#[cfg(feature = "claude-local-poc")]
+#[cfg(feature = "claude-desktop-local")]
 pub async fn handle_claude_local_models(
     State(state): State<ProxyState>,
     headers: axum::http::HeaderMap,

@@ -28,7 +28,7 @@ use tokio::task::JoinHandle;
 /// 代理服务器状态（共享）
 #[derive(Clone)]
 pub struct ProxyState {
-    #[cfg(feature = "claude-local-poc")]
+    #[cfg(feature = "claude-desktop-local")]
     pub local_session: Arc<super::local_session::LocalSession>,
     pub db: Arc<Database>,
     pub config: Arc<RwLock<ProxyConfig>>,
@@ -70,7 +70,7 @@ impl ProxyServer {
         let failover_manager = Arc::new(FailoverSwitchManager::new(db.clone()));
 
         let state = ProxyState {
-            #[cfg(feature = "claude-local-poc")]
+            #[cfg(feature = "claude-desktop-local")]
             local_session: Arc::default(),
             db,
             config: Arc::new(RwLock::new(config.clone())),
@@ -92,7 +92,7 @@ impl ProxyServer {
         }
     }
 
-    #[cfg(feature = "claude-local-poc")]
+    #[cfg(feature = "claude-desktop-local")]
     pub(crate) fn with_local_session(
         mut self,
         session: Arc<super::local_session::LocalSession>,
@@ -299,7 +299,7 @@ impl ProxyServer {
 
     fn build_router(&self) -> Router {
         let router = Router::new();
-        #[cfg(feature = "claude-local-poc")]
+        #[cfg(feature = "claude-desktop-local")]
         let router = router
             .route(
                 "/claude-desktop-local/v1/models",

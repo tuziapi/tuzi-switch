@@ -1,4 +1,4 @@
-//! P0 only: isolated ClaudeMom core, existing Tuzi gateway, fixed in-memory binding.
+//! Isolated ClaudeMom core, existing Tuzi gateway, fixed in-memory binding.
 //! No automatic launch, certificate trust, import, resume, or supplier mutation.
 use crate::store::AppState;
 use claude_local::{ClaudeLocalSettings, Host, Upstream};
@@ -10,11 +10,17 @@ use std::{
 };
 
 static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static UPDATE_RESERVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static OPERATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static HOST: OnceLock<Arc<TuziHost>> = OnceLock::new();
 #[path = "claude_local_copy.rs"]
 mod desktop_copy;
 const TESTED_VERSION: &str = desktop_copy::COPY_VERSION;
+const LOCAL_DIR: &str = if cfg!(feature = "claude-local-poc") {
+    "claude-local-p0"
+} else {
+    "claude-desktop-local"
+};
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -45,7 +51,7 @@ fn root_dir() -> PathBuf {
     // A settings-directory edit must not hide the running session's recovery marker.
     HOST.get()
         .map(|host| host.root.clone())
-        .unwrap_or_else(|| crate::config::get_app_config_dir().join("claude-local-p0"))
+        .unwrap_or_else(|| crate::config::get_app_config_dir().join(LOCAL_DIR))
 }
 fn manifest() -> PathBuf {
     root_dir().join("session.json")
@@ -62,6 +68,33 @@ pub(crate) fn ensure_idle() -> Result<(), String> {
         return Err("Claude 兼容会话正在运行或等待恢复；请正常退出 Claude，并在 Claude 配置中停止兼容会话后再退出或更新兔子助手。".into());
     }
     Ok(())
+}
+
+// Reserve under the same lock as launch. A read-only idle check alone permits
+// a new Claude session to start between that check and updater installation.
+pub(crate) fn begin_update() -> Result<(), String> {
+    let _guard = OPERATION.try_lock().map_err(|_| "兼容服务操作正在进行")?;
+    reserve_update(&manifest(), &SHUTTING_DOWN, &UPDATE_RESERVED)
+}
+
+fn reserve_update(
+    marker: &std::path::Path,
+    shutting_down: &std::sync::atomic::AtomicBool,
+    reserved: &std::sync::atomic::AtomicBool,
+) -> Result<(), String> {
+    if marker.exists() || shutting_down.load(std::sync::atomic::Ordering::SeqCst) {
+        return Err("请先退出 Claude 并停止兼容会话，再安装更新".into());
+    }
+    reserved.compare_exchange(
+        false, true,
+        std::sync::atomic::Ordering::SeqCst,
+        std::sync::atomic::Ordering::SeqCst,
+    ).map_err(|_| "更新安装正在进行")?;
+    Ok(())
+}
+
+pub(crate) fn release_update() {
+    UPDATE_RESERVED.store(false, std::sync::atomic::Ordering::SeqCst);
 }
 
 pub(crate) fn begin_shutdown() -> Result<(), String> {
@@ -133,7 +166,11 @@ impl Host for TuziHost {
         self.root.clone()
     }
     fn ca_name(&self) -> &str {
-        "Tuzi Claude Local P0 CA"
+        if cfg!(feature = "claude-local-poc") {
+            "Tuzi Claude Local P0 CA"
+        } else {
+            "Tuzi Claude Local CA"
+        }
     }
     fn isolated_profile_dir(&self) -> Option<PathBuf> {
         Some(self.root.join("desktop-profile"))
@@ -312,6 +349,9 @@ pub async fn claude_local_action(
     if SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
         return Err("兔子助手正在退出或重启".into());
     }
+    if UPDATE_RESERVED.load(std::sync::atomic::Ordering::SeqCst) {
+        return Err("兔子助手正在安装更新，请完成后再操作 Claude 配置".into());
+    }
     if ![
         "prepare",
         "trust",
@@ -369,7 +409,7 @@ pub async fn claude_local_action(
     }
     if action == "launch" {
         if !cfg!(target_os = "macos") {
-            return Err("P0 暂仅验证 macOS".into());
+            return Err("本地兼容功能暂仅验证 macOS".into());
         }
         let status = tauri::async_runtime::spawn_blocking(claude_local::status)
             .await
@@ -377,12 +417,12 @@ pub async fn claude_local_action(
             .map_err(|e| e.to_string())?;
         if status.version != TESTED_VERSION {
             return Err(format!(
-                "P0 仅允许 Claude {TESTED_VERSION}；当前 {} 需重新验证",
+                "本地兼容仅允许 Claude {TESTED_VERSION}；当前 {} 需重新验证",
                 status.version
             ));
         }
         if status.claude_running || !status.ca_trusted || !status.node_available {
-            return Err("请先退出 Claude，准备并信任证书，且安装支持 WebSocket 的 Node.js".into());
+            return Err("请先退出 Claude，准备并信任证书，并确认内置运行时已就绪".into());
         }
         let id = provider_id.ok_or("请选择 Claude Desktop 供应商")?;
         let provider = state
@@ -441,6 +481,38 @@ pub async fn claude_local_action(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_update_reservation_rejects_active_recovery_and_duplicate_install() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let temp = tempfile::tempdir().unwrap();
+        let marker = temp.path().join("session.json");
+        let shutdown = AtomicBool::new(false);
+        let reserved = AtomicBool::new(false);
+        // An incomplete/corrupt marker still means recovery is required.
+        fs::write(&marker, b"incomplete").unwrap();
+        assert!(reserve_update(&marker, &shutdown, &reserved).is_err());
+        assert!(!reserved.load(Ordering::SeqCst));
+        fs::remove_file(&marker).unwrap();
+        assert!(reserve_update(&marker, &shutdown, &reserved).is_ok());
+        assert!(reserve_update(&marker, &shutdown, &reserved).is_err());
+        reserved.store(false, Ordering::SeqCst);
+        assert!(reserve_update(&marker, &shutdown, &reserved).is_ok());
+        reserved.store(false, Ordering::SeqCst);
+        shutdown.store(true, Ordering::SeqCst);
+        assert!(reserve_update(&marker, &shutdown, &reserved).is_err());
+        assert!(!reserved.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn local_feature_keeps_experiment_and_normal_profile_paths_distinct() {
+        if cfg!(feature = "claude-local-poc") {
+            assert!(cfg!(feature = "isolated-profile"));
+            assert_eq!(LOCAL_DIR, "claude-local-p0");
+        } else {
+            assert_eq!(LOCAL_DIR, "claude-desktop-local");
+        }
+    }
+
     #[test]
     fn local_p0_config_has_no_shared_profile_or_advanced_capabilities() {
         let config = safe_config();
