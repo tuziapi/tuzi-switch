@@ -4,7 +4,9 @@ Runs only on disposable test-repository hosts. The actual app and its restarted
 child inherit a loopback-only sandbox. Discovery is synthetic; packages are not.
 """
 import hashlib
+import base64
 from signed_candidate_identity import verify_candidate
+from signed_creative_webdriver import PNG
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -13,6 +15,7 @@ import plistlib
 import signal
 import socket
 import ssl
+import sqlite3
 import subprocess
 import sys
 import tarfile
@@ -204,6 +207,91 @@ def screenshot(name):
     run(['screencapture','-x',str(output/(name+'.png'))],capture_output=True)
 
 
+creative_title='SYNTHETIC Mac migration '+legacy_version
+
+
+def press_label(label, prefix=False):
+    # WebKit exposes canvas tools as radio buttons and the host switch as a
+    # popup button. Operate their existing accessibility actions only.
+    literal=json.dumps(label)
+    comparison=('starts with ' if prefix else 'is ')+literal
+    body='''repeat with itemRef in (get entire contents of front window of p)
+try
+if role of itemRef is in {"AXButton", "AXRadioButton", "AXPopUpButton"} then
+if name of itemRef COMPARISON then
+perform action "AXPress" of itemRef
+return true
+end if
+end if
+end try
+end repeat
+return false'''.replace('COMPARISON',comparison)
+    wait_for(lambda: ax(body)=='true','Accessible label missing: '+label)
+
+
+def creative_record():
+    # Read only the synthetic board created through this runner's real UI.
+    # Compare WebKit's complete serialized record, including all image data,
+    # without writing to its database or decoding/recreating its format.
+    root=Path.home()/'Library/WebKit/com.tuziswitch.desktop/WebsiteData'
+    matches=[]
+    for db in root.rglob('IndexedDB.sqlite3'):
+        with sqlite3.connect(db.as_uri()+'?mode=ro',uri=True) as connection:
+            try:
+                store=connection.execute("SELECT id FROM ObjectStoreInfo WHERE name='boards'").fetchone()
+                if not store:
+                    continue
+                for key,value in connection.execute('SELECT key,value FROM Records WHERE objectStoreID=?',(store[0],)):
+                    data=bytes(value)
+                    if creative_title.encode() in data or creative_title.encode('utf-16-le') in data:
+                        image_present=b'image' in data or 'image'.encode('utf-16-le') in data
+                        if not image_present:
+                            continue
+                        matches.append(dict(key=sha(key.encode() if isinstance(key,str) else key),
+                                            value=sha(data),bytes=len(data)))
+            except sqlite3.OperationalError:
+                continue
+    assert len(matches)<=1, 'Ambiguous synthetic board'
+    return matches[0] if matches else None
+
+
+def create_creative_fixture():
+    click(['opentu 创作'])
+    click(['我的项目'])
+    click(['新建项目'])
+    click(['我的项目'])
+    click(['重命名 未命名项目'])
+    ax('keystroke "a" using command down\nkeystroke '+json.dumps(creative_title)+'\nkey code 36')
+    press_label(creative_title,prefix=True)
+    # Native image import, not direct IndexedDB insertion or a synthetic app.
+    image_path=lab/'SYNTHETIC-migration.png'
+    image_path.write_bytes(base64.b64decode(PNG))
+    press_label('图片 — Cmd+U')
+    wait_for(lambda: 'sheet ' in tree(),'Native image picker did not open')
+    ax('keystroke "g" using {command down, shift down}')
+    time.sleep(1)
+    ax('keystroke '+json.dumps(str(image_path))+'\nkey code 36')
+    time.sleep(1)
+    ax('key code 36')
+    wait_for(creative_record,'Imported image was not persisted')
+    screenshot('00-legacy-creative-image')
+    press_label('兔子助手导航')
+    click(['Codex'])
+    saved=wait_for(creative_record,'Synthetic project disappeared')
+    report['legacyCreativeRecord']=saved
+    return saved
+
+
+def assert_creative_preserved(saved, label):
+    assert wait_for(creative_record,'Saved creative record missing')==saved, 'Complete serialized project changed during upgrade'
+    click(['opentu 创作'])
+    click(['我的项目'])
+    press_label(creative_title,prefix=True)
+    screenshot('06-creative-preserved-'+label)
+    press_label('兔子助手导航')
+    click(['Codex'])
+
+
 def files_in_archive(directory):
     with tarfile.open(directory/asset,'r:gz') as archive:
         return {'/'.join(Path(member.name).parts[1:]):sha(archive.extractfile(member).read())
@@ -318,23 +406,28 @@ try:
         click(['Got it','我知道了'])
         wait_for(lambda: 'Tuzi account' in tree(),'Published old app did not load')
         screenshot('00-published-old-version')
+        legacy_creative=create_creative_fixture()
         ax('keystroke "q" using command down')
         wait_for(lambda: process.poll() is not None,'Published app must quit normally')
         assert process.returncode==0
+        legacy_creative=wait_for(creative_record,'Project lost on normal legacy exit')
         app.rename(lab/'published-legacy.app')
         base_backup.rename(app)
         assert_app(expected_base,'1.6.2')
         report['manualTransition']={'fromVersion':legacy_version,'toVersion':'1.6.2',
-            'source':legacy,'oldExitCode':process.returncode,'dataScope':'welcome preference; full creative migration remains separate'}
+            'source':legacy,'oldExitCode':process.returncode,'dataScope':'welcome preference and complete UI-created image project record'}
     stage('launch original installed application')
     process=subprocess.Popen(['sandbox-exec','-f',str(sandbox),str(executable)],env=app_env,stdout=application_log,stderr=application_log)
     pid=process.pid; report['initialPid']=pid
     if legacy_dir:
-        wait_for(lambda: 'Tuzi account' in tree(),'Manually updated app did not load')
+        wait_for(lambda: 'Codex' in tree(),'Manually updated app did not load')
         assert not button(['Got it','我知道了']), 'Manual transition lost welcome preference'
         report['checks']['publishedLegacyManualTransition']='passed'
         report['manualTransition']['status']='passed'
         report['remaining'].remove('published-old-version-manual-transition')
+        assert_creative_preserved(legacy_creative,'manual-transition')
+        report['checks']['legacyCreativeImageProjectPreservation']='passed'
+        before_upgrade_creative=wait_for(creative_record,'Project absent before signed upgrade')
     else:
         click(['Got it','我知道了'])
     # Use the persistent toolbar control, not the expiring 15-second toast.
@@ -386,9 +479,12 @@ try:
     assert len(restarted)==1
     pid=restarted[0]; report['restartedPid']=pid
     report['installedTarget']=assert_app(expected_target,'1.6.3')
-    wait_for(lambda: 'Tuzi account' in tree(),'Restarted actual app UI missing')
+    wait_for(lambda: 'Codex' in tree(),'Restarted actual app UI missing')
     assert not button(['Got it','我知道了']), 'Welcome dismissal was lost'
     screenshot('04-automatically-restarted')
+    if legacy_dir:
+        assert_creative_preserved(before_upgrade_creative,'signed-upgrade')
+        report['checks']['creativeImageProjectPreservation']='passed'
     report['checks'].update({k:'passed' for k in ['download','nativeSignature','install','automaticRestart',
         'exactSignedTargetBytes','welcomePreferencePreserved','sameInstallationRetry']})
     report['subsetStatus']='passed'
