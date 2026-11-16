@@ -1,0 +1,328 @@
+{
+  "kind": "reviewed-macos-upgrade-subset",
+  "officialAcceptance": false,
+  "candidateRunId": "43804959005",
+  "applicationCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "probeRunId": "43824656794",
+  "cases": [
+    {
+      "artifactName": "signed-installed-macos-macos-arm64-from-1.6.0",
+      "resultSha256": "ec292e35ea33dbe492e189cd0381dea28d15dcf846d97ee8c569e8d561f50542",
+      "platform": "macos-arm64",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageProjectPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "creativeImageProjectPreservation": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "exactSignedTargetBytes": "passed",
+        "welcomePreferencePreserved": "passed",
+        "sameInstallationRetry": "passed"
+      },
+      "manualTransition": {
+        "fromVersion": "1.6.0",
+        "toVersion": "1.6.2",
+        "source": {
+          "repository": "tuziapi/tuzi-switch",
+          "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+          "builderRepository": "AiW520/tuzi-switch",
+          "builderCommit": "3685725f3f76f9df607035024718421ffc78fd66",
+          "updaterSigned": false,
+          "publicationReady": false,
+          "run": "42974374413",
+          "target": "aarch64-apple-darwin",
+          "version": "1.6.0",
+          "developerSigned": false,
+          "notarized": false,
+          "channel": "stable",
+          "applicationId": "com.tuziswitch.desktop",
+          "isolatedLocalProfile": false,
+          "files": [
+            {
+              "file": "tuzi-assistant-macos-arm64.dmg",
+              "sha256": "0498106e784096f4ee77d38f0b15fb36b28a5931efc0016c93cdb96050f1ff97",
+              "bytes": 26747375
+            }
+          ]
+        },
+        "oldExitCode": 0,
+        "dataScope": "welcome preference and complete UI-created image project record",
+        "status": "passed"
+      },
+      "legacyCreativeRecord": {
+        "key": "ad1989cef1270af4b196f5c6247426b26eb33ea8f78666113ceda09f2d9cc658",
+        "value": "9e375736d4d1a8d1a389d6a7826d90ef32f3b4441b82e3d90be0bf372627fbad",
+        "bytes": 544
+      },
+      "installedBase": {
+        "version": "1.6.2",
+        "identifier": "com.tuziswitch.desktop",
+        "files": {
+          "Contents/Info.plist": "9bb54e4e61aa159e0f8d3f51a8e86474d001ee482a33ae099c94e07f201e7870",
+          "Contents/_CodeSignature/CodeResources": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+          "Contents/MacOS/tu-zi-switch": "9b5be5bc91b7b76a7246323c4d76a312b989f8ad071a65b1f79a34878751caf8",
+          "Contents/Resources/icon.icns": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc"
+        }
+      },
+      "installedTarget": {
+        "version": "1.6.3",
+        "identifier": "com.tuziswitch.desktop",
+        "files": {
+          "Contents/Info.plist": "7df3931ae1e2af1a8534f5bda037e2b76e892d305654f7d1f3cedaa5632fd2e0",
+          "Contents/_CodeSignature/CodeResources": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+          "Contents/MacOS/tu-zi-switch": "8f897eb3bf005a5a2b2fcf87f8ebed95d662427160666069722daea96957913e",
+          "Contents/Resources/icon.icns": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc"
+        }
+      },
+      "installerFailureScope": "Real OS temp-directory denial after signature verification; old app remains running. Privileged final app replacement failure is not covered.",
+      "unrelatedAdminTrustPreserved": true,
+      "testCaRejectedAfterRevocation": true
+    },
+    {
+      "artifactName": "signed-installed-macos-macos-arm64-from-1.6.1",
+      "resultSha256": "ffaac9b660768c3de793030762ac4ea136e31acd1c0a8ce3647f3bf71530d810",
+      "platform": "macos-arm64",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageProjectPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "creativeImageProjectPreservation": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "exactSignedTargetBytes": "passed",
+        "welcomePreferencePreserved": "passed",
+        "sameInstallationRetry": "passed"
+      },
+      "manualTransition": {
+        "fromVersion": "1.6.1",
+        "toVersion": "1.6.2",
+        "source": {
+          "repository": "tuziapi/tuzi-switch",
+          "commit": "7c13bc943a4b7116af15593ec0ac18af0ba9727f",
+          "builderRepository": "AiW520/tuzi-switch",
+          "builderCommit": "d0a06983982945eb57e1f2b8a76ff5b14e802a01",
+          "updaterSigned": false,
+          "publicationReady": false,
+          "run": "42995242902",
+          "target": "aarch64-apple-darwin",
+          "version": "1.6.1",
+          "developerSigned": false,
+          "notarized": false,
+          "channel": "stable",
+          "applicationId": "com.tuziswitch.desktop",
+          "isolatedLocalProfile": false,
+          "files": [
+            {
+              "file": "tuzi-assistant-macos-arm64.dmg",
+              "sha256": "918f912282eabc3ae265283841b4ccfd7823e5ed34a46cdae871bc8e8a45e3aa",
+              "bytes": 26749881
+            }
+          ]
+        },
+        "oldExitCode": 0,
+        "dataScope": "welcome preference and complete UI-created image project record",
+        "status": "passed"
+      },
+      "legacyCreativeRecord": {
+        "key": "20df7823ec6233be9057bec2fb9efb5d1113a66adb69d64977e0f3b655aae82d",
+        "value": "f3cfd5a1d0ef1b8d0d2461a563e2693bd297d3cc3c241de874ea2a301efce536",
+        "bytes": 544
+      },
+      "installedBase": {
+        "version": "1.6.2",
+        "identifier": "com.tuziswitch.desktop",
+        "files": {
+          "Contents/Info.plist": "9bb54e4e61aa159e0f8d3f51a8e86474d001ee482a33ae099c94e07f201e7870",
+          "Contents/_CodeSignature/CodeResources": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+          "Contents/MacOS/tu-zi-switch": "9b5be5bc91b7b76a7246323c4d76a312b989f8ad071a65b1f79a34878751caf8",
+          "Contents/Resources/icon.icns": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc"
+        }
+      },
+      "installedTarget": {
+        "version": "1.6.3",
+        "identifier": "com.tuziswitch.desktop",
+        "files": {
+          "Contents/Info.plist": "7df3931ae1e2af1a8534f5bda037e2b76e892d305654f7d1f3cedaa5632fd2e0",
+          "Contents/_CodeSignature/CodeResources": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+          "Contents/MacOS/tu-zi-switch": "8f897eb3bf005a5a2b2fcf87f8ebed95d662427160666069722daea96957913e",
+          "Contents/Resources/icon.icns": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc"
+        }
+      },
+      "installerFailureScope": "Real OS temp-directory denial after signature verification; old app remains running. Privileged final app replacement failure is not covered.",
+      "unrelatedAdminTrustPreserved": true,
+      "testCaRejectedAfterRevocation": true
+    },
+    {
+      "artifactName": "signed-installed-macos-macos-x64-from-1.6.0",
+      "resultSha256": "c2641e5a2e72598129b8800e5aed50abe3e0394dcacb6cc8bdd841343475917f",
+      "platform": "macos-x64",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageProjectPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "creativeImageProjectPreservation": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "exactSignedTargetBytes": "passed",
+        "welcomePreferencePreserved": "passed",
+        "sameInstallationRetry": "passed"
+      },
+      "manualTransition": {
+        "fromVersion": "1.6.0",
+        "toVersion": "1.6.2",
+        "source": {
+          "repository": "tuziapi/tuzi-switch",
+          "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+          "builderRepository": "AiW520/tuzi-switch",
+          "builderCommit": "3685725f3f76f9df607035024718421ffc78fd66",
+          "updaterSigned": false,
+          "publicationReady": false,
+          "run": "42974374413",
+          "target": "x86_64-apple-darwin",
+          "version": "1.6.0",
+          "developerSigned": false,
+          "notarized": false,
+          "channel": "stable",
+          "applicationId": "com.tuziswitch.desktop",
+          "isolatedLocalProfile": false,
+          "files": [
+            {
+              "file": "tuzi-assistant-macos-x64.dmg",
+              "sha256": "5ed7e04d87b79469cd6a4c1c395550eaa853b9cc9d76adb59c53fbd4528f9389",
+              "bytes": 27786660
+            }
+          ]
+        },
+        "oldExitCode": 0,
+        "dataScope": "welcome preference and complete UI-created image project record",
+        "status": "passed"
+      },
+      "legacyCreativeRecord": {
+        "key": "9c3e17d895f8ac5fc936ea766a427e7dca533c5f27281abe72897426b41e732a",
+        "value": "81b849c43656cbfec75438e4ceb13b5366ed052735a7599d89282017a7b2f107",
+        "bytes": 544
+      },
+      "installedBase": {
+        "version": "1.6.2",
+        "identifier": "com.tuziswitch.desktop",
+        "files": {
+          "Contents/Info.plist": "9bb54e4e61aa159e0f8d3f51a8e86474d001ee482a33ae099c94e07f201e7870",
+          "Contents/_CodeSignature/CodeResources": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+          "Contents/MacOS/tu-zi-switch": "af1f66a5c370c323dd719a08a5c8eb17a16096ea89c3dc93dbbc93109c5ad229",
+          "Contents/Resources/icon.icns": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc"
+        }
+      },
+      "installedTarget": {
+        "version": "1.6.3",
+        "identifier": "com.tuziswitch.desktop",
+        "files": {
+          "Contents/Info.plist": "7df3931ae1e2af1a8534f5bda037e2b76e892d305654f7d1f3cedaa5632fd2e0",
+          "Contents/_CodeSignature/CodeResources": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+          "Contents/MacOS/tu-zi-switch": "5d6b7dd83843b39b05d80053ad1b1b1758044fa5163b632cebdbe9e7e816254c",
+          "Contents/Resources/icon.icns": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc"
+        }
+      },
+      "installerFailureScope": "Real OS temp-directory denial after signature verification; old app remains running. Privileged final app replacement failure is not covered.",
+      "unrelatedAdminTrustPreserved": true,
+      "testCaRejectedAfterRevocation": true
+    },
+    {
+      "artifactName": "signed-installed-macos-macos-x64-from-1.6.1",
+      "resultSha256": "9481206bc7960fbaa9b5c21d629653790ae551180455304a2f4b5e00024bfafb",
+      "platform": "macos-x64",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageProjectPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "creativeImageProjectPreservation": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "exactSignedTargetBytes": "passed",
+        "welcomePreferencePreserved": "passed",
+        "sameInstallationRetry": "passed"
+      },
+      "manualTransition": {
+        "fromVersion": "1.6.1",
+        "toVersion": "1.6.2",
+        "source": {
+          "repository": "tuziapi/tuzi-switch",
+          "commit": "7c13bc943a4b7116af15593ec0ac18af0ba9727f",
+          "builderRepository": "AiW520/tuzi-switch",
+          "builderCommit": "d0a06983982945eb57e1f2b8a76ff5b14e802a01",
+          "updaterSigned": false,
+          "publicationReady": false,
+          "run": "42995242902",
+          "target": "x86_64-apple-darwin",
+          "version": "1.6.1",
+          "developerSigned": false,
+          "notarized": false,
+          "channel": "stable",
+          "applicationId": "com.tuziswitch.desktop",
+          "isolatedLocalProfile": false,
+          "files": [
+            {
+              "file": "tuzi-assistant-macos-x64.dmg",
+              "sha256": "db7594cbf0663e8aee1f6bdcb1d6c3c1fb213bf086bdcaaf2384482ed2375b14",
+              "bytes": 27791702
+            }
+          ]
+        },
+        "oldExitCode": 0,
+        "dataScope": "welcome preference and complete UI-created image project record",
+        "status": "passed"
+      },
+      "legacyCreativeRecord": {
+        "key": "84506415684138d83dcf5441cb7e723b68755168353a9191589a0bb7e6890fb6",
+        "value": "effa28259854b1dbf9cdf215e5b75173daaba95df10ef941f10fc5476d02bd79",
+        "bytes": 544
+      },
+      "installedBase": {
+        "version": "1.6.2",
+        "identifier": "com.tuziswitch.desktop",
+        "files": {
+          "Contents/Info.plist": "9bb54e4e61aa159e0f8d3f51a8e86474d001ee482a33ae099c94e07f201e7870",
+          "Contents/_CodeSignature/CodeResources": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+          "Contents/MacOS/tu-zi-switch": "af1f66a5c370c323dd719a08a5c8eb17a16096ea89c3dc93dbbc93109c5ad229",
+          "Contents/Resources/icon.icns": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc"
+        }
+      },
+      "installedTarget": {
+        "version": "1.6.3",
+        "identifier": "com.tuziswitch.desktop",
+        "files": {
+          "Contents/Info.plist": "7df3931ae1e2af1a8534f5bda037e2b76e892d305654f7d1f3cedaa5632fd2e0",
+          "Contents/_CodeSignature/CodeResources": "6bb3807f46ff5f8aaa63a84042b677a8eb064c020e7cba10c15e2c5c8104351f",
+          "Contents/MacOS/tu-zi-switch": "5d6b7dd83843b39b05d80053ad1b1b1758044fa5163b632cebdbe9e7e816254c",
+          "Contents/Resources/icon.icns": "9a3b54a1fd56bbe07323fc7c333a5e7b7e268ae7593cc2fb2d94404ceb8fdcfc"
+        }
+      },
+      "installerFailureScope": "Real OS temp-directory denial after signature verification; old app remains running. Privileged final app replacement failure is not covered.",
+      "unrelatedAdminTrustPreserved": true,
+      "testCaRejectedAfterRevocation": true
+    }
+  ],
+  "remaining": [
+    "Native business attribution supplement in progress; upgrade success alone does not satisfy the complete publication gate."
+  ]
+}
