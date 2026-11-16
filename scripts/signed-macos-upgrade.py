@@ -351,8 +351,9 @@ def create_creative_fixture():
     ax('keystroke "g" using {command down, shift down}')
     time.sleep(1)
     ax('keystroke '+json.dumps(str(image_path))+'\nkey code 36')
-    time.sleep(1)
-    ax('key code 36')
+    # Intel runners may still be navigating when the next Return arrives.
+    # Wait for the real file selection to enable Open, then press that button.
+    click(['Open','打开'])
     wait_for(creative_record,'Imported image was not persisted')
     screenshot('00-legacy-creative-image')
     press_label('兔子助手导航')
