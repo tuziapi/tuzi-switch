@@ -160,6 +160,8 @@ export function TuziDownloadView({
       matchMedia("(prefers-color-scheme: dark)").matches,
   );
   const { release, loading, error, retry } = useRelease();
+  const manualKeyTransition =
+    release?.repository === "tuziapi/tuzi-switch" && release.tag === "v1.6.2";
   const installCommand = macosInstallCommand(release);
   const pinnedInstallCommand = macosInstallCommand(release, { pinned: true });
   const tracker = useRef(null),
@@ -659,10 +661,12 @@ export function TuziDownloadView({
                     )
                   : t("安装包尚未进行开发者签名，系统可能提示无法验证发布者。")}
               </p>
-              {manualInstallOnly && (
+              {(manualInstallOnly || manualKeyTransition) && (
                 <p className="td-cache-notice">
                   {t(
-                    installCommand
+                    manualKeyTransition
+                      ? "1.6.2 更换了自动更新密钥。请先保存创作、退出旧版，再手动安装一次；保留原应用数据目录。后续更新使用新密钥验签。"
+                      : installCommand
                       ? "本次提供完整安装包。请下载对应安装包或使用 Mac 安装脚本，保存创作并退出旧版后手动安装。应用内签名自动安装暂不可用。"
                       : "本次提供完整安装包。请下载对应系统的正式安装包，保存创作并退出旧版后手动安装。应用内签名自动安装暂不可用。",
                   )}
