@@ -152,6 +152,7 @@ def execute(script, async_=False, args=None):
 def element_action(element, value):
     key='element-6066-11e4-a52e-4f735466cecf'
     assert key in element, 'Actual WebDriver element reference required'
+    execute("arguments[0].scrollIntoView({block:'center',inline:'center',behavior:'instant'}); return true;",args=[element])
     previous=None
     stable_samples=0
     def stable():

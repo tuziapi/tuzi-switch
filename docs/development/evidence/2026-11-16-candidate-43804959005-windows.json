@@ -1,0 +1,266 @@
+{
+  "kind": "reviewed-windows-candidate-subset",
+  "officialAcceptance": false,
+  "candidateRunId": "43804959005",
+  "applicationCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "probeRunId": "43818958453",
+  "cases": [
+    {
+      "artifactName": "signed-installed-windows-msi-from-1.6.0",
+      "resultSha256": "6250875803b9281ec8dc247e7573f2942d2731ccb34ea163723e20e92e0f0e03",
+      "checks": {
+        "manualTransition": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "completedGenerationPlaceholderRemoved": "passed",
+        "legacyCreativeImageAndTaskPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "manualTransition": {
+        "status": "passed",
+        "fromVersion": "1.6.0",
+        "toVersion": "1.6.2",
+        "publishedSource": {
+          "repository": "tuziapi/tuzi-switch",
+          "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+          "builderRepository": "AiW520/tuzi-switch",
+          "builderCommit": "3685725f3f76f9df607035024718421ffc78fd66",
+          "updaterSigned": false,
+          "publicationReady": false,
+          "run": "42974374413",
+          "target": "x86_64-pc-windows-msvc",
+          "version": "1.6.0",
+          "developerSigned": false,
+          "notarized": false,
+          "channel": "stable",
+          "applicationId": "com.tuziswitch.desktop",
+          "isolatedLocalProfile": false,
+          "files": [
+            {
+              "file": "tuzi-assistant-windows-x64.msi",
+              "sha256": "2cf974ecbb3620b7b3a2d151ded64eeb81c19156bb910874a0b96bf5be5f30f6",
+              "bytes": 25993216
+            },
+            {
+              "file": "tuzi-assistant-windows-x64.exe",
+              "sha256": "0495fe632dd23d9afb134e59d12db52fe071e23d2cfde3f716e82caa05a1dd1a",
+              "bytes": 22673572
+            }
+          ]
+        },
+        "sqliteProviderAndWebviewPreference": "passed"
+      },
+      "tempAclRestoration": {
+        "originalSddl": "O:BAG:S-1-5-21-3289802278-1561746829-1498425070-513D:(A;;FA;;;BA)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;CO)(A;OICIID;0x1200a9;;;BU)(A;CIID;LC;;;BU)(A;CIID;DC;;;BU)",
+        "restoredSddl": "O:BAG:S-1-5-21-3289802278-1561746829-1498425070-513D:AI(A;;FA;;;BA)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;CO)(A;OICIID;0x1200a9;;;BU)(A;CIID;LC;;;BU)(A;CIID;DC;;;BU)",
+        "writeProbePassed": true,
+        "ownerGroupAndRulesMatch": true
+      },
+      "creativeScope": "Actual installed UI/native HTTP and persistence; synthetic provider only. No production consumption records, real model quality or complete project-format migration acceptance."
+    },
+    {
+      "artifactName": "signed-installed-windows-msi-from-1.6.1",
+      "resultSha256": "d0fdccba1f9e0375c3184fa1fb65952eea284ff35877060dde734e8d6fb9d2f6",
+      "checks": {
+        "manualTransition": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "completedGenerationPlaceholderRemoved": "passed",
+        "legacyCreativeImageAndTaskPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "manualTransition": {
+        "status": "passed",
+        "fromVersion": "1.6.1",
+        "toVersion": "1.6.2",
+        "publishedSource": {
+          "repository": "tuziapi/tuzi-switch",
+          "commit": "7c13bc943a4b7116af15593ec0ac18af0ba9727f",
+          "builderRepository": "AiW520/tuzi-switch",
+          "builderCommit": "d0a06983982945eb57e1f2b8a76ff5b14e802a01",
+          "updaterSigned": false,
+          "publicationReady": false,
+          "run": "42995242902",
+          "target": "x86_64-pc-windows-msvc",
+          "version": "1.6.1",
+          "developerSigned": false,
+          "notarized": false,
+          "channel": "stable",
+          "applicationId": "com.tuziswitch.desktop",
+          "isolatedLocalProfile": false,
+          "files": [
+            {
+              "file": "tuzi-assistant-windows-x64.msi",
+              "sha256": "96ca5e21e58c5d35449ebd59fdfaffdbf65abee8ea04f9f9dfb46dc53e78d041",
+              "bytes": 25989120
+            },
+            {
+              "file": "tuzi-assistant-windows-x64.exe",
+              "sha256": "a237197468b59003134ce701503a8dcfebdd5ac8b3a4f93d39cb8d4f418cda73",
+              "bytes": 22685736
+            }
+          ]
+        },
+        "sqliteProviderAndWebviewPreference": "passed"
+      },
+      "tempAclRestoration": {
+        "originalSddl": "O:BAG:S-1-5-21-3289802278-1561746829-1498425070-513D:(A;;FA;;;BA)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;CO)(A;OICIID;0x1200a9;;;BU)(A;CIID;LC;;;BU)(A;CIID;DC;;;BU)",
+        "restoredSddl": "O:BAG:S-1-5-21-3289802278-1561746829-1498425070-513D:AI(A;;FA;;;BA)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;CO)(A;OICIID;0x1200a9;;;BU)(A;CIID;LC;;;BU)(A;CIID;DC;;;BU)",
+        "ownerGroupAndRulesMatch": true,
+        "writeProbePassed": true
+      },
+      "creativeScope": "Actual installed UI/native HTTP and persistence; synthetic provider only. No production consumption records, real model quality or complete project-format migration acceptance."
+    },
+    {
+      "artifactName": "signed-installed-windows-nsis-from-1.6.0",
+      "resultSha256": "338c4456453a61c67d1e17667b09ac62487b38c17042ef5d2dc8c9766bc99efb",
+      "checks": {
+        "manualTransition": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "completedGenerationPlaceholderRemoved": "passed",
+        "legacyCreativeImageAndTaskPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "manualTransition": {
+        "status": "passed",
+        "fromVersion": "1.6.0",
+        "toVersion": "1.6.2",
+        "publishedSource": {
+          "repository": "tuziapi/tuzi-switch",
+          "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+          "builderRepository": "AiW520/tuzi-switch",
+          "builderCommit": "3685725f3f76f9df607035024718421ffc78fd66",
+          "updaterSigned": false,
+          "publicationReady": false,
+          "run": "42974374413",
+          "target": "x86_64-pc-windows-msvc",
+          "version": "1.6.0",
+          "developerSigned": false,
+          "notarized": false,
+          "channel": "stable",
+          "applicationId": "com.tuziswitch.desktop",
+          "isolatedLocalProfile": false,
+          "files": [
+            {
+              "file": "tuzi-assistant-windows-x64.msi",
+              "sha256": "2cf974ecbb3620b7b3a2d151ded64eeb81c19156bb910874a0b96bf5be5f30f6",
+              "bytes": 25993216
+            },
+            {
+              "file": "tuzi-assistant-windows-x64.exe",
+              "sha256": "0495fe632dd23d9afb134e59d12db52fe071e23d2cfde3f716e82caa05a1dd1a",
+              "bytes": 22673572
+            }
+          ]
+        },
+        "sqliteProviderAndWebviewPreference": "passed"
+      },
+      "tempAclRestoration": {
+        "originalSddl": "O:BAG:S-1-5-21-3289802278-1561746829-1498425070-513D:(A;;FA;;;BA)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;CO)(A;OICIID;0x1200a9;;;BU)(A;CIID;LC;;;BU)(A;CIID;DC;;;BU)",
+        "writeProbePassed": true,
+        "restoredSddl": "O:BAG:S-1-5-21-3289802278-1561746829-1498425070-513D:AI(A;;FA;;;BA)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;CO)(A;OICIID;0x1200a9;;;BU)(A;CIID;LC;;;BU)(A;CIID;DC;;;BU)",
+        "ownerGroupAndRulesMatch": true
+      },
+      "creativeScope": "Actual installed UI/native HTTP and persistence; synthetic provider only. No production consumption records, real model quality or complete project-format migration acceptance."
+    },
+    {
+      "artifactName": "signed-installed-windows-nsis-from-1.6.1",
+      "resultSha256": "85110bd2a10b359312637a9b3efffa016c11ed86977b7df7eb7bc41a04965df1",
+      "checks": {
+        "manualTransition": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "completedGenerationPlaceholderRemoved": "passed",
+        "legacyCreativeImageAndTaskPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "manualTransition": {
+        "status": "passed",
+        "fromVersion": "1.6.1",
+        "toVersion": "1.6.2",
+        "publishedSource": {
+          "repository": "tuziapi/tuzi-switch",
+          "commit": "7c13bc943a4b7116af15593ec0ac18af0ba9727f",
+          "builderRepository": "AiW520/tuzi-switch",
+          "builderCommit": "d0a06983982945eb57e1f2b8a76ff5b14e802a01",
+          "updaterSigned": false,
+          "publicationReady": false,
+          "run": "42995242902",
+          "target": "x86_64-pc-windows-msvc",
+          "version": "1.6.1",
+          "developerSigned": false,
+          "notarized": false,
+          "channel": "stable",
+          "applicationId": "com.tuziswitch.desktop",
+          "isolatedLocalProfile": false,
+          "files": [
+            {
+              "file": "tuzi-assistant-windows-x64.msi",
+              "sha256": "96ca5e21e58c5d35449ebd59fdfaffdbf65abee8ea04f9f9dfb46dc53e78d041",
+              "bytes": 25989120
+            },
+            {
+              "file": "tuzi-assistant-windows-x64.exe",
+              "sha256": "a237197468b59003134ce701503a8dcfebdd5ac8b3a4f93d39cb8d4f418cda73",
+              "bytes": 22685736
+            }
+          ]
+        },
+        "sqliteProviderAndWebviewPreference": "passed"
+      },
+      "tempAclRestoration": {
+        "originalSddl": "O:BAG:S-1-5-21-3289802278-1561746829-1498425070-513D:(A;ID;FA;;;BA)(A;OICIIOID;GA;;;BA)(A;ID;FA;;;SY)(A;OICIIOID;GA;;;SY)(A;ID;0x1301bf;;;AU)(A;OICIIOID;SDGXGWGR;;;AU)(A;ID;0x1200a9;;;BU)(A;OICIIOID;GXGR;;;BU)",
+        "writeProbePassed": true,
+        "restoredSddl": "O:BAG:S-1-5-21-3289802278-1561746829-1498425070-513D:AI(A;ID;FA;;;BA)(A;OICIIOID;GA;;;BA)(A;ID;FA;;;SY)(A;OICIIOID;GA;;;SY)(A;ID;0x1301bf;;;AU)(A;OICIIOID;SDGXGWGR;;;AU)(A;ID;0x1200a9;;;BU)(A;OICIIOID;GXGR;;;BU)",
+        "ownerGroupAndRulesMatch": true
+      },
+      "creativeScope": "Actual installed UI/native HTTP and persistence; synthetic provider only. No production consumption records, real model quality or complete project-format migration acceptance."
+    }
+  ],
+  "note": "All four NSIS/MSI x 1.6.0/1.6.1 cases passed. Full cross-platform and new local package release acceptance remains pending."
+}
