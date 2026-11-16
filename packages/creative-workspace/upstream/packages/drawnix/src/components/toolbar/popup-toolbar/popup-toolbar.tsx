@@ -175,7 +175,7 @@ import { getCanvasAudioPlaybackQueue } from '../../../data/audio';
 import { openMusicPlayerToolAndPlay } from '../../../services/tool-launch-service';
 import { useCanvasAudioPlayback } from '../../../hooks/useCanvasAudioPlayback';
 import { buildImageTaskAIInputPrefillData } from '../../../utils/image-task-prefill';
-import { requestAIInputPrefill } from '../../../services/ai-input-ui-events';
+import { AI_INPUT_LAYOUT_EVENT, requestAIInputPrefill } from '../../../services/ai-input-ui-events';
 import {
   AUDIO_PLAYLIST_CANVAS_AUDIO_ID,
   AUDIO_PLAYLIST_CANVAS_AUDIO_LABEL,
@@ -1195,6 +1195,25 @@ export const PopupToolbar = () => {
     floatingStyles,
     updatePopupToolbarPosition,
   ]);
+
+  // The input bar may finish loading its image/long prompt after our initial
+  // positioning frames; measure again when its committed layout changes.
+  useEffect(() => {
+    if (!open || movingOrDragging) return;
+    let frame: number | null = null;
+    const onInputLayout = () => {
+      if (frame !== null) return;
+      frame = schedulePopupToolbarFrame(() => {
+        frame = null;
+        updatePopupToolbarPosition();
+      });
+    };
+    window.addEventListener(AI_INPUT_LAYOUT_EVENT, onInputLayout);
+    return () => {
+      window.removeEventListener(AI_INPUT_LAYOUT_EVENT, onInputLayout);
+      if (frame !== null) cancelPopupToolbarFrame(frame);
+    };
+  }, [open, movingOrDragging, updatePopupToolbarPosition]);
 
   // 同步 ref 和 state
   useEffect(() => {

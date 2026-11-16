@@ -1612,7 +1612,7 @@ index 52363b0..1c44db9 100644
      promptRef,
      uploadedContentRef,
 diff --git a/packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx b/packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx
-index 0843160..da64970 100644
+index 0843160..bbdfbf5 100644
 --- a/packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx
 +++ b/packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx
 @@ -1,3 +1,15 @@
@@ -1631,7 +1631,15 @@ index 0843160..da64970 100644
  import { isSunoNativeModel, getSunoNativeAction } from '../../services/suno-native';
  import { getSunoNativeParams, buildSunoNativeInputParams, collectSunoNativeResources } from '../../services/suno-native-params';
  /**
-@@ -310,9 +322,7 @@ import {
+@@ -258,6 +270,7 @@ import {
+ import {
+   AI_INPUT_FOCUS_EVENT,
+   AI_INPUT_PREFILL_EVENT,
++  AI_INPUT_LAYOUT_EVENT,
+   type AIInputFocusEventDetail,
+   type AIInputPrefillEventDetail,
+ } from '../../services/ai-input-ui-events';
+@@ -310,9 +323,7 @@ import {
  import {
    CANVAS_VIEW_SETTINGS_CHANGE_EVENT,
    persistCenterImageOnClickEnabled,
@@ -1641,7 +1649,7 @@ index 0843160..da64970 100644
  } from './canvas-view-settings';
  import {
    persistAutoInsertReferenceImagesEnabled,
-@@ -2024,13 +2034,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -2024,13 +2035,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
      );
      const [centerImageOnClickEnabled, setCenterImageOnClickEnabled] =
        useState(() => readCenterImageOnClickEnabled());
@@ -1655,7 +1663,7 @@ index 0843160..da64970 100644
        };
        window.addEventListener(CANVAS_VIEW_SETTINGS_CHANGE_EVENT, sync);
        return () =>
-@@ -2073,6 +2079,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -2073,6 +2080,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
      >([]);
      const [canvasAssociationTrigger, setCanvasAssociationTrigger] =
        useState<CanvasAssociationTrigger | null>(null);
@@ -1666,7 +1674,7 @@ index 0843160..da64970 100644
      const [isSubmitting, setIsSubmitting] = useState(false); // 防止快速重复点击（3秒防抖）
      const [pptExplainerDialogOpen, setPptExplainerDialogOpen] = useState(false);
      const [pptExplainerInitialSource, setPptExplainerInitialSource] =
-@@ -2084,6 +2094,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -2084,6 +2095,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
      const submitCooldownRef = useRef<NodeJS.Timeout | null>(null); // 提交冷却定时器
      const inputResizeFrameRef = useRef<number | null>(null);
      const [isFocused, setIsFocused] = useState(false);
@@ -1676,7 +1684,7 @@ index 0843160..da64970 100644
      const [isPromptManuallyExpanded, setIsPromptManuallyExpanded] =
        useState(false);
      const [canPromptManuallyExpand, setCanPromptManuallyExpand] =
-@@ -2929,7 +2942,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -2929,7 +2943,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
        const handleClickOutside = (event: MouseEvent) => {
          const target = event.target as HTMLElement;
          // 检查点击是否在 AIInputBar 容器外部
@@ -1686,7 +1694,7 @@ index 0843160..da64970 100644
            setIsFocused(false);
          }
        };
-@@ -3190,6 +3204,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -3190,6 +3205,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
  
            // 查找与此任务关联的步骤（即使 workflow 为 null 也继续处理 postProcessingCompleted）
            const eventTask = taskQueueService.getTask(event.taskId);
@@ -1695,7 +1703,7 @@ index 0843160..da64970 100644
            const step = eventTask
              ? findWorkflowStepForTask(workflow, eventTask)
              : findWorkflowStepByTaskId(workflow, event.taskId);
-@@ -4397,6 +4413,21 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -4397,6 +4414,21 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
      const handleBoundImageTargetChange = useCallback(
        (target: BoundImageTarget | null) => {
          resetBoundTaskbarDraftsForBoard(currentBoardId ?? null);
@@ -1717,7 +1725,7 @@ index 0843160..da64970 100644
          if (canvasToolbarPrefillElementIdRef.current) {
            if (
              target?.elementId === canvasToolbarPrefillElementIdRef.current
-@@ -4541,6 +4572,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -4541,6 +4573,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
          resetBoundTaskbarDraftsForBoard,
          saveActiveTaskbarDraft,
          generationType,
@@ -1725,7 +1733,7 @@ index 0843160..da64970 100644
          updatePromptSuggestion,
        ]
      );
-@@ -4986,7 +5018,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -4986,7 +5019,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                getSelectionKey(selectedModel, selectedModelRef),
                selectedParamsRef.current
              );
@@ -1734,7 +1742,7 @@ index 0843160..da64970 100644
        if (isSeedance2ModelId(selectedModel) && baseParams.size?.includes('@')) {
          const [resolution, legacyRatio] = baseParams.size.split('@');
          baseParams.size = resolution;
-@@ -5017,12 +5049,14 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5017,12 +5050,14 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
        restoredParams.forEach((p) => {
          if (p.id === 'size') return;
          const prevVal = baseParams[p.id];
@@ -1754,7 +1762,7 @@ index 0843160..da64970 100644
          if (prevVal && prevValIsValid) {
            nextParams[p.id] = prevVal;
          } else if (p.defaultValue) {
-@@ -5127,12 +5161,14 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5127,12 +5162,14 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
          const trigger =
            typeof triggerOrOverride === 'string' ? triggerOrOverride : 'button';
          const effectivePrompt = override?.prompt ?? prompt;
@@ -1769,7 +1777,7 @@ index 0843160..da64970 100644
            shouldUseBoundTargetForSubmission(
              generationType,
              effectiveBoundTargetMode
-@@ -5199,14 +5235,17 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5199,14 +5236,17 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
            ? [activeBoundTargetGenerationContent, ...uploadedContent]
            : generationContent;
          let effectiveContent = baseEffectiveContent;
@@ -1789,7 +1797,7 @@ index 0843160..da64970 100644
          const effectiveSelectedCount =
            activeBoundImageTarget?.type === 'text' ||
            activeBoundImageTarget?.type === 'audio'
-@@ -5360,7 +5399,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5360,7 +5400,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
  
          if (
            !override &&
@@ -1798,7 +1806,7 @@ index 0843160..da64970 100644
            selectedSkillId === 'generate_ppt_explainer_video'
          ) {
            setPptExplainerDialogOpen(true);
-@@ -5369,6 +5408,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5369,6 +5409,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
  
          if (
            !trimmedPrompt &&
@@ -1806,7 +1814,7 @@ index 0843160..da64970 100644
            !(effectiveGenerationType === 'audio' && (isSunoV2Model(effectiveSelectedModel) || isSunoNativeModel(effectiveSelectedModel))) &&
            baseEffectiveContent.length === 0 &&
            submittedCanvasAssociations.length === 0
-@@ -5386,6 +5426,53 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5386,6 +5427,53 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
          setIsInspirationSendGuideActive(false);
          onEnableRuntime?.();
  
@@ -1860,7 +1868,7 @@ index 0843160..da64970 100644
          const submitStartTime = Date.now();
          const promptLength = trimmedPrompt.length;
          const submitAnalyticsBase = {
-@@ -5428,6 +5515,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5428,6 +5516,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
              ...extras,
            });
          };
@@ -1870,7 +1878,7 @@ index 0843160..da64970 100644
          const abortIfSubmittedBoardChanged = (stage: string): boolean => {
            if (
              override ||
-@@ -5463,6 +5553,39 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5463,6 +5554,39 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
          trackSubmitStatus('start');
  
          try {
@@ -1910,7 +1918,7 @@ index 0843160..da64970 100644
            if (submittedCanvasAssociations.length > 0) {
              const submissionBoardId = submittedDraftBoardId?.trim();
              if (!submittedBoard || !submissionBoardId) {
-@@ -5619,6 +5742,11 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -5619,6 +5743,11 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                : 'image';
            await settingsManager.waitForInitialization();
            if (abortIfSubmittedBoardChanged('settings_initialization')) return;
@@ -1922,7 +1930,7 @@ index 0843160..da64970 100644
            const initialRoute = resolveInvocationRoute(
              currentRouteType,
              effectiveSelectedModelRef || effectiveSelectedModel
-@@ -6059,7 +6187,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6059,7 +6188,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
              let workzoneX: number = expectedInsertLeftX;
              let workzoneY: number = viewportCenterY - WORKZONE_HEIGHT / 2;
  
@@ -1931,7 +1939,7 @@ index 0843160..da64970 100644
                const selectedElements = getSelectedElements(board);
                let positionCalculated = false;
  
-@@ -6148,7 +6276,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6148,7 +6277,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
  
              // 如果选中了 Frame，将 Frame 信息传递给 WorkZone
              // 生成完成后媒体将插入到 Frame 内部并缩放到 Frame 尺寸
@@ -1940,7 +1948,7 @@ index 0843160..da64970 100644
              let targetFrameId: string | undefined;
              let targetFrameDimensions:
                | { width: number; height: number }
-@@ -6204,13 +6332,15 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6204,13 +6333,15 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                // Results fit a 400px width / 600px height envelope. Reserve it
                // while auto aspect ratio is unknown, without stretching the card.
                const reservedInsertSize = { width: Math.max(400, anchorSize.width), height: Math.max(600, anchorSize.height) };
@@ -1958,7 +1966,7 @@ index 0843160..da64970 100644
                    )
                  : resolveImageGenerationBatchAnchorPositions(
                      board, [expectedInsertLeftX, expectedInsertY], anchorSize,
-@@ -6238,7 +6368,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6238,7 +6369,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                        ? targetFrameDimensions
                        : undefined,
                      requestedSize: parsedParams.size,
@@ -1968,7 +1976,7 @@ index 0843160..da64970 100644
                      requestedCount: shouldCreateIndependentBatchAnchors
                        ? 1
                        : requestedCount,
-@@ -6278,18 +6409,23 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6278,18 +6410,23 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                      anchorCreateOptions
                    );
                  imageAnchorElements.push(anchorElement);
@@ -1996,7 +2004,7 @@ index 0843160..da64970 100644
                    const anchorRect = RectangleClient.getRectangleByPoints(
                      firstAnchor.points
                    );
-@@ -6409,6 +6545,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6409,6 +6546,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                }
              );
              if (usedSW) {
@@ -2004,7 +2012,7 @@ index 0843160..da64970 100644
                const submittedBoardStillCurrent = isSubmittedBoardCurrent(
                  submittedBoard,
                  submittedDraftBoardId,
-@@ -6497,6 +6634,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6497,6 +6635,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                submittedDraftBoardId
              );
            }
@@ -2012,7 +2020,7 @@ index 0843160..da64970 100644
            if (effectiveGenerationType === 'image') {
              applyCurrentImageAnchorPresentationState(board, 'handoff');
            }
-@@ -6619,7 +6757,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6619,7 +6758,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                stepId: string,
                status: string,
                result?: unknown,
@@ -2023,7 +2031,7 @@ index 0843160..da64970 100644
              ) => {
                workflowControl.updateStep(
                  stepId,
-@@ -6630,7 +6770,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6630,7 +6771,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                    | 'failed'
                    | 'skipped',
                  result,
@@ -2034,7 +2042,7 @@ index 0843160..da64970 100644
                );
  
                // 追加工具结果日志
-@@ -6733,7 +6875,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6733,7 +6876,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                    'failed',
                    undefined,
                    result.error || '执行失败',
@@ -2044,7 +2052,7 @@ index 0843160..da64970 100644
                  );
                  return false; // 返回失败
                } else if (result.taskId) {
-@@ -6810,7 +6953,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6810,7 +6954,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                  step.id,
                  'failed',
                  undefined,
@@ -2055,7 +2063,7 @@ index 0843160..da64970 100644
                );
                return false; // 返回失败
              } finally {
-@@ -6973,6 +7118,23 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6973,6 +7119,23 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
            workflowControl.abortWorkflow();
            submitLockRef.current = false;
            setIsSubmitting(false);
@@ -2079,7 +2087,7 @@ index 0843160..da64970 100644
          }
        },
        [
-@@ -6992,6 +7154,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -6992,6 +7155,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
          knowledgeContextRefs,
          agentMediaDefaultModels,
          agentMediaDefaultModelRefs,
@@ -2087,7 +2095,7 @@ index 0843160..da64970 100644
          generationType,
          selectedCount,
          selectedSkillId,
-@@ -7198,7 +7361,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7198,7 +7362,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
              stepId: string,
              status: string,
              result?: unknown,
@@ -2098,7 +2106,7 @@ index 0843160..da64970 100644
            ) => {
              workflowControl.updateStep(
                stepId,
-@@ -7209,7 +7374,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7209,7 +7375,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                  | 'failed'
                  | 'skipped',
                result,
@@ -2109,7 +2117,7 @@ index 0843160..da64970 100644
              );
              appendAgentLogRef.current({
                type: 'tool_result',
-@@ -7302,7 +7469,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7302,7 +7470,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                  'failed',
                  undefined,
                  result.error || '执行失败',
@@ -2119,7 +2127,7 @@ index 0843160..da64970 100644
                );
                return false;
              } else if (result.taskId) {
-@@ -7374,7 +7542,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7374,7 +7543,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                step.id,
                'failed',
                undefined,
@@ -2130,7 +2138,7 @@ index 0843160..da64970 100644
              );
              return false;
            } finally {
-@@ -7959,7 +8129,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7959,7 +8130,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
          canvasAssociationRefs.length > 0);
      const shouldHighlightInspirationSend =
        isInspirationSendGuideActive && canGenerate && !isSubmitting;
@@ -2139,7 +2147,7 @@ index 0843160..da64970 100644
      const hasSelectedTextContent = selectedContent.some(
        (item) => item.type === 'text' && item.text?.trim()
      );
-@@ -7971,6 +8141,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -7971,6 +8142,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
        canvasAssociationRefs.length > 0 ||
        Boolean(canvasAssociationTrigger);
      const shouldKeepExpanded =
@@ -2149,7 +2157,7 @@ index 0843160..da64970 100644
        isPromptManuallyExpanded ||
        isFocused ||
        hasUnsubmittedInputContent ||
-@@ -8053,17 +8226,21 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -8053,17 +8227,21 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
      }, []);
      const inputViewport = useMemo(() => {
        const viewport = window.visualViewport;
@@ -2175,7 +2183,7 @@ index 0843160..da64970 100644
  
        const board = SelectionWatcherBoardRef.current;
        const boardContainer = board
-@@ -8123,6 +8300,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -8123,9 +8301,16 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
        boundInputLayoutTick,
        inputViewport,
        positionedBoundImageTarget,
@@ -2183,7 +2191,16 @@ index 0843160..da64970 100644
        shouldKeepExpanded,
      ]);
  
-@@ -8262,31 +8440,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
++    // Images and long prompts resize/reposition this bar after selection settles.
++    // Notify the image toolbar after the DOM commit so it can avoid the final box.
++    useEffect(() => {
++      window.dispatchEvent(new Event(AI_INPUT_LAYOUT_EVENT));
++    }, [boundInputPosition?.left, boundInputPosition?.top, boundInputLayoutTick, discussionOpen]);
++
+     const followControlsTarget =
+       followedBoundImageTarget &&
+       supportsBoundTargetFollowControls(followedBoundImageTarget.type)
+@@ -8262,31 +8447,10 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                  }
                />
              </div>
@@ -2218,7 +2235,7 @@ index 0843160..da64970 100644
              </p>
              <div className="ai-input-bar__settings-row">
                <span>{language === 'zh' ? '保留原图' : 'Keep original image'}</span>
-@@ -8514,6 +8671,26 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -8514,6 +8678,26 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
  
            <AIInputComposerShell
              variant="canvas"
@@ -2245,7 +2262,7 @@ index 0843160..da64970 100644
              expanded={shouldKeepExpanded}
              longText={isPromptManuallyExpanded}
              disabled={isSubmitting}
-@@ -8830,7 +9007,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -8830,7 +9014,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                      shouldHighlightInspirationSend,
                  })}
                  aria-label={
@@ -2254,7 +2271,7 @@ index 0843160..da64970 100644
                  }
                  onMouseDown={(e) => {
                    e.preventDefault();
-@@ -8915,7 +9092,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
+@@ -8915,7 +9099,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                      onFocus={handleFocus}
                      onBlur={handleBlur}
                      placeholder={
@@ -13459,7 +13476,7 @@ index a10b381..98aaed9 100644
          onPointerDown={(event) => event.stopPropagation()}
          onKeyDown={(event) => {
 diff --git a/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx b/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
-index 75137cd..0c127e4 100644
+index 75137cd..1bb2296 100644
 --- a/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
 +++ b/packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx
 @@ -1,3 +1,6 @@
@@ -13469,6 +13486,15 @@ index 75137cd..0c127e4 100644
  import { resizeCanvasImage } from '../../../services/canvas-operations/resize-canvas-image';
  import Stack from '../../stack';
  import { ImageToolbarContents } from './image-toolbar-contents';
+@@ -172,7 +175,7 @@ import { getCanvasAudioPlaybackQueue } from '../../../data/audio';
+ import { openMusicPlayerToolAndPlay } from '../../../services/tool-launch-service';
+ import { useCanvasAudioPlayback } from '../../../hooks/useCanvasAudioPlayback';
+ import { buildImageTaskAIInputPrefillData } from '../../../utils/image-task-prefill';
+-import { requestAIInputPrefill } from '../../../services/ai-input-ui-events';
++import { AI_INPUT_LAYOUT_EVENT, requestAIInputPrefill } from '../../../services/ai-input-ui-events';
+ import {
+   AUDIO_PLAYLIST_CANVAS_AUDIO_ID,
+   AUDIO_PLAYLIST_CANVAS_AUDIO_LABEL,
 @@ -248,6 +251,7 @@ export const PopupToolbar = () => {
  
    // 图片编辑器状态
@@ -13477,7 +13503,33 @@ index 75137cd..0c127e4 100644
    const [editingImageBinding, setEditingImageBinding] = useState<CanvasBoardBinding | null>(null);
    const [imageToolMode, setImageToolMode] = useState<ImageToolMode | null>(null);
    const imageToolSelectionKey = selectedElements.map(element => element.id).join(',');
-@@ -1885,6 +1889,23 @@ export const PopupToolbar = () => {
+@@ -1192,6 +1196,25 @@ export const PopupToolbar = () => {
+     updatePopupToolbarPosition,
+   ]);
+ 
++  // The input bar may finish loading its image/long prompt after our initial
++  // positioning frames; measure again when its committed layout changes.
++  useEffect(() => {
++    if (!open || movingOrDragging) return;
++    let frame: number | null = null;
++    const onInputLayout = () => {
++      if (frame !== null) return;
++      frame = schedulePopupToolbarFrame(() => {
++        frame = null;
++        updatePopupToolbarPosition();
++      });
++    };
++    window.addEventListener(AI_INPUT_LAYOUT_EVENT, onInputLayout);
++    return () => {
++      window.removeEventListener(AI_INPUT_LAYOUT_EVENT, onInputLayout);
++      if (frame !== null) cancelPopupToolbarFrame(frame);
++    };
++  }, [open, movingOrDragging, updatePopupToolbarPosition]);
++
+   // 同步 ref 和 state
+   useEffect(() => {
+     propertyPanelOpenRef.current = showPropertyPanel;
+@@ -1885,6 +1908,23 @@ export const PopupToolbar = () => {
                  }}
                />
              )}
@@ -13501,7 +13553,7 @@ index 75137cd..0c127e4 100644
              {state.hasLayerDecomposition && (
                <ToolButton
                  className="ai-layer-decomposition"
-@@ -2023,6 +2044,7 @@ export const PopupToolbar = () => {
+@@ -2023,6 +2063,7 @@ export const PopupToolbar = () => {
                      if (
                        PlaitDrawElement.isDrawElement(element) &&
                        PlaitDrawElement.isImage(element) &&
@@ -13509,7 +13561,7 @@ index 75137cd..0c127e4 100644
                        element.url
                      ) {
                        downloadItems.push({ url: element.url, type: 'image' });
-@@ -2087,10 +2109,10 @@ export const PopupToolbar = () => {
+@@ -2087,10 +2128,10 @@ export const PopupToolbar = () => {
                      const processedItems: BatchDownloadItem[] = [];
                      const isDesktopDownload =
                        typeof window !== 'undefined' &&
@@ -13522,7 +13574,7 @@ index 75137cd..0c127e4 100644
                          processedItems.push(item);
                          continue;
                        }
-@@ -2178,7 +2200,7 @@ export const PopupToolbar = () => {
+@@ -2178,7 +2219,7 @@ export const PopupToolbar = () => {
                            ? `Opened ${downloadResult.openedCount} links for download`
                            : 'Opened link for download'
                        );
@@ -13531,7 +13583,7 @@ index 75137cd..0c127e4 100644
                        MessagePlugin.success(
                          downloadItems.length > 1
                            ? language === 'zh'
-@@ -2759,6 +2781,12 @@ export const PopupToolbar = () => {
+@@ -2759,6 +2800,12 @@ export const PopupToolbar = () => {
          />
        )}
  
@@ -20512,6 +20564,18 @@ index fd0d9b8..2cb3b92 100644
        ),
      selectionKey
    );
+diff --git a/packages/drawnix/src/services/ai-input-ui-events.ts b/packages/drawnix/src/services/ai-input-ui-events.ts
+index 4aa0157..9d59604 100644
+--- a/packages/drawnix/src/services/ai-input-ui-events.ts
++++ b/packages/drawnix/src/services/ai-input-ui-events.ts
+@@ -35,6 +35,7 @@ export interface AIInputPrefillEventDetail {
+ 
+ export const AI_INPUT_FOCUS_EVENT = 'aitu:ai-input-focus';
+ export const AI_INPUT_PREFILL_EVENT = 'aitu:ai-input-prefill';
++export const AI_INPUT_LAYOUT_EVENT = 'aitu:ai-input-layout';
+ 
+ export function resolvePptExplainerFrameIds(
+   orderedFrameIds: readonly string[],
 diff --git a/packages/drawnix/src/services/asset-storage-service.ts b/packages/drawnix/src/services/asset-storage-service.ts
 index 559282a..185b4de 100644
 --- a/packages/drawnix/src/services/asset-storage-service.ts

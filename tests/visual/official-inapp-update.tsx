@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { UpdateProvider } from "@/contexts/UpdateContext";
 import { UpdateBadge } from "@/components/UpdateBadge";
+import { CanvasUpdateNotice } from "@/components/CanvasUpdateNotice";
+import { CreativeTopBar } from "@/features/creative/CreativeTopBar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { registerUpdateGuard } from "@/lib/updateSafety";
@@ -150,14 +152,44 @@ createRoot(document.getElementById("root")!).render(
     storageKey="official-inapp-fixture"
   >
     <UpdateProvider>
-      <main className="p-8 bg-background text-foreground min-h-screen">
-        <div className="flex items-center gap-4">
-          <h1>正式渠道 · 应用内更新验收</h1>
-          <UpdateBadge />
-        </div>
-        <p className="mt-6">合成版本 1.5.6 → 1.5.7；不会下载真实更新包。</p>
-        <output className="block mt-6" />
-      </main>
+      {params.get("canvas") === "1" ? (
+        <main className="bg-background text-foreground h-screen flex flex-col">
+          <CreativeTopBar
+            page="canvas"
+            onPageChange={() => {}}
+            onOpenSettings={() => {}}
+            reserveMacControls
+          />
+          <div className="relative flex-1" style={{ background: "#faf9f6" }}>
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 8,
+                width: 48,
+                height: "80%",
+                background: "white",
+                borderRadius: 20,
+              }}
+              aria-label="合成画布工具栏"
+            />
+            <CanvasUpdateNotice />
+            <p className="absolute bottom-16 left-20">
+              更新提醒位置验收 · 合成版本，无真实下载安装
+            </p>
+            <output className="absolute bottom-8 left-20" />
+          </div>
+        </main>
+      ) : (
+        <main className="p-8 bg-background text-foreground min-h-screen">
+          <div className="flex items-center gap-4">
+            <h1>正式渠道 · 应用内更新验收</h1>
+            <UpdateBadge />
+          </div>
+          <p className="mt-6">合成版本 1.5.6 → 1.5.7；不会下载真实更新包。</p>
+          <output className="block mt-6" />
+        </main>
+      )}
       <Toaster />
     </UpdateProvider>
   </ThemeProvider>,

@@ -35,6 +35,7 @@ export interface AIInputPrefillEventDetail {
 
 export const AI_INPUT_FOCUS_EVENT = 'aitu:ai-input-focus';
 export const AI_INPUT_PREFILL_EVENT = 'aitu:ai-input-prefill';
+export const AI_INPUT_LAYOUT_EVENT = 'aitu:ai-input-layout';
 
 export function resolvePptExplainerFrameIds(
   orderedFrameIds: readonly string[],

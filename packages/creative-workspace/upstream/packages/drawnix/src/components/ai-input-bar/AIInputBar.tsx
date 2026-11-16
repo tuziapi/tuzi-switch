@@ -270,6 +270,7 @@ import {
 import {
   AI_INPUT_FOCUS_EVENT,
   AI_INPUT_PREFILL_EVENT,
+  AI_INPUT_LAYOUT_EVENT,
   type AIInputFocusEventDetail,
   type AIInputPrefillEventDetail,
 } from '../../services/ai-input-ui-events';
@@ -8303,6 +8304,12 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
       discussionOpen,
       shouldKeepExpanded,
     ]);
+
+    // Images and long prompts resize/reposition this bar after selection settles.
+    // Notify the image toolbar after the DOM commit so it can avoid the final box.
+    useEffect(() => {
+      window.dispatchEvent(new Event(AI_INPUT_LAYOUT_EVENT));
+    }, [boundInputPosition?.left, boundInputPosition?.top, boundInputLayoutTick, discussionOpen]);
 
     const followControlsTarget =
       followedBoundImageTarget &&

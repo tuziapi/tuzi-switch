@@ -8,6 +8,18 @@ vi.mock("@tuzi/creative-workspace", () => ({
 vi.mock("@tuzi/creative-workspace/style.css", () => ({}));
 
 describe("creative host navigation", () => {
+  it("mounts the update notice only on the visible canvas", async () => {
+    sessionStorage.setItem("tuzi-creative-page", "canvas");
+    const notice = <span>更新入口测试</span>;
+    const view = render(<CreativeWorkspace updateNotice={notice} />);
+    await screen.findByText("Editor: canvas");
+    expect(screen.getByText("更新入口测试")).toBeInTheDocument();
+    view.rerender(<CreativeWorkspace active={false} updateNotice={notice} />);
+    expect(screen.queryByText("更新入口测试")).toBeNull();
+    view.rerender(<CreativeWorkspace active updateNotice={notice} />);
+    fireEvent.click(screen.getByRole("button", { name: "我的项目" }));
+    expect(screen.queryByText("更新入口测试")).toBeNull();
+  });
   it("falls back from the removed workflow tab without touching other storage", async () => {
     sessionStorage.setItem("tuzi-creative-page", "workflow");
     localStorage.setItem("legacy-workflow-test", "synthetic-preserved");

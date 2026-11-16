@@ -1,0 +1,53 @@
+.canvas-update-notice {
+  position: absolute;
+  top: 12px;
+  left: 72px;
+  z-index: 25;
+  max-width: calc(100% - 88px);
+  color: hsl(var(--foreground));
+  font-size: 12px;
+}
+.canvas-update-notice__card,
+.canvas-update-notice__compact {
+  display: flex;
+  gap: 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--background));
+  box-shadow: 0 4px 18px rgb(0 0 0 / 8%);
+  padding: 12px;
+}
+.canvas-update-notice__card > svg,
+.canvas-update-notice__compact > svg {
+  flex-shrink: 0;
+  color: hsl(var(--primary));
+}
+.canvas-update-notice__content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.canvas-update-notice__content strong {
+  display: block;
+  line-height: 1.5;
+}
+.canvas-update-notice__content p {
+  margin: 4px 0 8px;
+  color: hsl(var(--muted-foreground));
+}
+.canvas-update-notice__content button {
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+.canvas-update-notice__close {
+  align-self: flex-start;
+  padding: 3px;
+  border-radius: 4px;
+}
+.canvas-update-notice__compact {
+  align-items: center;
+  padding: 8px 12px;
+}
+.canvas-update-notice button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}

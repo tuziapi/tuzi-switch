@@ -66,6 +66,7 @@ export function CreativeWorkspace({
   navigation,
   reserveMacControls,
   reserveWindowControls,
+  updateNotice,
 }: {
   active?: boolean;
   accountState?: AccountState;
@@ -74,6 +75,7 @@ export function CreativeWorkspace({
   navigation?: ReactNode;
   reserveMacControls?: boolean;
   reserveWindowControls?: boolean;
+  updateNotice?: ReactNode;
 }) {
   const [hasOpened, setHasOpened] = useState(active);
   useEffect(() => {
@@ -120,6 +122,7 @@ export function CreativeWorkspace({
         reserveWindowControls={reserveWindowControls}
       />
       <div className="relative min-h-0 flex-1">
+        {active && page === "canvas" && updateNotice}
         <CreativeErrorBoundary>
           <Suspense
             fallback={

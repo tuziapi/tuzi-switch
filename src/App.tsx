@@ -91,6 +91,7 @@ import { EditProviderDialog } from "@/components/providers/EditProviderDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { UpdateBadge } from "@/components/UpdateBadge";
+import { CanvasUpdateNotice } from "@/components/CanvasUpdateNotice";
 import { VersionHistory } from "@/components/version-history/VersionHistory";
 import { EnvWarningBanner } from "@/components/env/EnvWarningBanner";
 import { ProviderConnectionControls } from "@/components/providers/ProviderConnectionControls";
@@ -1969,6 +1970,7 @@ function App() {
           <OpenClawHealthBanner warnings={openclawHealthWarnings} />
         )}
         <CreativeWorkspace
+          updateNotice={<CanvasUpdateNotice />}
           active={currentView === "creative"}
           accountState={account.state}
           selectedKeyId={creativeKeyId}
