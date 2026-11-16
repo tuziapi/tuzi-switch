@@ -1,0 +1,15 @@
+{
+  "kind": "installed-real-export",
+  "packageCommit": "22ae76d26ed88220e30b910b5d1c65884bf3a300",
+  "packageVersion": "1.6.2",
+  "sourcePath": "/Users/sdy09/Documents/tuzi-switch-artifacts/installed-real-20261116/opentu-opentu-image.png",
+  "evidencePath": "/Users/sdy09/Documents/tuzi-switch-artifacts/installed-real-20261116/transparent-generation-22ae76d2.png",
+  "sha256": "4aad00420a9ba27257fb44c37b348cc4049362e01913bbd96f0331b7f3403051",
+  "size": [
+    1024,
+    1024
+  ],
+  "mode": "RGBA",
+  "alphaVerified": true,
+  "note": "The native save dialog produced the source file; evidence copy uses the requested stable filename."
+}

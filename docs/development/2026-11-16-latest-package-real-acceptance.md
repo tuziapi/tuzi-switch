@@ -69,3 +69,6 @@
 ### 2026-11-16 最新候选跨平台复验
 
 基于已绑定的 43786133865/22ae76d2 候选启动独立原字节复验：Linux run 43794074569 的 AppImage、DEB、RPM（1.6.0/1.6.1）全部成功；macOS run 43794078636 的 ARM64 与 x64 成功。Windows run 43794070706 未通过：NSIS 创作保留检查观察到 generation-anchor 仍为 `phase=inserting`，MSI 一组等待“查看更新”超时。失败已保留，不以 Linux/macOS 结果替代，正式发布继续禁止。
+
+
+最新包已完成透明 PNG 导出：原生保存产生 `opentu-opentu-image.png`，已核对 1024×1024 RGBA 且 alpha 通道含透明像素，并复制为验收证据 `transparent-generation-22ae76d2.png`。分层/OCR仍未提交，不能据此宣布 Seedream 5.5 全量验收通过。
