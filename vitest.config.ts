@@ -23,7 +23,13 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setupGlobals.ts", "./tests/setupTests.ts"],
     globals: true,
-    exclude: ["**/node_modules/**", "**/dist/**", "packages/creative-workspace/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "packages/creative-workspace/**",
+      // This vendored runtime uses node:test and is verified by its own runner.
+      "src-tauri/vendor/**",
+    ],
     coverage: {
       reporter: ["text", "lcov"],
     },

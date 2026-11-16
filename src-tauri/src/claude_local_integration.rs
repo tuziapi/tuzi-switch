@@ -51,6 +51,11 @@ fn manifest() -> PathBuf {
     root_dir().join("session.json")
 }
 
+fn bundled_node_path(executable: &std::path::Path) -> Option<PathBuf> {
+    let parent = executable.parent()?;
+    parent.ends_with("Contents/MacOS").then(|| parent.join("tuzi-claude-node"))
+}
+
 // This persisted marker is also checked before Host initialization after a crash.
 pub(crate) fn ensure_idle() -> Result<(), String> {
     if OPERATION.try_lock().is_err() || manifest().exists() {
@@ -137,6 +142,11 @@ impl Host for TuziHost {
         Some(desktop_copy::app_path(&self.root))
     }
     fn node_runtime(&self) -> Option<PathBuf> {
+        if let Some(path) = std::env::current_exe().ok().and_then(|path| bundled_node_path(&path)) {
+            // A packaged app must use its own pinned runtime. If missing, the
+            // core's readiness probe fails instead of borrowing a user's Node.
+            return Some(path);
+        }
         // Always Some: do not fall back to borrowing Node from Codex/ChatGPT.
         Some(
             ["/opt/homebrew/bin/node", "/usr/local/bin/node"]
@@ -470,3 +480,12 @@ mod tests {
         assert!(read_options(dir.path()).is_err());
     }
 }
+    #[test]
+    fn local_packaged_runtime_is_required_even_when_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("Tuzi.app/Contents/MacOS/tu-zi-switch");
+        let node = bundled_node_path(&exe).unwrap();
+        assert_eq!(node, exe.parent().unwrap().join("tuzi-claude-node"));
+        assert!(!node.exists());
+        assert!(bundled_node_path(&dir.path().join("target/debug/tu-zi-switch")).is_none());
+    }

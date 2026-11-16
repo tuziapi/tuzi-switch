@@ -1,0 +1,25 @@
+name: Claude local runtime tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src-tauri/vendor/claude-local/**'
+      - 'scripts/*claude-local*'
+      - 'scripts/test_prepare_claude_local_node.py'
+      - '.github/workflows/claude-local-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+      # Standard-library-only checks; no account, trusted CA, or model call.
+      - run: python3 scripts/test_prepare_claude_local_node.py
+      - run: node scripts/test-claude-local-runtime.mjs
