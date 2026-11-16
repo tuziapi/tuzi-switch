@@ -272,7 +272,11 @@ def create_creative_fixture():
         click(['不再提示'])
     if button(['展开工具栏']):
         click(['展开工具栏'])
-    press_label('图片 — Cmd+U')
+    # The image radio handles pointerdown; AXPress only dispatches click and
+    # therefore does not invoke its import handler. Use the existing native
+    # keyboard shortcut, which calls the same application image importer.
+    time.sleep(1)
+    ax('key code 53\nkeystroke "u" using command down')
     wait_for(lambda: 'sheet ' in tree(),'Native image picker did not open')
     ax('keystroke "g" using {command down, shift down}')
     time.sleep(1)
