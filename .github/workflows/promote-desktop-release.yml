@@ -104,7 +104,7 @@ jobs:
           if gh release view "$RELEASE_TAG" --json isDraft > /tmp/existing-release.json 2>/dev/null; then
             node -e 'if(!require("/tmp/existing-release.json").isDraft) throw Error("Published releases are immutable")'
           else
-            gh release create "$RELEASE_TAG" --verify-tag --title "兔子助手 $RELEASE_TAG" --notes-file "candidate-source/docs/releases/$RELEASE_TAG.md" --draft --latest=false
+            gh release create "$RELEASE_TAG" --verify-tag --title "兔子助手 $RELEASE_TAG" --notes-file "docs/releases/$RELEASE_TAG.md" --draft --latest=false
           fi
           # Reject stale draft assets, including old updater signatures, before publication.
           gh release view "$RELEASE_TAG" --json assets > /tmp/draft-assets.json
@@ -115,24 +115,24 @@ jobs:
             throw Error('Draft contains assets outside the approved publication subset');
           JS
           gh release upload "$RELEASE_TAG" publication-assets/* --clobber
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest --notes-file "candidate-source/docs/releases/$RELEASE_TAG.md"
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest --notes-file "docs/releases/$RELEASE_TAG.md"
       - uses: pnpm/action-setup@v4
         with:
           version: '9'
       - run: pnpm install --frozen-lockfile
-        working-directory: candidate-source
+      # Publishing metadata is reviewed after the immutable application build.
+      # Use the same main revision as the acceptance evidence so its installer
+      # pins and release notes cannot silently remain on the previous version.
       - run: pnpm build:download
-        working-directory: candidate-source
         env:
-          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ steps.source.outputs.sha }}/packages/download-page
+          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
       - name: Include source and public metadata
-        working-directory: candidate-source
         run: |
           cp packages/download-page/dist/tuzi-switch.html packages/download-page/dist/index.html
           cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/dist/
-          cp ../release-assets/tuzi-assistant-source.tar.gz packages/download-page/dist/source.tar.gz
+          cp release-assets/tuzi-assistant-source.tar.gz packages/download-page/dist/source.tar.gz
           touch packages/download-page/dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: candidate-source/packages/download-page/dist
+          path: packages/download-page/dist
       - uses: actions/deploy-pages@v4

@@ -367,7 +367,10 @@ def assert_creative_preserved(saved, label):
     click(['opentu 创作'])
     click(['我的项目'])
     press_label(creative_title,prefix=True)
-    wait_for(lambda: '任务队列' in tree(),'Creative canvas did not finish loading')
+    # Collapsed toolbars intentionally omit the task-queue control. The
+    # composer and imported canvas image are present in either toolbar state.
+    wait_for(lambda: 'text area ' in tree() and 'image 1 of group opentu' in tree(),
+             'Creative canvas and imported image did not finish loading')
     screenshot('06-creative-preserved-'+label)
     press_label('兔子助手导航')
     click(['Codex'])
@@ -377,7 +380,7 @@ def native_business_attribution(version, configure=False):
     stage('native synthetic generation attribution '+version)
     (lab/'creative-version').write_text(version)
     click(['opentu 创作'])
-    wait_for(lambda: '任务队列' in tree(),'Creative canvas not ready for native attribution')
+    wait_for(lambda: 'text area ' in tree(),'Creative canvas not ready for native attribution')
     if configure:
         click(['创作配置'])
         press_label('手动配置')
