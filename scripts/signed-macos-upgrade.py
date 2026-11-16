@@ -105,6 +105,16 @@ assert os.geteuid() != 0
 base_dir,target_dir,output = map(Path,sys.argv[1:4])
 platform = sys.argv[4]
 assert platform in ['macos-arm64','macos-x64']
+legacy_dir = Path(os.environ['LEGACY_INSTALLER_DIR']) if os.environ.get('LEGACY_INSTALLER_DIR') else None
+legacy_version = os.environ.get('LEGACY_VERSION', '1.6.1')
+legacy_sources = {
+    '1.6.0': dict(commit='21cad50c7f5b916b94bccf39c6d594724241bfb1', **{
+        'macos-arm64': '1e1db32f85831404c83ddfb9817999d1bd7df33a82b9572624cf4364dcd55e1b',
+        'macos-x64': '9e315ce4b8280f6c15218f2184b1847f2038bf1e69a5e7bc15611aada0582a4d'}),
+    '1.6.1': dict(commit='7c13bc943a4b7116af15593ec0ac18af0ba9727f', **{
+        'macos-arm64': '464efd9f5f2db3efa64b9c3599264b20e47097ec0efd5e8c29d57dc307510d25',
+        'macos-x64': 'f31b97cfb582b035f6460a591545efe3ed500a3cc7c7ecec9bd3b17241a10aa5'}),
+}
 assert not (Path.home()/'.tuzi-switch').exists(), 'Clean disposable profile required'
 output.mkdir(parents=True,exist_ok=True)
 lab = output.parent
@@ -273,10 +283,60 @@ try:
     sandbox.write_text('(version 1)\n(allow default)\n(deny network*)\n(allow network-outbound (remote ip "localhost:*"))\n(allow network-inbound (local ip "localhost:*"))\n')
     app_env={k:v for k,v in os.environ.items() if not any(w in k.upper() for w in ['TOKEN','SECRET','PASSWORD','PRIVATE_KEY'])}
     application_log=(output/'application.log').open('w')
+    # Only the app's dedicated temporary directory is denied in the staging
+    # failure test. Never change the runner's or a user's normal temp directory.
+    installer_temp=lab/'installer-temp'
+    installer_temp.mkdir(mode=0o700)
+    app_env['TMPDIR']=str(installer_temp)
+    if legacy_dir:
+        stage('published old-version manual transition')
+        legacy_bytes=(legacy_dir/('manifest-'+platform+'.json')).read_bytes()
+        assert sha(legacy_bytes)==legacy_sources[legacy_version][platform]
+        legacy=json.loads(legacy_bytes)
+        assert legacy['repository']=='tuziapi/tuzi-switch'
+        assert legacy['version']==legacy_version
+        assert legacy['commit']==legacy_sources[legacy_version]['commit']
+        legacy_dmg=legacy_dir/dmg.name
+        entry=next(f for f in legacy['files'] if f['file']==legacy_dmg.name)
+        assert sha(legacy_dmg.read_bytes())==entry['sha256']
+        base_backup=lab/'verified-base.app'
+        app.rename(base_backup)
+        mounted=plistlib.loads(capture(['hdiutil','attach','-readonly','-nobrowse','-plist',str(legacy_dmg)]))
+        mounts=[e['mount-point'] for e in mounted['system-entities'] if 'mount-point' in e]
+        assert len(mounts)==1
+        mount=mounts[0]
+        old_apps=list(Path(mount).glob('*.app')); assert len(old_apps)==1
+        run(['ditto',str(old_apps[0]),str(app)])
+        run(['hdiutil','detach',mount],stdout=subprocess.DEVNULL); mount=None
+        old_info=plistlib.loads((app/'Contents/Info.plist').read_bytes())
+        assert old_info['CFBundleShortVersionString']==legacy_version
+        assert old_info['CFBundleIdentifier']=='com.tuziswitch.desktop'
+        assert legacy['commit'].encode() in executable.read_bytes()
+        run(['codesign','--verify','--deep','--strict',str(app)],capture_output=True)
+        process=subprocess.Popen(['sandbox-exec','-f',str(sandbox),str(executable)],env=app_env,stdout=application_log,stderr=application_log)
+        pid=process.pid
+        click(['Got it','我知道了'])
+        wait_for(lambda: 'Tuzi account' in tree(),'Published old app did not load')
+        screenshot('00-published-old-version')
+        ax('keystroke "q" using command down')
+        wait_for(lambda: process.poll() is not None,'Published app must quit normally')
+        assert process.returncode==0
+        app.rename(lab/'published-legacy.app')
+        base_backup.rename(app)
+        assert_app(expected_base,'1.6.2')
+        report['manualTransition']={'fromVersion':legacy_version,'toVersion':'1.6.2',
+            'source':legacy,'oldExitCode':process.returncode,'dataScope':'welcome preference; full creative migration remains separate'}
     stage('launch original installed application')
     process=subprocess.Popen(['sandbox-exec','-f',str(sandbox),str(executable)],env=app_env,stdout=application_log,stderr=application_log)
     pid=process.pid; report['initialPid']=pid
-    click(['Got it','我知道了'])
+    if legacy_dir:
+        wait_for(lambda: 'Tuzi account' in tree(),'Manually updated app did not load')
+        assert not button(['Got it','我知道了']), 'Manual transition lost welcome preference'
+        report['checks']['publishedLegacyManualTransition']='passed'
+        report['manualTransition']['status']='passed'
+        report['remaining'].remove('published-old-version-manual-transition')
+    else:
+        click(['Got it','我知道了'])
     # Use the persistent toolbar control, not the expiring 15-second toast.
     click(['New version available: 1.6.3','检测到新版本：1.6.3'])
     screenshot('01-update-dialog')
@@ -295,6 +355,28 @@ try:
     click(['重新下载'])
     wait_for(lambda: button(['重启并更新']),'Native signature verification failed',120)
     screenshot('03-signature-verified')
+    stage('valid signed package staging permission failure')
+    installer_temp.chmod(0o500)
+    try:
+        try:
+            (installer_temp/'must-be-denied').mkdir()
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError('OS did not deny installer temp directory creation')
+        click(['重启并更新'])
+        wait_for(lambda: button(['重新下载']),'Staging permission error was not recoverable',60)
+        assert process.poll() is None
+        assert_app(expected_base,'1.6.2')
+        assert '安装未完成' in tree()
+        screenshot('03-staging-permission-denied')
+    finally:
+        installer_temp.chmod(0o700)
+    report['checks']['validSignedPackageStagingPermissionDenied']='passed'
+    report['installerFailureScope']='Real OS temp-directory denial after signature verification; old app remains running. Privileged final app replacement failure is not covered.'
+    report['remaining'].remove('valid-package-install-permission-failure')
+    click(['重新下载'])
+    wait_for(lambda: button(['重启并更新']),'Retry after permission restoration failed',120)
     click(['重启并更新'])
     # No app launch is allowed after this point. Observe the native restart.
     wait_for(lambda: process.poll() is not None,'Old process did not exit',120)

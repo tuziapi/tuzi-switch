@@ -6,6 +6,7 @@ package manager are real. This is a subset, never a release acceptance record.
 """
 import hashlib
 from signed_candidate_identity import verify_candidate
+from signed_creative_webdriver import CreativeChecks, MODEL45, MODEL55, model_response
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -20,7 +21,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 assert sys.platform == 'linux' and os.geteuid() == 0
 assert os.environ.get('GITHUB_ACTIONS') == 'true'
@@ -73,6 +74,8 @@ report = dict(kind='real-installed-linux-subset', officialAcceptance=False, inst
                   'published-old-version-manual-transition', 'creative-project-migration',
                   'business-attribution', 'reviewed-cross-platform-acceptance'])
 mode = 'normal'
+active_version = 'not-started'
+report['creativeRequests'] = []
 server = driver = session = None
 hosts = Path('/etc/hosts')
 original_hosts = hosts.read_bytes()
@@ -207,7 +210,49 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def creative(self):
+        url = urlsplit(self.path)
+        try:
+            if url.path == '/api/status':
+                assert self.command == 'GET' and not self.headers.get('Authorization')
+                result = {'success': True, 'data': {'system_name': 'SYNTHETIC local status'}}
+            else:
+                assert self.headers.get('Authorization') == 'Bearer sk-SYNTHETIC-GENERATION'
+                if url.path == '/v1/models':
+                    assert self.command == 'GET' and 'ch' not in parse_qs(url.query)
+                    result = {'data': [dict(id=id, supported_endpoint_types=['image-generation'],
+                                           endpoints={'image-generation': {'path': '/v1/images/generations', 'method': 'POST'}})
+                                       for id in [MODEL45, MODEL55]]}
+                else:
+                    assert self.command == 'POST' and url.path == '/v1/images/generations'
+                    length = int(self.headers.get('Content-Length', '0'))
+                    assert 0 < length < 1024 * 1024
+                    body = json.loads(self.rfile.read(length))
+                    channels = parse_qs(url.query).get('ch', [])
+                    if active_version in ['1.6.2', '1.6.3']:
+                        assert channels == ['3'], 'Official native generation must carry ch=3 exactly once'
+                    result = model_response(body)
+                    report['creativeRequests'].append(dict(version=active_version, model=body['model'],
+                        channels=channels, layers=bool(body.get('layer_decomposition_options')), syntheticAuthorizationMatched=True))
+            content = json.dumps(result).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(content)))
+            self.end_headers(); self.wfile.write(content)
+        except Exception as error:
+            report.setdefault('creativeServerErrors', []).append(str(error))
+            self.send_error(500, 'Synthetic fixture rejected native request')
+
+    def do_POST(self):
+        if self.headers.get('Host', '').split(':')[0] == 'api.tu-zi.com':
+            self.creative()
+        else:
+            self.send_error(404)
+
     def do_GET(self):
+        if self.headers.get('Host', '').split(':')[0] == 'api.tu-zi.com':
+            self.creative()
+            return
         self.path = urlsplit(self.path).path
         host = self.headers.get('Host', '').split(':')[0]
         report['requests'].append(dict(host=host, path=self.path, mode=mode))
@@ -284,7 +329,7 @@ try:
                     '-addext', 'basicConstraints=critical,CA:TRUE'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(['openssl', 'req', '-newkey', 'rsa:2048', '-nodes', '-keyout', str(lab/'tls.key'),
                     '-out', str(lab/'tls.csr'), '-subj', '/CN=github.com'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    (lab/'tls.ext').write_text('basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:github.com,DNS:api.github.com\n')
+    (lab/'tls.ext').write_text('basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:github.com,DNS:api.github.com,DNS:api.tu-zi.com\n')
     subprocess.run(['openssl', 'x509', '-req', '-in', str(lab/'tls.csr'), '-CA', str(trust),
                     '-CAkey', str(lab/'ca.key'), '-CAserial', str(lab/'ca.srl'), '-CAcreateserial',
                     '-out', str(lab/'tls.crt'), '-days', '1', '-sha256', '-extfile', str(lab/'tls.ext')],
@@ -292,7 +337,7 @@ try:
     (lab/'ca.key').chmod(0o600)
     (lab/'tls.key').chmod(0o600)
     subprocess.run(refresh_trust, check=True, stdout=subprocess.DEVNULL)
-    hosts.write_bytes(original_hosts + b'\n127.0.0.1 github.com api.github.com\n')
+    hosts.write_bytes(original_hosts + b'\n127.0.0.1 github.com api.github.com api.tu-zi.com\n')
     server = ThreadingHTTPServer(('127.0.0.1', 443), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(str(lab/'tls.crt'), str(lab/'tls.key'))
@@ -320,7 +365,9 @@ try:
                               *display_command],
                              stdin=subprocess.DEVNULL, stdout=log, stderr=log)
     wait_for(lambda: request('GET', '/status'), 'WebKitWebDriver not listening')
+    creative = CreativeChecks(execute, screenshot)
     if legacy_dir:
+        active_version = legacy_version
         manual_install(legacy_dir, old=True)
         attach()
         report['legacy'] = legacy
@@ -332,6 +379,8 @@ try:
         click(['我知道了', 'Got it'])
         seed()
         assert_preserved()
+        legacy_creative = creative.create()
+        creative.leave()
         screenshot('00-published-legacy-before-transition')
         settings_saved = execute('''const done=arguments[arguments.length-1];
 window.__TAURI_INTERNALS__.invoke('get_settings').then(settings=>window.__TAURI_INTERNALS__.invoke('save_settings',
@@ -349,6 +398,7 @@ window.__TAURI_INTERNALS__.invoke('get_settings').then(settings=>window.__TAURI_
             pass
         session = None
         manual_install(base_dir)
+    active_version = '1.6.2'
     attach()
     report['baseIdentity'] = identity('1.6.2', base['commit'])
     initial_pids = application_processes()
@@ -365,10 +415,18 @@ window.__TAURI_INTERNALS__.invoke('get_settings').then(settings=>window.__TAURI_
         assert report['legacyExecutableSha256'] != before_hash
         report['checks']['publishedLegacyManualTransition'] = 'passed'
         report['remaining'].remove('published-old-version-manual-transition')
+        creative.preserved(legacy_creative, 'manual-transition')
+        report['checks']['legacyCreativeImageTaskPreservation'] = 'passed'
     else:
         click(['我知道了', 'Got it'])
         seed()
-    click(['查看更新', 'View update'])
+    current_creative = creative.create(current=True)
+    report['checks']['nativeSeedream55Synthetic'] = 'passed'
+    creative.leave()
+    # The header notice is persistent even after the initial toast expires.
+    wait_for(lambda: execute('''const names=['检测到新版本：1.6.3','New version available: 1.6.3'];
+const e=[...document.querySelectorAll('button')].find(e=>e.getClientRects().length && names.includes(e.getAttribute('aria-label')));
+if(e)e.click();return Boolean(e);'''), 'Persistent update control missing')
     screenshot('01-update-dialog')
     for failure in ['corrupt', 'interrupted', 'missing']:
         mode = failure
@@ -425,6 +483,7 @@ window.__TAURI_INTERNALS__.invoke('get_settings').then(settings=>window.__TAURI_
     session = None
     attach(inspector)
     report['targetIdentity'] = identity('1.6.3', target['commit'])
+    active_version = '1.6.3'
     assert_preserved()
     report['finalExecutableSha256'] = digest_executable()
     if installer == 'appimage':
@@ -432,6 +491,12 @@ window.__TAURI_INTERNALS__.invoke('get_settings').then(settings=>window.__TAURI_
         assert report['finalExecutableSha256'] == target['files'][asset]
     report['checks'].update({k: 'passed' for k in ['download', 'nativeSignature', 'install', 'automaticRestart', 'version', 'sqliteProviderAndWebviewPreference', 'sameInstallationRetry']})
     screenshot('05-automatically-restarted')
+    creative.preserved(current_creative, 'signed-upgrade')
+    assert len([r for r in report['creativeRequests'] if r['version'] == '1.6.2']) == 2
+    assert not report.get('creativeServerErrors')
+    report['checks']['creativeImageLayerOcrTaskPreservation'] = 'passed'
+    report['checks']['installedDesktopAttributionSynthetic'] = 'passed'
+    report['creativeScope'] = 'Installed UI, native HTTP, persisted images/layers/OCR/tasks and exact pixels; synthetic provider. No production billing claim.'
     report['subsetStatus'] = 'passed'
 except Exception as error:
     report['subsetStatus'] = 'failed'

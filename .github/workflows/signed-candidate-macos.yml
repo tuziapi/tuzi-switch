@@ -29,8 +29,16 @@ jobs:
         include:
           - os: macos-15
             platform: macos-arm64
+            legacy: '1.6.0'
           - os: macos-15-intel
             platform: macos-x64
+            legacy: '1.6.0'
+          - os: macos-15
+            platform: macos-arm64
+            legacy: '1.6.1'
+          - os: macos-15-intel
+            platform: macos-x64
+            legacy: '1.6.1'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
@@ -61,16 +69,26 @@ jobs:
           gh api "repos/AiW520/tuzi-switch/actions/runs/$BASE_RUN_ID" > "$RUNNER_TEMP/base-run.json"
           gh api "repos/AiW520/tuzi-switch/actions/runs/$TARGET_RUN_ID" > "$RUNNER_TEMP/target-run.json"
           node scripts/verify-signed-linux-pair.mjs "$RUNNER_TEMP" macos
+      - name: Download immutable published manual-transition source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEGACY_VERSION: ${{ matrix.legacy }}
+          CANDIDATE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          gh release download "v$LEGACY_VERSION" -R tuziapi/tuzi-switch --dir "$RUNNER_TEMP/signed-legacy" \
+            --pattern "tuzi-assistant-$CANDIDATE_PLATFORM.dmg" --pattern "manifest-$CANDIDATE_PLATFORM.json"
       - name: Exercise original installed app with existing Accessibility permissions
         env:
           CANDIDATE_PLATFORM: ${{ matrix.platform }}
+          LEGACY_VERSION: ${{ matrix.legacy }}
+          LEGACY_INSTALLER_DIR: ${{ runner.temp }}/signed-legacy
         run: |
           export TUZI_TEST_OPENSSL="$(brew --prefix openssl@3)/bin/openssl"
           python3 scripts/signed-macos-upgrade.py "$RUNNER_TEMP/signed-base" "$RUNNER_TEMP/signed-target" "$RUNNER_TEMP/signed-macos/evidence" "$CANDIDATE_PLATFORM"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: signed-installed-macos-${{ matrix.platform }}
+          name: signed-installed-macos-${{ matrix.platform }}-from-${{ matrix.legacy }}
           path: |
             ${{ runner.temp }}/signed-macos/evidence/results.json
             ${{ runner.temp }}/signed-macos/evidence/application.log
