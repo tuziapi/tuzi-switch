@@ -279,7 +279,12 @@ def create_creative_fixture():
     bounds=ax('return {position of front window of p, size of front window of p}')
     x,y,w,h=map(float,bounds.split(', '))
     ax('click at {'+str(int(x+w*.85))+', '+str(int(y+h*.25))+'}\nkey code 32 using command down')
-    wait_for(lambda: 'sheet ' in tree(),'Native image picker did not open')
+    # WebKit's file input uses a standalone NSOpenPanel on current macOS;
+    # it is not always exposed as an AXSheet. Open may be disabled until a
+    # file is selected, so inspect its presence plus the enabled Cancel.
+    wait_for(lambda: button(['Cancel','取消']) and any(
+        'button '+label+' of' in tree() for label in ['Open','打开']),
+        'Native image picker did not open')
     ax('keystroke "g" using {command down, shift down}')
     time.sleep(1)
     ax('keystroke '+json.dumps(str(image_path))+'\nkey code 36')

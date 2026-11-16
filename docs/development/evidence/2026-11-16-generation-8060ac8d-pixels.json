@@ -1,0 +1,12 @@
+{
+  "candidateRun": "43804959005",
+  "sourceCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "kind": "native-saved-generated-png",
+  "sha256": "e13ba8cbaa62017274db6e76096cda9154a8d16a25dc4b3073caf8d982ea3524",
+  "width": 1024,
+  "height": 1024,
+  "mode": "RGBA",
+  "transparentPixels": 744072,
+  "partialAlphaPixels": 20996,
+  "opaquePixels": 283508
+}

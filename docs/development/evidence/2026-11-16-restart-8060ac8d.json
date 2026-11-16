@@ -1,0 +1,17 @@
+{
+  "candidateRun": "43804959005",
+  "sourceCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "checkedAt": "2026-11-16T07:23:47.165286+00:00",
+  "normalQuitConfirmed": true,
+  "restartViaInstalledApp": true,
+  "projectCount": 9,
+  "legacyProjectCount": 8,
+  "testProjectName": "1.6.2 8060ac8d 正式候选验收",
+  "generatedImageVisuallyRestored": true,
+  "observedText": [
+    "TUZI 8060",
+    "正式验收"
+  ],
+  "splitAndOcr": "User confirmed already verified and requested no repeat; no new split/OCR request on this candidate",
+  "officialAcceptance": false
+}
