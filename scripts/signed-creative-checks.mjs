@@ -92,6 +92,14 @@ async function generate(page, version) {
   await until(async () => (await records(page, 'aitu-app', 'tasks')).some(t => !before.some(b => b.id === t.id) && t.insertedToCanvas), 'Native generation did not reach the persisted canvas');
   return (await records(page, 'aitu-app', 'tasks')).find(t => !before.some(b => b.id === t.id) && t.insertedToCanvas);
 }
+async function waitForStableGenerationAnchors(page) {
+  await until(async () => {
+    const boards = await records(page, 'aitu-workspace', 'boards');
+    return boards.length > 0 && boards.every(board =>
+      board.elements.every(element => element.type !== 'generation-anchor')
+    );
+  }, 'Generation result did not settle after insertion');
+}
 async function snapshot(page) {
   const boards = (await records(page, 'aitu-workspace', 'boards')).filter(b => b.elements.some(e => e.type === 'image'));
   assert.ok(boards.length, 'Real UI must create a populated board');
@@ -114,6 +122,7 @@ async function imagePixels(page, id) {
 export async function createLegacyCreative(page, output) {
   await enter(page); await configure(page); await canvas(page);
   const task = await generate(page, '4.5');
+  await waitForStableGenerationAnchors(page);
   const saved = await snapshot(page);
   const element = saved.boards.flatMap(b => b.elements).find(e => e.generationTaskId === task.id);
   assert.ok(element);
@@ -124,6 +133,7 @@ export async function createLegacyCreative(page, output) {
 }
 export async function verifyCreativePreserved(page, saved, output, label) {
   await canvas(page);
+  await waitForStableGenerationAnchors(page);
   const current = await snapshot(page);
   for (const board of saved.boards) {
     const restored = current.boards.find(b => b.id === board.id);

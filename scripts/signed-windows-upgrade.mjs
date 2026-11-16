@@ -235,6 +235,13 @@ foreach ($program in $programs) {
     const visible = await welcome.waitFor({ timeout: 10000 }).then(() => true, () => false);
     if (visible) await welcome.click();
   }
+  async function openUpdateDialogFromCanvas(page) {
+    const creative = page.getByRole('button', { name: 'opentu 创作', exact: true });
+    if (await creative.count()) await creative.click();
+    const canvasNotice = page.locator('.canvas-update-notice');
+    await canvasNotice.waitFor({ timeout: 90000 });
+    await canvasNotice.getByRole('button', { name: '查看更新', exact: true }).click();
+  }
   async function seed(page) {
     await page.evaluate(async provider => {
       await window.__TAURI_INTERNALS__.invoke('add_provider', { app: 'claude', provider, addToLive: false });
@@ -300,7 +307,7 @@ foreach ($program in $programs) {
   if (legacyDir) report.checks.legacyCreativeImageAndTaskPreservation = 'passed';
   await leaveCreative(page);
   await page.reload();
-  await page.getByRole('button', { name: /查看更新|View update/i }).first().click({ timeout: 60000 });
+  await openUpdateDialogFromCanvas(page);
   const dialog = page.getByRole('dialog').filter({ hasText: '1.6.3' });
   await dialog.waitFor();
   await page.screenshot({ path: path.join(root, '01-real-update-dialog.png') });
