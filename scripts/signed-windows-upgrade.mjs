@@ -240,7 +240,14 @@ foreach ($program in $programs) {
     if (await creative.count()) await creative.click();
     const canvasNotice = page.locator('.canvas-update-notice');
     await canvasNotice.waitFor({ timeout: 90000 });
-    await canvasNotice.getByRole('button', { name: '查看更新', exact: true }).click();
+    const expanded = canvasNotice.getByRole('button', { name: '查看更新', exact: true });
+    if (await expanded.count()) {
+      await expanded.click();
+      return;
+    }
+    const compact = canvasNotice.locator('.canvas-update-notice__compact');
+    await compact.waitFor({ timeout: 30000 });
+    await compact.click();
   }
   async function seed(page) {
     await page.evaluate(async provider => {
