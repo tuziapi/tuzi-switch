@@ -149,6 +149,17 @@ def execute(script, async_=False, args=None):
                    {'script': script, 'args': args or []})
 
 
+def element_action(element, value):
+    key='element-6066-11e4-a52e-4f735466cecf'
+    assert key in element, 'Actual WebDriver element reference required'
+    route='/session/'+session+'/element/'+element[key]
+    if value is None:
+        request('POST', route+'/click', {})
+    else:
+        request('POST', route+'/clear', {})
+        request('POST', route+'/value', {'text': value})
+
+
 def attach(address=None):
     global session
     options = {'binary': str(executable), 'args': []}
@@ -365,7 +376,7 @@ try:
                               *display_command],
                              stdin=subprocess.DEVNULL, stdout=log, stderr=log)
     wait_for(lambda: request('GET', '/status'), 'WebKitWebDriver not listening')
-    creative = CreativeChecks(execute, screenshot)
+    creative = CreativeChecks(execute, screenshot, element_action)
     if legacy_dir:
         active_version = legacy_version
         manual_install(legacy_dir, old=True)

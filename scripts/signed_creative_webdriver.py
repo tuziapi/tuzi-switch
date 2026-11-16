@@ -27,8 +27,8 @@ def model_response(body):
 
 
 class CreativeChecks:
-    def __init__(self, execute, screenshot):
-        self.execute, self.screenshot = execute, screenshot
+    def __init__(self, execute, screenshot, element_action):
+        self.execute, self.screenshot, self.element_action = execute, screenshot, element_action
 
     def wait(self, fn, description):
         end = time.monotonic() + 75
@@ -45,14 +45,9 @@ class CreativeChecks:
 const visible=e=>e.getClientRects().length && getComputedStyle(e).visibility!=='hidden';
 const matches=[...document.querySelectorAll(selector)].filter(e=>visible(e) && !e.disabled &&
  (text===null || e.textContent.trim()===text || e.getAttribute('aria-label')===text));
-const e=matches.find(e=>!matches.some(child=>child!==e && e.contains(child)));
-if(!e)return false;
-if(value===null)e.click();else {
-const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;
-Object.getOwnPropertyDescriptor(proto,'value').set.call(e,value);
-e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));
-} return true;''', args=[selector, text, value])
-        return self.wait(attempt, 'Missing actionable UI: ' + selector + ' / ' + str(text))
+return matches.find(e=>!matches.some(child=>child!==e && e.contains(child))) || null;''', args=[selector, text, value])
+        element = self.wait(attempt, 'Missing actionable UI: ' + selector + ' / ' + str(text))
+        self.element_action(element, value)
 
     def records(self, db, store):
         result = self.execute('''const [db,store]=arguments,done=arguments[arguments.length-1];
@@ -79,11 +74,11 @@ q.onerror=()=>{c.close();reject(q.error)}}})})().then(done,e=>done({error:String
         self.action('button', '创作配置')
         self.action('[data-testid=settings-dialog] button', '手动配置')
         self.action('[data-testid=settings-dialog] input[type=password]', value='sk-SYNTHETIC-GENERATION')
-        assert self.execute('''const d=document.querySelector('[data-testid=settings-dialog]');
+        field = self.execute('''const d=document.querySelector('[data-testid=settings-dialog]');
 const f=[...d.querySelectorAll('.settings-dialog__field')].find(e=>e.querySelector('label')?.textContent.trim()==='API 地址');
-const input=f?.querySelector('input');if(!input)return false;
-Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'https://api.tu-zi.com/v1');
-input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));return true;''')
+return f?.querySelector('input') || null;''')
+        assert field
+        self.element_action(field, 'https://api.tu-zi.com/v1')
         self.action('[data-testid=settings-dialog] button', '保存')
         self.wait(lambda: not self.execute('return Boolean(document.querySelector("[data-testid=settings-dialog]"))'), 'Settings did not close')
 
@@ -107,7 +102,8 @@ c.width=c.height=64;const x=c.getContext('2d');x.drawImage(i,0,0);return [8,32,5
         self.action('.model-dropdown__trigger')
         self.action('button,div,span', '豆包')
         desired = '5.5' if current else '4.5'
-        self.wait(lambda: self.execute('''const e=[...document.querySelectorAll('.model-dropdown__item')].find(e=>e.getClientRects().length && e.textContent.includes(arguments[0]));if(e)e.click();return Boolean(e);''', args=[desired]), 'Model option missing')
+        option = self.wait(lambda: self.execute('''return [...document.querySelectorAll('.model-dropdown__item')].find(e=>e.getClientRects().length && e.textContent.includes(arguments[0])) || null;''', args=[desired]), 'Model option missing')
+        self.element_action(option, None)
         if current:
             self.action('.parameters-dropdown__trigger')
             self.action('button,div,span', '透明（PNG）')
