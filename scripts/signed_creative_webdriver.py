@@ -62,6 +62,9 @@ q.onerror=()=>{c.close();reject(q.error)}}})})().then(done,e=>done({error:String
     def enter(self):
         if not self.execute('return Boolean(document.querySelector("nav[aria-label=创作导航]"))'):
             self.action('button', 'opentu 创作')
+
+    def canvas(self):
+        self.enter()
         self.action('nav[aria-label=创作导航] button', '自由画布')
         self.wait(lambda: self.execute('return Boolean(document.querySelector(".plait-board-container"))'), 'Canvas missing')
         self.execute('''const e=[...document.querySelectorAll('button,label,span')].find(e=>e.textContent.trim()==='不再提示' && e.getClientRects().length);if(e)e.click();return true;''')
@@ -71,7 +74,8 @@ q.onerror=()=>{c.close();reject(q.error)}}})})().then(done,e=>done({error:String
         self.action('button', 'Codex')
 
     def configure(self):
-        self.action('button', '创作配置')
+        if not self.execute('return Boolean(document.querySelector("[data-testid=settings-dialog]"))'):
+            self.action('button', '创作配置')
         self.action('[data-testid=settings-dialog] button', '手动配置')
         self.action('[data-testid=settings-dialog] input[type=password]', value='sk-SYNTHETIC-GENERATION')
         field = self.execute('''const d=document.querySelector('[data-testid=settings-dialog]');
@@ -97,7 +101,7 @@ c.width=c.height=64;const x=c.getContext('2d');x.drawImage(i,0,0);return [8,32,5
         assert pixels == [[240, 30, 100, 255], [10, 190, 220, 255], [0, 0, 0, 0]], pixels
 
     def create(self, current=False):
-        self.enter(); self.configure()
+        self.enter(); self.configure(); self.canvas()
         before = self.records('aitu-app', 'tasks')
         self.action('.model-dropdown__trigger')
         self.action('button,div,span', '豆包')
@@ -134,7 +138,7 @@ c.width=c.height=64;const x=c.getContext('2d');x.drawImage(i,0,0);return [8,32,5
         return saved
 
     def preserved(self, saved, label):
-        self.enter()
+        self.canvas()
         current = self.snapshot()
         for board in saved['boards']:
             restored = next(b for b in current['boards'] if b['id'] == board['id'])

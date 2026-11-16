@@ -213,7 +213,7 @@ creative_title='SYNTHETIC Mac migration '+legacy_version
 def press_label(label, prefix=False):
     # WebKit exposes canvas tools as radio buttons and the host switch as a
     # popup button. Operate their existing accessibility actions only.
-    literal=json.dumps(label)
+    literal=json.dumps(label,ensure_ascii=False)
     comparison=('starts with ' if prefix else 'is ')+literal
     body='''repeat with itemRef in (get entire contents of front window of p)
 try

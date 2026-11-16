@@ -356,15 +356,33 @@ if (-not $denied) { throw 'Test temp directory did not reject OS directory creat
   assert.equal(sha(fs.readFileSync(executable)), beforeHash);
   assert.match(await dialog.innerText(), /安装未完成/);
   await page.screenshot({ path: path.join(root, '03-valid-package-staging-denied.png') });
-  powershell(String.raw`
+  report.tempAclRestoration = JSON.parse(powershell(String.raw`
 $ErrorActionPreference='Stop'
 $directory=Join-Path $env:TUZI_SIGNED_LAB_ROOT 'installer-temp'
 $saved=(Get-Content (Join-Path $env:TUZI_SIGNED_LAB_ROOT 'installer-temp-acl.original') -Raw).Trim()
 $acl=Get-Acl -LiteralPath $directory
 $acl.SetSecurityDescriptorSddlForm($saved)
 Set-Acl -LiteralPath $directory -AclObject $acl
-if ((Get-Acl -LiteralPath $directory).Sddl -ne $saved) { throw 'Installer temp ACL restoration failed' }
-`);
+$expected=[System.Security.AccessControl.DirectorySecurity]::new()
+$expected.SetSecurityDescriptorSddlForm($saved)
+$actual=Get-Acl -LiteralPath $directory
+function Get-NormalizedRules($security) {
+ @($security.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier]) | ForEach-Object {
+  '{0}|{1}|{2}|{3}|{4}|{5}' -f $_.IdentityReference.Value,[int]$_.AccessControlType,[int]$_.FileSystemRights,[int]$_.InheritanceFlags,[int]$_.PropagationFlags,$_.IsInherited
+ } | Sort-Object) -join ';'
+}
+$sidType=[System.Security.Principal.SecurityIdentifier]
+if ((Get-NormalizedRules $actual) -ne (Get-NormalizedRules $expected) -or
+ $actual.AreAccessRulesProtected -ne $expected.AreAccessRulesProtected -or
+ $actual.GetOwner($sidType).Value -ne $expected.GetOwner($sidType).Value -or
+ $actual.GetGroup($sidType).Value -ne $expected.GetGroup($sidType).Value) {
+ throw ('Installer temp ACL restoration differs: expected={0}; actual={1}' -f $saved,$actual.Sddl)
+}
+$probe=Join-Path $directory 'restored-write-probe'
+[System.IO.Directory]::CreateDirectory($probe) | Out-Null
+[System.IO.Directory]::Delete($probe)
+@{ originalSddl=$saved; restoredSddl=$actual.Sddl; ownerGroupAndRulesMatch=$true; writeProbePassed=$true } | ConvertTo-Json -Compress
+`));
   report.checks.validSignedPackageStagingPermissionDenied = 'passed';
   report.installerFailureScope = 'OS denies temporary installer directory creation after signature verification; application remains alive. External installer failure remains unverified.';
   await dialog.getByRole('button', { name: '重新下载', exact: true }).click();
