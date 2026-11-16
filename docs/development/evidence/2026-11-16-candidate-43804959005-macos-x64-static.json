@@ -1,0 +1,21 @@
+{
+  "sourceCommitEmbedded": true,
+  "adHocCodeSignatureIntegrity": true,
+  "allRegularFilesCompared": true,
+  "kind": "candidate-static-integrity",
+  "runId": "43804959005",
+  "applicationCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "repository": "AiW520/tuzi-switch",
+  "releaseRepository": "tuziapi/tuzi-switch",
+  "version": "1.6.2",
+  "platform": "macos-x64",
+  "installerSha256": "17a51ab4d769da9bb58c9996116dace1f3df34104b9773d4cd0d952673b80fdc",
+  "architecture": "x86_64",
+  "updaterArchiveSignatureVerified": true,
+  "officialUpdaterEndpointEmbedded": true,
+  "newOfficialPublicKeyEmbedded": true,
+  "productionQaCommandAbsent": true,
+  "dmgAndUpdaterArchiveFilesMatch": 4,
+  "executed": false,
+  "officialUpgradeAcceptance": false
+}

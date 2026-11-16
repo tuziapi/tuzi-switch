@@ -1,0 +1,10 @@
+{
+  "installedAt": "2026-11-16T07:06:01.465481+00:00",
+  "installedVersion": "1.6.2",
+  "sourceCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "candidateRun": "43804959005",
+  "backup": "/Users/sdy09/Documents/tuzi-switch-artifacts/installed-real-20261116/approved-8060ac8d/pre-install/兔子助手.app",
+  "sourceFileAndPermissionsMatch": true,
+  "installerSha256": "419b6d1e0703328c3a24bde7e698d40144ee291b1068f70b44e13fa31ca23310",
+  "newPackageBusinessAcceptance": "pending"
+}

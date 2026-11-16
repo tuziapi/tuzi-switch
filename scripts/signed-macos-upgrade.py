@@ -229,31 +229,6 @@ return false'''.replace('COMPARISON',comparison)
     wait_for(lambda: ax(body)=='true','Accessible label missing: '+label)
 
 
-def pointer_label(label):
-    # Canvas radio tools act on pointerup. AXPress emits only click; the
-    # keyboard shortcut also requires a prior pointer position inside canvas.
-    # Locate the visible control with AX, then send an actual native click.
-    body='''repeat with itemRef in (get entire contents of front window of p)
-try
-if role of itemRef is "AXRadioButton" and name of itemRef is LABEL then
-return {position of itemRef, size of itemRef}
-end if
-end try
-end repeat
-return ""'''.replace('LABEL',json.dumps(label,ensure_ascii=False))
-    previous=None
-    def stable():
-        nonlocal previous
-        current=ax(body)
-        same=current and current==previous
-        previous=current
-        return current if same else None
-    bounds=wait_for(stable,'Radio control did not stabilize: '+label)
-    x,y,w,h=map(float,bounds.split(', '))
-    assert w>0 and h>0
-    ax('click at {'+str(int(x+w/2))+', '+str(int(y+h/2))+'}')
-
-
 def creative_record():
     # Read only the synthetic board created through this runner's real UI.
     # Compare WebKit's complete serialized record, including all image data,
@@ -297,7 +272,13 @@ def create_creative_fixture():
         click(['不再提示'])
     if button(['展开工具栏']):
         click(['展开工具栏'])
-    pointer_label('图片 — Cmd+U')
+    # Compact runner screens clip the middle toolbar into an internal
+    # scroller. Hidden radios retain AX bounds outside that viewport. Place
+    # the pointer in the empty board first, satisfying the app shortcut's
+    # existing moving-point guard, then use its actual Cmd+U command.
+    bounds=ax('return {position of front window of p, size of front window of p}')
+    x,y,w,h=map(float,bounds.split(', '))
+    ax('click at {'+str(int(x+w*.85))+', '+str(int(y+h*.25))+'}\nkey code 32 using command down')
     wait_for(lambda: 'sheet ' in tree(),'Native image picker did not open')
     ax('keystroke "g" using {command down, shift down}')
     time.sleep(1)

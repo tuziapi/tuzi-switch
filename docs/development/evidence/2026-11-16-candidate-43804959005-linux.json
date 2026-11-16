@@ -1,0 +1,321 @@
+{
+  "candidateRun": "43804959005",
+  "applicationCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "testRun": "43820565887",
+  "scope": "Installed Linux AppImage/DEB/RPM from both published 1.6.0 and 1.6.1; synthetic model responses; signed subsequent upgrade.",
+  "cases": [
+    {
+      "artifactName": "signed-installed-linux-appimage-1.6.0",
+      "resultSha256": "73a490d48a9c629e1c5f7ecb508177dc82194f8ea39e273d2a96a99adc7183cd",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageTaskPreservation": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validPackageInstallPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "creativeRequests": [
+        {
+          "version": "1.6.0",
+          "model": "doubao-seedream-4-5-251128",
+          "channels": [
+            "0"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": true,
+          "syntheticAuthorizationMatched": true
+        }
+      ],
+      "manualTransition": null
+    },
+    {
+      "artifactName": "signed-installed-linux-appimage-1.6.1",
+      "resultSha256": "cbdf493c207edc5894c7222fd25b70f5be5fa7437e27d7258e404ca93c02dbfe",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageTaskPreservation": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validPackageInstallPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "creativeRequests": [
+        {
+          "version": "1.6.1",
+          "model": "doubao-seedream-4-5-251128",
+          "channels": [
+            "0"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": true,
+          "syntheticAuthorizationMatched": true
+        }
+      ],
+      "manualTransition": null
+    },
+    {
+      "artifactName": "signed-installed-linux-deb-1.6.0",
+      "resultSha256": "eeca0033c174d96005255d15eb49c6bd95440f4ada47fab0e0fc9aeb58beb711",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageTaskPreservation": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validPackageInstallPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "creativeRequests": [
+        {
+          "version": "1.6.0",
+          "model": "doubao-seedream-4-5-251128",
+          "channels": [
+            "0"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": true,
+          "syntheticAuthorizationMatched": true
+        }
+      ],
+      "manualTransition": null
+    },
+    {
+      "artifactName": "signed-installed-linux-deb-1.6.1",
+      "resultSha256": "bcb5b42274f9f69938ff2e3a0ba107fd2b57952d90c11c5de56ec2076285db8a",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageTaskPreservation": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validPackageInstallPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "creativeRequests": [
+        {
+          "version": "1.6.1",
+          "model": "doubao-seedream-4-5-251128",
+          "channels": [
+            "0"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": true,
+          "syntheticAuthorizationMatched": true
+        }
+      ],
+      "manualTransition": null
+    },
+    {
+      "artifactName": "signed-installed-linux-rpm-1.6.0",
+      "resultSha256": "f7e7156d14b26e92e4bcbc095dea0c84886d0c0adfb4a226b6a73efa8aa7c3bb",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageTaskPreservation": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validPackageInstallPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "creativeRequests": [
+        {
+          "version": "1.6.0",
+          "model": "doubao-seedream-4-5-251128",
+          "channels": [
+            "0"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": true,
+          "syntheticAuthorizationMatched": true
+        }
+      ],
+      "manualTransition": null
+    },
+    {
+      "artifactName": "signed-installed-linux-rpm-1.6.1",
+      "resultSha256": "cb8ac072148096d7f788f12861bf462a926bfbd9a2bffed9dd2744193ec54d36",
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageTaskPreservation": "passed",
+        "nativeSeedream55Synthetic": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validPackageInstallPermissionDenied": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "version": "passed",
+        "sqliteProviderAndWebviewPreference": "passed",
+        "sameInstallationRetry": "passed",
+        "creativeImageLayerOcrTaskPreservation": "passed",
+        "installedDesktopAttributionSynthetic": "passed"
+      },
+      "creativeRequests": [
+        {
+          "version": "1.6.1",
+          "model": "doubao-seedream-4-5-251128",
+          "channels": [
+            "0"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": false,
+          "syntheticAuthorizationMatched": true
+        },
+        {
+          "version": "1.6.2",
+          "model": "doubao-seedream-5-5-261028",
+          "channels": [
+            "3"
+          ],
+          "layers": true,
+          "syntheticAuthorizationMatched": true
+        }
+      ],
+      "manualTransition": null
+    }
+  ],
+  "officialAcceptance": false
+}
