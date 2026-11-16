@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-11-16T08:17:57.608508+00:00",
+  "url": "https://tuziapi.github.io/tuzi-switch/",
+  "version": "1.6.2",
+  "pageCommit": "ed5dbfec2a95c81fb58b60d44eb72d6e2a667875",
+  "method": "Public browser platform and native select controls; inspected rendered download anchor after each selection; did not activate download links.",
+  "installerSelections": [
+    "macos-arm64.dmg",
+    "macos-x64.dmg",
+    "windows-x64.exe",
+    "windows-x64.msi",
+    "linux-x64.deb",
+    "linux-x64.rpm",
+    "linux-x64.AppImage"
+  ],
+  "allSevenLinksMatchPublishedRelease": true,
+  "manualKeyTransitionNoticeVisible": true,
+  "macScriptVersion": "1.6.2",
+  "screenshotPath": "/Users/sdy09/Documents/tuzi-switch-artifacts/installed-real-20261116/approved-8060ac8d/public-v1.6.2-download-page.jpg",
+  "screenshotSha256": "8231aa81b18ff52c8d428a4ca6a9264e07b42efe4e4097d1449ded9cb07aee06"
+}
