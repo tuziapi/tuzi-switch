@@ -1,0 +1,31 @@
+// Browser fixture only; no native IPC, certificates or paid calls.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+(async () => {
+  const browser = await chromium.launch({headless:true, executablePath:process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+  const page = await browser.newPage({viewport:{width:1180,height:780}});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  await page.goto('http://127.0.0.1:5216/claude-local.html');
+  const button = name => page.getByRole('button',{name,exact:true});
+  await button('准备资源').waitFor(); assert.equal(await button('启动兼容模式').isEnabled(),false);
+  await button('准备资源').click();await button('信任本地证书').click();
+  await button('启动兼容模式').click(); await page.getByText('客户端已连接',{exact:true}).waitFor();
+  await page.getByLabel('供应商',{exact:true}).selectOption('b');
+  assert.match(await page.locator('section').first().innerText(),/本次绑定：合成供应商 A/);
+  assert.equal(await button('移除证书信任').isEnabled(),false);
+  const out=process.env.CLAUDE_LOCAL_QA_OUTPUT || '/tmp/tuzi-claude-local-ui';fs.mkdirSync(out,{recursive:true});
+  await page.screenshot({path:`${out}/running.png`,fullPage:true});
+  await button('停止 / 恢复').click(); await page.getByText('未启动',{exact:true}).waitFor();
+  await page.goto('http://127.0.0.1:5216/claude-local.html?recovery=1');
+  await page.getByText('需要恢复',{exact:true}).waitFor();assert.equal(await button('启动兼容模式').isEnabled(),false);
+  await button('停止 / 恢复').click();await page.getByText('未启动',{exact:true}).waitFor();
+  await page.setViewportSize({width:620,height:800});
+  await page.goto('http://127.0.0.1:5216/claude-local.html?lang=en&dark=1');
+  await button('Prepare resources').waitFor();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:`${out}/english-narrow.png`,fullPage:true});
+  assert.deepEqual(errors,[]);console.log('PASS: launch prerequisites, explicit trust, pinned UI binding, stop, crash recovery, narrow English layout.');
+  await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

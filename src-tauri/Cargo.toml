@@ -18,6 +18,8 @@ doctest = false
 [features]
 default = []
 test-hooks = []
+# P0 opt-in laboratory. Never enabled in release workflows.
+claude-local-poc = ["dep:claude-local", "dep:fs2", "isolated-profile"]
 # Isolate user data without enabling debug-only loopback fixtures.
 isolated-profile = []
 local-preview = ["isolated-profile"]
@@ -28,6 +30,8 @@ updater-acceptance = ["isolated-profile"]
 tauri-build = { version = "2.4.0", features = [] }
 
 [dependencies]
+claude-local = { path = "vendor/claude-local", optional = true }
+fs2 = { version = "0.4", optional = true }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"

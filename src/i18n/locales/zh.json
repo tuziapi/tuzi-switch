@@ -3203,5 +3203,26 @@
       "audio_completion_ratio": "音频输出倍率",
       "web_search_ratio": "联网搜索倍率"
     }
+  },
+  "claudeLocal": {
+    "title": "Claude 本地兼容 · P0 实验",
+    "description": "使用所选供应商的 API 接入 Claude 桌面版，配置与会话独立保存。当前仅开放基础聊天、Code 与汉化；不代表获得官方订阅权益。",
+    "requirements": "Claude {{version}} · 证书{{certificate}} · Node.js {{node}}",
+    "trusted": "已信任",
+    "untrusted": "未信任",
+    "ready": "就绪",
+    "missing": "缺失",
+    "bound": "本次绑定：{{name}}（更换供应商需停止后重启）",
+    "idle": "未启动",
+    "recovery": "需要恢复",
+    "connected": "客户端已连接",
+    "running": "服务运行中",
+    "prepare": "准备资源",
+    "trust": "信任本地证书",
+    "launch": "启动兼容模式",
+    "stop": "停止 / 恢复",
+    "untrust": "移除证书信任",
+    "stopHint": "首次信任证书会触发系统授权。停止前请正常退出 Claude；运行期间禁止关闭网关。P0 实验构建不支持自动安装更新。",
+    "statusError": "无法读取兼容服务状态，请重试。"
   }
 }

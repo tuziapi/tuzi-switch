@@ -1,0 +1,6 @@
+{
+  "productName": "兔子助手 Claude P0",
+  "identifier": "com.tuziswitch.desktop.claude-local-p0",
+  "app": { "windows": [{ "label": "main", "dragDropEnabled": false, "title": "兔子助手 · Claude P0", "width": 1100, "height": 760, "visible": false }] },
+  "bundle": { "createUpdaterArtifacts": false }
+}

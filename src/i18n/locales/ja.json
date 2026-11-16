@@ -3196,5 +3196,26 @@
       "audio_completion_ratio": "音声出力倍率",
       "web_search_ratio": "ウェブ検索倍率"
     }
+  },
+  "claudeLocal": {
+    "title": "Claude ローカル互換 · P0 実験",
+    "description": "選択した API プロバイダーで Claude Desktop に接続し、専用の設定と会話を保存します。P0 はチャット、Code、中国語化のみ対応します。公式サブスクリプションの権利は付与されません。",
+    "requirements": "Claude {{version}} · 証明書 {{certificate}} · Node.js {{node}}",
+    "trusted": "信頼済み",
+    "untrusted": "未信頼",
+    "ready": "準備完了",
+    "missing": "未検出",
+    "bound": "接続先：{{name}}（変更には停止と再起動が必要）",
+    "idle": "停止中",
+    "recovery": "復旧が必要",
+    "connected": "クライアント接続済み",
+    "running": "サービス稼働中",
+    "prepare": "リソースを準備",
+    "trust": "ローカル証明書を信頼",
+    "launch": "互換モードで起動",
+    "stop": "停止 / 復旧",
+    "untrust": "証明書の信頼を解除",
+    "stopHint": "証明書の信頼にはシステム認証が必要です。停止前に Claude を通常終了してください。セッション中はゲートウェイを停止できません。P0 ビルドでは自動更新のインストールを無効にしています。",
+    "statusError": "サービス状態を取得できません。再試行してください。"
   }
 }

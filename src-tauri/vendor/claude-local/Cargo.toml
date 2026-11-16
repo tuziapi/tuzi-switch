@@ -1,0 +1,45 @@
+[package]
+name = "claude-local"
+description = "Claude Desktop 完整功能模式核心：本地兼容服务、证书、profile 切换与启动"
+version = "0.1.3"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository = "https://github.com/BigPizzaV3/ClaudeMom"
+
+[features]
+default = []
+# 本地听写：SenseVoice 模型下载 / 转写引擎 + 给本地兼容服务用的转写服务（ClaudeMom 打开；Codex++ 用自己的 helper）。
+dictation = ["dep:sherpa-onnx", "dep:tokio", "dep:tokio-tungstenite", "dep:futures-util", "dep:reqwest", "dep:http"]
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+directories = "6"
+rcgen = { version = "0.14.10", default-features = false, features = ["crypto", "pem", "ring"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+sha2 = "0.10"
+time = "0.3"
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+futures-util = { version = "0.3", optional = true }
+http = { version = "1", optional = true }
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls", "rustls-tls-native-roots", "system-proxy"], default-features = false, optional = true }
+sherpa-onnx = { version = "1.13.8", optional = true }
+tokio = { version = "1", optional = true, features = ["macros", "process", "rt-multi-thread", "time", "io-util", "net", "sync"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"], optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+  "Win32_Foundation",
+  "Win32_Networking_WinHttp",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Registry",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+tempfile = "3"

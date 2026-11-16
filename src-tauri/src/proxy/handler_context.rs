@@ -34,6 +34,7 @@ pub struct StreamingTimeoutConfig {
 /// - Session ID（用于日志关联）
 pub struct RequestContext {
     aggregation_model: Option<String>,
+    pinned: bool,
     /// 请求开始时间
     pub start_time: Instant,
     /// 应用级代理配置（per-app，包含重试次数和超时配置）
@@ -89,6 +90,37 @@ impl RequestContext {
         tag: &'static str,
         app_type_str: &'static str,
     ) -> Result<Self, ProxyError> {
+        Self::new_inner(state, body, headers, app_type, tag, app_type_str, None).await
+    }
+
+    pub(crate) async fn new_pinned(
+        state: &ProxyState,
+        body: &serde_json::Value,
+        headers: &HeaderMap,
+        provider: Provider,
+    ) -> Result<Self, ProxyError> {
+        Self::new_inner(
+            state,
+            body,
+            headers,
+            AppType::ClaudeDesktop,
+            "Claude Local",
+            "claude-desktop",
+            Some(provider),
+        )
+        .await
+    }
+
+    async fn new_inner(
+        state: &ProxyState,
+        body: &serde_json::Value,
+        headers: &HeaderMap,
+        app_type: AppType,
+        tag: &'static str,
+        app_type_str: &'static str,
+        pinned_provider: Option<Provider>,
+    ) -> Result<Self, ProxyError> {
+        let pinned = pinned_provider.is_some();
         let start_time = Instant::now();
 
         // 从数据库读取应用级代理配置（per-app）
@@ -103,8 +135,12 @@ impl RequestContext {
         let optimizer_config = state.db.get_optimizer_config().unwrap_or_default();
         let copilot_optimizer_config = state.db.get_copilot_optimizer_config().unwrap_or_default();
 
-        let current_provider_id =
-            crate::settings::get_current_provider(&app_type).unwrap_or_default();
+        let current_provider_id = pinned_provider
+            .as_ref()
+            .map(|p| p.id.clone())
+            .unwrap_or_else(|| {
+                crate::settings::get_current_provider(&app_type).unwrap_or_default()
+            });
 
         // 从请求体提取模型名称
         let request_model = body
@@ -127,10 +163,17 @@ impl RequestContext {
 
         // 使用共享的 ProviderRouter 选择 Provider（熔断器状态跨请求保持）
         // 注意：只在这里调用一次，结果传递给 forwarder，避免重复消耗 HalfOpen 名额
-        let aggregation = crate::aggregation::resolve(&state.db, app_type_str, &request_model)
-            .map_err(ProxyError::ConfigError)?;
+        let aggregation = if pinned {
+            None
+        } else {
+            crate::aggregation::resolve(&state.db, app_type_str, &request_model)
+                .map_err(ProxyError::ConfigError)?
+        };
         let aggregation_model = aggregation.as_ref().map(|(_, model)| model.clone());
-        let providers = if let Some((provider, _)) = aggregation {
+        let providers = if let Some(provider) = pinned_provider {
+            app_config.auto_failover_enabled = false;
+            vec![provider]
+        } else if let Some((provider, _)) = aggregation {
             app_config.auto_failover_enabled = false;
             vec![provider]
         } else {
@@ -164,6 +207,7 @@ impl RequestContext {
         );
 
         Ok(Self {
+            pinned,
             aggregation_model,
             start_time,
             app_config,
@@ -246,6 +290,7 @@ impl RequestContext {
             self.copilot_optimizer_config.clone(),
         )
         .with_aggregation_model(self.aggregation_model.clone())
+        .with_pinned_provider(self.pinned)
     }
 
     /// 获取 Provider 列表（用于故障转移）

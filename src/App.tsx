@@ -95,6 +95,10 @@ import { CanvasUpdateNotice } from "@/components/CanvasUpdateNotice";
 import { VersionHistory } from "@/components/version-history/VersionHistory";
 import { EnvWarningBanner } from "@/components/env/EnvWarningBanner";
 import { ProviderConnectionControls } from "@/components/providers/ProviderConnectionControls";
+import {
+  ClaudeLocalPanel,
+  useClaudeLocalExitNotice,
+} from "@/components/proxy/ClaudeLocalPanel";
 import { ClaudeDesktopRouteToggle } from "@/components/proxy/ClaudeDesktopRouteToggle";
 import { FailoverToggle } from "@/components/proxy/FailoverToggle";
 import UsageScriptModal from "@/components/UsageScriptModal";
@@ -173,6 +177,7 @@ const getInitialApp = (): AppId => {
 };
 
 function App() {
+  useClaudeLocalExitNotice();
   const { t } = useTranslation();
   const reduceMotion = useReducedMotion();
   const queryClient = useQueryClient();
@@ -1292,6 +1297,11 @@ function App() {
                     transition={{ duration: 0.15 }}
                     className="space-y-4"
                   >
+                    {activeApp === "claude-desktop" && (
+                      <ClaudeLocalPanel
+                        providerId={currentProviderId || undefined}
+                      />
+                    )}
                     <ProviderList
                       focusRequest={
                         accountProviderFocus?.app === activeApp

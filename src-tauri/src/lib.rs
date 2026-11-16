@@ -5,6 +5,8 @@ mod app_store;
 mod auto_launch;
 mod capabilities;
 mod claude_desktop_config;
+#[cfg(feature = "claude-local-poc")]
+mod claude_local_integration;
 mod claude_mcp;
 mod claude_plugin;
 mod codex_config;
@@ -1258,6 +1260,8 @@ pub fn run() {
             commands::switch_provider,
             commands::import_default_config,
             commands::get_claude_desktop_status,
+            commands::get_claude_local_status,
+            commands::claude_local_action,
             commands::get_claude_desktop_default_routes,
             commands::import_claude_desktop_providers_from_claude,
             commands::get_claude_config_status,
@@ -1584,6 +1588,19 @@ pub fn run() {
         }
         // 处理退出请求（所有平台）
         if let RunEvent::ExitRequested { api, code, .. } = &event {
+            #[cfg(feature = "claude-local-poc")]
+            if code.is_some() && *code != Some(tauri::RESTART_EXIT_CODE) {
+                if let Err(message) = claude_local_integration::begin_shutdown() {
+                    api.prevent_exit();
+                    log::warn!("{message}");
+                    let _ = app_handle.emit("claude-local-exit-blocked", message);
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                    return;
+                }
+            }
             if *code == Some(tauri::RESTART_EXIT_CODE) {
                 log::info!("收到应用重启请求，交由 Tauri 原生重启流程处理");
                 return;
