@@ -5,6 +5,7 @@ child inherit a loopback-only sandbox. Discovery is synthetic; packages are not.
 """
 import hashlib
 import base64
+import ctypes
 from signed_candidate_identity import verify_candidate
 from signed_creative_webdriver import PNG
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -177,6 +178,25 @@ def tree():
     return ax('return entire contents of front window of p')
 
 
+def pointer_click(x, y):
+    # System Events' coordinate click does not reliably emit mouseMoved.
+    # The canvas upload shortcut explicitly requires its pointer-move state.
+    class Point(ctypes.Structure):
+        _fields_=[('x',ctypes.c_double),('y',ctypes.c_double)]
+    cg=ctypes.CDLL('/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics')
+    cf=ctypes.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
+    cg.CGEventCreateMouseEvent.argtypes=[ctypes.c_void_p,ctypes.c_uint32,Point,ctypes.c_uint32]
+    cg.CGEventCreateMouseEvent.restype=ctypes.c_void_p
+    cg.CGEventPost.argtypes=[ctypes.c_uint32,ctypes.c_void_p]
+    cf.CFRelease.argtypes=[ctypes.c_void_p]
+    for event_type in [5,1,2]:  # moved, left down, left up
+        event=cg.CGEventCreateMouseEvent(None,event_type,Point(x,y),0)
+        assert event, 'Native pointer event could not be created'
+        cg.CGEventPost(0,event)
+        cf.CFRelease(event)
+        time.sleep(.15)
+
+
 def button(names,press=False):
     labels='{'+','.join(json.dumps(s,ensure_ascii=False) for s in names)+'}'
     body='''set labels to LABELS
@@ -278,7 +298,8 @@ def create_creative_fixture():
     # existing moving-point guard, then use its actual Cmd+U command.
     bounds=ax('return {position of front window of p, size of front window of p}')
     x,y,w,h=map(float,bounds.split(', '))
-    ax('click at {'+str(int(x+w*.85))+', '+str(int(y+h*.25))+'}\nkey code 32 using command down')
+    pointer_click(int(x+w*.85),int(y+h*.25))
+    ax('key code 32 using command down')
     # WebKit's file input uses a standalone NSOpenPanel on current macOS;
     # it is not always exposed as an AXSheet. Open may be disabled until a
     # file is selected, so inspect its presence plus the enabled Cancel.
