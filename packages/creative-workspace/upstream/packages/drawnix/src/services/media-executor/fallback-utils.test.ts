@@ -1,3 +1,4 @@
+import { setAssistantAccount } from '../assistant-account';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   IMAGE_CACHE_TIMEOUT_MS,
@@ -400,6 +401,7 @@ describe('pollVideoStatus', () => {
 
 describe('cacheRemoteUrl', () => {
   afterEach(() => {
+    setAssistantAccount(undefined);
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -422,6 +424,27 @@ describe('cacheRemoteUrl', () => {
       contentHash: 'cached',
       reused: false,
     });
+  });
+
+  it('persists signed layer CDN bytes through the host instead of browser CORS or standalone IPC', async () => {
+    const nativeRequest = vi.fn().mockImplementation(async () => mediaResponse(PNG_SIGNATURE, 'image/png'));
+    setAssistantAccount({ requestManual: nativeRequest } as never);
+    const legacyInvoke = vi.fn().mockRejectedValue(new Error('unsupported standalone IPC'));
+    vi.stubGlobal('__TUZI_CREATIVE_NATIVE__', { invoke: legacyInvoke });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('CORS')));
+    const { cacheRemoteUrl } = await import('./fallback-utils');
+    const controller = new AbortController();
+    const result = await cacheRemoteUrl('https://cdn.example.test/layer.png?signature=synthetic', 'semantic', 'image', 'png', 1, {
+      forceRemoteCache: true, returnLocalCacheUrl: true, signal: controller.signal,
+    });
+    expect(result).toBe('/__aitu_cache__/image/semantic_1.png');
+    expect(cacheMediaFromBlob).toHaveBeenCalledTimes(1);
+    expect(nativeRequest).toHaveBeenCalledTimes(1);
+    expect(nativeRequest.mock.calls[0][1]).toMatchObject({ method: 'GET', credentials: 'omit', referrerPolicy: 'no-referrer' });
+    expect(nativeRequest.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    expect(new Headers(nativeRequest.mock.calls[0][1].headers).has('authorization')).toBe(false);
+    expect(legacyInvoke).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('aborts a stalled image download and preserves its source URL', async () => {
@@ -732,6 +755,7 @@ describe('cacheRemoteUrl', () => {
 
     expect(result).toBe(remoteUrl);
     expect(fetchMock).toHaveBeenCalledWith(remoteUrl, {
+      method: 'GET',
       credentials: 'omit',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
@@ -1082,6 +1106,7 @@ describe('cacheRemoteUrl', () => {
 
     expect(result).toBe('/__aitu_cache__/image/insert-123.png');
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith(remoteUrl, {
+      method: 'GET',
       credentials: 'omit',
       cache: 'no-store',
       headers: { Accept: 'image/*' },

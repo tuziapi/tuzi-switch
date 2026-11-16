@@ -113,3 +113,20 @@ describe("inline original image export under production CSP", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+
+describe("desktop CDN original image transport", () => {
+  it("reads a signed CDN image through the host without sending model credentials", async () => {
+    const blob = new Blob(["original CDN bytes"], { type: "image/png" });
+    const requestManual = vi.fn().mockResolvedValue({ ok: true, blob: async () => blob });
+    setAssistantAccount({ requestManual } as never);
+    const url = "https://cdn.example.test/layer.png?signature=synthetic";
+    expect(await readCanvasImage(url)).toBe(blob);
+    expect(requestManual).toHaveBeenCalledTimes(1);
+    expect(requestManual).toHaveBeenCalledWith(url, expect.objectContaining({
+      method: "GET", credentials: "omit", referrerPolicy: "no-referrer",
+    }));
+    expect(new Headers(requestManual.mock.calls[0][1].headers).has("authorization")).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

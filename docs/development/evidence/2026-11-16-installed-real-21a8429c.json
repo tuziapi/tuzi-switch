@@ -1,0 +1,50 @@
+{
+  "kind": "latest-installed-real-acceptance",
+  "sourceCommit": "21a8429c97168aade4475ce209a6608ac234e01c",
+  "userAuthorizationDate": "2026-11-16",
+  "paidTestsAuthorized": true,
+  "previousTwoCallLimitSuperseded": true,
+  "installed": true,
+  "oldProjectCount": 5,
+  "oldTestImageRestored": true,
+  "layerPreviewDisplayed": true,
+  "layerAttempt": {
+    "model": "doubao-seedream-5-5-261028",
+    "size": "1K",
+    "maxForegroundLayers": 2,
+    "ocr": true,
+    "maxOutputImages": 3,
+    "preparedAt": "2026-11-16T00:16:13.490276+00:00",
+    "status": "ui-success-applied",
+    "submittedAt": "2026-11-16T00:16:38.339885+00:00",
+    "uiSubmissions": 1,
+    "outputImages": 3,
+    "recognizedText": "TUZI 55",
+    "receiptRequestId": "202611160016272686358238268d9d6U3jZ6qRR",
+    "clientChannel": 3
+  },
+  "generationAttempt": {
+    "preparedAt": "2026-11-16T00:20:16.357828+00:00",
+    "model": "doubao-seedream-5-5-261028",
+    "size": "1K",
+    "background": "transparent",
+    "format": "png",
+    "count": 1,
+    "status": "ui-success-exported",
+    "uiSubmissions": 1,
+    "receiptRequestId": "202611160020271772146018268d9d6QRa2UCXi",
+    "clientChannel": 3
+  },
+  "layerZipExport": "failed-no-files-before-native-media-fix",
+  "generationPixels": {
+    "sha256": "485c2f79e2ad9b0a572cfe84c2938d8e8647cbda77caef8122f26ab7af2c366b",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparentPixels": 806071,
+    "semiTransparentPixels": 19847,
+    "opaquePixels": 222658
+  }
+}

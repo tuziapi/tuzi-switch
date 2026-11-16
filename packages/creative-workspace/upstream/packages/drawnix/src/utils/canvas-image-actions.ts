@@ -3,7 +3,7 @@ import {
   downloadFromBlob,
   base64ToBlob,
 } from "@aitu/utils";
-import { getAssistantAccount } from "../services/assistant-account";
+import { getAssistantAccount, fetchOutputMedia } from "../services/assistant-account";
 import { unifiedCacheService } from "../services/unified-cache-service";
 import { isVirtualMediaUrl } from "./virtual-media-url";
 import { copyToClipboard } from "./runtime-helpers";
@@ -48,10 +48,7 @@ export async function readCanvasImage(url: string): Promise<Blob> {
   if (!/^(https?:|blob:|data:image\/)/i.test(source)) {
     throw new Error("无法读取此图片来源。");
   }
-  const response = await fetch(source, {
-    referrerPolicy: "no-referrer",
-    credentials: "omit",
-  });
+  const response = await fetchOutputMedia(source);
   if (!response.ok)
     throw new Error("原图读取失败，请检查网络或从任务列表找回已有结果。");
   const blob = await response.blob();

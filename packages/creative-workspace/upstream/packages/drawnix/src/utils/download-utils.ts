@@ -26,7 +26,7 @@ import {
 import { isDesktopAssetUrl } from './desktop-asset-url';
 import { isVirtualMediaUrl } from './virtual-media-url';
 import { writeDesktopBinaryFile } from './desktop-binary-writer';
-import { getAssistantAccount } from '../services/assistant-account';
+import { getAssistantAccount, fetchOutputMedia } from '../services/assistant-account';
 import { runCanvasImageAction } from './canvas-image-actions';
 import { unifiedCacheService } from '../services/unified-cache-service';
 
@@ -504,7 +504,7 @@ function replaceFilenameExtension(filename: string, extension: string): string {
 }
 
 async function readDownloadBlob(item: BatchDownloadItem): Promise<Blob> {
-  if (isVirtualMediaUrl(item.url)) {
+  if (isVirtualMediaUrl(item.url) || isDesktopAssetUrl(item.url)) {
     const cachedBlob = await unifiedCacheService.getCachedBlob(item.url);
     if (!cachedBlob?.size) {
       throw new Error('原图缓存暂不可用，请从任务列表找回已有结果后重试');
@@ -514,7 +514,7 @@ async function readDownloadBlob(item: BatchDownloadItem): Promise<Blob> {
 
   const assetUrl =
     item.type === 'image' ? normalizeImageDataUrl(item.url) : item.url;
-  const response = await fetch(assetUrl, { referrerPolicy: 'no-referrer' });
+  const response = await fetchOutputMedia(assetUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch ${assetUrl}: ${response.status}`);
   }

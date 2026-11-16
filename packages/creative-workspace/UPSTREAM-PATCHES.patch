@@ -20527,10 +20527,10 @@ index 559282a..185b4de 100644
      }
 diff --git a/packages/drawnix/src/services/assistant-account.ts b/packages/drawnix/src/services/assistant-account.ts
 new file mode 100644
-index 0000000..b558a15
+index 0000000..171df0c
 --- /dev/null
 +++ b/packages/drawnix/src/services/assistant-account.ts
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,63 @@
 +import type { CreativeAccountBridge } from "../../../../../src/bridge-types";
 +export const ACCOUNT_REFERENCE_PREFIX = "tuzi-account:";
 +export const ASSISTANT_ACCOUNT_CHANGED = "tuzi-assistant-account-changed";
@@ -20569,6 +20569,18 @@ index 0000000..b558a15
 +/** Explicit host capability: does not enable the old desktop filesystem IPC. */
 +export function fetchAssistantManual(url: string, init: RequestInit = {}): Promise<Response> {
 +  return current?.requestManual ? current.requestManual(url, init) : fetch(url, init);
++}
++
++/** Fetch output media without model/account credentials; native HTTP handles CDN CORS. */
++export function fetchOutputMedia(url: string, signal?: AbortSignal, accept?: string): Promise<Response> {
++  const init: RequestInit = {
++    method: 'GET', credentials: 'omit', referrerPolicy: 'no-referrer',
++    cache: 'no-store', ...(signal ? { signal } : {}),
++    ...(accept ? { headers: { Accept: accept } } : {}),
++  };
++  return hasAssistantTransport() && /^https?:\/\//i.test(url)
++    ? fetchAssistantManual(url, init)
++    : fetch(url, init);
 +}
 +
 +/** External sites stay outside the host WebView and receive no model Key. */
@@ -22746,10 +22758,15 @@ index 0fefa27..6909c7c 100644
        if (onTaskUpdate) {
          onTaskUpdate(task.id, TaskStatus.FAILED, { error: errorInfo });
 diff --git a/packages/drawnix/src/services/media-executor/fallback-utils.test.ts b/packages/drawnix/src/services/media-executor/fallback-utils.test.ts
-index 3df57b2..aaa8b5a 100644
+index 3df57b2..3134bf2 100644
 --- a/packages/drawnix/src/services/media-executor/fallback-utils.test.ts
 +++ b/packages/drawnix/src/services/media-executor/fallback-utils.test.ts
-@@ -36,6 +36,16 @@ function mediaBlob(signature: Uint8Array, type: string): Blob {
+@@ -1,3 +1,4 @@
++import { setAssistantAccount } from '../assistant-account';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import {
+   IMAGE_CACHE_TIMEOUT_MS,
+@@ -36,6 +37,16 @@ function mediaBlob(signature: Uint8Array, type: string): Blob {
    return new Blob([signature], { type });
  }
  
@@ -22766,7 +22783,7 @@ index 3df57b2..aaa8b5a 100644
  function mediaResponse(
    signature: Uint8Array,
    type: string,
-@@ -197,6 +207,23 @@ describe('reference image transport fidelity', () => {
+@@ -197,6 +208,23 @@ describe('reference image transport fidelity', () => {
      }
    });
  
@@ -22790,7 +22807,7 @@ index 3df57b2..aaa8b5a 100644
    it('retains fetch failure behavior in original mode', async () => {
      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
      try {
-@@ -213,6 +240,28 @@ describe('pollVideoStatus', () => {
+@@ -213,6 +241,28 @@ describe('pollVideoStatus', () => {
      providerSend.mockReset();
    });
  
@@ -22819,7 +22836,43 @@ index 3df57b2..aaa8b5a 100644
    it('stops polling after the execution attempt is replaced', async () => {
      vi.useFakeTimers();
      try {
-@@ -399,11 +448,7 @@ describe('cacheRemoteUrl', () => {
+@@ -351,6 +401,7 @@ describe('pollVideoStatus', () => {
+ 
+ describe('cacheRemoteUrl', () => {
+   afterEach(() => {
++    setAssistantAccount(undefined);
+     vi.useRealTimers();
+     vi.unstubAllGlobals();
+   });
+@@ -375,6 +426,27 @@ describe('cacheRemoteUrl', () => {
+     });
+   });
+ 
++  it('persists signed layer CDN bytes through the host instead of browser CORS or standalone IPC', async () => {
++    const nativeRequest = vi.fn().mockImplementation(async () => mediaResponse(PNG_SIGNATURE, 'image/png'));
++    setAssistantAccount({ requestManual: nativeRequest } as never);
++    const legacyInvoke = vi.fn().mockRejectedValue(new Error('unsupported standalone IPC'));
++    vi.stubGlobal('__TUZI_CREATIVE_NATIVE__', { invoke: legacyInvoke });
++    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('CORS')));
++    const { cacheRemoteUrl } = await import('./fallback-utils');
++    const controller = new AbortController();
++    const result = await cacheRemoteUrl('https://cdn.example.test/layer.png?signature=synthetic', 'semantic', 'image', 'png', 1, {
++      forceRemoteCache: true, returnLocalCacheUrl: true, signal: controller.signal,
++    });
++    expect(result).toBe('/__aitu_cache__/image/semantic_1.png');
++    expect(cacheMediaFromBlob).toHaveBeenCalledTimes(1);
++    expect(nativeRequest).toHaveBeenCalledTimes(1);
++    expect(nativeRequest.mock.calls[0][1]).toMatchObject({ method: 'GET', credentials: 'omit', referrerPolicy: 'no-referrer' });
++    expect(nativeRequest.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
++    expect(new Headers(nativeRequest.mock.calls[0][1].headers).has('authorization')).toBe(false);
++    expect(legacyInvoke).not.toHaveBeenCalled();
++    expect(fetch).not.toHaveBeenCalled();
++  });
++
+   it('aborts a stalled image download and preserves its source URL', async () => {
+     vi.useFakeTimers();
+     const warning = vi.fn();
+@@ -399,11 +471,7 @@ describe('cacheRemoteUrl', () => {
    });
  
    it('caches raw base64 image payloads as content-addressed local URLs', async () => {
@@ -22832,7 +22885,7 @@ index 3df57b2..aaa8b5a 100644
  
      vi.stubGlobal('fetch', fetchMock);
  
-@@ -419,9 +464,7 @@ describe('cacheRemoteUrl', () => {
+@@ -419,9 +487,7 @@ describe('cacheRemoteUrl', () => {
      expect(result).toMatch(
        /^\/__aitu_cache__\/image\/content-[0-9a-f]{64}\.png$/
      );
@@ -22843,7 +22896,7 @@ index 3df57b2..aaa8b5a 100644
      expect(cacheMediaFromBlob).toHaveBeenCalledWith(result, blobLike, 'image', {
        taskId: 'task-raw-b64',
      });
-@@ -466,7 +509,7 @@ describe('cacheRemoteUrl', () => {
+@@ -466,7 +532,7 @@ describe('cacheRemoteUrl', () => {
      const inlineUrl = 'data:image/jpeg;base64,/9j/2Q==';
      const fetchMock = vi
        .fn<typeof fetch>()
@@ -22852,7 +22905,7 @@ index 3df57b2..aaa8b5a 100644
      vi.stubGlobal('fetch', fetchMock);
      const { cacheRemoteUrl } = await import('./fallback-utils');
      const warning = vi.fn();
-@@ -482,20 +525,34 @@ describe('cacheRemoteUrl', () => {
+@@ -482,20 +548,34 @@ describe('cacheRemoteUrl', () => {
          onCacheWarning: warning,
        }
      );
@@ -22895,11 +22948,32 @@ index 3df57b2..aaa8b5a 100644
    it('reuses the same cached file for identical base64 payloads across tasks', async () => {
      const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () =>
        mediaResponse(PNG_SIGNATURE, 'image/png', {
+@@ -675,6 +755,7 @@ describe('cacheRemoteUrl', () => {
+ 
+     expect(result).toBe(remoteUrl);
+     expect(fetchMock).toHaveBeenCalledWith(remoteUrl, {
++      method: 'GET',
+       credentials: 'omit',
+       cache: 'no-store',
+       referrerPolicy: 'no-referrer',
+@@ -1025,6 +1106,7 @@ describe('cacheRemoteUrl', () => {
+ 
+     expect(result).toBe('/__aitu_cache__/image/insert-123.png');
+     expect(fetchMock).toHaveBeenCalledExactlyOnceWith(remoteUrl, {
++      method: 'GET',
+       credentials: 'omit',
+       cache: 'no-store',
+       headers: { Accept: 'image/*' },
 diff --git a/packages/drawnix/src/services/media-executor/fallback-utils.ts b/packages/drawnix/src/services/media-executor/fallback-utils.ts
-index 5cc60cb..4ffc3ce 100644
+index 5cc60cb..dc3e310 100644
 --- a/packages/drawnix/src/services/media-executor/fallback-utils.ts
 +++ b/packages/drawnix/src/services/media-executor/fallback-utils.ts
-@@ -7,6 +7,11 @@
+@@ -1,3 +1,4 @@
++import { fetchOutputMedia, hasAssistantTransport } from '../assistant-account';
+ /**
+  * Fallback Executor 辅助函数
+  *
+@@ -7,6 +8,11 @@
  
  import type { VideoAPIConfig, GeminiConfig } from './types';
  import {
@@ -22911,7 +22985,7 @@ index 5cc60cb..4ffc3ce 100644
    calculateBlobChecksum,
    compressImageBlob,
    getFileExtension,
-@@ -89,8 +94,8 @@ export async function ensureBase64ForAI(
+@@ -89,8 +95,8 @@ export async function ensureBase64ForAI(
      const base64Part = value.slice(value.indexOf(',') + 1);
      const estimatedBytes = (base64Part.length * 3) / 4;
      if (estimatedBytes <= MAX_REFERENCE_IMAGE_BYTES) return value;
@@ -22922,7 +22996,7 @@ index 5cc60cb..4ffc3ce 100644
      return blobToBase64ForAI(blob, keepOriginal);
    }
    if (
-@@ -209,6 +214,7 @@ export async function pollVideoStatus(
+@@ -209,6 +215,7 @@ export async function pollVideoStatus(
    for (let attempt = 0; attempt < maxAttempts; attempt++) {
      assertPollingActive();
      let data: any;
@@ -22930,7 +23004,7 @@ index 5cc60cb..4ffc3ce 100644
      try {
        const statusPath = resolveVideoPollPathForModel(
          videoId,
-@@ -253,6 +259,7 @@ export async function pollVideoStatus(
+@@ -253,6 +260,7 @@ export async function pollVideoStatus(
        }
  
        const rawData = await response.json();
@@ -22938,7 +23012,7 @@ index 5cc60cb..4ffc3ce 100644
        data = isMiniMaxH3
          ? normalizeMiniMaxH3VideoResponse(rawData, videoId)
          : rawData;
-@@ -323,7 +330,7 @@ export async function pollVideoStatus(
+@@ -323,7 +331,7 @@ export async function pollVideoStatus(
        if (errCode) {
          (error as any).code = errCode;
        }
@@ -22947,7 +23021,7 @@ index 5cc60cb..4ffc3ce 100644
      }
  
      // 等待下一次轮询
-@@ -578,7 +585,7 @@ function invokeTauriCommand<T>(
+@@ -578,7 +586,7 @@ function invokeTauriCommand<T>(
    command: string,
    args?: Record<string, unknown>
  ): Promise<T> {
@@ -22956,7 +23030,31 @@ index 5cc60cb..4ffc3ce 100644
  }
  
  async function cacheRemoteUrlToDesktopMedia(
-@@ -912,11 +919,9 @@ export async function cacheRemoteUrl(
+@@ -701,7 +709,7 @@ export async function cacheRemoteUrl(
+     normalizedUrl.startsWith('http://') ||
+     normalizedUrl.startsWith('https://')
+   ) {
+-    if (isTauriEnvironment()) {
++    if (isTauriEnvironment() && !hasAssistantTransport()) {
+       try {
+         const desktopUrl = await cacheRemoteUrlToDesktopMedia(
+           normalizedUrl,
+@@ -813,13 +821,7 @@ export async function cacheRemoteUrl(
+       }
+ 
+       const download = async (signal?: AbortSignal) => {
+-        const response = await fetch(normalizedUrl, {
+-          credentials: 'omit',
+-          cache: 'no-store',
+-          ...(mediaType === 'image' ? { headers: { Accept: 'image/*' } } : {}),
+-          referrerPolicy: 'no-referrer',
+-          ...(signal ? { signal } : {}),
+-        });
++        const response = await fetchOutputMedia(normalizedUrl, signal, mediaType === 'image' ? 'image/*' : undefined);
+         signal?.throwIfAborted();
+         const blob = response.ok ? await response.blob() : undefined;
+         signal?.throwIfAborted();
+@@ -912,11 +914,9 @@ export async function cacheRemoteUrl(
    try {
      // data URL / 原始 base64：直接转 Blob 再缓存，避免把大串 base64 存进任务结果
      if (isDataURL(normalizedUrl)) {
@@ -33347,10 +33445,10 @@ index b306aab..eb031a4 100644
 +  );
 +});
 diff --git a/packages/drawnix/src/utils/__tests__/download-utils.test.ts b/packages/drawnix/src/utils/__tests__/download-utils.test.ts
-index 571a4f2..08fa200 100644
+index 571a4f2..031528b 100644
 --- a/packages/drawnix/src/utils/__tests__/download-utils.test.ts
 +++ b/packages/drawnix/src/utils/__tests__/download-utils.test.ts
-@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+@@ -2,10 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  import { AssetSource, AssetType, type Asset } from '../../types/asset.types';
  import { TaskStatus, TaskType, type Task } from '../../types/task.types';
  import type { AudioDownloadMetadata } from '../audio-id3';
@@ -33360,10 +33458,11 @@ index 571a4f2..08fa200 100644
    buildTaskDownloadItems,
    smartDownload,
 +  downloadMediaFile,
++  downloadAsZip,
  } from '../download-utils';
  
  const {
-@@ -101,6 +103,28 @@ function createTask(overrides: Partial<Task> = {}): Task {
+@@ -101,6 +104,28 @@ function createTask(overrides: Partial<Task> = {}): Task {
  }
  
  describe('download-utils', () => {
@@ -33392,7 +33491,7 @@ index 571a4f2..08fa200 100644
    beforeEach(() => {
      downloadFileMock.mockReset();
      openInNewTabMock.mockReset();
-@@ -112,9 +136,38 @@ describe('download-utils', () => {
+@@ -112,9 +137,56 @@ describe('download-utils', () => {
    });
  
    afterEach(() => {
@@ -33400,6 +33499,24 @@ index 571a4f2..08fa200 100644
      vi.unstubAllGlobals();
    });
  
++  it('exports remote layer PNGs and the OCR manifest through the native host despite browser CORS', async () => {
++    const png = new Blob([new Uint8Array([137,80,78,71,13,10,26,10])], { type: 'image/png' });
++    const requestManual = vi.fn().mockResolvedValue({ ok: true, blob: async () => png });
++    const saveMedia = vi.fn().mockResolvedValue('saved');
++    setAssistantAccount({ requestManual, saveMedia } as any);
++    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('CORS')));
++    const result = await downloadAsZip([{ url: 'https://cdn.example.test/layer.png?signature=synthetic', type: 'image', filename: '01-layer.png' }],
++      'layers.zip', undefined, [{filename: 'manifest.json', content: JSON.stringify({ textRecognition: { text: 'TUZI 55' } })}]);
++    expect(result).toMatchObject({ downloadedCount: 1, failedCount: 0 });
++    expect(saveMedia).toHaveBeenCalledWith(expect.any(Blob), 'layers.zip', 'archive');
++    const { default: JSZip } = await import('jszip');
++    const zip = await JSZip.loadAsync(saveMedia.mock.calls[0][0]);
++    expect(Object.keys(zip.files)).toEqual(['01-layer.png', 'manifest.json']);
++    expect(await zip.file('manifest.json')!.async('string')).toContain('TUZI 55');
++    expect(requestManual).toHaveBeenCalledTimes(1);
++    expect(fetch).not.toHaveBeenCalled();
++  });
++
 +  it('saves cached video through the host media dialog without image decoding or remote fetch', async () => {
 +    const video = new Blob([new Uint8Array([0,0,0,24,102,116,121,112,109,112,52,50])], { type: 'video/mp4' });
 +    getCachedBlobMock.mockResolvedValue(video);
@@ -33431,7 +33548,7 @@ index 571a4f2..08fa200 100644
    it('为素材库音频构建带封面的下载项', () => {
      const item = buildAssetDownloadItem(
        createAsset({
-@@ -240,7 +293,7 @@ describe('download-utils', () => {
+@@ -240,7 +312,7 @@ describe('download-utils', () => {
            filename: 'missing.mp4',
          },
        ])
@@ -34320,16 +34437,16 @@ index 0000000..eee09a1
 +}
 diff --git a/packages/drawnix/src/utils/canvas-image-actions.ts b/packages/drawnix/src/utils/canvas-image-actions.ts
 new file mode 100644
-index 0000000..8ee9bbc
+index 0000000..a1006ba
 --- /dev/null
 +++ b/packages/drawnix/src/utils/canvas-image-actions.ts
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,125 @@
 +import {
 +  normalizeImageDataUrl,
 +  downloadFromBlob,
 +  base64ToBlob,
 +} from "@aitu/utils";
-+import { getAssistantAccount } from "../services/assistant-account";
++import { getAssistantAccount, fetchOutputMedia } from "../services/assistant-account";
 +import { unifiedCacheService } from "../services/unified-cache-service";
 +import { isVirtualMediaUrl } from "./virtual-media-url";
 +import { copyToClipboard } from "./runtime-helpers";
@@ -34374,10 +34491,7 @@ index 0000000..8ee9bbc
 +  if (!/^(https?:|blob:|data:image\/)/i.test(source)) {
 +    throw new Error("无法读取此图片来源。");
 +  }
-+  const response = await fetch(source, {
-+    referrerPolicy: "no-referrer",
-+    credentials: "omit",
-+  });
++  const response = await fetchOutputMedia(source);
 +  if (!response.ok)
 +    throw new Error("原图读取失败，请检查网络或从任务列表找回已有结果。");
 +  const blob = await response.blob();
@@ -34466,14 +34580,14 @@ index 42c7c72..a7734ec 100644
  
  function shouldUseHttpAssetProtocol(): boolean {
 diff --git a/packages/drawnix/src/utils/download-utils.ts b/packages/drawnix/src/utils/download-utils.ts
-index 0d9525a..ee20c57 100644
+index 0d9525a..ccc6406 100644
 --- a/packages/drawnix/src/utils/download-utils.ts
 +++ b/packages/drawnix/src/utils/download-utils.ts
 @@ -26,6 +26,8 @@ import {
  import { isDesktopAssetUrl } from './desktop-asset-url';
  import { isVirtualMediaUrl } from './virtual-media-url';
  import { writeDesktopBinaryFile } from './desktop-binary-writer';
-+import { getAssistantAccount } from '../services/assistant-account';
++import { getAssistantAccount, fetchOutputMedia } from '../services/assistant-account';
 +import { runCanvasImageAction } from './canvas-image-actions';
  import { unifiedCacheService } from '../services/unified-cache-service';
  
@@ -34527,14 +34641,26 @@ index 0d9525a..ee20c57 100644
  }
  
  async function pickDesktopSavePath(filename: string): Promise<string | null> {
-@@ -487,7 +507,7 @@ async function readDownloadBlob(item: BatchDownloadItem): Promise<Blob> {
-   if (isVirtualMediaUrl(item.url)) {
+@@ -484,17 +504,17 @@ function replaceFilenameExtension(filename: string, extension: string): string {
+ }
+ 
+ async function readDownloadBlob(item: BatchDownloadItem): Promise<Blob> {
+-  if (isVirtualMediaUrl(item.url)) {
++  if (isVirtualMediaUrl(item.url) || isDesktopAssetUrl(item.url)) {
      const cachedBlob = await unifiedCacheService.getCachedBlob(item.url);
      if (!cachedBlob?.size) {
 -      throw new Error('本地媒体缓存不可用，请重新生成');
 +      throw new Error('原图缓存暂不可用，请从任务列表找回已有结果后重试');
      }
      return cachedBlob;
+   }
+ 
+   const assetUrl =
+     item.type === 'image' ? normalizeImageDataUrl(item.url) : item.url;
+-  const response = await fetch(assetUrl, { referrerPolicy: 'no-referrer' });
++  const response = await fetchOutputMedia(assetUrl);
+   if (!response.ok) {
+     throw new Error(`Failed to fetch ${assetUrl}: ${response.status}`);
    }
 @@ -667,7 +687,8 @@ export async function downloadAsZip(
    const zip = new JSZip();

@@ -8,6 +8,7 @@ import {
   buildTaskDownloadItems,
   smartDownload,
   downloadMediaFile,
+  downloadAsZip,
 } from '../download-utils';
 
 const {
@@ -138,6 +139,24 @@ describe('download-utils', () => {
   afterEach(() => {
     setAssistantAccount(undefined);
     vi.unstubAllGlobals();
+  });
+
+  it('exports remote layer PNGs and the OCR manifest through the native host despite browser CORS', async () => {
+    const png = new Blob([new Uint8Array([137,80,78,71,13,10,26,10])], { type: 'image/png' });
+    const requestManual = vi.fn().mockResolvedValue({ ok: true, blob: async () => png });
+    const saveMedia = vi.fn().mockResolvedValue('saved');
+    setAssistantAccount({ requestManual, saveMedia } as any);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('CORS')));
+    const result = await downloadAsZip([{ url: 'https://cdn.example.test/layer.png?signature=synthetic', type: 'image', filename: '01-layer.png' }],
+      'layers.zip', undefined, [{filename: 'manifest.json', content: JSON.stringify({ textRecognition: { text: 'TUZI 55' } })}]);
+    expect(result).toMatchObject({ downloadedCount: 1, failedCount: 0 });
+    expect(saveMedia).toHaveBeenCalledWith(expect.any(Blob), 'layers.zip', 'archive');
+    const { default: JSZip } = await import('jszip');
+    const zip = await JSZip.loadAsync(saveMedia.mock.calls[0][0]);
+    expect(Object.keys(zip.files)).toEqual(['01-layer.png', 'manifest.json']);
+    expect(await zip.file('manifest.json')!.async('string')).toContain('TUZI 55');
+    expect(requestManual).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('saves cached video through the host media dialog without image decoding or remote fetch', async () => {

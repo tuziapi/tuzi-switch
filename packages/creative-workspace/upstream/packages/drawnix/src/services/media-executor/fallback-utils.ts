@@ -1,3 +1,4 @@
+import { fetchOutputMedia, hasAssistantTransport } from '../assistant-account';
 /**
  * Fallback Executor 辅助函数
  *
@@ -708,7 +709,7 @@ export async function cacheRemoteUrl(
     normalizedUrl.startsWith('http://') ||
     normalizedUrl.startsWith('https://')
   ) {
-    if (isTauriEnvironment()) {
+    if (isTauriEnvironment() && !hasAssistantTransport()) {
       try {
         const desktopUrl = await cacheRemoteUrlToDesktopMedia(
           normalizedUrl,
@@ -820,13 +821,7 @@ export async function cacheRemoteUrl(
       }
 
       const download = async (signal?: AbortSignal) => {
-        const response = await fetch(normalizedUrl, {
-          credentials: 'omit',
-          cache: 'no-store',
-          ...(mediaType === 'image' ? { headers: { Accept: 'image/*' } } : {}),
-          referrerPolicy: 'no-referrer',
-          ...(signal ? { signal } : {}),
-        });
+        const response = await fetchOutputMedia(normalizedUrl, signal, mediaType === 'image' ? 'image/*' : undefined);
         signal?.throwIfAborted();
         const blob = response.ok ? await response.blob() : undefined;
         signal?.throwIfAborted();

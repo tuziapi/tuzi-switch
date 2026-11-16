@@ -38,6 +38,18 @@ export function fetchAssistantManual(url: string, init: RequestInit = {}): Promi
   return current?.requestManual ? current.requestManual(url, init) : fetch(url, init);
 }
 
+/** Fetch output media without model/account credentials; native HTTP handles CDN CORS. */
+export function fetchOutputMedia(url: string, signal?: AbortSignal, accept?: string): Promise<Response> {
+  const init: RequestInit = {
+    method: 'GET', credentials: 'omit', referrerPolicy: 'no-referrer',
+    cache: 'no-store', ...(signal ? { signal } : {}),
+    ...(accept ? { headers: { Accept: accept } } : {}),
+  };
+  return hasAssistantTransport() && /^https?:\/\//i.test(url)
+    ? fetchAssistantManual(url, init)
+    : fetch(url, init);
+}
+
 /** External sites stay outside the host WebView and receive no model Key. */
 export function isAssistantExternalTool(toolId: string): boolean {
   return import.meta.env.VITE_TUZI_ASSISTANT === 'true' &&
