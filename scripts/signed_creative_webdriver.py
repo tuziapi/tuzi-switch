@@ -43,8 +43,9 @@ class CreativeChecks:
         def attempt():
             return self.execute('''const [selector,text,value]=arguments;
 const visible=e=>e.getClientRects().length && getComputedStyle(e).visibility!=='hidden';
-const e=[...document.querySelectorAll(selector)].find(e=>visible(e) && !e.disabled &&
+const matches=[...document.querySelectorAll(selector)].filter(e=>visible(e) && !e.disabled &&
  (text===null || e.textContent.trim()===text || e.getAttribute('aria-label')===text));
+const e=matches.find(e=>!matches.some(child=>child!==e && e.contains(child)));
 if(!e)return false;
 if(value===null)e.click();else {
 const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;
