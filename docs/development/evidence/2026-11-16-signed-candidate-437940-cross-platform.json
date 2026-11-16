@@ -1,0 +1,35 @@
+{
+  "kind": "signed-candidate-cross-platform-real-upgrade-reprobe",
+  "baseRunId": "43786133865",
+  "baseCommit": "22ae76d26ed88220e30b910b5d1c65884bf3a300",
+  "baseVersion": "1.6.2",
+  "targetRunId": "43689683759",
+  "targetCommit": "695f4e933d797b39f7a61aad7804800a01eddc96",
+  "targetVersion": "1.6.3",
+  "sourceBranch": "codex/verified-desktop-updates",
+  "probeRuns": {
+    "windows": "43794070706",
+    "linux": "43794074569",
+    "macos": "43794078636"
+  },
+  "results": {
+    "windows": {
+      "status": "failed",
+      "reason": [
+        "NSIS creative preservation observed generation-anchor phase=inserting instead of completed",
+        "MSI update button did not appear within 60 seconds"
+      ]
+    },
+    "linux": {
+      "status": "passed",
+      "jobs": "AppImage/DEB/RPM from 1.6.0 and 1.6.1"
+    },
+    "macos": {
+      "status": "passed",
+      "jobs": "ARM64 and x64 signed candidate control"
+    }
+  },
+  "officialAcceptance": false,
+  "published": false,
+  "note": "Windows failures are retained as failures; Linux/macOS success does not substitute for Windows."
+}
