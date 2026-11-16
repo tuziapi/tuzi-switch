@@ -5271,6 +5271,10 @@
       "sha256": "8a9437f3e76d82c075b1fc49e8c5e7ab74f686a49b992d450a9db7bba3fc9080"
     },
     {
+      "path": "packages/drawnix/src/utils/__tests__/image-task-prefill.test.ts",
+      "sha256": "2128de7f7e244094cf4dfd71097484047b0c2d869ba2f3cfba534ea309dd4836"
+    },
+    {
       "path": "packages/drawnix/src/utils/__tests__/model-pricing-service.test.ts",
       "sha256": "52f9416dbcedb24a1f9432f0731980f289b0260288ddad7e79fa9e1cf558f342"
     },
@@ -6734,6 +6738,161 @@
       "path": "packages/drawnix/src/components/CanvasImageContextMenu.test.tsx",
       "origin": "assistant-integration",
       "reason": "Regression coverage for canvas image/video menus, native overlay targeting and delayed WebKit scroll dismissal"
+    },
+    {
+      "path": "docs/qa-canvas-generation-nodes.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "docs/qa-canvas-reroll.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/design.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/proposal.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/specs/ai-input-generation/spec.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/specs/canvas-generation-inputs/spec.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/tasks.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/validation.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.generation-discussion.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.reroll.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/generation-node-actions.test.tsx",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/generation-node-actions.tsx",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useAutoCompleteShapePicker.test.tsx",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useGenerationNodeDraft.test.tsx",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useGenerationNodeDraft.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-generation-node.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-generation-node.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node-thumbnail.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node-thumbnail.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/image-generation-recipe.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/image-generation-recipe.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/image-reference-ports.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/image-reference-ports.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar-position.test.ts",
+      "origin": "desktop-canvas-integration",
+      "reason": "Regress desktop header/editor collision discovered during PR338/339 integration UI verification"
     }
   ],
   "integration": {
@@ -6752,6 +6911,17 @@
       "date": "2026-11-05",
       "strategy": "incremental three-way merge with native SVG diagnostics, native clipboard and original media preservation",
       "record": "docs/development/2026-11-05-opentu-develop-sync.md"
+    },
+    {
+      "task": "UC-CANVAS-339",
+      "repository": "ljquan/opentu",
+      "sourceThread": "01a1c98c-5c80-7f11-ab13-8c7344e32bb0",
+      "baseRevision": "73f6e925df2edd3723bef358a21fd51b48492f12",
+      "revision": "debc11bc56b59c0e06dc8185ae529668a8245cfb",
+      "assistantBase": "c299b8df5d03a69afa96b637a1370ebdf3e00f29",
+      "date": "2026-11-16",
+      "strategy": "scoped three-way integration of PR338 feature paths plus PR339 actions; retain desktop discussion, native transports, Seedream55 and update UI",
+      "record": "docs/development/2026-11-16-canvas-generation-integration.md"
     }
   ]
 }

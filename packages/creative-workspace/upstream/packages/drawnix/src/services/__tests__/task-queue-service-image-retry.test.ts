@@ -1736,6 +1736,26 @@ describe('task-queue-service image edit retry persistence', () => {
     );
   });
 
+  it('keeps stripped image inputs in completed storage for result recipes', async () => {
+    const { taskQueueService, storedTasks } = await setupTaskQueueServiceHarness([
+      TaskStatus.COMPLETED,
+    ]);
+    const references = ['data:image/png;base64,SYNTHETIC_RECIPE_REFERENCE'];
+    const task = taskQueueService.createTask({
+      prompt: 'Preserve original recipe inputs', model: 'gpt-image-2', size: '1x1',
+      referenceImages: references,
+      maskImage: 'data:image/png;base64,SYNTHETIC_RECIPE_MASK',
+    }, TaskType.IMAGE);
+    await flushAsyncWork();
+    await taskQueueService.waitForTaskPersistence(task.id);
+    expect(storedTasks.get(task.id)?.status).toBe(TaskStatus.COMPLETED);
+    expect(storedTasks.get(task.id)?.params).toMatchObject({
+      referenceImages: references,
+      maskImage: 'data:image/png;base64,SYNTHETIC_RECIPE_MASK',
+    });
+    expect(taskQueueService.getTask(task.id)?.params.referenceImages).toBeUndefined();
+  });
+
   it('allows explicit manual retry for completed image tasks and clears stale results', async () => {
     const { taskQueueService, mocks } = await setupTaskQueueServiceHarness([
       TaskStatus.COMPLETED,
