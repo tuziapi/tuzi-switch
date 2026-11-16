@@ -4,8 +4,8 @@
   "releaseRepository": "tuziapi/tuzi-switch",
   "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
   "base": {
-    "runId": "43699923173",
-    "commit": "5bfee5f39b0b370093081227c6e19883f21280a0",
+    "runId": "43786133865",
+    "commit": "22ae76d26ed88220e30b910b5d1c65884bf3a300",
     "version": "1.6.2"
   },
   "target": {
