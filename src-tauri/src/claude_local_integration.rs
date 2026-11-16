@@ -12,7 +12,9 @@ use std::{
 static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static OPERATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static HOST: OnceLock<Arc<TuziHost>> = OnceLock::new();
-const TESTED_VERSION: &str = "2.26454.0";
+#[path = "claude_local_copy.rs"]
+mod desktop_copy;
+const TESTED_VERSION: &str = desktop_copy::COPY_VERSION;
 
 struct TuziHost {
     root: PathBuf,
@@ -57,6 +59,7 @@ fn host() -> Result<Arc<TuziHost>, String> {
         &root,
         &root.join("claude-local"),
         &root.join("desktop-profile"),
+        &root.join("desktop-profile-3p"),
     ] {
         if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
             return Err("隔离目录不能是符号链接".into());
@@ -109,6 +112,9 @@ impl Host for TuziHost {
     }
     fn isolated_profile_dir(&self) -> Option<PathBuf> {
         Some(self.root.join("desktop-profile"))
+    }
+    fn isolated_app_path(&self) -> Option<PathBuf> {
+        Some(desktop_copy::app_path(&self.root))
     }
     fn node_runtime(&self) -> Option<PathBuf> {
         // Always Some: do not fall back to borrowing Node from Codex/ChatGPT.
@@ -247,6 +253,11 @@ pub async fn claude_local_action(
     let host = host()?;
     if action != "stop" && manifest().exists() {
         return Err("请先正常退出 Claude 并停止现有兼容会话".into());
+    }
+    if matches!(action.as_str(), "prepare" | "launch") {
+        let root = host.root.clone();
+        tauri::async_runtime::spawn_blocking(move || desktop_copy::prepare(&root))
+            .await.map_err(|e| e.to_string())??;
     }
     if action == "launch" {
         if !cfg!(target_os = "macos") {

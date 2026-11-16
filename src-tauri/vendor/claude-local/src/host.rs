@@ -51,6 +51,8 @@ pub trait Host: Send + Sync {
 
     /// Host-owned profile; never switch or merge the user's real Claude profile.
     fn isolated_profile_dir(&self) -> Option<PathBuf> { None }
+    /// Host-owned signed application copy; None keeps upstream discovery unchanged.
+    fn isolated_app_path(&self) -> Option<PathBuf> { None }
     /// Explicit runtime supplied by the host (no borrowing another application's Node).
     fn node_runtime(&self) -> Option<PathBuf> { None }
 
@@ -112,6 +114,10 @@ static HOST: OnceLock<Arc<dyn Host>> = OnceLock::new();
 /// 进程启动时装一次宿主；重复调用忽略（返回 false）。
 pub fn install_host(host: Arc<dyn Host>) -> bool {
     HOST.set(host).is_ok()
+}
+
+pub(crate) fn isolated_app_path() -> Option<PathBuf> {
+    HOST.get().and_then(|host| host.isolated_app_path())
 }
 
 pub(crate) fn isolated_profile_dir() -> Option<PathBuf> {

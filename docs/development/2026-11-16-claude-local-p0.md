@@ -1,13 +1,13 @@
 # CL-LOCAL-P0：B 方案首版实现与验证
 
-本轮按用户选择实施“嵌入核心，复用兔子网关”。已完成可编译的 P0 接入、真实本机三段 HTTP 合成链路和 Claude profile 隔离启动检查。**完整 P0 验收仍未完成**：信任证书后的真实客户端登录、真实模型聊天与 Code 任务，以及联合分发的许可处理仍待确认。
+本轮按用户选择实施“嵌入核心，复用兔子网关”。最新完成 Claude 5.11492.5 独立应用副本与更新隔离，真实 Code 短回复、多轮和临时目录文件写入已通过。**完整 P0 验收仍未完成**：新版普通 Chat 入口触发 Cowork VM，当前受磁盘空间检查阻断；汉化尚不完整，联合分发许可未处理。下方首轮记录保留历史时点，最新结果见“新版适配与真实验收”。
 
 ## 工作区与边界
 
 - 分支：`codex/claude-local-p0`；基线 `6a7df853`。
 - 独立工作区：`/Users/sdy09/Documents/ChatGPT/tuzi-claude-local-p0`。未修改“完善桌面端自动更新”工作区。
 - 核心来源：ClaudeMom `ec627dbdc2e94ce1dbf5ccae8fc1018d903ac6fa`，`claude-local 0.1.3`。
-- 只做本地开发、测试和本地实验包；无 push、PR、发布、系统证书安装或付费模型调用。
+- 只做本地开发、测试和本地实验包；无 push、PR、发布。首轮未安装系统证书或调用付费模型；用户后续明确同意继续实机验收，授权证书信任与少量模型测试，并选择复用“兔子线路”。本次进展见下方原生预检记录。
 - 普通构建默认关闭核心。P0 特性强制隔离兔子数据；实验包使用 `com.tuziswitch.desktop.claude-local-p0`，不会自动导入正式版的供应商或凭证。
 
 ## 已实现
@@ -31,8 +31,8 @@
 ## 操作流程
 
 1. 构建/打开独立 P0 包，在 Claude Desktop 中手动配置测试 API 供应商，填好模型映射或明确的默认模型。
-2. 点“准备资源”，只写实验目录并生成本地 CA；点击“信任本地证书”才会请求系统授权。
-3. 关闭所有 Claude 窗口并退出 Claude，点击“启动兼容模式”。仅允许 macOS / Claude 2.26454.0，Node.js 需支持 fetch 和 WebSocket。
+2. 点“准备资源”，验证并复制官方签名 Claude 到独立版本目录，写实验资源并生成本地 CA；点击“信任本地证书”才会请求系统授权。
+3. 关闭所有 Claude 窗口并退出 Claude，点击“启动兼容模式”。当前仅允许 macOS / 已验证的 Claude 5.11492.5 独立副本，Node.js 需支持 fetch 和 WebSocket；其他版本须重新验证。
 4. 停止前先正常退出 Claude，再点“停止 / 恢复”。既有会话与配置保留，网关不会随之停止。
 5. 如有异常中断，重开实验包后先恢复。无需且不能自动沿用旧会话令牌。
 
@@ -73,14 +73,61 @@ scripts/build-claude-local-p0.sh
 CC_SWITCH_TEST_HOME=/tmp/tuzi-p0-test-home cargo test --manifest-path src-tauri/Cargo.toml --features claude-local-poc --lib local_ -- --test-threads=1
 
 # 仅当本机 Claude 已退出时，显式执行空白目录探针
-python3 scripts/qa/claude-local-isolation.py --run
+python3 scripts/qa/claude-local-isolation.py --run \
+  --app "<P0数据根>/desktop-app/5.11492.5/Claude.app" --expected-version 5.11492.5
 ```
 
-实验包：`src-tauri/target/debug/bundle/macos/兔子助手 Claude P0.app`，独立本地 macOS arm64 Debug 包，未安装到 Applications、未启动真实模型会话。可执行文件 SHA-256：`69601e0e57c524826d82eda7e8e4beaf66428d93d3f6a75f83221abd140773b9`。入口代码见 `src-tauri/src/claude_local_integration.rs`、`src-tauri/src/proxy/local_session.rs`、`src/components/proxy/ClaudeLocalPanel.tsx`。上游来源及补丁见 [TUZI-PATCHES](../../src-tauri/vendor/claude-local/TUZI-PATCHES.md)，决策见 [ADR-022](decisions/0022-claude-local-p0.md)。
+首轮实验包留档（当前包摘要见新版结果 JSON）：`src-tauri/target/debug/bundle/macos/兔子助手 Claude P0.app`，独立本地 macOS arm64 Debug 包。首轮 SHA-256：`69601e0e57c524826d82eda7e8e4beaf66428d93d3f6a75f83221abd140773b9`。入口代码见 `src-tauri/src/claude_local_integration.rs`、`src-tauri/src/proxy/local_session.rs`、`src/components/proxy/ClaudeLocalPanel.tsx`。上游来源及补丁见 [TUZI-PATCHES](../../src-tauri/vendor/claude-local/TUZI-PATCHES.md)，决策见 [ADR-022](decisions/0022-claude-local-p0.md)。
+
+## 继续实机验收：原生预检
+
+2026-11-16，用户答复“是，继续”，并明确选择复用当前“兔子线路”。已打开独立 P0 应用，以原生界面完成“准备资源”和“信任本地证书”。界面显示 Claude 2.26454.0、证书已信任、Node.js 就绪；系统 `security verify-cert` 对自有证书验证成功。证书当前保留在本机信任范围内，尚未执行移除。
+
+只读核对正式版配置发现：没有 Claude Desktop 供应商，Claude Code 当前供应商 `tuzi-route` 的 `ANTHROPIC_AUTH_TOKEN` 和 `ANTHROPIC_API_KEY` 都为空。没有将其他账户或工具的凭证混用为测试 Key。用户已在实验版界面内填写 Key、将地址设为 `https://api.tu-zi.com` 并添加“兔子线路 · P0 验收”。模型为 `anthropic/claude-sonnet-4.6`，使用 Anthropic Messages 映射，1M 未勾选。
+
+首轮兼容会话成功启动并绑定指定供应商，但 Claude 页面提示 `assets-proxy.anthropic.com` 资源加载失败。定位到内嵌 API 模板使上游进入线上 SPA / CDN 路径，未使用安装版本的网页资源。已修正隔离严格模式，使其固定使用本机安装包页面与静态资源，同时保留模板 API 行为；新增模板存在场景的 TLS 回归，确认页面和 CDN 资源无需出站请求。Node 回归共 27 项通过。首轮 Claude 与兼容服务均正常退出，运行标记已清除；数据库模型请求数为 0。
+
+在该首轮时点，登录、文本多轮和 Code 文件任务尚未验收。系统截图接口报 `SCStreamErrorDomain -3811`，当时未取得截图；新版测试截图已恢复，见下方真实画面。初始预检证据和个人配置摘要基线见 [native-preflight.json](attachments/claude-local-p0/native-preflight.json)，其中 Key 缺失和未启动状态仅表示该文件记录时点。
+
+## 新版适配与真实验收（2026-11-16）
+
+旧客户端自动更新器在测试过程中将 `/Applications/Claude.app` 从 2.26454.0 升至 5.11492.5。此前 profile 隔离不涵盖安装包，已向用户说明；用户明确选择“继续适配当前版本并隔离更新”。
+
+三层更新隔离：
+
+1. Host 新增可选 `isolated_app_path`，默认 None 保留上游行为。P0 固定副本目录；准备/启动时验证官方签名、团队和版本，临时复制后原子提升。状态轮询不复制，不自动接受其他版本或损坏的副本。
+2. 新版签名客户端忽略旧配置文件顶层的禁更新字段，实际读取自有 `desktop-profile-3p/configLibrary` 的所选条目。写入 `disableAutoUpdates:true`，保留其他字段、校验 UUID 与索引、拒绝符号链接。原生日志明确显示 `Auto-updates disabled by enterprise policy`。
+3. 严格隔离代理对 `/api/desktop/<platform>/<arch>/<type>/update` 返回 204；Code 运行组件下载不被该规则阻断。
+
+新版探针和真实测试结束后，原安装包、独立副本及检查范围内个人配置摘要均未变。原生日志仍在共享 `~/Library/Logs/Claude`，不宣称全 HOME 隔离。证据见 [新版探针](attachments/claude-local-p0/isolation-5.11492.5.json)。
+
+| 实机项目 | 结果 |
+|---|---|
+| 本地模式进入界面 | 无需 Claude 账号，官方签名独立副本启动成功 |
+| 模型映射 | 旧 ID 返回 400；只读模型列表核实后使用 `claude-sonnet-4-6` |
+| Code 短回复 | 真实返回 `P0-OK` |
+| 多轮上下文 | 下一轮真实返回 `P0-OK-2` |
+| 文件工具 | 临时目录创建 `p0-result.txt`，实际字节为 `P0-FILE-OK\n`；返回 `FILE-DONE` |
+| 普通 Chat | 首轮报 `VM_DISK_SPACE_INSUFFICIENT`；移除 Cowork 能力声明后仍进入 `/cowork/local_*` 并停留 Loading，不列为通过 |
+| 汉化 | 新主界面仍有大量英文，现有汉化未完整生效，不列为通过；未保留无效的新增词条补丁 |
+| 统计归属 | 首轮 4 个成功 SSE 请求归到 `claude`；修复后真实返回 `P0-FINAL`，对应成功记录为 `claude-desktop`。历史测试记录不改写 |
+| 正常退出 | Claude 正常退出后停止兼容服务，运行 marker 清除 |
+
+![最终实验入口与真实验证范围](attachments/claude-local-p0/native-final-panel.png)
+
+![新版 Code 多轮真实回复](attachments/claude-local-p0/native-code-multiturn.png)
+
+![新版 Code 文件任务](attachments/claude-local-p0/native-code-file.png)
+
+完整资源核查确认 5.11492.5 附带 `ion-dist.asar`（208001845 字节、buildId `spa-dev`）；旁边解包目录中的提示页不代表全部资源。核心优先读取 ASAR 固定网页壳与资源。新版 Chat 与汉化仍须按实机结果逐项适配，不以资源存在或单测通过代替验收。
+
+最终 Debug 包已重建并打开核对，SHA-256：`90839f6636866a3a7d1d114cc549ef7811b2c37652d74917a4262b2295c4e409`。最后一次模型实测后仅调整界面范围说明并移除无效的新增翻译，两个包的摘要分别保存在结果 JSON 中。
+
+新增回归：核心 Rust 59 项、Node 30 项、宿主 `local_` 19 项通过；宿主 HTTP 测试覆盖成功 JSON 与 SSE 的 Desktop 统计归属。SSE 测试使用真正的流式响应与独立消息 ID。真实证据见 [新版原生结果](attachments/claude-local-p0/native-5.11492.5-results.json)。本地费用记录为 0 不等于免费：本地未匹配模型定价，线上账单未核对。CA 仍受信任，无 push、PR 或发布。
 
 ## 未完成与下一步
 
-1. 在用户确认本地 CA 信任后，选择测试供应商完成真实登录、文本多轮、Code 文件任务、退出/恢复、中文显示验收；实际模型请求会使用测试供应商配额。
+1. 继续适配新版普通 Chat 和完整汉化。已完成的 Code 与隔离测试不代替这些验收；实验入口已同步展示实际验证范围。
 2. 继续验证 CONNECT/TLS 边界。专用网关令牌不等于整个兼容代理都已具备逐请求认证；当前仍不适合正式默认开放。
 3. 语音、电脑控制、Cowork、后台模式、Windows、内置 Node 发行和完整更新事务留在后续阶段。
 4. 确认上游 AGPL 核心的联合分发处理后，才讨论默认开启、合入发行分支与发布。

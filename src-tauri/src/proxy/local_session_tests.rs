@@ -155,7 +155,7 @@ async fn mock_upstream(
         let events = [
             (
                 "message_start",
-                json!({"type":"message_start","message":{"id":"synthetic","type":"message","role":"assistant","model":"upstream-test-model","content":[],"usage":{"input_tokens":2,"output_tokens":0}}}),
+                json!({"type":"message_start","message":{"id":"synthetic-stream","type":"message","role":"assistant","model":"upstream-test-model","content":[],"usage":{"input_tokens":2,"output_tokens":0}}}),
             ),
             (
                 "content_block_start",
@@ -179,7 +179,11 @@ async fn mock_upstream(
             .iter()
             .map(|(event, data)| format!("event: {event}\ndata: {data}\n\n"))
             .collect::<String>();
-        return ([("content-type", "text/event-stream")], body).into_response();
+        return axum::response::Response::builder()
+            .header("content-type", "text/event-stream")
+            .body(axum::body::Body::from_stream(futures::stream::once(async move {
+                Ok::<_, std::io::Error>(bytes::Bytes::from(body))
+            }))).unwrap();
     }
     Json(json!({"id":"synthetic", "type":"message", "role":"assistant", "model":"upstream-test-model",
         "content":[{"type":"tool_use","id":"tool-synthetic","name":"echo","input":{"text":"hello"}}],
@@ -307,6 +311,25 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
         .await
         .unwrap();
     assert!(streamed.contains("synthetic hello") && streamed.contains("message_stop"));
+    // The protocol parser is shared with Claude Code; consumption belongs to Desktop.
+    tokio::time::timeout(std::time::Duration::from_secs(3), async {
+        loop {
+            let ready = {
+                let conn = db.conn.lock().unwrap();
+                let counts: (i64, i64) = conn.query_row(
+                    "SELECT COUNT(*), COALESCE(SUM(CASE WHEN app_type = 'claude-desktop' THEN 1 ELSE 0 END), 0) FROM proxy_request_logs WHERE status_code = 200",
+                    [], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+                if counts.0 >= 2 { assert_eq!(counts.0, counts.1); true } else { false }
+            };
+            if ready { break; }
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+    }).await.unwrap_or_else(|_| {
+        let conn = db.conn.lock().unwrap();
+        let rows: Vec<(String, String, i64)> = conn.prepare("SELECT request_id, app_type, status_code FROM proxy_request_logs").unwrap()
+            .query_map([], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap().map(Result::unwrap).collect();
+        panic!("both native and SSE requests must produce Desktop usage records: {rows:?}");
+    });
     let mut unknown = body.clone();
     unknown["model"] = "claude-unbound".into();
     assert_eq!(

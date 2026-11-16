@@ -16,6 +16,7 @@ import { createOfficialAssets } from "./official-assets.mjs";
 import { createStateStore, dropUnroutedModels, gatewayModel, gatewayTarget, modelLabel, modelSelectors, modelWindow, planProfile, runtimeConfig } from "./runtime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const testCaDir = process.env.CLAUDE_LOCAL_TEST_CA_DIR || path.join(here, "ca");
 const modelIds = ["alpha/claude-opus-4-6", "beta/gpt-6", "gamma/grok-4", "alpha/shared", "beta/shared"];
 const modelWindows = {
   [modelIds[0]]: 1_000_000, [modelIds[1]]: 1_100_000, [modelIds[2]]: 256_000,
@@ -57,7 +58,7 @@ function writeAsar(resourcesDir, members) {
   fs.writeFileSync(path.join(resourcesDir, "ion-dist.asar"), Buffer.concat([prefix, ...bodies]));
 }
 
-async function request(instance, pathname, { host, body, type = "application/json", method = body === undefined ? "GET" : "POST", extraHeaders = {}, auth = true } = {}) {
+async function request(instance, pathname, { host, body, type = "application/json", method = body === undefined ? "GET" : "POST", extraHeaders = {}, auth = true, onChunk } = {}) {
   const raw = body === undefined ? null : Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body));
   const headers = {
     ...(raw ? { "content-type": type, "content-length": raw.length } : {}),
@@ -70,7 +71,7 @@ async function request(instance, pathname, { host, body, type = "application/jso
     connect.end();
     const [response, socket] = await once(connect, "connect");
     assert.equal(response.statusCode, 200);
-    const secure = tls.connect({ socket, servername: host, ca: fs.readFileSync(path.join(here, "ca/ca.pem")) });
+    const secure = tls.connect({ socket, servername: host, ca: fs.readFileSync(path.join(testCaDir, "ca.pem")) });
     await once(secure, "secureConnect");
     agent = new https.Agent({ keepAlive: false });
     agent.createConnection = () => secure;
@@ -83,7 +84,7 @@ async function request(instance, pathname, { host, body, type = "application/jso
       }, (res) => {
         const chunks = [];
         res.on("error", reject);
-        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("data", (chunk) => { chunks.push(chunk); onChunk?.(chunk, res); });
         res.on("end", () => {
           const bytes = Buffer.concat(chunks);
           resolve({
@@ -94,6 +95,7 @@ async function request(instance, pathname, { host, body, type = "application/jso
         });
       });
       req.on("error", (error) => reject(new Error(`${method} ${pathname}: ${error.message}\n${service?.output?.() ?? ""}`)));
+      if (onChunk) req.setTimeout(3000, () => req.destroy(new Error("stream made no progress")));
       req.end(raw);
     });
   } finally {
@@ -104,7 +106,7 @@ async function request(instance, pathname, { host, body, type = "application/jso
 async function start(extra = {}, runtimeDir = path.join(root, "runtime")) {
   const ready = path.join(root, "ready.json");
   const instanceId = `managed-test-${Date.now()}`;
-  const child = spawn(process.execPath, [path.join(runtimeDir, "proxy.mjs"), "--port", "0", "--mode", "mock", "--log", "0", "--ca", path.join(here, "ca")], {
+  const child = spawn(process.execPath, [path.join(runtimeDir, "proxy.mjs"), "--port", "0", "--mode", "mock", "--log", "0", "--ca", testCaDir], {
     env: {
       ...process.env,
       CLAUDE_LOCAL_MANAGED: "1",
@@ -301,6 +303,101 @@ test("fresh managed profile serves the installed official shell and bounded ASAR
   assert.equal(bootstrap.json.gated_imports_build_id, "fixture-build");
 });
 
+test("localization overrides and numeric regions cannot crash the runtime", async () => {
+  for (const host of ["claude.ai", "assets-proxy.anthropic.com"]) {
+    const prefix = host === "claude.ai" ? "" : "/claude-ai/v2";
+    for (const locale of ["zh-Hans", "es-419"]) {
+      const overrides = await request(service, `${prefix}/i18n/${locale}.overrides.json?v=1`, { host });
+      assert.equal(overrides.status, 200);
+      assert.deepEqual(overrides.json, {});
+      const base = await request(service, `${prefix}/i18n/${locale}.json`, { host });
+      assert.equal(base.status, 200);
+      assert.deepEqual(base.json, { message: "translated" });
+    }
+    assert.equal((await request(service, `${prefix}/i18n/unknown.resource`, { host })).status, 404);
+  }
+  assert.equal((await request(service, "/__codex_claude_local/health")).status, 200);
+});
+
+test("isolated template uses installed shell and CDN assets without outbound web requests", async () => {
+  const runtimeDir = path.join(root, "isolated-template-runtime");
+  fs.cpSync(path.join(root, "runtime"), runtimeDir, { recursive: true });
+  fs.writeFileSync(path.join(runtimeDir, "mock", ".codex-plus-template"), "");
+  let outbound = 0;
+  const upstream = http.createServer();
+  upstream.on("connect", (_req, socket) => {
+    outbound++;
+    socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+  });
+  upstream.listen(0, "127.0.0.1");
+  await once(upstream, "listening");
+  let instance;
+  try {
+    instance = await start({
+      CLAUDE_LOCAL_STRICT_MODELS: "1",
+      CLAUDE_LOCAL_UPSTREAM_PROXY: `http://127.0.0.1:${upstream.address().port}`,
+    }, runtimeDir);
+    const shell = await request(instance, "/new", { host: "claude.ai" });
+    assert.equal(shell.status, 200);
+    assert.match(shell.bytes.toString(), /data-build-id="fixture-build"/);
+    assert.match(shell.bytes.toString(), /claude-localization\.js/);
+    for (const [host, pathname] of [
+      ["claude.ai", "/assets/v1/main.js"],
+      ["assets-proxy.anthropic.com", "/claude-ai/v2/assets/v1/main.js"],
+    ]) {
+      const asset = await request(instance, pathname, { host });
+      assert.equal(asset.status, 200);
+      assert.equal(asset.bytes.toString(), "export const localOfficialAsset = true;");
+    }
+    for (const host of ["api.anthropic.com", "claude.ai"]) {
+      const update = await request(instance, "/api/desktop/darwin/arm64/squirrel/update?version=5.11492.5", { host });
+      assert.equal(update.status, 204);
+      assert.equal(update.bytes.length, 0);
+    }
+    assert.equal(outbound, 0);
+  } finally {
+    await stop(instance);
+    upstream.closeAllConnections();
+    await new Promise(resolve => upstream.close(resolve));
+  }
+});
+
+test("Code bundle streams before completion and cancellation closes its upstream", async () => {
+  let source;
+  let sourceClosed;
+  const upstream = http.createServer((_req, res) => {
+    source = res;
+    sourceClosed = once(res, "close");
+    res.writeHead(200, { "content-type": "application/zstd", "content-length": 6 });
+    res.write("abc");
+  });
+  upstream.listen(0, "127.0.0.1");
+  await once(upstream, "listening");
+  let instance;
+  try {
+    instance = await start({
+      CLAUDE_LOCAL_UPSTREAM_MAP: JSON.stringify({ "downloads.claude.ai": `http://127.0.0.1:${upstream.address().port}` }),
+    });
+    let chunks = 0;
+    const result = await request(instance, "/claude-code-releases/fixture/claude.app.tar.zst", {
+      host: "downloads.claude.ai",
+      onChunk: () => { if (++chunks === 1) source.end("def"); },
+    });
+    assert.equal(result.status, 200);
+    assert.equal(result.headers["content-length"], "6");
+    assert.equal(result.bytes.toString(), "abcdef");
+    await assert.rejects(request(instance, "/claude-code-releases/fixture/cancel.tar.zst", {
+      host: "downloads.claude.ai", onChunk: (_chunk, res) => res.destroy(new Error("test cancellation")),
+    }), /test cancellation/);
+    await Promise.race([sourceClosed, delay(2000).then(() => { throw new Error("upstream not cancelled"); })]);
+    assert.equal((await request(instance, "/__codex_claude_local/health")).status, 200);
+  } finally {
+    await stop(instance);
+    upstream.closeAllConnections();
+    await new Promise(resolve => upstream.close(resolve));
+  }
+});
+
 test("installed template fetches the first shell through the configured upstream proxy, then replays it", async () => {
   // 后端 install_assets 会写入内嵌模板（mock/.codex-plus-template）：模板数据配线上外壳写穿缓存。
   // 受限地区直连 claude.ai 会被 302，首次抓外壳要经后端传入的出站代理（CONNECT 隧道）。
@@ -438,6 +535,16 @@ test("installed template turns on the Cowork GrowthBook gate unless disabled", a
   assert.equal(on.hashing_algorithm, "djb2");
   const off = await features({ CLAUDE_LOCAL_COWORK: "0" });
   assert.deepEqual(off.features["574905726"], { defaultValue: false });
+});
+
+test("strict P0 does not advertise disabled Cowork capability", async () => {
+  const instance = await start({ CLAUDE_LOCAL_STRICT_MODELS: "1", CLAUDE_LOCAL_COWORK: "0" });
+  try {
+    const boot = (await request(instance, "/edge-api/bootstrap", { host: "claude.ai" })).json;
+    assert.equal(boot.feature_flags.cowork, false);
+    assert.ok(!boot.account.capabilities.includes("cowork"));
+    assert.ok(!boot.organization.capabilities.includes("cowork"));
+  } finally { await stop(instance); }
 });
 
 test("clean managed runtime uses synthetic bootstrap and configured catalogs without private recordings", async () => {

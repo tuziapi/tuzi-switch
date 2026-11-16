@@ -3206,7 +3206,7 @@
   },
   "claudeLocal": {
     "title": "Claude Local · P0 experiment",
-    "description": "Connect Claude Desktop through the selected API provider with a separate profile. P0 covers chat, Code and Chinese localization. It does not grant an official subscription.",
+    "description": "Connect a private Claude copy through the selected API provider. Code conversations and file tasks are verified; standard Chat and full localization are still being adapted. This does not grant an official subscription.",
     "requirements": "Claude {{version}} · Certificate {{certificate}} · Node.js {{node}}",
     "trusted": "trusted",
     "untrusted": "untrusted",
@@ -3222,7 +3222,7 @@
     "launch": "Launch local mode",
     "stop": "Stop / recover",
     "untrust": "Remove certificate trust",
-    "stopHint": "Trusting the certificate requires system authorization. Quit Claude normally before stopping. The gateway cannot stop during a session. Automatic update installation is disabled in P0 builds.",
+    "stopHint": "Trusting the certificate requires system authorization. Quit Claude before stopping; do not stop the gateway during a session. Automatic updates are isolated for both the experimental app and its private Claude copy.",
     "statusError": "Could not read local service status. Please retry."
   }
 }

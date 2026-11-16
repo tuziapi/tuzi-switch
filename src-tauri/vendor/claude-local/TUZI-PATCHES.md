@@ -13,6 +13,13 @@ Local changes:
 6. Export `serve_headless` for the synthetic HTTP integration test. It prepares a local CA but never trusts it or launches Desktop.
 7. Enable strict model routes for isolated hosts: explicit unknown models fail instead of silently falling back. Supply the selected default and small model to the client environment.
 8. Propagate a downstream streamed-response close in `forwardGateway` to the upstream request. A full three-hop cancellation test covers the change.
+9. In isolated strict mode, serve the shell and static resources from the pinned installed Desktop even when the embedded API template is present. The first native session otherwise fetched the independently deployed web shell and failed to load CDN resources. Keep template API responses and the upstream non-isolated behavior; cover the template-present path with a TLS regression test that rejects all outbound web requests.
+10. Handle locale override catalogs and numeric region tags such as `es-419`; return 404 for unsupported localization paths instead of dereferencing a null catalog and killing the proxy. Native Desktop requests `.overrides.json` during startup. TLS tests verify both main-site and CDN paths and continued health after malformed resource requests. Tests can use a temporary, untrusted CA via `CLAUDE_LOCAL_TEST_CA_DIR`.
+11. Stream non-cached `downloads.claude.ai` responses instead of buffering the entire signed Code bundle. Native Desktop otherwise reached its 30-second idle timeout before receiving any bytes. Preserve response length/content, remove hop-by-hop headers, and propagate cancellation upstream. A TLS regression waits for the first downstream chunk before finishing the upstream response, then verifies cancellation and runtime health. Desktop still performs the original download verification.
+
+12. `Host::isolated_app_path` 默认为 None；P0 提供官方签名、固定版本的独立应用副本，隔离客户端安装更新。
+13. 自有 `desktop-profile-3p/configLibrary` 所选条目禁更新，保留其他字段、拒绝路径穿越和符号链接；严格代理更新 feed 返回 204。5.11492.5 原生日志验证生效。
+14. 严格模式移除关闭的 Cowork capability 与 feature gate。新版完整 Chat/汉化仍需验收，不宣称全功能解锁。
 
 The upstream CONNECT/TLS compatibility surface retains its original authorization model. The scoped Tuzi route protects the core-to-gateway boundary; it does **not** make every CONNECT request token-authenticated. This is a P0 laboratory, not a hardened service. Production enablement requires reviewing that boundary and client-version compatibility.
 

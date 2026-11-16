@@ -102,6 +102,9 @@ const POC_I18N = path.join(POC_DIR ?? here, "i18n");
 // 托管模式在存在 PoC 数据（dev 录制目录或安装的内嵌 mock 模板）时走 PoC 数据路径；
 // 完全没有模板数据时保持合成兜底（officialShell/localBootstrap + 状态告警）。
 const dataManaged = runtime.managed && !POC_DIR;
+// Isolated Tuzi hosts pin the installed Desktop version. Embedded API templates
+// must not make its web shell drift to the live site's independently updated assets.
+const installedWebAssets = runtime.managed && (runtime.strictModels || !POC_DIR);
 const READ_CACHE = POC_DIR ? path.join(POC_DIR, ".cache") : CACHE_DIR;
 const LOG = arg("log", "1") !== "0";
 const READY_FILE = process.env.CLAUDE_LOCAL_READY_FILE;
@@ -235,6 +238,12 @@ if (!runtime.computerUse) {
   ORG.capabilities = ORG.capabilities.filter((name) => name !== "computer_use");
 }
 
+if (runtime.strictModels && !runtime.cowork) {
+  ACCOUNT.capabilities = ACCOUNT.capabilities.filter((name) => name !== "cowork");
+  ORG.capabilities = ORG.capabilities.filter((name) => name !== "cowork");
+  BOOTSTRAP.feature_flags.cowork = false;
+}
+
 // 读取录制到的真实 bootstrap 作为模板（capture.mjs 产出）
 function loadRecordedBootstrap() {
   if (dataManaged) return null;
@@ -287,15 +296,17 @@ const I18N_DIR = path.join(here, "i18n");
 const WEB_I18N_DIR = process.env.CLAUDE_LOCAL_WEB_I18N_DIR || path.resolve(here, "../assets/localization/catalogs");
 const i18nResponses = new Map();
 function localI18n(pathname) {
-  const match = pathname.match(/^\/i18n\/(?:(s|dynamic)\/)?([a-zA-Z-]+)\.json$/);
+  const match = pathname.match(/^\/i18n\/(?:(s|dynamic)\/)?([a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*)(\.overrides)?\.json$/);
   if (!match) return null;
   if (i18nResponses.has(pathname)) return i18nResponses.get(pathname);
-  const [, kind, requestedLocale] = match;
+  const [, kind, requestedLocale, overrides] = match;
   const locale = runtime.localization || requestedLocale === "zh-CN"
     ? "zh-Hans"
     : requestedLocale;
   const base = `${locale}.json`;
-  const catalog = kind === "dynamic" ? {
+  const catalog = overrides ? {
+    ...readI18n(path.join(WEB_I18N_DIR, `${locale}.overrides.json`)),
+  } : kind === "dynamic" ? {
     ...readI18n(path.join(WEB_I18N_DIR, "dynamic", base)),
     ...readI18n(i18nMap.get(pathname)),
   } : {
@@ -727,6 +738,12 @@ function resolvedBootstrap() {
     "web.plan_name.max_20x": runtime.localization ? "Codex++ 本地网关" : "Codex++ local gateway",
   };
   if (runtime.cowork) forceCowork(result, template);
+  if (runtime.strictModels && !runtime.cowork) {
+    result.feature_flags = { ...result.feature_flags, cowork: false };
+    if (result.org_growthbook?.features) {
+      result.org_growthbook.features[COWORK_FEATURE_ID] = { defaultValue: false };
+    }
+  }
   mergePoolModels(result);
   resolvedBootstrapCache = result;
   return result;
@@ -1261,12 +1278,17 @@ function isHashedStaticAsset(req, url) {
     /\/[^/]+-[A-Za-z0-9_-]{8,}\.(?:m?js|css|wasm|woff2?|ttf|otf|png|jpe?g|webp|gif|svg|ico)$/.test(url.pathname);
 }
 
-function bufferedResponseHeaders(headers, length) {
+function forwardedResponseHeaders(headers) {
   const result = { ...headers };
   const connectionHeaders = String(result.connection || "").split(",").map((name) => name.trim().toLowerCase());
   for (const name of ["connection", "transfer-encoding", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade", ...connectionHeaders]) {
     delete result[name];
   }
+  return result;
+}
+
+function bufferedResponseHeaders(headers, length) {
+  const result = forwardedResponseHeaders(headers);
   // Buffer 未解压，保留 content-encoding 并以实际传输字节数更新长度。
   result["content-length"] = length;
   return result;
@@ -1492,6 +1514,14 @@ function proxyUpstream(req, res, url) {
       timeout: 20000,
     },
     (up) => {
+      // Desktop's signed Code bundle can be hundreds of MB. Buffering it until
+      // completion makes the client hit its no-data timeout and retry forever.
+      if (url.hostname === "downloads.claude.ai" && !canCache) {
+        res.writeHead(up.statusCode, forwardedResponseHeaders(up.headers));
+        up.on("error", () => res.destroy());
+        up.pipe(res);
+        return;
+      }
       const chunks = [];
       up.on("data", (c) => chunks.push(c));
       up.on("end", () => {
@@ -1517,6 +1547,8 @@ function proxyUpstream(req, res, url) {
   );
   upstreamReq.on("timeout", () => upstreamReq.destroy(new Error("upstream timeout")));
   upstreamReq.on("error", (err) => {
+    if (res.destroyed) return;
+    if (res.headersSent) return res.destroy();
     if (serveCachedStaticAsset(req, res, url)) return;
     // 动态接口不能回放其它会话的缓存；文档仍沿用本地外壳兜底。
     if (canCache && document && fs.existsSync(cp) && fs.existsSync(metaPath)) {
@@ -1538,6 +1570,8 @@ function proxyUpstream(req, res, url) {
     res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
     res.end(`upstream unavailable: ${err.message}\n`);
   });
+  req.once("aborted", () => upstreamReq.destroy());
+  res.once("close", () => { if (!res.writableFinished) upstreamReq.destroy(); });
   req.pipe(upstreamReq);
 }
 
@@ -1550,6 +1584,13 @@ function handle(req, res, hostHeader) {
   noteClient();
   log(`${req.method} ${url.pathname}`);
 
+  // The host also disables updates in its private profile. Never forward Desktop
+  // update feeds in isolated mode; Code runtime downloads are a separate path.
+  if (runtime.managed && runtime.strictModels &&
+      /^\/api\/desktop\/[^/]+\/[^/]+\/[^/]+\/update\/?$/.test(url.pathname)) {
+    res.writeHead(204, { "cache-control": "no-store" });
+    return res.end();
+  }
   const hostName = url.hostname.toLowerCase();
   const isMainClaudeHost = /^(claude\.ai|www\.claude\.ai|claude\.com|www\.claude\.com)$/.test(hostName);
   if (MODE === "mock" && req.method === "GET" &&
@@ -1589,6 +1630,10 @@ function handle(req, res, hostHeader) {
     ["GET", "HEAD"].includes(req.method)
   ) {
     const body = localI18n(localI18nPath);
+    if (!body) {
+      res.writeHead(404, { "cache-control": "no-store" });
+      return res.end();
+    }
     const headers = {
       "content-type": "application/json; charset=utf-8",
       "content-length": body.length,
@@ -1601,7 +1646,7 @@ function handle(req, res, hostHeader) {
   }
 
   const officialResourcePath = (() => {
-    if (!dataManaged || !["GET", "HEAD"].includes(req.method)) return null;
+    if (!installedWebAssets || !["GET", "HEAD"].includes(req.method)) return null;
     const mapI18nPath = (pathname) => {
       const match = pathname.match(/^\/i18n\/(?:(s|dynamic)\/)?([a-zA-Z-]+)\.json$/);
       if (!match) return pathname;
@@ -1658,7 +1703,7 @@ function handle(req, res, hostHeader) {
 
   // Fresh受管profile直接使用安装包内同一版本的官方SPA和静态资源，不依赖旧HTML录制缓存。
   if (
-    dataManaged &&
+    installedWebAssets &&
     MODE === "mock" &&
     isMainClaudeHost &&
     req.method === "GET" &&

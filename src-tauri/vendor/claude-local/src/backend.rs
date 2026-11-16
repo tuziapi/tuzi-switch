@@ -183,6 +183,7 @@ fn platform_supported() -> bool {
 /// 轮询），结果做进程内缓存：缓存路径已不存在且不是 MSIX 路径时才重新解析。
 #[cfg(target_os = "windows")]
 fn source_app() -> PathBuf {
+    if let Some(path) = crate::host::isolated_app_path() { return path; }
     static CACHE: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(None));
     let mut slot = cache.lock().unwrap_or_else(|error| error.into_inner());
@@ -205,6 +206,7 @@ fn source_app() -> PathBuf {
 
 #[cfg(not(target_os = "windows"))]
 fn source_app() -> PathBuf {
+    if let Some(path) = crate::host::isolated_app_path() { return path; }
     let system = PathBuf::from("/Applications/Claude.app");
     if system.is_dir() {
         system
@@ -1956,6 +1958,46 @@ fn strip_inherited_proxy(command: &mut Command) {
     }
 }
 
+/// New Desktop builds read application policy from the selected local configLibrary entry.
+fn disable_isolated_updates(profile: &Path) -> Result<()> {
+    // Signed Desktop removes CLAUDE_USER_DATA_DIR and reads local policy from
+    // the sibling -3p profile even while its browser session remains in 1p.
+    let policy_profile = if profile.as_os_str().to_string_lossy().ends_with("-3p") { profile.to_path_buf() } else {
+        let mut name = profile.as_os_str().to_os_string(); name.push("-3p"); PathBuf::from(name)
+    };
+    ensure!(!fs::symlink_metadata(&policy_profile).is_ok_and(|m| m.file_type().is_symlink()), "隔离更新目录不能是符号链接");
+    let library = policy_profile.join("configLibrary");
+    let meta_path = library.join("_meta.json");
+    for path in [&library, &meta_path] {
+        ensure!(!fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()), "隔离更新配置不能是符号链接");
+    }
+    let mut meta: Value = match fs::read(&meta_path) {
+        Ok(bytes) => serde_json::from_slice(&bytes)?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => json!({
+            "appliedId":"11111111-2222-4333-8444-555555555559",
+            "entries":[{"id":"11111111-2222-4333-8444-555555555559","name":"Tuzi Local"}]
+        }),
+        Err(e) => return Err(e.into()),
+    };
+    let id = meta["appliedId"].as_str().context("隔离配置缺少 appliedId")?;
+    ensure!(uuid::Uuid::parse_str(id).is_ok() && id.len() == 36, "隔离配置 ID 无效");
+    ensure!(meta["entries"].as_array().is_some_and(|entries| entries.iter().any(|e| e["id"].as_str() == Some(id))), "隔离配置缺少所选条目");
+    let entry_path = library.join(format!("{id}.json"));
+    ensure!(!fs::symlink_metadata(&entry_path).is_ok_and(|m| m.file_type().is_symlink()), "隔离更新配置不能是符号链接");
+    let mut entry: Value = match fs::read(&entry_path) {
+        Ok(bytes) => serde_json::from_slice(&bytes)?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => json!({}),
+        Err(e) => return Err(e.into()),
+    };
+    entry.as_object_mut().context("隔离更新配置必须是 JSON 对象")?.insert("disableAutoUpdates".into(), json!(true));
+    // This private profile always uses its local entry, never a saved remote config pointer.
+    meta.as_object_mut().context("隔离配置索引必须是 JSON 对象")?.remove("hybridPointer");
+    private_dir(&library)?;
+    crate::fsutil::atomic_write(&entry_path, &serde_json::to_vec_pretty(&entry)?)?;
+    crate::fsutil::atomic_write(&meta_path, &serde_json::to_vec_pretty(&meta)?)?;
+    Ok(())
+}
+
 /// Write only the host-owned profile. Refuse symlinks rather than following them into personal data.
 fn prepare_isolated_profile(profile: &Path, root: &Path) -> Result<()> {
     for path in [profile.to_path_buf(), profile.join("claude_desktop_config.json"), root.join("claude-code"), root.join("claude-code/settings.json")] {
@@ -1970,6 +2012,7 @@ fn prepare_isolated_profile(profile: &Path, root: &Path) -> Result<()> {
         Err(error) => return Err(error.into()),
     };
     config.as_object_mut().context("隔离配置必须是 JSON 对象")?.insert("deploymentMode".into(), json!("1p"));
+    disable_isolated_updates(profile)?;
     crate::fsutil::atomic_write(&path, &serde_json::to_vec_pretty(&config)?)?;
     Ok(())
 }
@@ -3406,6 +3449,31 @@ RGvMS5OzZFvnFlekIHE6c+6QK9QtWD7P+PkIpRa1D01cb9SwsRHqGfs7o2UbaZxs\n\
 #[cfg(test)]
 mod tuzi_isolation_tests {
     use super::*;
+    #[test]
+    fn isolated_updates_preserve_selected_config_and_reject_unsafe_paths() {
+        let temp = tempfile::tempdir().unwrap();
+        let profile = temp.path().join("profile-3p");
+        disable_isolated_updates(&profile).unwrap();
+        let library = profile.join("configLibrary");
+        let entry = library.join("11111111-2222-4333-8444-555555555559.json");
+        fs::write(&entry, br#"{"custom":42,"disableAutoUpdates":false}"#).unwrap();
+        disable_isolated_updates(&profile).unwrap();
+        let value: Value = serde_json::from_slice(&fs::read(&entry).unwrap()).unwrap();
+        assert_eq!(value, json!({"custom":42,"disableAutoUpdates":true}));
+        fs::write(library.join("_meta.json"), br#"{"appliedId":"../../personal","entries":[]}"#).unwrap();
+        assert!(disable_isolated_updates(&profile).is_err());
+    }
+    #[cfg(unix)]
+    #[test]
+    fn isolated_updates_reject_linked_library() {
+        let temp = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let profile = temp.path().join("profile");
+        std::os::unix::fs::symlink(outside.path(),temp.path().join("profile-3p")).unwrap();
+        assert!(disable_isolated_updates(&profile).is_err());
+        assert_eq!(fs::read_dir(outside.path()).unwrap().count(),0);
+    }
+
     #[test]
     fn isolated_profile_preserves_fields_and_leaves_personal_data_untouched() {
         let temp = tempfile::tempdir().unwrap();

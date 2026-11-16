@@ -1,4 +1,4 @@
-2026-11-16 CL-LOCAL-P0：按用户选择 B，嵌入 ClaudeMom 核心并复用兔子网关；完成隔离、固定会话绑定、实验入口、合成 HTTP 链路和指定 Claude 版本的目录启动检查。真实登录/任务与发行许可仍待验收；仅独立本地实验，无发布。见 [实现与验证](2026-11-16-claude-local-p0.md) 和 [ADR-022](decisions/0022-claude-local-p0.md)。
+2026-11-16 CL-LOCAL-P0：B 方案已接入兔子网关。Claude 5.11492.5 独立签名副本、禁自动更新及更新 feed 拦截通过实机检查；真实 Code 多轮、文件任务与修复后的 Desktop 统计归属通过。普通 Chat 仍进入新版 Cowork 路径且无法完成，汉化未完整生效，实验入口已明确标注。59 项核心、30 项 Node、19 项宿主回归通过。CA 仍受信任，仅本地，无发布；完整验收与发行许可门槛保留。见 [实现与验证及实机截图](2026-11-16-claude-local-p0.md) 和 [ADR-022](decisions/0022-claude-local-p0.md)。
 
 2026-11-15 SYNC-DESKTOP-LOCAL-01：按用户选择 A，完整快进同步 verified-desktop-updates `9d2a60ee` 至本地 `codex/sync-verified-desktop-updates`，保留原分支及备份。839项宿主、2681项创作、25项原生、22项签名/发布检查、类型、两阶段前端构建与双浏览器合成流程通过；Windows/正式升级及真实模型验收限制保留。仅本地，无 push/PR/发布或安装。见 [同步与验证记录](2026-11-15-verified-desktop-local-sync.md)。
 
