@@ -1,0 +1,102 @@
+{
+  "kind": "reviewed-native-macos-business-attribution",
+  "candidateRunId": "43804959005",
+  "applicationCommit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+  "probeRunId": "43826296207",
+  "probeRunConclusion": "failure",
+  "reviewScope": "The selected ARM and Intel jobs passed. Unselected Intel 1.6.0 failed in the native file-picker harness; both old-version transitions use the four passing jobs from 43824656794. No failed job is treated as passed.",
+  "cases": {
+    "macos-arm64": {
+      "artifactId": "14206937023",
+      "artifactName": "signed-installed-macos-macos-arm64-from-1.6.1",
+      "artifactSha256": "sha256:e074128960b8766da448a8621b697daf7bed4fb4eff622f121bb1b63ac7cca7e",
+      "jobId": "133160887461",
+      "runAttempt": 1,
+      "resultSha256": "d323cdc0884a4960a1ab49e577b389bd8cddb1ea4429f7ee2c498c3427dd8dd3",
+      "requests": [
+        {
+          "version": "1.6.2",
+          "model": "gpt-image-2.5-sunburst",
+          "channels": [
+            "3"
+          ],
+          "syntheticAuthorizationMatched": true,
+          "layers": false
+        },
+        {
+          "version": "1.6.3",
+          "model": "gpt-image-2.5-sunburst",
+          "channels": [
+            "3"
+          ],
+          "syntheticAuthorizationMatched": true,
+          "layers": false
+        }
+      ],
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageProjectPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "creativeImageProjectPreservation": "passed",
+        "nativeBusinessAttribution": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "exactSignedTargetBytes": "passed",
+        "welcomePreferencePreserved": "passed",
+        "sameInstallationRetry": "passed"
+      }
+    },
+    "macos-x64": {
+      "artifactId": "14206479116",
+      "artifactName": "signed-installed-macos-macos-x64-from-1.6.1",
+      "artifactSha256": "sha256:3bdfc5ae6a69bfc5e9398978e67969c67343698f7ad230b8ac4be5f854d60310",
+      "jobId": "133163124961",
+      "runAttempt": 2,
+      "resultSha256": "5e899bee7da9981b7df85e9498151c176bedd567e7cb85e765383112e06388b4",
+      "requests": [
+        {
+          "version": "1.6.2",
+          "model": "gpt-image-2.5-sunburst",
+          "channels": [
+            "3"
+          ],
+          "syntheticAuthorizationMatched": true,
+          "layers": false
+        },
+        {
+          "version": "1.6.3",
+          "model": "gpt-image-2.5-sunburst",
+          "channels": [
+            "3"
+          ],
+          "syntheticAuthorizationMatched": true,
+          "layers": false
+        }
+      ],
+      "checks": {
+        "publishedLegacyManualTransition": "passed",
+        "legacyCreativeImageProjectPreservation": "passed",
+        "corrupt": "passed",
+        "interrupted": "passed",
+        "missing": "passed",
+        "validSignedPackageStagingPermissionDenied": "passed",
+        "creativeImageProjectPreservation": "passed",
+        "nativeBusinessAttribution": "passed",
+        "download": "passed",
+        "nativeSignature": "passed",
+        "install": "passed",
+        "automaticRestart": "passed",
+        "exactSignedTargetBytes": "passed",
+        "welcomePreferencePreserved": "passed",
+        "sameInstallationRetry": "passed"
+      }
+    }
+  },
+  "syntheticProvider": true,
+  "realProviderReceipt": "2026-11-16-generation-8060ac8d-receipt.json"
+}
