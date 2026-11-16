@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "kind": "local-package-integrity-only",
+  "sourceCommit": "986e088493d9c317777b6ea57c96d8e7f53d54d8",
+  "version": "1.6.2",
+  "bundleIdentifier": "com.tuziswitch.desktop",
+  "architecture": "arm64",
+  "artifact": "/Users/sdy09/Downloads/tuzi-1.6.2-integrated-986e0884/兔子助手_1.6.2_aarch64.dmg",
+  "sha256": "1b4af140c7a9554972cbe2b6151b6fd32052506ce027010345df083603bf7dd4",
+  "sizeBytes": 26853130,
+  "checks": {
+    "dmgIntegrity": true,
+    "appCodeSignatureIntegrity": true,
+    "mountedAppCodeSignatureIntegrity": true,
+    "mountedAppFilesAndPermissionsMatch": true,
+    "sourceCommitEmbedded": true,
+    "configuredUpdaterPublicKeyEmbedded": true
+  },
+  "bundleEntriesCompared": 8,
+  "codeSigning": "ad-hoc",
+  "appleNotarized": false,
+  "officialUpdaterSignedCandidate": false,
+  "installed": true,
+  "realLayerOcrAcceptance": "passed-on-this-source",
+  "paidRetestAuthorized": true,
+  "published": false,
+  "realTransparentGeneration": true,
+  "legacyLayerZipExport": true,
+  "newLayerZipExport": true,
+  "restartRestoresAllLayersAndOcr": true,
+  "releaseAcceptancePassed": false
+}

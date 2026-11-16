@@ -1,0 +1,156 @@
+[
+  {
+    "artifact": "legacy-layers-export-986e0884.zip",
+    "sha256": "b41fdbb72edcb81e37130c18502c88f52d299293f267c07c49533aa86fa19758",
+    "entries": 4,
+    "images": [
+      {
+        "file": "01-深蓝色粗体文字“TUZI 55”.png",
+        "size": [
+          1649,
+          636
+        ],
+        "mode": "RGBA",
+        "sha256": "7946c6cae25f722bb4ab91b3e8dde8460b830a62fdda02e8e1615647ccce69df",
+        "transparentPixels": 892119
+      },
+      {
+        "file": "02-左侧带棕色果柄与绿叶的红色苹果插画、右侧盛有带拉花咖啡的蓝色马克杯插画.png",
+        "size": [
+          1121,
+          936
+        ],
+        "mode": "RGBA",
+        "sha256": "3463ed1c89a1d50fc0a0783108499b962afd3e05dc98820c12b99f0856f0ab5c",
+        "transparentPixels": 760856
+      },
+      {
+        "file": "00-background.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "mode": "RGB",
+        "sha256": "628b56d55454d9a13b9e16f5a7d5303fe5b35293deabd5feba1428ffb902c8be",
+        "transparentPixels": 0
+      }
+    ],
+    "layers": [
+      {
+        "name": "background",
+        "kind": "background",
+        "zIndex": 0,
+        "urlKind": "remote",
+        "ocr": null
+      },
+      {
+        "name": "深蓝色粗体文字“TUZI 55”",
+        "kind": "foreground",
+        "zIndex": 1,
+        "urlKind": "remote",
+        "ocr": "TUZI 55"
+      },
+      {
+        "name": "左侧带棕色果柄与绿叶的红色苹果插画、右侧盛有带拉花咖啡的蓝色马克杯插画",
+        "kind": "foreground",
+        "zIndex": 2,
+        "urlKind": "remote",
+        "ocr": null
+      }
+    ]
+  },
+  {
+    "artifact": "new-layers-export-986e0884.zip",
+    "sha256": "9da32fd6e4129ba880383057f18c21734f7cbca4f8dc07aa660dc71c0ea22324",
+    "entries": 6,
+    "images": [
+      {
+        "file": "00-background.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "mode": "RGB",
+        "sha256": "1f86e171ac423c48cf01c1e3ff9928ba36550897a08f38c50a5f16155819d671",
+        "transparentPixels": 0
+      },
+      {
+        "file": "01-红色粗体文字“TUZI 16”.png",
+        "size": [
+          1577,
+          665
+        ],
+        "mode": "RGBA",
+        "sha256": "94b309e876ee0b308d86d90790ae51fbc75b852317f8c66df719d502c5e38963",
+        "transparentPixels": 902411
+      },
+      {
+        "file": "02-带棕色果柄与绿色叶片的红色苹果插画.png",
+        "size": [
+          995,
+          1054
+        ],
+        "mode": "RGBA",
+        "sha256": "be0894dea25d966910356d073de530f2bd67bdabb493f4e213801cf6821480d2",
+        "transparentPixels": 639120
+      },
+      {
+        "file": "03-盛有深棕色咖啡的蓝色带把手马克杯插画.png",
+        "size": [
+          1107,
+          947
+        ],
+        "mode": "RGBA",
+        "sha256": "ccb97bea3d5b38bb76a6c350954a5d66ff174806471fa415c28c41d55c39a958",
+        "transparentPixels": 657048
+      },
+      {
+        "file": "04-黑色粗体文字“新版验收”.png",
+        "size": [
+          1534,
+          684
+        ],
+        "mode": "RGBA",
+        "sha256": "e34afbe28b5650c8a27f9cf23a355a085950fe9cb36cf0f689fa657caa03cd55",
+        "transparentPixels": 873907
+      }
+    ],
+    "layers": [
+      {
+        "name": "background",
+        "kind": "background",
+        "zIndex": 0,
+        "urlKind": "cache",
+        "ocr": null
+      },
+      {
+        "name": "红色粗体文字“TUZI 16”",
+        "kind": "foreground",
+        "zIndex": 1,
+        "urlKind": "cache",
+        "ocr": "TUZI 16"
+      },
+      {
+        "name": "带棕色果柄与绿色叶片的红色苹果插画",
+        "kind": "foreground",
+        "zIndex": 2,
+        "urlKind": "cache",
+        "ocr": null
+      },
+      {
+        "name": "盛有深棕色咖啡的蓝色带把手马克杯插画",
+        "kind": "foreground",
+        "zIndex": 3,
+        "urlKind": "cache",
+        "ocr": null
+      },
+      {
+        "name": "黑色粗体文字“新版验收”",
+        "kind": "foreground",
+        "zIndex": 4,
+        "urlKind": "cache",
+        "ocr": "新版验收"
+      }
+    ]
+  }
+]

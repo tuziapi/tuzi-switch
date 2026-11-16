@@ -1,0 +1,15 @@
+{
+  "sourceCommit": "986e088493d9c317777b6ea57c96d8e7f53d54d8",
+  "sha256": "3c83e3ba484752140820ce40416bb3a579c4bc090b435b8252878904d11a066b",
+  "format": "PNG",
+  "mode": "RGBA",
+  "dimensions": [
+    1024,
+    1024
+  ],
+  "alpha": {
+    "transparent": 790471,
+    "translucent": 22858,
+    "opaque": 235247
+  }
+}
