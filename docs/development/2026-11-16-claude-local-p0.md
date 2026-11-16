@@ -1,6 +1,6 @@
 # CL-LOCAL-P0：B 方案首版实现与验证
 
-本轮按用户选择实施“嵌入核心，复用兔子网关”。最新完成 Claude 5.11492.5 独立应用副本与更新隔离，真实 Code 短回复、多轮和临时目录文件写入已通过。**完整 P0 验收仍未完成**：新版普通 Chat 首轮触发 Cowork VM 磁盘空间检查，移除 Cowork 能力声明后仍停留 Loading；汉化尚不完整，联合分发许可未处理。下方首轮记录保留历史时点，最新结果见“新版适配与真实验收”。
+本轮按用户选择实施“嵌入核心，复用兔子网关”。Claude 5.11492.5 独立副本与更新隔离、Code 多轮/文件任务/重启恢复、主要界面汉化已实测。新增可选语音、电脑控制与 Cowork 设置，语音模型下载和本地转写服务已通过。**全流程尚未验收完成**：普通 Chat 已越过 VM 安装及提示词初始化问题，当前被 VM 证书信任阻断；语音界面方案及 CA 补充 Basic X.509 信任待用户选择。下方首轮与新版初次结果均为历史时点，最新记录见“全流程继续验收”。
 
 ## 工作区与边界
 
@@ -38,7 +38,7 @@
 
 ## 新字段与兼容
 
-没有新增供应商持久化字段或改变 Direct / Proxy 枚举。未知上游上下文窗口不显式声明；核心仍有 200k 协议默认值，因此长上下文兼容性需要单独实测。P0 固定关闭高级能力，未把上游默认 `ultra` 当成产品权益。
+没有新增供应商持久化字段或改变 Direct / Proxy 枚举。未知上游上下文窗口不显式声明；核心仍有 200k 协议默认值，因此长上下文兼容性需要单独实测。首轮 P0 固定关闭高级能力；用户要求继续跑通全部流程后，新增自有 `options.json` 的可选开关，旧用户及缺失字段仍默认 false。未把上游默认 `ultra` 当成产品权益。
 
 自有 `session.json` 的 `schemaVersion=1`，含 `phase`（starting/running）、`providerId`、`providerName`、`claudeVersion`；无凭证。缺文件表示未运行；文件残留或不可解析且无核心进程表示需要恢复；停止成功后删除。配置根目录运行期间固定，修改兔子目录设置不能绕过旧会话检查。
 
@@ -129,7 +129,40 @@ python3 scripts/qa/claude-local-isolation.py --run \
 
 1. 继续适配新版普通 Chat 和完整汉化。已完成的 Code 与隔离测试不代替这些验收；实验入口已同步展示实际验证范围。
 2. 继续验证 CONNECT/TLS 边界。专用网关令牌不等于整个兼容代理都已具备逐请求认证；当前仍不适合正式默认开放。
-3. 语音、电脑控制、Cowork、后台模式、Windows、内置 Node 发行和完整更新事务留在后续阶段。
+3. 语音、电脑控制、Cowork 正在本轮继续实现与实测，当前结果见下方；后台模式、Windows、内置 Node 发行和完整更新事务尚未验收。
 4. 确认上游 AGPL 核心的联合分发处理后，才讨论默认开启、合入发行分支与发布。
 
 本地回退：正常退出 Claude，停止兼容会话，按需移除其 CA 信任，退出实验包。专用 profile 保留供恢复；正式版数据与原更新工作区不需要回滚。不要在会话活动中删除目录或切换回无此功能的构建。
+
+
+## 全流程继续验收（2026-11-16，进行中）
+
+用户要求“所有流程跑通”，并授权清理本机磁盘。仅清理可再生成的 Go/Rust 编译缓存、旧构建实验缓存、已完成下载的临时分片和自有 VM 压缩缓存，保留源码、正式数据与解压后的 VM 镜像。清理为 VM 安装腾出空间，但安装及编译仍消耗磁盘；不得把累计清理量当作当前可用空间。P0 构建脚本默认关闭 Cargo incremental，避免再次占用约 4 GB。
+
+| 项目 | 最新实测与结论 |
+|---|---|
+| 汉化 | 修复 catalog revision 格式，从 `1.1.1` 改为新版接受的 `1.1`，补齐 40 条新版 ID；侧栏、新建、开始任务、作品等已显示中文。并非所有动态文本全部翻译 |
+| 选项保存 | 语音、电脑控制、Cowork 默认 false；显式启用后重启保留；运行期间不可变更；缺文件和旧字段安全默认，坏 JSON/符号链接拒绝 |
+| VM | 真实下载并安装 bundle `072b6cbfe74f428a98bd86035f83b322b369d1f1`；VM 启动、SDK 2.1.325 安装成功。VM 成功不等于聊天成功 |
+| Chat 初始化 | 本地 bootstrap 原先缺少 `cowork_system_prompt.value.prompt`，导致前端等待；补充自有最小提示词与 system_prompts 接口后已能创建会话 |
+| VM 出站 | 原先继承系统代理，绕过本地兼容层；新增每次启动写入自有 `egressProxyUrl`。原生日志确认 admin-pinned proxy，Node 确认收到 `api.anthropic.com` CONNECT；仍仅监听 127.0.0.1 |
+| Chat 当前阻塞 | VM 返回 TLS BAD_CERTIFICATE；独立只读 Security 探针：同一 CA 的 SSL 校验 true，Basic X.509 false / -67843。拟补充 `ssl` + `basic` 两种明确策略，等待用户同意及系统确认；未关闭 TLS 校验 |
+| 中断 | 页面“停止回复”能终止失败重试，显示回复已中断；无成功 Chat 回复，不标为通过 |
+| Code 恢复 | 恢复已有会话，真实 Read 临时文件，返回 `P0-FILE-OK`；本轮未改个人会话 |
+| 语音下载 | 原生界面下载约 240 MB 模型，进度实际变化；固定大小与 SHA 校验成功后才可启用 |
+| 语音服务 | 真实本地 SenseVoice 模型经 WebSocket 转写合成音频成功；输入 `The local voice input test is successful.`，输出 `The local voice In test is successful.`，有词语识别偏差 |
+| 语音 UI | 新版原生入口还要求 gateway + interactive 认证及票据协议，当前不会显示麦克风。已提出“本地按钮”与“适配原生入口”供用户选择；后台转写不代表麦克风实测通过 |
+| 电脑控制/Cowork | 开关及后端能力已接入；真实文件任务、权限与电脑交互仍待 Chat/VM 证书修复后验收 |
+| 停止与恢复 | Claude 未退出时拒绝停止；正常退出后停止服务，session 与 dictation-helper receipt 删除；共享网关保留 |
+
+![主要界面汉化已生效，聊天失败已停止；此图不代表模型回复成功](attachments/claude-local-p0/native-localized-chat-pending.png)
+
+新增选项为自有 `options.json`：`voiceInput`、`computerUse`、`cowork`，统一 serde 默认 false。IPC 补齐 `options`、`voiceModelReady`、`voiceDownload` 与 enable/disable/prepare_voice 动作；前端类型、中英日文案及回归同步更新。模型位于隔离根 `speech-to-text/sensevoice-onnx`，不借用个人 Codex 模型缓存。
+
+语音 helper 有退出通知和 receipt 撤销；新会话使旧令牌失效，线程/运行时启动失败不留下 ready 标记。真实构建链接 `sherpa-onnx-sys 1.13.8` 官方预编译库，没有跳过原生链接。已通过核心 79 项、Node 64 项、宿主 `local_` 21 项、前端组件 6 项和类型检查；最新补充证书策略的两阶段前端构建与 macOS arm64 Debug 整包构建已成功；证书信任变更尚未执行。阶段证据见 [全流程进展 JSON](attachments/claude-local-p0/native-full-flow-progress.json)。
+
+CA 拟议修复只在显式“信任本地证书”动作中执行，使用当前用户登录钥匙串，保留 SSL 并追加 Basic X.509 策略。新版状态检查和启动门禁需要两者通过。移除信任修正为 user 域（原命令误用 admin `-d`），并分别验证两种策略已撤销；本轮尚未实机执行此移除操作。
+
+下一步须取得真正的 Chat 首轮与多轮回复，再做附件、Cowork 指定临时目录读写、电脑控制指定测试窗口、麦克风输入和异常恢复。所有未通过项仍保留，不以开关存在、模型文件齐全或构建成功替代实测。
+
+![扩展选项持久化及缺少 Basic X.509 信任时的启动门禁](attachments/claude-local-p0/native-capabilities-pending-trust.png)

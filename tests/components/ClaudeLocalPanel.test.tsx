@@ -96,5 +96,42 @@ describe("Claude local experiment", () => {
     expect(
       screen.getByRole("button", { name: "claudeLocal.stop" }),
     ).toBeEnabled();
+    expect(
+      screen.getByRole("checkbox", { name: "claudeLocal.computer" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("checkbox", { name: "claudeLocal.cowork" }),
+    ).toBeDisabled();
+  });
+  it("requires the local speech model before enabling voice", async () => {
+    mount();
+    expect(
+      await screen.findByRole("checkbox", { name: "claudeLocal.voice" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "claudeLocal.prepareVoice" }),
+    ).toBeEnabled();
+    expect(claudeDesktopLocal.action).not.toHaveBeenCalled();
+  });
+  it("persists advanced options only through an explicit idle action", async () => {
+    vi.mocked(claudeDesktopLocal.status).mockResolvedValue({
+      ...stopped,
+      voiceModelReady: true,
+    });
+    vi.mocked(claudeDesktopLocal.action).mockResolvedValue({
+      ...stopped,
+      voiceModelReady: true,
+      options: { voiceInput: true, computerUse: false, cowork: false },
+    });
+    mount();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "claudeLocal.voice" }),
+    );
+    await waitFor(() =>
+      expect(claudeDesktopLocal.action).toHaveBeenCalledWith(
+        "enable_voice",
+        "synthetic-provider",
+      ),
+    );
   });
 });

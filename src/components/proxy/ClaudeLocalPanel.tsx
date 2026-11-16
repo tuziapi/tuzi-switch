@@ -79,6 +79,59 @@ export function ClaudeLocalPanel({ providerId }: { providerId?: string }) {
       <p className="text-xs break-all text-muted-foreground">
         {status.profileDir}
       </p>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        {(
+          [
+            ["voice", status.options?.voiceInput],
+            ["computer", status.options?.computerUse],
+            ["cowork", status.options?.cowork],
+          ] as const
+        ).map(([feature, checked]) => (
+          <label key={feature} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={Boolean(checked)}
+              disabled={
+                active ||
+                action.isPending ||
+                (feature === "voice" && !status.voiceModelReady)
+              }
+              onChange={(event) =>
+                action.mutate(
+                  `${event.target.checked ? "enable" : "disable"}_${feature}`,
+                )
+              }
+            />
+            {t(`claudeLocal.${feature}`)}
+          </label>
+        ))}
+        {!status.voiceModelReady && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={active || action.isPending}
+            onClick={() => action.mutate("prepare_voice")}
+          >
+            {t("claudeLocal.prepareVoice")}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {t("claudeLocal.capabilityHint")}
+      </p>
+      {status.voiceDownload?.phase === "downloading" && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {t("claudeLocal.voiceProgress", {
+            percent: Math.min(
+              100,
+              Math.round(
+                (100 * (status.voiceDownload.completedBytes || 0)) /
+                  (status.voiceDownload.totalBytes || 1),
+              ),
+            ),
+          })}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {(["prepare", "trust", "launch", "stop", "untrust"] as const).map(
           (name) => (

@@ -244,7 +244,12 @@ test("fresh managed profile serves the installed official shell and bounded ASAR
   const shellHtml = shell.bytes.toString("utf8");
   assert.match(shellHtml, /data-build-id="fixture-build"/);
   assert.doesNotMatch(shellHtml, /stale private login shell/);
-  assert.match(shellHtml, /<meta name="i18n-catalogs" data-i18n-catalogs="en-US:1\.1\.1,zh-Hans:1\.1\.1">/);
+  // Desktop parses exactly locale:baseRevision.dynamicRevision. A third
+  // revision component silently excludes the locale and falls back to English.
+  const advertisedCatalogs = shellHtml.match(/data-i18n-catalogs="([^"]+)"/)[1]
+    .split(',').map(value => /^([\w-]+):([\w-]+)\.([\w-]+)$/.exec(value))
+    .filter(Boolean).map(match => match[1]);
+  assert.deepEqual(advertisedCatalogs, ['en-US', 'zh-Hans']);
   const shimIndex = shellHtml.indexOf('<script src="/__codex_plus/claude-localization.js"></script>');
   const firstAppScript = shellHtml.indexOf("<script>");
   assert.ok(shellHtml.indexOf('name="i18n-catalogs"') < firstAppScript);
@@ -544,6 +549,23 @@ test("strict P0 does not advertise disabled Cowork capability", async () => {
     assert.equal(boot.feature_flags.cowork, false);
     assert.ok(!boot.account.capabilities.includes("cowork"));
     assert.ok(!boot.organization.capabilities.includes("cowork"));
+  } finally { await stop(instance); }
+});
+
+test("strict P0 exposes explicitly enabled capabilities without enabling background access", async () => {
+  const instance = await start({
+    CLAUDE_LOCAL_STRICT_MODELS: "1", CLAUDE_LOCAL_COWORK: "1",
+    CLAUDE_LOCAL_COMPUTER_USE: "1", CLAUDE_LOCAL_BACKGROUND_MODE: "0",
+  });
+  try {
+    const boot = (await request(instance, "/edge-api/bootstrap", { host: "claude.ai" })).json;
+    assert.ok(boot.account.capabilities.includes("cowork"));
+    assert.ok(boot.account.capabilities.includes("computer_use"));
+    assert.ok(boot.system_prompts.cowork_system_prompt.value.prompt.trim().length > 0);
+    const prompts = await request(instance, `/api/bootstrap/${boot.organization.uuid}/system_prompts`, { host: "claude.ai" });
+    assert.deepEqual(prompts.json, boot.system_prompts);
+    const desktop = (await request(instance, "/api/desktop/features", { host: "claude.ai" })).json;
+    assert.deepEqual(desktop.features["1291166712"].value, { enabled: true, appScopedEnabled: false });
   } finally { await stop(instance); }
 });
 

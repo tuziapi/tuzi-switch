@@ -1016,14 +1016,9 @@ fn ca_trusted(root: &Path) -> bool {
     }
     #[cfg(target_os = "macos")]
     {
-        return probe(
-            Command::new("/usr/bin/security")
-                .args(["verify-cert", "-q", "-L", "-c"])
-                .arg(root.join("ca/server.crt"))
-                .args(["-p", "ssl", "-n", "claude.ai"]),
-            PROBE_TIMEOUT,
-        )
-        .is_ok_and(|(success, _)| success);
+        return ca_trusted_for_policy(root, "ssl")
+            && (crate::host::isolated_profile_dir().is_none()
+                || ca_trusted_for_policy(root, "basic"));
     }
     #[cfg(windows)]
     {
@@ -1041,6 +1036,19 @@ fn ca_trusted(root: &Path) -> bool {
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     false
+}
+
+#[cfg(target_os = "macos")]
+fn ca_trusted_for_policy(root: &Path, policy: &str) -> bool {
+    let mut command = Command::new("/usr/bin/security");
+    command.args(["verify-cert", "-q", "-L", "-c"]);
+    if policy == "ssl" {
+        command.arg(root.join("ca/server.crt"))
+            .args(["-p", "ssl", "-n", "claude.ai"]);
+    } else {
+        command.arg(root.join("ca/ca.pem")).args(["-p", policy]);
+    }
+    probe(&mut command, PROBE_TIMEOUT).is_ok_and(|(success, _)| success)
 }
 
 fn prepare_ca(root: &Path) -> Result<()> {
@@ -1133,14 +1141,20 @@ fn trust_ca(root: &Path) -> Result<()> {
         return Ok(());
     }
     #[cfg(target_os = "macos")]
-    checked(
-        Command::new("/usr/bin/security")
-            .args(["add-trusted-cert", "-r", "trustRoot", "-p", "ssl", "-k"])
-            .arg(home_dir().join("Library/Keychains/login.keychain-db"))
-            .arg(root.join("ca/ca.pem")),
-        Duration::from_secs(120),
-        "本地证书尚未信任，请在系统授权窗口中允许后重试",
-    )?;
+    {
+        let mut command = Command::new("/usr/bin/security");
+        command.args(["add-trusted-cert", "-r", "trustRoot", "-p", "ssl"]);
+        if crate::host::isolated_profile_dir().is_some() {
+            // New Desktop exports host roots to its VM only after Basic X.509
+            // evaluation. Keep explicit policies; do not grant all-purpose trust.
+            // This runs only after the user's explicit Trust action and OS dialog.
+            command.args(["-p", "basic"]);
+        }
+        command.arg("-k").arg(home_dir().join("Library/Keychains/login.keychain-db"))
+            .arg(root.join("ca/ca.pem"));
+        checked(&mut command, Duration::from_secs(120),
+            "本地证书尚未信任，请在系统授权窗口中允许后重试")?;
+    }
     // certutil -addstore 会弹 Windows 安全警告，用户点「是」才会返回成功。
     #[cfg(windows)]
     checked(
@@ -1189,13 +1203,13 @@ fn untrust_ca(root: &Path) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         let _ = Command::new("/usr/bin/security")
-            .args(["remove-trusted-cert", "-d"])
+            .arg("remove-trusted-cert")
             .arg(&cert)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
         ensure!(
-            !ca_trusted(root),
+            !ca_trusted_for_policy(root, "ssl") && !ca_trusted_for_policy(root, "basic"),
             "本地证书仍在信任列表中，请在“钥匙串访问”里删除 Codex++ Local CA"
         );
     }
@@ -1960,6 +1974,10 @@ fn strip_inherited_proxy(command: &mut Command) {
 
 /// New Desktop builds read application policy from the selected local configLibrary entry.
 fn disable_isolated_updates(profile: &Path) -> Result<()> {
+    configure_isolated_policy(profile, None)
+}
+
+fn configure_isolated_policy(profile: &Path, proxy_port: Option<u16>) -> Result<()> {
     // Signed Desktop removes CLAUDE_USER_DATA_DIR and reads local policy from
     // the sibling -3p profile even while its browser session remains in 1p.
     let policy_profile = if profile.as_os_str().to_string_lossy().ends_with("-3p") { profile.to_path_buf() } else {
@@ -1990,6 +2008,14 @@ fn disable_isolated_updates(profile: &Path) -> Result<()> {
         Err(e) => return Err(e.into()),
     };
     entry.as_object_mut().context("隔离更新配置必须是 JSON 对象")?.insert("disableAutoUpdates".into(), json!(true));
+    if let Some(port) = proxy_port {
+        ensure!(port > 0, "兼容代理端口无效");
+        // Electron's --proxy-server does not reach the new VM. Desktop applies
+        // this per-app policy to its guest and translates host loopback itself.
+        let object = entry.as_object_mut().context("隔离配置必须是 JSON 对象")?;
+        object.insert("egressProxyUrl".into(), json!(format!("http://127.0.0.1:{port}")));
+        object.remove("egressProxyPacUrl");
+    }
     // This private profile always uses its local entry, never a saved remote config pointer.
     meta.as_object_mut().context("隔离配置索引必须是 JSON 对象")?.remove("hybridPointer");
     private_dir(&library)?;
@@ -2409,6 +2435,12 @@ pub fn perform(action: &str) -> Result<ClaudeLocalResult> {
                 if let Some(profile) = crate::host::isolated_profile_dir() { prepare_isolated_profile(&profile, &root)?; }
                 sync_model_compact_windows(&root, &config, &upstream);
                 let port = start_backend(&root, &node, &config, &upstream, None)?;
+                if let Some(profile) = crate::host::isolated_profile_dir()
+                    && let Err(error) = configure_isolated_policy(&profile, Some(port))
+                {
+                    stop_backend();
+                    return Err(error);
+                }
                 if let Err(error) =
                     launch_original(&source, &root, Some(port), config.localization, Some(&upstream), code_share_home(&config))
                 {
@@ -3460,6 +3492,14 @@ mod tuzi_isolation_tests {
         disable_isolated_updates(&profile).unwrap();
         let value: Value = serde_json::from_slice(&fs::read(&entry).unwrap()).unwrap();
         assert_eq!(value, json!({"custom":42,"disableAutoUpdates":true}));
+        configure_isolated_policy(&profile, Some(43521)).unwrap();
+        let value: Value = serde_json::from_slice(&fs::read(&entry).unwrap()).unwrap();
+        assert_eq!(value["egressProxyUrl"], "http://127.0.0.1:43521");
+        assert_eq!(value["custom"], 42);
+        configure_isolated_policy(&profile, Some(43522)).unwrap();
+        let value: Value = serde_json::from_slice(&fs::read(&entry).unwrap()).unwrap();
+        assert_eq!(value["egressProxyUrl"], "http://127.0.0.1:43522");
+        assert!(configure_isolated_policy(&profile, Some(0)).is_err());
         fs::write(library.join("_meta.json"), br#"{"appliedId":"../../personal","entries":[]}"#).unwrap();
         assert!(disable_isolated_updates(&profile).is_err());
     }

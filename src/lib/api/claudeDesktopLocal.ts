@@ -5,6 +5,13 @@ export interface ClaudeLocalStatus {
   recoveryRequired?: boolean;
   boundProvider?: string | null;
   profileDir?: string | null;
+  options?: { voiceInput: boolean; computerUse: boolean; cowork: boolean };
+  voiceModelReady?: boolean;
+  voiceDownload?: {
+    phase?: string;
+    completedBytes?: number;
+    totalBytes?: number;
+  };
   core?: {
     supported: boolean;
     version: string;
@@ -22,7 +29,14 @@ export type ClaudeLocalAction =
   | "trust"
   | "untrust"
   | "launch"
-  | "stop";
+  | "stop"
+  | "prepare_voice"
+  | "enable_voice"
+  | "disable_voice"
+  | "enable_computer"
+  | "disable_computer"
+  | "enable_cowork"
+  | "disable_cowork";
 export const claudeDesktopLocal = {
   status: () => invoke<ClaudeLocalStatus>("get_claude_local_status"),
   action: (action: ClaudeLocalAction, providerId?: string) =>

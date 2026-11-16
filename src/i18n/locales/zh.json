@@ -3205,8 +3205,14 @@
     }
   },
   "claudeLocal": {
+    "voiceProgress": "正在下载语音模型：{{percent}}%",
+    "voice": "本地语音输入",
+    "computer": "电脑控制",
+    "cowork": "Cowork",
+    "prepareVoice": "下载语音模型（约 240 MB）",
+    "capabilityHint": "扩展功能需停止后设置。语音在本机转写；首次使用麦克风或电脑控制需系统授权。新版聊天与 Cowork 首次安装建议预留 20 GB 空间。",
     "title": "Claude 本地兼容 · P0 实验",
-    "description": "使用所选供应商的 API 接入独立 Claude 副本。当前已验证 Code 对话与文件任务；普通聊天和完整汉化仍在适配，不代表获得官方订阅权益。",
+    "description": "使用所选供应商的 API 接入独立 Claude 副本。Code 对话、文件任务和主要界面汉化已验证；聊天、语音入口及电脑控制仍在实机验收，不代表获得官方订阅权益。",
     "requirements": "Claude {{version}} · 证书{{certificate}} · Node.js {{node}}",
     "trusted": "已信任",
     "untrusted": "未信任",
@@ -3222,7 +3228,7 @@
     "launch": "启动兼容模式",
     "stop": "停止 / 恢复",
     "untrust": "移除证书信任",
-    "stopHint": "首次信任证书会触发系统授权。停止前请正常退出 Claude；运行期间禁止关闭网关。实验包及 Claude 独立副本已隔离自动更新。",
+    "stopHint": "证书信任包含 SSL 与 VM 所需的 Basic X.509 用途，需系统授权。停止前请退出 Claude；运行时禁止关闭网关。实验包和独立 Claude 已隔离更新。",
     "statusError": "无法读取兼容服务状态，请重试。"
   }
 }

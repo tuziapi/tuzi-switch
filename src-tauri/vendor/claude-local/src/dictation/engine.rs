@@ -51,8 +51,11 @@ impl std::fmt::Display for EngineError {
 
 impl std::error::Error for EngineError {}
 
-/// 模型目录：`$CODEX_HOME`（绝对路径时）或 `~/.codex` 下的 `speech-to-text/sensevoice-onnx`。
+/// 隔离宿主使用自身状态目录；其他宿主保留共享模型目录。
 pub fn model_dir() -> PathBuf {
+    if crate::host::isolated_profile_dir().is_some() {
+        return crate::host::host().state_dir().join("speech-to-text/sensevoice-onnx");
+    }
     let home = std::env::var_os("CODEX_HOME")
         .map(PathBuf::from)
         .filter(|path| path.is_absolute() && path.is_dir())

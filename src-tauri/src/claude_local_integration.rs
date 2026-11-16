@@ -2,7 +2,7 @@
 //! No automatic launch, certificate trust, import, resume, or supplier mutation.
 use crate::store::AppState;
 use claude_local::{ClaudeLocalSettings, Host, Upstream};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File, OpenOptions},
     path::PathBuf,
@@ -15,6 +15,26 @@ static HOST: OnceLock<Arc<TuziHost>> = OnceLock::new();
 #[path = "claude_local_copy.rs"]
 mod desktop_copy;
 const TESTED_VERSION: &str = desktop_copy::COPY_VERSION;
+
+#[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct LocalOptions {
+    voice_input: bool,
+    computer_use: bool,
+    cowork: bool,
+}
+fn read_options(root: &std::path::Path) -> anyhow::Result<LocalOptions> {
+    let path = root.join("options.json");
+    anyhow::ensure!(
+        !fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()),
+        "实验选项不能是符号链接"
+    );
+    match fs::read(path) {
+        Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(LocalOptions::default()),
+        Err(e) => Err(e.into()),
+    }
+}
 
 struct TuziHost {
     root: PathBuf,
@@ -127,10 +147,16 @@ impl Host for TuziHost {
         )
     }
     fn load_config(&self) -> anyhow::Result<ClaudeLocalSettings> {
-        Ok(safe_config())
+        let options = read_options(&self.root)?;
+        Ok(ClaudeLocalSettings {
+            voice_input: options.voice_input,
+            computer_use: options.computer_use,
+            cowork: options.cowork,
+            ..safe_config()
+        })
     }
     fn save_config(&self, _: &ClaudeLocalSettings) -> anyhow::Result<()> {
-        anyhow::bail!("P0 配置固定，暂不开放高级能力")
+        anyhow::bail!("请通过兔子助手的兼容选项修改配置")
     }
     fn preview_upstream(&self, _: &ClaudeLocalSettings) -> anyhow::Result<Upstream> {
         self.upstream
@@ -142,11 +168,27 @@ impl Host for TuziHost {
     fn prepare_upstream(&self, c: &ClaudeLocalSettings) -> anyhow::Result<Upstream> {
         self.preview_upstream(c)
     }
-    fn dictation_ready(&self, _: &ClaudeLocalSettings) -> bool {
-        false
+    fn dictation_ready(&self, config: &ClaudeLocalSettings) -> bool {
+        config.voice_input && claude_local::dictation::model_ready()
     }
     fn prepare_dictation_service(&self) -> anyhow::Result<()> {
-        anyhow::bail!("P0 未开放语音")
+        let root = self.root.clone();
+        claude_local::dictation::server::ensure_running(
+            &self.root,
+            Arc::new(move || {
+                use claude_local::dictation::EngineError;
+                let options =
+                    read_options(&root).map_err(|_| EngineError::new(500, "无法读取语音选项"))?;
+                if !options.voice_input || !root.join("session.json").is_file() {
+                    return Err(EngineError::new(403, "语音会话未启用"));
+                }
+                if !claude_local::dictation::model_ready() {
+                    return Err(EngineError::new(503, "语音模型未就绪"));
+                }
+                Ok(())
+            }),
+        )
+        .map(|_| ())
     }
 }
 
@@ -205,12 +247,22 @@ pub struct LocalStatus {
     bound_provider: Option<String>,
     profile_dir: Option<String>,
     core: Option<claude_local::ClaudeLocalStatus>,
+    options: LocalOptions,
+    voice_model_ready: bool,
+    voice_download: serde_json::Value,
 }
 
 #[tauri::command]
 pub async fn get_claude_local_status() -> Result<LocalStatus, String> {
-    let _guard = OPERATION.lock().await;
-    let host = host()?;
+    // Read-only polling must not occupy the mutation lock or fail a user click.
+    // Serialize first-time initialization, then poll the thread-safe core directly.
+    let host = match HOST.get() {
+        Some(host) => host.clone(),
+        None => {
+            let _guard = OPERATION.lock().await;
+            host()?
+        }
+    };
     tauri::async_runtime::spawn_blocking(move || read_status(&host))
         .await
         .map_err(|e| e.to_string())?
@@ -234,6 +286,9 @@ fn read_status(host: &TuziHost) -> Result<LocalStatus, String> {
                 .into_owned(),
         ),
         core: Some(core),
+        options: read_options(&host.root).map_err(|e| e.to_string())?,
+        voice_model_ready: claude_local::dictation::model_ready(),
+        voice_download: claude_local::dictation::model_status(),
     })
 }
 
@@ -247,17 +302,60 @@ pub async fn claude_local_action(
     if SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
         return Err("兔子助手正在退出或重启".into());
     }
-    if !["prepare", "trust", "untrust", "launch", "stop"].contains(&action.as_str()) {
+    if ![
+        "prepare",
+        "trust",
+        "untrust",
+        "launch",
+        "stop",
+        "prepare_voice",
+        "enable_voice",
+        "disable_voice",
+        "enable_computer",
+        "disable_computer",
+        "enable_cowork",
+        "disable_cowork",
+    ]
+    .contains(&action.as_str())
+    {
         return Err("未知操作".into());
     }
     let host = host()?;
     if action != "stop" && manifest().exists() {
         return Err("请先正常退出 Claude 并停止现有兼容会话".into());
     }
+    if action == "prepare_voice" {
+        claude_local::dictation::prepare_model()
+            .await
+            .map_err(|e| e.to_string())?;
+        return read_status(&host);
+    }
+    if action.starts_with("enable_") || action.starts_with("disable_") {
+        let enabled = action.starts_with("enable_");
+        let mut options = read_options(&host.root).map_err(|e| e.to_string())?;
+        match action.split_once('_').map(|(_, feature)| feature) {
+            Some("voice") => {
+                if enabled && !claude_local::dictation::model_ready() {
+                    return Err("请先下载本地语音模型".into());
+                }
+                options.voice_input = enabled;
+            }
+            Some("computer") => options.computer_use = enabled,
+            Some("cowork") => options.cowork = enabled,
+            _ => return Err("未知实验功能".into()),
+        }
+        claude_local::fsutil::atomic_write(
+            &host.root.join("options.json"),
+            &serde_json::to_vec_pretty(&options).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        return read_status(&host);
+    }
     if matches!(action.as_str(), "prepare" | "launch") {
         let root = host.root.clone();
         tauri::async_runtime::spawn_blocking(move || desktop_copy::prepare(&root))
-            .await.map_err(|e| e.to_string())??;
+            .await
+            .map_err(|e| e.to_string())??;
     }
     if action == "launch" {
         if !cfg!(target_os = "macos") {
@@ -300,6 +398,7 @@ pub async fn claude_local_action(
         if let Err(error) = result {
             // Keep the marker: even an uncertain launch must go through explicit recovery.
             claude_local::stop_backend();
+            claude_local::dictation::server::stop();
             state.proxy_service.release_local().await;
             *host.upstream.write().map_err(|_| "host lock failed")? = None;
             return Err(error);
@@ -314,6 +413,7 @@ pub async fn claude_local_action(
             .map_err(|e| e.to_string())?
             .map_err(|e| e.to_string())?;
         if action == "stop" {
+            claude_local::dictation::server::stop();
             state.proxy_service.release_local().await;
             *host.upstream.write().map_err(|_| "host lock failed")? = None;
             match fs::remove_file(manifest()) {
@@ -340,5 +440,33 @@ mod tests {
         assert!(!config.background_mode && !config.force_background_mode);
         assert!(!config.session_sync && !config.import_cli_sessions);
         assert_eq!(config.normalized_plan(), "free");
+    }
+
+    #[test]
+    fn local_options_default_and_legacy_fields_stay_disabled() {
+        let dir = tempfile::tempdir().unwrap();
+        let options = read_options(dir.path()).unwrap();
+        assert!(!options.voice_input && !options.computer_use && !options.cowork);
+        fs::write(dir.path().join("options.json"), br#"{"cowork":true}"#).unwrap();
+        let options = read_options(dir.path()).unwrap();
+        assert!(options.cowork && !options.voice_input && !options.computer_use);
+        let round_trip: LocalOptions =
+            serde_json::from_slice(&serde_json::to_vec(&options).unwrap()).unwrap();
+        assert!(round_trip.cowork);
+        fs::write(dir.path().join("options.json"), b"broken").unwrap();
+        assert!(read_options(dir.path()).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_options_reject_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("other.json"), b"{}").unwrap();
+        std::os::unix::fs::symlink(
+            dir.path().join("other.json"),
+            dir.path().join("options.json"),
+        )
+        .unwrap();
+        assert!(read_options(dir.path()).is_err());
     }
 }

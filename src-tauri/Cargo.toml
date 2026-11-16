@@ -19,7 +19,7 @@ doctest = false
 default = []
 test-hooks = []
 # P0 opt-in laboratory. Never enabled in release workflows.
-claude-local-poc = ["dep:claude-local", "dep:fs2", "isolated-profile"]
+claude-local-poc = ["dep:claude-local", "claude-local/dictation", "dep:fs2", "isolated-profile"]
 # Isolate user data without enabling debug-only loopback fixtures.
 isolated-profile = []
 local-preview = ["isolated-profile"]

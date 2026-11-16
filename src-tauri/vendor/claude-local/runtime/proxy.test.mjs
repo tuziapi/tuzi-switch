@@ -16,6 +16,7 @@ import { startupAssets } from "./scripts/patch-dictation-start.mjs";
 import { facadeFixture, recorderFixture } from "./scripts/fixtures/dictation-start.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const testCaDir = process.env.CLAUDE_LOCAL_TEST_CA_DIR || path.join(here, "ca");
 const gatewayRequests = [];
 const upstreamRequests = [];
 const cdnAssetPath = "/claude-ai/v2/assets/v1/codex-fixture-AbCd1234.js";
@@ -87,7 +88,7 @@ async function request(pathname, { host, body, method = body === undefined ? "GE
   assert.equal(res.statusCode, 200);
   assert.equal(head.length, 0);
   const secure = tls.connect({
-    socket, servername: host, ca: fs.readFileSync(path.join(here, "ca/ca.pem")),
+    socket, servername: host, ca: fs.readFileSync(path.join(testCaDir, "ca.pem")),
   });
   await once(secure, "secureConnect");
   const agent = new https.Agent({ keepAlive: false });
@@ -110,7 +111,7 @@ async function requestText(host, pathname, headers = {}) {
   assert.equal(res.statusCode, 200);
   assert.equal(head.length, 0);
   const secure = tls.connect({
-    socket, servername: host, ca: fs.readFileSync(path.join(here, "ca/ca.pem")),
+    socket, servername: host, ca: fs.readFileSync(path.join(testCaDir, "ca.pem")),
   });
   await once(secure, "secureConnect");
   const agent = new https.Agent({ keepAlive: false });
@@ -184,7 +185,7 @@ async function openTlsUpgrade({
   assert.equal(res.statusCode, 200);
   assert.equal(head.length, 0);
   const secure = tls.connect({
-    socket, servername: host, ca: fs.readFileSync(path.join(here, "ca/ca.pem")),
+    socket, servername: host, ca: fs.readFileSync(path.join(testCaDir, "ca.pem")),
   });
   await once(secure, "secureConnect");
   const key = crypto.randomBytes(16).toString("base64");
@@ -326,7 +327,7 @@ before(async () => {
   proxyPort = await listen(reservation);
   await new Promise((resolve) => reservation.close(resolve));
   proxy = spawn(process.execPath, [
-    path.join(here, "proxy.mjs"), "--port", String(proxyPort), "--mode", "mock", "--log", "0",
+    path.join(here, "proxy.mjs"), "--port", String(proxyPort), "--mode", "mock", "--log", "0", "--ca", testCaDir,
   ], {
     env: {
       ...process.env,

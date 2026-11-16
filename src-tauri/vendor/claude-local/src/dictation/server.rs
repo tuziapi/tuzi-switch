@@ -22,6 +22,7 @@ pub type Availability = Arc<dyn Fn() -> Result<(), EngineError> + Send + Sync>;
 struct Running {
     port: u16,
     receipt: PathBuf,
+    shutdown: tokio::sync::watch::Sender<bool>,
 }
 
 static RUNNING: OnceLock<Mutex<Option<Running>>> = OnceLock::new();
@@ -40,30 +41,36 @@ pub fn ensure_running(state_dir: &Path, availability: Availability) -> Result<u1
     {
         return Ok(current.port);
     }
+    if let Some(previous) = slot.take() {
+        let _ = previous.shutdown.send(true);
+        let _ = std::fs::remove_file(previous.receipt);
+    }
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .context("无法创建听写服务运行时")?;
     let token = uuid::Uuid::new_v4().to_string();
     let std_listener = std::net::TcpListener::bind(("127.0.0.1", 0)).context("听写服务无法监听本机端口")?;
     std_listener.set_nonblocking(true)?;
     let port = std_listener.local_addr()?.port();
     write_receipt(&receipt, port, &token)?;
     let accept_token = token.clone();
+    let (shutdown, mut shutdown_rx) = tokio::sync::watch::channel(false);
     std::thread::Builder::new()
         .name("claude-local-dictation-server".into())
         .spawn(move || {
-            let runtime = match tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(2)
-                .enable_all()
-                .build()
-            {
-                Ok(runtime) => runtime,
-                Err(_) => return,
-            };
             runtime.block_on(async move {
                 let Ok(listener) = TcpListener::from_std(std_listener) else {
                     return;
                 };
                 loop {
-                    let Ok((socket, _)) = listener.accept().await else {
-                        continue;
+                    let socket = tokio::select! {
+                        _ = shutdown_rx.changed() => break,
+                        accepted = listener.accept() => match accepted {
+                            Ok((socket, _)) => socket,
+                            Err(_) => continue,
+                        },
                     };
                     let token = accept_token.clone();
                     let availability = availability.clone();
@@ -73,14 +80,23 @@ pub fn ensure_running(state_dir: &Path, availability: Availability) -> Result<u1
                 }
             });
         })
-        .context("无法启动听写服务线程")?;
-    *slot = Some(Running { port, receipt });
+        .map_err(|error| {
+            let _ = std::fs::remove_file(&receipt);
+            anyhow::Error::new(error).context("无法启动听写服务线程")
+        })?;
+    *slot = Some(Running { port, receipt, shutdown });
     Ok(port)
 }
 
 /// 程序退出时删掉凭据，免得本地兼容服务连到一个已经不在的端口。
 pub fn remove_receipt() {
+    stop();
+}
+
+/// Revoke credentials and close the listener and its in-flight streams.
+pub fn stop() {
     if let Some(current) = running().lock().unwrap_or_else(|error| error.into_inner()).take() {
+        let _ = current.shutdown.send(true);
         let _ = std::fs::remove_file(current.receipt);
     }
 }
@@ -156,5 +172,38 @@ mod tests {
     fn header_end_is_found_after_the_blank_line() {
         assert_eq!(find_header_end(b"GET / HTTP/1.1\r\nA: b\r\n\r\nrest"), Some(20));
         assert_eq!(find_header_end(b"GET / HTTP/1.1\r\n"), None);
+    }
+
+    #[test]
+    fn stopping_revokes_receipt_and_closes_the_listener() {
+        use std::io::{Read, Write};
+        fn handshake(port: u16, token: &str) -> String {
+            let mut socket = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+            socket.set_read_timeout(Some(std::time::Duration::from_secs(3))).unwrap();
+            write!(socket, "GET /dictation/claude-stream HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n{TOKEN_HEADER}: {token}\r\n\r\n").unwrap();
+            let mut response = String::new();
+            socket.read_to_string(&mut response).unwrap();
+            response
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let unavailable: Availability = Arc::new(|| Err(EngineError::new(503, "test model unavailable")));
+        let port = ensure_running(dir.path(), unavailable.clone()).unwrap();
+        assert!(dir.path().join(RECEIPT_FILE).is_file());
+        assert_eq!(ensure_running(dir.path(), Arc::new(|| Ok(()))).unwrap(), port);
+        let receipt: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.path().join(RECEIPT_FILE)).unwrap()).unwrap();
+        let token = receipt["token"].as_str().unwrap();
+        assert!(handshake(port, "invalid").starts_with("HTTP/1.1 403"));
+        assert!(handshake(port, token).starts_with("HTTP/1.1 503"));
+        stop();
+        assert!(!dir.path().join(RECEIPT_FILE).exists());
+        let new_port = ensure_running(dir.path(), unavailable).unwrap();
+        assert!(handshake(new_port, token).starts_with("HTTP/1.1 403"));
+        stop();
+        for _ in 0..100 {
+            if std::net::TcpStream::connect(("127.0.0.1", port)).is_err()
+                && std::net::TcpStream::connect(("127.0.0.1", new_port)).is_err() { return; }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        panic!("dictation listener remained active after stop");
     }
 }
