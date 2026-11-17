@@ -46,8 +46,10 @@
 
 ## 云端旁证与未关闭的问题
 
-只读检查来源分支 run `44034208276`，它属于 `869ceb57`，不是整合分支的最终候选。六平台运行时均通过；Linux x64/ARM64、Mac ARM、Windows x64 候选成功，Mac Intel 尚在运行。Windows ARM64 的原生集成测试在 `backend::private_dir` 失败，错误为 `Private directory permission check timed out`；QuickJS ABI 测试已通过。
+只读检查来源分支 run `44034208276`，它属于 `869ceb57`，不是整合分支的最终候选。六平台运行时均通过；Linux x64/ARM64、Mac ARM/Intel、Windows x64 五个平台候选成功；该运行最终因 Windows ARM64 失败而整体失败。Windows ARM64 的原生集成测试在 `backend::private_dir` 失败，错误为 `Private directory permission check timed out`；QuickJS ABI 测试已通过。
 
 源码确认该检查通过 PowerShell 设置并验证私有目录 ACL，15 秒后终止进程。当前日志不足以区分冷启动延迟和实际挂起；没有跳过 ACL、修改超时后假定通过，也没有重新运行远端任务。Windows ARM64 必须补充诊断并在真实 runner 复验。
 
 当前结论：同步、构建、独立安装、Code 两轮及文件任务已完成；完整功能与跨平台发行门槛未满足。继续使用本候选完成 VM 初始化后的真实任务及重启/恢复；正式身份签名、安装升级、六平台实机与发行材料仍分别验收，不以该 Debug 包代替正式发布。
+
+最后检查：官方 rootfs 压缩文件公开响应大小为 1,246,877,094 字节；独立下载范围探测成功（HTTP 206，1 MiB / 5.12 秒），仅用于排查网络，不替换客户端资源。没有找到可直接复用的原始压缩缓存。普通 Chat 提交后等待正在进行的 VM 初始化，尚无模型回复；窗口捕获随后两次出现 macOS ScreenCaptureKit -3811 错误。Code 已通过的真实结果不受此项影响，普通 Chat 继续标记未通过。
