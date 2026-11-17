@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   isPreviewRelease,
+  previewDownloadRelease,
   previewPlatforms,
   previewRepository,
   previewVersion,
@@ -56,4 +57,23 @@ test("preview rejects official routing, missing packages, duplicate targets, bad
     assert.equal(isPreviewRelease(value), false);
   }
   assert.equal(isPreviewRelease(null), false);
+});
+
+test("existing page adapter preserves all architectures, hashes and source links", () => {
+  const raw = fixture();
+  const view = previewDownloadRelease(raw);
+  assert.deepEqual(
+    view.downloads.map((d) => d.id),
+    ["macos", "macos-intel", "windows", "deb", "deb-arm64"],
+  );
+  assert.equal(view.sourceUrl, raw.releaseUrl);
+  assert.equal(view.correspondingSourceUrl, raw.sourceUrl);
+  assert.equal(view.tag, "v1.6.3-beta.1");
+  view.downloads.forEach((d, i) => {
+    assert.equal(d.href, raw.downloads[i].url);
+    assert.equal(d.sha256, raw.downloads[i].sha256);
+    assert.equal(d.bytes, raw.downloads[i].bytes);
+  });
+  raw.downloads.pop();
+  assert.throws(() => previewDownloadRelease(raw), /Invalid preview/);
 });

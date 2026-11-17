@@ -73,3 +73,29 @@ export function isPreviewRelease(value) {
     );
   });
 }
+
+// Adapt the verified preview manifest to the existing shared download view.
+export function previewDownloadRelease(value) {
+  if (!isPreviewRelease(value)) throw new Error("Invalid preview release");
+  const ids = ["macos", "macos-intel", "windows", "deb", "deb-arm64"];
+  return {
+    ...value,
+    tag: `v${value.version}`,
+    sourceUrl: value.releaseUrl,
+    correspondingSourceUrl: value.sourceUrl,
+    downloads: previewPlatforms.map((platform, index) => {
+      const item = value.downloads.find(
+        (file) => file.platform === platform.id,
+      );
+      return {
+        id: ids[index],
+        title: platform.label,
+        subtitle: platform.detail,
+        format: platform.extension.slice(1).toUpperCase(),
+        href: item.url,
+        bytes: item.bytes,
+        sha256: item.sha256,
+      };
+    }),
+  };
+}
