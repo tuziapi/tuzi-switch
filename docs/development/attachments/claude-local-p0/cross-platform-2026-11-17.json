@@ -111,8 +111,8 @@
     "mainSha256": "669fdf618739487038f8adf4f37ab963f804ef0461a9cfc02a41c4146ea898b9",
     "nodeSha256": "ba7073582822078d8c90bca3facacc46690bc5366fab4b815aeef9148cd6e854",
     "signed": false,
-    "installed": false,
-    "launched": false,
+    "installed": true,
+    "launched": true,
     "licenseResourcesVerified": true,
     "archive": "/Users/sdy09/Documents/ChatGPT/ClaudeMom/deliverables/claude-local-cross-platform-2026-11-17/tuzi-claude-local-mac-arm64-1.6.2-669fdf6187-UNSIGNED-TEST.zip",
     "archiveSha256": "3f9ed79baf16702309667b6e8adf8f28a1a30f9409b275aa13c600f9c813e8a6",
@@ -133,5 +133,21 @@
     "initialArchive": "failed: no space left on device; incomplete archive deleted",
     "cleanup": "removed only reproducible debug/deps and debug/build caches from this task",
     "retry": "passed"
+  },
+  "localInstallation": {
+    "installedAt": "20261117-103105",
+    "destination": "/Applications/兔子助手.app",
+    "backupDirectory": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/claude-local-20261117-103105",
+    "previousMainSha256": "9b5be5bc91b7b76a7246323c4d76a312b989f8ad071a65b1f79a34878751caf8",
+    "installedMainSha256": "669fdf618739487038f8adf4f37ab963f804ef0461a9cfc02a41c4146ea898b9",
+    "version": "1.6.2",
+    "sourceCommit": "d50c1d50",
+    "candidate": "unsigned debug test build",
+    "launched": true,
+    "functionalAcceptance": false,
+    "uiVerified": "Claude Desktop native panel visible; Node ready; no provider configured; resources and certificate pending",
+    "activeGenerationTasksBeforeExit": 0,
+    "updatedVia": "local manual app replacement; not auto-update",
+    "userAuthorization": "2026-11-17: 更新一下本地的兔子助手，我去测试一下看看"
   }
 }

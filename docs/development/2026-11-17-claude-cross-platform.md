@@ -35,7 +35,7 @@ Windows 不再复制 MSIX 目录：官方说明 Cowork 的虚拟机后台服务�
 
 Mac 交叉检查 Linux 核心在编译 `ring` 的 C 依赖时被缺失的 Linux 工具链 / sysroot 阻断；不记录为 Linux 编译成功。Linux 证书模块另在 Mac 的核心测试构建中做 Rust 类型检查和指纹隔离测试，这不能代替 Linux 上的 NSS、pkexec、VM 验证。Windows 与 Linux 完整候选尚须对应系统生成。
 
-Mac ARM 正常身份的未签名 Debug 候选已构建，版本 1.6.2，主程序 SHA-256 为 `669fdf618739487038f8adf4f37ab963f804ef0461a9cfc02a41c4146ea898b9`。ZIP 首次因磁盘不足失败，删除残件并仅清理本任务可重新生成的编译缓存后，重新打包及全部条目 CRC 校验通过；归档摘要见证据文件。候选尚未安装或启动，不可作为自动更新包。
+Mac ARM 正常身份的未签名 Debug 候选已构建，版本 1.6.2，主程序 SHA-256 为 `669fdf618739487038f8adf4f37ab963f804ef0461a9cfc02a41c4146ea898b9`。ZIP 首次因磁盘不足失败，删除残件并仅清理本任务可重新生成的编译缓存后，重新打包及全部条目 CRC 校验通过；归档摘要见证据文件。初次打包时尚未安装或启动；后续本机安装见下文。本包不可作为自动更新包。
 
 ## 构建及环境采集
 
@@ -90,3 +90,11 @@ python3 scripts/qa/claude-local-platform-preflight.py --output claude-preflight.
 - [Chromium Linux NSS 证书库路径](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/linux/cert_management.md)
 - [Node 24.22.3 官方校验表](https://nodejs.org/dist/v24.22.3/SHASUMS256.txt)
 - [GitHub 托管运行器及架构](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+
+## 2026-11-17 本机安装交付
+
+用户明确要求更新本地兔子助手供亲自测试。确认任务队列生成中为 0，正常退出旧版后，备份原应用、`.tuzi-switch`、应用支持目录和 WebKit 数据，再替换 `/Applications/兔子助手.app`。安装的是上述 `d50c1d50` 对应的 Mac ARM 未签名 Debug 候选，版本仍为 1.6.2，主程序与内置 Node 摘要均匹配。不是远端发布或自动更新。
+
+新版本已正常启动并打开原生 Claude Desktop 配置页，兼容面板可见、内置 Node 就绪。该正常身份的兼容目录是首次使用，页面尚无供应商，资源未准备、证书未信任；未自动从 P0 迁移证书或凭证，也未启动模型请求。安装及配置入口检查通过，不代表普通聊天、Cowork、语音、电脑控制完整验收通过。用户可在此页导入兼容供应商、准备资源并亲自进行系统证书授权。
+
+原应用和本地数据备份位置：`/Users/sdy09/Library/Application Support/Tuzi Local Backups/claude-local-20261117-103105`。备份目录权限 0700，含本地私有数据，不进入源码归档或公开上传；具体安装收据见本机备份目录及跨平台证据的 `localInstallation`。

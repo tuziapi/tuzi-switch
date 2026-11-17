@@ -1,3 +1,5 @@
+2026-11-17 CL-LOCAL-UI-02：用户选择 B，Claude Desktop 改为单卡四步引导，收起可选功能和高级信息，保留原线路管理及会话保护。44 项相关测试、类型检查及本机候选构建通过；真实界面已检查，完整功能仍待验收。见 [启动面板优化](2026-11-17-claude-desktop-setup-ui.md)。仅本地，无推送或发布。
+
 2026-11-17 CL-LOCAL-PLATFORM-01：按最新要求扩展 Mac ARM/Intel、Windows x64/ARM64、Linux x64/ARM64。Windows 官方安装＋独立目录、Linux 官方支持功能范围已获确认；运行时、平台启动/证书代码、能力字段及六平台验证/候选流程已补齐，原生跨平台构建和实机验收仍待完成。见 [跨平台适配与验收](2026-11-17-claude-cross-platform.md)。未推送、未发布。
 
 2026-11-16 CL-LOCAL-RC-03：用户已确认首版先发布已验收的 Mac Apple Silicon 版本（Claude 5.11492.5），完整功能逐项通过才放行。候选 arm64 架构已只读核实；证书补充信任及语音入口两项仍待选择。未安装或发布，见 [首版范围与门槛](2026-11-17-claude-release-readiness.md)。

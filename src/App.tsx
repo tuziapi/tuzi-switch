@@ -1271,7 +1271,80 @@ function App() {
           return <ToolsPanel />;
         case "openclawAgents":
           return <AgentsDefaultsPanel />;
-        default:
+        default: {
+          const providerList = (
+            <ProviderList
+              focusRequest={
+                accountProviderFocus?.app === activeApp
+                  ? accountProviderFocus
+                  : undefined
+              }
+              onFocusComplete={clearAccountProviderFocus}
+              providers={providers}
+              currentProviderId={currentProviderId}
+              appId={activeApp}
+              isLoading={isLoading}
+              isProxyRunning={isProxyRunning}
+              isProxyTakeover={isProxyRunning && isCurrentAppTakeoverActive}
+              activeProviderId={activeProviderId}
+              switchingProviderId={switchingProviderId}
+              onSwitch={switchProvider}
+              onEdit={(provider) => {
+                setEditingProvider(provider);
+              }}
+              onDelete={(provider) =>
+                setConfirmAction({
+                  appId: activeApp,
+                  provider,
+                  action: "delete",
+                })
+              }
+              onRemoveFromConfig={
+                activeApp === "opencode" ||
+                activeApp === "openclaw" ||
+                activeApp === "hermes"
+                  ? (provider) =>
+                      setConfirmAction({
+                        appId: activeApp,
+                        provider,
+                        action: "remove",
+                      })
+                  : undefined
+              }
+              onClearConfig={
+                activeApp === "claude" ||
+                activeApp === "codex" ||
+                activeApp === "gemini"
+                  ? (provider) =>
+                      setConfirmAction({
+                        appId: activeApp,
+                        provider,
+                        action: "clearConfig",
+                      })
+                  : undefined
+              }
+              onDisableOmo={
+                activeApp === "opencode" ? handleDisableOmo : undefined
+              }
+              onDisableOmoSlim={
+                activeApp === "opencode" ? handleDisableOmoSlim : undefined
+              }
+              onDuplicate={handleDuplicateProvider}
+              onConfigureUsage={setUsageProvider}
+              onOpenWebsite={handleOpenWebsite}
+              onOpenTerminal={
+                activeApp === "claude" ? handleOpenTerminal : undefined
+              }
+              onCreate={() => setIsAddOpen(true)}
+              onSetAsDefault={
+                activeApp === "openclaw"
+                  ? setAsDefaultModel
+                  : activeApp === "hermes"
+                    ? switchProvider
+                    : undefined
+              }
+            />
+          );
           return (
             <div className="px-6 flex flex-col flex-1 min-h-0 overflow-hidden">
               {["claude", "codex", "gemini"].includes(activeApp) && (
@@ -1297,91 +1370,31 @@ function App() {
                     transition={{ duration: 0.15 }}
                     className="space-y-4"
                   >
-                    {activeApp === "claude-desktop" && (
+                    {activeApp === "claude-desktop" ? (
                       <ClaudeLocalPanel
                         providerId={currentProviderId || undefined}
-                      />
+                        providers={Object.values(providers)}
+                        providersLoading={isLoading}
+                        expandProviders={
+                          accountProviderFocus?.app === "claude-desktop"
+                        }
+                        switchingProviderId={switchingProviderId}
+                        onSelectProvider={(id) => {
+                          if (providers[id]) void switchProvider(providers[id]);
+                        }}
+                        onAddProvider={() => setIsAddOpen(true)}
+                      >
+                        {providerList}
+                      </ClaudeLocalPanel>
+                    ) : (
+                      providerList
                     )}
-                    <ProviderList
-                      focusRequest={
-                        accountProviderFocus?.app === activeApp
-                          ? accountProviderFocus
-                          : undefined
-                      }
-                      onFocusComplete={clearAccountProviderFocus}
-                      providers={providers}
-                      currentProviderId={currentProviderId}
-                      appId={activeApp}
-                      isLoading={isLoading}
-                      isProxyRunning={isProxyRunning}
-                      isProxyTakeover={
-                        isProxyRunning && isCurrentAppTakeoverActive
-                      }
-                      activeProviderId={activeProviderId}
-                      switchingProviderId={switchingProviderId}
-                      onSwitch={switchProvider}
-                      onEdit={(provider) => {
-                        setEditingProvider(provider);
-                      }}
-                      onDelete={(provider) =>
-                        setConfirmAction({
-                          appId: activeApp,
-                          provider,
-                          action: "delete",
-                        })
-                      }
-                      onRemoveFromConfig={
-                        activeApp === "opencode" ||
-                        activeApp === "openclaw" ||
-                        activeApp === "hermes"
-                          ? (provider) =>
-                              setConfirmAction({
-                                appId: activeApp,
-                                provider,
-                                action: "remove",
-                              })
-                          : undefined
-                      }
-                      onClearConfig={
-                        activeApp === "claude" ||
-                        activeApp === "codex" ||
-                        activeApp === "gemini"
-                          ? (provider) =>
-                              setConfirmAction({
-                                appId: activeApp,
-                                provider,
-                                action: "clearConfig",
-                              })
-                          : undefined
-                      }
-                      onDisableOmo={
-                        activeApp === "opencode" ? handleDisableOmo : undefined
-                      }
-                      onDisableOmoSlim={
-                        activeApp === "opencode"
-                          ? handleDisableOmoSlim
-                          : undefined
-                      }
-                      onDuplicate={handleDuplicateProvider}
-                      onConfigureUsage={setUsageProvider}
-                      onOpenWebsite={handleOpenWebsite}
-                      onOpenTerminal={
-                        activeApp === "claude" ? handleOpenTerminal : undefined
-                      }
-                      onCreate={() => setIsAddOpen(true)}
-                      onSetAsDefault={
-                        activeApp === "openclaw"
-                          ? setAsDefaultModel
-                          : activeApp === "hermes"
-                            ? switchProvider
-                            : undefined
-                      }
-                    />
                   </motion.div>
                 </AnimatePresence>
               </div>
             </div>
           );
+        }
       }
     })();
 
