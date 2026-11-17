@@ -31,6 +31,7 @@ mod mcp;
 mod native_tools;
 mod native_mcp;
 mod openclaw_config;
+mod opentu_mcp;
 mod opencode_config;
 mod panic_hook;
 mod prompt;
@@ -332,6 +333,11 @@ pub fn run() {
         )
         .setup(|app| {
             let _ = rustls::crypto::ring::default_provider().install_default();
+
+            // Local ChatGPT Desktop integration. The bridge binds to loopback
+            // and uses a per-launch bearer token; provider credentials stay in
+            // OpenTu and are never sent to the MCP client.
+            opentu_mcp::start(app.handle());
 
             // 预先刷新 Store 覆盖配置，确保后续路径读取正确（日志/数据库等）
             app_store::refresh_app_config_dir_override(app.handle());
@@ -1227,6 +1233,8 @@ pub fn run() {
             creative_codex::creative_codex_probe,
             creative_codex::creative_codex_chat,
             creative_codex::creative_codex_cancel,
+            opentu_mcp::opentu_mcp_pairing,
+            opentu_mcp::opentu_mcp_respond,
             creative_http::check_update_ready,
             creative_images::creative_image_action,
             creative_media::creative_save_media,

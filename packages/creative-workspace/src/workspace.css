@@ -46,6 +46,12 @@
 .creative-rename-dialog input { width:100%; padding:10px; border:1px solid #ddd6ca; border-radius:6px; background:transparent; color:inherit; }
 .creative-rename-dialog > div { display:flex; justify-content:flex-end; gap:14px; margin-top:20px; }
 .creative-rename-dialog button { background:transparent; border:0; font-size:13px; padding:6px 12px; }
+.creative-mcp-pairing { width:min(520px,92%); }
+.creative-mcp-pairing p { color:#6f6b63; font-size:12px; line-height:1.5; margin:0 0 16px; }
+.creative-mcp-pairing label { display:block; color:#6f6b63; font-size:12px; margin-top:10px; }
+.creative-mcp-pairing label input { margin-top:6px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; }
+.creative-mcp-pairing button { display:inline-flex; align-items:center; gap:6px; }
+.creative-root[data-theme=dark] .creative-mcp-pairing p, .creative-root[data-theme=dark] .creative-mcp-pairing label { color:#b4b0a9; }
 .creative-root[data-theme=dark] { background:#20201e; color:#e6e4df; }
 .creative-root[data-theme=dark] .creative-project-card, .creative-root[data-theme=dark] .creative-rename-dialog { background:#292925; border-color:#41403a; color:#e6e4df; }
 .creative-root[data-theme=dark] .creative-primary { background:#e6e4df; color:#252525; }
