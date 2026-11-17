@@ -30,6 +30,8 @@ class NodeArchiveTests(unittest.TestCase):
             self.assertEqual(config["mainBinaryName"], "tuzi-opentu-preview")
             self.assertFalse(config["bundle"]["createUpdaterArtifacts"])
             self.assertEqual(config["plugins"]["updater"]["endpoints"], [])
+            if "apple" in target:
+                self.assertEqual(config["bundle"]["macOS"]["signingIdentity"], "-")
             if "linux" in target:
                 self.assertEqual(config["productName"], "OpenTu Preview")
                 self.assertTrue(config["bundle"]["externalBin"][0].endswith("/tuzi-opentu-preview-node"))

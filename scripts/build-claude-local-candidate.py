@@ -44,6 +44,8 @@ def build_config(target, opentu_preview=False, test_release=False):
             config["bundle"]["externalBin"] = [f"{directory}/tuzi-opentu-preview-node"]
     if test_release:
         config["version"] = "1.6.3-beta.1"
+        if "apple" in target:
+            config["bundle"]["macOS"] = {"signingIdentity": "-"}
     return config
 
 
@@ -96,7 +98,7 @@ def main():
     config = build_config(target, args.opentu_preview, args.test_release)
     command = ["pnpm", "tauri", "build", *([] if args.test_release else ["--debug"]), *target_flags,
                "--features", "claude-desktop-local,opentu-preview" if args.opentu_preview else "claude-desktop-local", "--bundles", bundle_kind(target, args.test_release),
-               "--no-sign", "--config", str(config_path)]
+               *([] if args.test_release else ["--no-sign"]), "--config", str(config_path)]
     if args.dry_run:
         print(json.dumps({"target": target, "command": command, "config": config}, indent=2))
         return
