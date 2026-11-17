@@ -1,5 +1,5 @@
 import hashlib,importlib.util,json,pathlib,subprocess,tempfile,unittest
-ROOT=pathlib.Path.cwd()
+ROOT=pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('publish',ROOT/'scripts/publish-opentu-beta-assets.py')
 publish=importlib.util.module_from_spec(spec);spec.loader.exec_module(publish)
 PLATFORMS={'macos-arm64':('aarch64-apple-darwin','.dmg'),'macos-x64':('x86_64-apple-darwin','.dmg'),'windows-x64':('x86_64-pc-windows-msvc','.exe'),'linux-x64':('x86_64-unknown-linux-gnu','.deb'),'linux-arm64':('aarch64-unknown-linux-gnu','.deb')}
@@ -32,4 +32,5 @@ class PublicationChecks(unittest.TestCase):
     f=files[0];original=f.read_text();m=json.loads(original);m[field]=value;f.write_text(json.dumps(m))
     self.assertNotEqual(run('bad'+str(i)).returncode,0,field);f.write_text(original)
    files[-1].unlink();self.assertNotEqual(run('missing').returncode,0)
-unittest.main()
+if __name__ == "__main__":
+ unittest.main()
