@@ -7,6 +7,7 @@ import {
   Brain,
   Cpu,
   FolderOpen,
+  Globe,
   History,
   KeyRound,
   LayoutDashboard,
@@ -14,15 +15,18 @@ import {
   Network,
   Shield,
   SlidersHorizontal,
+  Store,
   Wrench,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import type { VisibleApps } from "@/types";
 import type { AppId } from "@/lib/api";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import { OpentuIcon } from "@/components/icons/OpentuIcon";
 import { cn } from "@/lib/utils";
+import { settingsApi } from "@/lib/api/settings";
 
 export type TuziView =
   | "account"
@@ -201,6 +205,26 @@ export function TuziSidebar({
             <OpentuIcon size={18} />
             {!collapsed && <span className="truncate">opentu 创作</span>}
           </button>
+          {[
+            { label: "直连站", url: "https://web.tu-zi.com/", icon: Globe },
+            { label: "兔小店", url: "https://store.tu-zi.com/", icon: Store },
+          ].map(({ label, url, icon: Icon }) => (
+            <button
+              key={url}
+              type="button"
+              className={itemClass(false)}
+              title={`${label} · 在浏览器中打开`}
+              aria-label={label}
+              onClick={() =>
+                void settingsApi
+                  .openExternal(url)
+                  .catch(() => toast.error("无法打开浏览器，请稍后重试"))
+              }
+            >
+              <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              {!collapsed && <span className="truncate">{label}</span>}
+            </button>
+          ))}
           {!collapsed && (
             <div className="px-3 pb-1 pt-4 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">
               {t("navigation.tools")}
