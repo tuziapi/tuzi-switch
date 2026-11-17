@@ -7,7 +7,7 @@ import re
 import subprocess
 
 REPO = 'AiW520/tuzi-switch'
-TAG = 'opentu-preview-v1.6.3-beta.1'
+TAG = 'opentu-preview-v1.6.3-beta.2'
 
 def gh(*args):
     return subprocess.check_output(['gh', *args], text=True).strip()
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         # Never move or replace an existing tag.
         gh('api','-X','POST',f'repos/{REPO}/git/refs','-f',f'ref=refs/tags/{TAG}','-f',f'sha={sha}')
         gh('release','create',TAG,'-R',REPO,'--verify-tag','--draft','--prerelease','--latest=false',
-           '--title','OpenTu 1.6.3-beta.1 测试版', '--notes-file','docs/releases/opentu-preview-v1.6.3-beta.1.md')
+           '--title','OpenTu 1.6.3-beta.2 测试版', '--notes-file','docs/releases/opentu-preview-v1.6.3-beta.2.md')
         draft = select_draft(api('releases?per_page=100'))
     assert draft is not None
     tag = api(f'git/ref/tags/{TAG}')['object']

@@ -24,7 +24,7 @@ export default defineConfig({
         return process.env.VITE_DOWNLOAD_CHANNEL === "preview"
           ? html.replace(
               "<title>兔子助手 · 下载</title>",
-              "<title>兔子助手 · 1.6.3-beta.1 测试版下载</title>",
+              "<title>兔子助手 · 1.6.3-beta.2 测试版下载</title>",
             )
           : html;
       },

@@ -3301,7 +3301,7 @@
     "trustHint": "Confirm local certificate trust in the system dialog before launching.",
     "launchHint": "Ready. Launch with the selected provider and a separate conversation directory.",
     "activeHint": "Save your work and quit Claude before stopping the local service.",
-    "runtimeMissingHint": "The bundled runtime is missing. Reinstall the complete app package.",
+    "runtimeMissingHint": "The bundled runtime is missing or cannot start. Update or reinstall the complete app package.",
     "closeClaudeHint": "Quit the open Claude app before continuing.",
     "prepareAction": "Prepare environment",
     "trustAction": "Authorize to continue",

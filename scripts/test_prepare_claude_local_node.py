@@ -2,6 +2,7 @@ import importlib.util
 import hashlib
 import io
 import os
+import plistlib
 from pathlib import Path
 import tarfile
 import stat
@@ -26,7 +27,7 @@ class NodeArchiveTests(unittest.TestCase):
             build_candidate.build_config("x86_64-pc-windows-msvc", False, True)
         for target in stage_node.TARGETS:
             config = build_candidate.build_config(target, True, True)
-            self.assertEqual(config["version"], "1.6.3-beta.1")
+            self.assertEqual(config["version"], "1.6.3-beta.2")
             self.assertEqual(config["mainBinaryName"], "tuzi-opentu-preview")
             self.assertFalse(config["bundle"]["createUpdaterArtifacts"])
             self.assertEqual(config["plugins"]["updater"]["endpoints"], [])
@@ -36,6 +37,14 @@ class NodeArchiveTests(unittest.TestCase):
                 self.assertEqual(config["productName"], "OpenTu Preview")
                 self.assertTrue(config["bundle"]["externalBin"][0].endswith("/tuzi-opentu-preview-node"))
         self.assertEqual(build_candidate.bundle_kind("aarch64-apple-darwin", True), "dmg")
+
+    def test_macos_signing_keeps_only_required_jit_entitlement_and_hardened_runtime(self):
+        for target in ["aarch64-apple-darwin", "x86_64-apple-darwin"]:
+            for preview, published in [(False, False), (True, False), (True, True)]:
+                config = build_candidate.build_config(target, preview, published)["bundle"]["macOS"]
+                self.assertTrue(config["hardenedRuntime"])
+                entitlements = build_candidate.ROOT / "src-tauri" / config["entitlements"]
+                self.assertEqual(plistlib.loads(entitlements.read_bytes()), {"com.apple.security.cs.allow-jit": True})
 
     def test_combined_preview_keeps_separate_identity_and_packaged_runtime(self):
         config = build_candidate.build_config("aarch64-apple-darwin", True)

@@ -35,6 +35,11 @@ def build_config(target, opentu_preview=False, test_release=False):
             "vendor/claude-local/TUZI-PATCHES.md": "licenses/TUZI-PATCHES.md",
         },
     }}
+    if "apple" in target:
+        config["bundle"]["macOS"] = {
+            "entitlements": "claude-local.entitlements.plist",
+            "hardenedRuntime": True,
+        }
     if opentu_preview:
         preview = json.loads((ROOT / "src-tauri/tauri.opentu-preview.conf.json").read_text(encoding="utf-8"))
         config["bundle"].update(preview.pop("bundle"))
@@ -43,9 +48,9 @@ def build_config(target, opentu_preview=False, test_release=False):
             config["productName"] = "OpenTu Preview"
             config["bundle"]["externalBin"] = [f"{directory}/tuzi-opentu-preview-node"]
     if test_release:
-        config["version"] = "1.6.3-beta.1"
+        config["version"] = "1.6.3-beta.2"
         if "apple" in target:
-            config["bundle"]["macOS"] = {"signingIdentity": "-"}
+            config["bundle"]["macOS"]["signingIdentity"] = "-"
     return config
 
 
@@ -84,7 +89,7 @@ def main():
     parser.add_argument("--target", choices=sorted(stage_node.TARGETS))
     parser.add_argument("--dry-run", action="store_true", help="Print the local build plan without downloading or building")
     parser.add_argument("--opentu-preview", action="store_true", help="Combine Claude and OpenTu in the independent OpenTu acceptance app and profile")
-    parser.add_argument("--test-release", action="store_true", help="Build optimized isolated 1.6.3-beta.1 installers; does not publish")
+    parser.add_argument("--test-release", action="store_true", help="Build optimized isolated 1.6.3-beta.2 installers; does not publish")
     args = parser.parse_args()
     target = args.target or stage_node.native_target()
     validate_host(target, stage_node.native_target())

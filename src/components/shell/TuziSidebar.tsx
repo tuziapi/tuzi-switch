@@ -7,7 +7,6 @@ import {
   Brain,
   Cpu,
   FolderOpen,
-  Globe,
   History,
   KeyRound,
   LayoutDashboard,
@@ -15,7 +14,6 @@ import {
   Network,
   Shield,
   SlidersHorizontal,
-  Store,
   Wrench,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -27,6 +25,8 @@ import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import { OpentuIcon } from "@/components/icons/OpentuIcon";
 import { cn } from "@/lib/utils";
 import { settingsApi } from "@/lib/api/settings";
+import directSiteIcon from "@/assets/tuzi-direct-rabbit.png";
+import shopIcon from "@/assets/tuzi-shop.png";
 
 export type TuziView =
   | "account"
@@ -206,9 +206,19 @@ export function TuziSidebar({
             {!collapsed && <span className="truncate">opentu 创作</span>}
           </button>
           {[
-            { label: "直连站", url: "https://web.tu-zi.com/", icon: Globe },
-            { label: "兔小店", url: "https://store.tu-zi.com/", icon: Store },
-          ].map(({ label, url, icon: Icon }) => (
+            {
+              label: "直连站",
+              url: "https://web.tu-zi.com/",
+              icon: directSiteIcon,
+              red: true,
+            },
+            {
+              label: "兔小店",
+              url: "https://store.tu-zi.com/",
+              icon: shopIcon,
+              red: false,
+            },
+          ].map(({ label, url, icon, red }) => (
             <button
               key={url}
               type="button"
@@ -221,7 +231,20 @@ export function TuziSidebar({
                   .catch(() => toast.error("无法打开浏览器，请稍后重试"))
               }
             >
-              <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              <img
+                src={icon}
+                width={18}
+                height={18}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                className="h-[18px] w-[18px] shrink-0 object-contain"
+                style={
+                  red
+                    ? { filter: "hue-rotate(145deg) saturate(1.1)" }
+                    : undefined
+                }
+              />
               {!collapsed && <span className="truncate">{label}</span>}
             </button>
           ))}

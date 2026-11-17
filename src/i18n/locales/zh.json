@@ -3301,7 +3301,7 @@
     "trustHint": "需要在系统窗口确认本地证书授权，完成后即可启动。",
     "launchHint": "准备就绪。启动后将使用所选线路，聊天内容保存在独立目录。",
     "activeHint": "请先在 Claude 中保存任务并退出，再停止本地服务。",
-    "runtimeMissingHint": "内置运行组件缺失，请重新安装完整的兔子助手安装包。",
+    "runtimeMissingHint": "内置运行组件缺失或无法启动，请更新或重新安装完整的兔子助手安装包。",
     "closeClaudeHint": "请先退出已打开的 Claude，再继续。",
     "prepareAction": "准备环境",
     "trustAction": "授权并继续",

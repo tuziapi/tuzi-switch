@@ -68,7 +68,7 @@ test("existing page adapter preserves all architectures, hashes and source links
   );
   assert.equal(view.sourceUrl, raw.releaseUrl);
   assert.equal(view.correspondingSourceUrl, raw.sourceUrl);
-  assert.equal(view.tag, "v1.6.3-beta.1");
+  assert.equal(view.tag, "v1.6.3-beta.2");
   view.downloads.forEach((d, i) => {
     assert.equal(d.href, raw.downloads[i].url);
     assert.equal(d.sha256, raw.downloads[i].sha256);

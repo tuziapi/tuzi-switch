@@ -29,13 +29,13 @@ class PublicationChecks(unittest.TestCase):
    files=[]
    for platform,(target,suffix) in PLATFORMS.items():
     folder=base/'artifacts'/platform;folder.mkdir(parents=True)
-    name=f'OpenTu-Preview-1.6.3-beta.1-{platform}{suffix}';p=folder/name;p.write_bytes(b'synthetic '+platform.encode())
-    m={'commit':sha,'runId':'123','repository':'AiW520/tuzi-switch','channel':'preview','version':'1.6.3-beta.1','target':target,'platform':platform,'applicationId':'com.tuziswitch.desktop.opentu-preview','isolatedProfile':True,'automaticUpdates':False,'file':name,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'checks':['native-runtime-probe','release-native-integration']}
+    name=f'OpenTu-Preview-1.6.3-beta.2-{platform}{suffix}';p=folder/name;p.write_bytes(b'synthetic '+platform.encode())
+    m={'commit':sha,'runId':'123','repository':'AiW520/tuzi-switch','channel':'preview','version':'1.6.3-beta.2','target':target,'platform':platform,'applicationId':'com.tuziswitch.desktop.opentu-preview','isolatedProfile':True,'automaticUpdates':False,'file':name,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'checks':['native-runtime-probe','release-native-integration','packaged-node-script-executed','node-jit-entitlement']}
     f=folder/(platform+'.json');f.write_text(json.dumps(m));files.append(f)
    def run(label):return subprocess.run(['python3',str(ROOT/'scripts/prepare-opentu-beta-assets.py'),'--artifacts',str(base/'artifacts'),'--output',str(base/label),'--sha',sha,'--run','123'],cwd=base,capture_output=True,text=True)
    self.assertEqual(run('good').returncode,0)
    self.assertEqual(len(list((base/'good').iterdir())),8)
-   for i,(field,value) in enumerate([('repository','tuziapi/tuzi-switch'),('commit','0'*40),('sha256','0'*64),('automaticUpdates',True),('runId','124')]):
+   for i,(field,value) in enumerate([('repository','tuziapi/tuzi-switch'),('commit','0'*40),('sha256','0'*64),('automaticUpdates',True),('runId','124'),('checks',['native-runtime-probe','release-native-integration']),('checks',['native-runtime-probe','release-native-integration','packaged-node-script-executed'])]):
     f=files[0];original=f.read_text();m=json.loads(original);m[field]=value;f.write_text(json.dumps(m))
     self.assertNotEqual(run('bad'+str(i)).returncode,0,field);f.write_text(original)
    files[-1].unlink();self.assertNotEqual(run('missing').returncode,0)

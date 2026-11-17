@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import tempfile
 
-VERSION = '1.6.3-beta.1'
+VERSION = '1.6.3-beta.2'
 TARGETS = {
     'aarch64-apple-darwin': ('macos-arm64', '.dmg'),
     'x86_64-apple-darwin': ('macos-x64', '.dmg'),
@@ -26,6 +26,17 @@ def digest(path):
         for chunk in iter(lambda: f.read(1024 * 1024), b''):
             h.update(chunk)
     return h.hexdigest()
+
+def probe_packaged_node(node, version):
+    probe = Path(__file__).with_name('probe-packaged-node.cjs').resolve()
+    output = subprocess.check_output([str(node.resolve()), str(probe)], text=True, timeout=15)
+    result = json.loads(output)
+    assert result == {'version': 'v' + version, 'script': True, 'fetch': True, 'websocket': True}, result
+
+def verify_node_entitlements(node):
+    output = subprocess.check_output(['codesign', '-d', '--entitlements', ':-', str(node)])
+    entitlements = plistlib.loads(output)
+    assert entitlements.get('com.apple.security.cs.allow-jit') is True, 'Packaged Node requires JIT permission'
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -54,9 +65,10 @@ def main():
                 assert info['CFBundleExecutable'] == 'tuzi-opentu-preview'
                 assert info['CFBundleShortVersionString'] == VERSION
                 subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
-                output = subprocess.check_output([str(app / 'Contents/MacOS/tuzi-claude-node'), '--version'], text=True).strip()
-                assert output == 'v' + provenance['version']
-                checks += ['dmg-mounted', 'isolated-identity', 'beta-version', 'ad-hoc-signature', 'packaged-node-executed']
+                node = app / 'Contents/MacOS/tuzi-claude-node'
+                verify_node_entitlements(node)
+                probe_packaged_node(node, provenance['version'])
+                checks += ['dmg-mounted', 'isolated-identity', 'beta-version', 'ad-hoc-signature', 'node-jit-entitlement', 'packaged-node-script-executed']
             finally:
                 subprocess.run(['hdiutil', 'detach', mount], check=True)
     elif suffix == '.deb':
@@ -69,8 +81,16 @@ def main():
             assert not (root / 'usr/bin/tuzi-claude-node').exists()
             assert (root / 'usr/bin/tuzi-opentu-preview').is_file()
             node = root / 'usr/bin/tuzi-opentu-preview-node'
-            assert subprocess.check_output([str(node), '--version'], text=True).strip() == 'v' + provenance['version']
-            checks += ['deb-extracted', 'no-stable-binary-collision', 'packaged-node-executed']
+            probe_packaged_node(node, provenance['version'])
+            checks += ['deb-extracted', 'no-stable-binary-collision', 'packaged-node-script-executed']
+    elif suffix == '.exe':
+        with tempfile.TemporaryDirectory() as directory:
+            extractor = shutil.which('7z') or str(Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / '7-Zip/7z.exe')
+            subprocess.run([extractor, 'x', '-y', str(installer.resolve()), '-o' + directory], check=True, stdout=subprocess.DEVNULL)
+            nodes = list(Path(directory).rglob('tuzi-claude-node.exe'))
+            assert len(nodes) == 1, 'Expected exactly one packaged Node in NSIS installer'
+            probe_packaged_node(nodes[0], provenance['version'])
+            checks += ['nsis-extracted', 'packaged-node-script-executed']
     output = Path('opentu-test-artifacts'); output.mkdir(exist_ok=True)
     name = f'OpenTu-Preview-{VERSION}-{platform}{suffix}'
     dest = output / name; shutil.copy2(installer, dest)
