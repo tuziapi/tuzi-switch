@@ -165,6 +165,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
           await invoke("check_update_ready");
         },
         relaunchApp,
+        () => invoke<void>("release_update_reservation"),
       );
     await session.current.download();
   }, [updateHandle, runManualDownload]);

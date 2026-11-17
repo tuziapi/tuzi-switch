@@ -57,8 +57,10 @@ describe("official signed update presentation", () => {
     const removeGuard = registerUpdateGuard(async () => {
       trace.push("save");
     });
-    invoke.mockImplementation(async () => {
-      trace.push("native-check");
+    invoke.mockImplementation(async (command: string) => {
+      if (command === "check_update_ready") trace.push("native-check");
+      else if (command === "release_update_reservation") trace.push("release");
+      else throw new Error(`Unexpected native command: ${command}`);
     });
     install.mockImplementation(async () => {
       trace.push("install");
@@ -115,7 +117,7 @@ describe("official signed update presentation", () => {
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "重启并更新" }));
       });
-      expect(trace).toEqual(["save", "native-check", "install", "restart"]);
+      expect(trace).toEqual(["save", "native-check", "install", "restart", "release"]);
     } finally {
       removeGuard();
     }

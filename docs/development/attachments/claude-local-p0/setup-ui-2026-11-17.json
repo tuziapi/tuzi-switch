@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-17",
+  "task": "CL-LOCAL-UI-02",
+  "baseCommit": "d50c1d502715519b9411e7e8932b33365977eec5",
+  "sourceSha256": {
+    "src/App.tsx": "b5ad1b9b5288cc701fa6ca89c45999ac12137badb3eb227953aebb2e9a88a34f",
+    "src/components/proxy/ClaudeLocalPanel.tsx": "f3e8b7c6ec09199567664ebabee8c26186449bc7ecae2cc058f6a9d829040e9a",
+    "src/i18n/locales/zh.json": "b86c4f2653ac2d71444d0dc767b02cc2651189ef80e9bf276f7bbfbb4ca05d46",
+    "src/i18n/locales/en.json": "e253d49e0fe6c1acbc54e251f0665ec4de83be755a88931ee5699c96d77734aa",
+    "src/i18n/locales/ja.json": "409ecfb8d3db3b902f9c24f14e8862ed72ecea1ec4d36e8608a1e153e5953978",
+    "tests/components/ClaudeLocalPanel.test.tsx": "8f52bc794ab3d3d6d268ec07ae26b92e40c365bb9952df60be26884d65cafb14",
+    "tests/visual/claude-local.tsx": "088b4b5ce90686829d17647de84a41a78c7a22f561720cc65662c26fdca8b6ff",
+    "tests/visual/claude-local.cjs": "7749cf57b1d42fcc00bf8c87b0b028879ab1dd51198fe4ae6018ec4326839784"
+  },
+  "tests": {
+    "panel": 13,
+    "providerList": 7,
+    "appIntegration": 24,
+    "typecheck": "passed",
+    "rendererAndNativeBundle": "passed",
+    "browserSimulation": "Windows staged setup and Linux English dark at 600/826 CSS px, no horizontal overflow"
+  },
+  "nativeInstallation": {
+    "installedAt": "20261117-104759",
+    "path": "/Applications/兔子助手.app",
+    "backupDirectory": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/claude-ui-20261117-104759",
+    "mainSha256": "4d9cfca4d52814cea04c61be6b1e0357fa15c917e5da0ed8aee1d628a44b614a",
+    "previousMainSha256": "669fdf618739487038f8adf4f37ab963f804ef0461a9cfc02a41c4146ea898b9",
+    "version": "1.6.2",
+    "candidate": "unsigned debug, CARGO_PROFILE_DEV_DEBUG=0",
+    "uiAcceptance": true,
+    "fullFeatureAcceptance": false,
+    "uiVerified": "Final native startup panel visible; optional features expanded; add-provider form opened and cancelled",
+    "launched": true
+  },
+  "realModelCalls": 0,
+  "certificateChanges": false,
+  "allPlatformAcceptance": false,
+  "releaseReady": false
+}

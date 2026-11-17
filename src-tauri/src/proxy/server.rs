@@ -28,6 +28,8 @@ use tokio::task::JoinHandle;
 /// 代理服务器状态（共享）
 #[derive(Clone)]
 pub struct ProxyState {
+    #[cfg(feature = "claude-desktop-local")]
+    pub local_session: Arc<super::local_session::LocalSession>,
     pub db: Arc<Database>,
     pub config: Arc<RwLock<ProxyConfig>>,
     pub status: Arc<RwLock<ProxyStatus>>,
@@ -68,6 +70,8 @@ impl ProxyServer {
         let failover_manager = Arc::new(FailoverSwitchManager::new(db.clone()));
 
         let state = ProxyState {
+            #[cfg(feature = "claude-desktop-local")]
+            local_session: Arc::default(),
             db,
             config: Arc::new(RwLock::new(config.clone())),
             status: Arc::new(RwLock::new(ProxyStatus::default())),
@@ -86,6 +90,15 @@ impl ProxyServer {
             shutdown_tx: Arc::new(RwLock::new(None)),
             server_handle: Arc::new(RwLock::new(None)),
         }
+    }
+
+    #[cfg(feature = "claude-desktop-local")]
+    pub(crate) fn with_local_session(
+        mut self,
+        session: Arc<super::local_session::LocalSession>,
+    ) -> Self {
+        self.state.local_session = session;
+        self
     }
 
     pub async fn start(&self) -> Result<ProxyServerInfo, ProxyError> {
@@ -285,7 +298,18 @@ impl ProxyServer {
     }
 
     fn build_router(&self) -> Router {
-        Router::new()
+        let router = Router::new();
+        #[cfg(feature = "claude-desktop-local")]
+        let router = router
+            .route(
+                "/claude-desktop-local/v1/models",
+                get(handlers::handle_claude_local_models),
+            )
+            .route(
+                "/claude-desktop-local/v1/messages",
+                post(handlers::handle_claude_local_messages),
+            );
+        router
             // 健康检查
             .route("/health", get(handlers::health_check))
             .route("/status", get(handlers::get_status))

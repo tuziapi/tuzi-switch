@@ -326,8 +326,9 @@ export async function checkForUpdate(
 }
 
 export async function relaunchApp(): Promise<void> {
-  const { relaunch } = await import("@tauri-apps/plugin-process");
-  await relaunch();
+  // The native command checks active Claude Local sessions before Tauri's
+  // non-cancellable restart path, including the delayed restart window.
+  await invoke("restart_app");
 }
 
 // 旧的聚合更新流程已由调用方直接使用 updateHandle 取代

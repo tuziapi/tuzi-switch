@@ -1994,6 +1994,17 @@ mod tests {
             )
             .unwrap_or_else(|e| panic!("{} save: {e}", app.as_str()));
             assert!(!saved.tested);
+            if matches!(app, AppType::ClaudeDesktop) {
+                let persisted = state
+                    .db
+                    .get_provider_by_id(&provider.id, app.as_str())
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(
+                    serde_json::to_value(&persisted.meta).unwrap()["claudeDesktopModelCatalog"],
+                    json!([{ "id": "synthetic-model" }])
+                );
+            }
             assert!(state
                 .db
                 .get_provider_by_id(&provider.id, app.as_str())

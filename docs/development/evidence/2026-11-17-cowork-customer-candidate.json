@@ -1,0 +1,18 @@
+{
+  "version": "1.6.2",
+  "bundleId": "com.tuziswitch.desktop",
+  "architecture": "arm64",
+  "mainSha256": "8508aed9c595adb5e24bc89297faef0825c03e1c0b5501d576c5c9353f56b63e",
+  "nodeVersion": "v24.22.3",
+  "nodeSha256": "ba7073582822078d8c90bca3facacc46690bc5366fab4b815aeef9148cd6e854",
+  "runtimeTests": 91,
+  "build": "unsigned Debug",
+  "installed": false,
+  "functionalAcceptance": false,
+  "releaseReady": false,
+  "baseCommit": "668afbe8",
+  "sourceFilesSha256": {
+    "src-tauri/vendor/claude-local/runtime/proxy.mjs": "9efcb24be2d540b875ae932f1ae836cb854caf3c7fa288c99c25d3528d5c53a4",
+    "src-tauri/vendor/claude-local/runtime/managed.test.mjs": "d488e7bb6ea5162f859e830c51e27e61feea02f87b10d23715401281b3aa983f"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-16",
+  "integrationCommit": "eb5688dc",
+  "desktopParent": "fa39f0f7a36d8c586dc4f3b04bafe06a82021de8",
+  "desktopCommitsIntegrated": 14,
+  "checks": {
+    "mergedHost": {
+      "files": 103,
+      "passed": 863
+    },
+    "creative": {
+      "files": 177,
+      "passed": 2823
+    },
+    "finalHost": {
+      "files": 103,
+      "passed": 865
+    },
+    "p0NativeLocalFilter": 24,
+    "normalNativeLocalFilter": 24,
+    "typecheck": "passed",
+    "defaultCargoCheck": "passed",
+    "twoStageRendererBuild": "passed"
+  },
+  "scope": "Local source regression; not native end-to-end acceptance",
+  "readyForRelease": false,
+  "releaseApproved": false,
+  "remoteActions": false
+}

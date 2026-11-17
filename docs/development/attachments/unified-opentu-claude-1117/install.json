@@ -1,0 +1,37 @@
+{
+  "installed": "/Applications/OpenTu 验收版.app",
+  "backup": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/unified-opentu-claude-20261117-142719",
+  "binarySha256": "8f3570814f5696ba47bd7b814fa00cba6f9fd2e7632e736b826bc2d1468ad156",
+  "nodeSha256": "b969412d5a96c134716ab288d344853423f675483f10989ea7837af8077e819c",
+  "nodeProbe": {
+    "version": "v24.22.3",
+    "fetch": "function",
+    "webSocket": "function"
+  },
+  "originalAssistantBinarySha256": "64c41bdd071736bd5e836a06050183c872e3e2587ab484725298ebb390e87b0d",
+  "originalAssistantUnchanged": true,
+  "features": [
+    "claude-desktop-local",
+    "opentu-preview"
+  ],
+  "profile": "com.tuziswitch.desktop.opentu-preview",
+  "build": "Debug local acceptance",
+  "signing": "ad-hoc local only",
+  "release": false,
+  "nativeUI": {
+    "claudeDesktopEntry": true,
+    "claudePanel": "未启动；先连接一条模型线路；Node.js 就绪；证书未信任",
+    "claudeProfile": "com.tuziswitch.desktop.opentu-preview/home/.tuzi-switch/claude-desktop-local/desktop-profile",
+    "opentuProjectCount": 2,
+    "chatgptPairingEntry": true,
+    "coldRestart": "quit application and relaunch; reopen SYNTHETIC OpenTu sync 1117; generation draft, one reference image, prompt and model preserved",
+    "providerConfigured": false,
+    "claudeLaunched": false,
+    "systemTrustModified": false,
+    "paidGeneration": false,
+    "limitations": [
+      "App control returned a capture error after restart; rebinding confirmed navigation had succeeded.",
+      "Full Claude Chat/Cowork/voice/computer-use acceptance was not performed."
+    ]
+  }
+}

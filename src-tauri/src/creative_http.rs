@@ -216,5 +216,22 @@ pub fn check_update_ready(
     if !PENDING.lock().unwrap().is_empty() || service.has_pending_requests() {
         return Err("仍有请求正在处理，请稍后重试更新。".into());
     }
-    Ok(())
+    #[cfg(feature = "claude-local-poc")]
+    {
+        crate::claude_local_integration::ensure_idle()?;
+        Err("P0 实验构建不支持自动安装更新，请使用独立正式版完成更新。".into())
+    }
+    #[cfg(not(feature = "claude-local-poc"))]
+    {
+        #[cfg(feature = "claude-desktop-local")]
+        crate::claude_local_integration::begin_update()?;
+        Ok(())
+    }
+}
+
+/// Release the launch reservation if the updater returns to the running app.
+#[tauri::command]
+pub fn release_update_reservation() {
+    #[cfg(feature = "claude-desktop-local")]
+    crate::claude_local_integration::release_update();
 }

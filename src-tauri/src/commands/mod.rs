@@ -2,6 +2,7 @@
 
 mod auth;
 mod balance;
+mod claude_local;
 mod codex_image_compat;
 mod codex_oauth;
 mod codex_settings;
@@ -37,6 +38,7 @@ mod workspace;
 
 pub use auth::*;
 pub use balance::*;
+pub use claude_local::*;
 pub use codex_image_compat::*;
 pub use codex_oauth::*;
 pub use codex_settings::*;

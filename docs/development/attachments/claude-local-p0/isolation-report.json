@@ -1,0 +1,12 @@
+{
+  "claudeVersion": "2.26454.0",
+  "profileCreated": true,
+  "launchEnvironmentReceived": true,
+  "failure": null,
+  "personalConfigHashesUnchanged": true,
+  "ownedProcessExited": true,
+  "certificateInstalled": false,
+  "modelCalls": 0,
+  "scope": "profile isolation launch only; not login, Chat, Code task, voice or computer-use acceptance",
+  "profileDirectory": "<temporary>/desktop-profile"
+}

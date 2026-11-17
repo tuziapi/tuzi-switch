@@ -18,6 +18,10 @@ doctest = false
 [features]
 default = []
 test-hooks = []
+# Optional integration; release workflows remain unchanged until acceptance.
+claude-desktop-local = ["dep:claude-local", "claude-local/dictation", "dep:fs2"]
+# P0 keeps its existing independent app and data identity.
+claude-local-poc = ["claude-desktop-local", "isolated-profile"]
 # Isolate user data without enabling debug-only loopback fixtures.
 isolated-profile = []
 opentu-preview = ["isolated-profile"]
@@ -29,6 +33,8 @@ updater-acceptance = ["isolated-profile"]
 tauri-build = { version = "2.4.0", features = [] }
 
 [dependencies]
+claude-local = { path = "vendor/claude-local", optional = true }
+fs2 = { version = "0.4", optional = true }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"

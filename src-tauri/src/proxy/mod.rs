@@ -20,6 +20,8 @@ mod health;
 pub mod http_client;
 pub mod hyper_client;
 pub(crate) mod json_canonical;
+#[cfg(feature = "claude-desktop-local")]
+pub(crate) mod local_session;
 pub mod log_codes;
 pub mod model_mapper;
 pub mod provider_router;
@@ -58,3 +60,6 @@ pub use types::{ProxyConfig, ProxyServerInfo, ProxyStatus};
 // 注意：这个导出用于模块内部，编译器可能警告未使用但实际被子模块使用
 #[allow(unused_imports)]
 pub(crate) use types::*;
+
+#[cfg(all(test, feature = "claude-desktop-local"))]
+mod local_session_tests;

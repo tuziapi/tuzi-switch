@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-16",
+  "appPath": "/Users/sdy09/Documents/ChatGPT/tuzi-claude-local-p0/src-tauri/target/debug/bundle/macos/兔子助手.app",
+  "bundleIdentifier": "com.tuziswitch.desktop",
+  "version": "1.6.2",
+  "profileFeature": "claude-desktop-local",
+  "buildType": "unsigned debug, no updater artifact",
+  "binarySha256": "2c342432c072f07bf03b891a540b0931b363a7bc3c38f86daaff0b7aabc35fe3",
+  "nodeVersion": "v24.22.3",
+  "nodeSha256": "ba7073582822078d8c90bca3facacc46690bc5366fab4b815aeef9148cd6e854",
+  "nodeLicenseIncluded": true,
+  "runtimeProvenanceIncluded": true,
+  "nonSystemMainBinaryDynamicDependencies": [],
+  "installed": false,
+  "launched": false,
+  "nativeEndToEndAccepted": false,
+  "readyForRelease": false
+}

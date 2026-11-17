@@ -38,6 +38,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { BasicFormFields } from "./BasicFormFields";
 import { EndpointField } from "./shared/EndpointField";
+import { ClaudeModelCatalog } from "./ClaudeModelCatalog";
+import {
+  isClaudeModel,
+  mergeCatalogRoutes,
+  sortCatalog,
+} from "@/lib/claudeDesktopModels";
 import { ModelDropdown } from "./shared/ModelDropdown";
 import { ProviderPresetSelector } from "./ProviderPresetSelector";
 import { providerSchema, type ProviderFormData } from "@/lib/schemas/provider";
@@ -53,7 +59,7 @@ import {
   type ClaudeDesktopProviderPreset,
 } from "@/config/claudeDesktopProviderPresets";
 import {
-  fetchModelsForConfig,
+  fetchClaudeDesktopModels,
   showFetchModelsError,
   type FetchedModel,
 } from "@/lib/api/model-fetch";
@@ -206,7 +212,40 @@ export function ClaudeDesktopProviderForm({
   const didSeedDefaultRoutes = useRef(
     Object.keys(initialData?.meta?.claudeDesktopModelRoutes ?? {}).length > 0,
   );
-  const [fetchedModels, setFetchedModels] = useState<FetchedModel[]>([]);
+  const [fetchedModels, setFetchedModels] = useState<FetchedModel[]>(() =>
+    (initialData?.meta?.claudeDesktopModelCatalog ?? []).map((model) => ({
+      ...model,
+      ownedBy: null,
+    })),
+  );
+  const [defaultModel, setDefaultModel] = useState(
+    envString(initialData?.settingsConfig, "ANTHROPIC_MODEL"),
+  );
+  const [catalogError, setCatalogError] = useState("");
+  const fetchedFor = useRef<{
+    baseUrl: string;
+    apiKey: string;
+    at: number;
+  } | null>(null);
+  const credentials = useRef({ baseUrl, apiKey });
+  useEffect(() => {
+    if (
+      credentials.current.baseUrl === baseUrl &&
+      credentials.current.apiKey === apiKey
+    )
+      return;
+    credentials.current = { baseUrl, apiKey };
+    const automatic = new Set(fetchedModels.map((model) => model.id));
+    setRoutes((rows) =>
+      rows.filter(
+        (row) => !(automatic.has(row.route) && row.route === row.model),
+      ),
+    );
+    if (automatic.has(defaultModel)) setDefaultModel("");
+    setFetchedModels([]);
+    fetchedFor.current = null;
+    setCatalogError("");
+  }, [baseUrl, apiKey]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [directModelsExpanded, setDirectModelsExpanded] = useState(
     initialMode === "direct" &&
@@ -382,6 +421,55 @@ export function ClaudeDesktopProviderForm({
     setRoutes(defaultProxyRouteRows);
   }, [defaultProxyRouteRows, mode, routes.length]);
 
+  const loadCatalog = async () => {
+    fetchedFor.current = null;
+    setIsFetchingModels(true);
+    setCatalogError("");
+    try {
+      const fetched = await fetchClaudeDesktopModels(
+        baseUrl.trim(),
+        apiKey.trim(),
+      );
+      const models = sortCatalog(fetched, defaultModel).map((model) => ({
+        ...model,
+        ownedBy: null,
+      }));
+      if (!models.length) throw new Error("empty catalog");
+      const existing = Object.fromEntries(
+        routes
+          .filter((row) => row.route.trim() && row.model.trim())
+          .map((row) => [
+            row.route,
+            {
+              model: row.model,
+              displayName: row.displayName,
+              supports1m: row.supports1m,
+            },
+          ]),
+      );
+      const merged = mergeCatalogRoutes(existing, models);
+      const rows = initialRouteRows(merged);
+      const chosen = rows.some((row) => row.model === defaultModel)
+        ? defaultModel
+        : (models.find(
+            (model) => isClaudeModel(model.id) && /sonnet/i.test(model.id),
+          )?.id ??
+          models.find((model) => isClaudeModel(model.id))?.id ??
+          rows[0]?.model ??
+          "");
+      setFetchedModels(models);
+      setRoutes(rows);
+      setDefaultModel(chosen);
+      fetchedFor.current = { baseUrl, apiKey, at: Date.now() };
+      return { models, rows, chosen };
+    } catch (error) {
+      setCatalogError(t("claudeDesktop.catalogFailed"));
+      showFetchModelsError(error, t);
+      throw error;
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
   const handleFetchModels = async () => {
     if (!baseUrl.trim() || !apiKey.trim()) {
       showFetchModelsError(null, t, {
@@ -390,28 +478,14 @@ export function ClaudeDesktopProviderForm({
       });
       return;
     }
-
-    setIsFetchingModels(true);
     try {
-      const models = await fetchModelsForConfig(baseUrl.trim(), apiKey.trim());
-      setFetchedModels(models);
-      toast.success(
-        t("providerForm.fetchModelsSuccess", {
-          count: models.length,
-          defaultValue: `已获取 ${models.length} 个模型`,
-        }),
-      );
-    } catch (error) {
-      showFetchModelsError(error, t, {
-        hasBaseUrl: Boolean(baseUrl.trim()),
-        hasApiKey: Boolean(apiKey.trim()),
-      });
-    } finally {
-      setIsFetchingModels(false);
+      await loadCatalog();
+    } catch {
+      /* Error is shown inline; keep manual configuration editable. */
     }
   };
 
-  const handleSubmit = async (values: ProviderFormData) => {
+  const handleSubmit = async (values: ProviderFormData, useManual = false) => {
     if (!values.name.trim()) {
       toast.error(
         t("providerForm.fillSupplierName", {
@@ -437,7 +511,27 @@ export function ClaudeDesktopProviderForm({
       return;
     }
 
-    const routeEntries = routes
+    let effectiveRows = routes;
+    let effectiveModels = fetchedModels;
+    let effectiveDefault = defaultModel;
+    const cache = fetchedFor.current;
+    if (
+      !useManual &&
+      (!cache ||
+        cache.baseUrl !== baseUrl ||
+        cache.apiKey !== apiKey ||
+        Date.now() - cache.at > 300000)
+    ) {
+      try {
+        const catalog = await loadCatalog();
+        effectiveRows = catalog.rows;
+        effectiveModels = catalog.models;
+        effectiveDefault = catalog.chosen;
+      } catch {
+        return;
+      }
+    }
+    const routeEntries = effectiveRows
       .map((route, index) => ({
         ...route,
         route:
@@ -450,6 +544,11 @@ export function ClaudeDesktopProviderForm({
       }))
       .filter((route) => route.route || route.model);
 
+    if (!routeEntries.length) {
+      setCatalogError(t("claudeDesktop.catalogNoClaude"));
+      setDirectModelsExpanded(true);
+      return;
+    }
     if (mode === "proxy") {
       const missing = routeEntries.find((route) => !route.model);
       if (missing) {
@@ -514,6 +613,15 @@ export function ClaudeDesktopProviderForm({
     };
 
     meta.claudeDesktopModelRoutes = routeMap;
+    meta.claudeDesktopModelCatalog = effectiveModels.map(
+      ({ id, createdAt }) => ({ id, ...(createdAt ? { createdAt } : {}) }),
+    );
+    const mappedModels = Object.values(routeMap).map((route) => route.model);
+    const selectedModel = mappedModels.includes(effectiveDefault)
+      ? effectiveDefault
+      : mappedModels[0];
+    (settingsConfig.env as Record<string, unknown>).ANTHROPIC_MODEL =
+      selectedModel;
 
     delete meta.endpointAutoSelect;
     delete meta.providerType;
@@ -565,299 +673,247 @@ export function ClaudeDesktopProviderForm({
     <Form {...form}>
       <form
         id="provider-form"
-        onSubmit={form.handleSubmit(handleSubmit)}
+        onSubmit={form.handleSubmit((values) => handleSubmit(values))}
         className="provider-form-shell space-y-6"
       >
-        {!editData && (
-          <ProviderPresetSelector
-            selectedPresetId={selectedPresetId}
-            groupedPresets={groupedPresets}
-            categoryKeys={categoryKeys}
-            presetCategoryLabels={presetCategoryLabels}
-            onPresetChange={handlePresetChange}
-            category={activePreset?.category}
-          />
-        )}
+        <fieldset
+          disabled={isFetchingModels || form.formState.isSubmitting}
+          className="space-y-6 min-w-0"
+        >
+          {!editData && (
+            <ProviderPresetSelector
+              selectedPresetId={selectedPresetId}
+              groupedPresets={groupedPresets}
+              categoryKeys={categoryKeys}
+              presetCategoryLabels={presetCategoryLabels}
+              onPresetChange={handlePresetChange}
+              category={activePreset?.category}
+            />
+          )}
 
-        <BasicFormFields form={form} />
+          <BasicFormFields form={form} />
 
-        <div className="space-y-1">
-          <Label>{"API Key"}</Label>
-          <Input
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            type="password"
-            placeholder="sk-..."
-          />
-        </div>
-
-        <EndpointField
-          id="baseUrl"
-          label={t("providerForm.apiEndpoint")}
-          value={baseUrl}
-          onChange={(v) => setBaseUrl(v)}
-          placeholder={t("providerForm.apiEndpointPlaceholder")}
-          hint={
-            needsModelMapping && apiFormat === "openai_responses"
-              ? t("providerForm.apiHintResponses")
-              : needsModelMapping && apiFormat === "openai_chat"
-                ? t("providerForm.apiHintOAI")
-                : needsModelMapping && apiFormat === "gemini_native"
-                  ? t("providerForm.apiHintGeminiNative")
-                  : t("providerForm.apiHint")
-          }
-          showManageButton={false}
-        />
-
-        <div className="space-y-3 rounded-lg border border-border-default bg-muted/20 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-1">
-              <Label>
-                {t("claudeDesktop.modelMappingToggle", {
-                  defaultValue: "需要模型映射",
-                })}
-              </Label>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {needsModelMapping
-                  ? t("claudeDesktop.modelMappingOnHint", {
-                      defaultValue:
-                        "Claude Desktop 目前对模型 ID 进行了限制，如果您的供应商提供的模型不是 Claude 系列模型，则需要打开本开关，并在使用过程中保持本地路由开启。",
-                    })
-                  : t("claudeDesktop.modelMappingOffHint", {
-                      defaultValue:
-                        "适合供应商已经暴露并接受 claude-* / anthropic/claude-* 模型名的 Anthropic Messages API；请求会由 Claude Desktop 直连供应商。",
-                    })}
-              </p>
-            </div>
-            <Switch
-              checked={needsModelMapping}
-              onCheckedChange={handleModelMappingChange}
-              aria-label={t("claudeDesktop.modelMappingToggle", {
-                defaultValue: "需要模型映射",
-              })}
+          <div className="space-y-1">
+            <Label htmlFor="claude-desktop-api-key">{"API Key"}</Label>
+            <Input
+              id="claude-desktop-api-key"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              type="password"
+              placeholder="sk-..."
             />
           </div>
-        </div>
 
-        {needsModelMapping && (
-          <div className="space-y-4 rounded-lg border border-border-default p-4">
-            <div className="space-y-2">
-              <Label>
-                {t("providerForm.apiFormat", { defaultValue: "API 格式" })}
-              </Label>
-              <Select
-                value={apiFormat}
-                onValueChange={(value) =>
-                  setApiFormat(value as ClaudeApiFormat)
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anthropic">
-                    {t("providerForm.apiFormatAnthropic", {
-                      defaultValue: "Anthropic Messages (原生)",
-                    })}
-                  </SelectItem>
-                  <SelectItem value="openai_chat">
-                    {t("providerForm.apiFormatOpenAIChat", {
-                      defaultValue: "OpenAI Chat Completions (需开启路由)",
-                    })}
-                  </SelectItem>
-                  <SelectItem value="openai_responses">
-                    {t("providerForm.apiFormatOpenAIResponses", {
-                      defaultValue: "OpenAI Responses API (需开启路由)",
-                    })}
-                  </SelectItem>
-                  <SelectItem value="gemini_native">
-                    {t("providerForm.apiFormatGeminiNative", {
-                      defaultValue:
-                        "Gemini Native generateContent (需开启路由)",
-                    })}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <EndpointField
+            id="baseUrl"
+            label={t("providerForm.apiEndpoint")}
+            value={baseUrl}
+            onChange={(v) => setBaseUrl(v)}
+            placeholder={t("providerForm.apiEndpointPlaceholder")}
+            hint={
+              needsModelMapping && apiFormat === "openai_responses"
+                ? t("providerForm.apiHintResponses")
+                : needsModelMapping && apiFormat === "openai_chat"
+                  ? t("providerForm.apiHintOAI")
+                  : needsModelMapping && apiFormat === "gemini_native"
+                    ? t("providerForm.apiHintGeminiNative")
+                    : t("providerForm.apiHint")
+            }
+            showManageButton={false}
+          />
 
-            <div className="space-y-3">
-              <div className="space-y-1 border-t border-border-default pt-4">
-                <div className="flex items-center justify-between">
-                  <Label>
-                    {t("claudeDesktop.routeMapTitle", {
-                      defaultValue: "模型映射",
-                    })}
-                  </Label>
-                  {renderActionButtons(
-                    () =>
-                      setRoutes((current) => [
-                        ...current,
-                        nextRouteRow(current, defaultProxyRouteRows),
-                      ]),
-                    t("claudeDesktop.addRoute", { defaultValue: "添加模型" }),
-                  )}
-                </div>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  {t("claudeDesktop.routeMapHint", {
-                    defaultValue:
-                      "填写供应商实际提供的模型名，显示名为在 Claude Desktop 模型列表中展示的名称。",
-                  })}
-                </p>
-              </div>
-
-              <div className="hidden grid-cols-[1fr_1fr_92px_36px] gap-2 px-1 text-xs font-medium text-muted-foreground md:grid">
-                <span>
-                  {t("claudeDesktop.upstreamModelLabel", {
-                    defaultValue: "实际请求模型",
-                  })}
-                </span>
-                <span>
-                  {t("claudeDesktop.displayNameLabel", {
-                    defaultValue: "显示名",
-                  })}
-                </span>
-                <span>
-                  {t("claudeDesktop.supports1mLabel", {
-                    defaultValue: "1M",
-                  })}
-                </span>
-                <span />
-              </div>
-              {routes.map((route, index) => (
-                <div
-                  key={`${route.route}-${index}`}
-                  className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_92px_36px]"
-                >
-                  <div className="flex gap-1">
-                    <Input
-                      value={route.model}
-                      onChange={(event) =>
-                        updateRoute(index, { model: event.target.value })
-                      }
-                      placeholder="kimi-k2 / deepseek-chat"
-                      className="flex-1"
-                    />
-                    {fetchedModels.length > 0 && (
-                      <ModelDropdown
-                        models={fetchedModels}
-                        onSelect={(id) => updateRoute(index, { model: id })}
-                      />
-                    )}
+          <ClaudeModelCatalog
+            models={fetchedModels}
+            defaultModel={defaultModel}
+            onSelect={(id) => {
+              setDefaultModel(id);
+              setRoutes((current) =>
+                current.some((row) => row.model === id)
+                  ? current
+                  : [
+                      ...current,
+                      {
+                        route: id,
+                        model: id,
+                        displayName: "",
+                        supports1m: false,
+                      },
+                    ],
+              );
+            }}
+            onRefresh={() => void handleFetchModels()}
+            busy={isFetchingModels || form.formState.isSubmitting}
+            error={catalogError}
+          />
+          {catalogError && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void form.handleSubmit((values) =>
+                  handleSubmit(values, true),
+                )();
+              }}
+            >
+              {t("claudeDesktop.catalogManualSave")}
+            </Button>
+          )}
+          <details className="group">
+            <summary className="cursor-pointer text-sm text-muted-foreground">
+              {t("claudeDesktop.catalogAdvanced")}
+            </summary>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-3 rounded-lg border border-border-default bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <Label>
+                      {t("claudeDesktop.modelMappingToggle", {
+                        defaultValue: "需要模型映射",
+                      })}
+                    </Label>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {needsModelMapping
+                        ? t("claudeDesktop.modelMappingOnHint", {
+                            defaultValue:
+                              "Claude Desktop 目前对模型 ID 进行了限制，如果您的供应商提供的模型不是 Claude 系列模型，则需要打开本开关，并在使用过程中保持本地路由开启。",
+                          })
+                        : t("claudeDesktop.modelMappingOffHint", {
+                            defaultValue:
+                              "适合供应商已经暴露并接受 claude-* / anthropic/claude-* 模型名的 Anthropic Messages API；请求会由 Claude Desktop 直连供应商。",
+                          })}
+                    </p>
                   </div>
-                  <Input
-                    value={route.displayName}
-                    onChange={(event) =>
-                      updateRoute(index, { displayName: event.target.value })
-                    }
-                    placeholder="Sonnet"
-                  />
-                  <label className="flex h-9 items-center gap-2 text-sm text-muted-foreground">
-                    <Checkbox
-                      checked={route.supports1m}
-                      onCheckedChange={(checked) =>
-                        updateRoute(index, { supports1m: checked === true })
-                      }
-                    />
-                    1M
-                  </label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() =>
-                      setRoutes((current) =>
-                        current.filter((_, i) => i !== index),
-                      )
-                    }
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!needsModelMapping && (
-          <Collapsible
-            open={directModelsExpanded}
-            onOpenChange={setDirectModelsExpanded}
-          >
-            <CollapsibleTrigger asChild>
-              <Button
-                type="button"
-                variant={null}
-                size="sm"
-                className="h-8 gap-1.5 px-0 text-sm font-medium text-foreground hover:opacity-70"
-              >
-                {directModelsExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-                {t("claudeDesktop.directModelListTitle", {
-                  defaultValue:
-                    "手动指定 Claude Desktop 模型列表（高级，可选）",
-                })}
-              </Button>
-            </CollapsibleTrigger>
-            {!directModelsExpanded && (
-              <p className="ml-1 mt-1 text-xs text-muted-foreground">
-                {t("claudeDesktop.directModelListCollapsedHint", {
-                  defaultValue:
-                    "原生 Claude 模型供应商通常不用填写，Claude Desktop 会自动读取 /v1/models。",
-                })}
-              </p>
-            )}
-            <CollapsibleContent className="space-y-4 pt-2">
-              <div className="space-y-4 rounded-lg border border-border-default p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <p className="flex-1 text-xs leading-relaxed text-muted-foreground">
-                    {t("claudeDesktop.directModelListHint", {
-                      defaultValue:
-                        "仅当供应商的 /v1/models 不可用或没有返回 Claude Desktop 可识别的 claude-* 模型名时填写；这些模型名会原样发送给供应商。",
+                  <Switch
+                    checked={needsModelMapping}
+                    onCheckedChange={handleModelMappingChange}
+                    aria-label={t("claudeDesktop.modelMappingToggle", {
+                      defaultValue: "需要模型映射",
                     })}
-                  </p>
-                  {renderActionButtons(
-                    () =>
-                      setRoutes((current) => [
-                        ...current,
-                        {
-                          route: "",
-                          model: "",
-                          displayName: "",
-                          supports1m: false,
-                        },
-                      ]),
-                    t("claudeDesktop.addModel", { defaultValue: "添加模型" }),
-                  )}
+                  />
                 </div>
+              </div>
 
-                {routes.length > 0 ? (
+              {needsModelMapping && (
+                <div className="space-y-4 rounded-lg border border-border-default p-4">
                   <div className="space-y-2">
+                    <Label>
+                      {t("providerForm.apiFormat", {
+                        defaultValue: "API 格式",
+                      })}
+                    </Label>
+                    <Select
+                      value={apiFormat}
+                      onValueChange={(value) =>
+                        setApiFormat(value as ClaudeApiFormat)
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="anthropic">
+                          {t("providerForm.apiFormatAnthropic", {
+                            defaultValue: "Anthropic Messages (原生)",
+                          })}
+                        </SelectItem>
+                        <SelectItem value="openai_chat">
+                          {t("providerForm.apiFormatOpenAIChat", {
+                            defaultValue:
+                              "OpenAI Chat Completions (需开启路由)",
+                          })}
+                        </SelectItem>
+                        <SelectItem value="openai_responses">
+                          {t("providerForm.apiFormatOpenAIResponses", {
+                            defaultValue: "OpenAI Responses API (需开启路由)",
+                          })}
+                        </SelectItem>
+                        <SelectItem value="gemini_native">
+                          {t("providerForm.apiFormatGeminiNative", {
+                            defaultValue:
+                              "Gemini Native generateContent (需开启路由)",
+                          })}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="space-y-1 border-t border-border-default pt-4">
+                      <div className="flex items-center justify-between">
+                        <Label>
+                          {t("claudeDesktop.routeMapTitle", {
+                            defaultValue: "模型映射",
+                          })}
+                        </Label>
+                        {renderActionButtons(
+                          () =>
+                            setRoutes((current) => [
+                              ...current,
+                              nextRouteRow(current, defaultProxyRouteRows),
+                            ]),
+                          t("claudeDesktop.addRoute", {
+                            defaultValue: "添加模型",
+                          }),
+                        )}
+                      </div>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        {t("claudeDesktop.routeMapHint", {
+                          defaultValue:
+                            "填写供应商实际提供的模型名，显示名为在 Claude Desktop 模型列表中展示的名称。",
+                        })}
+                      </p>
+                    </div>
+
+                    <div className="hidden grid-cols-[1fr_1fr_92px_36px] gap-2 px-1 text-xs font-medium text-muted-foreground md:grid">
+                      <span>
+                        {t("claudeDesktop.upstreamModelLabel", {
+                          defaultValue: "实际请求模型",
+                        })}
+                      </span>
+                      <span>
+                        {t("claudeDesktop.displayNameLabel", {
+                          defaultValue: "显示名",
+                        })}
+                      </span>
+                      <span>
+                        {t("claudeDesktop.supports1mLabel", {
+                          defaultValue: "1M",
+                        })}
+                      </span>
+                      <span />
+                    </div>
                     {routes.map((route, index) => (
                       <div
                         key={`${route.route}-${index}`}
-                        className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_92px_36px]"
+                        className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_92px_36px]"
                       >
                         <div className="flex gap-1">
                           <Input
-                            value={route.route}
+                            value={route.model}
                             onChange={(event) =>
-                              updateRoute(index, { route: event.target.value })
+                              updateRoute(index, { model: event.target.value })
                             }
-                            placeholder="claude-deepseek-chat"
+                            placeholder="kimi-k2 / deepseek-chat"
                             className="flex-1"
                           />
                           {fetchedModels.length > 0 && (
                             <ModelDropdown
                               models={fetchedModels}
                               onSelect={(id) =>
-                                updateRoute(index, { route: id })
+                                updateRoute(index, { model: id })
                               }
                             />
                           )}
                         </div>
+                        <Input
+                          value={route.displayName}
+                          onChange={(event) =>
+                            updateRoute(index, {
+                              displayName: event.target.value,
+                            })
+                          }
+                          placeholder="Sonnet"
+                        />
                         <label className="flex h-9 items-center gap-2 text-sm text-muted-foreground">
                           <Checkbox
                             checked={route.supports1m}
@@ -884,25 +940,140 @@ export function ClaudeDesktopProviderForm({
                       </div>
                     ))}
                   </div>
-                ) : null}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+                </div>
+              )}
 
-        <FormField
-          control={form.control}
-          name="settingsConfig"
-          render={() => (
-            <FormItem className="space-y-0">
-              <FormControl>
-                <input type="hidden" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+              {!needsModelMapping && (
+                <Collapsible
+                  open={directModelsExpanded}
+                  onOpenChange={setDirectModelsExpanded}
+                >
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant={null}
+                      size="sm"
+                      className="h-8 gap-1.5 px-0 text-sm font-medium text-foreground hover:opacity-70"
+                    >
+                      {directModelsExpanded ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      {t("claudeDesktop.directModelListTitle", {
+                        defaultValue:
+                          "手动指定 Claude Desktop 模型列表（高级，可选）",
+                      })}
+                    </Button>
+                  </CollapsibleTrigger>
+                  {!directModelsExpanded && (
+                    <p className="ml-1 mt-1 text-xs text-muted-foreground">
+                      {t("claudeDesktop.directModelListCollapsedHint", {
+                        defaultValue:
+                          "原生 Claude 模型供应商通常不用填写，Claude Desktop 会自动读取 /v1/models。",
+                      })}
+                    </p>
+                  )}
+                  <CollapsibleContent className="space-y-4 pt-2">
+                    <div className="space-y-4 rounded-lg border border-border-default p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <p className="flex-1 text-xs leading-relaxed text-muted-foreground">
+                          {t("claudeDesktop.directModelListHint", {
+                            defaultValue:
+                              "仅当供应商的 /v1/models 不可用或没有返回 Claude Desktop 可识别的 claude-* 模型名时填写；这些模型名会原样发送给供应商。",
+                          })}
+                        </p>
+                        {renderActionButtons(
+                          () =>
+                            setRoutes((current) => [
+                              ...current,
+                              {
+                                route: "",
+                                model: "",
+                                displayName: "",
+                                supports1m: false,
+                              },
+                            ]),
+                          t("claudeDesktop.addModel", {
+                            defaultValue: "添加模型",
+                          }),
+                        )}
+                      </div>
 
+                      {routes.length > 0 ? (
+                        <div className="space-y-2">
+                          {routes.map((route, index) => (
+                            <div
+                              key={`${route.route}-${index}`}
+                              className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_92px_36px]"
+                            >
+                              <div className="flex gap-1">
+                                <Input
+                                  value={route.route}
+                                  onChange={(event) =>
+                                    updateRoute(index, {
+                                      route: event.target.value,
+                                    })
+                                  }
+                                  placeholder="claude-deepseek-chat"
+                                  className="flex-1"
+                                />
+                                {fetchedModels.length > 0 && (
+                                  <ModelDropdown
+                                    models={fetchedModels}
+                                    onSelect={(id) =>
+                                      updateRoute(index, { route: id })
+                                    }
+                                  />
+                                )}
+                              </div>
+                              <label className="flex h-9 items-center gap-2 text-sm text-muted-foreground">
+                                <Checkbox
+                                  checked={route.supports1m}
+                                  onCheckedChange={(checked) =>
+                                    updateRoute(index, {
+                                      supports1m: checked === true,
+                                    })
+                                  }
+                                />
+                                1M
+                              </label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  setRoutes((current) =>
+                                    current.filter((_, i) => i !== index),
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              <FormField
+                control={form.control}
+                name="settingsConfig"
+                render={() => (
+                  <FormItem className="space-y-0">
+                    <FormControl>
+                      <input type="hidden" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </details>
+        </fieldset>
         {showButtons && (
           <div className="flex justify-end gap-2">
             <Button variant="outline" type="button" onClick={onCancel}>

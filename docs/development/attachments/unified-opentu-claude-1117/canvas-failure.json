@@ -1,0 +1,10 @@
+{
+  "engine": "webkit",
+  "results": [
+    "draft consumed into progress at original position",
+    "native failed card restores editable input without resubmission",
+    "restored draft persists through reload without generation"
+  ],
+  "errors": [],
+  "paid": false
+}

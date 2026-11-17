@@ -5,6 +5,7 @@ import { toast } from "sonner";
 export interface FetchedModel {
   id: string;
   ownedBy: string | null;
+  createdAt?: number;
   supportedEndpointTypes?: string[];
   endpoints?: Record<string, unknown>;
 }
@@ -78,4 +79,11 @@ export function showFetchModelsError(
 
   // 通用兜底
   toast.error(t("providerForm.fetchModelsFailed"));
+}
+
+export async function fetchClaudeDesktopModels(
+  baseUrl: string,
+  apiKey: string,
+): Promise<FetchedModel[]> {
+  return invoke("fetch_claude_desktop_models", { baseUrl, apiKey });
 }

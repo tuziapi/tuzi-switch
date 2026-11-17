@@ -1,0 +1,20 @@
+{
+  "task": "UC-CL-INTEGRATE-1117",
+  "date": "2026-11-17",
+  "branch": "codex/integrate-opentu-claude-1117",
+  "opentuParent": "4ff56e5400b374d294d2a56eaec7ccb5b734a02b",
+  "claudeParent": "fb2562a0cf293052166c67fdb3b08650b83f8d6f",
+  "sourceThread": "01a1e224-cd1b-7860-b4dc-7e52746d679c",
+  "scope": "local merge, regression, independent acceptance bundle; no remote publishing",
+  "additionalSourceChange": {
+    "path": ".github/workflows/claude-local-tests.yml",
+    "description": "NODE_OPTIONS 4096 MiB candidate build cap from source working tree",
+    "sha256": "e11b4f0447c39b58bdd6c900b7b4f413b7c085eb15fc5649ac5c6af0be43d044"
+  },
+  "conflicts": [
+    "docs/development/README.md",
+    "docs/development/progress.md",
+    "src-tauri/src/config.rs"
+  ],
+  "sourceWorkspaceModified": false
+}

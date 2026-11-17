@@ -47,6 +47,8 @@ pub fn get_home_dir() -> PathBuf {
 #[cfg(feature = "isolated-profile")]
 pub(crate) const ISOLATED_PROFILE_ID: &str = if cfg!(feature = "opentu-preview") {
     "com.tuziswitch.desktop.opentu-preview"
+} else if cfg!(feature = "claude-local-poc") {
+    "com.tuziswitch.desktop.claude-local-p0"
 } else if cfg!(feature = "local-preview") {
     "com.tuziswitch.desktop.preview"
 } else {
@@ -361,6 +363,15 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(all(feature = "opentu-preview", feature = "claude-desktop-local"))]
+    #[test]
+    fn local_combined_preview_preserves_opentu_profile_identity() {
+        assert_eq!(
+            super::ISOLATED_PROFILE_ID,
+            "com.tuziswitch.desktop.opentu-preview"
+        );
+        assert!(cfg!(feature = "isolated-profile"));
+    }
     use super::*;
 
     #[test]

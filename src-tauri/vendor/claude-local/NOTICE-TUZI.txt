@@ -1,0 +1,19 @@
+Claude local compatibility experimental integration
+
+This build embeds the claude-local core from BigPizzaV3/ClaudeMom.
+Upstream project: https://github.com/BigPizzaV3/ClaudeMom
+Core license: GNU Affero General Public License v3.0 only.
+The full license is supplied as LICENSE-claude-local.txt.
+Local modifications are documented in TUZI-PATCHES.md.
+
+The candidate workflow publishes a matching source snapshot as the
+claude-local-corresponding-source artifact, identified by its Git revision.
+That snapshot includes the Tuzi integration, vendored core and build scripts.
+Node runtime sources, version, official archive checksum and binary checksum
+are identified in claude-local-runtime/provenance.json; its license is included.
+
+Claude Desktop itself is not included in this package. Install it separately
+from the official publisher. This integration does not grant an official
+Claude subscription or change the terms of the configured model provider.
+
+This is an unsigned testing candidate, not a production updater release.

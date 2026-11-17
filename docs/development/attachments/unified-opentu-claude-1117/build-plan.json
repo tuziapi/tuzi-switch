@@ -1,0 +1,53 @@
+{
+  "target": "aarch64-apple-darwin",
+  "command": [
+    "pnpm",
+    "tauri",
+    "build",
+    "--debug",
+    "--features",
+    "claude-desktop-local,opentu-preview",
+    "--bundles",
+    "app",
+    "--no-sign",
+    "--config",
+    "/Users/sdy09/.codex/worktrees/verified-desktop-updates/tuzi-switch/src-tauri/target/claude-local-runtime/aarch64-apple-darwin/opentu-candidate.conf.json"
+  ],
+  "config": {
+    "bundle": {
+      "createUpdaterArtifacts": false,
+      "externalBin": [
+        "target/claude-local-runtime/aarch64-apple-darwin/tuzi-claude-node"
+      ],
+      "resources": {
+        "target/claude-local-runtime/aarch64-apple-darwin/LICENSE-node.txt": "claude-local-runtime/LICENSE-node.txt",
+        "target/claude-local-runtime/aarch64-apple-darwin/provenance.json": "claude-local-runtime/provenance.json",
+        "vendor/claude-local/LICENSE": "licenses/LICENSE-claude-local.txt",
+        "vendor/claude-local/NOTICE-TUZI.txt": "licenses/NOTICE-claude-local.txt",
+        "vendor/claude-local/TUZI-PATCHES.md": "licenses/TUZI-PATCHES.md"
+      }
+    },
+    "productName": "OpenTu \u9a8c\u6536\u7248",
+    "identifier": "com.tuziswitch.desktop.opentu-preview",
+    "app": {
+      "windows": [
+        {
+          "label": "main",
+          "title": "OpenTu \u9a8c\u6536\u7248"
+        }
+      ]
+    },
+    "plugins": {
+      "deep-link": {
+        "desktop": {
+          "schemes": [
+            "tuzi-opentu-preview"
+          ]
+        }
+      },
+      "updater": {
+        "endpoints": []
+      }
+    }
+  }
+}
