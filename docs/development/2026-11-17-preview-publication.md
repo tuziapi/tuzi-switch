@@ -10,7 +10,7 @@
 
 已知限制沿用真实验收记录：Code 多轮、文件读写和 Sonnet→Haiku 路由实测通过；普通 Chat/Cowork 的 VM 初始化、电脑控制、语音及跨平台实机功能尚未全部验收。Windows ARM64 上一候选 ACL 超时，因此不在本次五平台下载范围。重新打包后的安装包仍须核验，不能把旧包实测写成新包全功能通过。
 
-测试预发行 opentu-preview-v1.6.3-beta.1 已公开，原下载页正在部署与公网复核；本轮不发布正式版本。
+测试预发行 opentu-preview-v1.6.3-beta.1 与原测试下载页均已上线，公网复核通过；本轮未发布正式版本。下方过程记录保留当时状态，当前交付以本节及末尾记录为准。
 
 用户补充确认沿用既有下载页面：移除尚未部署的新独立页面，保留 TuziDownloadPage 原布局、截图、导航与主题，只接入测试清单、五个架构入口和测试说明。正式模式及其严格 stable 清单校验继续保留。测试模式不发送正式下载统计，也不显示正式安装脚本。
 
@@ -31,3 +31,15 @@ run 44046652521 再次在 Linux x64 失败，原因是按包执行 cargo clean �
 发布 run 44058368402 已逐字节核对并上传八个附件，但 GitHub release-by-tag 接口对草稿返回 404，因此保持草稿 448415988，尚未公开。发布脚本改用草稿数字 ID 核验，并只恢复同标签、同源码、逐字节一致的草稿附件；拒绝覆盖已公开版本或修改标签。补充草稿恢复/拒绝覆盖的测试后继续，安装包沿用原成功构建，不重建。
 
 测试预发行已完成：发布 run 44058932399 成功，Release 448415988 / opentu-preview-v1.6.3-beta.1 公开，8 个附件均与原构建逐字节一致；测试仓库 Latest 仍为 v1.5.4。实际 preview-release.json 来自发布凭据产物，已在本机核对真实 Release、五安装包摘要、固定标签与成功构建。即将推送清单以触发原测试页部署。
+
+
+## 测试交付与公网验收完成
+
+- 安装包源码：`ba998a2e4c105d72380b52686aa1f1b4c28f56b9`；五平台构建 `44048585617`、发布 `44058932399`、Pages 部署 `44059366175` 均 `completed / success`。页面部署源码为 `3bd54f7a88815a9b337cff2df80c1c94929219bb`；后续文档提交不改变安装包。
+- 沿用原测试下载页 https://aiw520.github.io/tuzi-switch/ ，原布局、导航、主题及截图保留；删除新独立页面。当前公开版本 `1.6.3-beta.1`，包含 Mac ARM64 / Intel、Windows x64、Linux x64 / ARM64 五个安装包。
+- 公网浏览器真实选择五种平台/架构，逐一核对下载链接与发布清单；SHA256 展开与平台切换、源码下载链接、测试说明正确，当前加载的产品图与图标无破图。截图及五个实际链接见本节附件。
+- 八个公开附件摘要与构建一致；五个安装包 HTTP 200、长度一致。Mac ARM 云端 artifact 已完整下载至本机，SHA256 一致，额外只读挂载 DMG 验证版本、独立应用身份和 ad-hoc 签名完整性后卸载；没有覆盖或启动现有应用，不把此检查描述为新包完整业务验收。
+- 正式页面 index 与 release.json 前后 SHA256 完全一致。测试 prerelease 未标记 Latest，测试 Latest 仍 `v1.5.4`；未修改正式更新通道或发布正式版。
+- 用户可开始测试；Chat/Cowork VM、电脑控制、语音、目标 ChatGPT 客户端完整联调和跨平台实机功能仍待完整验收。此前候选实测范围继续单独记录，不能替代当前 beta 全功能验收。
+
+证据目录：[preview-publication-1117](attachments/preview-publication-1117/)。包括 `publication.json`、`build-manifest.json`、`SHA256SUMS`、`public-download-heads.json`、`browser-downloads.json`、`official-before.json`、`official-unchanged.json`、`local-macos-dmg.json` 和 `download-page.jpg`。只保存公开发布元数据，不含凭证或用户业务数据。

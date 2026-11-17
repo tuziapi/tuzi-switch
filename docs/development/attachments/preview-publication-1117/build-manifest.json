@@ -1,0 +1,128 @@
+{
+  "version": "1.6.3-beta.1",
+  "commit": "ba998a2e4c105d72380b52686aa1f1b4c28f56b9",
+  "runId": 44048585617,
+  "packages": [
+    {
+      "version": "1.6.3-beta.1",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "ba998a2e4c105d72380b52686aa1f1b4c28f56b9",
+      "runId": "44048585617",
+      "target": "aarch64-apple-darwin",
+      "platform": "macos-arm64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.1-macos-arm64.dmg",
+      "bytes": 75341423,
+      "sha256": "47ffe6f644121a28700c9ce25a0d2aef0209e45e8940af9eadb7c0d6f791a681",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "dmg-mounted",
+        "isolated-identity",
+        "beta-version",
+        "ad-hoc-signature",
+        "packaged-node-executed"
+      ]
+    },
+    {
+      "version": "1.6.3-beta.1",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "ba998a2e4c105d72380b52686aa1f1b4c28f56b9",
+      "runId": "44048585617",
+      "target": "x86_64-apple-darwin",
+      "platform": "macos-x64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.1-macos-x64.dmg",
+      "bytes": 78495624,
+      "sha256": "2c62f78604e47215dc37d8eb32720d4e6f6c6e8f71c7ee02258afc8305d4e03c",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "dmg-mounted",
+        "isolated-identity",
+        "beta-version",
+        "ad-hoc-signature",
+        "packaged-node-executed"
+      ]
+    },
+    {
+      "version": "1.6.3-beta.1",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "ba998a2e4c105d72380b52686aa1f1b4c28f56b9",
+      "runId": "44048585617",
+      "target": "x86_64-pc-windows-msvc",
+      "platform": "windows-x64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.1-windows-x64.exe",
+      "bytes": 52573583,
+      "sha256": "0a9c8a0d54d82484ce5028f8e81a152055a84161d4e199ae21cb38e4f4e3f154",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration"
+      ]
+    },
+    {
+      "version": "1.6.3-beta.1",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "ba998a2e4c105d72380b52686aa1f1b4c28f56b9",
+      "runId": "44048585617",
+      "target": "x86_64-unknown-linux-gnu",
+      "platform": "linux-x64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.1-linux-x64.deb",
+      "bytes": 85936122,
+      "sha256": "9ac8aa6fee8ec059e8fc3c0c6d6d632fbae7441fee7982f1ae351342e7bf74da",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "deb-extracted",
+        "no-stable-binary-collision",
+        "packaged-node-executed"
+      ]
+    },
+    {
+      "version": "1.6.3-beta.1",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "ba998a2e4c105d72380b52686aa1f1b4c28f56b9",
+      "runId": "44048585617",
+      "target": "aarch64-unknown-linux-gnu",
+      "platform": "linux-arm64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.1-linux-arm64.deb",
+      "bytes": 83801590,
+      "sha256": "f36a5049bd2b02d5e124c69f9c6ca0c0f3db24bbdbcba5174906408501b00cc6",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "deb-extracted",
+        "no-stable-binary-collision",
+        "packaged-node-executed"
+      ]
+    }
+  ]
+}
