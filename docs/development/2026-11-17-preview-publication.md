@@ -21,3 +21,5 @@
 最终源码 6ba2caaf 的云端 verify 已通过：宿主 899 项、创作 2950 项、类型检查、运行时、打包脚本和下载页检查。五平台原生 Release 构建仍在进行，尚未据此发布。正式站 index/release.json 的部署前 SHA256 已保存至本机 /tmp/opentu-page-before-1117.json，发布后再次比对以确认没有影响正式页面。
 
 构建阻断：run 44044192167 的 Linux x64 缺少 espeak-ng 静态库；Linux ARM64 的 29 项原生测试通过，但 Tauri 正式构建缺少 sherpa-onnx-c-api。日志均恢复了此前 Rust cache；所用 rust-cache d1527c8f 的 cleanTargetDir 会递归删除非 Cargo 目录中的文件，而 sherpa-onnx-sys 1.13.8 仅以 lib 目录存在判断预编译库完整。已核对原官方 tar 中含 libespeak-ng.a。修复为缓存恢复后清除 CI 的生成语音库目录、cargo clean 该 sys crate，让依赖重新下载/解包，保留语音特性和测试门禁；不修改依赖源码或用空库绕过链接。
+
+run 44046652521 再次在 Linux x64 失败，原因是按包执行 cargo clean 默认只清 Debug，日志 Removed 0 files，Release build-script 输出仍指向已被删的语音目录。已用本机临时双 crate 编译实验复现：默认 clean 保留 Release rlib，带 --release 后确实移除。因此补齐 --release 后重新构建；不把命令退出成功等同修复有效。
