@@ -18,7 +18,9 @@ stage_node = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(stage_node)
 
 
-def build_config(target, opentu_preview=False):
+def build_config(target, opentu_preview=False, test_release=False):
+    if test_release and not opentu_preview:
+        raise ValueError("Published test installers require the isolated OpenTu profile")
     if target not in stage_node.TARGETS:
         raise ValueError("Unsupported target")
     directory = f"target/claude-local-runtime/{target}"
@@ -37,12 +39,17 @@ def build_config(target, opentu_preview=False):
         preview = json.loads((ROOT / "src-tauri/tauri.opentu-preview.conf.json").read_text(encoding="utf-8"))
         config["bundle"].update(preview.pop("bundle"))
         config.update(preview)
+        if "linux" in target:
+            config["productName"] = "OpenTu Preview"
+            config["bundle"]["externalBin"] = [f"{directory}/tuzi-opentu-preview-node"]
+    if test_release:
+        config["version"] = "1.6.3-beta.1"
     return config
 
 
-def bundle_kind(target):
+def bundle_kind(target, test_release=False):
     if "apple" in target:
-        return "app"
+        return "dmg" if test_release else "app"
     if "windows" in target:
         return "nsis"
     return "deb"
@@ -75,6 +82,7 @@ def main():
     parser.add_argument("--target", choices=sorted(stage_node.TARGETS))
     parser.add_argument("--dry-run", action="store_true", help="Print the local build plan without downloading or building")
     parser.add_argument("--opentu-preview", action="store_true", help="Combine Claude and OpenTu in the independent OpenTu acceptance app and profile")
+    parser.add_argument("--test-release", action="store_true", help="Build optimized isolated 1.6.3-beta.1 installers; does not publish")
     args = parser.parse_args()
     target = args.target or stage_node.native_target()
     validate_host(target, stage_node.native_target())
@@ -85,11 +93,12 @@ def main():
         version = subprocess.run(["rustc", "-vV"], capture_output=True, text=True, check=True, timeout=15)
         compiler_host = next((line.removeprefix("host: ") for line in version.stdout.splitlines() if line.startswith("host: ")), compiler_host)
     target_flags = [] if target == compiler_host else ["--target", target]
-    command = ["pnpm", "tauri", "build", "--debug", *target_flags,
-               "--features", "claude-desktop-local,opentu-preview" if args.opentu_preview else "claude-desktop-local", "--bundles", bundle_kind(target),
+    config = build_config(target, args.opentu_preview, args.test_release)
+    command = ["pnpm", "tauri", "build", *([] if args.test_release else ["--debug"]), *target_flags,
+               "--features", "claude-desktop-local,opentu-preview" if args.opentu_preview else "claude-desktop-local", "--bundles", bundle_kind(target, args.test_release),
                "--no-sign", "--config", str(config_path)]
     if args.dry_run:
-        print(json.dumps({"target": target, "command": command, "config": build_config(target, args.opentu_preview)}, indent=2))
+        print(json.dumps({"target": target, "command": command, "config": config}, indent=2))
         return
     command = pnpm_command(command[1:], shutil.which("pnpm") or shutil.which("pnpm.cmd") or "pnpm", os.name == "nt")
     output = config_path.parent
@@ -97,7 +106,9 @@ def main():
     binary = output / (f"tuzi-claude-node-{target}" + (".exe" if "windows" in target else ""))
     if provenance["target"] != target or provenance["binarySha256"] != stage_node.digest(binary):
         raise ValueError("Runtime provenance does not match the build target")
-    config_path.write_text(json.dumps(build_config(target, args.opentu_preview), indent=2) + "\n", encoding="utf-8")
+    if args.opentu_preview and "linux" in target:
+        shutil.copy2(binary, output / f"tuzi-opentu-preview-node-{target}")
+    config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     environment = dict(os.environ)
     environment["CARGO_INCREMENTAL"] = "0"
     subprocess.run(command, cwd=ROOT, env=environment, check=True)

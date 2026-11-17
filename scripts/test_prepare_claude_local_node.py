@@ -21,6 +21,20 @@ build_spec.loader.exec_module(build_candidate)
 
 
 class NodeArchiveTests(unittest.TestCase):
+    def test_published_preview_is_versioned_isolated_and_has_linux_binary_names(self):
+        with self.assertRaisesRegex(ValueError, "isolated"):
+            build_candidate.build_config("x86_64-pc-windows-msvc", False, True)
+        for target in stage_node.TARGETS:
+            config = build_candidate.build_config(target, True, True)
+            self.assertEqual(config["version"], "1.6.3-beta.1")
+            self.assertEqual(config["mainBinaryName"], "tuzi-opentu-preview")
+            self.assertFalse(config["bundle"]["createUpdaterArtifacts"])
+            self.assertEqual(config["plugins"]["updater"]["endpoints"], [])
+            if "linux" in target:
+                self.assertEqual(config["productName"], "OpenTu Preview")
+                self.assertTrue(config["bundle"]["externalBin"][0].endswith("/tuzi-opentu-preview-node"))
+        self.assertEqual(build_candidate.bundle_kind("aarch64-apple-darwin", True), "dmg")
+
     def test_combined_preview_keeps_separate_identity_and_packaged_runtime(self):
         config = build_candidate.build_config("aarch64-apple-darwin", True)
         self.assertEqual(config["identifier"], "com.tuziswitch.desktop.opentu-preview")

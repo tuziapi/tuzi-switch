@@ -113,7 +113,11 @@ fn bundled_node_path_for(executable: &std::path::Path, platform: &str, developme
     }
     match platform {
         "windows" => Some(parent.join("tuzi-claude-node.exe")),
-        "linux" => Some(parent.join("tuzi-claude-node")),
+        "linux" => Some(parent.join(if cfg!(feature = "opentu-preview") {
+            "tuzi-opentu-preview-node"
+        } else {
+            "tuzi-claude-node"
+        })),
         _ => None,
     }
 }
@@ -656,7 +660,7 @@ mod tests {
         for (platform, layout, sidecar) in [
             ("macos", "Tuzi.app/Contents/MacOS/tu-zi-switch", "tuzi-claude-node"),
             ("windows", "Tuzi/tu-zi-switch.exe", "tuzi-claude-node.exe"),
-            ("linux", "AppDir/usr/bin/tu-zi-switch", "tuzi-claude-node"),
+            ("linux", "AppDir/usr/bin/tu-zi-switch", if cfg!(feature = "opentu-preview") { "tuzi-opentu-preview-node" } else { "tuzi-claude-node" }),
         ] {
             let exe = dir.path().join(layout);
             for development in [false, true] {
