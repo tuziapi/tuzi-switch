@@ -73,7 +73,7 @@ export function ClaudeLocalPanel({
     return (
       <div
         role="status"
-        className="mx-auto w-full max-w-4xl rounded-2xl border p-6 text-sm text-muted-foreground"
+        className="w-full rounded-2xl border p-6 text-sm text-muted-foreground"
       >
         {t("claudeLocal.loadingPanel")}
       </div>
@@ -174,7 +174,7 @@ export function ClaudeLocalPanel({
   return (
     <section
       aria-label={t("claudeLocal.title")}
-      className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm"
+      className="w-full overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm"
     >
       <div className="p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
@@ -406,19 +406,18 @@ export function ClaudeLocalPanel({
                     {t(
                       !available[feature]
                         ? "claudeLocal.unsupportedFeature"
-                        : `claudeLocal.${feature}Description`,
+                        : feature === "voice" &&
+                            checked &&
+                            !status.voiceModelReady
+                          ? "claudeLocal.voicePendingDescription"
+                          : `claudeLocal.${feature}Description`,
                     )}
                   </p>
                 </div>
                 <Switch
                   id={`claude-local-${feature}`}
                   checked={available[feature] && Boolean(checked)}
-                  disabled={
-                    !available[feature] ||
-                    active ||
-                    busy ||
-                    (feature === "voice" && !status.voiceModelReady)
-                  }
+                  disabled={!available[feature] || active || busy}
                   onCheckedChange={(checked) =>
                     action.mutate(
                       `${checked ? "enable" : "disable"}_${feature}`,

@@ -29,3 +29,20 @@
 证据：[结构化记录](attachments/claude-local-p0/setup-ui-2026-11-17.json)。
 
 ![本机实际页面](attachments/claude-local-p0/setup-ui-native-2026-11-17.jpg)
+
+## CL-LOCAL-UI-03：默认勾选、系统识别与页面宽度
+
+2026-11-17 用户追加要求：三个功能默认勾选，取消系统选择，减少页面两侧留白。
+
+- 首次无 options.json 时，Mac/Windows 默认选择语音、电脑控制、Cowork；Linux 仅默认选择 Cowork。已有配置及缺字段的旧语义不迁移，用户保存的关闭选择保持有效。
+- 语音选择与资源就绪分开：未下载时显示待准备，允许取消或重新选择；实际运行配置只有模型就绪才启用语音，下载仍由原按钮明确触发。不因选中而自动下载、授权或启动。
+- 摘要改为“已选择 N 项”，三语言同步，避免将默认选择表述成实际可用。没有新增配置或 IPC 字段。
+- 正式应用沿用原生系统识别；预览自动识别浏览器所在系统并移除平台切换按钮，保留仅用于 QA 的 URL 参数。取消主卡和预览外层 896px 限宽；预览两侧保留 16/24px 响应式边距，正式配置页沿用宿主边距。
+- 验证：面板 15 项、Rust 默认/旧配置/资源门控 3 项、类型检查通过。CUA 预览确认系统选择消失、Mac 三项默认选中且语音可取消；1342 CSS px 下卡片宽约 1295px，左右各24px；600 CSS px 英文深色 Linux 无横向溢出、两项禁用且 Cowork 默认选择。
+- 本轮仅默认选项和界面调整，不代表语音、电脑控制、Cowork 完整实机验收完成；不推送、不发布。
+
+完整前端与 Mac ARM 原生构建通过，新版已替换 `/Applications/兔子助手.app` 并打开 Claude Desktop 页；真实界面确认三项默认选中、语音待下载提示、无系统选择、主卡占满宿主可用宽度。此前测试包保留在 `/Users/sdy09/Library/Application Support/Tuzi Local Backups/claude-defaults-20261117-110329`。本轮没有下载模型、启动兼容会话或修改证书。
+
+新程序 SHA-256：`91a0da7c172c83ac145b8ca7f8ce0176a864caa181894677619b176da7f4dedb`。仍为未签名 Debug 1.6.2 本地测试版。
+
+![默认勾选与宽版原生界面](attachments/claude-local-p0/defaults-native-2026-11-17.jpg)

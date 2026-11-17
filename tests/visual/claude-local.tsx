@@ -9,11 +9,18 @@ import { ThemeProvider } from "@/components/theme-provider";
 import i18n from "@/i18n";
 import "@/index.css";
 const params = new URLSearchParams(location.search);
+// Production uses native capabilities_for(std::env::consts::OS).
+// Browser-only fixtures detect the viewing OS; the query override is for QA.
+const detectedPlatform = /Mac/i.test(navigator.platform)
+  ? "macos"
+  : /Win/i.test(navigator.platform)
+    ? "windows"
+    : "linux";
 const platform = ["macos", "windows", "linux"].includes(
   params.get("platform") || "",
 )
   ? params.get("platform")!
-  : "macos";
+  : detectedPlatform;
 let imported = () => {};
 let status = {
   enabled: true,
@@ -28,7 +35,11 @@ let status = {
     computerUse: platform !== "linux",
     cowork: true,
   },
-  options: { voiceInput: false, computerUse: false, cowork: false },
+  options: {
+    voiceInput: platform !== "linux",
+    computerUse: platform !== "linux",
+    cowork: true,
+  },
   voiceModelReady: false,
   core: {
     version: "5.11492.5",
@@ -102,8 +113,8 @@ function Fixture() {
     select("a");
   };
   return (
-    <main className="min-h-screen bg-background text-foreground p-6 sm:p-10">
-      <div className="mx-auto max-w-4xl space-y-6">
+    <main className="min-h-screen bg-background text-foreground p-4 sm:p-6">
+      <div className="w-full space-y-6">
         <header className="border-b pb-5">
           <p className="text-sm text-muted-foreground mb-2">
             兔子助手 / 工具配置
@@ -112,22 +123,6 @@ function Fixture() {
           <p className="mt-2 text-sm text-muted-foreground">
             当前源码界面预览 · 模拟状态，可点击体验；不修改系统或调用模型
           </p>
-          <nav aria-label="预览平台" className="mt-4 flex gap-2">
-            {[
-              ["macos", "Mac"],
-              ["windows", "Windows"],
-              ["linux", "Linux"],
-            ].map(([value, label]) => (
-              <a
-                key={value}
-                href={`?platform=${value}`}
-                aria-current={platform === value ? "page" : undefined}
-                className={`rounded-md border px-3 py-1 text-sm ${platform === value ? "bg-primary text-primary-foreground" : "bg-background"}`}
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
         </header>
         <ClaudeLocalPanel
           providerId={provider}

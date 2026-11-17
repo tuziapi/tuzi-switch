@@ -22,12 +22,34 @@ const LOCAL_DIR: &str = if cfg!(feature = "claude-local-poc") {
     "claude-desktop-local"
 };
 
+// Missing fields in existing files retain the legacy disabled state.
 #[derive(Default, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct LocalOptions {
     voice_input: bool,
     computer_use: bool,
     cowork: bool,
+}
+impl LocalOptions {
+    fn first_use(platform: &'static str) -> Self {
+        let capabilities = capabilities_for(platform);
+        Self {
+            voice_input: capabilities.voice_input,
+            computer_use: capabilities.computer_use,
+            cowork: capabilities.cowork,
+        }
+    }
+
+    fn runtime_config(&self, platform: &'static str, voice_model_ready: bool) -> ClaudeLocalSettings {
+        let capabilities = capabilities_for(platform);
+        ClaudeLocalSettings {
+            // A selected preference is not proof that its local assets are ready.
+            voice_input: self.voice_input && capabilities.voice_input && voice_model_ready,
+            computer_use: self.computer_use && capabilities.computer_use,
+            cowork: self.cowork && capabilities.cowork,
+            ..safe_config()
+        }
+    }
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,7 +75,7 @@ fn read_options(root: &std::path::Path) -> anyhow::Result<LocalOptions> {
     );
     match fs::read(path) {
         Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(LocalOptions::default()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(LocalOptions::first_use(std::env::consts::OS)),
         Err(e) => Err(e.into()),
     }
 }
@@ -230,13 +252,7 @@ impl Host for TuziHost {
     }
     fn load_config(&self) -> anyhow::Result<ClaudeLocalSettings> {
         let options = read_options(&self.root)?;
-        let capabilities = capabilities_for(std::env::consts::OS);
-        Ok(ClaudeLocalSettings {
-            voice_input: options.voice_input && capabilities.voice_input,
-            computer_use: options.computer_use && capabilities.computer_use,
-            cowork: options.cowork && capabilities.cowork,
-            ..safe_config()
-        })
+        Ok(options.runtime_config(std::env::consts::OS, claude_local::dictation::model_ready()))
     }
     fn save_config(&self, _: &ClaudeLocalSettings) -> anyhow::Result<()> {
         anyhow::bail!("请通过兔子助手的兼容选项修改配置")
@@ -426,9 +442,6 @@ pub async fn claude_local_action(
         let mut options = read_options(&host.root).map_err(|e| e.to_string())?;
         match action.split_once('_').map(|(_, feature)| feature) {
             Some("voice") => {
-                if enabled && !claude_local::dictation::model_ready() {
-                    return Err("请先下载本地语音模型".into());
-                }
                 options.voice_input = enabled;
             }
             Some("computer") => options.computer_use = enabled,
@@ -567,8 +580,15 @@ mod tests {
     }
 
     #[test]
-    fn local_options_default_and_legacy_fields_stay_disabled() {
+    fn local_options_first_use_selects_supported_features_and_preserves_saved_choices() {
         let dir = tempfile::tempdir().unwrap();
+        let options = read_options(dir.path()).unwrap();
+        let capabilities = capabilities_for(std::env::consts::OS);
+        assert_eq!(options.voice_input, capabilities.voice_input);
+        assert_eq!(options.computer_use, capabilities.computer_use);
+        assert_eq!(options.cowork, capabilities.cowork);
+        assert!(!dir.path().join("options.json").exists());
+        fs::write(dir.path().join("options.json"), br#"{"voiceInput":false,"computerUse":false,"cowork":false}"#).unwrap();
         let options = read_options(dir.path()).unwrap();
         assert!(!options.voice_input && !options.computer_use && !options.cowork);
         fs::write(dir.path().join("options.json"), br#"{"cowork":true}"#).unwrap();
@@ -576,9 +596,28 @@ mod tests {
         assert!(options.cowork && !options.voice_input && !options.computer_use);
         let round_trip: LocalOptions =
             serde_json::from_slice(&serde_json::to_vec(&options).unwrap()).unwrap();
-        assert!(round_trip.cowork);
+        assert!(round_trip.cowork && !round_trip.voice_input && !round_trip.computer_use);
         fs::write(dir.path().join("options.json"), b"broken").unwrap();
         assert!(read_options(dir.path()).is_err());
+    }
+
+    #[test]
+    fn local_options_runtime_requires_assets_and_platform_support() {
+        for platform in ["macos", "windows", "linux"] {
+            let options = LocalOptions::first_use(platform);
+            assert!(options.cowork);
+            let waiting = options.runtime_config(platform, false);
+            assert!(!waiting.voice_input);
+            assert_eq!(waiting.computer_use, platform != "linux");
+            assert!(waiting.cowork);
+            let ready = options.runtime_config(platform, true);
+            assert_eq!(ready.voice_input, platform != "linux");
+            let disabled = LocalOptions::default().runtime_config(platform, true);
+            assert!(!disabled.voice_input && !disabled.computer_use && !disabled.cowork);
+        }
+        // Legacy flags must not bypass the Linux capability gate.
+        let legacy = LocalOptions::first_use("macos").runtime_config("linux", true);
+        assert!(!legacy.voice_input && !legacy.computer_use && legacy.cowork);
     }
 
     #[cfg(unix)]

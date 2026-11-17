@@ -209,16 +209,72 @@ describe("Claude Desktop guided setup", () => {
       expect(claudeDesktopLocal.action).toHaveBeenCalledWith("stop", undefined),
     );
   });
-  it("requires the local speech model before enabling voice", async () => {
+  it("shows selected defaults while voice awaits its model and allows cancellation", async () => {
+    vi.mocked(claudeDesktopLocal.status).mockResolvedValue({
+      ...stopped,
+      voiceModelReady: false,
+      options: { voiceInput: true, computerUse: true, cowork: true },
+    });
     mount();
     await expand("optionalFeatures");
+    for (const feature of ["voice", "computer", "cowork"]) {
+      const toggle = screen.getByRole("switch", {
+        name: `claudeLocal.${feature}`,
+      });
+      expect(toggle).toBeChecked();
+      expect(toggle).toBeEnabled();
+    }
     expect(
-      screen.getByRole("switch", { name: "claudeLocal.voice" }),
-    ).toBeDisabled();
+      screen.getByText("claudeLocal.voicePendingDescription"),
+    ).toBeVisible();
     expect(
       screen.getByRole("button", { name: "claudeLocal.prepareVoice" }),
     ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "claudeLocal.launchAction" }),
+    ).toBeEnabled();
     expect(claudeDesktopLocal.action).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("switch", { name: "claudeLocal.voice" }));
+    await waitFor(() =>
+      expect(claudeDesktopLocal.action).toHaveBeenCalledWith(
+        "disable_voice",
+        "synthetic-provider",
+      ),
+    );
+  });
+  it("saves a voice preference before download without downloading or launching", async () => {
+    mount();
+    await expand("optionalFeatures");
+    const toggle = screen.getByRole("switch", { name: "claudeLocal.voice" });
+    expect(toggle).not.toBeChecked();
+    expect(toggle).toBeEnabled();
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(claudeDesktopLocal.action).toHaveBeenCalledWith(
+        "enable_voice",
+        "synthetic-provider",
+      ),
+    );
+    expect(claudeDesktopLocal.action).toHaveBeenCalledTimes(1);
+  });
+  it("prepares the speech model only from its download button", async () => {
+    vi.mocked(claudeDesktopLocal.status).mockResolvedValue({
+      ...stopped,
+      voiceModelReady: false,
+      options: { voiceInput: true, computerUse: true, cowork: true },
+    });
+    mount();
+    await expand("optionalFeatures");
+    fireEvent.click(
+      screen.getByRole("button", { name: "claudeLocal.prepareVoice" }),
+    );
+    await waitFor(() =>
+      expect(claudeDesktopLocal.action).toHaveBeenCalledWith(
+        "prepare_voice",
+        "synthetic-provider",
+      ),
+    );
+    expect(claudeDesktopLocal.action).toHaveBeenCalledTimes(1);
   });
   it("disables unsupported Linux features even if old options enable them", async () => {
     vi.mocked(claudeDesktopLocal.status).mockResolvedValue({
