@@ -1,0 +1,33 @@
+{
+  "runId": 44064540204,
+  "attempt": 2,
+  "commit": "5dd5d97600687af0fe30b91f09514e1da3fb342b",
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "name": "installers (macos-15, aarch64-apple-darwin, macos-arm64)",
+      "conclusion": "success"
+    },
+    {
+      "name": "verify",
+      "conclusion": "success"
+    },
+    {
+      "name": "installers (macos-15-intel, x86_64-apple-darwin, macos-x64)",
+      "conclusion": "success"
+    },
+    {
+      "name": "installers (ubuntu-24.04-arm, aarch64-unknown-linux-gnu, linux-arm64)",
+      "conclusion": "success"
+    },
+    {
+      "name": "installers (windows-latest, x86_64-pc-windows-msvc, windows-x64)",
+      "conclusion": "success"
+    },
+    {
+      "name": "installers (ubuntu-22.04, x86_64-unknown-linux-gnu, linux-x64)",
+      "conclusion": "success"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "installed": "/Applications/OpenTu 验收版.app",
+  "version": "1.6.3-beta.2",
+  "backup": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/beta2-install-20261117-200643",
+  "sourceCommit": "5dd5d97600687af0fe30b91f09514e1da3fb342b",
+  "runId": 44064540204,
+  "installerSha256": "612f11679139401f51f8573bb40cd46881b393114f2357e11b7535fa0a5d745c",
+  "stableAssistantSha256": "64c41bdd071736bd5e836a06050183c872e3e2587ab484725298ebb390e87b0d",
+  "stableAssistantUnchanged": true,
+  "profilePreserved": true
+}

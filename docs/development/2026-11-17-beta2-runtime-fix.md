@@ -17,3 +17,17 @@
 ## 验证与交付状态
 
 18 项打包脚本测试、3 项发布门禁测试（包含旧检查标志拒绝）、类型检查、25 项相关前端测试和 19 项下载页测试通过。隔离真实签名回归通过。新版本号为 1.6.3-beta.2；完整五平台构建和最终包验收进行中，尚未发布新版本。旧 beta.1 的五平台构建记录保留，但其 Mac 运行时不能据此认定可用。
+
+云端构建：`44064540204`，源码 `5dd5d97600687af0fe30b91f09514e1da3fb342b`，verify 已成功，五平台安装包任务进行中。旧 beta.1 发布说明已添加 Mac 运行时故障提示，未修改旧附件或 tag。
+
+云端 verify 全量结果：899 项宿主、2950 项创作全部通过；两个 Linux 安装包已成功，并通过新增包内脚本/fetch/WebSocket 检查。Mac ARM job 133977248676 因 GitHub 托管 runner 容量不足、15 分钟未取得机器被取消，未编译。平台注记为 `The job was not acquired by Runner of type hosted even after multiple attempts`；其他任务继续，结束后按原源码重试取消任务。
+
+Windows x64 安装包已构建成功，NSIS 解包后的 Node 实际脚本/fetch/WebSocket 门禁通过。Mac Intel 原生集成测试通过，安装包仍在构建。安装前再次只读核实正式应用为 1.6.2、独立验收版为 beta.1；原生界面显示未启动、兔子coding 线路及 25 个模型，仍存在旧运行组件错误。尚未安装新包或切换下载页。
+
+## 五平台成功与本机安装
+
+构建 44064540204 attempt 2 全部成功。首轮 Mac ARM 未取得 runner，被单独重试；其余四平台成功产物保留，同一源码 5dd5d976。五个最终安装包均通过实际 Node 脚本/fetch/WebSocket，Mac 双架构还通过 JIT entitlement 与深度签名检查。结果见 attachments/beta2-runtime-1117/build-result.json。
+
+Mac ARM artifact 14325843019 已分段下载，完整 ZIP 与 GitHub artifact digest 一致；DMG SHA256 为 612f11679139401f51f8573bb40cd46881b393114f2357e11b7535fa0a5d745c。本机只读挂载验证 beta.2、独立身份、深度签名、JIT 和真实脚本/fetch/WebSocket 全部通过，见 local-package-check.json。
+
+已正常退出旧验收版，备份旧 app、SQLite 数据库及 settings 后安装云端 beta.2 到 /Applications/OpenTu 验收版.app，正式兔子助手主程序 SHA256 保持不变，未覆盖数据或新增证书权限。备份及安装证据见 install.json。已启动新包，但 macOS 当前锁屏，CUA 窗口读取失败且 System Events 显示 0 窗口；已请求用户解锁。最终界面复核仍待完成，因此测试 Release 和原下载页尚未切换。
