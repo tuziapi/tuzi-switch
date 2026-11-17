@@ -69,6 +69,7 @@ fn local_session_snapshot_auth_and_revocation() {
 
 struct LabHost {
     root: std::path::PathBuf,
+    desktop: std::path::PathBuf,
     upstream: claude_local::Upstream,
 }
 impl claude_local::Host for LabHost {
@@ -80,6 +81,9 @@ impl claude_local::Host for LabHost {
     }
     fn isolated_profile_dir(&self) -> Option<std::path::PathBuf> {
         Some(self.root.join("profile"))
+    }
+    fn isolated_app_path(&self) -> Option<std::path::PathBuf> {
+        Some(self.desktop.clone())
     }
     fn node_runtime(&self) -> Option<std::path::PathBuf> {
         Some("node".into())
@@ -195,6 +199,24 @@ async fn mock_upstream(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn local_session_headless_http_sse_tools_and_lifecycle() {
     let temp = tempfile::tempdir().unwrap();
+    // The managed runtime serves Desktop's bundled shell. Supply synthetic
+    // resources explicitly so this test never borrows a locally installed app.
+    let desktop = if cfg!(target_os = "macos") {
+        temp.path().join("Synthetic Claude.app")
+    } else {
+        temp.path().join("synthetic-desktop/claude")
+    };
+    let resources = if cfg!(target_os = "macos") {
+        desktop.join("Contents/Resources")
+    } else {
+        desktop.parent().unwrap().join("resources")
+    };
+    std::fs::create_dir_all(resources.join("ion-dist")).unwrap();
+    std::fs::write(
+        resources.join("ion-dist/index.html"),
+        r#"<!doctype html><html data-build-id="synthetic-integration"><head></head><body>Synthetic test only</body></html>"#,
+    )
+    .unwrap();
     let seen = Arc::new(Mutex::new(Vec::new()));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -231,6 +253,7 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
     assert!(upstream.model_windows.is_empty() && upstream.default_window.is_none());
     assert!(claude_local::install_host(Arc::new(LabHost {
         root: temp.path().into(),
+        desktop,
         upstream
     })));
     let _cleanup = StopCore;

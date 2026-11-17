@@ -24,7 +24,10 @@ mockIPC((command) => {
         ownedBy: "synthetic",
         createdAt: 1700000000 + index * 86400,
       })),
-      { id: "synthetic-image-model", ownedBy: "synthetic" },
+      { id: "deepseek-chat", ownedBy: "synthetic" },
+      { id: "vendor/gpt-conversation", ownedBy: "synthetic" },
+      { id: "gemini-flash-synthetic", ownedBy: "synthetic" },
+      { id: "gpt-image-synthetic", ownedBy: "synthetic" },
     ];
   }
   throw new Error(`Unexpected fixture IPC ${command}`);
@@ -55,7 +58,8 @@ function Fixture() {
         <div role="status">
           已保存 {saved.meta?.claudeDesktopModelCatalog?.length} 个模型，
           {Object.keys(saved.meta?.claudeDesktopModelRoutes ?? {}).length}{" "}
-          个映射；获取次数 {fetchCount}；默认{" "}
+          个映射；协议 {saved.meta?.apiFormat}；模式{" "}
+          {saved.meta?.claudeDesktopMode}；获取次数 {fetchCount}；默认{" "}
           {JSON.parse(saved.settingsConfig).env.ANTHROPIC_MODEL}
         </div>
       )}

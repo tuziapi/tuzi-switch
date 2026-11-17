@@ -1,0 +1,22 @@
+{
+  "installed": "/Applications/OpenTu 验收版.app",
+  "backup": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/unified-claude-refresh-20261117-150116",
+  "sourceParent": "869ceb573c7d9f4d60138f226b51ec0b9355db13",
+  "binarySha256": "07a6acb39da8b7b86a4c7a91f4e28b361d7ef2de574b74217ba5d6f8b012a416",
+  "originalAssistantSha256": "64c41bdd071736bd5e836a06050183c872e3e2587ab484725298ebb390e87b0d",
+  "originalAssistantUnchanged": true,
+  "signing": "local ad-hoc",
+  "build": "Mac ARM Debug",
+  "features": [
+    "claude-desktop-local",
+    "opentu-preview"
+  ],
+  "release": false,
+  "testProvider": {
+    "name": "兔子",
+    "sourceReadOnly": true,
+    "copiedToIndependentProfile": true,
+    "credentialsLogged": false
+  },
+  "existingClaudeSession": "Confirmed idle via UI, closed original signed private Claude copy and stopped its original assistant compatibility service normally before independent testing. Original provider and application binary preserved."
+}

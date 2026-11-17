@@ -118,6 +118,10 @@ windows-sys = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+[target.'cfg(all(target_os = "windows", target_arch = "aarch64"))'.dependencies]
+# rquickjs 0.8 does not ship pregenerated Windows ARM64 bindings.
+rquickjs = { version = "0.8", features = ["bindgen"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3.6.3", features = ["apple-native"] }
 objc2 = "0.5"

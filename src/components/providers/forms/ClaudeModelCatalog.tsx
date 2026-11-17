@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  isClaudeModel,
+  isKnownNonChatModel,
   sortCatalog,
   type CatalogModel,
 } from "@/lib/claudeDesktopModels";
@@ -25,18 +25,13 @@ export function ClaudeModelCatalog({
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
-  const [allKinds, setAllKinds] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const matches = useMemo(
     () =>
-      sortCatalog(models, defaultModel).filter(
-        (model) =>
-          (allKinds || isClaudeModel(model.id)) &&
-          model.id.toLowerCase().includes(search.trim().toLowerCase()),
+      sortCatalog(models, defaultModel).filter((model) =>
+        model.id.toLowerCase().includes(search.trim().toLowerCase()),
       ),
-    [models, defaultModel, allKinds, search],
+    [models, defaultModel, search],
   );
-  const visible = expanded ? matches : matches.slice(0, 10);
   return (
     <section
       aria-label={t("claudeDesktop.catalogTitle")}
@@ -79,40 +74,18 @@ export function ClaudeModelCatalog({
       )}
       {models.length > 0 && (
         <>
-          <div className="flex flex-wrap gap-2">
-            <Input
-              aria-label={t("claudeDesktop.catalogSearch")}
-              placeholder={t("claudeDesktop.catalogSearch")}
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setExpanded(false);
-              }}
-              className="min-w-0 flex-1"
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant={allKinds ? "secondary" : "outline"}
-              onClick={() => {
-                setAllKinds(!allKinds);
-                setExpanded(false);
-              }}
-              aria-pressed={allKinds}
-            >
-              {t(
-                allKinds
-                  ? "claudeDesktop.catalogAll"
-                  : "claudeDesktop.catalogClaude",
-              )}
-            </Button>
-          </div>
+          <Input
+            aria-label={t("claudeDesktop.catalogSearch")}
+            placeholder={t("claudeDesktop.catalogSearch")}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
           <div
             className="max-h-72 overflow-y-auto divide-y"
             role="radiogroup"
             aria-label={t("claudeDesktop.catalogDefault")}
           >
-            {visible.map((model) => (
+            {matches.map((model) => (
               <label
                 key={model.id}
                 className="flex items-center gap-3 py-2 text-sm"
@@ -121,11 +94,16 @@ export function ClaudeModelCatalog({
                   type="radio"
                   name="claude-catalog-default"
                   checked={defaultModel === model.id}
-                  disabled={busy || !isClaudeModel(model.id)}
+                  disabled={busy || isKnownNonChatModel(model.id)}
                   onChange={() => onSelect(model.id)}
                   aria-label={model.id}
                 />
                 <span className="min-w-0 flex-1 break-all">{model.id}</span>
+                {isKnownNonChatModel(model.id) && (
+                  <span className="text-xs text-muted-foreground">
+                    {t("claudeDesktop.catalogNonChatBadge")}
+                  </span>
+                )}
                 {defaultModel === model.id && (
                   <span className="shrink-0 text-xs text-primary">
                     {t("claudeDesktop.catalogDefault")}
@@ -139,21 +117,6 @@ export function ClaudeModelCatalog({
               </p>
             )}
           </div>
-          {matches.length > 10 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpanded(!expanded)}
-            >
-              {t(
-                expanded
-                  ? "claudeDesktop.catalogCollapse"
-                  : "claudeDesktop.catalogExpand",
-                { count: matches.length },
-              )}
-            </Button>
-          )}
           <p className="text-xs text-muted-foreground">
             {t("claudeDesktop.catalogScope")}
           </p>

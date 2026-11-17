@@ -2004,6 +2004,11 @@ mod tests {
                     serde_json::to_value(&persisted.meta).unwrap()["claudeDesktopModelCatalog"],
                     json!([{ "id": "synthetic-model" }])
                 );
+                assert_eq!(
+                    serde_json::to_value(&persisted.meta).unwrap()["claudeDesktopModelRoutes"]
+                        ["claude-sonnet-4-6"]["displayName"],
+                    "synthetic-model"
+                );
             }
             assert!(state
                 .db
