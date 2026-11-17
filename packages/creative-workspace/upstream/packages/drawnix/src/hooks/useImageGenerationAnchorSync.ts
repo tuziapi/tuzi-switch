@@ -1,3 +1,4 @@
+import { wasGenerationProgressRestored } from '../services/generation-node-lifecycle';
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { RectangleClient, type PlaitBoard, type Point } from '@plait/core';
 import { taskQueueService } from '../services/task-queue';
@@ -542,7 +543,7 @@ export function useImageGenerationAnchorSync({
         ImageGenerationAnchorTransforms.updateAnchor(board, anchor.id, patch);
       }
 
-      if (viewModel.phase === 'completed' && hasInserted) {
+      if (viewModel.phase === 'completed' && hasInserted && !wasGenerationProgressRestored(board, anchor.id)) {
         scheduleCompletedRemoval(board, anchor.id, removalTimersRef);
       } else {
         cancelScheduledRemoval(anchor.id, removalTimersRef);

@@ -1,3 +1,5 @@
+import { resolveSavedGenerationModel } from '../../utils/restore-generation-model';
+import { consumeGenerationDraft, getGenerationSlotPositions } from '../../services/generation-node-lifecycle';
 import {
   normalizeTuziVideoParams,
   allowsTuziVideoWithoutPrompt,
@@ -3400,7 +3402,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                   );
 
                   if (allPostProcessingFinished) {
-                    WorkZoneTransforms.removeWorkZone(board, workZoneId);
+                    WorkZoneTransforms.removeWorkZone(board, workZoneId, { automatic: true });
                     currentWorkZoneIdRef.current = null;
                     // console.log('[AIInputBar] Removed WorkZone after completion:', workZoneId);
                   }
@@ -3966,18 +3968,26 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             : nextGenerationType === 'text' || nextGenerationType === 'agent'
             ? textModels
             : imageModels;
+        const exactModel = detail.requireExactModelRef
+          ? (nextGenerationType === 'image' || nextGenerationType === 'video'
+            ? await resolveSavedGenerationModel(nextGenerationType, modelsForType, detail.model, detail.modelRef)
+            : findExactSelectableModel(modelsForType, detail.model, detail.modelRef))
+          : undefined;
+        if (!isCurrent()) return;
+        if (detail.requireExactModelRef && !exactModel) {
+          MessagePlugin.warning('历史模型或供应商当前不可用，请先恢复配置后继续编辑');
+          return;
+        }
         const nextModel =
-          (restoredInput && detail.modelRef
-            ? findExactSelectableModel
-            : findMatchingSelectableModel)(
-            modelsForType,
-            detail.model,
-            detail.modelRef || null
-          ) ||
+          (detail.requireExactModelRef ? exactModel : undefined) ||
+          (restoredInput && (nextGenerationType === 'image' || nextGenerationType === 'video')
+            ? await resolveSavedGenerationModel(nextGenerationType, modelsForType, detail.model, detail.modelRef)
+            : (restoredInput && detail.modelRef ? findExactSelectableModel : findMatchingSelectableModel)(modelsForType, detail.model, detail.modelRef || null)) ||
           (!restoredInput &&
             (findMatchingSelectableModel(modelsForType, detail.model, null) ||
               resolvePreferredModelSelection(nextGenerationType, modelsForType))) ||
           undefined;
+        if (!isCurrent()) return;
         if (restoredInput && !nextModel) {
           MessagePlugin.warning(language === 'zh' ? '原模型或渠道不可用，请先恢复模型配置' : 'Restore the original model/provider before continuing');
           return;
@@ -5484,7 +5494,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             ? getEffectiveVideoModelConfigForSelection(selectedModel, selectedModelRef || selectedModel, selectedParams).imageUpload : undefined;
           const errors = validateGenerationNode(submittedGenerationNode.data, submittedBoard.children, videoConfig);
           if (errors.length) { MessagePlugin.error(errors.join('；')); return; }
-          effectiveContent = snapshotGenerationReferences(submittedGenerationNode.data, submittedBoard.children).map(ref => ({ ...ref, type: 'image' as const }));
+          submittedGenerationNode.data.references = snapshotGenerationReferences(submittedGenerationNode.data, submittedBoard.children);
+          effectiveContent = submittedGenerationNode.data.references.map(ref => ({ ...ref, type: 'image' as const }));
         }
         const effectiveGenerationType = activeBoundImageTarget && !(discussionEnabled && !override)
           ? activeBoundImageTarget.type
@@ -5669,14 +5680,15 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           return;
         }
         if (restoreOriginalInputs && (effectiveGenerationType === 'image' || effectiveGenerationType === 'video') &&
-            !(effectiveSelectedModelRef ? findExactSelectableModel : findMatchingSelectableModel)(
+            !(await resolveSavedGenerationModel(effectiveGenerationType,
               effectiveGenerationType === 'video' ? videoModels : imageModels, effectiveSelectedModel, effectiveSelectedModelRef
-            )) {
+            ))) {
           MessagePlugin.warning(language === 'zh'
             ? '原模型或渠道不可用，请先恢复模型配置'
             : 'Restore the original model/provider before continuing');
           return;
         }
+        if (restoreOriginalInputs && SelectionWatcherBoardRef.current !== submittedBoard) return;
         if (submitLockRef.current || isSubmitting) {
           return; // 仅防止快速重复点击
         }
@@ -5815,7 +5827,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         trackSubmitStatus('start');
 
         try {
-          if (effectiveGenerationType === 'image' && effectiveSelectedCount > 1 && submittedBoard) {
+          if (!submittedGenerationNode && effectiveGenerationType === 'image' && effectiveSelectedCount > 1 && submittedBoard) {
             const previewParams = parseAIInput(effectivePrompt, {
               texts: [], images: [], videos: [], graphics: [],
             }, { modelId: effectiveSelectedModel, modelRef: effectiveSelectedModelRef,
@@ -6548,7 +6560,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
 
             // 如果选中了 Frame，将 Frame 信息传递给 WorkZone
             // 生成完成后媒体将插入到 Frame 内部并缩放到 Frame 尺寸
-            const frameInfo = restoreOriginalInputs ? null : submittedFrameInfo;
+            const frameInfo = restoreOriginalInputs || submittedGenerationNode ? null : submittedFrameInfo;
             let targetFrameId: string | undefined;
             let targetFrameDimensions:
               | { width: number; height: number }
@@ -6578,6 +6590,17 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               }
             }
 
+            const submittedDraftElement = submittedGenerationNode
+              ? board.children.find((element) => element.id === submittedGenerationNode.id)
+              : undefined;
+            if (submittedGenerationNode && !isGenerationNode(submittedDraftElement)) {
+              throw new Error('生成框已提交或删除，请重新选择');
+            }
+            if (submittedDraftElement) {
+              const rect = RectangleClient.getRectangleByPoints(submittedDraftElement.points!);
+              expectedInsertLeftX = workzoneX = rect.x;
+              expectedInsertY = workzoneY = rect.y;
+            }
             const isImageGeneration = parsedParams.generationType === 'image';
 
             if (isImageGeneration) {
@@ -6604,7 +6627,9 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               // Results fit a 400px width / 600px height envelope. Reserve it
               // while auto aspect ratio is unknown, without stretching the card.
               const reservedInsertSize = { width: Math.max(400, anchorSize.width), height: Math.max(600, anchorSize.height) };
-              const plannedAnchorPositions = batchPreparation?.count === requestedCount
+              const plannedAnchorPositions = isGenerationNode(submittedDraftElement)
+                ? getGenerationSlotPositions(board, submittedDraftElement, reservedInsertSize, requestedCount)
+                : batchPreparation?.count === requestedCount
                 ? batchPreparation.positions
                 : anchorTargetFrameId
                 ? null
@@ -6712,7 +6737,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 }, 100);
               }
             } else {
-              const retainedTaskPlacement = placeBelowRetainedTaskCards(
+              const retainedTaskPlacement = submittedDraftElement ? [workzoneX, workzoneY] as [number, number] : placeBelowRetainedTaskCards(
                 board,
                 [workzoneX, workzoneY],
                 { width: WORKZONE_WIDTH, height: WORKZONE_HEIGHT },
@@ -6749,6 +6774,11 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             }
           }
 
+          if (board && submittedGenerationNode && publishedTaskTargetElementId) {
+            consumeGenerationDraft(board, submittedGenerationNode.id, submittedGenerationNode.data,
+              currentImageAnchorIdsRef.current.length
+                ? currentImageAnchorIdsRef.current : [publishedTaskTargetElementId], submittedDraftBoardId || '');
+          }
           if (board && publishedTaskTargetElementId) {
             // 任务节点已可见；异步提交返回后的建线仍作为幂等重试。
             linkWorkflowCanvasAssociationsToTaskTarget(
@@ -7304,7 +7334,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           );
           const hasCreatedTasks = createdTaskIds.length > 0;
 
-          if (allStepsFinished && !hasCreatedTasks) {
+          if (allStepsFinished && !hasCreatedTasks && !workflowFailed) {
             // 所有步骤都已完成且没有创建任务，立即删除 WorkZone
             const workZoneId = currentWorkZoneIdRef.current;
             const imageAnchorIds = currentImageAnchorIdsRef.current;
@@ -7334,7 +7364,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
                 // 常规 image anchor 的删除由 useImageGenerationAnchorSync 统一处理。
                 setTimeout(() => {
                   if (workZoneId) {
-                    WorkZoneTransforms.removeWorkZone(board, workZoneId);
+                    WorkZoneTransforms.removeWorkZone(board, workZoneId, { automatic: true });
                     currentWorkZoneIdRef.current = null;
                   }
                   if (imageAnchorIds.length > 0) {
@@ -7385,6 +7415,11 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             applyCurrentImageAnchorPresentationState(submittedBoard, 'failed', {
               error:
                 error instanceof Error ? error.message : '创建图片任务失败',
+            });
+          }
+          if (submittedGenerationNode && submittedBoard && currentWorkZoneIdRef.current) {
+            WorkZoneTransforms.updateWorkflow(submittedBoard, currentWorkZoneIdRef.current, {
+              status: 'failed',
             });
           }
           workflowControl.abortWorkflow();
@@ -7904,7 +7939,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
           (s) => (s.result as { taskId?: string })?.taskId
         );
 
-        if (allStepsFinished && !hasCreatedTasks) {
+        if (allStepsFinished && !hasCreatedTasks && !workflowFailed) {
           // 所有步骤都已完成且没有创建任务，立即删除 WorkZone
           const retryWorkZoneId = currentWorkZoneIdRef.current;
           const retryBoard = SelectionWatcherBoardRef.current;
@@ -7929,7 +7964,7 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
             if (allPostProcessingFinished) {
               // 延迟删除，让用户看到完成状态
               setTimeout(() => {
-                WorkZoneTransforms.removeWorkZone(retryBoard, retryWorkZoneId);
+                WorkZoneTransforms.removeWorkZone(retryBoard, retryWorkZoneId, { automatic: true });
                 currentWorkZoneIdRef.current = null;
               }, 1500);
             }

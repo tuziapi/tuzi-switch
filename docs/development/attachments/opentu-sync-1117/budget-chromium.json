@@ -1,0 +1,73 @@
+{
+  "engine": "chromium",
+  "limit": 1048576,
+  "originalBytes": 4405524,
+  "results": [
+    {
+      "fallback": false,
+      "count": 1,
+      "inputBytes": 4405524,
+      "outputBytes": 734365,
+      "unchanged": true,
+      "images": [
+        [
+          1200,
+          800
+        ]
+      ],
+      "textUnchanged": true
+    },
+    {
+      "fallback": false,
+      "count": 2,
+      "inputBytes": 8810919,
+      "outputBytes": 955997,
+      "unchanged": true,
+      "images": [
+        [
+          960,
+          640
+        ],
+        [
+          1200,
+          800
+        ]
+      ],
+      "textUnchanged": true
+    },
+    {
+      "fallback": true,
+      "count": 1,
+      "inputBytes": 4405524,
+      "outputBytes": 734365,
+      "unchanged": true,
+      "images": [
+        [
+          1200,
+          800
+        ]
+      ],
+      "textUnchanged": true
+    },
+    {
+      "fallback": true,
+      "count": 2,
+      "inputBytes": 8810919,
+      "outputBytes": 955997,
+      "unchanged": true,
+      "images": [
+        [
+          960,
+          640
+        ],
+        [
+          1200,
+          800
+        ]
+      ],
+      "textUnchanged": true
+    }
+  ],
+  "keepOriginalRejected": true,
+  "paidRequests": 0
+}

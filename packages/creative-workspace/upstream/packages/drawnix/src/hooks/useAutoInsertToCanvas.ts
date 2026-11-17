@@ -1258,7 +1258,8 @@ function resolvePendingInsertContext(
   const imageAnchor = findImageGenerationAnchorForTask(board, task);
   let insertionPoint = resolveImageAnchorInsertionPoint({
     anchor: imageAnchor,
-    workzoneExpectedInsertPosition: workzone?.expectedInsertPosition,
+    workzoneExpectedInsertPosition: workzone?.generationOrigin
+      ? workzone.points[0] : workzone?.expectedInsertPosition,
   });
   let targetFrameId: string | undefined;
   let targetFrameDimensions: { width: number; height: number } | undefined;
@@ -3206,6 +3207,10 @@ export function useAutoInsertToCanvas(
 
           const workzone = findWorkZoneForTask(board, event.taskId);
           if (workzone) {
+            if (event.type === 'postProcessingFailed' && workzone.generationOrigin) {
+              WorkZoneTransforms.updateWorkflow(board, workzone.id, { status: 'failed' });
+              return;
+            }
             // 重新检查该 WorkZone 的所有步骤
             const allStepsFinished = workzone.workflow.steps?.every(
               (step) =>
@@ -3231,7 +3236,7 @@ export function useAutoInsertToCanvas(
 
               if (allPostProcessingFinished) {
                 setTimeout(() => {
-                  WorkZoneTransforms.removeWorkZone(board, workzone.id);
+                  WorkZoneTransforms.removeWorkZone(board, workzone.id, { automatic: true });
                 }, 1500);
               }
             }

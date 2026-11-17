@@ -1,3 +1,4 @@
+import { readGenerationOrigin, restoreGenerationDraft } from '../../services/generation-node-lifecycle';
 import { createNativeFailureDetails, getNativeFailureLayout, type FailureRows } from '../shared/NativeGenerationFailureDetails';
 import { getImageFailureDetails } from '../../utils/image-error-details';
 import { RectangleClient, type PlaitBoard } from '@plait/core';
@@ -157,7 +158,7 @@ export class ImageGenerationAnchorGenerator {
     const layout = [
       element.id, rect.x, rect.y, rect.width, rect.height, element.phase, element.batchIndex,
       element.batchTotal || element.requestedCount || element.taskIds.length || 1,
-      element.previewImageUrl, typeof element.progress === 'number',
+      Boolean(readGenerationOrigin(element)), element.previewImageUrl, typeof element.progress === 'number',
     ];
     // Progress arrives from both task/board updates and the display clock.
     // Keep SVG animations and layout intact for these frequent, local changes.
@@ -208,7 +209,10 @@ export class ImageGenerationAnchorGenerator {
         const taskId = element.primaryTaskId || element.taskIds[0];
         window.dispatchEvent(new CustomEvent(IMAGE_GENERATION_ANCHOR_RETRY_EVENT, { detail: { taskId, anchorId: element.id } }));
       });
-      this.appendDesktopActionButton(host, rect.x + 120, rect.y + height - 40, 92, 28, '关闭', 'var(--failure-muted, #68747b)', () => this.dismissAnchor(element.id), true);
+      if (readGenerationOrigin(element)) {
+        this.appendDesktopActionButton(host, rect.x + 120, rect.y + height - 40, 92, 28, '恢复编辑', 'var(--failure-action, #356859)', () => restoreGenerationDraft(this.board, element.id));
+      }
+      this.appendDesktopActionButton(host, rect.x + (readGenerationOrigin(element) ? 224 : 120), rect.y + height - 40, 92, 28, '关闭', 'var(--failure-muted, #68747b)', () => this.dismissAnchor(element.id), true);
       this.onSizeChange?.({ width, height });
       return;
     }

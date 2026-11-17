@@ -1,9 +1,11 @@
+import { generationOriginInput } from '../../../services/generation-node-lifecycle';
 import { LayerDecompositionDialog } from '../../layer-decomposition';
 import { SEEDREAM55_MODEL_ID } from '../../../services/model-adapters/seedream55';
 import { getAssistantAccount } from '../../../services/assistant-account';
 import { resizeCanvasImage } from '../../../services/canvas-operations/resize-canvas-image';
 import Stack from '../../stack';
 import { ImageToolbarContents } from './image-toolbar-contents';
+import { SeedreamContinueButton } from './seedream-continue-button';
 import { GenerationNodeActions } from './generation-node-actions';
 import type { ImageToolMode } from './canvas-image-tools-dialog';
 import { getCanvasBoardBinding, type CanvasBoardBinding } from '../../../services/canvas-operations/canvas-board-ref';
@@ -110,6 +112,7 @@ import {
   PaintBucket,
   Orbit,
   Ungroup,
+  ScanText,
 } from 'lucide-react';
 import { useDrawnix, DialogType } from '../../../hooks/use-drawnix';
 import { useI18n } from '../../../i18n';
@@ -135,6 +138,7 @@ import { splitAndInsertImages } from '../../../utils/image-splitter';
 import {
   LayerDecompositionCorrectionRequiredError,
   startAutomaticLayerDecomposition,
+  getSemanticLayerMetadata,
 } from '../../../services/layer-decomposition';
 import {
   smartDownload,
@@ -244,7 +248,9 @@ const cancelPopupToolbarFrame = (frameId: number) => {
 export const PopupToolbar = () => {
   const board = useBoard();
   // 过滤掉 WorkZone 元素，避免点击 WorkZone 时弹出 popup-toolbar
-  const allSelectedElements = getSelectedElements(board);
+  const allSelectedElements = getSelectedElements(board).map(
+    (selected) => board.children.find((element) => element.id === selected.id) || selected
+  );
   const generationSelection = allSelectedElements.length > 0 &&
     allSelectedElements.every((element) => element.generationNode || element.generationInput);
   const selectedElements = allSelectedElements.filter(
@@ -942,7 +948,7 @@ export const PopupToolbar = () => {
         const record = imageElement as typeof imageElement & {
           generationTaskId?: string;
         };
-        const savedInput = readImageGenerationRecipe(imageElement);
+        const savedInput = readImageGenerationRecipe(imageElement) || generationOriginInput(imageElement);
         const matchedTask = savedInput
           ? undefined
           : (record.generationTaskId
@@ -2097,6 +2103,22 @@ export const PopupToolbar = () => {
                 }}
               />
             )}
+            {selectedElements.length === 1 && getSemanticLayerMetadata(selectedElements[0])?.textRecognition && (
+              <ToolButton className="layer-ocr-to-text" type="icon" visible icon={<ScanText size={16} />}
+                aria-label="转换为可编辑文字" tooltip="近似还原文字与样式，保留原图片层，可撤销"
+                onClick={() => {
+                  const binding = getCanvasBoardBinding();
+                  const sourceId = selectedElements[0].id;
+                  const sourceUrl = selectedElements[0].url;
+                  void import('../../../services/layer-decomposition/text-conversion').then(({ convertLayerToEditableText }) => {
+                    const current = getCanvasBoardBinding();
+                    if (!binding || binding.board !== board || current?.board !== board || current.boardId !== binding.boardId) throw new Error('画板已切换，请重新选择图层');
+                    if (!board.children.some((element) => element.id === sourceId && element.url === sourceUrl)) throw new Error('原图片层已变更，请重新选择');
+                    const count = convertLayerToEditableText(board, sourceId);
+                    MessagePlugin.success(`已转换 ${count} 行可编辑文字；字体与字号为近似还原，可撤销恢复原图层`);
+                  }).catch((error) => MessagePlugin.error(error instanceof Error ? error.message : '文字转换失败'));
+                }} />
+            )}
             {state.hasImageEdit && (['angle'] as const).map((mode) => (
               <ToolButton key={`local-image-${mode}`} className={`local-image-${mode}`} type="icon" visible
                 icon={<Orbit size={16} />}
@@ -2823,6 +2845,19 @@ export const PopupToolbar = () => {
                 }
               }}
             />
+            {selectedElements.length === 1 && isVideoElement(selectedElements[0]) && generationOriginInput(selectedElements[0]) && (
+              <ToolButton type="icon" icon={<Pencil size={15} />} visible={true}
+                tooltip={language === 'zh' ? '调整后生成：恢复原视频输入' : 'Edit original video inputs'}
+                aria-label={language === 'zh' ? '调整后生成' : 'Edit original inputs'}
+                onPointerUp={() => {
+                  const input = generationOriginInput(selectedElements[0]);
+                  if (input) requestAIInputPrefill({
+                    ...resolveRecipeCanvasSources(input, board.children),
+                    boardId: getCanvasBoardBinding()?.boardId || undefined, source: 'canvas-toolbar',
+                  });
+                }} />
+            )}
+            {state.hasRegenerateImage && <SeedreamContinueButton board={board} element={selectedElements[0]} />}
             {state.hasRegenerateImage && (
               <>
               <ToolButton
