@@ -1663,6 +1663,30 @@ function handle(req, res, hostHeader) {
   }
   const hostName = url.hostname.toLowerCase();
   const isMainClaudeHost = /^(claude\.ai|www\.claude\.ai|claude\.com|www\.claude\.com)$/.test(hostName);
+  // A stale renderer or backend preference must not turn unsupported hosted
+  // creation into an empty 200 (or an SSE keep-alive) and imply task acceptance.
+  if (MODE !== "passthrough" && runtime.managed && runtime.strictModels &&
+      (isMainClaudeHost || hostName === "api.anthropic.com") && req.method === "POST" &&
+      /^(?:\/v1\/code\/sessions|\/api\/organizations\/[^/]+\/cowork\/sessions)\/?$/.test(url.pathname)) {
+    req.resume();
+    return json(res, {
+      type: "error",
+      error: {
+        type: "not_supported_error",
+        reason: "local_executor_required",
+        message: runtime.localization
+          ? "当前连接使用本地 Cowork，无法创建云端任务。请退出 Claude 后，从兔子助手重新启动；若仍失败，请检查客户端兼容版本。"
+          : "This connection uses local Cowork and cannot create hosted tasks. Quit Claude and relaunch it from Tuzi Assistant. If the error persists, check the supported client version.",
+      },
+    }, 501);
+  }
+  // The local executor has no hosted sessions. Keep discovery and its watch
+  // on the local API instead of forwarding synthetic identity to the cloud.
+  if (MODE === "mock" && runtime.managed && runtime.strictModels &&
+      (isMainClaudeHost || hostName === "api.anthropic.com") && req.method === "GET" &&
+      /^\/v1\/code\/sessions(?:\/watch)?\/?$/.test(url.pathname)) {
+    return mockApi(req, res, url);
+  }
   if (MODE === "mock" && req.method === "GET" &&
       (isMainClaudeHost || hostName === "api.anthropic.com") &&
       /^\/api\/(?:organizations\/[^/]+\/)?model_selector\/[^/]+\/?$/.test(url.pathname)) {

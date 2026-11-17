@@ -577,6 +577,34 @@ test("strict P0 exposes explicitly enabled capabilities without enabling backgro
   } finally { await stop(instance); }
 });
 
+test("strict managed cloud session creation fails explicitly without invoking the gateway", async () => {
+  const instance = await start({ CLAUDE_LOCAL_STRICT_MODELS: "1", CLAUDE_LOCAL_COWORK: "1" });
+  try {
+    const before = received.length;
+    for (const host of ["claude.ai", "api.anthropic.com"]) {
+      for (const pathname of ["/v1/code/sessions", "/api/organizations/test-org/cowork/sessions/"]) {
+        const result = await request(instance, pathname, {
+          host, body: { message: "synthetic-private-prompt" },
+          extraHeaders: { accept: "text/event-stream, application/json" },
+        });
+        assert.equal(result.status, 501, `${host}${pathname} must not return an empty success or SSE stream`);
+        assert.equal(result.json.error.type, "not_supported_error");
+        assert.equal(result.json.error.reason, "local_executor_required");
+        assert.match(result.json.error.message, /Cowork/);
+        assert.ok(!result.bytes.includes(Buffer.from("synthetic-private-prompt")));
+        assert.equal(result.json.session, undefined);
+        assert.equal(result.json.session_id, undefined);
+      }
+    }
+    assert.equal(received.length, before, "unsupported creation cannot send a model request");
+    for (const host of ["claude.ai", "api.anthropic.com"]) {
+      const list = await request(instance, "/v1/code/sessions/?limit=20", { host });
+      assert.equal(list.status, 200);
+      assert.deepEqual(list.json.sessions, [], "hosted discovery stays local and does not invent sessions");
+    }
+  } finally { await stop(instance); }
+});
+
 test("clean managed runtime uses synthetic bootstrap and configured catalogs without private recordings", async () => {
   for (const pathname of ["/edge-api/bootstrap", "/api/bootstrap", "/api/bootstrap/local/app_start"]) {
     const result = await request(service, pathname, { host: "claude.ai" });
