@@ -42,7 +42,17 @@ function mount(
   });
   const props = {
     providerId: "synthetic-provider",
-    providers: [{ id: "synthetic-provider", name: "Synthetic" }],
+    providers: [
+      {
+        id: "synthetic-provider",
+        name: "Synthetic",
+        meta: {
+          claudeDesktopModelRoutes: {
+            "claude-synthetic": { model: "claude-synthetic" },
+          },
+        },
+      },
+    ],
     onSelectProvider: vi.fn(),
     onAddProvider: vi.fn(),
     ...overrides,
@@ -65,6 +75,22 @@ beforeEach(() => {
   vi.mocked(claudeDesktopLocal.action).mockResolvedValue(stopped);
 });
 describe("Claude Desktop guided setup", () => {
+  it("opens model configuration instead of launching a provider without mappings", async () => {
+    const onEditProvider = vi.fn();
+    mount({
+      providers: [{ id: "synthetic-provider", name: "Empty" }],
+      onEditProvider,
+    });
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "claudeLocal.configureModels",
+      }),
+    );
+    expect(onEditProvider).toHaveBeenCalledWith("synthetic-provider");
+    expect(screen.getByText("claudeLocal.modelsMissingHint")).toBeVisible();
+    expect(screen.queryByText("claudeLocal.launchHint")).toBeNull();
+    expect(claudeDesktopLocal.action).not.toHaveBeenCalled();
+  });
   it("retains provider management in builds without the optional core", async () => {
     vi.mocked(claudeDesktopLocal.status).mockResolvedValue({ enabled: false });
     mount();
@@ -324,7 +350,15 @@ describe("Claude Desktop guided setup", () => {
   it("switches lines through the existing provider action", async () => {
     const { props } = mount({
       providers: [
-        { id: "synthetic-provider", name: "Synthetic" },
+        {
+          id: "synthetic-provider",
+          name: "Synthetic",
+          meta: {
+            claudeDesktopModelRoutes: {
+              "claude-synthetic": { model: "claude-synthetic" },
+            },
+          },
+        },
         { id: "other", name: "Other" },
       ],
     });

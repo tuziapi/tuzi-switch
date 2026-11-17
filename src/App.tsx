@@ -1383,6 +1383,7 @@ function App() {
                           if (providers[id]) void switchProvider(providers[id]);
                         }}
                         onAddProvider={() => setIsAddOpen(true)}
+                        onEditProvider={(id) => { if (providers[id]) setEditingProvider(providers[id]); }}
                       >
                         {providerList}
                       </ClaudeLocalPanel>

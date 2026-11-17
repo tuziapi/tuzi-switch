@@ -14,6 +14,8 @@ import {
   SlidersHorizontal,
   Square,
 } from "lucide-react";
+import type { Provider } from "@/types";
+import { configuredModels } from "@/lib/claudeDesktopModels";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { providersApi } from "@/lib/api/providers";
@@ -24,11 +26,13 @@ import {
 
 interface ClaudeLocalPanelProps {
   providerId?: string;
-  providers?: { id: string; name: string }[];
+  providers?: (Pick<Provider, "id" | "name"> &
+    Partial<Pick<Provider, "meta" | "settingsConfig">>)[];
   providersLoading?: boolean;
   switchingProviderId?: string;
   onSelectProvider?: (id: string) => void;
   onAddProvider?: () => void;
+  onEditProvider?: (id: string) => void;
   children?: ReactNode;
   expandProviders?: boolean;
 }
@@ -40,6 +44,7 @@ export function ClaudeLocalPanel({
   switchingProviderId,
   onSelectProvider,
   onAddProvider,
+  onEditProvider,
   children,
   expandProviders = false,
 }: ClaudeLocalPanelProps) {
@@ -69,6 +74,14 @@ export function ClaudeLocalPanel({
       if (!count) toast.info(t("claudeLocal.importEmpty"));
     },
   });
+  const selectedProvider = providers.find(
+    (provider) => provider.id === providerId,
+  );
+  const models = configuredModels(selectedProvider);
+  const modelsSignature = models.join("\n");
+  useEffect(() => {
+    action.reset();
+  }, [providerId, modelsSignature]);
   if (query.isPending)
     return (
       <div
@@ -116,13 +129,15 @@ export function ClaudeLocalPanel({
     Boolean(switchingProviderId);
   const hasProvider = Boolean(providerId);
   const prepared = Boolean(core?.caReady && core?.supported && core?.version);
-  const stage = !hasProvider
-    ? 0
-    : !prepared || !core?.nodeAvailable
-      ? 1
-      : !core.caTrusted
-        ? 2
-        : 3;
+  const needsModels = hasProvider && models.length === 0;
+  const stage =
+    !hasProvider || needsModels
+      ? 0
+      : !prepared || !core?.nodeAvailable
+        ? 1
+        : !core.caTrusted
+          ? 2
+          : 3;
   const state = status.recoveryRequired
     ? "recovery"
     : core?.connected
@@ -149,20 +164,24 @@ export function ClaudeLocalPanel({
   ].filter(Boolean).length;
   const hint = active
     ? "activeHint"
-    : runtimeMissing
-      ? "runtimeMissingHint"
-      : externalClaude
-        ? "closeClaudeHint"
-        : ["lineHint", "prepareHint", "trustHint", "launchHint"][stage];
+    : needsModels
+      ? "modelsMissingHint"
+      : runtimeMissing
+        ? "runtimeMissingHint"
+        : externalClaude
+          ? "closeClaudeHint"
+          : ["lineHint", "prepareHint", "trustHint", "launchHint"][stage];
   const primaryLabel = active
     ? status.recoveryRequired
       ? "recoverAction"
       : "stopAction"
-    : primary === "launch"
-      ? "launchAction"
-      : primary === "trust"
-        ? "trustAction"
-        : "prepareAction";
+    : needsModels
+      ? "configureModels"
+      : primary === "launch"
+        ? "launchAction"
+        : primary === "trust"
+          ? "trustAction"
+          : "prepareAction";
   const error = action.error || importing.error;
   const progress = Math.min(
     100,
@@ -309,6 +328,25 @@ export function ClaudeLocalPanel({
             </div>
           )}
         </div>
+        {!active && hasProvider && models.length > 0 && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            {t("claudeLocal.modelsConfigured", {
+              count:
+                selectedProvider?.meta?.claudeDesktopModelCatalog?.length ||
+                models.length,
+            })}
+            {onEditProvider && (
+              <Button
+                variant="link"
+                size="sm"
+                disabled={busy}
+                onClick={() => onEditProvider(providerId!)}
+              >
+                {t("claudeLocal.manageModels")}
+              </Button>
+            )}
+          </p>
+        )}
         <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
             {t(`claudeLocal.${hint}`)}
@@ -320,9 +358,15 @@ export function ClaudeLocalPanel({
               disabled={
                 busy ||
                 (!active &&
-                  (!hasProvider || runtimeMissing || Boolean(externalClaude)))
+                  (!hasProvider ||
+                    (needsModels
+                      ? !onEditProvider
+                      : runtimeMissing || Boolean(externalClaude))))
               }
-              onClick={() => action.mutate(primary)}
+              onClick={() => {
+                if (!active && needsModels) onEditProvider?.(providerId!);
+                else action.mutate(primary);
+              }}
             >
               {action.isPending ? (
                 <Loader2

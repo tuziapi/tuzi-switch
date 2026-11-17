@@ -126,7 +126,14 @@ function Fixture() {
         </header>
         <ClaudeLocalPanel
           providerId={provider}
-          providers={lines}
+          providers={lines.map((line) => ({
+            ...line,
+            meta: {
+              claudeDesktopModelRoutes: {
+                "claude-synthetic": { model: "claude-synthetic" },
+              },
+            },
+          }))}
           onSelectProvider={select}
           onAddProvider={imported}
         >

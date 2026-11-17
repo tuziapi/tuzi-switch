@@ -23,3 +23,8 @@ pub async fn fetch_models_for_config(
     )
     .await
 }
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn fetch_claude_desktop_models(base_url: String, api_key: String) -> Result<Vec<FetchedModel>, String> {
+    model_fetch::fetch_desktop_models(&base_url, &api_key).await
+}

@@ -295,8 +295,8 @@
     "upstreamModelLabel": "リクエストモデル",
     "displayNameLabel": "表示名",
     "supports1mLabel": "1M",
-    "directModelListTitle": "Claude Desktop モデルを手動指定（高度・任意）",
-    "directModelListCollapsedHint": "ネイティブ Claude モデルのプロバイダーでは通常不要です。Claude Desktop が /v1/models を自動取得します。",
+    "directModelListTitle": "Claude モデルを手動指定",
+    "directModelListCollapsedHint": "自動取得が使えない場合は、ここでモデルを入力できます。",
     "directModelListHint": "プロバイダーの /v1/models が使えない、または Claude Desktop が認識できる claude-* モデル ID を返さない場合だけ入力してください。1M をオンにするとモデル ID の後ろに [1M] マーカーを書き込みます。",
     "directModelInvalid": "直結モデルは claude-* / anthropic/claude-* のモデル ID を使う必要があります",
     "addModel": "モデルを追加",
@@ -314,7 +314,24 @@
         "active": "Claude Desktop ローカルルーティングは起動中です - {{address}}:{{port}}",
         "inactive": "モデルマッピングや形式変換が必要なプロバイダー向けに Claude Desktop ローカルルーティングを起動します。設定アドレス: {{address}}:{{port}}"
       }
-    }
+    },
+    "catalogTitle": "モデル一覧",
+    "catalogCount": "{{count}} 個を取得済み・最初の 10 個を表示",
+    "catalogAutoHint": "保存時に全モデルを取得し、利用可能な Claude モデルを設定します。",
+    "catalogLoading": "取得中…",
+    "catalogRefresh": "モデルを更新",
+    "catalogSearch": "モデル名で検索",
+    "catalogAll": "すべてのモデル",
+    "catalogClaude": "Claude のみ",
+    "catalogDefault": "既定のモデル",
+    "catalogNoMatches": "該当するモデルはありません",
+    "catalogCollapse": "10 個に戻す",
+    "catalogExpand": "全 {{count}} 個を表示",
+    "catalogScope": "既定のモデルを先頭に、公開日があるモデルは新しい順に表示します。他のモデルは詳細マッピングで設定できます。掲載は全機能の動作確認を意味しません。",
+    "catalogFailed": "モデルを取得できず、保存していません。接続先と Key を確認して再試行するか、モデルを手動で設定して保存してください。",
+    "catalogNoClaude": "設定可能な Claude モデルがありません。起動前に詳細設定で手動マッピングを追加してください。",
+    "catalogManualSave": "手動設定を保存",
+    "catalogAdvanced": "モデルの詳細設定"
   },
   "notifications": {
     "providerAdded": "プロバイダーを追加しました",
@@ -3265,6 +3282,10 @@
     "advanced": "詳細設定",
     "repairResources": "環境を再確認",
     "testingNote": "テスト版 · 各機能を検証中です。公式サブスクリプションの権利は付与されません。",
-    "loadingPanel": "Claude の設定を読み込み中…"
+    "loadingPanel": "Claude の設定を読み込み中…",
+    "modelsMissingHint": "モデルが未設定です。モデルを設定して保存してから起動してください。",
+    "configureModels": "モデルを設定",
+    "modelsConfigured": "{{count}} 個のモデルを取得・設定済み",
+    "manageModels": "モデルを管理"
   }
 }

@@ -299,11 +299,16 @@ pub(crate) fn upstream(
     let routes =
         crate::claude_desktop_config::proxy_model_routes(provider).map_err(|e| e.to_string())?;
     let models: Vec<_> = routes.iter().map(|r| r.route_id.clone()).collect();
-    let default_model = models
-        .iter()
-        .find(|m| m.as_str() == "claude-local-default")
-        .unwrap_or(&models[0])
-        .clone();
+    let selected = provider.settings_config.pointer("/env/ANTHROPIC_MODEL").and_then(|value| value.as_str());
+    let normalize = |model: &str| {
+        let model = model.trim();
+        if model.to_ascii_lowercase().ends_with("[1m]") { model[..model.len()-4].trim_end().to_owned() } else { model.to_owned() }
+    };
+    let default_model = routes.iter()
+        .find(|route| selected.is_some_and(|model| normalize(model) == normalize(&route.upstream_model) || normalize(model) == normalize(&route.route_id)))
+        .map(|route| route.route_id.clone())
+        .or_else(|| models.iter().find(|model| model.as_str() == "claude-local-default").cloned())
+        .unwrap_or_else(|| models[0].clone());
     let small_model = models
         .iter()
         .find(|m| m.contains("haiku"))
@@ -536,6 +541,18 @@ pub async fn claude_local_action(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_catalog_default_model_is_used_in_runtime_including_context_suffix() {
+        let mut provider = crate::provider::Provider::with_id("synthetic".into(), "Synthetic".into(), serde_json::json!({"env":{"ANTHROPIC_MODEL":"claude-z"}}), None);
+        provider.meta = Some(serde_json::from_value(serde_json::json!({"claudeDesktopModelRoutes":{
+            "claude-a":{"model":"claude-a"}, "claude-z":{"model":"claude-z","supports1m":true}
+        }})).unwrap());
+        let mapped = upstream(&provider, 1234, "synthetic-token".into()).unwrap();
+        assert_eq!(mapped.default_model, "claude-z [1M]");
+        let reloaded: crate::provider::Provider = serde_json::from_slice(&serde_json::to_vec(&provider).unwrap()).unwrap();
+        assert_eq!(upstream(&reloaded, 1234, "synthetic-token".into()).unwrap().default_model, "claude-z [1M]");
+    }
+
     #[test]
     fn local_update_reservation_rejects_active_recovery_and_duplicate_install() {
         use std::sync::atomic::{AtomicBool, Ordering};
