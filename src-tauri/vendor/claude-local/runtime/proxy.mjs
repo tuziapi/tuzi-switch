@@ -165,7 +165,14 @@ const ACCOUNT = {
     "claude_code",
     "cowork",
   ],
-  settings: { ...(runtime.localization ? { locale: "zh-Hans" } : {}), theme: "system" },
+  settings: {
+    ...(runtime.localization ? { locale: "zh-Hans" } : {}),
+    theme: "system",
+    // The 5.x client treats an absent/null preference as cloud Cowork. Our
+    // managed gateway has no hosted session worker: use its native local
+    // session implementation, including the client's normal permission checks.
+    ...(runtime.managed && runtime.strictModels ? { dramatic_shrimp_enabled: false } : {}),
+  },
 };
 
 const ORG = {

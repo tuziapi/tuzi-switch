@@ -565,6 +565,10 @@ test("strict P0 exposes explicitly enabled capabilities without enabling backgro
     const boot = (await request(instance, "/edge-api/bootstrap", { host: "claude.ai" })).json;
     assert.ok(boot.account.capabilities.includes("cowork"));
     assert.ok(boot.account.capabilities.includes("computer_use"));
+    assert.equal(boot.account.settings.dramatic_shrimp_enabled, false, "managed Cowork uses the native local executor instead of an unavailable cloud worker");
+    assert.equal(boot.user.settings.dramatic_shrimp_enabled, false);
+    const profile = (await request(instance, "/api/account_profile", { host: "claude.ai" })).json;
+    assert.equal(profile.account.settings.dramatic_shrimp_enabled, false, "profile refresh must preserve the local routing preference");
     assert.ok(boot.system_prompts.cowork_system_prompt.value.prompt.trim().length > 0);
     const prompts = await request(instance, `/api/bootstrap/${boot.organization.uuid}/system_prompts`, { host: "claude.ai" });
     assert.deepEqual(prompts.json, boot.system_prompts);
