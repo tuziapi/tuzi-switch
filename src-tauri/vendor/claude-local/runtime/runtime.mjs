@@ -1,6 +1,54 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
+import { gunzip, inflate, brotliDecompress } from "node:zlib";
+
+const decompressors = { gzip: promisify(gunzip), deflate: promisify(inflate), br: promisify(brotliDecompress) };
+const bodyError = (message, statusCode = 400) => Object.assign(new Error(message), { statusCode });
+
+// Windows stat synthesizes POSIX mode bits; privacy there is enforced by the
+// host-owned directory ACL, not by testing 0600 on the receipt file.
+export function isPrivateFile(metadata, { platform = process.platform, uid = process.getuid?.() } = {}) {
+  if (!metadata.isFile() || metadata.isSymbolicLink()) return false;
+  return platform === "win32" || ((metadata.mode & 0o077) === 0 && (uid === undefined || metadata.uid === uid));
+}
+
+export async function decodeJsonBody(raw, encoding = "identity", limit = 16 * 1024 * 1024) {
+  const kind = String(encoding).trim().toLowerCase();
+  if (!["", "identity", "gzip", "deflate", "br"].includes(kind)) throw bodyError("Unsupported content encoding", 415);
+  let bytes = raw;
+  if (decompressors[kind]) {
+    try { bytes = await decompressors[kind](raw, { maxOutputLength: limit }); }
+    catch (error) { throw bodyError(error.code === "ERR_BUFFER_TOO_LARGE" ? "Request body too large" : "Invalid compressed request", error.code === "ERR_BUFFER_TOO_LARGE" ? 413 : 400); }
+  }
+  if (bytes.length > limit) throw bodyError("Request body too large", 413);
+  try {
+    const value = JSON.parse(bytes.toString("utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    return value;
+  } catch { throw bodyError("Invalid JSON request"); }
+}
+
+export function readJsonBody(req, limit = 16 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    let failed = false;
+    const chunks = [];
+    const fail = (error) => { if (!failed) { failed = true; chunks.length = 0; reject(error); } };
+    req.on("data", (chunk) => {
+      if (failed) return;
+      size += chunk.length;
+      if (size > limit) return fail(bodyError("Request body too large", 413));
+      chunks.push(chunk);
+    });
+    req.once("aborted", () => fail(bodyError("Request aborted")));
+    req.once("error", () => fail(bodyError("Request failed")));
+    req.once("end", () => {
+      if (!failed) resolve(decodeJsonBody(Buffer.concat(chunks), req.headers["content-encoding"], limit));
+    });
+  });
+}
 
 const MAX_STATE_BYTES = 32 * 1024 * 1024;
 const MAX_TEXT = 1024 * 1024;

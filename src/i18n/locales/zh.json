@@ -3212,7 +3212,7 @@
     "prepareVoice": "下载语音模型（约 240 MB）",
     "capabilityHint": "扩展功能需停止后设置。语音在本机转写；首次使用麦克风或电脑控制需系统授权。新版聊天与 Cowork 首次安装建议预留 20 GB 空间。",
     "title": "Claude 本地兼容 · P0 实验",
-    "description": "使用所选供应商的 API 接入独立 Claude 副本。Code 对话、文件任务和主要界面汉化已验证；聊天、语音入口及电脑控制仍在实机验收，不代表获得官方订阅权益。",
+    "description": "使用所选供应商的 API 接入独立 Claude 数据目录。各平台功能正在逐项验收；本地兼容不代表获得官方订阅权益。",
     "requirements": "Claude {{version}} · 证书{{certificate}} · Node.js {{node}}",
     "trusted": "已信任",
     "untrusted": "未信任",
@@ -3228,7 +3228,9 @@
     "launch": "启动兼容模式",
     "stop": "停止 / 恢复",
     "untrust": "移除证书信任",
-    "stopHint": "证书信任包含 SSL 与 VM 所需的 Basic X.509 用途，需系统授权。停止前请退出 Claude；运行时禁止关闭网关。实验包和独立 Claude 已隔离更新。",
-    "statusError": "无法读取兼容服务状态，请重试。"
+    "stopHint": "请先退出 Claude，再停止兼容服务。Mac 使用固定版本副本；Windows 使用已安装的官方客户端，升级到未适配版本后将暂停兼容启动。证书仅在主动点击信任后配置。",
+    "statusError": "无法读取兼容服务状态，请重试。",
+    "unsupportedFeature": "此平台暂不支持",
+    "linuxHint": "Linux 支持范围为聊天、Code、汉化和 Cowork；官方暂不支持听写和电脑控制。Cowork 需要 KVM 权限、QEMU、至少 8 GB 内存及约 25 GB 可用空间。"
   }
 }

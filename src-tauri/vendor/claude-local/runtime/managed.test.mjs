@@ -147,7 +147,7 @@ async function start(extra = {}, runtimeDir = path.join(root, "runtime")) {
   }
   child.kill("SIGTERM");
   await closed;
-  throw new Error("Managed fixture did not become ready");
+  throw new Error(`Managed fixture did not become ready: ${output}`);
 }
 
 async function stop(instance, signal = false) {
@@ -155,7 +155,9 @@ async function stop(instance, signal = false) {
   if (signal) instance.child.kill("SIGTERM");
   else instance.child.stdin.end();
   const result = await Promise.race([instance.closed, delay(5000).then(() => { throw new Error("Managed fixture did not exit"); })]);
-  assert.equal(result[0], 0);
+  // Windows SIGTERM is forced termination; graceful persistence is exercised
+  // separately by stdin closure. The subsequent request must fail on all OSes.
+  if (!(signal && process.platform === "win32")) assert.equal(result[0], 0);
 }
 
 const header = (conv) => ld(1, Buffer.concat([ld(1, Buffer.concat([ld(1, "test-session"), vi(2, 1)])), ld(2, conv)]));
@@ -225,7 +227,9 @@ test("managed readiness reports an assigned port and health polling is not clien
   assert.equal(first.json.lastClientAt, null);
   assert.equal(second.json.lastClientAt, null);
   assert.equal(Object.hasOwn(first.json, "token"), false);
-  assert.equal(fs.statSync(path.join(root, "ready.json")).mode & 0o777, 0o600);
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(path.join(root, "ready.json")).mode & 0o777, 0o600);
+  }
   await request(service, "/api/bootstrap", { host: "claude.ai" });
   const active = await request(service, "/__codex_claude_local/health");
   assert.equal(typeof active.json.lastClientAt, "string");
@@ -771,11 +775,17 @@ test("RPC sends preserve model choice, switching, complete history and restart s
   const saved = JSON.parse(fs.readFileSync(path.join(root, "state.json"), "utf8"));
   assert.equal(saved.conversations[0].turns[0].model, modelIds[1]);
   assert.equal(saved.conversations[0].model, modelIds[2]);
-  assert.equal(fs.statSync(path.join(root, "state.json")).mode & 0o777, 0o600);
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(path.join(root, "state.json")).mode & 0o777, 0o600);
+  }
   service = await start();
   await rpc("SendAndSettle", send(conv, "third test"));
   assert.equal(received.at(-1).body.model, modelIds[2]);
   assert.equal(received.at(-1).body.messages.length, 5);
+  const history = await request(service, `/api/organizations/local/chat_conversations/${conv}`, { host: "claude.ai" });
+  assert.deepEqual(history.json.chat_messages.map((message) => message.text), [
+    "first test", "gateway reply", "second test", "gateway reply", "third test", "gateway reply",
+  ]);
   const prefs = await request(service, "/api/organizations/local/notification/preferences", { host: "claude.ai" });
   assert.equal(prefs.json.preferences.feature_preference.complete.enable_email, false);
   assert.equal(service.output().includes("first test"), false);

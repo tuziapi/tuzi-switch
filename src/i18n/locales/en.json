@@ -3212,7 +3212,7 @@
     "prepareVoice": "Download speech model (~240 MB)",
     "capabilityHint": "Stop the session before changing features. Speech is transcribed locally. Microphone and computer use require system permission. Reserve 20 GB for the first Chat / Cowork setup.",
     "title": "Claude Local · P0 experiment",
-    "description": "Connect a private Claude copy through the selected API provider. Code conversations, file tasks, and main-screen localization are verified. Chat, the dictation entry, and computer use are still undergoing device testing. This does not grant an official subscription.",
+    "description": "Use the selected provider API with a separate Claude data directory. Features are being verified on each platform. Local compatibility does not grant an official subscription.",
     "requirements": "Claude {{version}} · Certificate {{certificate}} · Node.js {{node}}",
     "trusted": "trusted",
     "untrusted": "untrusted",
@@ -3228,7 +3228,9 @@
     "launch": "Launch local mode",
     "stop": "Stop / recover",
     "untrust": "Remove certificate trust",
-    "stopHint": "Certificate trust covers SSL and Basic X.509 for the VM and requires system authorization. Quit Claude before stopping. Keep the gateway running during a session. Updates are isolated for this experiment and its private Claude copy.",
-    "statusError": "Could not read local service status. Please retry."
+    "stopHint": "Quit Claude before stopping the local service. Mac uses a pinned copy; Windows uses the installed official client and blocks unverified versions after updates. Certificate trust is configured only after an explicit Trust action.",
+    "statusError": "Could not read local service status. Please retry.",
+    "unsupportedFeature": "Unavailable on this platform",
+    "linuxHint": "Linux scope: Chat, Code, localization and Cowork. Official dictation and computer use are unavailable. Cowork requires KVM access, QEMU, at least 8 GB RAM and about 25 GB free space."
   }
 }

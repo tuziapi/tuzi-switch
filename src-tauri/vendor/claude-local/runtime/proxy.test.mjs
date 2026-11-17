@@ -11,7 +11,7 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import tls from "node:tls";
 import { fileURLToPath } from "node:url";
-import { gzipSync, gunzipSync } from "node:zlib";
+import { gzipSync, gunzipSync, deflateSync, brotliCompressSync } from "node:zlib";
 import { startupAssets } from "./scripts/patch-dictation-start.mjs";
 import { facadeFixture, recorderFixture } from "./scripts/fixtures/dictation-start.mjs";
 
@@ -41,7 +41,7 @@ async function listen(server) {
   return server.address().port;
 }
 
-async function response(req, body) {
+async function response(req, body, text = false) {
   const result = new Promise((resolve, reject) => {
     req.on("error", reject);
     req.on("response", (res) => {
@@ -51,7 +51,7 @@ async function response(req, body) {
       res.on("end", () => resolve({
         status: res.statusCode,
         headers: res.headers,
-        body: JSON.parse(Buffer.concat(chunks).toString("utf8")),
+        body: text ? Buffer.concat(chunks).toString("utf8") : JSON.parse(Buffer.concat(chunks).toString("utf8")),
       }));
     });
   });
@@ -59,11 +59,12 @@ async function response(req, body) {
   return result;
 }
 
-async function request(pathname, { host, body, method = body === undefined ? "GET" : "POST", beforeBody } = {}) {
-  const raw = body === undefined ? undefined : JSON.stringify(body);
+async function request(pathname, { host, body, rawBody, encoding, text = false, method = body === undefined && rawBody === undefined ? "GET" : "POST", beforeBody } = {}) {
+  const raw = rawBody ?? (body === undefined ? undefined : JSON.stringify(body));
   const headers = raw === undefined ? {} : {
     "content-type": "application/json",
     "content-length": Buffer.byteLength(raw),
+    ...(encoding ? { "content-encoding": encoding } : {}),
   };
   const send = async (req) => {
     if (beforeBody) {
@@ -73,7 +74,7 @@ async function request(pathname, { host, body, method = body === undefined ? "GE
       await ready;
       await beforeBody();
     }
-    return response(req, raw);
+    return response(req, raw, text);
   };
   if (!host) {
     return send(http.request({
@@ -301,6 +302,11 @@ before(async () => {
       path: req.url,
       body: JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"),
     });
+    if (gatewayRequests.at(-1).body.stream === true) {
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      res.end('data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"回复成功"}}\n\ndata: {"type":"message_stop"}\n\n');
+      return;
+    }
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ type: "message", content: [{ type: "text", text: "ok" }] }));
   });
@@ -510,7 +516,9 @@ test("Desktop receives the native Computer Use rollout without enabling permissi
   assert.equal(result.body.features["1291166712"].on, true);
   assert.equal(result.body.features["1291166712"].off, false);
   assert.equal(result.body.features["1291166712"].source, "force");
-  assert.deepEqual(Object.keys(result.body.features), ["1291166712"]);
+  assert.equal(result.body.features["40173473"].value, true);
+  assert.equal(result.body.features["40173473"].off, false);
+  assert.deepEqual(Object.keys(result.body.features).sort(), ["40173473", "1291166712"].sort());
   assert.equal(result.body.chicagoEnabled, undefined);
 });
 
@@ -556,6 +564,61 @@ test("billing settings receive an empty invoice page without undefined rows", as
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, { invoices: [], next_page: null });
   assert.deepEqual([result.body].flatMap((page) => page.invoices), []);
+});
+
+test("compressed Chat completion reaches the gateway with intact prompts and streams replies over TLS", async () => {
+  for (const [encoding, encode] of [["gzip", gzipSync], ["deflate", deflateSync], ["br", brotliCompressSync]]) {
+    const prompt = `跨平台正文 ${encoding} 🐰`;
+    const conversation = crypto.randomUUID();
+    const result = await request(`/api/organizations/local/chat_conversations/${conversation}/completion`, {
+      host: "claude.ai", encoding, text: true,
+      rawBody: encode(Buffer.from(JSON.stringify({ prompt }))),
+    });
+    assert.equal(result.status, 200);
+    assert.match(result.body, /回复成功/);
+    assert.match(result.body, /message_stop/);
+    assert.equal(gatewayRequests.at(-1).body.messages.at(-1).content, prompt);
+    const history = await request(`/api/organizations/local/chat_conversations/${conversation}`, { host: "claude.ai" });
+    assert.equal(history.body.chat_messages.at(-1).text, "回复成功");
+  }
+});
+
+test("malformed compressed Chat requests fail before consuming model tokens", async () => {
+  const count = gatewayRequests.length;
+  for (const [encoding, rawBody, expected] of [["gzip", Buffer.from("bad"), 400], ["zstd", Buffer.from("{}"), 415]]) {
+    const result = await request(`/api/organizations/local/chat_conversations/${crypto.randomUUID()}/completion`, {
+      host: "claude.ai", encoding, rawBody,
+    });
+    assert.equal(result.status, expected);
+  }
+  assert.equal(gatewayRequests.length, count);
+});
+
+test("REST conversation rename and delete persist without recreating deleted history", async () => {
+  const created = await request("/api/organizations/local/chat_conversations", { host: "claude.ai", body: {} });
+  assert.equal(created.status, 201);
+  const endpoint = `/api/organizations/local/chat_conversations/${created.body.uuid}`;
+  const renamed = await request(endpoint, {
+    host: "claude.ai", method: "PATCH", encoding: "gzip",
+    rawBody: gzipSync(Buffer.from(JSON.stringify({ name: "跨平台测试会话" }))),
+  });
+  assert.equal(renamed.status, 200);
+  assert.equal((await request(endpoint, { host: "claude.ai" })).body.name, "跨平台测试会话");
+  assert.equal((await request(endpoint, { host: "claude.ai", method: "DELETE" })).status, 200);
+  assert.equal((await request(endpoint, { host: "claude.ai" })).status, 404);
+  const list = await request("/api/organizations/local/chat_conversations", { host: "claude.ai" });
+  assert.equal(list.body.some((item) => item.uuid === created.body.uuid), false);
+});
+
+test("current clients receive typed policy, directory and activation responses", async () => {
+  for (const host of [undefined, "api.anthropic.com", "claude.ai"]) {
+    const result = await request("/api/claude_code/policy_limits", { host });
+    assert.deepEqual(result.body.restrictions, {});
+  }
+  const servers = await request("/api/directory/servers", { host: "claude.ai" });
+  assert.deepEqual(servers.body, { servers: [], next_cursor: null });
+  const tasks = await request("/api/organizations/local/activation/cowork/tasks", { host: "claude.ai" });
+  assert.deepEqual(tasks.body, { tasks: [] });
 });
 
 test("Artifacts receives a concrete artifact list and count", async () => {

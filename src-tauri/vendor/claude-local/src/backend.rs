@@ -22,6 +22,10 @@ const HEALTH_PATH: &str = "/__codex_claude_local/health";
 const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 const START_TIMEOUT: Duration = Duration::from_secs(12);
 static OPERATION: Mutex<()> = Mutex::new(());
+#[cfg(any(target_os = "linux", all(test, unix)))]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+#[path = "linux_ca.rs"]
+mod linux_ca;
 
 const ASSETS: &[(&str, &[u8])] = &[
     (
@@ -174,9 +178,9 @@ fn home_dir() -> PathBuf {
         .unwrap_or_default()
 }
 
-/// 原版 Claude 本地模式支持的平台：macOS 与 Windows。
+/// Desktop adapters; platform support is separate from end-to-end acceptance.
 fn platform_supported() -> bool {
-    cfg!(any(target_os = "macos", target_os = "windows"))
+    cfg!(any(target_os = "macos", target_os = "windows", target_os = "linux"))
 }
 
 /// Windows 上解析 Claude.exe 要走 PowerShell 查 Appx 包，冷启动很慢（status 每 3 秒
@@ -204,7 +208,12 @@ fn source_app() -> PathBuf {
     resolved
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
+fn source_app() -> PathBuf {
+    crate::host::isolated_app_path().unwrap_or_else(|| PathBuf::from("/usr/lib/claude-desktop/claude-desktop"))
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 fn source_app() -> PathBuf {
     if let Some(path) = crate::host::isolated_app_path() { return path; }
     let system = PathBuf::from("/Applications/Claude.app");
@@ -216,7 +225,7 @@ fn source_app() -> PathBuf {
 }
 
 fn executable(source: &Path) -> PathBuf {
-    if cfg!(windows) {
+    if cfg!(any(windows, target_os = "linux")) {
         source.to_path_buf()
     } else {
         source.join("Contents/MacOS/Claude")
@@ -225,7 +234,7 @@ fn executable(source: &Path) -> PathBuf {
 
 /// 官方应用自带的页面资源目录：mac 在 bundle 里，Windows 在 exe 旁边的 `resources/`。
 fn desktop_resources(source: &Path) -> PathBuf {
-    if cfg!(windows) {
+    if cfg!(any(windows, target_os = "linux")) {
         source
             .parent()
             .map(|dir| dir.join("resources"))
@@ -245,16 +254,63 @@ fn source_supported(source: &Path) -> bool {
     }
     #[cfg(not(windows))]
     {
-        cfg!(target_os = "macos") && executable(source).is_file()
+        cfg!(any(target_os = "macos", target_os = "linux")) && executable(source).is_file()
     }
 }
 
 pub fn private_dir(path: &Path) -> Result<()> {
+    if let Ok(metadata) = fs::symlink_metadata(path) {
+        ensure!(!metadata.file_type().is_symlink(), "Private directory cannot be a symbolic link");
+    }
     fs::create_dir_all(path)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        ensure!(fs::symlink_metadata(path)?.file_attributes() & 0x400 == 0,
+            "Private directory cannot be a reparse point");
+        // Pass paths as data, never interpolate them into PowerShell source.
+        // Replace inherited permissions with current-user and SYSTEM access.
+        // Child state/receipt files inherit this ACL, since Windows chmod does
+        // not implement Unix 0600/0700 semantics.
+        let script = r#"$ErrorActionPreference = 'Stop'
+$sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$acl = New-Object System.Security.AccessControl.DirectorySecurity
+$acl.SetOwner($sid)
+$acl.SetAccessRuleProtection($true, $false)
+foreach ($principal in @($sid, [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18'))) {
+    $rule = [System.Security.AccessControl.FileSystemAccessRule]::new($principal, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+    $acl.AddAccessRule($rule)
+}
+Set-Acl -LiteralPath $env:TUZI_CLAUDE_PRIVATE_DIR -AclObject $acl
+$actual = Get-Acl -LiteralPath $env:TUZI_CLAUDE_PRIVATE_DIR
+if (-not $actual.AreAccessRulesProtected -or $actual.GetOwner([System.Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { throw 'Private directory ACL verification failed' }
+foreach ($rule in $actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) {
+    if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Value -notin @($sid.Value, 'S-1-5-18')) { throw 'Unexpected private directory access' }
+}
+"#;
+        let mut command = hidden_command("powershell.exe");
+        command.args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .env("TUZI_CLAUDE_PRIVATE_DIR", path)
+            .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        let mut child = command.spawn().context("Cannot set private directory permissions")?;
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if let Some(status) = child.try_wait()? {
+                ensure!(status.success(), "Cannot secure private directory permissions");
+                break;
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                bail!("Private directory permission check timed out");
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
     }
     Ok(())
 }
@@ -908,8 +964,12 @@ fn is_desktop_claude_image(exe_file: &str, path: Option<&Path>) -> bool {
 fn claude_processes() -> Result<String> {
     #[cfg(target_os = "macos")]
     {
+        let (success, bytes) = probe(Command::new("/usr/bin/id").arg("-u"), PROBE_TIMEOUT)?;
+        let uid = String::from_utf8_lossy(&bytes).trim().parse::<u32>();
+        ensure!(success && uid.is_ok(), "无法检测当前用户的 Claude 进程");
+        let uid = uid?.to_string();
         let (success, bytes) = probe(
-            Command::new("/usr/bin/pgrep").args(["-fl", "/Contents/MacOS/Claude( |$)"]),
+            Command::new("/usr/bin/pgrep").args(["-U", &uid, "-fl", "/Contents/MacOS/Claude( |$)"]),
             PROBE_TIMEOUT,
         )?;
         return Ok(if success {
@@ -922,9 +982,13 @@ fn claude_processes() -> Result<String> {
     {
         // 与 pgrep -fl 同一形状：`{pid} {command_line}`，pids_on_proxy/use_proxy 原样可用。
         let mut listing = String::new();
+        let own_session = crate::winproc::process_session_id(std::process::id());
         for info in crate::winproc::enumerate_processes() {
             if !is_desktop_claude_image(&info.exe_file, info.executable_path.as_deref()) {
                 continue;
+            }
+            if let (Some(own), Some(other)) = (own_session, crate::winproc::process_session_id(info.process_id)) {
+                if own != other { continue; }
             }
             let command_line = crate::winproc::process_command_line(info.process_id)
                 .unwrap_or_default();
@@ -932,7 +996,23 @@ fn claude_processes() -> Result<String> {
         }
         return Ok(listing);
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let uid = fs::metadata("/proc/self")?.uid();
+        let mut listing = String::new();
+        for entry in fs::read_dir("/proc")?.flatten() {
+            let Some(pid) = entry.file_name().to_str().and_then(|name| name.parse::<u32>().ok()) else { continue };
+            if !entry.metadata().is_ok_and(|metadata| metadata.uid() == uid) { continue; }
+            let Ok(bytes) = fs::read(entry.path().join("cmdline")) else { continue };
+            let args = bytes.split(|byte| *byte == 0).collect::<Vec<_>>();
+            if fs::read_link(entry.path().join("exe")).ok().as_deref() != Some(Path::new("/usr/lib/claude-desktop/claude-desktop")) { continue; }
+            let command = args.iter().map(|arg| String::from_utf8_lossy(arg)).collect::<Vec<_>>().join(" ");
+            listing.push_str(&format!("{pid} {command}\n"));
+        }
+        return Ok(listing);
+    }
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     Ok(String::new())
 }
 
@@ -979,7 +1059,12 @@ fn version(source: &Path) -> String {
     resolved
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(target_os = "linux")]
+fn version(source: &Path) -> String {
+    crate::desktop::app_version(source, "", Instant::now() + PROBE_TIMEOUT).unwrap_or_default()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 fn version(_source: &Path) -> String {
     String::new()
 }
@@ -993,7 +1078,7 @@ fn ca_ready(root: &Path) -> bool {
 }
 
 /// CA 证书的 SHA-1 指纹（大写十六进制、无冒号）：certutil 按它定位信任条目。
-#[cfg(any(windows, test))]
+#[cfg(any(windows, target_os = "linux", test))]
 fn ca_thumbprint(pem: &[u8]) -> Option<String> {
     let text = std::str::from_utf8(pem).ok()?;
     let begin = "-----BEGIN CERTIFICATE-----";
@@ -1034,7 +1119,9 @@ fn ca_trusted(root: &Path) -> bool {
         )
         .is_ok_and(|(success, _)| success);
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(target_os = "linux")]
+    { return linux_ca::trusted(root); }
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     false
 }
 
@@ -1135,11 +1222,13 @@ fn generate_ca(ca: &Path, ca_name: &str) -> Result<()> {
 fn trust_ca(root: &Path) -> Result<()> {
     ensure!(
         platform_supported(),
-        "本地证书信任目前仅支持 macOS 和 Windows"
+        "本地证书信任目前仅支持 macOS、Windows 和 Linux"
     );
     if ca_trusted(root) {
         return Ok(());
     }
+    #[cfg(target_os = "linux")]
+    { return linux_ca::trust(root); }
     #[cfg(target_os = "macos")]
     {
         let mut command = Command::new("/usr/bin/security");
@@ -1194,12 +1283,14 @@ fn assets_digest() -> &'static str {
 fn untrust_ca(root: &Path) -> Result<()> {
     ensure!(
         platform_supported(),
-        "本地证书信任目前仅支持 macOS 和 Windows"
+        "本地证书信任目前仅支持 macOS、Windows 和 Linux"
     );
     let cert = root.join("ca/ca.pem");
     if !cert.is_file() {
         return Ok(());
     }
+    #[cfg(target_os = "linux")]
+    { return linux_ca::untrust(root); }
     #[cfg(target_os = "macos")]
     {
         let _ = Command::new("/usr/bin/security")
@@ -2287,7 +2378,7 @@ pub fn serve_headless() -> Result<u16> {
 pub fn perform(action: &str) -> Result<ClaudeLocalResult> {
     ensure!(
         platform_supported(),
-        "原版 Claude 本地模式目前仅支持 macOS 和 Windows"
+        "原版 Claude 本地模式目前仅支持 macOS、Windows 和 Linux"
     );
     ensure!(
         ["launch", "stop", "trust", "untrust", "prepare", "sync_sessions"].contains(&action),

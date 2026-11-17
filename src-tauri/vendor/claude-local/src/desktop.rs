@@ -101,6 +101,39 @@ pub fn source_app(deadline: Instant) -> Result<PathBuf> {
     Ok(local.join(r"Programs\Claude\Claude.exe"))
 }
 
+/// Resolve only a registered, trusted official MSIX. Keeping its installed path
+/// preserves the package identity and Cowork service; this never copies or repairs it.
+#[cfg(any(target_os = "windows", test))]
+pub fn verified_windows_app(expected_version: &str, deadline: Instant) -> Result<PathBuf> {
+    let script = r#"$ErrorActionPreference = 'Stop'
+$families = @('Claude_pzs8sxrjxfjjc', 'AnthropicPBC.Claude_fnn82j28hfe8t')
+$packages = @(Get-AppxPackage -Name Claude; Get-AppxPackage -Name AnthropicPBC.Claude) | Where-Object { $_.PackageFamilyName -in $families -and $_.Status -eq 'Ok' }
+foreach ($package in $packages) {
+    $exe = Join-Path $package.InstallLocation 'app\Claude.exe'
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { continue }
+    $item = Get-Item -LiteralPath $exe
+    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+    $versions = @($env:TUZI_CLAUDE_EXPECTED_VERSION, ($env:TUZI_CLAUDE_EXPECTED_VERSION + '.0'))
+    if ($item.VersionInfo.ProductVersion -notin $versions -or $package.Version.ToString() -notin $versions) { continue }
+    $signature = Get-AuthenticodeSignature -LiteralPath $exe
+    if ($signature.Status -ne 'Valid') { continue }
+    [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+    @{path=$item.FullName; version=$item.VersionInfo.ProductVersion} | ConvertTo-Json -Compress
+    exit 0
+}
+throw 'No supported official signed Claude package. Install the supported version with the official installer; do not reset existing app data.'
+"#;
+    let output = probe_output(Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .env("TUZI_CLAUDE_EXPECTED_VERSION", expected_version), deadline)?;
+    ensure!(output.status.success(), "未找到版本匹配且签名有效的官方 Claude MSIX；请通过官方安装器检查安装，不要重置个人数据");
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .context("Claude 应用验证返回了无效结果")?;
+    let path = PathBuf::from(value["path"].as_str().context("Claude 应用验证缺少路径")?);
+    ensure!(is_claude_msix_path(&path) && path.is_file(), "Claude 应用验证返回了异常路径");
+    Ok(path)
+}
+
 #[cfg(any(target_os = "windows", test))]
 fn claude_package_locations(bytes: &[u8]) -> Result<Vec<String>> {
     // PowerShell 对零、一、多条记录分别输出空白、对象、数组。
@@ -162,7 +195,28 @@ pub fn is_claude_msix_path(path: &Path) -> bool {
             || (tail.len() == 2 && tail[1].eq_ignore_ascii_case("claude-desktop.exe")))
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(target_os = "linux")]
+pub fn source_app(_deadline: Instant) -> Result<PathBuf> {
+    Ok(PathBuf::from("/usr/lib/claude-desktop/claude-desktop"))
+}
+
+#[cfg(target_os = "linux")]
+pub fn verified_linux_app(expected_version: &str, deadline: Instant) -> Result<PathBuf> {
+    use std::os::unix::fs::MetadataExt;
+    let app = source_app(deadline)?;
+    ensure!(app_version(&app, "", deadline)? == expected_version, "请安装已适配版本的官方 Claude Debian 软件包");
+    // Keep the official installed location: the package's AppArmor userns
+    // profile is bound to this path. Copying it would break Chromium sandboxing.
+    for path in [app.clone(), app.parent().unwrap().join("resources/app.asar")] {
+        let metadata = fs::symlink_metadata(&path).context("Claude 官方安装文件缺失")?;
+        ensure!(metadata.is_file() && !metadata.file_type().is_symlink()
+            && metadata.uid() == 0 && metadata.mode() & 0o022 == 0,
+            "Claude 软件包文件必须由系统安装并归 root 所有，且不可由普通用户修改");
+    }
+    Ok(app)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub fn source_app(_deadline: Instant) -> Result<PathBuf> {
     Ok(PathBuf::from("Claude.exe"))
 }
@@ -192,7 +246,19 @@ pub fn app_version(app: &Path, _key: &str, deadline: Instant) -> Result<String> 
     Ok(if output.status.success() { String::from_utf8_lossy(&output.stdout).trim().to_string() } else { String::new() })
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(target_os = "linux")]
+pub fn app_version(app: &Path, _key: &str, deadline: Instant) -> Result<String> {
+    if app != Path::new("/usr/lib/claude-desktop/claude-desktop") || !app.is_file() { return Ok(String::new()); }
+    let output = probe_output(Command::new("/usr/bin/dpkg-query")
+        .args(["-W", "-f=${Status}\n${Version}", "claude-desktop"]), deadline)?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut lines = text.lines();
+    Ok(if output.status.success() && lines.next() == Some("install ok installed") {
+        lines.next().unwrap_or_default().trim().to_string()
+    } else { String::new() })
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub fn app_version(_app: &Path, _key: &str, _deadline: Instant) -> Result<String> { Ok(String::new()) }
 
 #[cfg(test)]

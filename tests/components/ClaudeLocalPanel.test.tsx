@@ -41,6 +41,35 @@ beforeEach(() => {
   vi.mocked(claudeDesktopLocal.status).mockResolvedValue(stopped);
 });
 describe("Claude local experiment", () => {
+  it("disables unavailable Linux features and does not offer a speech download", async () => {
+    vi.mocked(claudeDesktopLocal.status).mockResolvedValue({
+      ...stopped,
+      capabilities: {
+        platform: "linux",
+        voiceInput: false,
+        computerUse: false,
+        cowork: true,
+      },
+      options: { voiceInput: true, computerUse: true, cowork: false },
+    });
+    mount();
+    const voice = await screen.findByRole("checkbox", {
+      name: /claudeLocal.voice/,
+    });
+    expect(voice).toBeDisabled();
+    expect(voice).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: /claudeLocal.computer/ }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("checkbox", { name: "claudeLocal.cowork" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "claudeLocal.prepareVoice" }),
+    ).toBeNull();
+    expect(screen.getByText("claudeLocal.linuxHint")).toBeVisible();
+    expect(claudeDesktopLocal.action).not.toHaveBeenCalled();
+  });
   it("stays hidden in default builds without invoking mutations", async () => {
     vi.mocked(claudeDesktopLocal.status).mockResolvedValue({ enabled: false });
     mount();

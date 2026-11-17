@@ -25,7 +25,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createConversationService } from "./conversation-service.mjs";
 import { isPatchedStartupAsset, startupAssets } from "./scripts/patch-dictation-start.mjs";
-import { createStateStore, dropUnroutedModels, gatewayBody, gatewayModel, gatewayTarget, modelLabel, modelList, modelSelectors, modelWindow, planProfile, runtimeConfig } from "./runtime.mjs";
+import { createStateStore, dropUnroutedModels, gatewayBody, gatewayModel, gatewayTarget, isPrivateFile, modelLabel, modelList, modelSelectors, modelWindow, planProfile, readJsonBody, runtimeConfig } from "./runtime.mjs";
 import { createOfficialAssets } from "./official-assets.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -767,6 +767,25 @@ function resolvedBootstrap() {
 
 // REST 侧的会话条目：拿录制文件里的第一条当模板，叠动态字段
 let REST_CONV_TEMPLATE = null;
+function restMessages(c) {
+  if (c.chat_messages?.length) return c.chat_messages;
+  const messages = [];
+  for (const turn of c.turns || []) {
+    const date = turn.created ? new Date(turn.created) : null;
+    const created = date && Number.isFinite(date.getTime()) ? date.toISOString() : c.created_at;
+    const entry = (uuid, sender, index, parent, text, extra = {}) => ({
+      uuid, sender, index, parent_message_uuid: parent ?? null, text,
+      content: [{ type: "text", text, citations: [] }],
+      created_at: created, updated_at: created, ...extra,
+    });
+    messages.push(entry(turn.humanId, "human", turn.humanIndex, turn.humanParent, turn.prompt || ""));
+    if (turn.complete || turn.text) {
+      messages.push(entry(turn.asstId, "assistant", turn.asstIndex, turn.humanId, turn.text || "",
+        turn.complete ? { stop_reason: turn.stopReason === "error" ? "error" : "end_turn" } : {}));
+    }
+  }
+  return messages;
+}
 function convToRest(c) {
   if (!REST_CONV_TEMPLATE) {
     try {
@@ -809,11 +828,6 @@ function mockApi(req, res, url) {
       model_selector_state: state ? [state] : [],
       organization_uuid: ORG.uuid,
     });
-  }
-
-  const convGet = p.match(/\/chat_conversations\/([0-9a-f-]{36})$/);
-  if (convGet && method === "GET") {
-    return json(res, convToRest(ensureConv(convGet[1])));
   }
 
   // 会话列表：静态模板 + 运行期动态会话（RPC 建的）合并，按更新时间倒序
@@ -895,6 +909,10 @@ function mockApi(req, res, url) {
   // 原生桌面使用已求值的 GrowthBook 结果；用户开关和系统权限仍由客户端检查。
   if (method === "GET" && p === "/api/desktop/features") {
     const features = {
+      "40173473": {
+        value: runtime.computerUse, on: runtime.computerUse, off: !runtime.computerUse, source: "force",
+        experiment: null, experimentResult: null,
+      },
       "1291166712": {
         value: { enabled: runtime.computerUse, appScopedEnabled: runtime.computerUse && runtime.backgroundMode },
         on: runtime.computerUse, off: !runtime.computerUse, source: "force",
@@ -1167,15 +1185,32 @@ function mockApi(req, res, url) {
   }
   const convMatch = p.match(/\/chat_conversations\/([^/]+)$/);
   if (convMatch) {
-    if (CONV_STATE.has(convMatch[1])) return json(res, convToRest(ensureConv(convMatch[1])));
-    return json(res, { error: "not found" }, 404);
+    const conv = CONV_STATE.get(convMatch[1]);
+    if (!conv) return json(res, { error: "not found" }, 404);
+    if (method === "GET") return json(res, { ...convToRest(conv), chat_messages: restMessages(conv) });
+    if (method === "DELETE") {
+      CONV_STATE.delete(convMatch[1]);
+      stateStore.changed();
+      stateStore.flush();
+      return json(res, {});
+    }
+    if (method === "PATCH" || method === "PUT") {
+      readJsonBody(req).then((body) => {
+        if (typeof body.name !== "string" || !body.name.trim() || body.name.length > 200) {
+          return json(res, { error: "Invalid conversation name" }, 400);
+        }
+        conv.name = body.name.trim();
+        conv.updated_at = new Date().toISOString();
+        stateStore.changed();
+        stateStore.flush();
+        return json(res, convToRest(conv));
+      }).catch((error) => json(res, { error: error.statusCode ? error.message : "Conversation update failed" }, error.statusCode || 500));
+      return;
+    }
+    return json(res, { error: "Method not allowed" }, 405);
   }
   if (/\/completion$/.test(p)) {
-    let raw = "";
-    req.on("data", (c) => (raw += c));
-    req.on("end", () => {
-      let body = {};
-      try { body = JSON.parse(raw); } catch {}
+    readJsonBody(req).then((body) => {
       const prompt = typeof body.prompt === "string" ? body.prompt : "";
       const human = body.turn_message_uuids?.human_message_uuid || crypto.randomUUID();
       const asst = body.turn_message_uuids?.assistant_message_uuid || crypto.randomUUID();
@@ -1258,6 +1293,9 @@ function mockApi(req, res, url) {
         try { res.end(); } catch {}
       });
       greq.end(payload);
+    }).catch((error) => {
+      if (!res.headersSent) json(res, { error: error.statusCode ? error.message : "Completion request failed" }, error.statusCode || 500);
+      else res.end();
     });
     return;
   }
@@ -1279,6 +1317,12 @@ function mockApi(req, res, url) {
   }
   if (/\/feature|flags|eligib/.test(p)) {
     return json(res, BOOTSTRAP.feature_flags);
+  }
+  if (method === "GET" && p === "/api/directory/servers") {
+    return json(res, { servers: [], next_cursor: null });
+  }
+  if (method === "GET" && /^\/api\/organizations\/[^/]+\/activation\/[^/]+\/tasks$/.test(p)) {
+    return json(res, { tasks: [] });
   }
   // 未知 API 兜底；有结构要求的接口必须在上方单独实现。
   return json(res, {});
@@ -1824,7 +1868,7 @@ function handle(req, res, hostHeader) {
       }
       // 远端托管策略：本地空放行（不挡插件/连接器）。
       // CLI 比 Desktop 校验更严格，settings 响应必须包含 uuid/checksum/settings。
-      // policy_limits → {restrictions:[],compliance_taints:[],defaults:{}}（BymwSUZ2 校验器）
+      // policy_limits → {restrictions:{},compliance_taints:[],defaults:{}}（BymwSUZ2 校验器）
       if (/^\/api\/claude_code\/settings/.test(url.pathname)) {
         const body = JSON.stringify({ uuid: ORG.uuid, settings: {}, content: { entries: {} }, checksum: "local-1" });
         res.writeHead(200, {
@@ -1836,7 +1880,7 @@ function handle(req, res, hostHeader) {
         return res.end(body);
       }
       if (/^\/api\/claude_code\/policy_limits/.test(url.pathname)) {
-        return json(res, { restrictions: [], compliance_taints: [], defaults: {}, artifact_create_notice: null });
+        return json(res, { restrictions: {}, compliance_taints: [], defaults: {}, artifact_create_notice: null });
       }
       // token 计数：网关不一定实现，本地估算
       if (req.method === "POST" && url.pathname === "/v1/messages/count_tokens") {
@@ -1887,7 +1931,7 @@ function handle(req, res, hostHeader) {
     return res.end(body);
   }
   if (MODE !== "passthrough" && /^\/api\/claude_code\/policy_limits/.test(url.pathname)) {
-    return json(res, { restrictions: [], compliance_taints: [], defaults: {}, artifact_create_notice: null });
+    return json(res, { restrictions: {}, compliance_taints: [], defaults: {}, artifact_create_notice: null });
   }
   if (MODE !== "passthrough" && /^\/api\/claude_cli\/bootstrap/.test(url.pathname)) {
     return json(res, { client_data: {}, settings: {}, config: {}, enabled: true, environments: [], sessions: [], plugins: [], items: [], data: [] });
@@ -2026,8 +2070,7 @@ function readDictationReceipt() {
   const receiptPath = path.join(APP_STATE_DIR, "dictation-helper.json");
   try {
     const metadata = fs.lstatSync(receiptPath);
-    if (!metadata.isFile() || metadata.isSymbolicLink() || (metadata.mode & 0o077) !== 0) return null;
-    if (typeof process.getuid === "function" && metadata.uid !== process.getuid()) return null;
+    if (!isPrivateFile(metadata)) return null;
     const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
     if (
       !Number.isInteger(receipt.port) || receipt.port < 1 || receipt.port > 65535 ||
@@ -2229,7 +2272,7 @@ const outer = http.createServer((req, res) => {
     return json(res, { client_data: {}, settings: {}, config: {}, enabled: true, environments: [], sessions: [], plugins: [], items: [], data: [] });
   }
   if (/^\/api\/claude_code\/policy_limits/.test(u.pathname)) {
-    return json(res, { restrictions: [], compliance_taints: [], defaults: {}, artifact_create_notice: null });
+    return json(res, { restrictions: {}, compliance_taints: [], defaults: {}, artifact_create_notice: null });
   }
   if (/^\/api\/claude_code\//.test(u.pathname)) {
     const body = JSON.stringify({ uuid: ORG.uuid, settings: {}, content: { entries: {} }, checksum: "local-1" });

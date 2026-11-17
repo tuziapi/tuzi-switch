@@ -38,10 +38,33 @@ fn validate(app: &Path) -> Result<(), String> {
     }
     Ok(())
 }
-pub(super) fn prepare(root: &Path) -> Result<(), String> {
-    if !cfg!(target_os = "macos") {
-        return Err("独立 Claude 副本暂仅支持 macOS".into());
+pub(super) fn version_allowed(platform: &str, version: &str) -> bool {
+    version == COPY_VERSION || (platform == "windows" && version == format!("{COPY_VERSION}.0"))
+}
+
+pub(super) fn prepare(root: &Path) -> Result<PathBuf, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = root;
+        return claude_local::desktop::verified_windows_app(
+            COPY_VERSION, std::time::Instant::now() + std::time::Duration::from_secs(20)
+        ).map_err(|e| e.to_string());
     }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = root;
+        return claude_local::desktop::verified_linux_app(
+            COPY_VERSION, std::time::Instant::now() + std::time::Duration::from_secs(10)
+        ).map_err(|e| e.to_string());
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    return Err("此平台的官方客户端隔离启动仍在适配".into());
+    #[cfg(target_os = "macos")]
+    prepare_macos(root)
+}
+
+#[cfg(target_os = "macos")]
+fn prepare_macos(root: &Path) -> Result<PathBuf, String> {
     let target = app_path(root);
     let parent = target.parent().unwrap();
     for path in [root, &root.join("desktop-app"), parent, &target] {
@@ -49,7 +72,8 @@ pub(super) fn prepare(root: &Path) -> Result<(), String> {
     }
     // A prepared copy stays pinned even when /Applications receives a later update.
     if target.exists() {
-        return validate(&target);
+        validate(&target)?;
+        return Ok(target);
     }
     let source = [
         PathBuf::from("/Applications/Claude.app"),
@@ -78,11 +102,20 @@ pub(super) fn prepare(root: &Path) -> Result<(), String> {
     validate(&staged_app)?;
     // The host operation and cross-process owner locks serialize this promotion.
     fs::rename(staged_app, &target).map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(target)
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_version_allowlist_does_not_expand_other_versions() {
+        for platform in ["macos", "windows", "linux"] {
+            assert!(version_allowed(platform, "5.11492.5"));
+            assert!(!version_allowed(platform, "5.11492.6"));
+            assert!(!version_allowed(platform, "5.11492.5-beta"));
+            assert_eq!(version_allowed(platform, "5.11492.5.0"), platform == "windows");
+        }
+    }
     #[test]
     fn local_copy_path_is_pinned_and_does_not_follow_symlinks() {
         let root = tempfile::tempdir().unwrap();
@@ -94,7 +127,7 @@ mod tests {
         {
             let outside = tempfile::tempdir().unwrap();
             std::os::unix::fs::symlink(outside.path(), root.path().join("desktop-app")).unwrap();
-            assert!(prepare(root.path()).is_err());
+            assert!(reject_link(&root.path().join("desktop-app")).is_err());
             assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
         }
     }

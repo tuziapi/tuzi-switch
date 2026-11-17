@@ -29,6 +29,22 @@ struct LocalOptions {
     computer_use: bool,
     cowork: bool,
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalCapabilities {
+    platform: &'static str,
+    voice_input: bool,
+    computer_use: bool,
+    cowork: bool,
+}
+fn capabilities_for(platform: &'static str) -> LocalCapabilities {
+    LocalCapabilities {
+        platform,
+        voice_input: matches!(platform, "macos" | "windows"),
+        computer_use: matches!(platform, "macos" | "windows"),
+        cowork: matches!(platform, "macos" | "windows" | "linux"),
+    }
+}
 fn read_options(root: &std::path::Path) -> anyhow::Result<LocalOptions> {
     let path = root.join("options.json");
     anyhow::ensure!(
@@ -45,6 +61,7 @@ fn read_options(root: &std::path::Path) -> anyhow::Result<LocalOptions> {
 struct TuziHost {
     root: PathBuf,
     upstream: RwLock<Option<Upstream>>,
+    desktop_app: RwLock<Option<PathBuf>>,
     _lock: File,
 }
 fn root_dir() -> PathBuf {
@@ -58,8 +75,25 @@ fn manifest() -> PathBuf {
 }
 
 fn bundled_node_path(executable: &std::path::Path) -> Option<PathBuf> {
+    bundled_node_path_for(executable, std::env::consts::OS, cfg!(debug_assertions))
+}
+
+fn bundled_node_path_for(executable: &std::path::Path, platform: &str, development: bool) -> Option<PathBuf> {
     let parent = executable.parent()?;
-    parent.ends_with("Contents/MacOS").then(|| parent.join("tuzi-claude-node"))
+    if platform == "macos" {
+        return parent.ends_with("Contents/MacOS").then(|| parent.join("tuzi-claude-node"));
+    }
+    // Windows installers and Linux deb/AppImage place sidecars beside the host.
+    // A Cargo debug executable can use development Node; installed debug bundles
+    // still require the sidecar, even if it is missing or damaged.
+    if development && parent.ends_with("target/debug") {
+        return None;
+    }
+    match platform {
+        "windows" => Some(parent.join("tuzi-claude-node.exe")),
+        "linux" => Some(parent.join("tuzi-claude-node")),
+        _ => None,
+    }
 }
 
 // This persisted marker is also checked before Host initialization after a crash.
@@ -133,6 +167,7 @@ fn host() -> Result<Arc<TuziHost>, String> {
         .map_err(|e| e.to_string())?;
     fs2::FileExt::try_lock_exclusive(&lock).map_err(|_| "另一个兔子实例已占用兼容目录")?;
     let host = Arc::new(TuziHost {
+        desktop_app: RwLock::new(if cfg!(target_os = "macos") { Some(desktop_copy::app_path(&root)) } else { None }),
         root,
         upstream: RwLock::new(None),
         _lock: lock,
@@ -176,7 +211,7 @@ impl Host for TuziHost {
         Some(self.root.join("desktop-profile"))
     }
     fn isolated_app_path(&self) -> Option<PathBuf> {
-        Some(desktop_copy::app_path(&self.root))
+        self.desktop_app.read().ok().and_then(|path| path.clone())
     }
     fn node_runtime(&self) -> Option<PathBuf> {
         if let Some(path) = std::env::current_exe().ok().and_then(|path| bundled_node_path(&path)) {
@@ -195,10 +230,11 @@ impl Host for TuziHost {
     }
     fn load_config(&self) -> anyhow::Result<ClaudeLocalSettings> {
         let options = read_options(&self.root)?;
+        let capabilities = capabilities_for(std::env::consts::OS);
         Ok(ClaudeLocalSettings {
-            voice_input: options.voice_input,
-            computer_use: options.computer_use,
-            cowork: options.cowork,
+            voice_input: options.voice_input && capabilities.voice_input,
+            computer_use: options.computer_use && capabilities.computer_use,
+            cowork: options.cowork && capabilities.cowork,
             ..safe_config()
         })
     }
@@ -295,6 +331,7 @@ pub struct LocalStatus {
     profile_dir: Option<String>,
     core: Option<claude_local::ClaudeLocalStatus>,
     options: LocalOptions,
+    capabilities: LocalCapabilities,
     voice_model_ready: bool,
     voice_download: serde_json::Value,
 }
@@ -334,6 +371,7 @@ fn read_status(host: &TuziHost) -> Result<LocalStatus, String> {
         ),
         core: Some(core),
         options: read_options(&host.root).map_err(|e| e.to_string())?,
+        capabilities: capabilities_for(std::env::consts::OS),
         voice_model_ready: claude_local::dictation::model_ready(),
         voice_download: claude_local::dictation::model_status(),
     })
@@ -371,6 +409,9 @@ pub async fn claude_local_action(
         return Err("未知操作".into());
     }
     let host = host()?;
+    if cfg!(target_os = "linux") && matches!(action.as_str(), "prepare_voice" | "enable_voice" | "enable_computer") {
+        return Err("Linux 官方客户端暂不支持听写和电脑控制".into());
+    }
     if action != "stop" && manifest().exists() {
         return Err("请先正常退出 Claude 并停止现有兼容会话".into());
     }
@@ -403,19 +444,20 @@ pub async fn claude_local_action(
     }
     if matches!(action.as_str(), "prepare" | "launch") {
         let root = host.root.clone();
-        tauri::async_runtime::spawn_blocking(move || desktop_copy::prepare(&root))
+        let path = tauri::async_runtime::spawn_blocking(move || desktop_copy::prepare(&root))
             .await
             .map_err(|e| e.to_string())??;
+        *host.desktop_app.write().map_err(|_| "host lock failed")? = Some(path);
     }
     if action == "launch" {
-        if !cfg!(target_os = "macos") {
-            return Err("本地兼容功能暂仅验证 macOS".into());
+        if !cfg!(any(target_os = "macos", target_os = "windows", target_os = "linux")) {
+            return Err("此平台的官方客户端隔离启动仍在适配".into());
         }
         let status = tauri::async_runtime::spawn_blocking(claude_local::status)
             .await
             .map_err(|e| e.to_string())?
             .map_err(|e| e.to_string())?;
-        if status.version != TESTED_VERSION {
+        if !desktop_copy::version_allowed(std::env::consts::OS, &status.version) {
             return Err(format!(
                 "本地兼容仅允许 Claude {TESTED_VERSION}；当前 {} 需重新验证",
                 status.version
@@ -555,9 +597,20 @@ mod tests {
     #[test]
     fn local_packaged_runtime_is_required_even_when_missing() {
         let dir = tempfile::tempdir().unwrap();
-        let exe = dir.path().join("Tuzi.app/Contents/MacOS/tu-zi-switch");
-        let node = bundled_node_path(&exe).unwrap();
-        assert_eq!(node, exe.parent().unwrap().join("tuzi-claude-node"));
-        assert!(!node.exists());
-        assert!(bundled_node_path(&dir.path().join("target/debug/tu-zi-switch")).is_none());
+        for (platform, layout, sidecar) in [
+            ("macos", "Tuzi.app/Contents/MacOS/tu-zi-switch", "tuzi-claude-node"),
+            ("windows", "Tuzi/tu-zi-switch.exe", "tuzi-claude-node.exe"),
+            ("linux", "AppDir/usr/bin/tu-zi-switch", "tuzi-claude-node"),
+        ] {
+            let exe = dir.path().join(layout);
+            for development in [false, true] {
+                let node = bundled_node_path_for(&exe, platform, development).unwrap();
+                assert_eq!(node, exe.parent().unwrap().join(sidecar));
+                assert!(!node.exists());
+            }
+            assert!(bundled_node_path_for(&dir.path().join("target/debug/tu-zi-switch"), platform, true).is_none());
+            if platform != "macos" {
+                assert!(bundled_node_path_for(&dir.path().join("Installed/debug/tu-zi-switch"), platform, true).is_some());
+            }
+        }
     }

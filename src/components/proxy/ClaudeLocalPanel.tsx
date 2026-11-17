@@ -36,6 +36,12 @@ export function ClaudeLocalPanel({ providerId }: { providerId?: string }) {
   if (!query.data?.enabled) return null;
   const status = query.data;
   const core = status.core;
+  const capabilities = status.capabilities;
+  const available = {
+    voice: capabilities?.voiceInput ?? true,
+    computer: capabilities?.computerUse ?? true,
+    cowork: capabilities?.cowork ?? true,
+  };
   const active = Boolean(
     status.boundProvider || status.recoveryRequired || core?.running,
   );
@@ -90,8 +96,9 @@ export function ClaudeLocalPanel({ providerId }: { providerId?: string }) {
           <label key={feature} className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={Boolean(checked)}
+              checked={available[feature] && Boolean(checked)}
               disabled={
+                !available[feature] ||
                 active ||
                 action.isPending ||
                 (feature === "voice" && !status.voiceModelReady)
@@ -103,9 +110,14 @@ export function ClaudeLocalPanel({ providerId }: { providerId?: string }) {
               }
             />
             {t(`claudeLocal.${feature}`)}
+            {!available[feature] && (
+              <span className="text-xs text-muted-foreground">
+                {t("claudeLocal.unsupportedFeature")}
+              </span>
+            )}
           </label>
         ))}
-        {!status.voiceModelReady && (
+        {available.voice && !status.voiceModelReady && (
           <Button
             size="sm"
             variant="outline"
@@ -117,7 +129,11 @@ export function ClaudeLocalPanel({ providerId }: { providerId?: string }) {
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        {t("claudeLocal.capabilityHint")}
+        {t(
+          capabilities?.platform === "linux"
+            ? "claudeLocal.linuxHint"
+            : "claudeLocal.capabilityHint",
+        )}
       </p>
       {status.voiceDownload?.phase === "downloading" && (
         <p role="status" className="text-xs text-muted-foreground">

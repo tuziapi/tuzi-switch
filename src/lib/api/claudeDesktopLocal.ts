@@ -6,6 +6,12 @@ export interface ClaudeLocalStatus {
   boundProvider?: string | null;
   profileDir?: string | null;
   options?: { voiceInput: boolean; computerUse: boolean; cowork: boolean };
+  capabilities?: {
+    platform: string;
+    voiceInput: boolean;
+    computerUse: boolean;
+    cowork: boolean;
+  };
   voiceModelReady?: boolean;
   voiceDownload?: {
     phase?: string;

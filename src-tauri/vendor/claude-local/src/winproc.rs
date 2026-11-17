@@ -302,6 +302,14 @@ unsafe extern "system" {
     ) -> i32;
 }
 
+/// Session lookup does not open or modify the target process.
+pub fn process_session_id(process_id: u32) -> Option<u32> {
+    let mut session = 0u32;
+    // SAFETY: the output points to a live u32 for the duration of the call.
+    unsafe { ProcessIdToSessionId(process_id, &mut session) }
+        .as_bool().then_some(session)
+}
+
 
 #[cfg(windows)]
 fn query_peb_base_address(handle: HANDLE) -> Option<usize> {
