@@ -4,6 +4,13 @@ spec=importlib.util.spec_from_file_location('publish',ROOT/'scripts/publish-open
 publish=importlib.util.module_from_spec(spec);spec.loader.exec_module(publish)
 PLATFORMS={'macos-arm64':('aarch64-apple-darwin','.dmg'),'macos-x64':('x86_64-apple-darwin','.dmg'),'windows-x64':('x86_64-pc-windows-msvc','.exe'),'linux-x64':('x86_64-unknown-linux-gnu','.deb'),'linux-arm64':('aarch64-unknown-linux-gnu','.deb')}
 class PublicationChecks(unittest.TestCase):
+ def test_draft_resume_cannot_replace_a_published_release(self):
+  draft={'tag_name':publish.TAG,'id':123,'draft':True,'prerelease':True}
+  self.assertIsNone(publish.select_draft([]))
+  self.assertEqual(publish.select_draft([draft]),draft)
+  for releases in [[{**draft,'draft':False}],[{**draft,'prerelease':False}],[draft,draft]]:
+   with self.assertRaises(AssertionError):publish.select_draft(releases)
+
  def test_remote_digest_matching_and_rejection(self):
   with tempfile.TemporaryDirectory() as d:
    p=pathlib.Path(d)/'synthetic.bin';p.write_bytes(b'synthetic')

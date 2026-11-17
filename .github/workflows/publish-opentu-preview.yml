@@ -46,6 +46,7 @@ jobs:
           pattern: opentu-beta-*
           path: downloaded-installers
       - name: Validate all five installers and prepare corresponding source
+        id: prepare
         env:
           SOURCE_SHA: ${{ steps.build.outputs.sha }}
         run: |
@@ -56,6 +57,7 @@ jobs:
           SOURCE_SHA: ${{ steps.build.outputs.sha }}
         run: python3 scripts/publish-opentu-beta-assets.py
       - uses: actions/upload-artifact@v4
+        if: always() && steps.prepare.outcome == 'success'
         with:
           name: opentu-preview-publication-proof
           path: |

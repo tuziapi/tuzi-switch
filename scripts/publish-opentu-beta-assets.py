@@ -30,6 +30,15 @@ def verify_assets(release, files):
         assert asset['size'] == path.stat().st_size and asset['digest'] == digest(path), path.name
         assert asset['state'] == 'uploaded', path.name
 
+def select_draft(releases):
+    matches = [r for r in releases if r['tag_name'] == TAG]
+    assert len(matches) <= 1, 'Duplicate release tag'
+    if not matches:
+        return None
+    release = matches[0]
+    assert release['draft'] and release['prerelease'], 'Refuse to replace a published release'
+    return release
+
 if __name__ == '__main__':
     assert os.environ.get('GITHUB_REPOSITORY') == REPO
     assert os.environ.get('GITHUB_REF') == 'refs/heads/main'
@@ -41,17 +50,30 @@ if __name__ == '__main__':
     files = sorted(Path('prepared-release').iterdir())
     assert len(files) == 8 and all(p.is_file() and not p.is_symlink() for p in files)
     previous = api('releases/latest')
-    # Creating a new ref fails rather than replacing any existing public version.
-    gh('api','-X','POST',f'repos/{REPO}/git/refs','-f',f'ref=refs/tags/{TAG}','-f',f'sha={sha}')
-    gh('release','create',TAG,'-R',REPO,'--verify-tag','--draft','--prerelease','--latest=false',
-       '--title','OpenTu 1.6.3-beta.1 测试版', '--notes-file','docs/releases/opentu-preview-v1.6.3-beta.1.md')
-    gh('release','upload',TAG,'-R',REPO,*map(str,files))
-    draft = json.loads(gh('api',f'repos/{REPO}/releases/tags/{TAG}'))
-    assert draft['draft'] and draft['prerelease']
-    verify_assets(draft, files)
-    assert api(f'git/ref/tags/{TAG}')['object']['sha'] == sha
+    # GitHub's release-by-tag endpoint excludes drafts. Resolve a draft via
+    # the release list, then use its numeric ID throughout verification.
+    draft = select_draft(api('releases?per_page=100'))
+    if draft is None:
+        # Never move or replace an existing tag.
+        gh('api','-X','POST',f'repos/{REPO}/git/refs','-f',f'ref=refs/tags/{TAG}','-f',f'sha={sha}')
+        gh('release','create',TAG,'-R',REPO,'--verify-tag','--draft','--prerelease','--latest=false',
+           '--title','OpenTu 1.6.3-beta.1 测试版', '--notes-file','docs/releases/opentu-preview-v1.6.3-beta.1.md')
+        draft = select_draft(api('releases?per_page=100'))
+    assert draft is not None
+    tag = api(f'git/ref/tags/{TAG}')['object']
+    assert tag['type'] == 'commit' and tag['sha'] == sha
+    release_id = draft['id']
+    assert all(a['name'] in {p.name for p in files} for a in draft['assets'])
+    for path in files:
+        matches = [a for a in draft['assets'] if a['name'] == path.name]
+        if matches:
+            # Resume only byte-identical draft assets; never use --clobber.
+            verify_assets({'assets': matches}, [path])
+        else:
+            gh('release','upload',TAG,'-R',REPO,str(path))
+    verify_assets(api(f'releases/{release_id}'), files)
     gh('release','edit',TAG,'-R',REPO,'--draft=false','--prerelease','--latest=false')
-    release = api(f'releases/tags/{TAG}')
+    release = api(f'releases/{release_id}')
     verify_assets(release,files)
     assert not release['draft'] and release['prerelease']
     assert api('releases/latest')['id'] == previous['id'], 'Stable Latest changed'
