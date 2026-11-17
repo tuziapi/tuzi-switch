@@ -62,6 +62,9 @@ jobs:
   candidate:
     if: github.repository == 'AiW520/tuzi-switch' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_candidates))
     needs: runtime
+    env:
+      # Match the existing desktop build budget, including Tauri's nested build.
+      NODE_OPTIONS: --max-old-space-size=4096
     strategy:
       fail-fast: false
       matrix:
@@ -95,6 +98,14 @@ jobs:
         with:
           toolchain: "1.95"
           targets: ${{ matrix.target }}
+      - name: Locate native libclang for Windows ARM64 bindings
+        if: matrix.target == 'aarch64-pc-windows-msvc'
+        shell: pwsh
+        run: |
+          $clangDirectory = Split-Path (Get-Command clang.exe -ErrorAction Stop).Source
+          $clangLibrary = Join-Path $clangDirectory 'libclang.dll'
+          if (-not (Test-Path $clangLibrary)) { throw "Native LLVM libclang.dll is required" }
+          "LIBCLANG_PATH=$clangDirectory" >> $env:GITHUB_ENV
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libgtk-3-dev

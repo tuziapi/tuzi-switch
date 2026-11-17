@@ -571,6 +571,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn local_quickjs_native_bindings_execute_values_and_exceptions() {
+        // Exercise the JSValue ABI on each candidate host, including generated
+        // Windows ARM64 bindings, without making any provider/network calls.
+        let runtime = Runtime::new().unwrap();
+        let context = Context::full(&runtime).unwrap();
+        context.with(|ctx| {
+            assert_eq!(ctx.eval::<i32, _>("6 * 7").unwrap(), 42);
+            assert_eq!(ctx.eval::<f64, _>("1.25 + 0.5").unwrap(), 1.75);
+            let result: String = ctx
+                .eval("JSON.stringify({remaining: 42, label: 'synthetic'})")
+                .unwrap();
+            assert_eq!(
+                serde_json::from_str::<Value>(&result).unwrap(),
+                serde_json::json!({"remaining": 42, "label": "synthetic"})
+            );
+            assert!(ctx.eval::<i32, _>("throw new Error('synthetic')").is_err());
+            let _exception = ctx.catch();
+            assert_eq!(ctx.eval::<i32, _>("21 + 21").unwrap(), 42);
+        });
+    }
+
+    #[test]
     fn test_https_bypass_prevention() {
         // 非本地域名的 HTTP 应该被拒绝
         let result = validate_base_url("http://127.0.0.1.evil.com/api");
