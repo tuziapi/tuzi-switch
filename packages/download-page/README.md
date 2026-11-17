@@ -73,3 +73,12 @@ v1.5.7 改进三列批量布局、准备占位、结果固定位置与视口保�
 新增创作讨论与主输入框协同、跨媒体批量规划、可选本地 Codex、附件及 Gemini Omni 视频；完善播放、拖动和原生导出。正式手动安装交付，不提供本次签名自动安装。已知限制与实测范围见 `docs/releases/v1.6.0.md`。
 
 当前构建：`RELEASE_TAG=v1.6.0 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm build:download`。加载器默认 v1.6.0，保留 v1.5.7/v1.5.6/v1.5.5 固定脚本。新 DMG 摘要必须与正式 Release 一致后才部署。
+
+
+## 2026-11-17 独立测试版
+
+测试站沿用同一 `TuziDownloadPage`，保留原布局、截图、导航与主题。`VITE_DOWNLOAD_CHANNEL=preview` 只允许测试仓库 `AiW520/tuzi-switch`；读取 `preview-release.json`，完整校验五个平台、固定版本/标签、独立应用身份、关闭自动更新、每个安装包的地址/大小/SHA256。校验失败时不显示可下载安装包，不回退到正式版。正式模式继续读取并严格校验 `release.json`。
+
+由 `opentu-test-release.yml` 在五个原生 runner 构建同一 SHA；全部成功后将安装包、构建清单、校验摘要和对应源码发布为非 Latest 的 prerelease。`publish-opentu-test-page.yml` 只在测试 main 执行，先核对真实 GitHub Release 附件摘要、不可变标签与成功构建，再部署原下载页。该流程不修改正式站或正式更新清单，测试版不发送正式下载统计。
+
+本地页面测试：`pnpm --filter @tuzi/download-page test`。测试模式构建：`VITE_RELEASE_REPOSITORY=AiW520/tuzi-switch VITE_DOWNLOAD_CHANNEL=preview pnpm --filter @tuzi/download-page exec vite build`。不要把合成验收清单提交至 public 目录或部署。

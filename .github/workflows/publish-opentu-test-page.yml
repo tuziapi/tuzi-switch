@@ -41,6 +41,7 @@ jobs:
         env:
           VITE_RELEASE_REPOSITORY: AiW520/tuzi-switch
           VITE_DOWNLOAD_CHANNEL: preview
+          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
         run: pnpm --filter @tuzi/download-page exec vite build
       - name: Package page
         run: |
