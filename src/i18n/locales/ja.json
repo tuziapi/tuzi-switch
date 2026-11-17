@@ -1,4 +1,32 @@
 {
+  "opentuConnection": {
+    "tab": "OpenTu 接続",
+    "title": "ChatGPT / MCP クライアント接続",
+    "description": "ローカルクライアントから OpenTu のモデルと現在のキャンバスを操作できます。Streamable HTTP を選び、以下のアドレスとトークンを設定してください。",
+    "name": "名前",
+    "transport": "接続方式",
+    "http": "Streamable HTTP",
+    "endpoint": "ローカル MCP アドレス",
+    "unavailable": "サービス未準備：接続を確認してください",
+    "copyAddress": "アドレスをコピー",
+    "auth": "認証には専用の Bearer Token を使います。モデル API キーは使用しません。",
+    "copyToken": "トークンをコピー",
+    "copyHeader": "Authorization 値をコピー",
+    "headerHelp": "Token 欄にはトークンを貼り付けます。カスタムヘッダーの場合、名前は Authorization、値は Bearer 接頭辞付きの内容です。",
+    "restart": "兔子助手を起動したままにしてください。再起動のたびにアドレスとトークンが変わるので、再コピーが必要です。トークンは画面に表示しません。チャットに送信しないでください。",
+    "check": "接続を確認",
+    "checking": "確認中…",
+    "passed": "ローカル HTTP の初期化、認証、ツール一覧を確認しました（{{count}} ツール）。",
+    "canvasReady": "OpenTu ワークスペースは準備完了です。操作するキャンバスを開いてください。",
+    "openCanvas": "キャンバスやモデルを呼び出す前に OpenTu ワークスペースを開いてください。",
+    "localOnly": "ローカルサービスのみの確認です。対象クライアントで接続し、ツールを実際に呼び出してください。クラウドクライアントには別途 Tunnel が必要です。",
+    "error": "操作に失敗しました。検証版が起動していることを確認し、再確認またはページを開き直してください。",
+    "copied": {
+      "endpoint": "アドレスをコピーしました。",
+      "token": "トークンをコピーしました。クライアントの認証欄に貼り付けてください。",
+      "authorization": "Bearer 接頭辞付きの Authorization 値をコピーしました。"
+    }
+  },
   "app": {
     "title": "兔子助手",
     "description": "Claude Code・Codex・Gemini CLI のためのオールインワンアシスタント"

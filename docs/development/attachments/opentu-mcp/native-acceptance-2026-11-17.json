@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-17",
+  "platform": "macOS aarch64",
+  "baseCommit": "8257a15a",
+  "identity": "com.tuziswitch.desktop.opentu-preview",
+  "installedApp": "/Applications/OpenTu 验收版.app",
+  "nativeHttpCanvas": {
+    "checks": [
+      "unauthenticated_401",
+      "initialize",
+      "empty_202_notification",
+      "ping",
+      "nine_tools",
+      "renderer_canvas_snapshot",
+      "renderer_model_list",
+      "insert_text_and_read_back",
+      "reversible_move_and_revision_change",
+      "stale_revision_rejected_without_mutation",
+      "native_keyboard_undo_restores_revision"
+    ],
+    "toolCount": 9,
+    "modelCount": 0,
+    "canvasElements": 1,
+    "targetChatGPTClientTested": false
+  },
+  "coldRestart": {
+    "checks": [
+      "unauthenticated_401",
+      "initialize",
+      "empty_202_notification",
+      "ping",
+      "nine_tools",
+      "renderer_canvas_snapshot",
+      "renderer_model_list",
+      "persisted_fixture_restored"
+    ],
+    "toolCount": 9,
+    "modelCount": 0,
+    "canvasElements": 1,
+    "targetChatGPTClientTested": false
+  },
+  "initialInsertionConfirmed": true,
+  "oldEndpointsClosed": true,
+  "installedBinaryMatchesBundle": true,
+  "bundleIntegrity": "codesign --verify --deep --strict passed",
+  "diskImageIntegrity": "hdiutil verify passed",
+  "dmgSha256": "4bd29bd64506a7c88cef230c59c59667d986bc7fa97054113cee7b9e5b99fc3a",
+  "signing": "ad-hoc local only; no updater signature; no notarization",
+  "targetClientAccepted": false,
+  "paidModelCalls": 0,
+  "released": false,
+  "notes": [
+    "First undo attempt could not confirm focus during a window capture error; focused canvas retry restored the exact previous revision.",
+    "Isolated profile has no configured models; model creation and ChatGPT client acceptance remain pending."
+  ]
+}

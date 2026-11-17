@@ -40,6 +40,7 @@ import { ImportExportSection } from "@/components/settings/ImportExportSection";
 import { BackupListSection } from "@/components/settings/BackupListSection";
 import { WebdavSyncSection } from "@/components/settings/WebdavSyncSection";
 import { AboutSection } from "@/components/settings/AboutSection";
+import { OpenTuConnectionPanel } from "@/components/settings/OpenTuConnectionPanel";
 import { ProxyTabContent } from "@/components/settings/ProxyTabContent";
 import { ModelTestConfigPanel } from "@/components/usage/ModelTestConfigPanel";
 import { UsageDashboard } from "@/components/usage/UsageDashboard";
@@ -224,6 +225,9 @@ export function SettingsPage({
               {t("settings.tabAdvanced")}
             </TabsTrigger>
             <TabsTrigger value="usage">{t("usage.title")}</TabsTrigger>
+            <TabsTrigger value="opentu">
+              {t("opentuConnection.tab")}
+            </TabsTrigger>
             <TabsTrigger value="about">{t("common.about")}</TabsTrigger>
           </TabsList>
 
@@ -490,6 +494,9 @@ export function SettingsPage({
                 ) : null}
               </TabsContent>
 
+              <TabsContent value="opentu" className="mt-0 pb-4">
+                <OpenTuConnectionPanel />
+              </TabsContent>
               <TabsContent value="about" className="mt-0">
                 <AboutSection isPortable={isPortable} />
               </TabsContent>

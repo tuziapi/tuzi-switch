@@ -45,7 +45,9 @@ pub fn get_home_dir() -> PathBuf {
 
 /// User-independent profile identity for explicit test/preview builds.
 #[cfg(feature = "isolated-profile")]
-pub(crate) const ISOLATED_PROFILE_ID: &str = if cfg!(feature = "local-preview") {
+pub(crate) const ISOLATED_PROFILE_ID: &str = if cfg!(feature = "opentu-preview") {
+    "com.tuziswitch.desktop.opentu-preview"
+} else if cfg!(feature = "local-preview") {
     "com.tuziswitch.desktop.preview"
 } else {
     "com.tuziswitch.desktop.acceptance"

@@ -1,4 +1,32 @@
 {
+  "opentuConnection": {
+    "tab": "OpenTu 接入",
+    "title": "连接 ChatGPT / MCP 客户端",
+    "description": "让本机客户端调用 OpenTu 模型并操作当前画布。选择流式 HTTP，填写下方地址和配对令牌。",
+    "name": "名称",
+    "transport": "类型",
+    "http": "流式 HTTP（Streamable HTTP）",
+    "endpoint": "本地 MCP 地址",
+    "unavailable": "服务尚未就绪，请点击检查连接",
+    "copyAddress": "复制地址",
+    "auth": "配对认证：使用此服务专用的 Bearer Token，不使用模型 API Key。",
+    "copyToken": "复制配对令牌",
+    "copyHeader": "复制 Authorization 值",
+    "headerHelp": "如果客户端提供 Token 输入框，粘贴配对令牌；如果提供自定义请求头，名称填 Authorization，值粘贴带 Bearer 前缀的内容。",
+    "restart": "请保持兔子助手运行。每次重启后地址和令牌会变化，需要重新复制。令牌不显示在页面上，不要发送到聊天中。",
+    "check": "检查连接",
+    "checking": "正在检查…",
+    "passed": "本地 HTTP 初始化、认证与工具列表检查通过，共 {{count}} 个工具。",
+    "canvasReady": "OpenTu 工作区已就绪；操作前请打开目标画布。",
+    "openCanvas": "请先打开 OpenTu 创作工作区，再发起画布或模型调用。",
+    "localOnly": "这只证明本机服务可用；还需在目标客户端完成连接并实际调用工具。云端客户端需要另外配置 Tunnel。",
+    "error": "操作失败。请确认验收版已运行，重试检查连接或重新打开本页。",
+    "copied": {
+      "endpoint": "已复制本地地址。",
+      "token": "已复制配对令牌，请粘贴到客户端认证字段。",
+      "authorization": "已复制 Authorization 值，包含 Bearer 前缀。"
+    }
+  },
   "app": {
     "title": "兔子助手",
     "description": "Claude Code / Codex / Gemini CLI 全方位辅助工具"

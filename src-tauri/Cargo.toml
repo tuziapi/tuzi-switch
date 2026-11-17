@@ -20,6 +20,7 @@ default = []
 test-hooks = []
 # Isolate user data without enabling debug-only loopback fixtures.
 isolated-profile = []
+opentu-preview = ["isolated-profile"]
 local-preview = ["isolated-profile"]
 # Explicit, isolated native upgrade laboratory; never enabled in release jobs.
 updater-acceptance = ["isolated-profile"]

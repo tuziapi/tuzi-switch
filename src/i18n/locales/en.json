@@ -1,4 +1,32 @@
 {
+  "opentuConnection": {
+    "tab": "OpenTu connection",
+    "title": "Connect ChatGPT / MCP clients",
+    "description": "Let a local client use OpenTu models and the current canvas. Choose Streamable HTTP and enter the address and pairing token below.",
+    "name": "Name",
+    "transport": "Transport",
+    "http": "Streamable HTTP",
+    "endpoint": "Local MCP address",
+    "unavailable": "Service not ready; check the connection",
+    "copyAddress": "Copy address",
+    "auth": "Authentication uses a dedicated Bearer Token, not your model API key.",
+    "copyToken": "Copy pairing token",
+    "copyHeader": "Copy Authorization value",
+    "headerHelp": "For a Token field, paste the pairing token. For custom headers, use Authorization as the name and paste the value with the Bearer prefix.",
+    "restart": "Keep Tuzi Assistant running. The address and token change after every restart; copy them again. The token is hidden. Never send it in chat.",
+    "check": "Check connection",
+    "checking": "Checking…",
+    "passed": "Local HTTP initialization, authentication and tool discovery passed: {{count}} tools.",
+    "canvasReady": "OpenTu workspace ready. Open the target canvas before editing.",
+    "openCanvas": "Open the OpenTu creative workspace before canvas or model calls.",
+    "localOnly": "This verifies the local service only. Connect and call a tool in the target client to complete acceptance. Cloud clients need a separately configured Tunnel.",
+    "error": "Operation failed. Ensure the acceptance app is running, then retry or reopen this page.",
+    "copied": {
+      "endpoint": "Local address copied.",
+      "token": "Pairing token copied. Paste it into the client authentication field.",
+      "authorization": "Authorization value copied, including the Bearer prefix."
+    }
+  },
   "app": {
     "title": "兔子助手",
     "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
