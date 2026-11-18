@@ -1,5 +1,7 @@
 # UC-BETA2-RUNTIME-1117：签名运行时修复与品牌图标
 
+最终状态（2026-11-18）：beta.2 已安装、测试版已发布、原下载页已更新。以下过程状态以文末最终交付为准。
+
 用户在 beta.1 报告 Claude 页面“内置运行组件缺失”，并明确要求修复。继续已有测试发布授权：仅测试库与原测试下载页，五平台同 SHA 构建成功后发布 beta.2，不改正式库或正式更新通道。用户随后要求兔小店用其图一，直连站用图二的红色兔子。
 
 ## 根因与修复
@@ -35,3 +37,14 @@ Mac ARM artifact 14325843019 已分段下载，完整 ZIP 与 GitHub artifact di
 ## 解锁后界面复核（2026-11-18）
 
 用户解锁后，重新激活已安装 beta.2，原生界面已确认：直连站红兔子、兔小店原图显示，顺序位于 opentu 创作后；Claude 页显示“准备就绪”，启动按钮可用，旧组件错误消失；原“兔子coding”线路及 25 个模型保留。截图与辅助功能记录见 installed-beta2-ready.jpg / installed-beta2-ready.txt。未发起模型调用，也未据此宣称 Claude 全部业务或跨平台实机验收通过。按既有授权继续发布测试 prerelease，并沿用原测试下载页。
+
+## 最终测试交付（2026-11-18）
+
+- 五平台构建 44064540204 / 源码 5dd5d97600687af0fe30b91f09514e1da3fb342b 成功；Mac ARM 安装与运行时实测、解锁后界面复核通过。
+- 发布 44213080095 成功，测试 prerelease `opentu-preview-v1.6.3-beta.2` / Release ID 449389544；八个附件（五安装包、对应源码、摘要、构建清单）摘要均匹配。测试 Latest 保持 v1.5.4。
+- 原测试下载页 https://aiw520.github.io/tuzi-switch/ 已切换 beta.2，部署 44213408165 成功，页面来源 fee095625de7f152e3178a6c5060f0ee4578bf17。五种系统/芯片组合逐项选择，全部指向正确 beta.2 文件；五公网安装包 HTTP 200、长度正确，页面图片均已加载。
+- 原 beta.1 发布说明已提示下载 beta.2 修复包，未改旧附件或标签。正式 Latest v1.6.2、正式页面 index 与 release.json 的摘要和之前一致。
+- 首次发布 44212721142 在创建草稿后列表未及时包含新草稿而中断，未公开半成品。已改用创建响应返回的草稿 ID，增加过时列表回归；4 项发布脚本测试通过，从原草稿继续完成发布。安装包无需重建。
+- 发布前 19 项下载页测试及真实 Release/标签/源码/五安装包校验通过。证据：publication.json、build-manifest.json、SHA256SUMS、public-downloads.json、page-platform-links.json、final-publication-check.json、published-beta2-page.jpg。
+
+此轮验收范围是签名运行时故障、图标、安装保留、五平台打包与测试下载交付。未新增付费模型调用，不把按钮恢复可用、编译或探针结果认定为 Claude Chat/Cowork/电脑控制/语音/ChatGPT 客户端完整联调及跨平台实机全部通过。仍待用户测试，不发布正式版。
