@@ -24,20 +24,46 @@ const platform = ["macos", "windows", "linux"].includes(
 let imported = () => {};
 const status = {
   enabled: true,
+  desktopRunning: params.has("running"),
   recoveryRequired: params.has("recovery"),
-  capabilities: { platform, voiceInput: false, computerUse: false, cowork: false },
+  capabilities: {
+    platform,
+    voiceInput: false,
+    computerUse: false,
+    cowork: false,
+  },
+};
+const gateway = {
+  supported: true,
+  configured: params.has("configured"),
+  appliedId: params.has("configured") ? "synthetic-profile" : null,
+  mode: "proxy",
+  expectedBaseUrl: "http://127.0.0.1:15721/claude-desktop",
+  actualBaseUrl: "http://127.0.0.1:15721/claude-desktop",
+  proxyRunning: params.has("configured"),
+  staleRawModels: false,
+  missingRouteMappings: false,
+  gatewayTokenConfigured: true,
 };
 mockIPC((command, payload) => {
+  if (command === "get_claude_desktop_status") return structuredClone(gateway);
   if (command === "import_claude_desktop_providers_from_claude") {
     imported();
     return 1;
   }
   if (command === "get_claude_local_status") return structuredClone(status);
-  if (command === "detect_official_claude_installation") return !params.has("missing");
+  if (command === "detect_official_claude_installation")
+    return !params.has("missing");
   if (command === "claude_local_action") {
     const { action } = payload as { action: string };
     if (action === "stop") status.recoveryRequired = false;
-    else if (action !== "untrust") throw new Error(`Unexpected cleanup action: ${action}`);
+    else if (action === "prepare_connection" || action === "launch") {
+      gateway.configured = true;
+      gateway.appliedId = "synthetic-profile";
+      gateway.proxyRunning = true;
+      if (action === "launch") status.desktopRunning = true;
+    } else if (action !== "untrust")
+      throw new Error(`Unexpected cleanup action: ${action}`);
     return structuredClone(status);
   }
   throw new Error(`Unexpected synthetic IPC: ${command}`);

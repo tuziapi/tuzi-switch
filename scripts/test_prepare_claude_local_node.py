@@ -27,7 +27,7 @@ class NodeArchiveTests(unittest.TestCase):
             build_candidate.build_config("x86_64-pc-windows-msvc", False, True)
         for target in stage_node.TARGETS:
             config = build_candidate.build_config(target, True, True)
-            self.assertEqual(config["version"], "1.6.3-beta.4")
+            self.assertEqual(config["version"], "1.6.3-beta.5")
             self.assertEqual(config["mainBinaryName"], "tuzi-opentu-preview")
             self.assertFalse(config["bundle"]["createUpdaterArtifacts"])
             self.assertEqual(config["plugins"]["updater"]["endpoints"], [])

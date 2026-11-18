@@ -1,5 +1,5 @@
 name: OpenTu five-platform test installers
-run-name: "OpenTu 1.6.3-beta.4 · ${{ github.sha }}"
+run-name: "OpenTu 1.6.3-beta.5 · ${{ github.sha }}"
 on:
   push:
     branches: [codex/test-opentu-1117]
@@ -102,12 +102,25 @@ jobs:
       - run: pnpm build:renderer
       - name: Native integration in the actual release feature set
         run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local,opentu-preview --lib local_ -- --test-threads=1
+      - name: Native gateway configuration and rollback
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local,opentu-preview --lib claude_desktop_ -- --test-threads=1
       - name: Build isolated test installer
         env:
           APPLE_SIGNING_IDENTITY: '-'
         run: python3 scripts/build-claude-local-candidate.py --target ${{ matrix.target }} --opentu-preview --test-release
       - name: Verify and collect installer
         run: python3 scripts/collect-opentu-test-installer.py --target ${{ matrix.target }} --platform ${{ matrix.platform }}
+      - name: Install and cold-start Windows candidate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: scripts/qa/opentu-windows-install-smoke.ps1 -Installer opentu-test-artifacts/OpenTu-Preview-1.6.3-beta.5-windows-x64.exe -Output windows-installed-smoke.json
+      - name: Upload Windows installation evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installed-smoke
+          path: windows-installed-smoke.json
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
           name: opentu-beta-${{ matrix.platform }}

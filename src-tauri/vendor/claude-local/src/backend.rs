@@ -967,6 +967,10 @@ fn is_desktop_claude_image(exe_file: &str, path: Option<&Path>) -> bool {
         .is_some_and(|dir| dir.join("resources").join("app.asar").is_file())
 }
 
+pub fn desktop_running() -> Result<bool> {
+    Ok(!claude_processes()?.trim().is_empty())
+}
+
 fn claude_processes() -> Result<String> {
     #[cfg(target_os = "macos")]
     {

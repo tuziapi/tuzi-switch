@@ -5,6 +5,8 @@ Upstream license: `AGPL-3.0-only`; original license text is retained in `LICENSE
 
 Local changes:
 
+2026-11-18: Export the existing Desktop process probe as `desktop_running` for the certificate-free gateway wizard. This read-only probe does not initialize the compatibility runtime. The host reuses `launch_claude` for the installed official client without compatibility arguments, local CA setup or TLS verification overrides. See ADR-023 in the host development records.
+
 1. Expand workspace package/dependency inheritance so the library builds as an optional path dependency. Voice dependencies stay optional; the explicit Tuzi P0 feature now enables dictation.
 2. Add `Host::isolated_profile_dir` and `Host::node_runtime` hooks. The Tuzi host supplies both; it never borrows the runtime from another application.
 3. Use a host-owned Desktop profile and Code directory. No personal profile switching, legacy session merge, import or synchronization occurs in the isolated path. Preserve unknown isolated-config fields; reject symlinks before writing.

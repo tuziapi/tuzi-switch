@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface ClaudeLocalStatus {
   enabled: boolean;
+  desktopRunning?: boolean | null;
   recoveryRequired?: boolean;
   boundProvider?: string | null;
   profileDir?: string | null;
@@ -32,6 +33,7 @@ export interface ClaudeLocalStatus {
 }
 export type ClaudeLocalAction =
   | "prepare"
+  | "prepare_connection"
   | "trust"
   | "untrust"
   | "launch"

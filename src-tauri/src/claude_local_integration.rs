@@ -3,6 +3,7 @@
 use crate::store::AppState;
 use claude_local::{ClaudeLocalSettings, Host, Upstream};
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 use std::{
     fs::{self, File, OpenOptions},
     path::PathBuf,
@@ -351,6 +352,7 @@ pub(crate) fn upstream(
 #[serde(rename_all = "camelCase")]
 pub struct LocalStatus {
     enabled: bool,
+    desktop_running: Option<bool>,
     recovery_required: bool,
     bound_provider: Option<String>,
     profile_dir: Option<String>,
@@ -364,6 +366,7 @@ pub struct LocalStatus {
 fn gateway_status() -> LocalStatus {
     LocalStatus {
         enabled: true,
+        desktop_running: None,
         recovery_required: manifest().exists(),
         bound_provider: None,
         profile_dir: None,
@@ -383,12 +386,16 @@ fn gateway_status() -> LocalStatus {
 #[derive(Debug, PartialEq)]
 enum GatewayAction {
     CheckInstallation,
+    PrepareConnection,
+    Launch,
     Cleanup,
 }
 
 fn gateway_action(action: &str, recovery_required: bool) -> Result<GatewayAction, String> {
     match action {
         "prepare" => Ok(GatewayAction::CheckInstallation),
+        "prepare_connection" if !recovery_required => Ok(GatewayAction::PrepareConnection),
+        "launch" if !recovery_required => Ok(GatewayAction::Launch),
         "stop" if recovery_required => Ok(GatewayAction::Cleanup),
         "untrust" if !recovery_required => Ok(GatewayAction::Cleanup),
         "untrust" => Err("请先停止旧版兼容会话".into()),
@@ -398,13 +405,82 @@ fn gateway_action(action: &str, recovery_required: bool) -> Result<GatewayAction
 
 #[tauri::command]
 pub async fn get_claude_local_status() -> Result<LocalStatus, String> {
-    Ok(gateway_status())
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut status = gateway_status();
+        status.desktop_running = claude_local::desktop_running().ok();
+        status
+    }).await.map_err(|error| error.to_string())
+}
+
+fn gateway_provider(state: &AppState, provider_id: &str) -> Result<crate::provider::Provider, String> {
+    let current = crate::services::ProviderService::current(state, crate::app_config::AppType::ClaudeDesktop)
+        .map_err(|error| error.to_string())?;
+    if current != provider_id {
+        return Err("所选线路已变化，请重新选择后再继续".into());
+    }
+    let provider = state.db.get_provider_by_id(provider_id, "claude-desktop")
+        .map_err(|error| error.to_string())?.ok_or("所选线路不存在")?;
+    crate::claude_desktop_config::validate_provider(&provider).map_err(|error| error.to_string())?;
+    Ok(provider)
+}
+
+fn needs_gateway_route(provider: &crate::provider::Provider) -> bool {
+    !crate::claude_desktop_config::is_official_provider(provider)
+        && matches!(crate::claude_desktop_config::provider_mode(provider), crate::provider::ClaudeDesktopMode::Proxy)
+}
+
+fn configure_gateway_process(command: &mut std::process::Command) {
+    for name in ["NODE_EXTRA_CA_CERTS", "NODE_TLS_REJECT_UNAUTHORIZED", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"] {
+        command.env_remove(name);
+    }
+}
+
+async fn prepare_gateway_connection(app: tauri::AppHandle, provider_id: String, launch: bool) -> Result<(), String> {
+    let preflight_app = app.clone();
+    let selected = provider_id.clone();
+    let needs_route = tauri::async_runtime::spawn_blocking(move || -> Result<bool, String> {
+        let state = preflight_app.state::<AppState>();
+        let _guard = crate::services::provider::OperationGuard::acquire().map_err(|error| error.to_string())?;
+        let provider = gateway_provider(&state, &selected)?;
+        if claude_local::desktop_running().map_err(|error| error.to_string())? {
+            return Err("请先完全退出 Claude，再继续配置或启动".into());
+        }
+        if claude_local::desktop::official_installation_present().map_err(|error| error.to_string())? != Some(true) {
+            return Err("请先安装 Claude Desktop，再重新检测".into());
+        }
+        Ok(needs_gateway_route(&provider))
+    }).await.map_err(|error| error.to_string())??;
+    let state = app.state::<AppState>();
+    if needs_route {
+        state.proxy_service.start().await?;
+    }
+    let route_running = state.proxy_service.is_running().await;
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let state = app.state::<AppState>();
+        let _guard = crate::services::provider::OperationGuard::acquire().map_err(|error| error.to_string())?;
+        let provider = gateway_provider(&state, &provider_id)?;
+        if needs_gateway_route(&provider) && !route_running {
+            return Err("本地路由尚未就绪，请重新检查线路".into());
+        }
+        if claude_local::desktop_running().map_err(|error| error.to_string())? {
+            return Err("请先完全退出 Claude，再继续配置或启动".into());
+        }
+        let source = claude_local::desktop::source_app(std::time::Instant::now() + std::time::Duration::from_secs(15))
+            .map_err(|error| error.to_string())?;
+        crate::claude_desktop_config::apply_provider(state.db.as_ref(), &provider).map_err(|error| error.to_string())?;
+        if launch {
+            claude_local::launch_claude(&source, configure_gateway_process).map_err(|error| error.to_string())?;
+        }
+        Ok(())
+    }).await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
 pub async fn claude_local_action(
+    app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     action: String,
+    provider_id: Option<String>,
 ) -> Result<LocalStatus, String> {
     let _guard = OPERATION.try_lock().map_err(|_| "兼容服务操作正在进行")?;
     if SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
@@ -422,6 +498,10 @@ pub async fn claude_local_action(
             };
         }
         GatewayAction::Cleanup => {}
+        GatewayAction::PrepareConnection | GatewayAction::Launch => {
+            prepare_gateway_connection(app_handle, provider_id.ok_or("请先选择线路")?, action == "launch").await?;
+            return get_claude_local_status().await;
+        }
     }
     let host = host()?;
     let stop = action == "stop";
@@ -446,11 +526,33 @@ pub async fn claude_local_action(
 mod tests {
     use super::*;
     #[test]
-    fn local_gateway_only_probes_or_cleans_up() {
-        use GatewayAction::{CheckInstallation, Cleanup};
+    fn local_gateway_launch_drops_legacy_credentials_and_certificate_overrides() {
+        let mut command = std::process::Command::new("synthetic-claude");
+        for name in ["NODE_EXTRA_CA_CERTS", "NODE_TLS_REJECT_UNAUTHORIZED", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"] {
+            command.env(name, "synthetic-legacy-value");
+        }
+        configure_gateway_process(&mut command);
+        assert!(command.get_args().next().is_none());
+        assert!(command.get_envs().all(|(_, value)| value.is_none()));
+        assert_eq!(command.get_envs().count(), 5);
+    }
+
+    #[test]
+    fn local_gateway_only_mapping_providers_require_a_router() {
+        let mut provider = crate::provider::Provider::with_id("synthetic".into(), "Synthetic".into(), serde_json::json!({}), None);
+        assert!(!needs_gateway_route(&provider));
+        provider.meta = Some(serde_json::from_value(serde_json::json!({"claudeDesktopMode":"proxy"})).unwrap());
+        assert!(needs_gateway_route(&provider));
+        provider.id = crate::database::CLAUDE_DESKTOP_OFFICIAL_PROVIDER_ID.into();
+        assert!(!needs_gateway_route(&provider));
+    }
+
+    #[test]
+    fn local_gateway_actions_never_restore_certificate_setup() {
+        use GatewayAction::{CheckInstallation, Cleanup, PrepareConnection, Launch};
         for recovering in [false, true] {
             assert_eq!(gateway_action("prepare", recovering), Ok(CheckInstallation));
-            for action in ["trust", "launch", "prepare_voice", "enable_computer", "sync_sessions", "unknown"] {
+            for action in ["trust", "prepare_voice", "enable_computer", "sync_sessions", "unknown"] {
                 assert!(gateway_action(action, recovering).is_err());
             }
         }
@@ -458,6 +560,10 @@ mod tests {
         assert!(gateway_action("stop", false).is_err());
         assert_eq!(gateway_action("untrust", false), Ok(Cleanup));
         assert!(gateway_action("untrust", true).is_err());
+        assert_eq!(gateway_action("prepare_connection", false), Ok(PrepareConnection));
+        assert_eq!(gateway_action("launch", false), Ok(Launch));
+        assert!(gateway_action("prepare_connection", true).is_err());
+        assert!(gateway_action("launch", true).is_err());
     }
     #[test]
     fn local_catalog_default_model_is_used_in_runtime_including_context_suffix() {

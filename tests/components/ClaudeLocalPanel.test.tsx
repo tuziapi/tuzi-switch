@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/claudeDesktopLocal";
 import { providersApi } from "@/lib/api/providers";
 import { settingsApi } from "@/lib/api/settings";
+import { toast } from "sonner";
 vi.mock("@/lib/api/settings", () => ({
   settingsApi: { openExternal: vi.fn() },
 }));
@@ -25,16 +26,20 @@ vi.mock("@/lib/api/claudeDesktopLocal", () => ({
   },
 }));
 vi.mock("@/lib/api/providers", () => ({
-  providersApi: { importClaudeDesktopFromClaude: vi.fn() },
+  providersApi: {
+    importClaudeDesktopFromClaude: vi.fn(),
+    getClaudeDesktopStatus: vi.fn(),
+  },
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock("sonner", () => ({
-  toast: { info: vi.fn(), error: vi.fn(), warning: vi.fn() },
+  toast: { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() },
 }));
 const stopped = {
   enabled: true,
+  desktopRunning: false,
   recoveryRequired: false,
   core: {
     version: "5.11492.5",
@@ -71,21 +76,198 @@ function mount(
     onAddProvider: vi.fn(),
     ...overrides,
   };
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
       <ClaudeLocalPanel {...props}>
         <p>provider-management-fallback</p>
       </ClaudeLocalPanel>
     </QueryClientProvider>,
   );
-  return { client, props };
+  return { client, props, ...view };
 }
+const readyConnection = {
+  supported: true,
+  configured: true,
+  appliedId: "synthetic-profile",
+  mode: "proxy" as const,
+  expectedBaseUrl: "http://127.0.0.1:15721/claude-desktop",
+  actualBaseUrl: "http://127.0.0.1:15721/claude-desktop",
+  proxyRunning: true,
+  staleRawModels: false,
+  missingRouteMappings: false,
+  gatewayTokenConfigured: true,
+};
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.setItem("claude-desktop-configuration-mode", "normal");
   vi.mocked(claudeDesktopLocal.status).mockResolvedValue(stopped);
   vi.mocked(claudeDesktopLocal.officialInstallation).mockResolvedValue(true);
   vi.mocked(settingsApi.openExternal).mockResolvedValue(undefined);
   vi.mocked(claudeDesktopLocal.action).mockResolvedValue(stopped);
+  vi.mocked(providersApi.getClaudeDesktopStatus).mockResolvedValue(
+    readyConnection,
+  );
+});
+
+describe("Claude Desktop configuration modes", () => {
+  beforeEach(() =>
+    localStorage.removeItem("claude-desktop-configuration-mode"),
+  );
+
+  it("restores the wizard and persists normal mode without applying a provider", async () => {
+    const view = mount();
+    await screen.findByRole("button", { name: "claudeLocal.launchAction" });
+    expect(screen.getByText("claudeLocal.connectionStep")).toBeVisible();
+    expect(screen.queryByText("claudeLocal.trustStep")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "claudeLocal.normalMode" }),
+    );
+    expect(screen.getByText("provider-management-fallback")).toBeVisible();
+    expect(screen.queryByText("claudeLocal.stepsLabel")).toBeNull();
+    view.unmount();
+    mount();
+    expect(
+      await screen.findByRole("button", { name: "claudeLocal.normalMode" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(claudeDesktopLocal.action).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "claudeLocal.guidedMode" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "claudeLocal.launchAction" }),
+    ).toBeEnabled();
+  });
+
+  it("keeps model editing and provider selection wired to the existing forms", async () => {
+    const edit = vi.fn();
+    const { props } = mount({ onEditProvider: edit });
+    await screen.findByRole("button", { name: "claudeLocal.launchAction" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "claudeLocal.manageModels" }),
+    );
+    expect(edit).toHaveBeenCalledWith("synthetic-provider");
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "synthetic-provider" },
+    });
+    expect(props.onSelectProvider).toHaveBeenCalledWith("synthetic-provider");
+  });
+
+  it("prepares the route before launching and never requests certificate trust", async () => {
+    vi.mocked(providersApi.getClaudeDesktopStatus).mockResolvedValue({
+      ...readyConnection,
+      proxyRunning: false,
+    });
+    mount();
+    const prepare = await screen.findByRole("button", {
+      name: "claudeLocal.checkConnection",
+    });
+    vi.mocked(providersApi.getClaudeDesktopStatus).mockResolvedValue(
+      readyConnection,
+    );
+    fireEvent.click(prepare);
+    await waitFor(() =>
+      expect(claudeDesktopLocal.action).toHaveBeenCalledWith(
+        "prepare_connection",
+        "synthetic-provider",
+      ),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "claudeLocal.launchAction" }),
+    );
+    await waitFor(() =>
+      expect(claudeDesktopLocal.action).toHaveBeenCalledWith(
+        "launch",
+        "synthetic-provider",
+      ),
+    );
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("claudeLocal.launchRequested"),
+    );
+    expect(claudeDesktopLocal.action).not.toHaveBeenCalledWith(
+      "trust",
+      expect.anything(),
+    );
+    expect(screen.queryByText("claudeLocal.gatewayCleanupDone")).toBeNull();
+  });
+
+  it.each([true, null])(
+    "blocks starting when process status is %s",
+    async (desktopRunning) => {
+      vi.mocked(claudeDesktopLocal.status).mockResolvedValue({
+        enabled: true,
+        desktopRunning,
+      });
+      mount();
+      expect(
+        await screen.findByRole("button", { name: "claudeLocal.launchAction" }),
+      ).toBeDisabled();
+      expect(screen.getByRole("combobox")).toBeDisabled();
+      expect(claudeDesktopLocal.action).not.toHaveBeenCalled();
+    },
+  );
+
+  it("shows missing-model setup instead of launching", async () => {
+    const edit = vi.fn();
+    mount({
+      providers: [{ id: "synthetic-provider", name: "Synthetic" }],
+      onEditProvider: edit,
+    });
+    const configure = await screen.findByRole("button", {
+      name: "claudeLocal.configureModels",
+    });
+    await waitFor(() => expect(configure).toBeEnabled());
+    fireEvent.click(configure);
+    expect(edit).toHaveBeenCalledWith("synthetic-provider");
+    expect(claudeDesktopLocal.action).not.toHaveBeenCalled();
+  });
+
+  it("leaves optional features visible and unavailable with explanations", async () => {
+    mount();
+    fireEvent.click(await screen.findByText("claudeLocal.optionalFeatures"));
+    for (const feature of ["voice", "computer", "cowork"]) {
+      expect(
+        screen.getByRole("switch", { name: `claudeLocal.${feature}` }),
+      ).toBeDisabled();
+      expect(
+        screen.getByText(`claudeLocal.${feature}GatewayHint`),
+      ).toBeVisible();
+    }
+  });
+
+  it("keeps recovery blocking configuration in both modes", async () => {
+    vi.mocked(claudeDesktopLocal.status).mockResolvedValue({
+      ...stopped,
+      recoveryRequired: true,
+    });
+    mount();
+    await screen.findByRole("button", { name: "claudeLocal.recoverAction" });
+    for (const mode of ["normal", "guided"]) {
+      fireEvent.click(
+        screen.getByRole("button", { name: `claudeLocal.${mode}Mode` }),
+      );
+      expect(screen.queryByText("provider-management-fallback")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "claudeLocal.launchAction" }),
+      ).toBeNull();
+    }
+  });
+
+  it("keeps launch errors visible and allows retry without claiming success", async () => {
+    vi.mocked(claudeDesktopLocal.action).mockRejectedValue(
+      new Error("synthetic launch failure"),
+    );
+    mount();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "claudeLocal.launchAction" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "synthetic launch failure",
+    );
+    expect(
+      screen.getByRole("button", { name: "claudeLocal.launchAction" }),
+    ).toBeEnabled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
 });
 describe("Claude Desktop guided setup", () => {
   const windows = {
@@ -114,7 +296,7 @@ describe("Claude Desktop guided setup", () => {
         }),
       );
       fireEvent.click(
-        screen.getByRole("button", { name: "claudeLocal.prepareAction" }),
+        screen.getByRole("button", { name: "claudeLocal.recheckInstallation" }),
       );
       await screen.findByText("claudeLocal.gatewayHint");
       expect(screen.getByText("provider-management-fallback")).toBeTruthy();
@@ -124,6 +306,20 @@ describe("Claude Desktop guided setup", () => {
       expect(claudeDesktopLocal.action).not.toHaveBeenCalled();
     },
   );
+  it("confirms every manual recheck even when the installation is unchanged", async () => {
+    mount();
+    await screen.findByText("claudeLocal.gatewayHint");
+    expect(toast.success).not.toHaveBeenCalled();
+    for (const count of [1, 2]) {
+      fireEvent.click(
+        screen.getByRole("button", { name: "claudeLocal.recheckInstallation" }),
+      );
+      await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(count));
+    }
+    expect(toast.success).toHaveBeenCalledWith(
+      "claudeLocal.installationConfirmed",
+    );
+  });
   it("keeps recovery available when the Windows installation probe fails", async () => {
     vi.mocked(claudeDesktopLocal.status).mockResolvedValue({
       ...windows,
