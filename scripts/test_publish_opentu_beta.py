@@ -1,9 +1,19 @@
 import hashlib,importlib.util,json,pathlib,subprocess,tempfile,unittest
+from unittest.mock import patch
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('publish',ROOT/'scripts/publish-opentu-beta-assets.py')
 publish=importlib.util.module_from_spec(spec);spec.loader.exec_module(publish)
 PLATFORMS={'macos-arm64':('aarch64-apple-darwin','.dmg'),'macos-x64':('x86_64-apple-darwin','.dmg'),'windows-x64':('x86_64-pc-windows-msvc','.exe'),'linux-x64':('x86_64-unknown-linux-gnu','.deb'),'linux-arm64':('aarch64-unknown-linux-gnu','.deb')}
 class PublicationChecks(unittest.TestCase):
+ def test_creation_uses_response_even_when_release_list_is_stale(self):
+  draft={'tag_name':publish.TAG,'id':123,'draft':True,'prerelease':True}
+  with patch.object(publish,'gh',return_value=json.dumps(draft)) as request, patch.object(publish,'api',return_value=[]) as stale_list:
+   self.assertEqual(publish.create_draft('a'*40),draft)
+   stale_list.assert_not_called()
+   self.assertEqual(request.call_count,1)
+  with patch.object(publish,'gh',return_value=json.dumps({**draft,'draft':False})):
+   with self.assertRaises(AssertionError):publish.create_draft('a'*40)
+
  def test_draft_resume_cannot_replace_a_published_release(self):
   draft={'tag_name':publish.TAG,'id':123,'draft':True,'prerelease':True}
   self.assertIsNone(publish.select_draft([]))

@@ -39,6 +39,17 @@ def select_draft(releases):
     assert release['draft'] and release['prerelease'], 'Refuse to replace a published release'
     return release
 
+def create_draft(sha):
+    # Use the create response directly: the release list can lag behind writes.
+    release = json.loads(gh('api', '-X', 'POST', f'repos/{REPO}/releases',
+        '-f', f'tag_name={TAG}', '-f', f'target_commitish={sha}',
+        '-F', 'draft=true', '-F', 'prerelease=true', '-f', 'make_latest=false',
+        '-f', 'name=OpenTu 1.6.3-beta.2 测试版',
+        '-F', 'body=@docs/releases/opentu-preview-v1.6.3-beta.2.md'))
+    draft = select_draft([release])
+    assert draft is not None, 'Create response did not identify the expected draft'
+    return draft
+
 if __name__ == '__main__':
     assert os.environ.get('GITHUB_REPOSITORY') == REPO
     assert os.environ.get('GITHUB_REF') == 'refs/heads/main'
@@ -56,9 +67,7 @@ if __name__ == '__main__':
     if draft is None:
         # Never move or replace an existing tag.
         gh('api','-X','POST',f'repos/{REPO}/git/refs','-f',f'ref=refs/tags/{TAG}','-f',f'sha={sha}')
-        gh('release','create',TAG,'-R',REPO,'--verify-tag','--draft','--prerelease','--latest=false',
-           '--title','OpenTu 1.6.3-beta.2 测试版', '--notes-file','docs/releases/opentu-preview-v1.6.3-beta.2.md')
-        draft = select_draft(api('releases?per_page=100'))
+        draft = create_draft(sha)
     assert draft is not None
     tag = api(f'git/ref/tags/{TAG}')['object']
     assert tag['type'] == 'commit' and tag['sha'] == sha
