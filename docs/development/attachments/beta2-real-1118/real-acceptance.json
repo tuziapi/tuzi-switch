@@ -88,12 +88,91 @@
   ],
   "observedDefect": "Preview identity selected legacy acceptance feed and advertised test-f86531a4 (#15); no download clicked",
   "unverified": [
-    "Cowork file tasks",
     "computer use",
     "microphone UI",
     "ChatGPT client MCP end-to-end",
     "other platform physical installation",
     "formal identity signed upgrade"
   ],
-  "formalRelease": false
+  "formalRelease": false,
+  "cowork": {
+    "status": "passed file task",
+    "file": "beta2-cowork-1118.txt",
+    "content": "TUZI-BETA2-FILE-OK\nCOWORK-FILE-OK\n",
+    "sha256": "dbd93c6462dfc4083f6ee833428d5d0c0de57232fbf477b7f70b96b9768eeee2",
+    "scope": "only named synthetic directory; one-session folder allowance, not always allow",
+    "coldRestartRestored": false,
+    "gatewayRequests": [
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 19570,
+        "output_tokens": 42,
+        "created_at": 1794965855
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 323,
+        "output_tokens": 65,
+        "created_at": 1794965860
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 297,
+        "output_tokens": 62,
+        "created_at": 1794965867
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 252,
+        "output_tokens": 47,
+        "created_at": 1794965872
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 232,
+        "output_tokens": 126,
+        "created_at": 1794965878
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 120,
+        "output_tokens": 49,
+        "created_at": 1794965883
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 202,
+        "output_tokens": 62,
+        "created_at": 1794965890
+      }
+    ]
+  }
 }

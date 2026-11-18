@@ -6,6 +6,6 @@
 
 提供 Mac 双架构、Windows x64、Linux 双架构的独立验收包，可与正式兔子助手共存。测试版暂不支持应用内更新，请手动替换旧验收版。
 
-Mac 为 ad-hoc 签名、未经 Apple 公证；Windows 未做 Authenticode 签名。Claude 文本对话、Code 文件读写和冷启动恢复已有 beta.2 实机记录；其他高级功能、ChatGPT 客户端联调及跨平台完整实机仍在验收，尚不代表正式版放行。当前 beta.3 的最终构建与安装验证以构建清单和交付记录为准。
+Mac 为 ad-hoc 签名、未经 Apple 公证；Windows 未做 Authenticode 签名。Claude 文本对话、Code / Cowork 文件读写，以及对话与 Code 的冷启动恢复已有 beta.2 实机记录；其他高级功能、ChatGPT 客户端联调及跨平台完整实机仍在验收，尚不代表正式版放行。当前 beta.3 的最终构建与安装验证以构建清单和交付记录为准。
 
 附件包含五种安装包、SHA256SUMS、构建清单和对应源码。反馈请提供版本、系统及复现步骤，不要附带密钥或个人会话。
