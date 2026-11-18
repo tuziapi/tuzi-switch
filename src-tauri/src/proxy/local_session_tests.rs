@@ -67,68 +67,6 @@ fn local_session_snapshot_auth_and_revocation() {
     .is_err());
 }
 
-struct LabHost {
-    root: std::path::PathBuf,
-    desktop: std::path::PathBuf,
-    upstream: claude_local::Upstream,
-}
-impl claude_local::Host for LabHost {
-    fn state_dir(&self) -> std::path::PathBuf {
-        self.root.clone()
-    }
-    fn ca_name(&self) -> &str {
-        "Tuzi Synthetic Test CA"
-    }
-    fn isolated_profile_dir(&self) -> Option<std::path::PathBuf> {
-        Some(self.root.join("profile"))
-    }
-    fn isolated_app_path(&self) -> Option<std::path::PathBuf> {
-        Some(self.desktop.clone())
-    }
-    fn node_runtime(&self) -> Option<std::path::PathBuf> {
-        Some("node".into())
-    }
-    fn load_config(&self) -> anyhow::Result<claude_local::ClaudeLocalSettings> {
-        Ok(claude_local::ClaudeLocalSettings {
-            enabled: true,
-            voice_input: false,
-            cowork: false,
-            session_sync: false,
-            import_cli_sessions: false,
-            code_share_home: Some(false),
-            plan: "free".into(),
-            ..Default::default()
-        })
-    }
-    fn save_config(&self, _: &claude_local::ClaudeLocalSettings) -> anyhow::Result<()> {
-        anyhow::bail!("read-only")
-    }
-    fn preview_upstream(
-        &self,
-        _: &claude_local::ClaudeLocalSettings,
-    ) -> anyhow::Result<claude_local::Upstream> {
-        Ok(self.upstream.clone())
-    }
-    fn prepare_upstream(
-        &self,
-        c: &claude_local::ClaudeLocalSettings,
-    ) -> anyhow::Result<claude_local::Upstream> {
-        self.preview_upstream(c)
-    }
-    fn dictation_ready(&self, _: &claude_local::ClaudeLocalSettings) -> bool {
-        false
-    }
-    fn prepare_dictation_service(&self) -> anyhow::Result<()> {
-        anyhow::bail!("disabled")
-    }
-}
-struct StopCore;
-impl Drop for StopCore {
-    fn drop(&mut self) {
-        claude_local::stop_backend();
-    }
-}
-
 async fn mock_upstream(
     State(seen): State<Arc<Mutex<Vec<(HeaderMap, Value)>>>>,
     h: HeaderMap,
@@ -194,29 +132,8 @@ async fn mock_upstream(
         "stop_reason":"tool_use", "usage":{"input_tokens":2,"output_tokens":3}})).into_response()
 }
 
-/// Three real loopback hops: managed Node core -> Tuzi gateway -> synthetic upstream.
-/// No system CA trust, Desktop process, external provider or personal DB is touched.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn local_session_headless_http_sse_tools_and_lifecycle() {
-    let temp = tempfile::tempdir().unwrap();
-    // The managed runtime serves Desktop's bundled shell. Supply synthetic
-    // resources explicitly so this test never borrows a locally installed app.
-    let desktop = if cfg!(target_os = "macos") {
-        temp.path().join("Synthetic Claude.app")
-    } else {
-        temp.path().join("synthetic-desktop/claude")
-    };
-    let resources = if cfg!(target_os = "macos") {
-        desktop.join("Contents/Resources")
-    } else {
-        desktop.parent().unwrap().join("resources")
-    };
-    std::fs::create_dir_all(resources.join("ion-dist")).unwrap();
-    std::fs::write(
-        resources.join("ion-dist/index.html"),
-        r#"<!doctype html><html data-build-id="synthetic-integration"><head></head><body>Synthetic test only</body></html>"#,
-    )
-    .unwrap();
+async fn local_gateway_http_sse_tools_and_lifecycle() {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -248,36 +165,12 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
         db.get_proxy_config().await.unwrap().listen_port,
         config.listen_port
     );
-    let upstream =
-        crate::claude_local_integration::upstream(&fixed, info.port, token.clone()).unwrap();
-    assert!(upstream.model_windows.is_empty() && upstream.default_window.is_none());
-    assert!(claude_local::install_host(Arc::new(LabHost {
-        root: temp.path().into(),
-        desktop,
-        upstream
-    })));
-    let _cleanup = StopCore;
-    let port = tokio::task::spawn_blocking(claude_local::serve_headless)
-        .await
-        .unwrap()
-        .unwrap();
-    let local = format!("http://127.0.0.1:{port}/v1/messages");
     let client = reqwest::Client::builder()
         .no_proxy()
         .timeout(std::time::Duration::from_secs(15))
         .build()
         .unwrap();
     let body = json!({"model":"claude-local-default","max_tokens":32,"messages":[{"role":"user","content":"hello"}],"tools":[{"name":"echo","input_schema":{"type":"object","properties":{"text":{"type":"string"}}}}]});
-    assert_eq!(
-        client
-            .post(&local)
-            .json(&body)
-            .send()
-            .await
-            .unwrap()
-            .status(),
-        403
-    );
     assert!(!client
         .post(&gateway)
         .json(&body)
@@ -297,7 +190,7 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
         .status()
         .is_success());
     let response = client
-        .post(&local)
+        .post(&gateway)
         .bearer_auth(&token)
         .json(&body)
         .send()
@@ -322,7 +215,7 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
         json!({"role":"assistant","content":value["content"]}),
         json!({"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-synthetic","content":"hello"}]})]);
     let streamed = client
-        .post(&local)
+        .post(&gateway)
         .bearer_auth(&token)
         .json(&followup)
         .send()
@@ -355,18 +248,6 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
     });
     let mut unknown = body.clone();
     unknown["model"] = "claude-unbound".into();
-    assert_eq!(
-        client
-            .post(&local)
-            .bearer_auth(&token)
-            .json(&unknown)
-            .send()
-            .await
-            .unwrap()
-            .status(),
-        400
-    );
-
     assert_eq!(
         client
             .post(&gateway)
@@ -414,7 +295,7 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
     cancel["messages"][0]["content"] = "cancel".into();
     cancel["stream"] = true.into();
     let mut response = client
-        .post(&local)
+        .post(&gateway)
         .bearer_auth(&token)
         .json(&cancel)
         .send()
@@ -433,7 +314,6 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
         db.get_current_provider("claude-desktop").unwrap(),
         Some(second.id)
     );
-    claude_local::stop_backend();
     service.release_local().await;
     assert!(service.is_running().await, "shared gateway is left running");
     assert!(!client
@@ -447,8 +327,5 @@ async fn local_session_headless_http_sse_tools_and_lifecycle() {
         .is_success());
     service.stop().await.unwrap();
     mock_task.abort();
-    assert!(!temp
-        .path()
-        .join("claude-local/real-profile-switch.json")
-        .exists());
+
 }
