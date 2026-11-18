@@ -1,0 +1,85 @@
+Window: "OpenTu 验收版", App: OpenTu 验收版.
+0 standard window OpenTu 验收版, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: 兔子助手, URL: tauri://localhost
+			3 container 应用导航
+				4 text 兔子助手
+				5 text Assistant workspace
+				6 button 收起侧栏
+				7 button 兔子账户
+				8 button opentu 创作
+				9 button 直连站, Help: 直连站 · 在浏览器中打开
+				10 button 兔小店, Help: 兔小店 · 在浏览器中打开
+				11 text 工具
+				12 button Claude Code
+				13 button Claude Desktop
+				14 button Codex
+				15 button Gemini CLI
+				16 button OpenCode
+				17 button OpenClaw
+				18 button Hermes
+				19 button Grok Build
+				20 button Pi
+				21 button MiniMax Code
+				22 container 工作区
+					23 text 工作区
+					24 button MCP 管理
+					25 button Skills 管理
+					26 button 提示词
+					27 button 会话管理
+					28 button 授权管理
+					29 button 本机使用统计
+					30 button 智能体
+					31 button 统一供应商
+				32 button 设置
+			33 container
+				34 container Claude
+				35 text Claude Desktop 供应商
+				36 button 设置
+				37 button 查看版本历程, Help: 版本历程
+				38 button 检测到新版本：test-f86531a4 (#15)
+				39 switch (settable, boolean) off
+				40 button Skills
+				41 button 会话管理
+				42 button
+			43 container Claude Desktop 配置
+				44 heading Claude Desktop, Value: 2
+					45 text Claude Desktop
+				46 text 用已有 API 线路，连接桌面 Claude。
+				47 text 未启动
+				48 container 首次连接步骤
+					49 text 选择线路
+					50 text 准备环境
+					51 text 系统授权
+					52 container
+						53 text 4 启动
+				54 text 模型线路
+				55 pop up button 模型线路, Value: 兔子coding
+				56 button 添加线路
+				57 container
+					58 text 已获取或配置 25 个模型
+					59 button 管理模型
+				60 text 准备就绪。启动后将使用所选线路，聊天内容保存在独立目录。
+				61 button 启动 Claude
+				62 summary Value: off, 可选功能
+已选择 3 项
+					63 text 可选功能
+					64 text 已选择 3 项
+				65 summary 线路管理, Value: off
+					66 text 线路管理
+				67 summary 高级设置, Value: off
+					68 text 高级设置
+			69 container Notifications alt+T
+	70 close button
+	71 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	72 minimize button
+	73 text OpenTu 验收版
+74 menu bar
+	75 OpenTu 验收版
+	76 File
+	77 Edit
+	78 View
+	79 Window
+	80 Help
+
+The focused UI element is 2 HTML content Description: 兔子助手, URL: tauri://localhost

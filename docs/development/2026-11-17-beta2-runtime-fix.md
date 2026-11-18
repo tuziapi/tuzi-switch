@@ -31,3 +31,7 @@ Windows x64 安装包已构建成功，NSIS 解包后的 Node 实际脚本/fetch
 Mac ARM artifact 14325843019 已分段下载，完整 ZIP 与 GitHub artifact digest 一致；DMG SHA256 为 612f11679139401f51f8573bb40cd46881b393114f2357e11b7535fa0a5d745c。本机只读挂载验证 beta.2、独立身份、深度签名、JIT 和真实脚本/fetch/WebSocket 全部通过，见 local-package-check.json。
 
 已正常退出旧验收版，备份旧 app、SQLite 数据库及 settings 后安装云端 beta.2 到 /Applications/OpenTu 验收版.app，正式兔子助手主程序 SHA256 保持不变，未覆盖数据或新增证书权限。备份及安装证据见 install.json。已启动新包，但 macOS 当前锁屏，CUA 窗口读取失败且 System Events 显示 0 窗口；已请求用户解锁。最终界面复核仍待完成，因此测试 Release 和原下载页尚未切换。
+
+## 解锁后界面复核（2026-11-18）
+
+用户解锁后，重新激活已安装 beta.2，原生界面已确认：直连站红兔子、兔小店原图显示，顺序位于 opentu 创作后；Claude 页显示“准备就绪”，启动按钮可用，旧组件错误消失；原“兔子coding”线路及 25 个模型保留。截图与辅助功能记录见 installed-beta2-ready.jpg / installed-beta2-ready.txt。未发起模型调用，也未据此宣称 Claude 全部业务或跨平台实机验收通过。按既有授权继续发布测试 prerelease，并沿用原测试下载页。
