@@ -44,7 +44,7 @@ describe("WorkBuddyProviderForm", () => {
     fireEvent.change(screen.getByRole("combobox"), {
       target: { value: "official" },
     });
-    expect(await screen.findByText("打开 WorkBuddy")).toBeVisible();
+    await waitFor(() => expect(screen.getByText("打开 WorkBuddy")).toBeVisible());
     fireEvent.click(screen.getByRole("button", { name: "common.add" }));
     await waitFor(() => expect(save).toHaveBeenCalledOnce());
     expect(save.mock.calls[0][0]).toMatchObject({
