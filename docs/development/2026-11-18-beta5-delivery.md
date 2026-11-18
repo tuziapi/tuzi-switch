@@ -28,11 +28,21 @@ Windows x64 和 Linux 两个平台首轮构建成功。Mac 两个平台首轮因
 
 Windows CI 已真实安装当前 EXE，确认产品版本、首次窗口启动和再次启动，并确认被检查的本地 Claude 根证书集合没有改变；[原始报告及构建关联](attachments/beta5/windows-installed-smoke.json) 已归档。报告明确 `claudeConversationVerified=false`。安装包 SHA256 为 `a44fec2efbbde479144529443c793262a8c5c52c17e364e6308c7f2421a6b87f`，发布时必须再次匹配。
 
-五平台构建 `44284675642` 第二次运行最终成功，源码仍为上述 `8fe9414d`。发布工作流 `44298522258` 成功，测试版于 2026-11-18 19:52:50（上海时间）公开。八个附件已上传，版本为 prerelease；测试库 Stable Latest 仍为 `v1.5.4`。下载页更新与公网复核仍在进行。
+五平台构建 `44284675642` 第二次运行最终成功，源码仍为上述 `8fe9414d`。发布工作流 `44298522258` 成功，测试版于 2026-11-18 19:52:50（上海时间）公开。八个附件已上传，版本为 prerelease；测试库 Stable Latest 仍为 `v1.5.4`。下载页更新与公网复核已完成，正式仓库 Latest 仍为 `v1.6.2`。
 
 已读取云端原生日志：Windows x64 的 `local_` 32 项、`claude_desktop_` 14 项通过；Linux x64、Linux ARM64、Mac ARM64 和 Mac Intel 各 33 项、15 项通过。数量因平台条件编译不同，不能简单视为互不重复的测试用例。
 
 两个 Mac 平台的云端 DMG 挂载、应用身份/版本、ad-hoc 签名完整性、Node JIT 权限及最终包内脚本/fetch/WebSocket 探针通过。本机额外下载 ARM64 CI 产物因速度过慢而中止，没有完成该包的本机挂载或安装，不能记为本机实测通过。
+
+## 公网交付与复核
+
+- 测试下载页：https://aiw520.github.io/tuzi-switch/ 。页面提交 `90f6f7d0e28a14ae775c5ba42e8f14a51fe5be2d`，部署运行 `44299056728` 成功；下载页 19 项测试及已发布文件/源码/标签/构建检查通过。
+- 发行：https://github.com/AiW520/tuzi-switch/releases/tag/opentu-preview-v1.6.3-beta.5 。五个安装包、对应源码、构建清单及 SHA256SUMS 共八个公开地址均返回 HTTP 200。
+- 八个附件的 GitHub 摘要和大小与云端发布证明完全一致；Windows EXE 摘要同时匹配真实安装检查的报告。
+- 实际下载公开 `build-manifest.json`，验证其完整字节摘要、大小、版本、源码 SHA、运行编号及五包摘要。公网下载页清单与发布生成清单逐字段一致。
+- 实际浏览器打开页面并切换五种平台/架构选择，版本均为 beta.5，下载按钮逐项指向对应的新安装包。此次不修改正式页面或自动更新通道。
+- 本机重复下载完整 Windows EXE 同样因网络限速中止；没有把这次本机整包重复下载计为通过。完整安装包的字节摘要校验发生在云端收集/发布流程，公开 API 摘要复核和 HTTP 可访问性检查分别记录，不混称本机已下载全部附件。
+- [公网复核记录](attachments/beta5/publication-verification.json)；Windows 安装检查仅覆盖 CI 机器，范围见下节。
 
 ## 客户正式交付条件
 
