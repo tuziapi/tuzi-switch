@@ -6,7 +6,7 @@ parser.add_argument('--output', type=pathlib.Path, required=True)
 parser.add_argument('--sha', required=True)
 parser.add_argument('--run', type=int, required=True)
 args=parser.parse_args()
-version='1.6.3-beta.4'
+version='1.6.3-beta.5'
 tag='opentu-preview-v'+version
 repository='AiW520/tuzi-switch'
 platforms={
