@@ -84,6 +84,10 @@ impl Provider {
             .map(|s| s.enabled)
             .unwrap_or(false)
     }
+
+    pub fn has_official_category(&self) -> bool {
+        self.category.as_deref() == Some("official")
+    }
 }
 
 /// 供应商管理器

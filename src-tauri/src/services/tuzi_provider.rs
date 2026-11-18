@@ -284,6 +284,10 @@ fn write_set(app: &AppType, provider: &Provider) -> Result<Vec<PathBuf>, AppErro
         AppType::OpenCode => paths.push(crate::opencode_config::get_opencode_config_path()),
         AppType::OpenClaw => paths.push(crate::openclaw_config::get_openclaw_config_path()),
         AppType::Hermes => paths.push(crate::hermes_config::get_hermes_config_path()),
+        AppType::WorkBuddy => paths.extend([
+            crate::workbuddy_config::config_path(),
+            crate::mcp::workbuddy::config_path(),
+        ]),
     }
     paths.sort();
     paths.dedup();
@@ -637,6 +641,7 @@ fn model_key<'a>(app: &AppType, provider: &'a Provider) -> Option<&'a str> {
         AppType::OpenCode => "/options/apiKey",
         AppType::OpenClaw => "/apiKey",
         AppType::Hermes => "/api_key",
+        AppType::WorkBuddy => "/apiKey",
     };
     provider
         .settings_config
@@ -773,6 +778,9 @@ fn validate_provider(app: &AppType, provider: &Provider) -> Result<(), AppError>
                 "codex_responses" | "anthropic_messages"
             ),
         ),
+        AppType::WorkBuddy => {
+            return Err(AppError::Config("WorkBuddy 不使用兔子账户供应商校验流程".into()));
+        }
     };
     let expected = match app {
         AppType::Claude | AppType::ClaudeDesktop => "https://apius.tu-zi.com",
@@ -887,6 +895,12 @@ fn selected_models(
             } else {
                 "chat"
             }
+        }
+        AppType::WorkBuddy => {
+            if let Some(list) = c.get("models").and_then(|v| v.as_array()) {
+                models.extend(list.iter().filter_map(|item| item.get("id").and_then(|v| v.as_str()).map(str::to_string)));
+            }
+            "chat"
         }
     };
     models.sort();
@@ -1920,6 +1934,9 @@ mod tests {
             }
             AppType::Hermes => {
                 json!({"base_url":"https://api.tu-zi.com/v1","api_key":key,"api_mode":"codex_responses","models":[{"id":"synthetic-model"}]})
+            }
+            AppType::WorkBuddy => {
+                json!({"vendor":"Tu-Zi","url":"https://api.tu-zi.com/v1/chat/completions","apiKey":key,"models":[{"id":"synthetic-model","supportsToolCall":true}]})
             }
         };
         let mut provider = Provider::with_id(

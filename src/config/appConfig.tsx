@@ -24,6 +24,7 @@ export const APP_IDS: AppId[] = [
   "opencode",
   "openclaw",
   "hermes",
+  "workbuddy",
 ];
 
 /** App IDs shown in Skills panels (excludes OpenClaw — it doesn't support Skills) */
@@ -38,6 +39,7 @@ export const SKILLS_APP_IDS: AppId[] = [
 /** App IDs shown in MCP panels (excludes OpenClaw) */
 export const MCP_APP_IDS: (AppId | NativeTool)[] = [
   ...SKILLS_APP_IDS,
+  "workbuddy",
   "grokbuild",
   "pi",
   "mcode",
@@ -135,5 +137,13 @@ export const APP_ICON_MAP: Record<AppId | NativeTool, AppConfig> = {
       "bg-violet-500/10 ring-1 ring-violet-500/20 hover:bg-violet-500/20 text-violet-600 dark:text-violet-400",
     badgeClass:
       "bg-violet-500/10 text-violet-700 dark:text-violet-300 hover:bg-violet-500/20 border-0 gap-1.5",
+  },
+  workbuddy: {
+    label: "WorkBuddy",
+    icon: <ProviderIcon icon="workbuddy" name="WorkBuddy" size={14} />,
+    activeClass:
+      "bg-sky-500/10 ring-1 ring-sky-500/20 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400",
+    badgeClass:
+      "bg-sky-500/10 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 border-0 gap-1.5",
   },
 };

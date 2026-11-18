@@ -1,5 +1,5 @@
 name: OpenTu five-platform test installers
-run-name: "OpenTu 1.6.3-beta.3 · ${{ github.sha }}"
+run-name: "OpenTu 1.6.3-beta.4 · ${{ github.sha }}"
 on:
   push:
     branches: [codex/test-opentu-1117]
@@ -33,7 +33,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: python3 scripts/test_prepare_claude_local_node.py
-      - run: node scripts/test-claude-local-runtime.mjs
+      - run: python3 scripts/check-preview-gateway.py
       - run: pnpm build:creative
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1

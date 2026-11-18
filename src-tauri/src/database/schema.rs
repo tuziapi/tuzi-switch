@@ -52,12 +52,12 @@ mod usage_semantics_migration_tests {
              PRAGMA user_version = 11;",
         )?;
         Database::apply_schema_migrations_on_conn(&conn)?;
-        let row: (String, bool, bool, bool, bool) = conn.query_row(
-            "SELECT name, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed FROM mcp_servers WHERE id = 'existing'",
+        let row: (String, bool, bool, bool, bool, bool) = conn.query_row(
+            "SELECT name, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed, enabled_workbuddy FROM mcp_servers WHERE id = 'existing'",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         )?;
-        assert_eq!(row, ("Existing".into(), false, false, false, false));
+        assert_eq!(row, ("Existing".into(), false, false, false, false, false));
         assert_eq!(Database::get_user_version(&conn)?, SCHEMA_VERSION);
         Ok(())
     }
@@ -128,7 +128,8 @@ impl Database {
             enabled_grokbuild BOOLEAN NOT NULL DEFAULT 0,
             enabled_pi BOOLEAN NOT NULL DEFAULT 0,
             enabled_mcode BOOLEAN NOT NULL DEFAULT 0,
-            pi_managed BOOLEAN NOT NULL DEFAULT 0
+            pi_managed BOOLEAN NOT NULL DEFAULT 0,
+            enabled_workbuddy BOOLEAN NOT NULL DEFAULT 0
         )",
             [],
         )
@@ -515,6 +516,11 @@ impl Database {
                             )?;
                         }
                         Self::set_user_version(conn, 12)?;
+                    }
+                    12 => {
+                        log::info!("迁移数据库从 v12 到 v13（添加 WorkBuddy MCP 支持）");
+                        Self::migrate_v12_to_v13(conn)?;
+                        Self::set_user_version(conn, 13)?;
                     }
                     _ => {
                         return Err(AppError::Database(format!(
@@ -1306,6 +1312,18 @@ impl Database {
             )?;
         }
         log::info!("v10 -> v11 迁移完成：已添加 input_token_semantics");
+        Ok(())
+    }
+
+    /// v12 -> v13 迁移：添加 WorkBuddy MCP 启用标记。
+    fn migrate_v12_to_v13(conn: &Connection) -> Result<(), AppError> {
+        Self::add_column_if_missing(
+            conn,
+            "mcp_servers",
+            "enabled_workbuddy",
+            "BOOLEAN NOT NULL DEFAULT 0",
+        )?;
+        log::info!("v12 -> v13 迁移完成：已添加 WorkBuddy MCP 支持");
         Ok(())
     }
 

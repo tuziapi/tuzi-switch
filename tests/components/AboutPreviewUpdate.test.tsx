@@ -51,7 +51,7 @@ vi.mock("react-i18next", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal("__APP_VERSION__", "1.6.3-beta.3");
+  vi.stubGlobal("__APP_VERSION__", "1.6.3-beta.4");
   mocks.check.mockResolvedValue(null);
   mocks.webCheck.mockResolvedValue({ updated: false });
 });

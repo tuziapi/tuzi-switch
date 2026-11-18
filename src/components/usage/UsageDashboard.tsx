@@ -43,6 +43,7 @@ const APP_FILTER_OPTIONS: AppTypeFilter[] = [
   "claude",
   "codex",
   "gemini",
+  "workbuddy",
 ];
 
 const FILTER_ALL = "all:";

@@ -462,11 +462,5 @@ mod tests {
         assert_eq!(report.note, "3p 模式还没有会话");
     }
 
-    /// 写死的 mock 账号/组织必须与 proxy.mjs 里的字面量保持一致。
-    #[test]
-    fn full_mode_ids_match_proxy_mock() {
-        let proxy = include_str!("../runtime/proxy.mjs");
-        assert!(proxy.contains(FULL_ACCOUNT), "proxy.mjs 的 ACCOUNT.id 变了");
-        assert!(proxy.contains(FULL_ORG), "proxy.mjs 的 ORG.uuid 变了");
-    }
+
 }

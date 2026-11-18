@@ -1,6 +1,6 @@
 [package]
 name = "tu-zi-switch"
-version = "1.6.3-beta.3"
+version = "1.6.3-beta.4"
 description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI - tuzi switch"
 authors = ["lkj020626-lgtm"]
 license = "MIT"
@@ -93,6 +93,7 @@ indexmap = { version = "2", features = ["serde"] }
 rust_decimal = "1.33"
 uuid = { version = "1.11", features = ["v4"] }
 sha2 = "0.10"
+hmac = "0.12"
 rand = "0.8"
 zeroize = { version = "1", features = ["derive"] }
 minisign-verify = "0.2"

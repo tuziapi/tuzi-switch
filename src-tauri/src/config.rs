@@ -361,6 +361,18 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
     Ok(())
 }
 
+/// 原子写入私有凭据文件，并在 Unix 上固定为仅所有者可读写。
+pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<(), AppError> {
+    atomic_write(path, data)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+            .map_err(|error| AppError::io(path, error))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(all(feature = "opentu-preview", feature = "claude-desktop-local"))]

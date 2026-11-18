@@ -893,7 +893,7 @@ fn meta_has_profile_entry(path: &Path) -> bool {
 }
 
 fn is_supported_platform() -> bool {
-    cfg!(any(target_os = "macos", windows))
+    cfg!(any(target_os = "macos", target_os = "linux", windows))
 }
 
 #[allow(clippy::needless_return)]
@@ -909,7 +909,13 @@ fn current_platform_paths() -> Result<ClaudeDesktopPaths, AppError> {
         return Ok(windows_paths_from_local_app_data(&local_app_data));
     }
 
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(target_os = "linux")]
+    {
+        let xdg = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from);
+        return Ok(linux_paths(&get_home_dir(), xdg.as_deref(), Path::new("/.flatpak-info").is_file()));
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
     {
         Err(unsupported_platform_error())
     }
@@ -919,6 +925,13 @@ fn current_platform_paths() -> Result<ClaudeDesktopPaths, AppError> {
 fn macos_paths_from_home(home: &Path) -> ClaudeDesktopPaths {
     let app_support = home.join("Library").join("Application Support");
     paths_from_dirs(app_support.join("Claude"), app_support.join("Claude-3p"))
+}
+
+#[cfg(any(target_os = "linux", all(unix, test)))]
+fn linux_paths(home: &Path, xdg: Option<&Path>, flatpak: bool) -> ClaudeDesktopPaths {
+    let default_config = home.join(".config");
+    let root = xdg.filter(|path| !flatpak && path.is_absolute()).unwrap_or(&default_config);
+    paths_from_dirs(root.join("Claude"), root.join("Claude-3p"))
 }
 
 #[cfg(windows)]
@@ -992,17 +1005,27 @@ fn proxy_origin_from_parts(listen_address: &str, listen_port: u16) -> String {
     format!("http://{}:{}", connect_host_for_url, listen_port)
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 fn unsupported_platform_error() -> AppError {
     AppError::localized(
         "claude_desktop.unsupported_platform",
-        "当前平台暂不支持 Claude Desktop 3P 配置。第一阶段仅支持 macOS 和 Windows。",
-        "Claude Desktop 3P configuration is not supported on this platform yet. Phase 1 only supports macOS and Windows.",
+        "当前平台暂不支持 Claude Desktop 网关配置。",
+        "Claude Desktop gateway configuration is unavailable on this platform.",
     )
 }
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn linux_gateway_uses_the_host_config_directory() {
+        let home = std::path::Path::new("/synthetic-home");
+        for (xdg, flatpak, expected) in [("/custom", false, "/custom"), ("relative", false, "/synthetic-home/.config"), ("/sandbox", true, "/synthetic-home/.config")] {
+            let paths = super::linux_paths(home, Some(std::path::Path::new(xdg)), flatpak);
+            assert!(paths.normal_config_path.starts_with(std::path::Path::new(expected).join("Claude")));
+            assert!(paths.profile_path.starts_with(std::path::Path::new(expected).join("Claude-3p")));
+        }
+    }
     use super::*;
     use crate::database::Database;
     use crate::provider::{ClaudeDesktopModelRoute, ProviderMeta};

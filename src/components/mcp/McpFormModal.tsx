@@ -71,6 +71,7 @@ const McpFormModal: React.FC<McpFormModalProps> = ({
     grokbuild: boolean;
     pi: boolean;
     mcode: boolean;
+    workbuddy: boolean;
   }>(() => {
     if (initialData?.apps) {
       return {
@@ -78,6 +79,7 @@ const McpFormModal: React.FC<McpFormModalProps> = ({
         grokbuild: !!initialData.apps.grokbuild,
         pi: !!initialData.apps.pi,
         mcode: !!initialData.apps.mcode,
+        workbuddy: !!initialData.apps.workbuddy,
       };
     }
     return {
@@ -90,6 +92,7 @@ const McpFormModal: React.FC<McpFormModalProps> = ({
       grokbuild: false,
       pi: false,
       mcode: false,
+      workbuddy: defaultEnabledApps.includes("workbuddy"),
     };
   });
 
@@ -613,6 +616,7 @@ const McpFormModal: React.FC<McpFormModalProps> = ({
                     ["grokbuild", "Grok Build"],
                     ["pi", "Pi"],
                     ["mcode", "MiniMax Code"],
+                    ["workbuddy", "WorkBuddy"],
                   ] as const
                 ).map(([app, label]) => (
                   <div className="flex items-center gap-2" key={app}>

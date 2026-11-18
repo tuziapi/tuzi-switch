@@ -27,6 +27,7 @@ const APP_CONFIG: Array<{
   { id: "opencode", icon: "opencode", nameKey: "apps.opencode" },
   { id: "openclaw", icon: "openclaw", nameKey: "apps.openclaw" },
   { id: "hermes", icon: "hermes", nameKey: "apps.hermes" },
+  { id: "workbuddy", icon: "workbuddy", nameKey: "apps.workbuddy" },
 ];
 
 export function AppVisibilitySettings({
@@ -43,6 +44,7 @@ export function AppVisibilitySettings({
     opencode: true,
     openclaw: true,
     hermes: true,
+    workbuddy: true,
   };
 
   // Count how many apps are currently visible
@@ -73,7 +75,7 @@ export function AppVisibilitySettings({
       </header>
       <div className="inline-flex gap-1 rounded-md border border-border-default bg-background p-1">
         {APP_CONFIG.map((app) => {
-          const isVisible = visibleApps[app.id];
+          const isVisible = !!visibleApps[app.id];
           // Disable button if this is the last visible app
           const isDisabled = isVisible && visibleCount <= 1;
 

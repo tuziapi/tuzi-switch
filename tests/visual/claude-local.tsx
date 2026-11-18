@@ -22,36 +22,10 @@ const platform = ["macos", "windows", "linux"].includes(
   ? params.get("platform")!
   : detectedPlatform;
 let imported = () => {};
-let status = {
+const status = {
   enabled: true,
   recoveryRequired: params.has("recovery"),
-  boundProvider: params.has("recovery")
-    ? "合成供应商 A"
-    : (null as string | null),
-  profileDir: "~/.tuzi-switch/claude-local-p0/desktop-profile",
-  capabilities: {
-    platform,
-    voiceInput: platform !== "linux",
-    computerUse: platform !== "linux",
-    cowork: true,
-  },
-  options: {
-    voiceInput: platform !== "linux",
-    computerUse: platform !== "linux",
-    cowork: true,
-  },
-  voiceModelReady: false,
-  core: {
-    version: "5.11492.5",
-    supported: true,
-    claudeRunning: false,
-    running: false,
-    connected: false,
-    caReady: params.has("ready"),
-    caTrusted: params.has("ready"),
-    nodeAvailable: true,
-    warning: null,
-  },
+  capabilities: { platform, voiceInput: false, computerUse: false, cowork: false },
 };
 mockIPC((command, payload) => {
   if (command === "import_claude_desktop_providers_from_claude") {
@@ -59,37 +33,11 @@ mockIPC((command, payload) => {
     return 1;
   }
   if (command === "get_claude_local_status") return structuredClone(status);
+  if (command === "detect_official_claude_installation") return !params.has("missing");
   if (command === "claude_local_action") {
-    const { action, providerId } = payload as {
-      action: string;
-      providerId?: string;
-    };
-    if (action === "prepare") status.core.caReady = true;
-    if (action === "trust") status.core.caTrusted = true;
-    if (action === "untrust") status.core.caTrusted = false;
-    if (action === "prepare_voice" && platform !== "linux")
-      status.voiceModelReady = true;
-    for (const [feature, key] of [
-      ["voice", "voiceInput"],
-      ["computer", "computerUse"],
-      ["cowork", "cowork"],
-    ] as const) {
-      if (action === `enable_${feature}` && status.capabilities[key])
-        status.options[key] = true;
-      if (action === `disable_${feature}`) status.options[key] = false;
-    }
-    if (action === "launch") {
-      status.core.running = true;
-      status.core.connected = true;
-      status.boundProvider =
-        providerId === "b" ? "合成供应商 B" : "合成供应商 A";
-    }
-    if (action === "stop") {
-      status.core.running = false;
-      status.core.connected = false;
-      status.boundProvider = null;
-      status.recoveryRequired = false;
-    }
+    const { action } = payload as { action: string };
+    if (action === "stop") status.recoveryRequired = false;
+    else if (action !== "untrust") throw new Error(`Unexpected cleanup action: ${action}`);
     return structuredClone(status);
   }
   throw new Error(`Unexpected synthetic IPC: ${command}`);

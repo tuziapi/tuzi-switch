@@ -14,6 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@aitu/utils": path.resolve(__dirname, "packages/creative-workspace/upstream/packages/utils/src/index.ts"),
     },
   },
   define: {

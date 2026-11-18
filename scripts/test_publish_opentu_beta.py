@@ -39,8 +39,8 @@ class PublicationChecks(unittest.TestCase):
    files=[]
    for platform,(target,suffix) in PLATFORMS.items():
     folder=base/'artifacts'/platform;folder.mkdir(parents=True)
-    name=f'OpenTu-Preview-1.6.3-beta.3-{platform}{suffix}';p=folder/name;p.write_bytes(b'synthetic '+platform.encode())
-    m={'commit':sha,'runId':'123','repository':'AiW520/tuzi-switch','channel':'preview','version':'1.6.3-beta.3','target':target,'platform':platform,'applicationId':'com.tuziswitch.desktop.opentu-preview','isolatedProfile':True,'automaticUpdates':False,'file':name,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'checks':['native-runtime-probe','release-native-integration','packaged-node-script-executed','node-jit-entitlement']}
+    name=f'OpenTu-Preview-1.6.3-beta.4-{platform}{suffix}';p=folder/name;p.write_bytes(b'synthetic '+platform.encode())
+    m={'commit':sha,'runId':'123','repository':'AiW520/tuzi-switch','channel':'preview','version':'1.6.3-beta.4','target':target,'platform':platform,'applicationId':'com.tuziswitch.desktop.opentu-preview','isolatedProfile':True,'automaticUpdates':False,'file':name,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'checks':['native-runtime-probe','release-native-integration','packaged-node-script-executed','node-jit-entitlement']}
     f=folder/(platform+'.json');f.write_text(json.dumps(m));files.append(f)
    def run(label):return subprocess.run(['python3',str(ROOT/'scripts/prepare-opentu-beta-assets.py'),'--artifacts',str(base/'artifacts'),'--output',str(base/label),'--sha',sha,'--run','123'],cwd=base,capture_output=True,text=True)
    self.assertEqual(run('good').returncode,0)

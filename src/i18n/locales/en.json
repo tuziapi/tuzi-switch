@@ -27,6 +27,15 @@
       "authorization": "Authorization value copied, including the Bearer prefix."
     }
   },
+  "workbuddyForm": { "invalidJson": "Check the JSON configuration and model fields.", "selectAccount": "Select a WorkBuddy account first." },
+  "workbuddyQuota": {
+    "expiry": "{{amount}} credits · {{until}}",
+    "noExpiry": "No expiry",
+    "not_running": "Open WorkBuddy to refresh credits",
+    "not_current": "Switch to this account to refresh credits",
+    "not_signed_in": "Sign in to WorkBuddy to refresh credits",
+    "failed": "Could not refresh credits"
+  },
   "app": {
     "title": "兔子助手",
     "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
@@ -978,7 +987,8 @@
     "gemini": "Gemini",
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
-    "hermes": "Hermes"
+    "hermes": "Hermes",
+    "workbuddy": "WorkBuddy"
   },
   "sessionManager": {
     "title": "Session Manager",
@@ -1456,7 +1466,8 @@
       "all": "All",
       "claude": "Claude Code",
       "codex": "Codex",
-      "gemini": "Gemini"
+      "gemini": "Gemini",
+      "workbuddy": "WorkBuddy"
     },
     "dataSources": "Data Sources",
     "dataSource": {
@@ -1464,6 +1475,7 @@
       "session_log": "Session Log",
       "codex_db": "Codex DB",
       "codex_session": "Codex Session",
+      "workbuddy_session": "WorkBuddy Session",
       "gemini_session": "Gemini Session"
     },
     "sessionSync": {
@@ -3256,6 +3268,14 @@
     }
   },
   "claudeLocal": {
+    "gatewayHint": "Claude Desktop is installed. Quit Claude, enable your preferred provider below, then reopen Claude. This setup requires no local root certificate.",
+    "gatewayDetectionError": "Could not confirm the Claude Desktop installation. Check the installation and select Prepare environment again.",
+    "gatewayCleanup": "Clean up a previous compatibility setup",
+    "gatewayCleanupDone": "The selected cleanup action is complete.",
+    "downloadLink": "Download from claude.com",
+    "installTitle": "Claude Desktop was not detected",
+    "installMessage": "Install the desktop app from the Claude website, then return here to continue setup.",
+    "downloadError": "Could not open the Claude website. Visit claude.com in your browser.",
     "voiceProgress": "Downloading speech model: {{percent}}%",
     "voice": "Local dictation",
     "computer": "Computer use",

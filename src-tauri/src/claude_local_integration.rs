@@ -361,52 +361,50 @@ pub struct LocalStatus {
     voice_download: serde_json::Value,
 }
 
+fn gateway_status() -> LocalStatus {
+    LocalStatus {
+        enabled: true,
+        recovery_required: manifest().exists(),
+        bound_provider: None,
+        profile_dir: None,
+        core: None,
+        options: LocalOptions::default(),
+        capabilities: LocalCapabilities {
+            platform: std::env::consts::OS,
+            voice_input: false,
+            computer_use: false,
+            cowork: false,
+        },
+        voice_model_ready: false,
+        voice_download: serde_json::Value::Null,
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum GatewayAction {
+    CheckInstallation,
+    Cleanup,
+}
+
+fn gateway_action(action: &str, recovery_required: bool) -> Result<GatewayAction, String> {
+    match action {
+        "prepare" => Ok(GatewayAction::CheckInstallation),
+        "stop" if recovery_required => Ok(GatewayAction::Cleanup),
+        "untrust" if !recovery_required => Ok(GatewayAction::Cleanup),
+        "untrust" => Err("请先停止旧版兼容会话".into()),
+        _ => Err("请启用 Claude Desktop 网关线路，然后重新打开 Claude。".into()),
+    }
+}
+
 #[tauri::command]
 pub async fn get_claude_local_status() -> Result<LocalStatus, String> {
-    // Read-only polling must not occupy the mutation lock or fail a user click.
-    // Serialize first-time initialization, then poll the thread-safe core directly.
-    let host = match HOST.get() {
-        Some(host) => host.clone(),
-        None => {
-            let _guard = OPERATION.lock().await;
-            host()?
-        }
-    };
-    tauri::async_runtime::spawn_blocking(move || read_status(&host))
-        .await
-        .map_err(|e| e.to_string())?
-}
-fn read_status(host: &TuziHost) -> Result<LocalStatus, String> {
-    let marker: Option<serde_json::Value> = fs::read(manifest())
-        .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok());
-    let core = claude_local::status().map_err(|e| e.to_string())?;
-    Ok(LocalStatus {
-        enabled: true,
-        recovery_required: manifest().exists() && !core.running,
-        bound_provider: marker
-            .as_ref()
-            .and_then(|m| m["providerName"].as_str())
-            .map(str::to_string),
-        profile_dir: Some(
-            host.root
-                .join("desktop-profile")
-                .to_string_lossy()
-                .into_owned(),
-        ),
-        core: Some(core),
-        options: read_options(&host.root).map_err(|e| e.to_string())?,
-        capabilities: capabilities_for(std::env::consts::OS),
-        voice_model_ready: claude_local::dictation::model_ready(),
-        voice_download: claude_local::dictation::model_status(),
-    })
+    Ok(gateway_status())
 }
 
 #[tauri::command]
 pub async fn claude_local_action(
     state: tauri::State<'_, AppState>,
     action: String,
-    provider_id: Option<String>,
 ) -> Result<LocalStatus, String> {
     let _guard = OPERATION.try_lock().map_err(|_| "兼容服务操作正在进行")?;
     if SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
@@ -415,136 +413,52 @@ pub async fn claude_local_action(
     if UPDATE_RESERVED.load(std::sync::atomic::Ordering::SeqCst) {
         return Err("兔子助手正在安装更新，请完成后再操作 Claude 配置".into());
     }
-    if ![
-        "prepare",
-        "trust",
-        "untrust",
-        "launch",
-        "stop",
-        "prepare_voice",
-        "enable_voice",
-        "disable_voice",
-        "enable_computer",
-        "disable_computer",
-        "enable_cowork",
-        "disable_cowork",
-    ]
-    .contains(&action.as_str())
-    {
-        return Err("未知操作".into());
+    match gateway_action(&action, manifest().exists())? {
+        GatewayAction::CheckInstallation => {
+            return match crate::commands::detect_official_claude_installation().await? {
+                Some(true) => Ok(gateway_status()),
+                Some(false) => Err("请先安装 Claude Desktop，再重新检测".into()),
+                None => Err("无法确认 Claude Desktop 安装状态".into()),
+            };
+        }
+        GatewayAction::Cleanup => {}
     }
     let host = host()?;
-    if cfg!(target_os = "linux") && matches!(action.as_str(), "prepare_voice" | "enable_voice" | "enable_computer") {
-        return Err("Linux 官方客户端暂不支持听写和电脑控制".into());
-    }
-    if action != "stop" && manifest().exists() {
-        return Err("请先正常退出 Claude 并停止现有兼容会话".into());
-    }
-    if action == "prepare_voice" {
-        claude_local::dictation::prepare_model()
-            .await
-            .map_err(|e| e.to_string())?;
-        return read_status(&host);
-    }
-    if action.starts_with("enable_") || action.starts_with("disable_") {
-        let enabled = action.starts_with("enable_");
-        let mut options = read_options(&host.root).map_err(|e| e.to_string())?;
-        match action.split_once('_').map(|(_, feature)| feature) {
-            Some("voice") => {
-                options.voice_input = enabled;
-            }
-            Some("computer") => options.computer_use = enabled,
-            Some("cowork") => options.cowork = enabled,
-            _ => return Err("未知实验功能".into()),
-        }
-        claude_local::fsutil::atomic_write(
-            &host.root.join("options.json"),
-            &serde_json::to_vec_pretty(&options).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-        return read_status(&host);
-    }
-    if matches!(action.as_str(), "prepare" | "launch") {
-        let root = host.root.clone();
-        let path = tauri::async_runtime::spawn_blocking(move || desktop_copy::prepare(&root))
-            .await
-            .map_err(|e| e.to_string())??;
-        *host.desktop_app.write().map_err(|_| "host lock failed")? = Some(path);
-    }
-    if action == "launch" {
-        if !cfg!(any(target_os = "macos", target_os = "windows", target_os = "linux")) {
-            return Err("此平台的官方客户端隔离启动仍在适配".into());
-        }
-        let status = tauri::async_runtime::spawn_blocking(claude_local::status)
-            .await
-            .map_err(|e| e.to_string())?
-            .map_err(|e| e.to_string())?;
-        if !desktop_copy::version_allowed(std::env::consts::OS, &status.version) {
-            return Err(format!(
-                "本地兼容仅允许 Claude {TESTED_VERSION}；当前 {} 需重新验证",
-                status.version
-            ));
-        }
-        if status.claude_running || !status.ca_trusted || !status.node_available {
-            return Err("请先退出 Claude，准备并信任证书，并确认内置运行时已就绪".into());
-        }
-        let id = provider_id.ok_or("请选择 Claude Desktop 供应商")?;
-        let provider = state
-            .db
-            .get_provider_by_id(&id, "claude-desktop")
-            .map_err(|e| e.to_string())?
-            .ok_or("供应商不存在")?;
-        let provider = crate::proxy::local_session::snapshot(provider)?;
-        // Persist intent before opening a session; credentials are deliberately absent.
-        let marker = serde_json::json!({"schemaVersion":1,"phase":"starting","providerId":provider.id,"providerName":provider.name,"claudeVersion":status.version});
-        crate::config::write_json_file(&manifest(), &marker).map_err(|e| e.to_string())?;
-        let result = async {
-            let (info, token) = state.proxy_service.bind_local(provider.clone()).await?;
-            *host.upstream.write().map_err(|_| "host lock failed")? =
-                Some(upstream(&provider, info.port, token)?);
-            tauri::async_runtime::spawn_blocking(|| claude_local::perform("launch"))
-                .await
-                .map_err(|e| e.to_string())?
-                .map_err(|e| e.to_string())?;
-            Ok::<_, String>(())
-        }
-        .await;
-        if let Err(error) = result {
-            // Keep the marker: even an uncertain launch must go through explicit recovery.
-            claude_local::stop_backend();
-            claude_local::dictation::server::stop();
-            state.proxy_service.release_local().await;
-            *host.upstream.write().map_err(|_| "host lock failed")? = None;
-            return Err(error);
-        }
-        let mut marker = marker;
-        marker["phase"] = "running".into();
-        crate::config::write_json_file(&manifest(), &marker).map_err(|e| e.to_string())?;
-    } else {
-        let op = action.clone();
-        tauri::async_runtime::spawn_blocking(move || claude_local::perform(&op))
-            .await
-            .map_err(|e| e.to_string())?
-            .map_err(|e| e.to_string())?;
-        if action == "stop" {
-            claude_local::dictation::server::stop();
-            state.proxy_service.release_local().await;
-            *host.upstream.write().map_err(|_| "host lock failed")? = None;
-            match fs::remove_file(manifest()) {
-                Ok(()) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => return Err(e.to_string()),
-            }
-        }
-    }
-    tauri::async_runtime::spawn_blocking(move || read_status(&host))
+    let stop = action == "stop";
+    tauri::async_runtime::spawn_blocking(move || claude_local::perform(&action))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())?;
+    if stop {
+        claude_local::dictation::server::stop();
+        state.proxy_service.release_local().await;
+        *host.upstream.write().map_err(|_| "host lock failed")? = None;
+        match fs::remove_file(manifest()) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Ok(gateway_status())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_gateway_only_probes_or_cleans_up() {
+        use GatewayAction::{CheckInstallation, Cleanup};
+        for recovering in [false, true] {
+            assert_eq!(gateway_action("prepare", recovering), Ok(CheckInstallation));
+            for action in ["trust", "launch", "prepare_voice", "enable_computer", "sync_sessions", "unknown"] {
+                assert!(gateway_action(action, recovering).is_err());
+            }
+        }
+        assert_eq!(gateway_action("stop", true), Ok(Cleanup));
+        assert!(gateway_action("stop", false).is_err());
+        assert_eq!(gateway_action("untrust", false), Ok(Cleanup));
+        assert!(gateway_action("untrust", true).is_err());
+    }
     #[test]
     fn local_catalog_default_model_is_used_in_runtime_including_context_suffix() {
         let mut provider = crate::provider::Provider::with_id("synthetic".into(), "Synthetic".into(), serde_json::json!({"env":{"ANTHROPIC_MODEL":"claude-z"}}), None);

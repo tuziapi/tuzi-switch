@@ -71,6 +71,7 @@ const APP_ORDER: AppId[] = [
   "opencode",
   "openclaw",
   "hermes",
+  "workbuddy",
 ];
 
 const APP_NAMES: Record<AppId, string> = {
@@ -81,6 +82,7 @@ const APP_NAMES: Record<AppId, string> = {
   opencode: "OpenCode",
   openclaw: "OpenClaw",
   hermes: "Hermes",
+  workbuddy: "WorkBuddy",
 };
 
 export function TuziSidebar({

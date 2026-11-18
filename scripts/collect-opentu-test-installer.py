@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import tempfile
 
-VERSION = '1.6.3-beta.3'
+VERSION = '1.6.3-beta.4'
 TARGETS = {
     'aarch64-apple-darwin': ('macos-arm64', '.dmg'),
     'x86_64-apple-darwin': ('macos-x64', '.dmg'),

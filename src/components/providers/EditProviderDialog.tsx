@@ -75,7 +75,7 @@ export function EditProviderDialog({
       // OpenCode uses additive mode - each provider's config is stored independently in DB
       // Reading live config would return the full opencode.json (with $schema, provider, mcp etc.)
       // instead of just the provider fragment, causing incorrect nested structure on save
-      if (appId === "codex" || appId === "opencode") {
+      if (appId === "codex" || appId === "opencode" || appId === "workbuddy") {
         if (!cancelled) {
           setLiveSettings(null);
           setHasLoadedLive(true);

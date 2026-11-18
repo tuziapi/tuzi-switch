@@ -136,6 +136,9 @@ impl ConfigService {
             AppType::Hermes => {
                 // Hermes uses additive mode, no live sync needed
             }
+            AppType::WorkBuddy => {
+                crate::workbuddy_config::set_provider(&provider.id, &provider.settings_config)?;
+            }
         }
 
         Ok(())

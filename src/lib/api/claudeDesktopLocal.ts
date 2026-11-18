@@ -44,6 +44,8 @@ export type ClaudeLocalAction =
   | "enable_cowork"
   | "disable_cowork";
 export const claudeDesktopLocal = {
+  officialInstallation: () =>
+    invoke<boolean | null>("detect_official_claude_installation"),
   status: () => invoke<ClaudeLocalStatus>("get_claude_local_status"),
   action: (action: ClaudeLocalAction, providerId?: string) =>
     invoke<ClaudeLocalStatus>("claude_local_action", { action, providerId }),

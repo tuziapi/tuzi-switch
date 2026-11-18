@@ -34,6 +34,7 @@ mod sync_support;
 mod lightweight;
 mod usage;
 mod webdav_sync;
+pub(crate) mod workbuddy_account;
 mod workspace;
 
 pub use auth::*;
@@ -70,3 +71,4 @@ pub use lightweight::*;
 pub use usage::*;
 pub use webdav_sync::*;
 pub use workspace::*;
+pub use workbuddy_account::*;

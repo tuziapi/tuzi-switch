@@ -21,6 +21,7 @@ import type { AppId } from "@/lib/api";
 
 interface ProviderActionsProps {
   appId?: AppId;
+  workBuddyCustom?: boolean;
   isCurrent: boolean;
   isSwitching?: boolean;
   isSwitchDisabled?: boolean;
@@ -51,6 +52,7 @@ interface ProviderActionsProps {
 
 export function ProviderActions({
   appId,
+  workBuddyCustom = false,
   isCurrent,
   isSwitching = false,
   isSwitchDisabled = false,
@@ -84,7 +86,7 @@ export function ProviderActions({
   const isAdditiveMode =
     (appId === "opencode" && !isOmo) ||
     appId === "openclaw" ||
-    appId === "hermes";
+    appId === "hermes" || workBuddyCustom;
 
   // 故障转移模式下的按钮逻辑（累加模式和 OMO 应用不支持故障转移）
   const isFailoverMode =

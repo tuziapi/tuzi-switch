@@ -166,6 +166,7 @@ const VALID_APPS: AppId[] = [
   "opencode",
   "openclaw",
   "hermes",
+  "workbuddy",
 ];
 
 const getInitialApp = (): AppId => {
@@ -321,6 +322,7 @@ function App() {
     opencode: true,
     openclaw: true,
     hermes: true,
+    workbuddy: true,
   };
 
   const getFirstVisibleApp = (): AppId => {
@@ -331,6 +333,7 @@ function App() {
     if (visibleApps.opencode) return "opencode";
     if (visibleApps.openclaw) return "openclaw";
     if (visibleApps.hermes) return "hermes";
+    if (visibleApps.workbuddy) return "workbuddy";
     return "claude"; // fallback
   };
 
@@ -429,7 +432,7 @@ function App() {
     activeApp === "opencode" ||
     activeApp === "openclaw" ||
     activeApp === "gemini" ||
-    activeApp === "hermes";
+    activeApp === "hermes" || activeApp === "workbuddy";
 
   const {
     addProvider,
@@ -816,7 +819,9 @@ function App() {
       queryKey: ["providers", appId],
     });
 
-    if (appId === "opencode") {
+    if (appId === "workbuddy") {
+      await queryClient.invalidateQueries({ queryKey: ["workbuddy", "modelOwners"] });
+    } else if (appId === "opencode") {
       await queryClient.invalidateQueries({
         queryKey: ["opencodeLiveProviderIds"],
       });
@@ -1301,6 +1306,7 @@ function App() {
               }
               onRemoveFromConfig={
                 activeApp === "opencode" ||
+                activeApp === "workbuddy" ||
                 activeApp === "openclaw" ||
                 activeApp === "hermes"
                   ? (provider) =>

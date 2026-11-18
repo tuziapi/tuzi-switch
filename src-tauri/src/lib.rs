@@ -50,6 +50,8 @@ mod tuzi_account;
 
 mod tray;
 mod usage_script;
+mod workbuddy_config;
+mod sync_utils;
 mod web_hot_update;
 #[cfg(feature = "updater-acceptance")]
 mod updater_acceptance;
@@ -1274,6 +1276,7 @@ pub fn run() {
             commands::import_default_config,
             commands::get_claude_desktop_status,
             commands::get_claude_local_status,
+            commands::detect_official_claude_installation,
             commands::claude_local_action,
             commands::get_claude_desktop_default_routes,
             commands::import_claude_desktop_providers_from_claude,
@@ -1552,6 +1555,8 @@ pub fn run() {
             commands::auth_remove_account,
             commands::auth_set_default_account,
             commands::auth_logout,
+            commands::workbuddy_model_owners,
+            commands::workbuddy_account_open_app,
             // Copilot OAuth commands (multi-account support)
             commands::copilot_start_device_flow,
             commands::copilot_poll_for_auth,

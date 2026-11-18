@@ -29,10 +29,6 @@ mod linux_ca;
 
 const ASSETS: &[(&str, &[u8])] = &[
     (
-        "proxy.mjs",
-        include_bytes!("../runtime/proxy.mjs"),
-    ),
-    (
         "page-shim.js",
         include_bytes!("../assets/localization/page-shim.js"),
     ),
@@ -277,31 +273,22 @@ pub fn private_dir(path: &Path) -> Result<()> {
         // Replace inherited permissions with current-user and SYSTEM access.
         // Child state/receipt files inherit this ACL, since Windows chmod does
         // not implement Unix 0600/0700 semantics.
-        let script = r#"$ErrorActionPreference = 'Stop'
-$sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
-$acl = New-Object System.Security.AccessControl.DirectorySecurity
-$acl.SetOwner($sid)
-$acl.SetAccessRuleProtection($true, $false)
-foreach ($principal in @($sid, [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18'))) {
-    $rule = [System.Security.AccessControl.FileSystemAccessRule]::new($principal, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
-    $acl.AddAccessRule($rule)
-}
-Set-Acl -LiteralPath $env:TUZI_CLAUDE_PRIVATE_DIR -AclObject $acl
-$actual = Get-Acl -LiteralPath $env:TUZI_CLAUDE_PRIVATE_DIR
-if (-not $actual.AreAccessRulesProtected -or $actual.GetOwner([System.Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { throw 'Private directory ACL verification failed' }
-foreach ($rule in $actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) {
-    if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Value -notin @($sid.Value, 'S-1-5-18')) { throw 'Unexpected private directory access' }
-}
-"#;
+        let script = include_str!("private_dir_windows.ps1");
         let mut command = hidden_command("powershell.exe");
         command.args(["-NoProfile", "-NonInteractive", "-Command", script])
             .env("TUZI_CLAUDE_PRIVATE_DIR", path)
-            .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
-        let mut child = command.spawn().context("Cannot set private directory permissions")?;
+            .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+        let mut child = command.spawn().context("Cannot start Windows private directory permission setup")?;
         let deadline = Instant::now() + Duration::from_secs(15);
         loop {
             if let Some(status) = child.try_wait()? {
-                ensure!(status.success(), "Cannot secure private directory permissions");
+                if !status.success() {
+                    let mut diagnostic = Vec::new();
+                    if let Some(stdout) = child.stdout.take() {
+                        let _ = stdout.take(1024).read_to_end(&mut diagnostic);
+                    }
+                    bail!("{}", private_dir_failure(status.code(), &diagnostic));
+                }
                 break;
             }
             if Instant::now() >= deadline {
@@ -313,6 +300,25 @@ foreach ($rule in $actual.GetAccessRules($true, $true, [System.Security.Principa
         }
     }
     Ok(())
+}
+
+// Parse only the bounded, path-free report from our embedded Windows script.
+// Ignore arbitrary host output (including policy messages containing user data).
+#[cfg(any(windows, test))]
+fn private_dir_failure(code: Option<i32>, output: &[u8]) -> String {
+    for line in String::from_utf8_lossy(output).lines() {
+        let fields: Vec<_> = line.trim().split('|').collect();
+        if fields.len() == 4 && fields[0] == "TUZI_ACL_ERROR"
+            && ["identity", "reparse-check", "build-acl", "write-acl", "verify-acl"].contains(&fields[1])
+            && fields[2].len() == 8 && fields[2].bytes().all(|b| b.is_ascii_hexdigit())
+            && !fields[3].is_empty() && fields[3].len() <= 80
+            && fields[3].bytes().all(|b| b.is_ascii_alphanumeric())
+        {
+            return format!("Cannot secure private directory permissions (stage={}, HRESULT=0x{}, type={})",
+                fields[1], fields[2], fields[3]);
+        }
+    }
+    format!("Cannot secure private directory permissions (PowerShell exit={code:?}; no safe diagnostic available)")
 }
 
 /// 完整功能模式里内置 Claude Code 的配置目录（`CLAUDE_CONFIG_DIR`，会话记录在它的 `projects/` 下）。
@@ -1138,124 +1144,8 @@ fn ca_trusted_for_policy(root: &Path, policy: &str) -> bool {
     probe(&mut command, PROBE_TIMEOUT).is_ok_and(|(success, _)| success)
 }
 
-fn prepare_ca(root: &Path) -> Result<()> {
-    if ca_ready(root) {
-        return Ok(());
-    }
-    let ca = root.join("ca");
-    private_dir(&ca)?;
-    generate_ca(&ca, host().ca_name())
-}
-
-/// 用 rcgen 在进程内生成整套本地 CA 材料，不再调用外部 openssl
-/// （Windows 系统不自带 openssl，之前还得去找 Git for Windows 附带的那枚）。
-/// 只在 `ca_ready` 为假时调用：磁盘上已有的证书（含旧版 RSA 证书）继续沿用。
-fn generate_ca(ca: &Path, ca_name: &str) -> Result<()> {
-    use rcgen::{
-        BasicConstraints, CertificateParams, DistinguishedName, DnType,
-        ExtendedKeyUsagePurpose, IsCa, Issuer, KeyPair, KeyUsagePurpose, SerialNumber,
-    };
-    let now = time::OffsetDateTime::now_utc();
-    // 随机序列号：uuid v4 的 16 字节，最高位清零避免被当成负数。
-    let serial = || {
-        let mut bytes = *uuid::Uuid::new_v4().as_bytes();
-        bytes[0] &= 0x7f;
-        SerialNumber::from_slice(&bytes)
-    };
-    let distinguished_name = |name: &str| {
-        let mut dn = DistinguishedName::new();
-        dn.push(DnType::CommonName, name);
-        dn
-    };
-
-    // 本地 CA：默认 ECDSA P-256 自签，只用来签本机这一枚服务证书。
-    let ca_key = KeyPair::generate().context("生成本地 CA 私钥失败")?;
-    let mut ca_params = CertificateParams::default();
-    ca_params.distinguished_name = distinguished_name(ca_name);
-    ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-    ca_params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
-    ca_params.serial_number = Some(serial());
-    ca_params.not_before = now - time::Duration::days(1);
-    ca_params.not_after = now + time::Duration::days(3650);
-    let ca_cert = ca_params
-        .self_signed(&ca_key)
-        .context("生成本地 CA 证书失败")?;
-
-    // 服务端证书：本地代理拦截 claude.ai 系 TLS 用。SAN 覆盖官方域名与 localhost；
-    // "127.0.0.1" 会被解析成 IpAddress 类型的 SAN（不是 DNS）。有效期不超过 825 天
-    // （Apple 对 TLS 服务端证书的要求），取 824 天留一天余量。
-    let server_key = KeyPair::generate().context("生成本地服务私钥失败")?;
-    let mut server_params = CertificateParams::new(vec![
-        "claude.ai".into(),
-        "*.claude.ai".into(),
-        "claude.com".into(),
-        "*.claude.com".into(),
-        "anthropic.com".into(),
-        "*.anthropic.com".into(),
-        "claudeusercontent.com".into(),
-        "*.claudeusercontent.com".into(),
-        "localhost".into(),
-        "127.0.0.1".into(),
-    ])
-    .context("本地服务证书参数无效")?;
-    server_params.distinguished_name = distinguished_name("claude.ai");
-    server_params.is_ca = IsCa::NoCa;
-    server_params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
-    server_params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
-    server_params.use_authority_key_identifier_extension = true;
-    server_params.serial_number = Some(serial());
-    server_params.not_before = now - time::Duration::days(1);
-    server_params.not_after = now + time::Duration::days(824);
-    let issuer = Issuer::new(ca_params, &ca_key);
-    let server_cert = server_params
-        .signed_by(&server_key, &issuer)
-        .context("签发本地服务证书失败")?;
-
-    // 私钥在前证书在后；PEM 私钥是 PKCS#8，Node 的 tls.createSecureContext 能直接读。
-    write_private(&ca.join("ca.key"), ca_key.serialize_pem().as_bytes())?;
-    write_private(&ca.join("server.key"), server_key.serialize_pem().as_bytes())?;
-    write_private(&ca.join("ca.pem"), ca_cert.pem().as_bytes())?;
-    write_private(&ca.join("server.crt"), server_cert.pem().as_bytes())?;
-    Ok(())
-}
-
-fn trust_ca(root: &Path) -> Result<()> {
-    ensure!(
-        platform_supported(),
-        "本地证书信任目前仅支持 macOS、Windows 和 Linux"
-    );
-    if ca_trusted(root) {
-        return Ok(());
-    }
-    #[cfg(target_os = "linux")]
-    { return linux_ca::trust(root); }
-    #[cfg(target_os = "macos")]
-    {
-        let mut command = Command::new("/usr/bin/security");
-        command.args(["add-trusted-cert", "-r", "trustRoot", "-p", "ssl"]);
-        if crate::host::isolated_profile_dir().is_some() {
-            // New Desktop exports host roots to its VM only after Basic X.509
-            // evaluation. Keep explicit policies; do not grant all-purpose trust.
-            // This runs only after the user's explicit Trust action and OS dialog.
-            command.args(["-p", "basic"]);
-        }
-        command.arg("-k").arg(home_dir().join("Library/Keychains/login.keychain-db"))
-            .arg(root.join("ca/ca.pem"));
-        checked(&mut command, Duration::from_secs(120),
-            "本地证书尚未信任，请在系统授权窗口中允许后重试")?;
-    }
-    // certutil -addstore 会弹 Windows 安全警告，用户点「是」才会返回成功。
-    #[cfg(windows)]
-    checked(
-        hidden_command("certutil")
-            .args(["-user", "-addstore", "Root"])
-            .arg(root.join("ca/ca.pem")),
-        Duration::from_secs(120),
-        "本地证书尚未信任，请在 Windows 弹出的安全警告中点击“是”后重试",
-    )?;
-    ensure!(ca_trusted(root), "本地证书信任未生效，请重新检查系统授权");
-    Ok(())
-}
+fn prepare_ca(_: &Path) -> Result<()> { bail!("Use Claude Desktop gateway configuration") }
+fn trust_ca(_: &Path) -> Result<()> { bail!("Use Claude Desktop gateway configuration") }
 
 /// 内嵌的运行时代理资产指纹。
 ///
@@ -2376,6 +2266,7 @@ pub fn serve_headless() -> Result<u16> {
 }
 
 pub fn perform(action: &str) -> Result<ClaudeLocalResult> {
+    ensure!(matches!(action, "stop" | "untrust"), "Only legacy cleanup is available");
     ensure!(
         platform_supported(),
         "原版 Claude 本地模式目前仅支持 macOS、Windows 和 Linux"
@@ -2569,6 +2460,54 @@ pub fn perform(action: &str) -> Result<ClaudeLocalResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn private_dir_error_preserves_only_safe_os_diagnostics() {
+        let message = private_dir_failure(Some(1), b"TUZI_ACL_ERROR|write-acl|80070005|UnauthorizedAccessException\r\n");
+        assert!(message.contains("stage=write-acl, HRESULT=0x80070005"));
+        for output in [
+            "secret profile path and token",
+            "TUZI_ACL_ERROR|secret-stage|80070005|UnauthorizedAccessException",
+            "TUZI_ACL_ERROR|write-acl|secret-value|UnauthorizedAccessException",
+            "TUZI_ACL_ERROR|write-acl|80070005|C:\\Users\\private",
+        ] {
+            let message = private_dir_failure(Some(1), output.as_bytes());
+            assert!(message.contains("no safe diagnostic available"));
+            assert!(!message.contains("secret"));
+            assert!(!message.contains("Users"));
+        }
+    }
+
+    #[test]
+    fn private_dir_repeated_calls_preserve_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let directory = temp.path().join("兔子 space & quote' dollar$");
+        private_dir(&directory).unwrap();
+        let file = directory.join("synthetic.txt");
+        fs::write(&file, b"SYNTHETIC").unwrap();
+        private_dir(&directory).unwrap();
+        private_dir(&directory).unwrap();
+        assert_eq!(fs::read(&file).unwrap(), b"SYNTHETIC");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(fs::metadata(&directory).unwrap().permissions().mode() & 0o777, 0o700);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_dir_rejects_symlinks_without_changing_target() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("target");
+        fs::create_dir(&target).unwrap();
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o755)).unwrap();
+        let link = temp.path().join("link");
+        symlink(&target, &link).unwrap();
+        assert!(private_dir(&link).unwrap_err().to_string().contains("symbolic link"));
+        assert_eq!(fs::metadata(target).unwrap().permissions().mode() & 0o777, 0o755);
+    }
 
     #[test]
     fn upstream_web_proxy_prefers_inherited_then_system_and_only_http() {
@@ -3480,38 +3419,12 @@ RGvMS5OzZFvnFlekIHE6c+6QK9QtWD7P+PkIpRa1D01cb9SwsRHqGfs7o2UbaZxs\n\
         assert!(claude_pids_on_proxy(&listing, 500).is_empty(), "端口不整词匹配");
     }
 
-    /// 进程内生成的 CA 材料：四件齐全、PEM 头正确（私钥是 PKCS#8）、
-    /// ca.pem 能算出 SHA-1 指纹。
     #[test]
-    fn generate_ca_writes_complete_pem_material() {
+    fn gateway_setup_never_creates_certificate_material() {
         let temp = tempfile::tempdir().unwrap();
-        let ca = temp.path().join("ca");
-        fs::create_dir_all(&ca).unwrap();
-        generate_ca(&ca, "Test Claude Local CA").unwrap();
-
-        assert!(ca_ready(temp.path()), "四个文件都要有内容");
-        for name in ["ca.key", "server.key"] {
-            let pem = fs::read(ca.join(name)).unwrap();
-            assert!(
-                pem.starts_with(b"-----BEGIN PRIVATE KEY-----"),
-                "{name} 应是 PKCS#8 PEM 私钥"
-            );
-        }
-        for name in ["ca.pem", "server.crt"] {
-            let pem = fs::read(ca.join(name)).unwrap();
-            assert!(
-                pem.starts_with(b"-----BEGIN CERTIFICATE-----"),
-                "{name} 应是 PEM 证书"
-            );
-        }
-        let thumbprint = ca_thumbprint(&fs::read(ca.join("ca.pem")).unwrap()).unwrap();
-        assert_eq!(thumbprint.len(), 40, "SHA-1 指纹 40 位十六进制");
-        assert!(thumbprint.chars().all(|ch| ch.is_ascii_digit() || ('A'..='F').contains(&ch)));
-
-        // 已有证书不重复生成：再调 prepare_ca 不动磁盘上的材料。
-        let ca_pem = fs::read(ca.join("ca.pem")).unwrap();
-        prepare_ca(temp.path()).unwrap();
-        assert_eq!(fs::read(ca.join("ca.pem")).unwrap(), ca_pem);
+        assert!(prepare_ca(temp.path()).is_err());
+        assert!(trust_ca(temp.path()).is_err());
+        assert!(!temp.path().join("ca").exists());
     }
 
     #[test]

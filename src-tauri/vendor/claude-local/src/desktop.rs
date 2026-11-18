@@ -73,16 +73,23 @@ pub fn source_app(_deadline: Instant) -> Result<PathBuf> {
 
 #[cfg(target_os = "windows")]
 pub fn source_app(deadline: Instant) -> Result<PathBuf> {
+    windows_installation(deadline).map(|(path, _)| path)
+}
+
+#[cfg(windows)]
+fn windows_installation(deadline: Instant) -> Result<(PathBuf, bool)> {
     let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(home_dir);
     let program = std::env::var_os("ProgramFiles").map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(r"C:\Program Files"));
     let query = probe_output(Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference = 'Stop'; @(Get-AppxPackage -Name Claude; Get-AppxPackage -Name AnthropicPBC.Claude) | Select-Object Name,InstallLocation | ConvertTo-Json -Compress"]), deadline);
+    let mut registered = false;
     if let Ok(output) = &query {
         if output.status.success() {
             for install in claude_package_locations(&output.stdout)? {
+                registered = true;
                 let packaged = PathBuf::from(install).join(r"app\Claude.exe");
-                if packaged.is_file() { return Ok(packaged); }
+                if packaged.is_file() { return Ok((packaged, true)); }
             }
         }
     }
@@ -94,11 +101,36 @@ pub fn source_app(deadline: Instant) -> Result<PathBuf> {
         local.join(r"Claude\Claude.exe"),
         program.join(r"Claude\Claude.exe"),
     ];
-    if let Some(path) = candidates.into_iter().find(|path| path.is_file()) { return Ok(path); }
+    if let Some(path) = candidates.into_iter().find(|path| path.is_file()) { return Ok((path, true)); }
     // 查询失败不是「未安装」，明确返回错误，避免把超时误报成未安装。
     let output = query?;
     ensure!(output.status.success(), "无法检测 Claude 安装位置，请检查 Windows 应用包服务后重试");
-    Ok(local.join(r"Programs\Claude\Claude.exe"))
+    Ok((local.join(r"Programs\Claude\Claude.exe"), registered))
+}
+
+pub fn official_installation_present() -> Result<Option<bool>> {
+    #[cfg(windows)]
+    return windows_installation(Instant::now() + PROBE_TIMEOUT).map(|(_, installed)| Some(installed));
+    #[cfg(target_os = "macos")]
+    {
+        for root in [PathBuf::from("/Applications"), home_dir().join("Applications")] {
+            if root.join("Claude.app/Contents/MacOS/Claude").try_exists()? {
+                return Ok(Some(true));
+            }
+        }
+        Ok(Some(false))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let path = source_app(Instant::now() + PROBE_TIMEOUT)?;
+        return match std::fs::metadata(path) {
+            Ok(metadata) => Ok(Some(metadata.is_file())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Some(false)),
+            Err(error) => Err(error.into()),
+        };
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+    Ok(None)
 }
 
 /// Resolve only a registered, trusted official MSIX. Keeping its installed path

@@ -27,6 +27,15 @@
       "authorization": "Bearer 接頭辞付きの Authorization 値をコピーしました。"
     }
   },
+  "workbuddyForm": { "invalidJson": "JSON 設定とモデルの項目を確認してください。", "selectAccount": "WorkBuddy アカウントを選択してください。" },
+  "workbuddyQuota": {
+    "expiry": "{{amount}} クレジット · {{until}}",
+    "noExpiry": "無期限",
+    "not_running": "残高を更新するには WorkBuddy を開いてください",
+    "not_current": "このアカウントに切り替えると残高を更新できます",
+    "not_signed_in": "残高を更新するには WorkBuddy にログインしてください",
+    "failed": "残高を更新できませんでした"
+  },
   "app": {
     "title": "兔子助手",
     "description": "Claude Code・Codex・Gemini CLI のためのオールインワンアシスタント"
@@ -973,7 +982,8 @@
     "gemini": "Gemini",
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
-    "hermes": "Hermes"
+    "hermes": "Hermes",
+    "workbuddy": "WorkBuddy"
   },
   "sessionManager": {
     "title": "セッション管理",
@@ -1451,7 +1461,8 @@
       "all": "すべて",
       "claude": "Claude Code",
       "codex": "Codex",
-      "gemini": "Gemini"
+      "gemini": "Gemini",
+      "workbuddy": "WorkBuddy"
     },
     "dataSources": "データソース",
     "dataSource": {
@@ -1459,6 +1470,7 @@
       "session_log": "セッションログ",
       "codex_db": "Codex DB",
       "codex_session": "Codex セッション",
+      "workbuddy_session": "WorkBuddy セッション",
       "gemini_session": "Gemini セッション"
     },
     "sessionSync": {
@@ -3249,6 +3261,14 @@
     }
   },
   "claudeLocal": {
+    "gatewayHint": "Claude Desktop を検出しました。Claude を終了し、下でプロバイダーを有効にしてから、Claude を再起動してください。ローカルのルート証明書は不要です。",
+    "gatewayDetectionError": "Claude Desktop のインストールを確認できません。インストール状況を確認してから再度「環境を準備」を選択してください。",
+    "gatewayCleanup": "旧バージョンの互換設定を解除",
+    "gatewayCleanupDone": "選択した操作が完了しました。",
+    "downloadLink": "claude.com からダウンロード",
+    "installTitle": "Claude Desktop が見つかりません",
+    "installMessage": "Claude 公式サイトからデスクトップアプリをインストールし、ここに戻って設定を続けてください。",
+    "downloadError": "Claude 公式サイトを開けませんでした。ブラウザーで claude.com にアクセスしてください。",
     "voiceProgress": "音声モデルをダウンロード中：{{percent}}%",
     "voice": "ローカル音声入力",
     "computer": "コンピューター操作",

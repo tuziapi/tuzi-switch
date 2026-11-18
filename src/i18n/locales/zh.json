@@ -27,6 +27,15 @@
       "authorization": "已复制 Authorization 值，包含 Bearer 前缀。"
     }
   },
+  "workbuddyForm": { "invalidJson": "请检查 JSON 配置和模型字段。", "selectAccount": "请先选择 WorkBuddy 账号。" },
+  "workbuddyQuota": {
+    "expiry": "{{amount}} 积分 · {{until}}",
+    "noExpiry": "长期有效",
+    "not_running": "打开 WorkBuddy 可刷新额度",
+    "not_current": "切换到此账号可刷新额度",
+    "not_signed_in": "登录 WorkBuddy 可刷新额度",
+    "failed": "本次额度查询失败"
+  },
   "app": {
     "title": "兔子助手",
     "description": "Claude Code / Codex / Gemini CLI 全方位辅助工具"
@@ -978,7 +987,8 @@
     "gemini": "Gemini",
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
-    "hermes": "Hermes"
+    "hermes": "Hermes",
+    "workbuddy": "WorkBuddy"
   },
   "sessionManager": {
     "title": "会话管理",
@@ -1456,7 +1466,8 @@
       "all": "全部",
       "claude": "Claude Code",
       "codex": "Codex",
-      "gemini": "Gemini"
+      "gemini": "Gemini",
+      "workbuddy": "WorkBuddy"
     },
     "dataSources": "数据来源",
     "dataSource": {
@@ -1464,6 +1475,7 @@
       "session_log": "会话日志",
       "codex_db": "Codex 数据库",
       "codex_session": "Codex 会话日志",
+      "workbuddy_session": "WorkBuddy 会话日志",
       "gemini_session": "Gemini 会话日志"
     },
     "sessionSync": {
@@ -3256,6 +3268,14 @@
     }
   },
   "claudeLocal": {
+    "gatewayHint": "已检测到 Claude Desktop。请完全退出 Claude，在下方启用所需线路，再重新打开 Claude。此流程无需本地根证书。",
+    "gatewayDetectionError": "无法确认 Claude Desktop 是否已安装。请检查安装后重新点击「准备环境」。",
+    "gatewayCleanup": "清理旧版兼容配置",
+    "gatewayCleanupDone": "所选清理操作已完成。",
+    "downloadLink": "前往 claude.com 下载",
+    "installTitle": "未检测到 Claude Desktop",
+    "installMessage": "请从 Claude 官网下载安装桌面应用，然后回到这里继续配置。",
+    "downloadError": "无法打开 Claude 官网，请在浏览器中访问 claude.com。",
     "voiceProgress": "正在下载语音模型：{{percent}}%",
     "voice": "本地语音输入",
     "computer": "电脑控制",

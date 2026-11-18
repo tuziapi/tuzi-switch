@@ -1,0 +1,44 @@
+name: Windows Claude private directory regression
+on:
+  push:
+    branches: [codex/windows-claude-acl-1118]
+    paths:
+      - '.github/workflows/windows-claude-acl.yml'
+      - 'scripts/qa/windows-claude-acl.ps1'
+      - 'src-tauri/vendor/claude-local/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  permissions:
+    if: github.repository == 'AiW520/tuzi-switch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.95'
+      - name: Build and test the actual Rust entry point using release dependency versions
+        shell: powershell
+        run: |
+          Copy-Item src-tauri/Cargo.lock src-tauri/vendor/claude-local/Cargo.lock
+          cargo test --manifest-path src-tauri/vendor/claude-local/Cargo.toml --lib private_dir_
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --locked --manifest-path src-tauri/vendor/claude-local/Cargo.toml --example private-dir-probe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise production ACL script with elevated and standard users
+        shell: powershell
+        run: scripts/qa/windows-claude-acl.ps1 -NativeProbe src-tauri/vendor/claude-local/target/debug/examples/private-dir-probe.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: claude-acl-${{ matrix.os }}
+          path: acl-results/*.json
+          if-no-files-found: error

@@ -16,6 +16,7 @@ mod codex;
 mod gemini;
 mod hermes;
 mod opencode;
+pub(crate) mod workbuddy;
 mod validation;
 
 // 重新导出公共 API

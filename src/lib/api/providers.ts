@@ -47,7 +47,15 @@ export interface ClaudeDesktopDefaultRoute {
   supports1m: boolean;
 }
 
+export interface WorkBuddyModelOwner {
+  id: string;
+  owner: string | null;
+}
+
 export const providersApi = {
+  async workbuddyModelOwners(): Promise<WorkBuddyModelOwner[]> {
+    return await invoke("workbuddy_model_owners");
+  },
   async getAll(appId: AppId): Promise<Record<string, Provider>> {
     return await invoke("get_providers", { app: appId });
   },

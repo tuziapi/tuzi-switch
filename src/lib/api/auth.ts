@@ -95,7 +95,10 @@ export async function authLogout(
   });
 }
 
+export const workbuddyAccountOpenApp = () => invoke<void>("workbuddy_account_open_app");
+
 export const authApi = {
+  workbuddyAccountOpenApp,
   authStartLogin,
   authPollForAccount,
   authListAccounts,

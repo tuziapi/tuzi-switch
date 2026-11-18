@@ -151,7 +151,11 @@ export function ProviderList({
     queryFn: () => providersApi.getOpenCodeLiveProviderIds(),
     enabled: appId === "opencode",
   });
-
+  const { data: workbuddyOwners } = useQuery({
+    queryKey: ["workbuddy", "modelOwners"],
+    queryFn: providersApi.workbuddyModelOwners,
+    enabled: appId === "workbuddy",
+  });
   // OpenClaw: 查询 live 配置中的供应商 ID 列表，用于判断 isInConfig
   const { data: openclawLiveIds } = useOpenClawLiveProviderIds(
     appId === "openclaw",
@@ -185,9 +189,12 @@ export function ProviderList({
       if (appId === "hermes") {
         return hermesLiveIds?.includes(providerId) ?? false;
       }
+      if (appId === "workbuddy") {
+        return workbuddyOwners?.some(({ owner }) => owner === providerId) ?? false;
+      }
       return true; // 其他应用始终返回 true
     },
-    [appId, opencodeLiveIds, openclawLiveIds, hermesLiveIds],
+    [appId, opencodeLiveIds, openclawLiveIds, hermesLiveIds, workbuddyOwners],
   );
 
   // OpenClaw: query default model to determine which provider is default
@@ -577,7 +584,7 @@ export function ProviderList({
                       ? isOmoSlimCurrent
                       : appId === "hermes"
                         ? isHermesCurrent
-                        : provider.id === currentProviderId
+                          : provider.id === currentProviderId
                 }
                 appId={appId}
                 isInConfig={isProviderInConfig(provider.id)}

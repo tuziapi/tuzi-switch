@@ -260,6 +260,16 @@ pub fn sync_session_usage(
         }
     }
 
+    match crate::services::session_usage_workbuddy::sync_workbuddy_usage(&state.db) {
+        Ok(workbuddy_result) => {
+            result.imported += workbuddy_result.imported;
+            result.skipped += workbuddy_result.skipped;
+            result.files_scanned += workbuddy_result.files_scanned;
+            result.errors.extend(workbuddy_result.errors);
+        }
+        Err(e) => result.errors.push(format!("WorkBuddy 同步失败: {e}")),
+    }
+
     Ok(result)
 }
 
