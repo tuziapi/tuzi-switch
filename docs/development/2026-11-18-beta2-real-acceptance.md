@@ -33,3 +33,9 @@ beta.2 在宿主和画布左上角提示 `test-f86531a4 (#15)`。未点击下载
 beta.3 构建 `44216753049`，固定源码 `be5bd7bb2f61cdc289504837bbacc181a24b3d3a`；云端 verify 已通过，宿主 907 项、创作 2950 项全部通过，五平台原生构建进行中。下载页暂保持 beta.2，未发布 beta.3。
 
 正式门槛仍未完成：电脑控制、麦克风 UI、目标 ChatGPT MCP 全链路、其他平台实机及正式身份签名升级。此次对话/Code/Cowork/恢复通过不能替代这些项目。
+
+## beta.3 本机新包复验
+
+同一构建的 Mac ARM artifact 14390897159 全部 ZIP SHA256 与 GitHub digest 一致；DMG 摘要 a80ebea13f6c14f4e1914231021f84640e9217ae8f59c96ebefac232080fb0d0。只读挂载后验证独立身份、版本、深度签名、Node JIT 及真实脚本/fetch/WebSocket，通过后安装。旧 app、SQLite 一致备份和 settings 存于 `~/Library/Application Support/Tuzi Local Backups/beta3-install-20261118-101930`；正式应用摘要保持不变。
+
+实际新包显示 v1.6.3-beta.3；手动检查提示独立验收版应从原测试页安装，没有旧 test-f86531a4 更新提醒。原两个项目及带参考图草稿保留。Claude 再次启动，Cowork 文件任务完整恢复；在恢复会话里发送合成升级后检查，真实返回 TUZI-BETA3-UPGRADE-OK，网关实际 gpt-6.1-sol / HTTP 200。证据见 `attachments/beta3-channel-1118/`。未复测拆分/OCR，未发布正式版。

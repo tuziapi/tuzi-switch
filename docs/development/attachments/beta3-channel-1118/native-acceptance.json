@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-11-18T02:29:54.968737+00:00",
+  "version": "1.6.3-beta.3",
+  "sourceCommit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+  "settingsVersionCorrect": true,
+  "legacyUpdateNoticeAbsent": true,
+  "manualUpdateGuidanceObserved": true,
+  "canvasProjectAndReferenceDraftPreserved": true,
+  "coworkHistoryAndFilesPreserved": true,
+  "realReply": "TUZI-BETA3-UPGRADE-OK",
+  "gatewayRequest": {
+    "app_type": "claude-desktop",
+    "model": "gpt-6.1-sol",
+    "request_model": "claude-gpt-6.1-sol",
+    "status_code": 200,
+    "is_streaming": 1,
+    "created_at": 1794968887
+  },
+  "otherPlatformRealHardware": false,
+  "formalRelease": false
+}

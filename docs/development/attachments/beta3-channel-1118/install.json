@@ -1,0 +1,26 @@
+{
+  "backupDirectory": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/beta3-install-20261118-101930",
+  "previous": {
+    "version": "1.6.3-beta.2",
+    "identifier": "com.tuziswitch.desktop.opentu-preview",
+    "sha256": "420e6699202828a16400cbf354489e05212ae0bf22fc75f6f6db3fae46dd0360"
+  },
+  "installed": {
+    "version": "1.6.3-beta.3",
+    "identifier": "com.tuziswitch.desktop.opentu-preview",
+    "sha256": "091ad0f5a9426258d4413155b9e97a5ef4feb56a41624cd2b980bbc3928804f2"
+  },
+  "formalBefore": {
+    "version": "1.6.2",
+    "identifier": "com.tuziswitch.desktop",
+    "sha256": "64c41bdd071736bd5e836a06050183c872e3e2587ab484725298ebb390e87b0d"
+  },
+  "formalAfter": {
+    "version": "1.6.2",
+    "identifier": "com.tuziswitch.desktop",
+    "sha256": "64c41bdd071736bd5e836a06050183c872e3e2587ab484725298ebb390e87b0d"
+  },
+  "databaseBackup": "SQLite backup API",
+  "settingsBackup": true,
+  "existingProfileRetained": true
+}
