@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { previewVersion } from "./src/previewRelease.js";
 const repository =
   process.env.VITE_RELEASE_REPOSITORY ||
   process.env.GITHUB_REPOSITORY ||
@@ -24,7 +25,7 @@ export default defineConfig({
         return process.env.VITE_DOWNLOAD_CHANNEL === "preview"
           ? html.replace(
               "<title>兔子助手 · 下载</title>",
-              "<title>兔子助手 · 1.6.3-beta.2 测试版下载</title>",
+              `<title>兔子助手 · ${previewVersion} 测试版下载</title>`,
             )
           : html;
       },

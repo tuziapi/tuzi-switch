@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { FaApple, FaLinux, FaWindows } from "react-icons/fa6";
 import { isStableRelease, repository } from "./stableRelease";
-import { previewDownloadRelease } from "./previewRelease";
+import { previewDownloadRelease, previewVersion } from "./previewRelease";
 import { macosInstallCommand } from "./macosInstaller";
 import "./tuzi-download.css";
 
@@ -522,7 +522,7 @@ export function TuziDownloadView({
               <p>
                 {t(
                   preview
-                    ? "测试版 1.6.3-beta.2 · 安装后为独立的 OpenTu 验收版。"
+                    ? `测试版 ${previewVersion} · 安装后为独立的 OpenTu 验收版。`
                     : "下载包含 opentu 的兔子助手，选择适合电脑的安装包。",
                 )}
               </p>
