@@ -62,6 +62,24 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe("acceptance update channel", () => {
+  it.each([0, 1, 15, 999])(
+    "does not offer legacy or stable updates to preview build %s",
+    async (runNumber) => {
+      invoke.mockResolvedValue({ ...build, channel: "preview", runNumber });
+      const { checkForUpdate } = await import("@/lib/updater");
+      expect(await checkForUpdate()).toEqual({ status: "disabled" });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(check).not.toHaveBeenCalled();
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(invoke).toHaveBeenCalledWith("get_update_build_info");
+    },
+  );
+  it("rejects a preview identity passed directly to the legacy updater", async () => {
+    await expect(
+      checkAcceptanceUpdate({ ...build, channel: "preview" }, 100),
+    ).rejects.toThrow("no published update identity");
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it.each(["macos", "macos-intel", "windows", "linux"])(
     "offers the exact %s artifact only on user click",
     async (platform) => {

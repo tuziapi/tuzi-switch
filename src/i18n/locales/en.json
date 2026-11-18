@@ -810,6 +810,7 @@
     "browseDirectory": "Browse Directory",
     "resetDefault": "Reset to default directory (takes effect after saving)",
     "updateNoticeTitle": "Tuzi Assistant update available",
+    "previewUpdateManualHint": "This standalone preview does not support in-app updates. Open Release Notes to visit the test download page and install a newer version manually.",
     "viewUpdate": "View update",
     "acceptanceUpdateNotice": "Test build with opentu. Sign in to GitHub to download.",
     "downloadUpdate": "Download update",

@@ -1,0 +1,100 @@
+Window: "Claude", App: Claude.
+0 标准窗口 Claude, Secondary Actions: Raise
+	1 container Claude
+		2 container
+			3 滚动区
+				4 HTML 内容 file:///Users/sdy09/Library/Application%20Support/com.tuziswitch.desktop.opentu-preview/home/.tuzi-switch/claude-desktop-local/desktop-app/5.11492.5/Claude.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html
+			5 滚动区
+				6 HTML 内容 This is a synthetic connectivi... - Claude, URL: claude.ai/cowork/local_65f3c565-9350-40c4-8bcd-95ed712f3bf4
+					7 container
+						8 container
+							9 标题 Claude, Value: 1
+								10 文本 Claude
+							11 container 侧边栏
+								12 按钮 隐藏侧边栏
+								13 模式
+									14 单选按钮 对话和 Cowork, Value: 1
+									15 单选按钮 Code, Value: 0
+								16 container
+									17 标题 导航, Value: 2
+										18 文本 导航
+									19 container
+										20 按钮 新建
+										21 按钮 搜索
+										22 按钮 项目
+										23 按钮 作品
+										24 按钮 Dispatch 测试版
+										25 按钮 自定义
+										26 标题 最近使用, Value: 3
+											27 按钮 最近使用
+										28 弹出式按钮 筛选和分组最近对话
+										29 container
+											30 按钮 This is a synthetic connectivi...
+												31 文本 This is a synthetic connectivi...
+											32 弹出式按钮 This is a synthetic connectivi... 的更多选项
+										33 按钮 查看全部
+									34 container
+										35 弹出式按钮
+										36 link 获取应用和扩展, Value: claude.ai/downloads
+								37 分离器 调整侧边栏宽度, Value: 288
+							38 container
+								39 container 主面板
+									40 container
+										41 工具栏 页面工具
+											42 container
+												43 按钮 仅在此电脑上
+												44 标题 This is a synthetic connectivi..., Value: 2
+													45 按钮 This is a synthetic connectivi...，重命名会话
+												46 弹出式按钮 This is a synthetic connectivi... 的更多选项
+										47 container
+											48 container 对话消息
+												49 文本 使用向上和向下箭头键在消息之间移动。
+												50 container
+													51 container 第 1 条消息，共 4 条
+														52 标题 您说：This is a synthetic connectivity acceptance test., Value: 3
+															53 文本 您说：This is a synthetic connectivity acceptance test.
+														54 文本 This is a synthetic connectivity acceptance test. Reply only TUZI-BETA2-1118-OK. Do not call tools or access files.
+														55 按钮 显示 您说：This is a synthetic connectivity acceptance test. 的消息操作
+													56 container 第 2 条消息，共 4 条
+														57 container
+															58 标题 Claude 已回复：TUZI-BETA2-1118-OK, Value: 3
+																59 文本 Claude 已回复：TUZI-BETA2-1118-OK
+															60 文本 TUZI-BETA2-1118-OK
+														61 按钮 显示 Claude 已回复：TUZI-BETA2-1118-OK 的消息操作
+													62 container 第 3 条消息，共 4 条
+														63 标题 您说：Return the exact marker from your previous response, followed by a space and CONTEXT-OK., Value: 3
+															64 文本 您说：Return the exact marker from your previous response, followed by a space and CONTEXT-OK.
+														65 文本 Return the exact marker from your previous response, followed by a space and CONTEXT-OK. Do not use tools.
+														66 按钮 显示 您说：Return the exact marker from your previous response, followed by a space and CONTEXT-OK. 的消息操作
+													67 container 第 4 条消息，共 4 条
+														68 container
+															69 标题 Claude 已回复：TUZI-BETA2-1118-OK CONTEXT-OK, Value: 3
+																70 文本 Claude 已回复：TUZI-BETA2-1118-OK CONTEXT-OK
+															71 文本 TUZI-BETA2-1118-OK CONTEXT-OK
+														72 工具栏 消息操作
+															73 按钮 复制
+															74 文本 8分钟前
+											75 container
+												76 container
+													77 文本输入区 (settable) 输入您发送给 Claude 的提示词, Value: 输入消息…
+
+														78 文本 输入消息…
+													79 弹出式按钮 添加文件、连接器等
+													80 弹出式按钮 (disabled) 模型：gpt-6.1-sol
+													81 按钮 (disabled) 发送消息
+											82 文本 Claude 是 AI，可能会出错。请仔细核对回复。
+						83 container
+							84 container Notifications
+	85 关闭按钮
+	86 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	87 最小化按钮
+88 menu bar
+	89 Claude
+	90 文件
+	91 编辑
+	92 视图
+	93 转到
+	94 窗口
+	95 帮助
+
+The focused UI element is 77 文本输入区 (settable) 输入您发送给 Claude 的提示词, Value: 输入消息…

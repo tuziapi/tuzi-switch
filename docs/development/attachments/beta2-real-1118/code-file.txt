@@ -1,0 +1,112 @@
+Window: "Claude", App: Claude.
+0 标准窗口 Claude, Secondary Actions: Raise
+	1 container Claude
+		2 container
+			3 滚动区
+				4 HTML 内容 file:///Users/sdy09/Library/Application%20Support/com.tuziswitch.desktop.opentu-preview/home/.tuzi-switch/claude-desktop-local/desktop-app/5.11492.5/Claude.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html
+			5 滚动区
+				6 HTML 内容 Synthetic beta.2 acceptance test. Work only - Claude Code, URL: claude.ai/epitaxy/local_2bbaeac7-6c6f-43bb-9f6c-2910e37ea380
+					7 container
+						8 container
+							9 标题 Claude Code, Value: 1
+								10 文本 Claude Code
+							11 container 侧边栏
+								12 按钮 隐藏侧边栏
+								13 container
+									14 标题 导航, Value: 2
+										15 文本 导航
+									16 container 模式
+										17 按钮 主页
+										18 按钮 Code
+									19 container
+										20 按钮 新建
+										21 按钮 搜索
+										22 按钮 作品
+										23 按钮 自定义
+										24 标题 Tuzi-Acceptance-1117, Value: 3
+											25 按钮 Tuzi-Acceptance-1117
+										26 按钮 New session in Tuzi-Acceptance-1117
+										27 弹出式按钮 筛选
+										28 container
+											29 按钮 Synthetic beta.2 acceptance test. Work only 空闲
+												30 文本 Synthetic beta.2 acceptance test. Work only
+												31 图像 空闲
+											32 弹出式按钮 Synthetic beta.2 acceptance test. Work only 的更多选项
+										33 container
+											34 按钮 This is a synthetic connectivity test. 空闲
+												35 文本 This is a synthetic connectivity test.
+												36 图像 空闲
+											37 弹出式按钮 This is a synthetic connectivity test. 的更多选项
+									38 container
+										39 弹出式按钮
+										40 按钮 Code 设置
+								41 分离器 调整侧边栏宽度, Value: 288
+							42 container
+								43 container 主面板
+									44 container
+										45 container
+											46 container
+												47 工具栏 会话工具
+													48 container
+														49 弹出式按钮 远程控制
+														50 标题 Synthetic beta.2 acceptance test. Work only, Value: 2
+															51 按钮 Synthetic beta.2 acceptance test. Work only，重命名会话
+														52 弹出式按钮 Synthetic beta.2 acceptance test. Work only 的更多选项
+														53 弹出式按钮 Tuzi-Acceptance-1117
+													54 container
+														55 切换按钮 终端, Value: 0
+														56 切换按钮 更改, Value: 0
+														57 切换按钮 浏览器, Value: 0
+														58 切换按钮 文件, Value: 0
+														59 弹出式按钮 查看选项
+												60 container
+													61 文本 Claude 已完成回复
+													62 container 对话消息
+														63 文本 使用向上和向下箭头键在消息之间移动。
+														64 container
+															65 container 消息 1
+																66 标题 您说：Synthetic beta.2 acceptance test., Value: 3
+																	67 文本 您说：Synthetic beta.2 acceptance test.
+																68 文本 Synthetic beta.2 acceptance test. Work only in the selected Tuzi-Acceptance-1117 folder. Create a new file beta2-1118-result.txt containing exactly TUZI-BETA2-FILE-OK and one newline. If that file already exists, do not overwrite it; report that instead. Read only this test file back and reply with its content. Do not inspect or modify any other files and do not use network tools.
+																69 工具栏 消息操作
+																	70 文本 2分钟前
+																	71 按钮 复制
+																	72 按钮 回退到此处
+																	73 按钮 从此处分叉
+															74 container 消息 2
+																75 container
+																	76 标题 Claude 已回复：TUZI-BETA2-FILE-OK, Value: 3
+																		77 文本 Claude 已回复：TUZI-BETA2-FILE-OK
+																	78 按钮 Ran a command, read beta2-1118-result.txt
+															79 container
+																80 文本 TUZI-BETA2-FILE-OK
+																81 按钮 显示 Claude 已回复：TUZI-BETA2-FILE-OK 的消息操作
+												82 文本 对话模式
+												83 container
+													84 container
+														85 文本输入区 (settable) 提示词, Placeholder: 输入 / 以使用命令, Value: 
+
+													86 按钮 (disabled) 发送
+												87 container
+													88 弹出式按钮 添加
+													89 弹出式按钮 接受编辑
+													90 弹出式按钮 模型：gpt-6.1-sol
+													91 弹出式按钮 投入程度：高
+													92 弹出式按钮 用量：上下文 28.2k / 1M (3%)
+													93 文本 快速模式已关闭
+											94 文本 方向键可移动图块。按与当前方向垂直的方向键可预览拆分；按 Enter 确认，按 Escape 取消。
+						95 container
+							96 container Notifications
+	97 关闭按钮
+	98 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	99 最小化按钮
+100 menu bar
+	101 Claude
+	102 文件
+	103 编辑
+	104 视图
+	105 转到
+	106 窗口
+	107 帮助
+
+The focused UI element is 6 HTML 内容 Synthetic beta.2 acceptance test. Work only - Claude Code, URL: claude.ai/epitaxy/local_2bbaeac7-6c6f-43bb-9f6c-2910e37ea380

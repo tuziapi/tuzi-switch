@@ -1,5 +1,5 @@
 name: OpenTu five-platform test installers
-run-name: "OpenTu 1.6.3-beta.2 · ${{ github.sha }}"
+run-name: "OpenTu 1.6.3-beta.3 · ${{ github.sha }}"
 on:
   push:
     branches: [codex/test-opentu-1117]

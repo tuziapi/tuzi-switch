@@ -810,6 +810,7 @@
     "browseDirectory": "浏览目录",
     "resetDefault": "恢复默认目录（需保存后生效）",
     "updateNoticeTitle": "兔子助手有新版本",
+    "previewUpdateManualHint": "独立验收版暂不支持应用内更新。请通过“更新日志”打开测试下载页，下载并手动安装新版本。",
     "viewUpdate": "查看更新",
     "acceptanceUpdateNotice": "含 opentu 的测试包，登录 GitHub 后下载。",
     "downloadUpdate": "下载更新",

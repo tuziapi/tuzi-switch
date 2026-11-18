@@ -218,6 +218,7 @@ export async function getCurrentVersion(): Promise<string> {
 export async function checkForUpdate(
   opts: CheckOptions = {},
 ): Promise<
+  | { status: "disabled" }
   | { status: "up-to-date" }
   | { status: "available"; info: UpdateInfo; update: UpdateHandle }
 > {
@@ -227,6 +228,9 @@ export async function checkForUpdate(
     timeout,
     "Get update build identity timed out",
   );
+  // Independent OpenTu previews have no updater artifacts. In particular they
+  // must never compare workflow run numbers with the legacy acceptance feed.
+  if (build.channel === "preview") return { status: "disabled" };
   if (build.channel === "acceptance")
     return checkAcceptanceUpdate(build, timeout);
   if (build.channel !== "stable") throw new Error("Unknown update channel");

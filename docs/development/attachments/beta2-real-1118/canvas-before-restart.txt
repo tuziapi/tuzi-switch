@@ -1,0 +1,85 @@
+Window: "OpenTu 验收版", App: OpenTu 验收版.
+0 standard window OpenTu 验收版, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: 兔子助手, URL: tauri://localhost
+			3 container opentu 创作工作区
+				4 container 创作工具栏
+					5 pop up button 兔子助手导航
+					6 container 创作导航
+						7 button 我的项目
+						8 button 自由画布
+					9 button 创作配置
+					10 button (collapsed) 对话, Help: 展开对话, Secondary Actions: Expand
+				11 container 桌面版本更新
+					12 button 更新 test-f86531a4 (#15)
+				13 image
+				14 text ﻿
+				15 container 图片生成卡片
+					16 image
+					17 image
+					18 image
+					19 image
+					20 text 生成图片
+					21 text 草稿
+					22 image
+					23 image
+					24 image
+					25 text 1 张参考图
+					26 text SYNTHETIC 1117 ：
+					27 text 点击卡片，编辑提示词与参数
+					28 image
+					29 text gpt-image-2.5-sunburst
+					30 text 1 个结果
+					31 image
+				32 button 拖动工具栏位置，双击复位
+				33 button 应用菜单 (有新功能)
+				34 button GitHub
+				35 radio button 手形工具 — H, Value: 0
+				36 radio button 选择 — V, Value: 1
+				37 button 画笔 — P
+				38 button 形状
+				39 radio button 文本 — T, Value: 0
+				40 radio button 图片 — Cmd+U, Value: 0
+				41 radio button 素材库, Value: 0
+				42 radio button AI 图片生成, Value: 0
+				43 radio button AI 视频生成, Value: 0
+				44 button 更多
+				45 button OpenTu 资源
+				46 button 用户反馈群
+				47 button 打开项目
+				48 button 打开工具箱
+				49 button 任务队列
+				50 button 清理网站数据
+				51 container
+					52 button 上传图片或视频
+					53 button 从素材库选择
+					54 button (collapsed) 选择知识库笔记, Secondary Actions: Expand
+					55 toggle button 开启联想, Value: off
+					56 button 图片
+					57 pop up button GPT Image 2.5 Sunburst (↑↓ Tab)
+					58 button auto, 自动, 自动, 自动
+					59 button 1个
+					60 button (disabled) 发送生成请求
+					61 text entry area (settable) Value: [text entry area], Placeholder: 描述你想要创建的图片
+						62 text 描述你想要创建的图片
+					63 button (collapsed) 我的提示词, Secondary Actions: Expand
+					64 button 设置
+					65 button (collapsed) 打开讨论：用文本模型讨论，再预览并批量生成, Secondary Actions: Expand
+				66 button 缩小 — Cmd+-
+				67 pop up button 自适应
+				68 button 放大 — Cmd++
+				69 button 展开小地图
+			70 container Notifications alt+T
+	71 close button
+	72 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	73 minimize button
+	74 text OpenTu 验收版
+75 menu bar
+	76 OpenTu 验收版
+	77 File
+	78 Edit
+	79 View
+	80 Window
+	81 Help
+
+The focused UI element is 2 HTML content Description: 兔子助手, URL: tauri://localhost

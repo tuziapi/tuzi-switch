@@ -264,7 +264,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
         await settingsApi.openExternal(updateInfo.releaseUrl);
         return;
       }
-      if (build?.channel === "acceptance") {
+      if (build?.channel === "acceptance" || build?.channel === "preview") {
         await settingsApi.openExternal(ACCEPTANCE_DOWNLOAD_PAGE);
         return;
       }
@@ -310,6 +310,12 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     let nativeUpdateError: unknown = null;
     try {
       const available = await checkUpdate();
+      if (available === null) {
+        toast.info(t("settings.previewUpdateManualHint"), {
+          closeButton: true,
+        });
+        return;
+      }
       if (available) {
         openUpdateDialog();
         return;

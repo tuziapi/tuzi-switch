@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { UpdateHandle, UpdateInfo } from "./updater";
 
 export interface UpdateBuildInfo {
-  channel: "stable" | "acceptance";
+  channel: "stable" | "acceptance" | "preview";
   repository: string;
   runNumber: number;
   commit: string;
@@ -121,6 +121,7 @@ export async function checkAcceptanceUpdate(
   | { status: "available"; info: UpdateInfo; update: UpdateHandle }
 > {
   if (
+    build.channel !== "acceptance" ||
     build.repository !== ACCEPTANCE_REPOSITORY ||
     !Number.isSafeInteger(build.runNumber) ||
     build.runNumber <= 0 ||
