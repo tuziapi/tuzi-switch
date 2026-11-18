@@ -1,50 +1,50 @@
 {
   "channel": "preview",
   "repository": "AiW520/tuzi-switch",
-  "version": "1.6.3-beta.4",
-  "tag": "opentu-preview-v1.6.3-beta.4",
+  "version": "1.6.3-beta.5",
+  "tag": "opentu-preview-v1.6.3-beta.5",
   "prerelease": true,
   "applicationId": "com.tuziswitch.desktop.opentu-preview",
   "automaticUpdates": false,
-  "commit": "8388123aa682dfe00eac8dd8d8ffe6ec2f796d20",
-  "runId": 44268084338,
-  "releaseUrl": "https://github.com/AiW520/tuzi-switch/releases/tag/opentu-preview-v1.6.3-beta.4",
-  "sourceUrl": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.4/opentu-preview-source-8388123aa682dfe00eac8dd8d8ffe6ec2f796d20.tar.gz",
+  "commit": "8fe9414d714960912ba6447b40e2773c053ed486",
+  "runId": 44284675642,
+  "releaseUrl": "https://github.com/AiW520/tuzi-switch/releases/tag/opentu-preview-v1.6.3-beta.5",
+  "sourceUrl": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.5/opentu-preview-source-8fe9414d714960912ba6447b40e2773c053ed486.tar.gz",
   "downloads": [
     {
       "platform": "macos-arm64",
-      "file": "OpenTu-Preview-1.6.3-beta.4-macos-arm64.dmg",
-      "bytes": 76933766,
-      "sha256": "8f6596a45d6902929206357fba9bcb2fed3bc5e3c8292957a736b876b4bafaa6",
-      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.4/OpenTu-Preview-1.6.3-beta.4-macos-arm64.dmg"
+      "file": "OpenTu-Preview-1.6.3-beta.5-macos-arm64.dmg",
+      "bytes": 76969172,
+      "sha256": "e6a633356b135746d10acb215072818983f6feacddd91c4a9d4598a980e574ec",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.5/OpenTu-Preview-1.6.3-beta.5-macos-arm64.dmg"
     },
     {
       "platform": "macos-x64",
-      "file": "OpenTu-Preview-1.6.3-beta.4-macos-x64.dmg",
-      "bytes": 80179897,
-      "sha256": "cbddc40d864fb71ecfd1664a9fe0cdfa4f6488f3e2f9b379f9beb53224f90ff8",
-      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.4/OpenTu-Preview-1.6.3-beta.4-macos-x64.dmg"
+      "file": "OpenTu-Preview-1.6.3-beta.5-macos-x64.dmg",
+      "bytes": 80190152,
+      "sha256": "c94c1fc352bc1548195ef97574053f37ea781ba01b1c7d772913517e05e378fd",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.5/OpenTu-Preview-1.6.3-beta.5-macos-x64.dmg"
     },
     {
       "platform": "windows-x64",
-      "file": "OpenTu-Preview-1.6.3-beta.4-windows-x64.exe",
-      "bytes": 54282153,
-      "sha256": "7a50e4ba6f093e6176c536642f77f73d5762dbeef826177b33ead1ed5ca2d586",
-      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.4/OpenTu-Preview-1.6.3-beta.4-windows-x64.exe"
+      "file": "OpenTu-Preview-1.6.3-beta.5-windows-x64.exe",
+      "bytes": 54305105,
+      "sha256": "a44fec2efbbde479144529443c793262a8c5c52c17e364e6308c7f2421a6b87f",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.5/OpenTu-Preview-1.6.3-beta.5-windows-x64.exe"
     },
     {
       "platform": "linux-x64",
-      "file": "OpenTu-Preview-1.6.3-beta.4-linux-x64.deb",
-      "bytes": 87596368,
-      "sha256": "7cfd9eb71b916dd7952c331acde36d9f268f36b9d7c07b6ca6deac5ba6fd8d74",
-      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.4/OpenTu-Preview-1.6.3-beta.4-linux-x64.deb"
+      "file": "OpenTu-Preview-1.6.3-beta.5-linux-x64.deb",
+      "bytes": 87617182,
+      "sha256": "fcd04b77190bb779b432dd969844457f1ecb0d1afe5119617a053cacc8bcc347",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.5/OpenTu-Preview-1.6.3-beta.5-linux-x64.deb"
     },
     {
       "platform": "linux-arm64",
-      "file": "OpenTu-Preview-1.6.3-beta.4-linux-arm64.deb",
-      "bytes": 85454464,
-      "sha256": "87151cfbb43331daf92323cac223ff02406807fa60ead37b9475050451df9fda",
-      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.4/OpenTu-Preview-1.6.3-beta.4-linux-arm64.deb"
+      "file": "OpenTu-Preview-1.6.3-beta.5-linux-arm64.deb",
+      "bytes": 85474768,
+      "sha256": "75003025434c11db7f89a7870447b7c94b9640d8768df03996cbfe1b5e3d3815",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.5/OpenTu-Preview-1.6.3-beta.5-linux-arm64.deb"
     }
   ]
 }
