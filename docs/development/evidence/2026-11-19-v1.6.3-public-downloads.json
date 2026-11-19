@@ -1,0 +1,400 @@
+{
+  "tag": "v1.6.3",
+  "checkedAt": "2026-11-19T10:51:09.385222+00:00",
+  "pageCommit": "5f0d0f24b184d121ef47550ea7be12db4b6d5e29",
+  "assets": [
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/latest.json",
+      "httpStatus": 200,
+      "verifiedBytes": 6738,
+      "verification": "full-file",
+      "sha256": "7956bf55bb49aa7d314e002cd90c929bce2a1dbad9eecb26d0e091b3abbc6a4e",
+      "name": "latest.json",
+      "totalBytes": 6738,
+      "fullSha256VerifiedByGitHub": "sha256:7956bf55bb49aa7d314e002cd90c929bce2a1dbad9eecb26d0e091b3abbc6a4e"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/manifest-linux-x64.json",
+      "httpStatus": 200,
+      "verifiedBytes": 904,
+      "verification": "full-file",
+      "sha256": "048119658237b9a55be72888c8b251dd1ac5a273033421f630c2c38a3bfe2056",
+      "name": "manifest-linux-x64.json",
+      "totalBytes": 904,
+      "fullSha256VerifiedByGitHub": "sha256:048119658237b9a55be72888c8b251dd1ac5a273033421f630c2c38a3bfe2056"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/manifest-macos-arm64.json",
+      "httpStatus": 200,
+      "verifiedBytes": 562,
+      "verification": "full-file",
+      "sha256": "2f9dfabb915e0d57c4db45668212cc5a1192fdbdcf8249b65451f947186a3468",
+      "name": "manifest-macos-arm64.json",
+      "totalBytes": 562,
+      "fullSha256VerifiedByGitHub": "sha256:2f9dfabb915e0d57c4db45668212cc5a1192fdbdcf8249b65451f947186a3468"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/manifest-macos-x64.json",
+      "httpStatus": 200,
+      "verifiedBytes": 559,
+      "verification": "full-file",
+      "sha256": "f08c70de33d844e198cc60e12cb4478931380fee0d7f966c7569795b64a7070f",
+      "name": "manifest-macos-x64.json",
+      "totalBytes": 559,
+      "fullSha256VerifiedByGitHub": "sha256:f08c70de33d844e198cc60e12cb4478931380fee0d7f966c7569795b64a7070f"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/manifest-windows-x64.json",
+      "httpStatus": 200,
+      "verifiedBytes": 758,
+      "verification": "full-file",
+      "sha256": "1a7ea9529a81c767a0a9982931f851d49e391c1b22b019500f4fd9b6c4748c37",
+      "name": "manifest-windows-x64.json",
+      "totalBytes": 758,
+      "fullSha256VerifiedByGitHub": "sha256:1a7ea9529a81c767a0a9982931f851d49e391c1b22b019500f4fd9b6c4748c37"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/SHA256SUMS",
+      "httpStatus": 200,
+      "verifiedBytes": 2137,
+      "verification": "full-file",
+      "sha256": "451a75d0dae54d8fb3533004d0e6f09cd3c72ed06ee4ad32c8e45cb2ad8a52a9",
+      "name": "SHA256SUMS",
+      "totalBytes": 2137,
+      "fullSha256VerifiedByGitHub": "sha256:451a75d0dae54d8fb3533004d0e6f09cd3c72ed06ee4ad32c8e45cb2ad8a52a9"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.AppImage",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "76ce835ec4bacbb391ebdab9b26a56397f09989403bae11d3eed71cc22262290",
+      "name": "tuzi-assistant-linux-x64.AppImage",
+      "totalBytes": 160041464,
+      "fullSha256VerifiedByGitHub": "sha256:2f7e03d89d9f590085aa9c2ff428bc18293b8c6d12b594337a5b16d06a9784e8"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.AppImage.sig",
+      "httpStatus": 200,
+      "verifiedBytes": 424,
+      "verification": "full-file",
+      "sha256": "65cb3f31d8b397eb04c6378879bc433dcda21f0c056792f2c0dd325b82de4d0f",
+      "name": "tuzi-assistant-linux-x64.AppImage.sig",
+      "totalBytes": 424,
+      "fullSha256VerifiedByGitHub": "sha256:65cb3f31d8b397eb04c6378879bc433dcda21f0c056792f2c0dd325b82de4d0f"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.deb",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "bfb03b7fc27f7b525905d76b66ca47b00eb9e14c59c30fd5623ad37e16d248e4",
+      "name": "tuzi-assistant-linux-x64.deb",
+      "totalBytes": 87619836,
+      "fullSha256VerifiedByGitHub": "sha256:8559e912d78cd3998a5f9b37dc9c36b65bbd7c4d62d8d9e4379b12d34ca3864f"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.deb.sig",
+      "httpStatus": 200,
+      "verifiedBytes": 420,
+      "verification": "full-file",
+      "sha256": "816843d797cc6cd47c8de9304de37026278c1bafc28bdc84891da875fcb43f6b",
+      "name": "tuzi-assistant-linux-x64.deb.sig",
+      "totalBytes": 420,
+      "fullSha256VerifiedByGitHub": "sha256:816843d797cc6cd47c8de9304de37026278c1bafc28bdc84891da875fcb43f6b"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.rpm",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "e9950d494b62b64f9d93e4ceb3232bb292c18cd25ba15d074ad15f89419a9c73",
+      "name": "tuzi-assistant-linux-x64.rpm",
+      "totalBytes": 87620164,
+      "fullSha256VerifiedByGitHub": "sha256:b054b39ef9f0b194bf5364ea4f9e98333a2208602c8bbb8bed4c7785d4a644bf"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.rpm.sig",
+      "httpStatus": 200,
+      "verifiedBytes": 420,
+      "verification": "full-file",
+      "sha256": "2e2f2b76943e1bd042566a0a9d6e5cef24ca382daa54764a810cbca8d8242951",
+      "name": "tuzi-assistant-linux-x64.rpm.sig",
+      "totalBytes": 420,
+      "fullSha256VerifiedByGitHub": "sha256:2e2f2b76943e1bd042566a0a9d6e5cef24ca382daa54764a810cbca8d8242951"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-macos-arm64.app.tar.gz",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "e00a3f5f42d8db6b483e3e4c8b1935990ce48ae8f36f891edce98fdbe65e1409",
+      "name": "tuzi-assistant-macos-arm64.app.tar.gz",
+      "totalBytes": 78242136,
+      "fullSha256VerifiedByGitHub": "sha256:417ff4f946de27285cedc11555bd66a6460b6700b0523dd95bcf8afd13b2a383"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-macos-arm64.app.tar.gz.sig",
+      "httpStatus": 200,
+      "verifiedBytes": 432,
+      "verification": "full-file",
+      "sha256": "a06b771b8e094c28d1928173204949d8331f584315570764b8521f14a3959ca4",
+      "name": "tuzi-assistant-macos-arm64.app.tar.gz.sig",
+      "totalBytes": 432,
+      "fullSha256VerifiedByGitHub": "sha256:a06b771b8e094c28d1928173204949d8331f584315570764b8521f14a3959ca4"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-macos-arm64.dmg",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "461dd9ce3a65f140f35b8c38f93f7fd7a88a3454f9cbed95f1daf724b4d8a62b",
+      "name": "tuzi-assistant-macos-arm64.dmg",
+      "totalBytes": 76962236,
+      "fullSha256VerifiedByGitHub": "sha256:2180fee36357a6f48450b53c7d70701caa7744f92ad4c162a191f9a9d91b5416"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-macos-x64.app.tar.gz",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "566629fe0dfd0227ee122a323669e0c3196a93f0a45a19d517bf96bfbbea3903",
+      "name": "tuzi-assistant-macos-x64.app.tar.gz",
+      "totalBytes": 81046454,
+      "fullSha256VerifiedByGitHub": "sha256:b6e264219918321744b88a46e23f2ce979e1b18dd30e95304e48d1c2c6087198"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-macos-x64.app.tar.gz.sig",
+      "httpStatus": 200,
+      "verifiedBytes": 428,
+      "verification": "full-file",
+      "sha256": "2cf49931bdb3d2d5e19101a979f03250eb76cb0a8485c64d813176dff3efa19b",
+      "name": "tuzi-assistant-macos-x64.app.tar.gz.sig",
+      "totalBytes": 428,
+      "fullSha256VerifiedByGitHub": "sha256:2cf49931bdb3d2d5e19101a979f03250eb76cb0a8485c64d813176dff3efa19b"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-macos-x64.dmg",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "00598ab8b1ebbbd78099cc81a1259ffef1a4dd32530a9c5d68cc73c76da92395",
+      "name": "tuzi-assistant-macos-x64.dmg",
+      "totalBytes": 80174943,
+      "fullSha256VerifiedByGitHub": "sha256:b670fd44fc960b14e6884b890e2843096e21cf3542850f162aa749753a5265c5"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-source.tar.gz",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "92c6ce01e8b82a73029f0a724e383e07b60a87869514d4ebdd4c7b1b08731739",
+      "name": "tuzi-assistant-source.tar.gz",
+      "totalBytes": 33238452,
+      "fullSha256VerifiedByGitHub": "sha256:fc8b7e09e7a0f7a24fa47d2a143d355d347f06421b417f9d75992e806f172e75"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.exe",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "720facc4408fc9406eb3c06f41676fe828405dc69d1b16dcf492f3aa6fea6287",
+      "name": "tuzi-assistant-windows-x64.exe",
+      "totalBytes": 54303246,
+      "fullSha256VerifiedByGitHub": "sha256:c2a9a2f70635b4fff3d3caefb56bae6f543976b4f999fa25c5f1a1cd0e5c3159"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.exe.sig",
+      "httpStatus": 200,
+      "verifiedBytes": 420,
+      "verification": "full-file",
+      "sha256": "c73a859cccc18ed4ab65cbf29e508b9a9646388488d6ab408bd119f892e3f33c",
+      "name": "tuzi-assistant-windows-x64.exe.sig",
+      "totalBytes": 420,
+      "fullSha256VerifiedByGitHub": "sha256:c73a859cccc18ed4ab65cbf29e508b9a9646388488d6ab408bd119f892e3f33c"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.msi",
+      "httpStatus": 206,
+      "verifiedBytes": 64,
+      "verification": "first-64-bytes",
+      "sha256": "e5d01edd2a2875412d8c35ee106b57648581774b53ad6fc99addb920424b31ae",
+      "name": "tuzi-assistant-windows-x64.msi",
+      "totalBytes": 71589888,
+      "fullSha256VerifiedByGitHub": "sha256:bd8f5c7b2f5e89d12a7287e4a9825a3944464372ea74e86c11015d8fdc347429"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.msi.sig",
+      "httpStatus": 200,
+      "verifiedBytes": 420,
+      "verification": "full-file",
+      "sha256": "6172b5616a57f7400a5b797125b3221b295d4bad2664b50327a0a95f1c3535b9",
+      "name": "tuzi-assistant-windows-x64.msi.sig",
+      "totalBytes": 420,
+      "fullSha256VerifiedByGitHub": "sha256:6172b5616a57f7400a5b797125b3221b295d4bad2664b50327a0a95f1c3535b9"
+    }
+  ],
+  "pageFiles": [
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/LICENSE.txt",
+      "httpStatus": 200,
+      "verifiedBytes": 34523,
+      "verification": "full-file",
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "path": "LICENSE.txt"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/assets/tuzi-switch-D32FSEU9.css",
+      "httpStatus": 200,
+      "verifiedBytes": 18880,
+      "verification": "full-file",
+      "sha256": "36e7c6fd79dbdb4186ba7b6af9235ac66141c1019df68297791a8ded64df1082",
+      "path": "assets/tuzi-switch-D32FSEU9.css"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/assets/tuzi-switch-DKM6YblB.js",
+      "httpStatus": 200,
+      "verifiedBytes": 174670,
+      "verification": "full-file",
+      "sha256": "8f8968f72826c453c4d0ccddc1051478ea894aa14ce45e020a00b987432c87b1",
+      "path": "assets/tuzi-switch-DKM6YblB.js"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/download-SOURCE.json",
+      "httpStatus": 200,
+      "verifiedBytes": 2835,
+      "verification": "full-file",
+      "sha256": "49e6374210370276bcb9cb058cd8d4991118254af7f8fb63ed01e47d2ef6214a",
+      "path": "download-SOURCE.json"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/index.html",
+      "httpStatus": 200,
+      "verifiedBytes": 605,
+      "verification": "full-file",
+      "sha256": "a2f9231e8527f9f3e8823855ba9e5640571f0d218f9c5ced9af0a39570d3a618",
+      "path": "index.html"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.5.sh",
+      "httpStatus": 200,
+      "verifiedBytes": 9541,
+      "verification": "full-file",
+      "sha256": "4384f7885226c6cb7c1ea8b797141ad5e7ee542f09cc74ddb9c6d4fb0f7e4b49",
+      "path": "install-macos-v1.5.5.sh"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.6.sh",
+      "httpStatus": 200,
+      "verifiedBytes": 9541,
+      "verification": "full-file",
+      "sha256": "06c4932d60768acc2bb8f9e7a0929f3c8884b2e054874a154856ca01082b80f6",
+      "path": "install-macos-v1.5.6.sh"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.7.sh",
+      "httpStatus": 200,
+      "verifiedBytes": 9541,
+      "verification": "full-file",
+      "sha256": "d961d779546e20aa088f0b8b505c1c2b617a1357007dacbb60ae2f4d839a95d8",
+      "path": "install-macos-v1.5.7.sh"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.0.sh",
+      "httpStatus": 200,
+      "verifiedBytes": 9541,
+      "verification": "full-file",
+      "sha256": "8b815171738be8417163a50cc85e59d59c959275ccc86779b7631e746fe625c3",
+      "path": "install-macos-v1.6.0.sh"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.1.sh",
+      "httpStatus": 200,
+      "verifiedBytes": 9541,
+      "verification": "full-file",
+      "sha256": "a1cfe907c72f4a5fedb82142d4b204c1eedbb72b884616911fa0f7ff3d388ecf",
+      "path": "install-macos-v1.6.1.sh"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.2.sh",
+      "httpStatus": 200,
+      "verifiedBytes": 9541,
+      "verification": "full-file",
+      "sha256": "7bf1dc2fc7d4dcbcc7f5345823339f71c5ba73b2a69c1cd48991464ca0d9fb21",
+      "path": "install-macos-v1.6.2.sh"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.3.sh",
+      "httpStatus": 200,
+      "verifiedBytes": 9541,
+      "verification": "full-file",
+      "sha256": "751f67c81c0c5a3de8135216c155f3aadb5e473c37664487da8735d7c08a6be8",
+      "path": "install-macos-v1.6.3.sh"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/install.sh",
+      "httpStatus": 200,
+      "verifiedBytes": 2072,
+      "verification": "full-file",
+      "sha256": "0d016c1a0903e2744bc9e659c06f1bed76a428e700bec393cc1e84791362fe59",
+      "path": "install.sh"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/release.json",
+      "httpStatus": 200,
+      "verifiedBytes": 2923,
+      "verification": "full-file",
+      "sha256": "063562d58b1c449db02df17b8d4d7438ef03b0c22bed5ebdb16871b48269357f",
+      "path": "release.json"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-assistant-assets/configuration.png",
+      "httpStatus": 200,
+      "verifiedBytes": 95500,
+      "verification": "full-file",
+      "sha256": "57f28915982f499f9e089ada427c76bedb5eeda97eedcee5e70648a1a0b0b2b1",
+      "path": "tuzi-assistant-assets/configuration.png"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-assistant-assets/icon.png",
+      "httpStatus": 200,
+      "verifiedBytes": 123307,
+      "verification": "full-file",
+      "sha256": "0ac46b55e71b60d46874ca24ded5a98228967753e9dc9333d52f4faa157cf9bc",
+      "path": "tuzi-assistant-assets/icon.png"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-assistant-assets/projects.png",
+      "httpStatus": 200,
+      "verifiedBytes": 53433,
+      "verification": "full-file",
+      "sha256": "e2de881f14cd73fe8d7066a3ff84744d697a5e3c5fc2d4efb9353451959c4caa",
+      "path": "tuzi-assistant-assets/projects.png"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-assistant-assets/tools.png",
+      "httpStatus": 200,
+      "verifiedBytes": 78751,
+      "verification": "full-file",
+      "sha256": "5bde352fcb30dac958ba4f130d2511d533bb5c53d01548db5cdea985e2e1feb9",
+      "path": "tuzi-assistant-assets/tools.png"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-download-analytics.html",
+      "httpStatus": 200,
+      "verifiedBytes": 1416,
+      "verification": "full-file",
+      "sha256": "8d3ef99572f00d8826c49630c9ade6d082c8e3cb261d81f3dc458cd01460d389",
+      "path": "tuzi-download-analytics.html"
+    },
+    {
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-switch.html",
+      "httpStatus": 200,
+      "verifiedBytes": 605,
+      "verification": "full-file",
+      "sha256": "a2f9231e8527f9f3e8823855ba9e5640571f0d218f9c5ced9af0a39570d3a618",
+      "path": "tuzi-switch.html"
+    }
+  ],
+  "scope": "All uploaded asset whole-file digests and sizes match GitHub metadata. Small public assets and all page files were downloaded completely; large asset routes were checked using their first 64 bytes. Separate Mac installer verification downloads both DMGs completely."
+}

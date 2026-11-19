@@ -1,0 +1,84 @@
+{
+  "tag": "v1.6.3",
+  "checkedDate": "2026-11-19",
+  "page": "https://tuziapi.github.io/tuzi-switch/",
+  "pageCommit": "5f0d0f24b184d121ef47550ea7be12db4b6d5e29",
+  "browser": {
+    "method": "Actual in-app browser selection and download href inspection",
+    "downloadButtonClicked": false,
+    "finalSelection": "macos-arm64",
+    "checks": [
+      {
+        "platform": "windows-exe",
+        "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.exe",
+        "result": "passed"
+      },
+      {
+        "platform": "windows-msi",
+        "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-windows-x64.msi",
+        "result": "passed"
+      },
+      {
+        "platform": "linux-deb",
+        "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.deb",
+        "result": "passed"
+      },
+      {
+        "platform": "linux-rpm",
+        "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.rpm",
+        "result": "passed"
+      },
+      {
+        "platform": "linux-appimage",
+        "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.AppImage",
+        "result": "passed"
+      },
+      {
+        "platform": "macos-arm64",
+        "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-macos-arm64.dmg",
+        "result": "passed"
+      },
+      {
+        "platform": "macos-x64",
+        "href": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-macos-x64.dmg",
+        "result": "passed"
+      }
+    ]
+  },
+  "macos": {
+    "scriptSha256": "751f67c81c0c5a3de8135216c155f3aadb5e473c37664487da8735d7c08a6be8",
+    "mode": "verify-only",
+    "network": "Initial direct curl attempts failed with HTTP/2 error or timeout. Verification passed after inheriting the existing system HTTP/HTTPS proxy in the subprocess environment; no proxy settings or script changes.",
+    "checks": [
+      "Full public DMG download",
+      "SHA256",
+      "Mount",
+      "Application identity",
+      "Version",
+      "Architecture",
+      "codesign --verify --deep --strict"
+    ],
+    "results": [
+      {
+        "architecture": "arm64",
+        "command": "bash scripts/install-macos.sh --verify-only --arch arm64",
+        "exitCode": 0,
+        "dmgSha256": "2180fee36357a6f48450b53c7d70701caa7744f92ad4c162a191f9a9d91b5416"
+      },
+      {
+        "architecture": "x64",
+        "command": "bash scripts/install-macos.sh --verify-only --arch x64",
+        "exitCode": 0,
+        "dmgSha256": "b670fd44fc960b14e6884b890e2843096e21cf3542850f162aa749753a5265c5"
+      }
+    ],
+    "applicationInstalled": false,
+    "quarantineRemoved": false,
+    "applicationLaunched": false,
+    "appleNotarizationVerified": false
+  },
+  "limitations": [
+    "Windows Claude sessions and WorkBuddy real-account end-to-end behavior were not fully verified in this release task.",
+    "No real paid model calls in synthetic upgrade tests."
+  ]
+}
