@@ -183,6 +183,7 @@ jobs:
           retention-days: 30
       - run: python3 scripts/test_release_assets.py
       - run: python3 scripts/test_windows_branding.py
+      - run: python3 scripts/test_prepare_windows_msi.py
       - run: python3 scripts/test_prepare_claude_local_node.py
       - run: python3 scripts/check-preview-gateway.py
       - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs scripts/verify-tauri-compatibility.mjs scripts/test-signed-candidate-pair.mjs
@@ -271,13 +272,13 @@ jobs:
       - name: Native regression (host target)
         shell: bash
         run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib -- --test-threads=1
-      - name: Acceptance profile regression
-        shell: bash
-        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --lib --features claude-desktop-local,isolated-profile acceptance_profile_ -- --test-threads=1
       - name: Isolated MCP service regression
         if: runner.os == 'macOS'
         shell: bash
         run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib native_mcp_service_ -- --ignored --test-threads=1
+      - name: Acceptance profile regression
+        shell: bash
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --lib --features claude-desktop-local,isolated-profile acceptance_profile_ -- --test-threads=1
       - name: Build installers
         shell: bash
         env:

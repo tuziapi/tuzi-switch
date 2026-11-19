@@ -16,6 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("stage_node", Path(__file__).with_name("prepare-claude-local-node.py"))
 stage_node = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(stage_node)
+msi_spec = importlib.util.spec_from_file_location("per_user_msi", Path(__file__).with_name("prepare-windows-msi.py"))
+per_user_msi = importlib.util.module_from_spec(msi_spec)
+msi_spec.loader.exec_module(per_user_msi)
 
 
 def build_config(target, opentu_preview=False, test_release=False):
@@ -129,6 +132,9 @@ def main():
                "--features", "claude-desktop-local,opentu-preview" if args.opentu_preview else "claude-desktop-local",
                *([] if args.stable_release else ["--bundles", bundle_kind(target, args.test_release)]),
                *([] if optimized else ["--no-sign"]), "--config", str(config_path)]
+    windows_stable = args.stable_release and "windows" in target
+    if windows_stable:
+        command.append("--no-bundle")
     if args.dry_run:
         print(json.dumps({"target": target, "command": command, "config": config}, indent=2))
         return
@@ -144,6 +150,12 @@ def main():
     environment = dict(os.environ)
     environment["CARGO_INCREMENTAL"] = "0"
     subprocess.run(command, cwd=ROOT, env=environment, check=True)
+    if windows_stable:
+        per_user_msi.prepare_template(ROOT, config, ROOT / "src-tauri/target" / target / "release", output / "per-user-runtime.wxs")
+        config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+        bundle = pnpm_command(["tauri", "bundle", "--verbose", *target_flags, "--features", "claude-desktop-local", "--config", str(config_path)],
+                              shutil.which("pnpm") or shutil.which("pnpm.cmd") or "pnpm", os.name == "nt")
+        subprocess.run(bundle, cwd=ROOT, env=environment, check=True)
 
 
 if __name__ == "__main__":
