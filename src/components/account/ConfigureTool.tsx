@@ -286,7 +286,8 @@ function ConfigureToolSession({
         {(Object.keys(labels) as TuziTool[])
           .filter(
             (id) =>
-              id !== "claude-desktop" || !/linux/i.test(navigator.platform),
+              TUZI_TOOL_TARGETS.some((target) => target.appId === id) &&
+              (id !== "claude-desktop" || !/linux/i.test(navigator.platform)),
           )
           .map((id) => {
             const saved = existing.filter((s) => s.app === id);
