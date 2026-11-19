@@ -50521,3 +50521,20 @@ index cc6c2e31..e315a8f2 100644
        expect(preview.hasAttribute('src')).toBe(false);
        expect(mocks.load).toHaveBeenCalledExactlyOnceWith(cachedElement.url);
        expect(mocks.insert).not.toHaveBeenCalled();
+diff --git a/packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts b/packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts
+index fbcb8b32..6e905b05 100644
+--- a/packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts
++++ b/packages/drawnix/src/hooks/__tests__/useAutoInsertToCanvas.test.ts
+@@ -126,6 +126,12 @@ vi.mock('../../services/task-storage-reader', () => ({
+   taskStorageReader: { getTask: mocks.getStoredTask },
+ }));
+
++vi.mock('../../services/unified-cache-service', () => ({
++  unifiedCacheService: {
++    getCachedBlob: vi.fn().mockResolvedValue(null),
++  },
++}));
++
+ vi.mock('../../services/workflow-completion-service', () => ({
+   workflowCompletionService: {
+     registerTask: mocks.registerTask,

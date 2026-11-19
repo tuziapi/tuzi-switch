@@ -126,6 +126,12 @@ vi.mock('../../services/task-storage-reader', () => ({
   taskStorageReader: { getTask: mocks.getStoredTask },
 }));
 
+vi.mock('../../services/unified-cache-service', () => ({
+  unifiedCacheService: {
+    getCachedBlob: vi.fn().mockResolvedValue(null),
+  },
+}));
+
 vi.mock('../../services/workflow-completion-service', () => ({
   workflowCompletionService: {
     registerTask: mocks.registerTask,
