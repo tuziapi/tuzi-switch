@@ -14,7 +14,7 @@ spec.loader.exec_module(collector)
 
 
 def verify_resources(root, node, provenance):
-    packaged = json.loads((root / "claude-local-runtime/provenance.json").read_text())
+    packaged = json.loads((root / "claude-local-runtime/provenance.json").read_text(encoding="utf-8"))
     assert packaged == provenance, "Packaged runtime provenance differs from verified source"
     for resource in ["claude-local-runtime/LICENSE-node.txt", "licenses/LICENSE-claude-local.txt", "licenses/NOTICE-claude-local.txt", "licenses/TUZI-PATCHES.md"]:
         assert (root / resource).is_file(), f"Missing redistribution material: {resource}"
@@ -26,9 +26,9 @@ def main():
     parser.add_argument("--target", required=True)
     args = parser.parse_args()
     bundle = Path("src-tauri/target") / args.target / "release/bundle"
-    provenance = json.loads((Path("src-tauri/target/claude-local-runtime") / args.target / "provenance.json").read_text())
+    provenance = json.loads((Path("src-tauri/target/claude-local-runtime") / args.target / "provenance.json").read_text(encoding="utf-8"))
     assert provenance["target"] == args.target and provenance["runtimeProbe"] == "passed"
-    version = json.loads(Path("package.json").read_text())["version"]
+    version = json.loads(Path("package.json").read_text(encoding="utf-8"))["version"]
     if "apple" in args.target:
         installers = list(bundle.rglob("*.dmg"))
         assert len(installers) == 1

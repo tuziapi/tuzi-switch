@@ -271,13 +271,25 @@ jobs:
       - run: pnpm build:renderer
       - name: Native regression (host target)
         shell: bash
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
+          CARGO_PROFILE_RELEASE_LTO: 'false'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
         run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib -- --test-threads=1
       - name: Isolated MCP service regression
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
+          CARGO_PROFILE_RELEASE_LTO: 'false'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
         run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib native_mcp_service_ -- --ignored --test-threads=1
       - name: Acceptance profile regression
         shell: bash
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
+          CARGO_PROFILE_RELEASE_LTO: 'false'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
         run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --lib --features claude-desktop-local,isolated-profile acceptance_profile_ -- --test-threads=1
       - name: Build installers
         shell: bash
