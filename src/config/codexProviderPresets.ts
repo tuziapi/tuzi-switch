@@ -100,6 +100,25 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     theme: { icon: "codex-sub" },
   },
   {
+    name: "兔子订阅",
+    websiteUrl: "",
+    apiKeyUrl: "https://store.tu-zi.com/cat/11",
+    auth: {},
+    config: generateThirdPartyConfig(
+      "provider-coding01",
+      "https://coding.tu-zi.com",
+      "CODING01_CODEX_API_KEY",
+      "gpt-6-astra",
+    ),
+    // Same protocol family, but selecting this preset allocates a fresh
+    // credential slot; it never reuses another saved subscription's key.
+    envKey: "CODING01_CODEX_API_KEY",
+    category: "aggregator",
+    endpointCandidates: ["https://coding.tu-zi.com"],
+    icon: "codex-sub",
+    theme: { icon: "codex-sub" },
+  },
+  {
     name: "gaccode",
     websiteUrl: "",
     apiKeyUrl: "https://store.tu-zi.com/cat/1",

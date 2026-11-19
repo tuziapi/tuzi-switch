@@ -1,0 +1,112 @@
+Window: "Claude", App: Claude.
+0 标准窗口 Claude, Secondary Actions: Raise
+	1 container Claude
+		2 container
+			3 滚动区
+				4 HTML 内容 file:///Users/sdy09/Library/Application%20Support/com.tuziswitch.desktop.opentu-preview/home/.tuzi-switch/claude-desktop-local/desktop-app/5.11492.5/Claude.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html
+			5 滚动区
+				6 HTML 内容 This is a synthetic connectivi... - Claude, URL: claude.ai/cowork/local_65f3c565-9350-40c4-8bcd-95ed712f3bf4
+					7 container
+						8 container
+							9 标题 Claude, Value: 1
+								10 文本 Claude
+							11 container 侧边栏
+								12 按钮 隐藏侧边栏
+								13 container
+									14 标题 导航, Value: 2
+										15 文本 导航
+									16 container 模式
+										17 按钮 主页
+										18 按钮 Code
+									19 container
+										20 按钮 新建
+										21 按钮 搜索
+										22 按钮 项目
+										23 按钮 作品
+										24 按钮 Dispatch 测试版
+										25 按钮 自定义
+										26 标题 对话和任务, Value: 3
+											27 按钮 对话和任务
+										28 弹出式按钮 筛选和分组最近对话
+										29 container
+											30 按钮 This is a synthetic connectivi... 标记为未读
+												31 文本 This is a synthetic connectivi...
+												32 按钮 标记为未读
+													33 图像 Done
+											34 弹出式按钮 This is a synthetic connectivi... 的更多选项
+										35 按钮 查看全部
+									36 container
+										37 弹出式按钮
+										38 link 获取应用和扩展, Value: claude.ai/downloads
+								39 分离器 调整侧边栏宽度, Value: 288
+							40 container
+								41 container 主面板
+									42 container
+										43 工具栏 页面工具
+											44 container
+												45 按钮 仅在此电脑上
+												46 标题 This is a synthetic connectivi..., Value: 2
+													47 按钮 This is a synthetic connectivi...，重命名会话
+												48 弹出式按钮 This is a synthetic connectivi... 的更多选项
+										49 container
+											50 container 对话消息
+												51 文本 使用向上和向下箭头键在消息之间移动。
+												52 container
+													53 container 第 1 条消息，共 4 条
+														54 标题 您说：This is a synthetic connectivity acceptance test., Value: 3
+															55 文本 您说：This is a synthetic connectivity acceptance test.
+														56 文本 This is a synthetic connectivity acceptance test. Reply only TUZI-BETA2-1118-OK. Do not call tools or access files.
+														57 工具栏 消息操作
+															58 文本 1分钟前
+															59 按钮 从此处重新开始对话
+															60 按钮 复制
+													61 container 第 2 条消息，共 4 条
+														62 container
+															63 标题 Claude 已回复：TUZI-BETA2-1118-OK, Value: 3
+																64 文本 Claude 已回复：TUZI-BETA2-1118-OK
+															65 文本 TUZI-BETA2-1118-OK
+														66 工具栏 消息操作
+															67 按钮 复制
+															68 文本 1分钟前
+													69 container 第 3 条消息，共 4 条
+														70 标题 您说：Return the exact marker from your previous response, followed by a space and CONTEXT-OK., Value: 3
+															71 文本 您说：Return the exact marker from your previous response, followed by a space and CONTEXT-OK.
+														72 文本 Return the exact marker from your previous response, followed by a space and CONTEXT-OK. Do not use tools.
+														73 工具栏 消息操作
+															74 文本 现在
+															75 按钮 从此处重新开始对话
+															76 按钮 编辑
+															77 按钮 复制
+													78 container 第 4 条消息，共 4 条
+														79 container
+															80 标题 Claude 已回复：TUZI-BETA2-1118-OK CONTEXT-OK, Value: 3
+																81 文本 Claude 已回复：TUZI-BETA2-1118-OK CONTEXT-OK
+															82 文本 TUZI-BETA2-1118-OK CONTEXT-OK
+														83 工具栏 消息操作
+															84 按钮 复制
+															85 文本 现在
+											86 container
+												87 container
+													88 文本输入区 (settable) 输入您发送给 Claude 的提示词, Value: 输入消息…
+
+														89 文本 输入消息…
+													90 弹出式按钮 添加文件、连接器等
+													91 弹出式按钮 (disabled) 模型：gpt-6.1-sol
+													92 按钮 (disabled) 发送消息
+											93 文本 Claude 是 AI，可能会出错。请仔细核对回复。
+										94 文本 Claude 已完成回复
+						95 container
+							96 container Notifications
+	97 关闭按钮
+	98 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	99 最小化按钮
+100 menu bar
+	101 Claude
+	102 文件
+	103 编辑
+	104 视图
+	105 转到
+	106 窗口
+	107 帮助
+
+The focused UI element is 6 HTML 内容 This is a synthetic connectivi... - Claude, URL: claude.ai/cowork/local_65f3c565-9350-40c4-8bcd-95ed712f3bf4

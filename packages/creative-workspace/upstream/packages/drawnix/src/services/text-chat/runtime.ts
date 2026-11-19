@@ -1,5 +1,6 @@
+import type { CanvasEditPlan } from "./canvas-schema";
 import { canRetryDiscussion } from "./conversation";
-import { ensureAssistantCreationConfigured } from '../assistant-creation-setup';
+import { ensureAssistantCreationConfigured } from "../assistant-creation-setup";
 import { chatStorageService as storage } from "../chat-storage-service";
 import { requestTextChat, type TextChatRequest } from "./request";
 import { localCodex } from "./local-codex";
@@ -54,7 +55,10 @@ export class TextChatRuntime {
     this.emit({ activeId: id });
     storage.setDrawerState?.({ textActiveSessionId: id });
   };
-  ensureDiscussion = (boardId: string, model: ModelRef | null): Promise<string> => {
+  ensureDiscussion = (
+    boardId: string,
+    model: ModelRef | null,
+  ): Promise<string> => {
     if (!boardId) return Promise.reject(new Error("请先打开画板。"));
     const pending = this.discussionCreation.get(boardId);
     if (pending) return pending;
@@ -62,17 +66,37 @@ export class TextChatRuntime {
     const create = (async () => {
       await this.initialize();
       if (epoch !== this.epoch) throw new Error("会话已重置。");
-      const active = this.snapshot.sessions.find(s => s.id === this.snapshot.activeId && s.textChat.linkedBoardId === boardId && s.textChat.executionMode === "agent");
-      const existing = active || this.snapshot.sessions.find(s => s.textChat.linkedBoardId === boardId && s.textChat.executionMode === "agent");
+      const active = this.snapshot.sessions.find(
+        (s) =>
+          s.id === this.snapshot.activeId &&
+          s.textChat.linkedBoardId === boardId &&
+          s.textChat.executionMode === "agent",
+      );
+      const existing =
+        active ||
+        this.snapshot.sessions.find(
+          (s) =>
+            s.textChat.linkedBoardId === boardId &&
+            s.textChat.executionMode === "agent",
+        );
       if (existing) return existing.id;
       const id = await this.create(model);
       if (epoch !== this.epoch) throw new Error("会话已重置。");
-      this.configure(id, {}, { executionMode: "agent", linkedBoardId: boardId });
+      this.configure(
+        id,
+        {},
+        { executionMode: "agent", linkedBoardId: boardId },
+      );
       await this.save(id);
       return id;
     })();
     this.discussionCreation.set(boardId, create);
-    void create.finally(() => { if (this.discussionCreation.get(boardId) === create) this.discussionCreation.delete(boardId); }).catch(() => {});
+    void create
+      .finally(() => {
+        if (this.discussionCreation.get(boardId) === create)
+          this.discussionCreation.delete(boardId);
+      })
+      .catch(() => {});
     return create;
   };
   constructor(
@@ -259,24 +283,49 @@ export class TextChatRuntime {
   };
   canSend = (id: string): boolean => {
     const session = this.get(id);
-    const discussion = session.textChat.executionMode === 'agent' && session.textChat.linkedBoardId;
-    return ensureAssistantCreationConfigured('text', session.sessionModelRef || session.sessionModel,
-      Boolean(discussion && localCodex.selection()));
+    const discussion =
+      session.textChat.executionMode === "agent" &&
+      session.textChat.linkedBoardId;
+    return ensureAssistantCreationConfigured(
+      "text",
+      session.sessionModelRef || session.sessionModel,
+      Boolean(discussion && localCodex.selection()),
+    );
   };
-  send = async (id: string, content: string, regenerateUserId?: string, submission: DiscussionSubmission = {}) => {
+  send = async (
+    id: string,
+    content: string,
+    regenerateUserId?: string,
+    submission: DiscussionSubmission = {},
+  ) => {
     if (this.requests.has(id)) return;
     if (!this.canSend(id)) return;
     const session = this.get(id);
-    const discussion = session.textChat.executionMode === "agent" && session.textChat.linkedBoardId;
+    const discussion =
+      session.textChat.executionMode === "agent" &&
+      session.textChat.linkedBoardId;
     const codex = discussion ? localCodex.selection() : undefined;
     if (discussion && regenerateUserId) {
-      const previous = session.textChat.messages.filter(m => m.replyTo === regenerateUserId).at(-1);
-      const original = session.textChat.messages.find(m => m.id === regenerateUserId);
-      if (!previous || !canRetryDiscussion(previous) || original?.origin === "canvas")
-        throw new Error("此讨论不能直接重试，请发送新消息并重新选择画布引用，避免重复提交生成任务。");
+      const previous = session.textChat.messages
+        .filter((m) => m.replyTo === regenerateUserId)
+        .at(-1);
+      const original = session.textChat.messages.find(
+        (m) => m.id === regenerateUserId,
+      );
+      if (
+        !previous ||
+        !canRetryDiscussion(previous) ||
+        original?.origin === "canvas"
+      )
+        throw new Error(
+          "此讨论不能直接重试，请发送新消息并重新选择画布引用，避免重复提交生成任务。",
+        );
     }
     const text = content.trim();
-    const attachments = submission.origin === "canvas" ? [] : session.textChat.draftAttachments || [];
+    const attachments =
+      submission.origin === "canvas"
+        ? []
+        : session.textChat.draftAttachments || [];
     validateAttachmentRefs(attachments);
     if (!regenerateUserId && !text && !attachments.length) return;
     if (text.length > 200000) throw new Error("单条消息过长，请分段发送。");
@@ -313,7 +362,16 @@ export class TextChatRuntime {
       status: "pending",
       replyTo: user.id,
       model: codex ? `Codex · ${codex.model}` : session.sessionModel,
-      ...(discussion ? { discussion: { boardId: discussion, runId: this.db.generateId(), taskIds: [], submission: "not_started" } } : {}),
+      ...(discussion
+        ? {
+            discussion: {
+              boardId: discussion,
+              runId: this.db.generateId(),
+              taskIds: [],
+              submission: "not_started",
+            },
+          }
+        : {}),
     };
     messages.push(assistant);
     const controller = new AbortController();
@@ -330,14 +388,21 @@ export class TextChatRuntime {
       messageCount: messages.length,
       textChat: {
         ...session.textChat,
-        draft: regenerateUserId || submission.origin === "canvas" ? session.textChat.draft : "",
-        draftAttachments: regenerateUserId || submission.origin === "canvas"
-          ? session.textChat.draftAttachments
-          : [],
+        draft:
+          regenerateUserId || submission.origin === "canvas"
+            ? session.textChat.draft
+            : "",
+        draftAttachments:
+          regenerateUserId || submission.origin === "canvas"
+            ? session.textChat.draftAttachments
+            : [],
         messages,
       },
     });
     const epoch = this.epoch;
+    const latestLink = () =>
+      this.get(id).textChat.messages.find((m) => m.id === assistant.id)!
+        .discussion!;
     let pending: Partial<TextMessage> | undefined,
       renderTimer: ReturnType<typeof setTimeout> | undefined;
     const flush = () => {
@@ -371,24 +436,66 @@ export class TextChatRuntime {
         },
       };
       const result = assistant.discussion
-        ? await (await import("./discussion")).requestDiscussion({
-            ...request, link: assistant.discussion, messageId: assistant.id, context: submission.context,
+        ? await (
+            await import("./discussion")
+          ).requestDiscussion({
+            ...request,
+            link: assistant.discussion,
+            messageId: assistant.id,
+            context: submission.context,
+            previousCanvasContext: session.textChat.messages
+              .filter((m) => m.role === "user" && m.canvasContext)
+              .at(-1)?.canvasContext,
+            onCanvasContext: async (canvasContext) => {
+              controller.signal.throwIfAborted();
+              if (epoch !== this.epoch)
+                throw new DOMException("讨论已切换", "AbortError");
+              this.updateMessage(id, user.id, { canvasContext });
+              await this.save(id);
+              controller.signal.throwIfAborted();
+            },
+            onCanvasPlan: async (canvasPlan, automatic) => {
+              controller.signal.throwIfAborted();
+              if (epoch !== this.epoch)
+                throw new DOMException("讨论已切换", "AbortError");
+              this.updateMessage(id, assistant.id, {
+                discussion: { ...latestLink(), canvasPlan },
+              });
+              await this.save(id);
+              if (!automatic)
+                return "画布操作已列出，请确认后执行；当前未修改画布。";
+              return this.applyCanvasPlan(
+                id,
+                assistant.id,
+                canvasPlan,
+                controller.signal,
+                epoch,
+              );
+            },
             onPlan: async (plan) => {
               controller.signal.throwIfAborted();
-              if (epoch !== this.epoch) throw new DOMException("讨论已切换", "AbortError");
-              this.updateMessage(id, assistant.id, { discussion: { ...assistant.discussion!, plan } });
+              if (epoch !== this.epoch)
+                throw new DOMException("讨论已切换", "AbortError");
+              this.updateMessage(id, assistant.id, {
+                discussion: { ...latestLink(), plan },
+              });
               await this.save(id);
             },
             onBeforeSubmit: async () => {
               controller.signal.throwIfAborted();
-              if (epoch !== this.epoch) throw new DOMException("讨论已切换", "AbortError");
-              this.updateMessage(id, assistant.id, { discussion: { ...assistant.discussion!, submission: "started" } });
+              if (epoch !== this.epoch)
+                throw new DOMException("讨论已切换", "AbortError");
+              this.updateMessage(id, assistant.id, {
+                discussion: { ...latestLink(), submission: "started" },
+              });
               await this.save(id);
               controller.signal.throwIfAborted();
             },
             onTasks: async (taskIds) => {
               if (epoch !== this.epoch) return;
-              this.updateMessage(id, assistant.id, { discussion: { ...assistant.discussion!, taskIds, submission: "started" } });
+              this.updateMessage(id, assistant.id, {
+                discussion: { ...latestLink(), taskIds, submission: "started" },
+              });
               await this.save(id);
             },
           })
@@ -419,14 +526,112 @@ export class TextChatRuntime {
       }
     }
   };
+  private applyCanvasPlan = async (
+    id: string,
+    messageId: string,
+    plan: CanvasEditPlan,
+    signal: AbortSignal,
+    epoch: number,
+  ) => {
+    const check = () => {
+      signal.throwIfAborted();
+      if (epoch !== this.epoch)
+        throw new DOMException("讨论已切换", "AbortError");
+    };
+    const setStatus = (status: CanvasEditPlan["status"]) => {
+      const link = this.get(id).textChat.messages.find(
+        (m) => m.id === messageId,
+      )!.discussion!;
+      this.updateMessage(id, messageId, {
+        discussion: { ...link, canvasPlan: { ...plan, status } },
+      });
+    };
+    check();
+    try {
+      const { executeCanvasEdits } = await import("./canvas-control");
+      check();
+      setStatus("started");
+      await this.save(id); // Persist before mutation; restart never replays uncertain edits.
+      check();
+      const feedback = executeCanvasEdits(plan);
+      setStatus("applied");
+      await this.save(id);
+      return feedback;
+    } catch (error) {
+      if (epoch === this.epoch) {
+        const current = this.get(id).textChat.messages.find(
+          (m) => m.id === messageId,
+        )?.discussion?.canvasPlan;
+        // A save failure after application must not say that no edits occurred.
+        if (current?.status !== "applied") setStatus("error");
+        await this.save(id).catch(() => {});
+      }
+      throw error;
+    }
+  };
+  decideCanvasPlan = async (
+    id: string,
+    messageId: string,
+    execute: boolean,
+  ) => {
+    if (this.requests.has(id)) return;
+    const message = this.get(id).textChat.messages.find(
+      (m) => m.id === messageId,
+    );
+    const link = message?.discussion;
+    if (!link?.canvasPlan || link.canvasPlan.status !== "ready")
+      throw new Error("此画布操作已经处理或不可执行。");
+    const controller = new AbortController(),
+      epoch = this.epoch;
+    this.requests.set(id, controller);
+    this.emit({ running: new Set(this.requests.keys()) });
+    try {
+      if (!execute) {
+        this.updateMessage(id, messageId, {
+          discussion: {
+            ...link,
+            canvasPlan: { ...link.canvasPlan, status: "cancelled" },
+          },
+        });
+        await this.save(id);
+      } else {
+        const feedback = await this.applyCanvasPlan(
+          id,
+          messageId,
+          link.canvasPlan,
+          controller.signal,
+          epoch,
+        );
+        if (epoch === this.epoch)
+          this.updateMessage(id, messageId, {
+            content: `${message!.content}\n\n${feedback}`,
+          });
+      }
+    } finally {
+      if (epoch === this.epoch) {
+        this.requests.delete(id);
+        this.emit({ running: new Set(this.requests.keys()) });
+        await this.save(id).catch(() => {});
+      }
+    }
+  };
   decidePlan = async (id: string, messageId: string, execute: boolean) => {
     if (this.requests.has(id)) return;
-    const message = this.get(id).textChat.messages.find(m => m.id === messageId);
+    const message = this.get(id).textChat.messages.find(
+      (m) => m.id === messageId,
+    );
     const link = message?.discussion;
-    if (!link?.plan || link.plan.status !== "ready" || link.submission !== "not_started" || link.taskIds.length)
+    if (
+      !link?.plan ||
+      link.plan.status !== "ready" ||
+      link.submission !== "not_started" ||
+      link.taskIds.length
+    )
       throw new Error("此计划已经提交或不可执行。");
     if (!execute) {
-      this.updateMessage(id, messageId, { discussion: { ...link, plan: { ...link.plan, status: "cancelled" } } });
+      this.updateMessage(id, messageId, {
+        discussion: { ...link, plan: { ...link.plan, status: "cancelled" } },
+      });
       await this.save(id);
       return;
     }
@@ -436,29 +641,50 @@ export class TextChatRuntime {
     const epoch = this.epoch;
     let currentLink = link;
     try {
-      const { workspaceService } = await import('../workspace-service');
-      if (workspaceService.getState().currentBoardId !== link.boardId) throw new Error("请先返回这段讨论所属的画板再执行。");
-      const { executeDiscussionPlan } = await import('./discussion');
-      await executeDiscussionPlan({
-        sessionId: id, messageId, link, signal: controller.signal,
-        onBeforeSubmit: async () => {
-          controller.signal.throwIfAborted();
-          if (epoch !== this.epoch) throw new DOMException("讨论已切换", "AbortError");
-          currentLink = { ...currentLink, submission: "started", plan: { ...link.plan!, status: "started" } };
-          this.updateMessage(id, messageId, { discussion: currentLink, status: "streaming", error: undefined });
-          await this.save(id);
-          controller.signal.throwIfAborted();
+      const { workspaceService } = await import("../workspace-service");
+      if (workspaceService.getState().currentBoardId !== link.boardId)
+        throw new Error("请先返回这段讨论所属的画板再执行。");
+      const { executeDiscussionPlan } = await import("./discussion");
+      await executeDiscussionPlan(
+        {
+          sessionId: id,
+          messageId,
+          link,
+          signal: controller.signal,
+          onBeforeSubmit: async () => {
+            controller.signal.throwIfAborted();
+            if (epoch !== this.epoch)
+              throw new DOMException("讨论已切换", "AbortError");
+            currentLink = {
+              ...currentLink,
+              submission: "started",
+              plan: { ...link.plan!, status: "started" },
+            };
+            this.updateMessage(id, messageId, {
+              discussion: currentLink,
+              status: "streaming",
+              error: undefined,
+            });
+            await this.save(id);
+            controller.signal.throwIfAborted();
+          },
+          onTasks: async (taskIds) => {
+            if (epoch !== this.epoch) return;
+            currentLink = { ...currentLink, taskIds };
+            this.updateMessage(id, messageId, { discussion: currentLink });
+            await this.save(id);
+          },
         },
-        onTasks: async (taskIds) => {
-          if (epoch !== this.epoch) return;
-          currentLink = { ...currentLink, taskIds };
-          this.updateMessage(id, messageId, { discussion: currentLink });
-          await this.save(id);
-        },
-      }, link.plan);
-      if (epoch === this.epoch) this.updateMessage(id, messageId, { status: "complete" });
+        link.plan,
+      );
+      if (epoch === this.epoch)
+        this.updateMessage(id, messageId, { status: "complete" });
     } catch (e) {
-      if (epoch === this.epoch) this.updateMessage(id, messageId, { status: controller.signal.aborted ? "stopped" : "error", error: controller.signal.aborted ? undefined : (e as Error).message });
+      if (epoch === this.epoch)
+        this.updateMessage(id, messageId, {
+          status: controller.signal.aborted ? "stopped" : "error",
+          error: controller.signal.aborted ? undefined : (e as Error).message,
+        });
     } finally {
       if (epoch === this.epoch) {
         this.requests.delete(id);

@@ -213,7 +213,7 @@ def wait_for(fn,message,seconds=90):
 
 def ax(body):
     script = 'tell application "System Events"\nset p to first application process whose unix id is '+str(pid)+'\nset frontmost of p to true\n'+body+'\nend tell'
-    return capture(['osascript','-e',script],text=True,stderr=subprocess.PIPE,timeout=25).strip()
+    return capture(['osascript','-e',script],text=True,stderr=subprocess.PIPE,timeout=60).strip()
 
 
 def tree():
@@ -242,6 +242,15 @@ def pointer_click(x, y):
 def button(names,press=False):
     labels='{'+','.join(json.dumps(s,ensure_ascii=False) for s in names)+'}'
     body='''set labels to LABELS
+repeat with itemRef in (get buttons of front window of p)
+try
+if name of itemRef is in labels then
+if not enabled of itemRef then return false
+PRESS
+return true
+end if
+end try
+end repeat
 set allItems to get entire contents of front window of p
 repeat with itemRef in allItems
 try
@@ -260,8 +269,7 @@ return false'''.replace('LABELS',labels).replace('PRESS','perform action "AXPres
 
 def click(names):
     stage('press '+str(names))
-    wait_for(lambda: button(names),'Accessible enabled button missing: '+str(names))
-    assert button(names,True)
+    wait_for(lambda: button(names,True),'Accessible enabled button missing: '+str(names))
 
 
 def screenshot(name):

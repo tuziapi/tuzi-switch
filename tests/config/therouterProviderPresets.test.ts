@@ -3,6 +3,22 @@ import { codexProviderPresets } from "@/config/codexProviderPresets";
 import { geminiProviderPresets } from "@/config/geminiProviderPresets";
 
 describe("Provider presets", () => {
+  it("adds Rabbit subscription without changing the existing Codex subscription routes", () => {
+    const rabbit = codexProviderPresets.find((p) => p.name === "兔子订阅")!;
+    const codex = codexProviderPresets.find((p) => p.name === "codex订阅")!;
+    expect(rabbit.endpointCandidates).toEqual(["https://coding.tu-zi.com"]);
+    expect(rabbit.config).toContain('base_url = "https://coding.tu-zi.com"');
+    expect(rabbit.config).toContain('wire_api = "responses"');
+    expect(rabbit.auth).toEqual({});
+    expect(rabbit.envKey).toBe("CODING01_CODEX_API_KEY");
+    expect(codex.endpointCandidates).toEqual([
+      "https://api.tu-zi.com/coding",
+      "https://coding.tu-zi.com",
+      "https://coding.opentu.ai",
+      "https://coding.sydney-ai.com",
+    ]);
+    expect(codex.config).toContain('base_url = "https://api.tu-zi.com/coding"');
+  });
   it("provides the requested Codex presets with OpenAI-compatible endpoints", () => {
     expect(codexProviderPresets.map((item) => item.name)).toEqual(
       expect.arrayContaining(["兔子线路", "codex订阅", "gaccode"]),

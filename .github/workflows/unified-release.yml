@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      windows_msi_packaging_probe_only:
+        description: Diagnose MSI packaging with a synthetic executable; no application build, signing or publication
+        type: boolean
+        default: false
       official_candidate:
         description: Build official-channel candidates on the protected test executor; never publish
         type: boolean
@@ -55,10 +59,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: unified-release-${{ inputs.signed_candidate_macos_probe_only && 'signed-macos-probe' || inputs.signed_candidate_linux_probe_only && 'signed-linux-probe' || inputs.signed_candidate_windows_only && 'signed-windows' || inputs.native_upgrade_lab_only && (inputs.native_upgrade_packages_only && 'native-packages' || 'native-lab') || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
+  group: unified-release-${{ inputs.windows_msi_packaging_probe_only && 'windows-msi-probe' || inputs.signed_candidate_macos_probe_only && 'signed-macos-probe' || inputs.signed_candidate_linux_probe_only && 'signed-linux-probe' || inputs.signed_candidate_windows_only && 'signed-windows' || inputs.native_upgrade_lab_only && (inputs.native_upgrade_packages_only && 'native-packages' || 'native-lab') || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
   cancel-in-progress: false
 
 env:
+  CARGO_INCREMENTAL: '0'
   # Creative workspace exceeds the 2 GiB heap default on macOS runners.
   NODE_OPTIONS: --max-old-space-size=4096
   TUZI_SWITCH_RELEASE_REPOSITORY: ${{ inputs.official_candidate && 'tuziapi/tuzi-switch' || github.repository }}
@@ -66,6 +71,32 @@ env:
   TUZI_OFFICIAL_TEST_CANDIDATE: ${{ inputs.official_candidate && '1' || '0' }}
 
 jobs:
+  windows-msi-packaging-probe:
+    if: inputs.windows_msi_packaging_probe_only && github.repository == 'AiW520/tuzi-switch'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the pinned bundler
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/tuzi-msi-tools" --ignore-scripts --no-package-lock @tauri-apps/cli@2.10.1
+      - name: Reproduce MSI packaging with synthetic application bytes
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/probe-windows-msi.py "$RUNNER_TEMP/tuzi-msi-tools/node_modules/@tauri-apps/cli/tauri.js" 2>&1 | tee "$RUNNER_TEMP/msi-probe.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-msi-packaging-diagnostics
+          path: |
+            ${{ runner.temp }}/msi-probe.log
+            src-tauri/target/x86_64-pc-windows-msvc/release/wix/x64/main.wxs
+          if-no-files-found: warn
+
   signed-candidate-macos:
     if: inputs.signed_candidate_macos_probe_only && github.repository == 'AiW520/tuzi-switch'
     uses: ./.github/workflows/signed-candidate-macos.yml
@@ -106,7 +137,7 @@ jobs:
       UPDATER_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
 
   verify:
-    if: ${{ !inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
+    if: ${{ !inputs.windows_msi_packaging_probe_only && !inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
     runs-on: ubuntu-22.04
     outputs:
       tag: ${{ steps.identity.outputs.tag }}
@@ -152,6 +183,9 @@ jobs:
           retention-days: 30
       - run: python3 scripts/test_release_assets.py
       - run: python3 scripts/test_windows_branding.py
+      - run: python3 scripts/test_prepare_windows_msi.py
+      - run: python3 scripts/test_prepare_claude_local_node.py
+      - run: python3 scripts/check-preview-gateway.py
       - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs scripts/verify-tauri-compatibility.mjs scripts/test-signed-candidate-pair.mjs
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
@@ -165,10 +199,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          - os: macos-15
             target: aarch64-apple-darwin
             name: macos-arm64
-          - os: macos-latest
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             name: macos-x64
           - os: windows-latest
@@ -184,7 +218,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libasound2-dev libgtk-3-dev
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -204,6 +238,17 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
           cache-on-failure: true
+      - name: Rehydrate native speech libraries after Cargo cache restore
+        shell: bash
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import shutil
+          cache = Path("src-tauri/target/sherpa-onnx-prebuilt")
+          if cache.exists():
+              shutil.rmtree(cache)
+          PYTHON
+          cargo clean --release --manifest-path src-tauri/Cargo.toml -p sherpa-onnx-sys
       - run: pnpm install --frozen-lockfile
       - name: Prepare updater signing key
         shell: bash
@@ -226,14 +271,26 @@ jobs:
       - run: pnpm build:renderer
       - name: Native regression (host target)
         shell: bash
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
-      - name: Acceptance profile regression
-        shell: bash
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --features isolated-profile acceptance_profile_ -- --test-threads=1
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
+          CARGO_PROFILE_RELEASE_LTO: 'false'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib -- --test-threads=1
       - name: Isolated MCP service regression
         if: runner.os == 'macOS'
         shell: bash
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib native_mcp_service_ -- --ignored --test-threads=1
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
+          CARGO_PROFILE_RELEASE_LTO: 'false'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib native_mcp_service_ -- --ignored --test-threads=1
+      - name: Acceptance profile regression
+        shell: bash
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: '1'
+          CARGO_PROFILE_RELEASE_LTO: 'false'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --lib --features claude-desktop-local,isolated-profile acceptance_profile_ -- --test-threads=1
       - name: Build installers
         shell: bash
         env:
@@ -242,16 +299,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
         run: |
           set -euo pipefail
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs)"
-          else
-            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --desktop-product-name)"
-          fi
-          pnpm tauri build --target "$BUILD_TARGET" --config "$RELEASE_CONFIG" 2>&1 | tee "$RUNNER_TEMP/tuzi-bundle.log"
+          python3 scripts/build-claude-local-candidate.py --target "$BUILD_TARGET" --stable-release 2>&1 | tee "$RUNNER_TEMP/tuzi-bundle.log"
           if grep -Fq 'Failed to add bundler type' "$RUNNER_TEMP/tuzi-bundle.log"; then
             echo 'Installer type was not embedded; refusing an updater candidate with ambiguous package selection'
             exit 1
           fi
+      - name: Verify packaged runtime and stable identity
+        run: python3 scripts/verify-official-runtime.py --target ${{ matrix.target }}
       - name: Collect installers and source manifest
         shell: bash
         env:

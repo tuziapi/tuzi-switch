@@ -1,3 +1,5 @@
+import { isGenerationNode } from '../../services/generation-node';
+import { getGenerationSlotPositions } from '../../services/generation-node-lifecycle';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -96,7 +98,7 @@ exports.prepare = async function(submittedBoard, imageItems, enabled) {
   ${referencePreparation}
   return { ...referenceSources, referenceImages };
 };
-exports.plan = function(board, imageSourceIds, enabled, requestedCount) {
+exports.plan = function(board, imageSourceIds, enabled, requestedCount, submittedDraftElement) {
   const batchPreparation = null;
   const anchorTargetFrameId = undefined;
   const targetFrameId = undefined;
@@ -117,7 +119,7 @@ exports.plan = function(board, imageSourceIds, enabled, requestedCount) {
 ).outputText;
 
 const callbacks = {} as {
-  plan: (board: ReturnType<typeof createBoard>, sources: string[], enabled: boolean, count: number) => [number, number][];
+  plan: (board: ReturnType<typeof createBoard>, sources: string[], enabled: boolean, count: number, draft?: ReturnType<typeof createBoard>['children'][number]) => [number, number][];
   prepare: (board: ReturnType<typeof createBoard>, images: GenerationReferenceImage[], enabled: boolean) => Promise<{ imageSourceIds: string[]; referenceImages: string[] }>;
   selected: (processed: Awaited<ReturnType<typeof processSelectedContentForAI>>, elements: ReturnType<typeof createBoard>['children']) => GenerationReferenceImage[];
   params: (
@@ -134,6 +136,8 @@ const callbacks = {} as {
 };
 runInNewContext(compiled, {
   exports: callbacks,
+  isGenerationNode,
+  getGenerationSlotPositions,
   createCanvasAssociationLines,
   snapshotCanvasAssociationRefs,
   buildBoundTargetGenerationParams,
@@ -351,6 +355,7 @@ describe('batch submission preparation lifecycle', () => {
           await yieldBatchPreparationPaint();
           if (scenario === 'switch-before-preflight') boardRef.current = createBoard([]);
         },
+        restoreOriginalInputs: false, submittedGenerationNode: null,
         effectiveGenerationType: 'image', effectiveSelectedCount: 4, submittedBoard: board,
         effectivePrompt: 'synthetic', effectiveSelectedModel: 'synthetic', effectiveSelectedModelRef: undefined,
         effectiveSelectedParams: {}, submittedFrameInfo: null,
@@ -421,4 +426,12 @@ it('cleans partially inserted unbound anchors while preserving tasks already han
   expect(removeAnchor).toHaveBeenCalledWith({}, 'partial');
   expect(preparation.dispose).toHaveBeenCalledOnce();
   expect(preparationRef.current).toBeNull();
+});
+
+
+it('reserves batch results at the draft origin instead of using reference layout', () => {
+  const draft = {id:'draft',type:'geometry',shape:'roundRectangle',points:[[900,200],[1244,424]],generationNode:{version:1,generationType:'image',prompt:'synthetic',model:'model',params:{},count:2,references:[]}};
+  const board=createBoard([draft]);
+  board.getRectangle = element => RectangleClient.getRectangleByPoints(element.points || []);
+  expect(callbacks.plan(board,[],false,2,draft)).toEqual([[900,200],[1340,200]]);
 });

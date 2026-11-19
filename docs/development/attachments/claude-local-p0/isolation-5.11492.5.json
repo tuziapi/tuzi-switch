@@ -1,0 +1,19 @@
+{
+  "claudeVersion": "5.11492.5",
+  "applicationPath": "/Users/sdy09/Library/Application Support/com.tuziswitch.desktop.claude-local-p0/home/.tuzi-switch/claude-local-p0/desktop-app/5.11492.5/Claude.app",
+  "autoUpdatesDisabledInNativeLog": true,
+  "originalBundleUnchanged": true,
+  "copyBundleUnchanged": true,
+  "originalBundleSha256": "aa2093648be1854537cf517b09c750be2ba68089306727eb04aadd23eeea91b7",
+  "copyBundleSha256": "aa2093648be1854537cf517b09c750be2ba68089306727eb04aadd23eeea91b7",
+  "profileCreated": true,
+  "launchEnvironmentReceived": true,
+  "failure": null,
+  "personalConfigHashesUnchanged": true,
+  "ownedProcessExited": true,
+  "certificateInstalled": false,
+  "modelCalls": 0,
+  "scope": "profile isolation launch only; not login, Chat, Code task, voice or computer-use acceptance",
+  "profileDirectory": "/var/folders/z5/q3nn77s577d3mzdfxf_2jpdw0000gn/T/tuzi-claude-isolation-fcvrodu7/desktop-profile",
+  "profileCreatedEvidence": "Chromium Local State file exists"
+}

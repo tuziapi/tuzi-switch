@@ -1,0 +1,73 @@
+{
+  "engine": "webkit",
+  "limit": 1048576,
+  "originalBytes": 4504972,
+  "results": [
+    {
+      "fallback": false,
+      "count": 1,
+      "inputBytes": 4504972,
+      "outputBytes": 966901,
+      "unchanged": true,
+      "images": [
+        [
+          1200,
+          800
+        ]
+      ],
+      "textUnchanged": true
+    },
+    {
+      "fallback": false,
+      "count": 2,
+      "inputBytes": 9009815,
+      "outputBytes": 962493,
+      "unchanged": true,
+      "images": [
+        [
+          768,
+          512
+        ],
+        [
+          960,
+          640
+        ]
+      ],
+      "textUnchanged": true
+    },
+    {
+      "fallback": true,
+      "count": 1,
+      "inputBytes": 4504972,
+      "outputBytes": 966901,
+      "unchanged": true,
+      "images": [
+        [
+          1200,
+          800
+        ]
+      ],
+      "textUnchanged": true
+    },
+    {
+      "fallback": true,
+      "count": 2,
+      "inputBytes": 9009815,
+      "outputBytes": 962493,
+      "unchanged": true,
+      "images": [
+        [
+          768,
+          512
+        ],
+        [
+          960,
+          640
+        ]
+      ],
+      "textUnchanged": true
+    }
+  ],
+  "keepOriginalRejected": true,
+  "paidRequests": 0
+}

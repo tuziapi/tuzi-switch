@@ -14,9 +14,11 @@
   "meta": {
     "apiFormat": "anthropic",
     "claudeDesktopMode": "proxy",
+    "claudeDesktopModelCatalog": [{ "id": "synthetic-model" }],
     "claudeDesktopModelRoutes": {
       "claude-sonnet-4-6": {
-        "model": "synthetic-model"
+        "model": "synthetic-model",
+        "displayName": "synthetic-model"
       }
     },
     "custom_endpoints": {

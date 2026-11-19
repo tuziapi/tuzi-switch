@@ -19,6 +19,7 @@ pub(crate) fn targets(
         AppType::Gemini,
         AppType::OpenCode,
         AppType::Hermes,
+        AppType::WorkBuddy,
     ]
     .into_iter()
     .filter_map(|app| {
@@ -52,6 +53,10 @@ pub(crate) fn targets(
             AppType::Hermes => (
                 crate::hermes_config::get_hermes_dir(),
                 crate::hermes_config::get_hermes_config_path(),
+            ),
+            AppType::WorkBuddy => (
+                crate::workbuddy_config::data_dir(),
+                super::workbuddy::config_path(),
             ),
             _ => unreachable!(),
         };
@@ -107,6 +112,11 @@ const CORE: &[&str] = &[
 ];
 
 fn converted(app: &AppType, path: &Path, spec: &Value) -> Result<Value, AppError> {
+    if *app == AppType::WorkBuddy {
+        let normalized = super::workbuddy::transport_spec(spec);
+        super::validation::validate_server_spec(&normalized)?;
+        return Ok(normalized);
+    }
     super::validation::validate_server_spec(spec)?;
     match app {
         AppType::Codex => {
@@ -197,6 +207,7 @@ pub(crate) fn transform(
     next: Option<&Value>,
 ) -> Result<Vec<u8>, AppError> {
     let text = std::str::from_utf8(before.unwrap_or_default()).map_err(|_| error())?;
+    let text = if *app == AppType::WorkBuddy { text.trim_start_matches('\u{feff}') } else { text };
     let old = old.map(|v| converted(app, path, v)).transpose()?;
     let next = next.map(|v| converted(app, path, v)).transpose()?;
     if *app == AppType::Codex {
@@ -265,7 +276,23 @@ pub(crate) fn transform(
         .or_insert_with(|| json!({}))
         .as_object_mut()
         .ok_or_else(error)?;
-    match merge(servers.get(id), old.as_ref(), next.as_ref())? {
+    let result = if *app == AppType::WorkBuddy {
+        let existing = servers.get(id);
+        if existing.is_some_and(super::workbuddy::is_connector) { return Err(error()); }
+        let current = existing.map(super::workbuddy::transport_spec);
+        let expected = old.as_ref().or_else(|| existing.filter(|value| value.get("disabled") == Some(&json!(true))).and(next.as_ref()));
+        merge(current.as_ref(), expected, next.as_ref())?.map(|transport| {
+            let mut value = existing.cloned().unwrap_or_else(|| json!({}));
+            let object = value.as_object_mut().expect("validated MCP object");
+            for key in CORE { object.remove(*key); }
+            object.remove("disabled");
+            object.extend(transport.as_object().expect("validated MCP transport").clone());
+            value
+        })
+    } else {
+        merge(servers.get(id), old.as_ref(), next.as_ref())?
+    };
+    match result {
         Some(value) => {
             servers.insert(id.into(), value);
         }

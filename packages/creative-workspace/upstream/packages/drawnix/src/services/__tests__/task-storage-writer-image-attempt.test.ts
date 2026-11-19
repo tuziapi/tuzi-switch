@@ -67,6 +67,39 @@ describe('task-storage-writer image attempt guards', () => {
     vi.unstubAllGlobals();
   });
 
+  it('retains image references through remote acceptance, completion and reopening for reroll', async () => {
+    const task = createImageTask('recipe-attempt');
+    const references = ['data:image/png;base64,SYNTHETIC_REFERENCE'];
+    task.params.referenceImages = references;
+    task.params.maskImage = 'data:image/png;base64,SYNTHETIC_MASK';
+    await taskStorageWriter.saveTask(task);
+    await taskStorageWriter.updateRemoteId(task.id, 'recipe-remote', undefined, 'recipe-attempt');
+    expect((await taskStorageWriter.getTask(task.id))?.params.referenceImages).toEqual(references);
+    await taskStorageWriter.completeTask(task.id, {
+      url: 'https://synthetic.invalid/result.png', format: 'png', size: 1,
+    }, 'recipe-attempt');
+    taskStorageWriter.close();
+    expect((await taskStorageWriter.getTask(task.id))?.params).toMatchObject({
+      referenceImages: references,
+      maskImage: 'data:image/png;base64,SYNTHETIC_MASK',
+    });
+  });
+
+  it('still clears cancelled image inputs and completed video inputs', async () => {
+    const task = createImageTask('cancel-attempt');
+    task.params.referenceImages = ['data:image/png;base64,SYNTHETIC'];
+    await taskStorageWriter.saveTask(task);
+    await taskStorageWriter.updateStatus(task.id, 'cancelled', 'cancel-attempt');
+    expect((await taskStorageWriter.getTask(task.id))?.params.referenceImages).toBeUndefined();
+    const video = createVideoTask();
+    video.params.referenceImages = ['data:image/png;base64,SYNTHETIC'];
+    await taskStorageWriter.saveTask(video);
+    await taskStorageWriter.completeTask(video.id, {
+      url: 'https://synthetic.invalid/result.mp4', format: 'mp4', size: 1,
+    });
+    expect((await taskStorageWriter.getTask(video.id))?.params.referenceImages).toBeUndefined();
+  });
+
   it('preserves video submission ID across reopening and failure, and clears it for a new remote task', async () => {
     const task = createVideoTask();
     await taskStorageWriter.saveTask(task);

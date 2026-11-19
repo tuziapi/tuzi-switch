@@ -103,7 +103,8 @@ it("round-trips every text field in the existing environment backup, retaining o
       messages: [
         {
           id: "answer",
-          discussion: { boardId: "synthetic-board", runId: "synthetic-run", taskIds: ["synthetic-task"], submission: "started", plan: {version:1,status:"started",steps:[{type:"text",prompt:"synthetic",count:1,model:"synthetic",modelRef:{profileId:"synthetic",modelId:"synthetic"}}]} },
+          canvasContext: {boardId:"synthetic-board",revision:"a".repeat(64),summary:"unselected a",notice:"5 sampled frames, no audio",images:["data:image/jpeg;base64,YQ=="],references:{images:[],graphics:[],videos:["/asset-library/synthetic.mp4"]}},
+          discussion: { canvasPlan:{version:1,status:"ready",boardId:"synthetic-board",revision:"a".repeat(64),actions:[{op:"delete",ids:["a"]}]}, boardId: "synthetic-board", runId: "synthetic-run", taskIds: ["synthetic-task"], submission: "started", plan: {version:1,status:"started",steps:[{type:"text",prompt:"synthetic",count:1,model:"synthetic",modelRef:{profileId:"synthetic",modelId:"synthetic"}}]} },
           role: "assistant",
           content: "partial",
           reasoning: "thinking",

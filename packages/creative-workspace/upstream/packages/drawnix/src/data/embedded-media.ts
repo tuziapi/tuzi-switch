@@ -38,7 +38,7 @@ const extractVirtualUrls = (elements: PlaitElement[]): Set<string> => {
 
     const record = obj as Record<string, unknown>;
 
-    const urlFields = ['url', 'imageUrl', 'videoUrl', 'poster', 'src'];
+    const urlFields = ['url', 'imageUrl', 'videoUrl', 'poster', 'src', 'sourceUrl', 'maskImage'];
     for (const field of urlFields) {
       if (typeof record[field] === 'string' && isVirtualUrl(record[field] as string)) {
         urls.add(record[field] as string);
@@ -102,10 +102,7 @@ const collectEmbeddedMedia = async (
   for (const url of virtualUrls) {
     try {
       const blob = await unifiedCacheService.getCachedBlob(url);
-      if (!blob) {
-        console.warn(`[serializeAsJSON] 无法获取缓存媒体: ${url}`);
-        continue;
-      }
+      if (!blob?.size) throw new Error('本地媒体不存在或为空');
 
       const mimeType = getMimeType(url, blob);
       const mediaType = getMediaType(mimeType);
@@ -122,7 +119,7 @@ const collectEmbeddedMedia = async (
         taskId: cacheMetadata.metadata?.taskId,
       });
     } catch (error) {
-      console.error(`[serializeAsJSON] 处理媒体失败: ${url}`, error);
+      throw new Error('无法完整读取画布媒体，文件未导出。请恢复缺失的图片或视频后重试。', { cause: error });
     }
   }
 
@@ -139,12 +136,31 @@ export const collectEmbeddedMediaFromElements = async (
   return embeddedMedia.length > 0 ? embeddedMedia : undefined;
 };
 
+/** Validate the whole media section before restoring or clearing any stores. */
+export function validateEmbeddedMedia(embeddedMedia?: EmbeddedMediaItem[]): void {
+  if (embeddedMedia === undefined) return;
+  if (!Array.isArray(embeddedMedia)) throw new Error('嵌入媒体格式无效');
+  const seen = new Set<string>();
+  for (const item of embeddedMedia) {
+    if (!item || typeof item.url !== 'string' || !isVirtualUrl(item.url) ||
+        !['image', 'video'].includes(item.type) ||
+        typeof item.mimeType !== 'string' || !item.mimeType.includes('/') ||
+        typeof item.data !== 'string' || !item.data || seen.has(item.url)) {
+      throw new Error('嵌入媒体格式无效或地址重复');
+    }
+    try { atob(item.data); }
+    catch { throw new Error('嵌入媒体内容损坏，原画布未修改'); }
+    seen.add(item.url);
+  }
+}
+
 /**
  * 恢复嵌入的媒体数据到缓存中
  */
 export const restoreEmbeddedMedia = async (
   embeddedMedia?: EmbeddedMediaItem[]
 ): Promise<void> => {
+  validateEmbeddedMedia(embeddedMedia);
   if (!embeddedMedia || embeddedMedia.length === 0) return;
 
   for (const item of embeddedMedia) {
@@ -164,7 +180,7 @@ export const restoreEmbeddedMedia = async (
         lastUsed: item.lastUsed || item.cachedAt,
       });
     } catch (error) {
-      console.error(`[restoreEmbeddedMedia] 恢复媒体失败: ${item.url}`, error);
+      throw new Error('恢复媒体失败，请检查存储空间后重试。', { cause: error });
     }
   }
 };

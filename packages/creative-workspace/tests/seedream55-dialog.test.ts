@@ -2,7 +2,7 @@ import React from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { LayerDecompositionDialog } from '../upstream/packages/drawnix/src/components/layer-decomposition/LayerDecompositionDialog';
-const {decompose,insert,board}=vi.hoisted(()=>({decompose:vi.fn(),insert:vi.fn(),board:{children:[{id:'source',type:'image'}]}}));
+const {decompose,insert,board}=vi.hoisted(()=>({decompose:vi.fn(),insert:vi.fn(),board:{children:[{id:'source',type:'image',url:'https://example.test/source.png'}]}}));
 const {readPreview}=vi.hoisted(()=>({readPreview:vi.fn()}));
 vi.mock('../upstream/packages/drawnix/src/services/unified-cache-service',()=>({
   unifiedCacheService:{getCachedImageBlobWithThumbnailFallback:readPreview},
@@ -21,7 +21,7 @@ vi.mock('tdesign-react',()=>({
   Progress:()=>null,MessagePlugin:{warning:vi.fn(),error:vi.fn(),success:vi.fn()},
 }));
 describe('real layer settings dialog',()=>{
-  beforeEach(()=>{vi.clearAllMocks();readPreview.mockResolvedValue(null);});
+  beforeEach(()=>{vi.clearAllMocks();board.children[0].url='https://example.test/source.png';readPreview.mockResolvedValue(null);});
   it('resolves a desktop cached source for preview without making a model request',async()=>{
     readPreview.mockResolvedValue(new Blob(['synthetic-image'],{type:'image/png'}));
     const createUrl=vi.fn(()=> 'blob:synthetic-layer-preview');
@@ -81,4 +81,25 @@ describe('real layer settings dialog',()=>{
     rerender(React.createElement(LayerDecompositionDialog,{...props,open:false}));
     await waitFor(()=>expect(screen.queryByRole('alert')).toBeNull());
   });
+});
+
+
+it('recovers an accepted request with its handle without posting again or changing parameters', async () => {
+  const artifact = { groupId:'recovered', url:'https://example.test/layer.png', zIndex:0, name:'base', description:'', boundingBox:{absolute:[0,0,1,1],normalized:[0,0,1000,1000]} };
+  vi.clearAllMocks();
+  const recover = vi.fn().mockResolvedValue({groupId:'recovered', background:artifact, layers:[], resultKind:'inference'});
+  board.children[0].url = 'https://example.test/source.png';
+  decompose.mockImplementation(async (_request, options) => {
+    options.onRecoveryAvailable({requestId:'synthetic-recovery',recover});
+    throw new Error('SYNTHETIC response interrupted');
+  });
+  render(React.createElement(LayerDecompositionDialog,{open:true,board:board as any,sourceElementId:'source',imageUrl:board.children[0].url,language:'zh',providerModelId:'doubao-seedream-5-5-261028',onClose:()=>{}}));
+  fireEvent.click(screen.getByRole('button',{name:'开始分层'}));
+  expect(await screen.findByRole('alert')).toBeTruthy();
+  expect((screen.getByRole('slider') as HTMLInputElement).disabled).toBe(true);
+  expect((screen.getByRole('combobox') as HTMLSelectElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button',{name:'获取已有结果'}));
+  await screen.findByRole('button',{name:'应用到画布'});
+  expect(decompose).toHaveBeenCalledTimes(1);
+  expect(recover).toHaveBeenCalledTimes(1);
 });

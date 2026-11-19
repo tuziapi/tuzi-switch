@@ -591,9 +591,9 @@ class TaskQueueService {
 
   private async persistTaskInternal(task: Task): Promise<void> {
     const shouldKeepTransientMediaParams =
-      !task.remoteId &&
-      task.status !== TaskStatus.COMPLETED &&
-      task.status !== TaskStatus.CANCELLED;
+      task.status !== TaskStatus.CANCELLED &&
+      (task.type === TaskType.IMAGE ||
+        (!task.remoteId && task.status !== TaskStatus.COMPLETED));
     const persistableTask = shouldKeepTransientMediaParams
       ? await this.restoreStrippedTaskParams(task)
       : task;

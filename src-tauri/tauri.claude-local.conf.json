@@ -1,0 +1,9 @@
+{
+  "bundle": {
+    "externalBin": ["target/claude-local-runtime/tuzi-claude-node"],
+    "resources": {
+      "target/claude-local-runtime/LICENSE-node.txt": "claude-local-runtime/LICENSE-node.txt",
+      "target/claude-local-runtime/provenance.json": "claude-local-runtime/provenance.json"
+    }
+  }
+}

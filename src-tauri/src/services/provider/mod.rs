@@ -1738,6 +1738,15 @@ impl ProviderService {
             Self::set_provider_live_config_managed(&mut provider, add_to_live);
         }
 
+        if app_type == AppType::WorkBuddy {
+            let managed = add_to_live && !crate::workbuddy_config::is_official_provider(&provider);
+            Self::set_provider_live_config_managed(&mut provider, managed);
+            if managed {
+                crate::workbuddy_config::update_and_commit(&crate::workbuddy_config::config_path(), &provider.id, Some(&provider.settings_config), || state.db.save_provider(app_type.as_str(), &provider))?;
+                return Ok(true);
+            }
+        }
+
         // Save to database
         state.db.save_provider(app_type.as_str(), &provider)?;
 
@@ -1964,6 +1973,11 @@ impl ProviderService {
             )?;
             Self::set_provider_live_config_managed(&mut provider, live_config_managed);
 
+            if app_type == AppType::WorkBuddy && live_config_managed && !crate::workbuddy_config::is_official_provider(&provider) {
+                crate::workbuddy_config::update_and_commit(&crate::workbuddy_config::config_path(), &provider.id, Some(&provider.settings_config), || state.db.save_provider(app_type.as_str(), &provider))?;
+                return Ok(true);
+            }
+
             // Save to database after live-config presence is resolved so parse errors
             // do not report failure after already mutating DB state.
             state.db.save_provider(app_type.as_str(), &provider)?;
@@ -2060,6 +2074,9 @@ impl ProviderService {
             }
         }
 
+        if app_type == AppType::WorkBuddy && state.db.get_provider_by_id(id, app_type.as_str())?.is_some_and(|provider| !crate::workbuddy_config::is_official_provider(&provider)) {
+            return crate::workbuddy_config::update_and_commit(&crate::workbuddy_config::config_path(), id, None, || state.db.delete_provider(app_type.as_str(), id));
+        }
         state.db.delete_provider(app_type.as_str(), id)
     }
 
@@ -2109,6 +2126,12 @@ impl ProviderService {
             AppType::Hermes => {
                 remove_hermes_provider_from_live(id)?;
             }
+            AppType::WorkBuddy => {
+                let Some(mut provider) = state.db.get_provider_by_id(id, app_type.as_str())? else { return Ok(()) };
+                if crate::workbuddy_config::is_official_provider(&provider) { return Ok(()); }
+                Self::set_provider_live_config_managed(&mut provider, false);
+                return crate::workbuddy_config::update_and_commit(&crate::workbuddy_config::config_path(), id, None, || state.db.save_provider(app_type.as_str(), &provider));
+            }
             _ => {
                 return Err(AppError::Message(format!(
                     "App {} does not support remove from live config",
@@ -2134,7 +2157,7 @@ impl ProviderService {
             AppType::Claude => Self::clear_claude_live_config(state, id),
             AppType::Codex => Self::clear_codex_live_config(state, id),
             AppType::Gemini => Self::clear_gemini_live_config(state, id),
-            AppType::OpenCode | AppType::OpenClaw | AppType::Hermes => {
+            AppType::OpenCode | AppType::OpenClaw | AppType::Hermes | AppType::WorkBuddy => {
                 Self::remove_from_live_config(state, app_type, id)
             }
             _ => Err(AppError::Message(format!(
@@ -2492,7 +2515,20 @@ impl ProviderService {
         }
 
         // Sync to live (write_gemini_live handles security flag internally for Gemini)
-        write_live_with_common_config(state.db.as_ref(), &app_type, &provider)?;
+        let workbuddy_models = app_type == AppType::WorkBuddy && !crate::workbuddy_config::is_official_provider(&provider);
+        if workbuddy_models {
+            let config = build_effective_settings_with_common_config(&state.db, &app_type, &provider)?;
+            let mut updated = provider.clone();
+            Self::set_provider_live_config_managed(&mut updated, true);
+            crate::workbuddy_config::update_and_commit(
+                &crate::workbuddy_config::config_path(),
+                &provider.id,
+                Some(&config),
+                || state.db.save_provider(app_type.as_str(), &updated),
+            )?;
+        } else {
+            write_live_with_common_config(state.db.as_ref(), &app_type, &provider)?;
+        }
 
         // Hermes is additive, so "switching" doesn't overwrite a live config file
         // — we instead update the top-level `model:` section to point at this
@@ -2520,6 +2556,7 @@ impl ProviderService {
         // If persisting the marker fails, roll back the just-written live config so we don't leave
         // the provider in a silent inconsistent state (present in live, but still marked DB-only).
         if app_type.is_additive_mode()
+            && !workbuddy_models
             && Self::provider_live_config_managed(&provider) != Some(true)
         {
             let mut updated = provider.clone();
@@ -2712,6 +2749,7 @@ impl ProviderService {
             AppType::OpenCode => Self::extract_opencode_common_config(&provider.settings_config),
             AppType::OpenClaw => Self::extract_openclaw_common_config(&provider.settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
+            AppType::WorkBuddy => Ok(String::new()),
         }
     }
 
@@ -2728,6 +2766,7 @@ impl ProviderService {
             AppType::OpenCode => Self::extract_opencode_common_config(settings_config),
             AppType::OpenClaw => Self::extract_openclaw_common_config(settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
+            AppType::WorkBuddy => Ok(String::new()),
         }
     }
 
@@ -3114,6 +3153,16 @@ impl ProviderService {
                     ));
                 }
             }
+            AppType::WorkBuddy if crate::workbuddy_config::is_official_provider(provider) => {
+                if !provider.settings_config.is_object() {
+                    return Err(AppError::InvalidInput(
+                        "WorkBuddy configuration must be a JSON object".into(),
+                    ));
+                }
+            }
+            AppType::WorkBuddy => {
+                crate::workbuddy_config::validate_provider(&provider.settings_config)?;
+            }
         }
 
         // Validate and clean UsageScript configuration (common for all app types)
@@ -3312,6 +3361,21 @@ impl ProviderService {
                     .unwrap_or("")
                     .to_string();
 
+                Ok((api_key, base_url))
+            }
+            AppType::WorkBuddy => {
+                let api_key = provider
+                    .settings_config
+                    .get("apiKey")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string();
+                let base_url = provider
+                    .settings_config
+                    .get("url")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string();
                 Ok((api_key, base_url))
             }
         }

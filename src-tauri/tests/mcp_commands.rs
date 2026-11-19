@@ -15,6 +15,40 @@ use support::{
 };
 
 #[test]
+fn workbuddy_service_import_toggle_and_conflict_are_atomic() {
+    let _guard = test_mutex().lock().unwrap();
+    reset_test_fs();
+    let dir = tempfile::tempdir().unwrap();
+    std::env::set_var("WORKBUDDY_CONFIG_DIR", dir.path());
+    let path = dir.path().join("mcp.json");
+    let seed = json!({"custom": true, "mcpServers": {
+        "fixture": {"command":"synthetic", "disabled":true,"timeout":42},
+        "connector": {"command":"skip", "managedBy":"connector"}
+    }});
+    fs::write(&path, seed.to_string()).unwrap();
+    let state = create_test_state().unwrap();
+    assert_eq!(McpService::import_from_workbuddy(&state).unwrap(), 1);
+    assert_eq!(McpService::import_from_workbuddy(&state).unwrap(), 0);
+    McpService::toggle_app(&state, "fixture", AppType::WorkBuddy, true).unwrap();
+    let mut live: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(live["mcpServers"]["fixture"]["timeout"], 42);
+    assert!(live["mcpServers"]["fixture"].get("disabled").is_none());
+    assert_eq!(live["mcpServers"]["connector"], seed["mcpServers"]["connector"]);
+    live["mcpServers"]["fixture"]["command"] = json!("user-edited");
+    live["mcpServers"]["another"] = json!({"command":"synthetic"});
+    let edited = live.to_string();
+    fs::write(&path, &edited).unwrap();
+    assert!(McpService::import_from_workbuddy(&state).is_err());
+    assert!(McpService::toggle_app(&state, "fixture", AppType::WorkBuddy, false).is_err());
+    assert_eq!(fs::read_to_string(path).unwrap(), edited);
+    let records = state.db.get_all_mcp_servers().unwrap();
+    assert!(records["fixture"].apps.workbuddy);
+    assert!(!records.contains_key("another"));
+    assert!(!records.contains_key("connector"));
+    std::env::remove_var("WORKBUDDY_CONFIG_DIR");
+}
+
+#[test]
 fn import_default_config_claude_persists_provider() {
     let _guard = test_mutex().lock().expect("acquire test mutex");
     reset_test_fs();
@@ -251,6 +285,7 @@ command = "echo"
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -345,6 +380,7 @@ fn set_mcp_enabled_for_codex_writes_live_config() {
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -410,6 +446,7 @@ fn enabling_codex_mcp_skips_when_codex_dir_missing() {
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -455,6 +492,7 @@ fn upsert_mcp_server_disabling_app_removes_from_claude_live_config() {
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -489,6 +527,7 @@ fn upsert_mcp_server_disabling_app_removes_from_claude_live_config() {
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -622,6 +661,7 @@ fn enabling_gemini_mcp_skips_when_gemini_dir_missing() {
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -677,6 +717,7 @@ fn enabling_claude_mcp_skips_when_claude_config_absent() {
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -738,6 +779,7 @@ fn sync_all_enabled_removes_known_disabled_but_preserves_unknown_live_entries() 
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -760,6 +802,7 @@ fn sync_all_enabled_removes_known_disabled_but_preserves_unknown_live_entries() 
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,

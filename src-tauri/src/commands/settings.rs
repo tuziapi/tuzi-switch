@@ -272,6 +272,8 @@ pub async fn restore_codex_unified_history() -> Result<CodexUnifyHistoryRestoreR
 /// 重启应用程序（当 app_config_dir 变更后使用）
 #[tauri::command]
 pub async fn restart_app(app: AppHandle) -> Result<bool, String> {
+    #[cfg(feature = "claude-desktop-local")]
+    crate::claude_local_integration::begin_shutdown()?;
     crate::save_window_state_before_exit(&app);
 
     // 在后台延迟重启，让函数有时间返回响应

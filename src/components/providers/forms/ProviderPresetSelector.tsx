@@ -95,7 +95,7 @@ export function ProviderPresetSelector({
       case "tuzi":
         return <ProviderIcon icon="tuzi" name="Tu-Zi" size={14} />;
       case "codex-sub":
-        return <ProviderIcon icon="codex-sub" name="codex订阅" size={14} />;
+        return <ProviderIcon icon="codex-sub" name={preset.name} size={14} />;
       case "gaccode":
         return <ProviderIcon icon="gaccode" name="gaccode" size={14} />;
       case "generic":

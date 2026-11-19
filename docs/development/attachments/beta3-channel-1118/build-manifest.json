@@ -1,0 +1,132 @@
+{
+  "version": "1.6.3-beta.3",
+  "commit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+  "runId": 44216753049,
+  "packages": [
+    {
+      "version": "1.6.3-beta.3",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+      "runId": "44216753049",
+      "target": "aarch64-apple-darwin",
+      "platform": "macos-arm64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.3-macos-arm64.dmg",
+      "bytes": 77060790,
+      "sha256": "a80ebea13f6c14f4e1914231021f84640e9217ae8f59c96ebefac232080fb0d0",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "dmg-mounted",
+        "isolated-identity",
+        "beta-version",
+        "ad-hoc-signature",
+        "node-jit-entitlement",
+        "packaged-node-script-executed"
+      ]
+    },
+    {
+      "version": "1.6.3-beta.3",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+      "runId": "44216753049",
+      "target": "x86_64-apple-darwin",
+      "platform": "macos-x64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.3-macos-x64.dmg",
+      "bytes": 80220300,
+      "sha256": "729f998c14150fbb3a6f305eded6b2fb5821909fad1c40330404e2345203f78d",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "dmg-mounted",
+        "isolated-identity",
+        "beta-version",
+        "ad-hoc-signature",
+        "node-jit-entitlement",
+        "packaged-node-script-executed"
+      ]
+    },
+    {
+      "version": "1.6.3-beta.3",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+      "runId": "44216753049",
+      "target": "x86_64-pc-windows-msvc",
+      "platform": "windows-x64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.3-windows-x64.exe",
+      "bytes": 54347297,
+      "sha256": "88c2ce8fa08feb9d03612fab392b3d57ae08f0ca84526f6cea6ceeba5235db6e",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "nsis-extracted",
+        "packaged-node-script-executed"
+      ]
+    },
+    {
+      "version": "1.6.3-beta.3",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+      "runId": "44216753049",
+      "target": "x86_64-unknown-linux-gnu",
+      "platform": "linux-x64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.3-linux-x64.deb",
+      "bytes": 87673424,
+      "sha256": "b5fdf2f16e8eb90258ea4e265475db36e2fd54d715a444f0e1cc91a06f1be7a5",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "deb-extracted",
+        "no-stable-binary-collision",
+        "packaged-node-script-executed"
+      ]
+    },
+    {
+      "version": "1.6.3-beta.3",
+      "channel": "preview",
+      "repository": "AiW520/tuzi-switch",
+      "commit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+      "runId": "44216753049",
+      "target": "aarch64-unknown-linux-gnu",
+      "platform": "linux-arm64",
+      "applicationId": "com.tuziswitch.desktop.opentu-preview",
+      "isolatedProfile": true,
+      "automaticUpdates": false,
+      "developerSigned": false,
+      "notarized": false,
+      "file": "OpenTu-Preview-1.6.3-beta.3-linux-arm64.deb",
+      "bytes": 85521662,
+      "sha256": "93f06cdb2b8b448cfb4db536f43d4adcd17cdca7052c639a08ae2ee21daa7c1f",
+      "checks": [
+        "native-runtime-probe",
+        "release-native-integration",
+        "deb-extracted",
+        "no-stable-binary-collision",
+        "packaged-node-script-executed"
+      ]
+    }
+  ]
+}

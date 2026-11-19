@@ -1,6 +1,6 @@
 {
   "name": "tu-zi-switch",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI - 兔子助手",
   "type": "module",
   "scripts": {
@@ -14,6 +14,7 @@
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,css,json}\"",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest watch",
+    "test:claude-local-runtime": "node scripts/test-claude-local-runtime.mjs",
     "release": "npm run release:patch",
     "release:patch": "npm version patch",
     "release:minor": "npm version minor",

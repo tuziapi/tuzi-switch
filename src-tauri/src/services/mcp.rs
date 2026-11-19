@@ -275,12 +275,13 @@ impl McpService {
         let mut total = 0;
         let mut errors = Vec::new();
         type Importer = fn(&AppState) -> Result<usize, AppError>;
-        let sources: [(&str, Importer); 6] = [
+        let sources: [(&str, Importer); 7] = [
             ("Claude", Self::import_from_claude),
             ("Codex", Self::import_from_codex),
             ("Gemini", Self::import_from_gemini),
             ("OpenCode", Self::import_from_opencode),
             ("Hermes", Self::import_from_hermes),
+            ("WorkBuddy", Self::import_from_workbuddy),
             ("Grok / Pi / MiniMax", Self::import_from_native_tools),
         ];
         for (name, import) in sources {
@@ -294,6 +295,11 @@ impl McpService {
         } else {
             Err(AppError::Message(format!("导入未全部完成：成功来源已保存 {total} 项，失败来源未保存。已保存项会保留，修复以下问题后可再次导入，不会重复新增。{}", errors.join("; "))))
         }
+    }
+
+    pub fn import_from_workbuddy(state: &AppState) -> Result<usize, AppError> {
+        let _guard = mutation_lock()?;
+        mcp::workbuddy::import(state)
     }
 
     pub fn import_from_native_tools(state: &AppState) -> Result<usize, AppError> {
@@ -430,6 +436,7 @@ impl McpService {
             AppType::Hermes => {
                 mcp::sync_single_server_to_hermes(&Default::default(), &server.id, &server.server)?;
             }
+            AppType::WorkBuddy => mcp::workbuddy::sync(&server.id, Some(&server.server))?,
         }
         Ok(())
     }
@@ -452,6 +459,7 @@ impl McpService {
             AppType::Hermes => {
                 mcp::remove_server_from_hermes(id)?;
             }
+            AppType::WorkBuddy => mcp::workbuddy::sync(id, None)?,
         }
         Ok(())
     }
@@ -552,6 +560,7 @@ impl McpService {
         importer(&mut config)?;
         let existing = state.db.get_all_mcp_servers()?;
         let mut pending = Vec::new();
+        let mut added = 0;
         for server in config.mcp.servers.unwrap_or_default().into_values() {
             if let Some(old) = existing.get(&server.id) {
                 if !crate::mcp::transaction::connections_match(&app, &server.server, &old.server)? {
@@ -567,10 +576,11 @@ impl McpService {
                 }
             } else {
                 pending.push(server);
+                added += 1;
             }
         }
         state.db.save_mcp_servers_atomic(&pending)?;
-        Ok(pending.len())
+        Ok(added)
     }
     pub fn import_from_claude(state: &AppState) -> Result<usize, AppError> {
         Self::import_legacy(state, AppType::Claude, crate::mcp::import_from_claude)

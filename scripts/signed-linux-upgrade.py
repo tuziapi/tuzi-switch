@@ -518,6 +518,9 @@ if(e)e.click();return Boolean(e);'''), 'Persistent update control missing')
     screenshot('05-automatically-restarted')
     creative.preserved(current_creative, 'signed-upgrade')
     assert len([r for r in report['creativeRequests'] if r['version'] == '1.6.2']) == 2
+    report['creativeAfterUpgrade'] = creative.create()
+    assert any(record['version'] == '1.6.3' and record['channels'] == ['3'] for record in report['creativeRequests'])
+    report['checks']['targetNativeBusinessAttribution'] = 'passed'
     assert not report.get('creativeServerErrors')
     report['checks']['creativeImageLayerOcrTaskPreservation'] = 'passed'
     report['checks']['installedDesktopAttributionSynthetic'] = 'passed'

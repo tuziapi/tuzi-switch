@@ -1,0 +1,121 @@
+{
+  "recordedAt": "2026-11-17T15:33:26.228859+08:00",
+  "installedBinarySha256": "07a6acb39da8b7b86a4c7a91f4e28b361d7ef2de574b74217ba5d6f8b012a416",
+  "clientVersion": "5.11492.5",
+  "providerName": "兔子",
+  "profile": "independent OpenTu acceptance",
+  "code": {
+    "realFirstReply": "TUZI-ACCEPT-1117-OK",
+    "multiTurnAndWriteRead": "passed",
+    "actualFileContents": "TUZI-ACCEPT-1117-OK\nFILE-WRITE-OK\n",
+    "actualFileSha256": "3160d5677cad21fd56405877b0954e17b7ab4ca60f7b4ba161ebfb29644e04e3",
+    "modelSwitch": {
+      "from": "claude-sonnet-4-6",
+      "to": "claude-haiku-4-5",
+      "reply": "MODEL-SWITCH-OK",
+      "gatewayVerified": true
+    }
+  },
+  "gatewayRequestMetadata": [
+    {
+      "app_type": "claude-desktop",
+      "model": "claude-sonnet-4-6",
+      "request_model": "claude-sonnet-4-6",
+      "status_code": 200,
+      "input_tokens": 3,
+      "output_tokens": 14,
+      "is_streaming": 1,
+      "created_at": 1794900161
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "claude-sonnet-4-6",
+      "request_model": "claude-sonnet-4-6",
+      "status_code": 200,
+      "input_tokens": 3,
+      "output_tokens": 268,
+      "is_streaming": 1,
+      "created_at": 1794900212
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "claude-sonnet-4-6",
+      "request_model": "claude-sonnet-4-6",
+      "status_code": 200,
+      "input_tokens": 3,
+      "output_tokens": 155,
+      "is_streaming": 1,
+      "created_at": 1794900217
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "claude-sonnet-4-6",
+      "request_model": "claude-sonnet-4-6",
+      "status_code": 200,
+      "input_tokens": 3,
+      "output_tokens": 21,
+      "is_streaming": 1,
+      "created_at": 1794900220
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "claude-haiku-4-5",
+      "request_model": "claude-haiku-4-5",
+      "status_code": 200,
+      "input_tokens": 61,
+      "output_tokens": 1,
+      "is_streaming": 0,
+      "created_at": 1794900419
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "claude-haiku-4-5",
+      "request_model": "claude-haiku-4-5",
+      "status_code": 200,
+      "input_tokens": 3,
+      "output_tokens": 9,
+      "is_streaming": 1,
+      "created_at": 1794900436
+    }
+  ],
+  "chatAndCowork": {
+    "status": "not yet passed",
+    "initialFailure": "11.0 GB available; official VM installer requires 16.1 GB",
+    "afterSpaceRecovery": "30 GiB available; native Retry starts official download",
+    "vmDownload": "in progress",
+    "officialCompressedBytes": 1246877094,
+    "downloadProbe": {
+      "status": 206,
+      "bytes": 1048576,
+      "seconds": 5.12037
+    },
+    "uiLimitation": "ScreenCaptureKit -3811 twice after pending Chat submit",
+    "realChatReplyReceived": false
+  },
+  "windowsArm64": {
+    "sourceRun": 44034208276,
+    "job": 133873661237,
+    "status": "failed",
+    "test": "proxy::local_session_tests::local_session_headless_http_sse_tools_and_lifecycle",
+    "reason": "Private directory permission check timed out",
+    "quickjsAbiTest": "passed",
+    "notFixedOrRetested": true
+  },
+  "formalRelease": false,
+  "cloudSourceRun": {
+    "run": 44034208276,
+    "status": "completed",
+    "conclusion": "failure",
+    "runtimePlatformsPassed": 6,
+    "candidatePlatformsPassed": [
+      "linux-x64",
+      "linux-arm64",
+      "mac-arm64",
+      "mac-x64",
+      "windows-x64"
+    ],
+    "candidateFailed": [
+      "windows-arm64"
+    ]
+  }
+}

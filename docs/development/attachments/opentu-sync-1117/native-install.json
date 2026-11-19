@@ -1,0 +1,37 @@
+{
+  "installed": "/Applications/OpenTu 验收版.app",
+  "backup": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/opentu-sync-budget-20261117-123852",
+  "binarySha256": "5abc2182cfd25034303bb752b8429a3adf63b8e4865e776ee3ad51574b7134e0",
+  "originalAssistantBinarySha256": "64c41bdd071736bd5e836a06050183c872e3e2587ab484725298ebb390e87b0d",
+  "originalAssistantBinaryUnchanged": true,
+  "signing": "local ad-hoc",
+  "formalRelease": false,
+  "nativeModelRequests": 0,
+  "priorBuildNativeSmoke": {
+    "binarySha256": "555f53ff40c024001a61f3d77a3228afc472a4a2f2402fa1c753e256e6f48b7a",
+    "checks": [
+      "cold start",
+      "previous MCP synthetic canvas retained",
+      "new isolated synthetic canvas",
+      "PNG import from native file picker",
+      "click reference port keeps menu open",
+      "image menu creates referenced generation draft",
+      "draft auto-save",
+      "cold restart retains image, reference line and draft"
+    ],
+    "syntheticProject": "SYNTHETIC OpenTu sync 1117"
+  },
+  "finalBuildStartup": {
+    "processRunning": true,
+    "uiVerified": true,
+    "checks": [
+      "unlocked macOS session",
+      "OpenTu 验收版 window visible",
+      "OpenTu 创作 workspace opened",
+      "SYNTHETIC OpenTu sync 1117 project visible",
+      "saved image generation draft visible",
+      "1 reference image visible"
+    ],
+    "nativeModelRequests": 0
+  }
+}

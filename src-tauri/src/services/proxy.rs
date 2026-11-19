@@ -38,6 +38,9 @@ const CLAUDE_MODEL_OVERRIDE_ENV_KEYS: [&str; 6] = [
 
 #[derive(Clone)]
 pub struct ProxyService {
+    #[cfg(feature = "claude-desktop-local")]
+    pub(crate) local_session: Arc<crate::proxy::local_session::LocalSession>,
+    lifecycle: Arc<tokio::sync::Mutex<()>>,
     db: Arc<Database>,
     server: Arc<RwLock<Option<ProxyServer>>>,
     image_auth_token: Arc<str>,
@@ -54,6 +57,9 @@ pub struct HotSwitchOutcome {
 impl ProxyService {
     pub fn new(db: Arc<Database>) -> Self {
         Self {
+            #[cfg(feature = "claude-desktop-local")]
+            local_session: Arc::default(),
+            lifecycle: Arc::default(),
             db,
             server: Arc::new(RwLock::new(None)),
             image_auth_token: Arc::from(uuid::Uuid::new_v4().simple().to_string()),
@@ -172,6 +178,11 @@ impl ProxyService {
 
     /// 启动代理服务器
     pub async fn start(&self) -> Result<ProxyServerInfo, String> {
+        let _guard = self.lifecycle.lock().await;
+        self.start_inner().await
+    }
+
+    async fn start_inner(&self) -> Result<ProxyServerInfo, String> {
         // 1. 启动时自动设置 proxy_enabled = true
         let mut global_config = self
             .db
@@ -213,6 +224,8 @@ impl ProxyService {
             app_handle,
             self.image_auth_token.clone(),
         );
+        #[cfg(feature = "claude-desktop-local")]
+        let server = server.with_local_session(self.local_session.clone());
         let info = server
             .start()
             .await
@@ -730,6 +743,49 @@ impl ProxyService {
 
     /// 停止代理服务器
     pub async fn stop(&self) -> Result<(), String> {
+        let _guard = self.lifecycle.lock().await;
+        self.ensure_local_idle()?;
+        self.stop_inner().await
+    }
+
+    fn ensure_local_idle(&self) -> Result<(), String> {
+        #[cfg(feature = "claude-desktop-local")]
+        if self.local_session.active() {
+            return Err("请先退出 Claude 并停止兼容会话，再关闭或修改网关".into());
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "claude-desktop-local")]
+    pub(crate) async fn bind_local(
+        &self,
+        provider: Provider,
+    ) -> Result<(ProxyServerInfo, String), String> {
+        let _guard = self.lifecycle.lock().await;
+        self.ensure_local_idle()?;
+        let config = self
+            .db
+            .get_proxy_config()
+            .await
+            .map_err(|e| e.to_string())?;
+        if config.listen_address != "127.0.0.1" {
+            return Err("兼容模式要求兔子网关仅监听 127.0.0.1".into());
+        }
+        let info = self.start_inner().await?;
+        if info.address != "127.0.0.1" {
+            return Err("正在运行的网关不是本机回环地址".into());
+        }
+        let token = self.local_session.bind(provider)?;
+        Ok((info, token))
+    }
+
+    #[cfg(feature = "claude-desktop-local")]
+    pub(crate) async fn release_local(&self) {
+        let _guard = self.lifecycle.lock().await;
+        self.local_session.clear();
+    }
+
+    async fn stop_inner(&self) -> Result<(), String> {
         if let Some(server) = self.server.write().await.take() {
             server
                 .stop()
@@ -761,8 +817,10 @@ impl ProxyService {
     ///
     /// 会清除 settings 表中的代理状态，下次启动不会自动恢复。
     pub async fn stop_with_restore(&self) -> Result<(), String> {
+        let _guard = self.lifecycle.lock().await;
+        self.ensure_local_idle()?;
         // 1. 停止代理服务器（即使未运行也继续执行恢复逻辑）
-        if let Err(e) = self.stop().await {
+        if let Err(e) = self.stop_inner().await {
             log::warn!("停止代理服务器失败（将继续恢复 Live 配置）: {e}");
         }
 
@@ -808,8 +866,10 @@ impl ProxyService {
     ///
     /// 用于程序正常退出时，保留代理状态以便下次启动时自动恢复
     pub async fn stop_with_restore_keep_state(&self) -> Result<(), String> {
+        let _guard = self.lifecycle.lock().await;
+        self.ensure_local_idle()?;
         // 1. 停止代理服务器（即使未运行也继续执行恢复逻辑）
-        if let Err(e) = self.stop().await {
+        if let Err(e) = self.stop_inner().await {
             log::warn!("停止代理服务器失败（将继续恢复 Live 配置）: {e}");
         }
 
@@ -1988,6 +2048,8 @@ impl ProxyService {
 
     /// 更新代理配置
     pub async fn update_config(&self, config: &ProxyConfig) -> Result<(), String> {
+        let _guard = self.lifecycle.lock().await;
+        self.ensure_local_idle()?;
         // 记录旧配置用于判定是否需要重启
         let previous = self
             .db
@@ -2029,6 +2091,8 @@ impl ProxyService {
                 app_handle,
                 self.image_auth_token.clone(),
             );
+            #[cfg(feature = "claude-desktop-local")]
+            let new_server = new_server.with_local_session(self.local_session.clone());
             new_server
                 .start()
                 .await

@@ -1,0 +1,11 @@
+{
+  "productName": "OpenTu 验收版",
+  "mainBinaryName": "tuzi-opentu-preview",
+  "identifier": "com.tuziswitch.desktop.opentu-preview",
+  "app": { "windows": [{ "label": "main", "title": "OpenTu 验收版" }] },
+  "bundle": { "createUpdaterArtifacts": false },
+  "plugins": {
+    "deep-link": { "desktop": { "schemes": ["tuzi-opentu-preview"] } },
+    "updater": { "endpoints": [] }
+  }
+}

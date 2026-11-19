@@ -1,0 +1,10 @@
+{
+  "engine": "webkit",
+  "results": [
+    "draft consumed into progress at original position",
+    "result replaces progress and keeps original input",
+    "reload preserves result without new generation"
+  ],
+  "errors": [],
+  "paid": false
+}

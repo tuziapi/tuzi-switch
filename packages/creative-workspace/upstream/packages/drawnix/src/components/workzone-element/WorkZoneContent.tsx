@@ -47,6 +47,7 @@ interface WorkZoneContentProps {
   className?: string;
   onSizeChange?: (size: { width: number; height: number }) => void;
   onDelete?: () => void;
+  onRestoreDraft?: () => void;
   /** 当 SW 中找不到工作流或工作流状态变更时的回调 */
   onWorkflowStateChange?: (
     workflowId: string,
@@ -65,6 +66,7 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
   className = '',
   onSizeChange,
   onDelete,
+  onRestoreDraft,
   onWorkflowStateChange,
   onRetry,
   onHideForever,
@@ -430,7 +432,9 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
       {failed && <g transform="translate(0 106)"><NativeGenerationFailureDetails rows={nativeFailureRows} width={width} /></g>}
       {onDelete && action('删除', width - 92, onDelete)}
       {canRetry && action(isRetrying ? '重试中' : '重试', 14, () => void handleRetry(), isRetrying)}
-      {onHideForever && action('隐藏卡片', canRetry ? 98 : 14, handleHideForeverClick)}
+      {onRestoreDraft && ['failed', 'cancelled'].includes(workflowStatus.status)
+        ? action('恢复编辑', canRetry ? 98 : 14, onRestoreDraft)
+        : onHideForever && action('隐藏卡片', canRetry ? 98 : 14, handleHideForeverClick)}
       <ConfirmDialog open={showHideConfirm} title="隐藏进度卡片" description="确定不再显示进度卡片？任务仍会在后台执行，可在设置中恢复显示。"
         confirmText="确定" cancelText="取消" onOpenChange={setShowHideConfirm} onConfirm={handleHideConfirm} />
     </g>;
@@ -471,6 +475,21 @@ export const WorkZoneContent: React.FC<WorkZoneContentProps> = ({
             </button>
           </HoverTip>
         )}
+        {onRestoreDraft &&
+          ['failed', 'cancelled'].includes(workflowStatus.status) && (
+            <button
+              type="button"
+              className="workzone-content__retry-btn"
+              onPointerDown={stopWorkZonePressEvent}
+              onPointerUp={stopWorkZonePressEvent}
+              onClick={(event) => {
+                handleWorkZoneButtonClick(event);
+                onRestoreDraft();
+              }}
+            >
+              恢复编辑
+            </button>
+          )}
         {/* 删除按钮 - 始终显示（如果有 onDelete 回调） */}
         {onDelete && (
           <HoverTip content="删除" showArrow={false}>

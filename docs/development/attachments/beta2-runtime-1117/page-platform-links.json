@@ -1,0 +1,22 @@
+[
+  {
+    "platform": "macos-arm64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-macos-arm64.dmg"
+  },
+  {
+    "platform": "macos-x64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-macos-x64.dmg"
+  },
+  {
+    "platform": "windows-x64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-windows-x64.exe"
+  },
+  {
+    "platform": "linux-x64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-linux-x64.deb"
+  },
+  {
+    "platform": "linux-arm64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-linux-arm64.deb"
+  }
+]

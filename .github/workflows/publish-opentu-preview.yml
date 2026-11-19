@@ -1,0 +1,68 @@
+name: Publish verified OpenTu preview assets
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful five-platform test installer run
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: opentu-preview-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'AiW520/tuzi-switch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUILD_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/test_publish_opentu_beta.py
+      - name: Verify immutable build identity
+        id: build
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          run_id = os.environ['BUILD_RUN_ID']
+          assert re.fullmatch(r'[1-9][0-9]*', run_id)
+          run = json.loads(subprocess.check_output(['gh','api',f'repos/AiW520/tuzi-switch/actions/runs/{run_id}']))
+          assert run['status'] == 'completed' and run['conclusion'] == 'success'
+          assert run['path'] == '.github/workflows/opentu-test-release.yml'
+          assert run['repository']['full_name'] == 'AiW520/tuzi-switch'
+          sha = run['head_sha']; assert re.fullmatch(r'[a-f0-9]{40}', sha)
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write(f'sha={sha}\n')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: opentu-beta-*
+          path: downloaded-installers
+      - name: Validate all five installers and prepare corresponding source
+        id: prepare
+        env:
+          SOURCE_SHA: ${{ steps.build.outputs.sha }}
+        run: |
+          git fetch --no-tags origin "$SOURCE_SHA"
+          python3 scripts/prepare-opentu-beta-assets.py --artifacts downloaded-installers --output prepared-release --sha "$SOURCE_SHA" --run "$BUILD_RUN_ID"
+      - name: Publish test prerelease only after all asset digests match
+        env:
+          SOURCE_SHA: ${{ steps.build.outputs.sha }}
+        run: python3 scripts/publish-opentu-beta-assets.py
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.prepare.outcome == 'success'
+        with:
+          name: opentu-preview-publication-proof
+          path: |
+            prepared-release-preview-release.json
+            prepared-release/build-manifest.json
+            prepared-release/SHA256SUMS
+            opentu-preview-publication.json
+          if-no-files-found: error

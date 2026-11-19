@@ -1,0 +1,142 @@
+name: Claude local runtime tests
+
+on:
+  push:
+    branches: [codex/claude-local-p0]
+  workflow_dispatch:
+    inputs:
+      build_candidates:
+        description: "Build unsigned local-testing candidates; never publish a release"
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - "src-tauri/vendor/claude-local/**"
+      - "src-tauri/src/claude_local*.rs"
+      - "scripts/*claude-local*"
+      - "scripts/test_prepare_claude_local_node.py"
+      - ".github/workflows/claude-local-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.3"
+      # Standard-library-only checks; no account, trusted CA, or model call.
+      - run: python3 scripts/test_prepare_claude_local_node.py
+      - run: node scripts/test-claude-local-runtime.mjs
+      - run: python3 scripts/prepare-claude-local-node.py --target ${{ matrix.target }}
+      - name: Verify embedded runtime executes on the target host
+        run: |
+          node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("src-tauri/target/claude-local-runtime/provenance.json")); if(p.runtimeProbe!=="passed") throw Error("Native probe was not run");'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: claude-local-runtime-${{ matrix.target }}
+          path: src-tauri/target/claude-local-runtime/provenance.json
+
+  candidate:
+    if: github.repository == 'AiW520/tuzi-switch' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_candidates))
+    needs: runtime
+    env:
+      # Match the existing desktop build budget, including Tauri's nested build.
+      NODE_OPTIONS: --max-old-space-size=4096
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.3"
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.95"
+          targets: ${{ matrix.target }}
+      - name: Locate native libclang for Windows ARM64 bindings
+        if: matrix.target == 'aarch64-pc-windows-msvc'
+        shell: pwsh
+        run: |
+          $clangDirectory = Split-Path (Get-Command clang.exe -ErrorAction Stop).Source
+          $clangLibrary = Join-Path $clangDirectory 'libclang.dll'
+          if (-not (Test-Path $clangLibrary)) { throw "Native LLVM libclang.dll is required" }
+          "LIBCLANG_PATH=$clangDirectory" >> $env:GITHUB_ENV
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libgtk-3-dev
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm build:renderer
+      - name: Verify native integration
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib local_ -- --test-threads=1
+      - run: python3 scripts/build-claude-local-candidate.py --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: claude-local-UNSIGNED-TEST-ONLY-${{ matrix.target }}
+          path: |
+            src-tauri/target/debug/bundle/
+            src-tauri/target/${{ matrix.target }}/debug/bundle/
+          retention-days: 7
+
+  corresponding-source:
+    if: github.repository == 'AiW520/tuzi-switch' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_candidates))
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive the exact source revision
+        run: |
+          mkdir -p source-artifact
+          git rev-parse HEAD > source-artifact/REVISION.txt
+          git archive --format=tar.gz --prefix=tuzi-claude-local-source/ --output=source-artifact/tuzi-claude-local-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: claude-local-corresponding-source
+          path: source-artifact/
+          retention-days: 7

@@ -6,6 +6,7 @@ export interface TextTurn {
   content: string;
   attachments?: TextAttachmentRef[];
   images?: string[];
+  canvasSnapshot?: boolean;
 }
 export interface TextUsage {
   input?: number;

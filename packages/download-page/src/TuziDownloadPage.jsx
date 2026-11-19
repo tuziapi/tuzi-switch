@@ -20,9 +20,11 @@ import {
 } from "lucide-react";
 import { FaApple, FaLinux, FaWindows } from "react-icons/fa6";
 import { isStableRelease, repository } from "./stableRelease";
+import { previewDownloadRelease, previewVersion } from "./previewRelease";
 import { macosInstallCommand } from "./macosInstaller";
 import "./tuzi-download.css";
 
+const preview = import.meta.env.VITE_DOWNLOAD_CHANNEL === "preview";
 const pageSource =
   import.meta.env.VITE_DOWNLOAD_SOURCE_URL ||
   `https://github.com/${repository}/tree/main/packages/download-page`;
@@ -59,10 +61,28 @@ const platforms = [
   { id: "windows", label: "Windows", icon: FaWindows },
   { id: "linux", label: "Linux", icon: FaLinux },
 ];
+const previewFaqs = [
+  [
+    "这次测试版更新了什么？",
+    "集成最新 opentu 画布、讨论视频关键帧与画布操作、媒体文件菜单、ChatGPT MCP 接入，以及 Claude 本地集成。高级流程仍在验收，欢迎反馈问题。",
+  ],
+  [
+    "会覆盖正式兔子助手吗？",
+    "安装后为独立的 OpenTu 验收版，使用独立数据目录，可与正式兔子助手共存。测试版仅手动安装更新；请勿覆盖正式应用或复制其数据库。",
+  ],
+  [
+    "如何选择安装包？",
+    "Mac 按 Apple Silicon / Intel 选择 DMG，Windows 提供 x64 EXE，Linux 提供 x64 / ARM64 DEB。Mac 未经 Apple 开发者签名或公证，Windows 未做 Authenticode 签名，系统可能提示无法验证发布者。",
+  ],
+  [
+    "哪些功能还需要测试？",
+    "此前 Mac 实测通过 Claude Code 多轮、文件读写和模型切换；普通 Chat / Cowork 的 VM 初始化、电脑控制、语音、ChatGPT 客户端联调以及跨平台实机功能尚未全部验收。五平台构建通过不代表全部功能已通过实机测试。",
+  ],
+];
 const faqs = [
   [
-    "v1.6.2 更新了什么？",
-    "完善应用内签名更新、安装失败提示和重试，更新提醒位于画布左上角。补齐 Seedream 5.5 生图、透明背景、分层与 OCR 适配及桌面消费来源记录。本版更换自动更新密钥，旧版需退出应用并手动安装一次 1.6.2；后续版本使用新密钥验签更新。",
+    "v1.6.3 更新了什么？",
+    "Claude 配置支持普通配置与模拟客户端向导切换，保留模型选择和启动入口，准备环境无需本地根证书。补齐 WorkBuddy 配置、Windows 环境修复、GPT 模型真实名称及兼容路由，并同步 OpenTu 画布与协作改进。1.6.2 可在应用内签名更新，1.6.1 及更早版本请先手动安装新版本。",
   ],
   [
     "Mac 提示无法验证开发者或应用打不开怎么办？",
@@ -119,14 +139,19 @@ export function useRelease() {
     let disposed = false;
     const timer = setTimeout(() => controller.abort(), 18000);
     setState({ loading: true, release: null, error: false });
-    fetch(`${import.meta.env.BASE_URL}release.json`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
+    fetch(
+      `${import.meta.env.BASE_URL}${preview ? "preview-release.json" : "release.json"}`,
+      {
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    )
       .then(async (response) => {
         if (!response.ok) throw new Error("Release unavailable");
-        const release = await response.json();
-        if (!isStableRelease(release)) throw new Error("Invalid release");
+        const data = await response.json();
+        const release = preview ? previewDownloadRelease(data) : data;
+        if (!preview && !isStableRelease(release))
+          throw new Error("Invalid release");
         if (!disposed) setState({ loading: false, release, error: false });
       })
       .catch(() => {
@@ -190,12 +215,13 @@ export function TuziDownloadView({
       ? ["macos", "macos-intel"].includes(item.id)
       : platform === "windows"
         ? ["windows", "msi"].includes(item.id)
-        : ["deb", "rpm", "appimage"].includes(item.id),
+        : ["deb", "deb-arm64", "rpm", "appimage"].includes(item.id),
   );
   const selected = choices.find((item) => item.id === packageId) || choices[0];
   const current = screens[screen];
   const PlatformIcon = platforms.find((item) => item.id === platform).icon;
   const track = (item) => {
+    if (preview) return;
     const message = {
       type: "tuzi-download-click",
       platform: item.id,
@@ -229,15 +255,17 @@ export function TuziDownloadView({
       className={`tuzi-download ${compact ? "is-compact" : ""} ${!standalone && !compact ? "is-site-page" : ""}`}
       data-theme={standalone ? (dark ? "dark" : "light") : undefined}
     >
-      <iframe
-        ref={tracker}
-        src={`${import.meta.env.BASE_URL}tuzi-download-analytics.html`}
-        title={t("下载统计")}
-        hidden
-        tabIndex={-1}
-        onLoad={trackerLoaded}
-        referrerPolicy="no-referrer"
-      />
+      {!preview && (
+        <iframe
+          ref={tracker}
+          src={`${import.meta.env.BASE_URL}tuzi-download-analytics.html`}
+          title={t("下载统计")}
+          hidden
+          tabIndex={-1}
+          onLoad={trackerLoaded}
+          referrerPolicy="no-referrer"
+        />
+      )}
       <a className="td-skip" href={`#${anchor("downloads")}`}>
         {t("跳到下载区域")}
       </a>
@@ -305,7 +333,7 @@ export function TuziDownloadView({
                   href={`#${anchor("downloads")}`}
                 >
                   <ArrowDownToLine size={18} />
-                  {t("下载兔子助手")}
+                  {t(preview ? "下载测试版" : "下载兔子助手")}
                 </a>
                 <a className="td-text-link" href={`#${anchor("workspace")}`}>
                   {t("探索统一工作区")}
@@ -491,26 +519,38 @@ export function TuziDownloadView({
             <div className="td-download-intro">
               <p className="td-eyebrow">READY WHEN YOU ARE</p>
               <h2 id={anchor("download-title")}>{t("从你的桌面开始。")}</h2>
-              <p>{t("下载包含 opentu 的兔子助手，选择适合电脑的安装包。")}</p>
+              <p>
+                {t(
+                  preview
+                    ? `测试版 ${previewVersion} · 安装后为独立的 OpenTu 验收版。`
+                    : "下载包含 opentu 的兔子助手，选择适合电脑的安装包。",
+                )}
+              </p>
               <div className="td-release-status" role="status">
                 <span className={error || release?.stale ? "is-stale" : ""} />
                 {loading
                   ? t("正在获取版本…")
                   : release
-                    ? `兔子助手 ${release.tag}`
+                    ? `${preview ? "测试版" : "兔子助手"} ${release.tag}`
                     : t("版本暂时无法获取")}
               </div>
               <p className="td-release-boundary">
-                {t("工具管理、兔子账户与 opentu 创作，一个客户端即可使用。")}
+                {t(
+                  preview
+                    ? "可与正式兔子助手共存，数据独立；测试完成后再发布正式版本。"
+                    : "工具管理、兔子账户与 opentu 创作，一个客户端即可使用。",
+                )}
               </p>
             </div>
             <div className="td-download-box">
               {platform === "macos" && (
                 <p className="td-preview-note">
                   {t(
-                    installCommand
-                      ? "macOS：终端安装会自动识别芯片；也可选择下方安装包手动安装。"
-                      : "macOS：请先退出旧版，将 DMG 中的兔子助手拖入“应用程序”并替换，再从“应用程序”打开。",
+                    preview
+                      ? "macOS：将 DMG 中的 OpenTu 验收版拖入“应用程序”。仅替换旧验收版，保留正式兔子助手。"
+                      : installCommand
+                        ? "macOS：终端安装会自动识别芯片；也可选择下方安装包手动安装。"
+                        : "macOS：请先退出旧版，将 DMG 中的兔子助手拖入“应用程序”并替换，再从“应用程序”打开。",
                   )}
                 </p>
               )}
@@ -600,7 +640,11 @@ export function TuziDownloadView({
               )}
               {choices.length > 1 && (
                 <label className="td-package-select">
-                  {t(platform === "macos" ? "芯片类型" : "安装格式")}
+                  {t(
+                    platform === "macos" || (preview && platform === "linux")
+                      ? "芯片类型"
+                      : "安装格式",
+                  )}
                   <select
                     value={selected.id}
                     onChange={(event) => setPackageId(event.target.value)}
@@ -631,7 +675,7 @@ export function TuziDownloadView({
                   }}
                 >
                   <ArrowDownToLine size={18} />
-                  {t("下载兔子助手")} {release.tag}
+                  {t(preview ? "下载测试版" : "下载兔子助手")} {release.tag}
                   <ArrowUpRight size={17} />
                 </a>
               ) : (
@@ -640,17 +684,25 @@ export function TuziDownloadView({
                 </button>
               )}
               <p className="td-package-note">
-                {platform === "macos"
+                {preview
                   ? t(
-                      "请在“关于本机”中确认芯片类型，下载后打开 DMG，将兔子助手拖入“应用程序”。",
+                      platform === "macos"
+                        ? "请确认 Apple Silicon 或 Intel，安装独立 OpenTu 验收版。"
+                        : platform === "windows"
+                          ? "双击 EXE，按提示安装。适用于 Intel / AMD 64 位电脑。"
+                          : "按 x64 / ARM64 选择 DEB，适用于 Debian / Ubuntu。",
                     )
-                  : platform === "windows"
+                  : platform === "macos"
                     ? t(
-                        "下载后双击 EXE 或 MSI，按提示安装。适用于 Intel / AMD 64 位电脑。",
+                        "请在“关于本机”中确认芯片类型，下载后打开 DMG，将兔子助手拖入“应用程序”。",
                       )
-                    : t(
-                        "选择 DEB、RPM 或 AppImage；DEB 适合 Debian / Ubuntu。",
-                      )}
+                    : platform === "windows"
+                      ? t(
+                          "下载后双击 EXE 或 MSI，按提示安装。适用于 Intel / AMD 64 位电脑。",
+                        )
+                      : t(
+                          "选择 DEB、RPM 或 AppImage；DEB 适合 Debian / Ubuntu。",
+                        )}
               </p>
               <p className="td-cache-notice">
                 {platform === "macos"
@@ -661,15 +713,33 @@ export function TuziDownloadView({
                     )
                   : t("安装包尚未进行开发者签名，系统可能提示无法验证发布者。")}
               </p>
-              {(manualInstallOnly || manualKeyTransition) && (
+              {preview && selected && (
+                <details className="td-cache-notice">
+                  <summary>{t("安装包 SHA256")}</summary>
+                  <p style={{ overflowWrap: "anywhere" }}>{selected.sha256}</p>
+                </details>
+              )}
+              {preview && (
+                <p className="td-cache-notice">
+                  {t(
+                    "测试版暂不自动更新。Chat / Cowork、电脑控制、语音与跨平台实机功能仍待完整验收。",
+                  )}
+                </p>
+              )}
+              {!preview && (manualInstallOnly || manualKeyTransition) && (
                 <p className="td-cache-notice">
                   {t(
                     manualKeyTransition
                       ? "1.6.2 更换了自动更新密钥。请先保存创作、退出旧版，再手动安装一次；保留原应用数据目录。后续更新使用新密钥验签。"
                       : installCommand
-                      ? "本次提供完整安装包。请下载对应安装包或使用 Mac 安装脚本，保存创作并退出旧版后手动安装。应用内签名自动安装暂不可用。"
-                      : "本次提供完整安装包。请下载对应系统的正式安装包，保存创作并退出旧版后手动安装。应用内签名自动安装暂不可用。",
+                        ? "本次提供完整安装包。请下载对应安装包或使用 Mac 安装脚本，保存创作并退出旧版后手动安装。应用内签名自动安装暂不可用。"
+                        : "本次提供完整安装包。请下载对应系统的正式安装包，保存创作并退出旧版后手动安装。应用内签名自动安装暂不可用。",
                   )}
+                </p>
+              )}
+              {!preview && !manualInstallOnly && release?.tag === "v1.6.3" && (
+                <p className="td-cache-notice">
+                  {t("1.6.2 用户可在应用内检查更新；1.6.1 及更早版本请保存创作、退出旧版后手动安装。独立 OpenTu 验收版数据不会自动合并到正式版。")}
                 </p>
               )}
               {release?.stale && (
@@ -685,6 +755,15 @@ export function TuziDownloadView({
                 {t("查看更新说明与全部安装包")}
                 <ArrowUpRight size={14} />
               </a>
+              {release?.correspondingSourceUrl && (
+                <a
+                  className="td-release-link"
+                  href={release.correspondingSourceUrl}
+                  {...external}
+                >
+                  {t("下载本版本对应源码")} <ArrowUpRight size={14} />
+                </a>
+              )}
             </div>
           </section>
           <section
@@ -701,7 +780,7 @@ export function TuziDownloadView({
               </h2>
             </div>
             <div className="td-faq-list">
-              {faqs.map(([question, answer]) => (
+              {(preview ? previewFaqs : faqs).map(([question, answer]) => (
                 <details key={question}>
                   <summary>
                     {t(question)}

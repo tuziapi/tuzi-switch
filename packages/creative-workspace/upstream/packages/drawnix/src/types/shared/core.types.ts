@@ -170,6 +170,8 @@ export interface ConversationTaskLink {
 export interface GenerationParams {
   /** Shared discussion identity, fixed before queue dispatch. */
   conversationLink?: ConversationTaskLink;
+  /** Persistent canvas draft that submitted this immutable task. */
+  generationNodeId?: string;
   /** Durable workflow owner. Generic queue scans must never submit these tasks. */
   workflow?: { scopeId: string; targetId: string; attemptId: string; routeIdentity?: string };
   /** Text prompt describing the desired content */

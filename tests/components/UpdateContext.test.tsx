@@ -51,14 +51,48 @@ beforeEach(() => {
 });
 
 describe("official signed update presentation", () => {
+  it("keeps preview startup silent and returns disabled for a manual check", async () => {
+    const results: Array<boolean | null> = [];
+    function CheckPreview() {
+      const value = useUpdate();
+      return (
+        <button
+          onClick={() =>
+            void value.checkUpdate().then((result) => results.push(result))
+          }
+        >
+          {value.hasUpdate ? "available" : "check preview"}
+        </button>
+      );
+    }
+    check.mockResolvedValue({ status: "disabled" });
+    render(
+      <UpdateProvider>
+        <CheckPreview />
+      </UpdateProvider>,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(info).not.toHaveBeenCalled();
+    expect(success).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByText("check preview"));
+    });
+    expect(results).toEqual([null]);
+    expect(download).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+  });
   it("shows notes, downloads only after consent, pins the version and saves before explicit install", async () => {
     const install = vi.fn().mockResolvedValue(undefined);
     const trace: string[] = [];
     const removeGuard = registerUpdateGuard(async () => {
       trace.push("save");
     });
-    invoke.mockImplementation(async () => {
-      trace.push("native-check");
+    invoke.mockImplementation(async (command: string) => {
+      if (command === "check_update_ready") trace.push("native-check");
+      else if (command === "release_update_reservation") trace.push("release");
+      else throw new Error(`Unexpected native command: ${command}`);
     });
     install.mockImplementation(async () => {
       trace.push("install");
@@ -115,7 +149,13 @@ describe("official signed update presentation", () => {
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "重启并更新" }));
       });
-      expect(trace).toEqual(["save", "native-check", "install", "restart"]);
+      expect(trace).toEqual([
+        "save",
+        "native-check",
+        "install",
+        "restart",
+        "release",
+      ]);
     } finally {
       removeGuard();
     }

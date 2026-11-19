@@ -1,0 +1,64 @@
+{
+  "task": "UC-CL-INTEGRATE-1117",
+  "environment": "macOS arm64; Rust 1.95; combined claude-desktop-local,opentu-preview features",
+  "host": {
+    "files": 105,
+    "passed": 886,
+    "command": "pnpm test:unit"
+  },
+  "creative": {
+    "files": 187,
+    "passed": 2950,
+    "command": "pnpm test:creative"
+  },
+  "typecheck": {
+    "passed": true,
+    "command": "pnpm typecheck"
+  },
+  "claudeRuntime": {
+    "passed": 91,
+    "command": "pnpm test:claude-local-runtime"
+  },
+  "nodeArchiveAndBuild": {
+    "passed": 16,
+    "command": "python3 scripts/test_prepare_claude_local_node.py"
+  },
+  "native": {
+    "localFilterPassed": 28,
+    "providerFixtureRoundTripPassed": 1,
+    "opentuMcpPassed": 7,
+    "features": [
+      "claude-desktop-local",
+      "opentu-preview"
+    ]
+  },
+  "creativeProvenance": {
+    "reconstructedFiles": 1700,
+    "passed": true
+  },
+  "browserClaude": {
+    "passed": true,
+    "synthetic": true,
+    "checks": [
+      "launch prerequisites",
+      "explicit trust simulation",
+      "pinned UI binding",
+      "stop",
+      "crash recovery",
+      "narrow English layout"
+    ]
+  },
+  "browserCanvas": [
+    "canvas-success.json",
+    "canvas-failure.json"
+  ],
+  "nativeBundle": "install.json",
+  "earlierFailures": [
+    "Host full suite initially failed on an unmocked Claude model catalog command; mock, shared fixture and persistence assertion updated; final full run passed.",
+    "Creative parallel full run initially had 3 timeout failures in 2 unchanged image files under load; 28 targeted tests and final full run passed without increasing timeouts.",
+    "Initial native test dependency download stalled and its redundant sherpa build was stopped; same-version local prebuilt cache reused, final native runs passed."
+  ],
+  "release": false,
+  "remoteMutation": false,
+  "realClaudeTaskAcceptance": false
+}

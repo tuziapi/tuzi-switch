@@ -12,15 +12,15 @@ fn save_server(conn: &Connection, server: &McpServer) -> Result<(), AppError> {
     conn.execute(
         "INSERT OR REPLACE INTO mcp_servers (
             id, name, server_config, description, homepage, docs, tags,
-            enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+            enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed, enabled_workbuddy
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
         params![
             server.id, server.name,
             serde_json::to_string(&server.server).map_err(|e| AppError::Database(format!("Failed to serialize server config: {e}")))?,
             server.description, server.homepage, server.docs,
             serde_json::to_string(&server.tags).map_err(|e| AppError::Database(format!("Failed to serialize tags: {e}")))?,
             server.apps.claude, server.apps.codex, server.apps.gemini, server.apps.opencode,
-            server.apps.hermes, server.apps.grokbuild, server.apps.pi, server.apps.mcode, server.apps.pi_managed,
+            server.apps.hermes, server.apps.grokbuild, server.apps.pi, server.apps.mcode, server.apps.pi_managed, server.apps.workbuddy,
         ],
     ).map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
@@ -97,7 +97,7 @@ impl Database {
     pub fn get_all_mcp_servers(&self) -> Result<IndexMap<String, McpServer>, AppError> {
         let conn = lock_conn!(self.conn);
         let mut stmt = conn.prepare(
-            "SELECT id, name, server_config, description, homepage, docs, tags, enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed
+            "SELECT id, name, server_config, description, homepage, docs, tags, enabled_claude, enabled_codex, enabled_gemini, enabled_opencode, enabled_hermes, enabled_grokbuild, enabled_pi, enabled_mcode, pi_managed, enabled_workbuddy
              FROM mcp_servers
              ORDER BY name ASC, id ASC"
         ).map_err(|e| AppError::Database(e.to_string()))?;
@@ -136,6 +136,7 @@ impl Database {
                             pi: row.get(13)?,
                             mcode: row.get(14)?,
                             pi_managed: row.get(15)?,
+                            workbuddy: row.get(16)?,
                         },
                         description,
                         homepage,

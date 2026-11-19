@@ -1,0 +1,103 @@
+Window: "OpenTu 验收版", App: OpenTu 验收版.
+0 standard window OpenTu 验收版, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: 兔子助手, URL: tauri://localhost
+			3 container 应用导航
+				4 text 兔子助手
+				5 text Assistant workspace
+				6 button 收起侧栏
+				7 button 兔子账户
+				8 button opentu 创作
+				9 button 直连站, Help: 直连站 · 在浏览器中打开
+				10 button 兔小店, Help: 兔小店 · 在浏览器中打开
+				11 text 工具
+				12 button Claude Code
+				13 button Claude Desktop
+				14 button Codex
+				15 button Gemini CLI
+				16 button OpenCode
+				17 button OpenClaw
+				18 button Hermes
+				19 button Grok Build
+				20 button Pi
+				21 button MiniMax Code
+				22 container 工作区
+					23 text 工作区
+					24 button MCP 管理
+					25 button Skills 管理
+					26 button 提示词
+					27 button 会话管理
+					28 button 授权管理
+					29 button 本机使用统计
+					30 button 智能体
+					31 button 统一供应商
+				32 button 设置
+			33 container
+				34 button
+				35 heading 设置, Value: 1
+					36 text 设置
+			37 container
+				38 tab group (selectable) 设置
+					39 tab (selectable) 通用
+					40 tab (selectable) 路由
+					41 tab (selectable) 认证
+					42 tab (selectable) 高级
+					43 tab (selectable) 使用统计
+					44 tab (selectable) OpenTu 接入
+					45 tab (selected) 关于
+				46 container 关于
+					47 container
+						48 heading 关于, Value: 3
+							49 text 关于
+						50 text 查看版本信息与更新状态。
+					51 image 兔子助手
+					52 heading 兔子助手, Value: 4
+						53 text 兔子助手
+					54 text 版本
+					55 text v1.6.3-beta.3
+					56 button 更新日志
+					57 button 检查更新
+					58 heading 本地环境检查, Value: 3
+						59 text 本地环境检查
+					60 button 刷新
+					61 text Claude
+					62 text macOS
+					63 text 2.1.327
+					64 text 2.1.220
+					65 text Codex
+					66 text macOS
+					67 text 0.169.1
+					68 text 0.160.0
+					69 text Gemini
+					70 text macOS
+					71 text 0.68.0
+					72 text 0.53.0
+					73 text OpenCode
+					74 text macOS
+					75 text not installed or not executable
+					76 heading 一键安装, Value: 3
+						77 text 一键安装
+					78 text 安装 Claude Code / Codex / Gemini CLI / OpenCode
+					79 button 复制
+					80 text # Claude Code (Native install - recommended)
+curl -fsSL https://claude.ai/install.sh | bash
+# Codex
+npm i -g @openai/codex@latest
+# Gemini CLI
+npm i -g @google/gemini-cli@latest
+# OpenCode
+curl -fsSL https://opencode.ai/install | bash
+			81 container Notifications alt+T
+	82 close button
+	83 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	84 minimize button
+	85 text OpenTu 验收版
+86 menu bar
+	87 OpenTu 验收版
+	88 File
+	89 Edit
+	90 View
+	91 Window
+	92 Help
+
+The focused UI element is 46 container 关于

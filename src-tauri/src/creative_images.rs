@@ -118,7 +118,7 @@ pub(crate) fn save_destination(
         {
             Ok((path, true))
         }
-        _ => Err(format!("原图格式是 {extension}，请使用对应的文件后缀")),
+        _ => Err(format!("文件格式是 {extension}，请使用对应的文件后缀")),
     }
 }
 
@@ -128,24 +128,24 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8], replace: bool) -> Result<(
         return Err("目标是链接文件，请选择普通文件位置".into());
     }
     let mut file =
-        tempfile::NamedTempFile::new_in(parent).map_err(|_| "无法创建图片文件，请检查目录权限")?;
+        tempfile::NamedTempFile::new_in(parent).map_err(|_| "无法创建媒体文件，请检查目录权限")?;
     file.write_all(bytes)
         .and_then(|_| file.as_file().sync_all())
-        .map_err(|_| "图片写入失败，请检查磁盘空间")?;
+        .map_err(|_| "媒体写入失败，请检查磁盘空间")?;
     if replace {
         file.persist(path)
     } else {
         file.persist_noclobber(path)
     }
-    .map_err(|_| "保存图片失败，请检查文件是否被占用")?;
+    .map_err(|_| "保存媒体失败，请检查文件是否被占用")?;
     Ok(())
 }
 
-fn ensure_picture(root: &Path, bytes: &[u8], extension: &str) -> Result<PathBuf, String> {
+pub(crate) fn ensure_export_copy(root: &Path, bytes: &[u8], extension: &str) -> Result<PathBuf, String> {
     if std::fs::symlink_metadata(root).is_ok_and(|m| m.file_type().is_symlink()) {
-        return Err("图片导出目录是符号链接，请使用另存为".into());
+        return Err("媒体导出目录是符号链接，请使用另存为".into());
     }
-    std::fs::create_dir_all(root).map_err(|_| "无法创建图片目录，请使用另存为选择位置")?;
+    std::fs::create_dir_all(root).map_err(|_| "无法创建媒体目录，请使用另存为选择位置")?;
     let hash = format!("{:x}", Sha256::digest(bytes));
     for n in 0..1000 {
         let suffix = if n == 0 {
@@ -157,7 +157,7 @@ fn ensure_picture(root: &Path, bytes: &[u8], extension: &str) -> Result<PathBuf,
         match std::fs::symlink_metadata(&path) {
             Ok(meta) if meta.is_file() && !meta.file_type().is_symlink() => {
                 if meta.len() == bytes.len() as u64
-                    && std::fs::read(&path).map_err(|_| "无法读取已有图片副本")? == bytes
+                    && std::fs::read(&path).map_err(|_| "无法读取已有媒体副本")? == bytes
                 {
                     return Ok(path);
                 }
@@ -168,10 +168,10 @@ fn ensure_picture(root: &Path, bytes: &[u8], extension: &str) -> Result<PathBuf,
                 write_atomic(&path, bytes, false)?;
                 return Ok(path);
             }
-            Err(_) => return Err("无法访问图片目录".into()),
+            Err(_) => return Err("无法访问媒体目录".into()),
         }
     }
-    Err("同名图片过多，请使用另存为".into())
+    Err("同名媒体过多，请使用另存为".into())
 }
 
 #[tauri::command]
@@ -223,7 +223,7 @@ pub async fn creative_image_action(
                 let _lock = IMAGE_OPERATIONS
                     .lock()
                     .map_err(|_| "图片保存正忙，请重试")?;
-                let path = ensure_picture(&picture_root()?, &bytes, extension)?;
+                let path = ensure_export_copy(&picture_root()?, &bytes, extension)?;
                 app.opener().reveal_item_in_dir(&path).map_err(|_| {
                     "图片已保存，但无法打开文件管理器，请到系统图片目录的“兔子助手”文件夹查看"
                 })?;
@@ -304,12 +304,12 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("兔子助手");
         let bytes = png();
-        let first = ensure_picture(&root, &bytes, "png").unwrap();
+        let first = ensure_export_copy(&root, &bytes, "png").unwrap();
         assert_eq!(std::fs::read(&first).unwrap(), bytes);
-        assert_eq!(ensure_picture(&root, &bytes, "png").unwrap(), first);
+        assert_eq!(ensure_export_copy(&root, &bytes, "png").unwrap(), first);
         assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
         std::fs::remove_file(&first).unwrap();
-        assert_eq!(ensure_picture(&root, &bytes, "png").unwrap(), first);
+        assert_eq!(ensure_export_copy(&root, &bytes, "png").unwrap(), first);
         assert_eq!(std::fs::read(&first).unwrap(), bytes);
     }
 
@@ -317,15 +317,15 @@ mod tests {
     fn preserves_user_modified_copy_and_reuses_new_copy() {
         let temp = tempfile::tempdir().unwrap();
         let bytes = png();
-        let first = ensure_picture(temp.path(), &bytes, "png").unwrap();
+        let first = ensure_export_copy(temp.path(), &bytes, "png").unwrap();
         // Same length but different bytes must also be preserved.
         let modified = vec![42; bytes.len()];
         std::fs::write(&first, &modified).unwrap();
-        let second = ensure_picture(temp.path(), &bytes, "png").unwrap();
+        let second = ensure_export_copy(temp.path(), &bytes, "png").unwrap();
         assert_ne!(first, second);
         assert_eq!(std::fs::read(&first).unwrap(), modified);
         assert_eq!(std::fs::read(&second).unwrap(), bytes);
-        assert_eq!(ensure_picture(temp.path(), &bytes, "png").unwrap(), second);
+        assert_eq!(ensure_export_copy(temp.path(), &bytes, "png").unwrap(), second);
     }
 
     #[test]
@@ -371,15 +371,15 @@ mod tests {
         std::fs::create_dir(&outside).unwrap();
         let root = temp.path().join("pictures");
         symlink(&outside, &root).unwrap();
-        assert!(ensure_picture(&root, &png(), "png").is_err());
+        assert!(ensure_export_copy(&root, &png(), "png").is_err());
         std::fs::remove_file(&root).unwrap();
-        let first = ensure_picture(&root, &png(), "png").unwrap();
+        let first = ensure_export_copy(&root, &png(), "png").unwrap();
         let outside_file = outside.join("user.png");
         std::fs::write(&outside_file, b"keep").unwrap();
         std::fs::remove_file(&first).unwrap();
         symlink(&outside_file, &first).unwrap();
         assert!(write_atomic(&first, &png(), true).is_err());
-        let next = ensure_picture(&root, &png(), "png").unwrap();
+        let next = ensure_export_copy(&root, &png(), "png").unwrap();
         assert_ne!(next, first);
         assert_eq!(std::fs::read(outside_file).unwrap(), b"keep");
     }

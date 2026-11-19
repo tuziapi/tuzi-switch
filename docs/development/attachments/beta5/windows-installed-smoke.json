@@ -1,0 +1,15 @@
+{
+  "repository": "AiW520/tuzi-switch",
+  "buildRunId": 44284675642,
+  "sourceCommit": "8fe9414d714960912ba6447b40e2773c053ed486",
+  "artifact": "windows-installed-smoke",
+  "report": {
+    "installerSha256": "a44fec2efbbde479144529443c793262a8c5c52c17e364e6308c7f2421a6b87f",
+    "installed": true,
+    "windowOpened": true,
+    "restarted": true,
+    "localCertificateUnchanged": true,
+    "claudeConversationVerified": false,
+    "productVersion": "1.6.3-beta.5"
+  }
+}

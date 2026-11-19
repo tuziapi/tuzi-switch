@@ -64,7 +64,12 @@ type ProviderFilter =
   | "opencode"
   | "openclaw"
   | "gemini"
-  | "hermes";
+  | "hermes"
+  | "workbuddy";
+
+function canDeleteSession(session: SessionMeta) {
+  return Boolean(session.sourcePath) && session.providerId !== "workbuddy";
+}
 
 export function SessionManagerPage({ appId }: { appId: string }) {
   const { t } = useTranslation();
@@ -246,7 +251,7 @@ export function SessionManagerPage({ appId }: { appId: string }) {
       return;
     }
 
-    const targets = deleteTargets.filter((session) => session.sourcePath);
+    const targets = deleteTargets.filter(canDeleteSession);
     setDeleteTargets(null);
 
     if (targets.length === 0) {
@@ -347,7 +352,7 @@ export function SessionManagerPage({ appId }: { appId: string }) {
   };
 
   const deletableFilteredSessions = useMemo(
-    () => filteredSessions.filter((session) => Boolean(session.sourcePath)),
+    () => filteredSessions.filter(canDeleteSession),
     [filteredSessions],
   );
 
@@ -360,7 +365,7 @@ export function SessionManagerPage({ appId }: { appId: string }) {
   );
 
   const selectedDeletableSessions = useMemo(
-    () => selectedSessions.filter((session) => Boolean(session.sourcePath)),
+    () => selectedSessions.filter(canDeleteSession),
     [selectedSessions],
   );
 
@@ -394,7 +399,7 @@ export function SessionManagerPage({ appId }: { appId: string }) {
     );
 
   const toggleSessionChecked = (session: SessionMeta, checked: boolean) => {
-    if (!session.sourcePath) return;
+    if (!canDeleteSession(session)) return;
     const key = getSessionKey(session);
     setSelectedSessionKeys((current) => {
       const next = new Set(current);
@@ -672,6 +677,12 @@ export function SessionManagerPage({ appId }: { appId: string }) {
                                 <span>Gemini CLI</span>
                               </div>
                             </SelectItem>
+                            <SelectItem value="workbuddy">
+                              <div className="flex items-center gap-2">
+                                <ProviderIcon icon="workbuddy" name="WorkBuddy" size={14} />
+                                <span>WorkBuddy</span>
+                              </div>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
 
@@ -794,7 +805,7 @@ export function SessionManagerPage({ appId }: { appId: string }) {
                               isChecked={selectedSessionKeys.has(
                                 getSessionKey(session),
                               )}
-                              isCheckDisabled={!session.sourcePath}
+                              isCheckDisabled={!canDeleteSession(session)}
                               onSelect={setSelectedKey}
                               onToggleChecked={(checked) =>
                                 toggleSessionChecked(session, checked)
@@ -934,7 +945,7 @@ export function SessionManagerPage({ appId }: { appId: string }) {
                                 setDeleteTargets([selectedSession])
                               }
                               disabled={
-                                !selectedSession.sourcePath || isDeleting
+                                !canDeleteSession(selectedSession) || isDeleting
                               }
                             >
                               <Trash2 className="size-3.5" />

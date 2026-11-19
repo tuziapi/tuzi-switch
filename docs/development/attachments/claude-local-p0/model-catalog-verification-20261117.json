@@ -1,0 +1,63 @@
+{
+  "task": "CL-LOCAL-MODELS-01",
+  "date": "2026-11-17",
+  "install": {
+    "date": "2026-11-17T11:45:40.351524",
+    "backup": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/claude-catalog-20261117-114539",
+    "oldSha256": "91a0da7c172c83ac145b8ca7f8ce0176a864caa181894677619b176da7f4dedb",
+    "newSha256": "4f41a866bff62b3eae4fddb7cf76b1adf62dc4469e2abb7f7382da2b4836c914",
+    "build": "unsigned Debug macOS arm64 1.6.2",
+    "source": "/Users/sdy09/Documents/ChatGPT/tuzi-claude-local-p0/src-tauri/target/debug/bundle/macos/兔子助手.app"
+  },
+  "realCatalog": {
+    "catalogCount": 16,
+    "claudeCount": 16,
+    "routeCount": 16,
+    "beforeRouteCount": 4,
+    "default": "claude-sonnet-4-6",
+    "previousDefault": null,
+    "manualRoutesPreserved": true,
+    "endpointUnchanged": true,
+    "keyUnchanged": true,
+    "ids": [
+      "claude-fable-5",
+      "claude-fable-5-1",
+      "claude-fable-5-2",
+      "claude-haiku-4-5",
+      "claude-haiku-4-5-20251001",
+      "claude-haiku-5-5",
+      "claude-opus-4-5",
+      "claude-opus-4-5-20251101",
+      "claude-opus-4-6",
+      "claude-opus-4-7",
+      "claude-opus-4-8",
+      "claude-opus-5",
+      "claude-opus-5-5",
+      "claude-sonnet-4-6",
+      "claude-sonnet-5",
+      "claude-sonnet-5-5"
+    ]
+  },
+  "ui": {
+    "savedThroughNativeForm": true,
+    "reopenedPersistedCatalog": true,
+    "defaultVisibleCount": 10,
+    "expandedCount": 16,
+    "search": "sonnet",
+    "searchResults": 3
+  },
+  "tests": {
+    "frontend": 54,
+    "frontendFinalTargeted": 23,
+    "nativeModelFetch": 24,
+    "nativeDefaultRuntime": 1,
+    "typecheck": "passed",
+    "finalMacArmCandidateBuild": "passed"
+  },
+  "limitations": [
+    "Model IDs are supplier catalog claims, not independent model identity or function verification.",
+    "No new inference request or full Claude workflow acceptance.",
+    "Unsigned Debug macOS ARM 1.6.2 local candidate; no push, PR or release.",
+    "Windows, Intel Mac and Linux not runtime-tested in this task."
+  ]
+}

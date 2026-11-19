@@ -1,0 +1,487 @@
+{
+  "task": "UC-CANVAS-1117",
+  "date": "2026-11-17",
+  "sourceThread": "01a1c98c-5c80-7f11-ab13-8c7344e32bb0",
+  "sourceRevision": "ac719253192143e5c9e3721b69d20c07865b4bd9",
+  "previousSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb",
+  "desktopBase": "d3e96c3e1ad57307db21d60a862b2c492c379e09",
+  "branch": "codex/sync-opentu-canvas-1117",
+  "files": [
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.image-lineage.test.ts",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.reroll.test.ts",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.tsx",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/ParametersDropdown.test.tsx",
+      "initialMerge": "conflict",
+      "disposition": "retain desktop tests; source hunks include excluded pre-existing Flash/GPT26/ratio implementation; desktop regression and new continuation tests retained",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/ParametersDropdown.tsx",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/parameters-dropdown.scss",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/image-generation-anchor/ImageGenerationAnchorContent.tsx",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/image-generation-anchor/image-generation-anchor.transforms.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/layer-decomposition/Seedream55LayerDialog.test.tsx",
+      "initialMerge": "source",
+      "disposition": "adapted into existing desktop LayerDecompositionDialog/provider; retain size, original provider, preview and explicit apply",
+      "desktopExists": false
+    },
+    {
+      "path": "packages/drawnix/src/components/layer-decomposition/Seedream55LayerDialog.tsx",
+      "initialMerge": "source",
+      "disposition": "adapted into existing desktop LayerDecompositionDialog/provider; retain size, original provider, preview and explicit apply",
+      "desktopExists": false
+    },
+    {
+      "path": "packages/drawnix/src/components/startup/DrawnixDeferredRuntime.tsx",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/seedream-continue-button.test.tsx",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/seedream-continue-button.tsx",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/workzone-element/WorkZoneContent.test.tsx",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/components/workzone-element/WorkZoneContent.tsx",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useAutoCompleteShapePicker.test.tsx",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useAutoCompleteShapePicker.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useAutoInsertToCanvas.ts",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useImageGenerationAnchorSync.ts",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useWorkflowSubmission.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/plugins/canvas-association-line.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/plugins/canvas-association-line.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/plugins/canvas-association.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-arrow-line-auto-complete-extend.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-arrow-line-auto-complete-extend.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-generation-node.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-workzone.ts",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/plugins/workzone-transforms.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/media-executor.test.ts",
+      "initialMerge": "conflict",
+      "disposition": "retain desktop tests; source hunks include excluded pre-existing Flash/GPT26/ratio implementation; desktop regression and new continuation tests retained",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/__tests__/provider-routing.test.ts",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/ai-input-ui-events.ts",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node-lifecycle.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node-lifecycle.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/image-generation-recipe.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/canvas-ocr.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/canvas.ts",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/contract.ts",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/manifest.ts",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/provider.test.ts",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/provider.ts",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/recovery.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/recovery.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/seedream55.test.ts",
+      "initialMerge": "source",
+      "disposition": "adapted into existing desktop LayerDecompositionDialog/provider; retain size, original provider, preview and explicit apply",
+      "desktopExists": false
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/seedream55.ts",
+      "initialMerge": "source",
+      "disposition": "adapted into existing desktop LayerDecompositionDialog/provider; retain size, original provider, preview and explicit apply",
+      "desktopExists": false
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/text-conversion.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/text-conversion.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/types.ts",
+      "initialMerge": "conflict",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/media-executor/fallback-adapter-routes.ts",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/model-adapters/__tests__/seedream-response.test.ts",
+      "initialMerge": "conflict",
+      "disposition": "retain desktop tests; source hunks include excluded pre-existing Flash/GPT26/ratio implementation; desktop regression and new continuation tests retained",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/provider-routing/provider-transport.ts",
+      "initialMerge": "merged",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/services/provider-routing/types.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/types/image-generation-anchor.types.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/types/workzone.types.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/image-task-prefill.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/utils/image-task-prefill.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/utils/image-toolbar-preferences.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/utils/restore-generation-model.test.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    },
+    {
+      "path": "packages/drawnix/src/utils/restore-generation-model.ts",
+      "initialMerge": "source",
+      "disposition": "integrated; preserve desktop behavior on overlap",
+      "desktopExists": true
+    }
+  ],
+  "excluded": [
+    "Web release version/changelog and screenshots; desktop version remains 1.6.2 acceptance",
+    "Existing source Flash/GPT26 features excluded by previous desktop integration; no unrelated model expansion",
+    "Source untracked node_modules.worktree-backup files"
+  ],
+  "verification": {
+    "creativeFull": {
+      "tests": 2937,
+      "files": 186,
+      "result": "passed"
+    },
+    "postNativeImageRestore": {
+      "tests": 10,
+      "files": 1,
+      "result": "passed"
+    },
+    "host": {
+      "tests": 859,
+      "files": 102,
+      "result": "passed"
+    },
+    "hostTypecheck": "passed",
+    "rendererBuild": "passed",
+    "upstreamReconstruction": "passed (1698 files)",
+    "browser": "Chromium/WebKit image success and failure/restore, synthetic transport only",
+    "native": {
+      "installed": "/Applications/OpenTu 验收版.app",
+      "backup": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/opentu-sync-20261117-122214",
+      "binarySha256": "555f53ff40c024001a61f3d77a3228afc472a4a2f2402fa1c753e256e6f48b7a",
+      "originalAssistantBinaryUnchanged": true,
+      "signing": "local ad-hoc",
+      "formalRelease": false,
+      "nativeSmoke": [
+        "cold start",
+        "previous MCP synthetic canvas retained",
+        "new isolated synthetic canvas",
+        "PNG import from native file picker",
+        "click reference port keeps menu open",
+        "image menu creates referenced generation draft",
+        "draft auto-save",
+        "cold restart retains image, reference line and draft"
+      ],
+      "nativeModelRequests": 0,
+      "syntheticProject": "SYNTHETIC OpenTu sync 1117"
+    },
+    "browserReports": {
+      "chromium": {
+        "engine": "chromium",
+        "results": [
+          "draft consumed into progress at original position",
+          "result replaces progress and keeps original input",
+          "reload preserves result without new generation"
+        ],
+        "errors": [],
+        "paid": false
+      },
+      "chromium-failure": {
+        "engine": "chromium",
+        "results": [
+          "draft consumed into progress at original position",
+          "native failed card restores editable input without resubmission",
+          "restored draft persists through reload without generation"
+        ],
+        "errors": [],
+        "paid": false
+      },
+      "webkit": {
+        "engine": "webkit",
+        "results": [
+          "draft consumed into progress at original position",
+          "result replaces progress and keeps original input",
+          "reload preserves result without new generation"
+        ],
+        "errors": [],
+        "paid": false
+      },
+      "webkit-failure": {
+        "engine": "webkit",
+        "results": [
+          "draft consumed into progress at original position",
+          "native failed card restores editable input without resubmission",
+          "restored draft persists through reload without generation"
+        ],
+        "errors": [],
+        "paid": false
+      }
+    }
+  },
+  "publication": {
+    "pushed": false,
+    "published": false,
+    "formalSignature": false
+  },
+  "additionalWorkingTreeSnapshot": {
+    "reason": "Source session added Gemini Omni serialized request budget fix during synchronization",
+    "files": [
+      {
+        "path": "packages/drawnix/src/services/gemini-omni-request-budget.ts",
+        "sha256": "5c3cac5aa4d6f06125da300d2692466439688b20515b5165368cf85d844b7da7",
+        "sourceState": "uncommitted working tree atop ac719253",
+        "disposition": "integrated"
+      },
+      {
+        "path": "packages/drawnix/src/services/gemini-omni-request-budget.test.ts",
+        "sha256": "62f6cfd09af309d76ad3fb9c2e93c98add3d9e7d076fd42f48e9a4f738d19b95",
+        "sourceState": "uncommitted working tree atop ac719253",
+        "disposition": "integrated"
+      },
+      {
+        "path": "packages/drawnix/src/services/tuzi-video-request.ts",
+        "sha256": "e5bd2ea56aa8340da6bf33b838001f825c364294cc7b3889201d6c5c89b8ba75",
+        "sourceState": "uncommitted working tree atop ac719253",
+        "disposition": "integrated"
+      },
+      {
+        "path": "docs/qa-gemini-omni-request-budget.md",
+        "sha256": "05377434348a4c5603237675db00dc5816552eaa704f8516ed9464ea787d1f30",
+        "sourceState": "uncommitted working tree atop ac719253",
+        "disposition": "source verification reference; not copied"
+      }
+    ]
+  }
+}

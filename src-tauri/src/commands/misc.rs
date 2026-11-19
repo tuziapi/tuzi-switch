@@ -257,7 +257,9 @@ pub struct UpdateBuildInfo {
 #[tauri::command]
 pub fn get_update_build_info() -> UpdateBuildInfo {
     UpdateBuildInfo {
-        channel: if cfg!(feature = "isolated-profile") {
+        channel: if cfg!(feature = "opentu-preview") {
+            "preview"
+        } else if cfg!(feature = "isolated-profile") {
             "acceptance"
         } else {
             "stable"
@@ -270,6 +272,7 @@ pub fn get_update_build_info() -> UpdateBuildInfo {
             ("macos", "x86_64") => "macos-intel",
             ("windows", "x86_64") => "windows",
             ("linux", "x86_64") => "linux",
+            ("linux", "aarch64") => "linux-arm64",
             _ => "unsupported",
         },
     }
@@ -2048,11 +2051,13 @@ mod tests {
 #[cfg(test)]
 mod update_build_tests {
     #[test]
-    fn update_build_identity_matches_native_profile() {
+    fn local_update_build_identity_matches_native_profile() {
         let info = super::get_update_build_info();
         assert_eq!(
             info.channel,
-            if cfg!(feature = "isolated-profile") {
+            if cfg!(feature = "opentu-preview") {
+                "preview"
+            } else if cfg!(feature = "isolated-profile") {
                 "acceptance"
             } else {
                 "stable"

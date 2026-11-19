@@ -112,6 +112,26 @@ beforeEach(() => {
   });
 });
 describe("B09 key workflow regressions", () => {
+  it("only offers account adapters with a supported protocol", async () => {
+    setup(
+      <ConfigureTool
+        state={state}
+        keyDto={key}
+        onClose={vi.fn()}
+        onReady={vi.fn()}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Codex 选择并配置/ }),
+      ).toBeEnabled(),
+    );
+    expect(screen.queryByRole("button", { name: /WorkBuddy/ })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /Grok Build 选择并配置/ }),
+    ).toBeEnabled();
+  });
+
   it("waits for explicit delete confirmation, cancel and Escape send zero requests; double click sends once", async () => {
     let finish!: () => void;
     vi.mocked(desktopRequest).mockImplementation(async (req) => {

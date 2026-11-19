@@ -1,0 +1,130 @@
+Window: "Claude", App: Claude.
+0 标准窗口 Claude, Secondary Actions: Raise
+	1 container Claude
+		2 container
+			3 滚动区
+				4 HTML 内容 file:///Users/sdy09/Library/Application%20Support/com.tuziswitch.desktop.opentu-preview/home/.tuzi-switch/claude-desktop-local/desktop-app/5.11492.5/Claude.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html
+			5 滚动区
+				6 HTML 内容 Synthetic Cowork acceptance te... - Claude, URL: claude.ai/cowork/local_a2edbd0f-66fd-4386-bc74-6723c09ed1dc
+					7 container
+						8 container
+							9 标题 Claude, Value: 1
+								10 文本 Claude
+							11 container 侧边栏
+								12 按钮 隐藏侧边栏
+								13 container
+									14 标题 导航, Value: 2
+										15 文本 导航
+									16 container 模式
+										17 按钮 主页
+										18 按钮 Code
+									19 container
+										20 按钮 新建
+										21 按钮 搜索
+										22 按钮 项目
+										23 按钮 作品
+										24 按钮 Dispatch 测试版
+										25 按钮 自定义
+										26 标题 对话和任务, Value: 3
+											27 按钮 对话和任务
+										28 弹出式按钮 筛选和分组最近对话
+										29 container
+											30 按钮 Synthetic Cowork acceptance te... 标记为未读
+												31 文本 Synthetic Cowork acceptance te...
+												32 按钮 标记为未读
+													33 图像 Done
+											34 弹出式按钮 Synthetic Cowork acceptance te... 的更多选项
+										35 container
+											36 按钮 This is a synthetic connectivi... 标记为未读
+												37 文本 This is a synthetic connectivi...
+												38 按钮 标记为未读
+													39 图像 Done
+											40 弹出式按钮 This is a synthetic connectivi... 的更多选项
+										41 按钮 查看全部
+									42 container
+										43 弹出式按钮
+										44 link 获取应用和扩展, Value: claude.ai/downloads
+								45 分离器 调整侧边栏宽度, Value: 288
+							46 container
+								47 container 主面板
+									48 container
+										49 container
+											50 工具栏 页面工具
+												51 container
+													52 按钮 仅在此电脑上
+													53 标题 Synthetic Cowork acceptance te..., Value: 2
+														54 按钮 Synthetic Cowork acceptance te...，重命名会话
+													55 弹出式按钮 Synthetic Cowork acceptance te... 的更多选项
+												56 切换按钮 活动面板, Value: 1
+											57 container
+												58 container 对话消息
+													59 文本 使用向上和向下箭头键在消息之间移动。
+													60 container
+														61 container 第 1 条消息，共 2 条
+															62 标题 您说：Synthetic Cowork acceptance test., Value: 3
+																63 文本 您说：Synthetic Cowork acceptance test.
+															64 文本 Synthetic Cowork acceptance test. Work only inside the selected Tuzi-Acceptance-1117 folder. Read beta2-1118-result.txt. Create a NEW file beta2-cowork-1118.txt containing the exact content you read followed by COWORK-FILE-OK and a newline. Do not overwrite an existing file. Read the new file back and report its exact contents. Do not read or modify any other files, use connectors, browse, or access the network.
+															65 工具栏 消息操作
+																66 文本 2分钟前
+																67 按钮 从此处重新开始对话
+																68 按钮 编辑
+																69 按钮 复制
+														70 container 第 2 条消息，共 2 条
+															71 container
+																72 标题 Claude 已回复：Created beta2-cowork-1118.txt without overwriting an existing file and read it back., Value: 3
+																	73 文本 Claude 已回复：Created beta2-cowork-1118.txt without overwriting an existing file and read it back.
+																74 按钮 已运行 3 个命令, 读取了 2 个文件, 已查找文件
+																75 文本 已运行 3 个命令, 读取了 2 个文件, 已查找文件
+																76 container
+																	77 文本 Created 
+																	78 文本 beta2-cowork-1118.txt
+																	79 文本  without overwriting an existing file and read it back. Its exact contents are:
+																	80 container text 代码
+																		81 container
+																			82 按钮 复制到剪贴板
+																		83 文本 text
+																		84 文本 TUZI-BETA2-FILE-OK
+COWORK-FILE-OK
+																	85 文本 The file ends with a newline.
+															86 工具栏 消息操作
+																87 按钮 复制
+																88 文本 2分钟前
+												89 container
+													90 container
+														91 文本输入区 (settable) 输入您发送给 Claude 的提示词, Value: 输入消息…
+
+															92 文本 输入消息…
+														93 container
+															94 弹出式按钮 添加文件、连接器等
+															95 按钮 添加文件夹
+														96 弹出式按钮 手动批准
+														97 弹出式按钮 (disabled) 模型：gpt-6.1-sol
+														98 按钮 (disabled) 发送消息
+												99 文本 Claude 是 AI，可能会出错。请仔细核对回复。
+										100 文本 Claude 已完成回复
+										101 container 会话活动面板
+											102 按钮 进度
+											103 按钮 Tuzi-Acceptance-1117 前往文件夹
+												104 文本 Tuzi-Acceptance-1117
+												105 按钮 前往文件夹
+											106 按钮 Beta2 cowork 1118 · TXT
+											107 按钮 在文件夹中显示
+											108 按钮 Beta2 1118 result · TXT
+											109 按钮 在文件夹中显示
+											110 按钮 上下文
+											111 文本 跟踪此任务中使用的工具和引用的文件。
+						112 container
+							113 container Notifications
+	114 关闭按钮
+	115 全屏幕按钮 Help: 此按钮也可以执行缩放窗口的操作, Secondary Actions: 缩放窗口
+	116 最小化按钮
+117 menu bar
+	118 Claude
+	119 文件
+	120 编辑
+	121 视图
+	122 转到
+	123 窗口
+	124 帮助
+
+The focused UI element is 91 文本输入区 (settable) 输入您发送给 Claude 的提示词, Value: 输入消息…

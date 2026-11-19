@@ -50,15 +50,13 @@ export const loadFromBlob = async (board: PlaitBoard, blob: Blob | File) => {
   let data: DrawnixExportedData;
   try {
     data = JSON.parse(contents);
-    if (isValidDrawnixData(data)) {
-      // 如果存在嵌入的媒体数据，先恢复它们
-      await restoreEmbeddedMedia(data.embeddedMedia);
-      return data;
-    }
-    throw new Error('Error: invalid file');
-  } catch (error: any) {
+  } catch {
     throw new Error('Error: invalid file');
   }
+  if (!isValidDrawnixData(data)) throw new Error('Error: invalid file');
+  // Surface media/storage errors before the caller replaces the current canvas.
+  await restoreEmbeddedMedia(data.embeddedMedia);
+  return data;
 };
 
 export const createFile = (

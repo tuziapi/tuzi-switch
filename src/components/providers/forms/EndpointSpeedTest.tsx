@@ -23,6 +23,7 @@ const ENDPOINT_TIMEOUT_SECS: Record<AppId, number> = {
   opencode: 8,
   openclaw: 8,
   hermes: 8,
+  workbuddy: 8,
 };
 
 interface TestResult {

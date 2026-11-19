@@ -5,6 +5,8 @@ mod app_store;
 mod auto_launch;
 mod capabilities;
 mod claude_desktop_config;
+#[cfg(feature = "claude-desktop-local")]
+mod claude_local_integration;
 mod claude_mcp;
 mod claude_plugin;
 mod codex_config;
@@ -31,6 +33,7 @@ mod mcp;
 mod native_tools;
 mod native_mcp;
 mod openclaw_config;
+mod opentu_mcp;
 mod opencode_config;
 mod panic_hook;
 mod prompt;
@@ -47,6 +50,8 @@ mod tuzi_account;
 
 mod tray;
 mod usage_script;
+mod workbuddy_config;
+mod sync_utils;
 mod web_hot_update;
 #[cfg(feature = "updater-acceptance")]
 mod updater_acceptance;
@@ -332,6 +337,11 @@ pub fn run() {
         )
         .setup(|app| {
             let _ = rustls::crypto::ring::default_provider().install_default();
+
+            // Local ChatGPT Desktop integration. The bridge binds to loopback
+            // and uses a per-launch bearer token; provider credentials stay in
+            // OpenTu and are never sent to the MCP client.
+            opentu_mcp::start(app.handle());
 
             // 预先刷新 Store 覆盖配置，确保后续路径读取正确（日志/数据库等）
             app_store::refresh_app_config_dir_override(app.handle());
@@ -1227,9 +1237,16 @@ pub fn run() {
             creative_codex::creative_codex_probe,
             creative_codex::creative_codex_chat,
             creative_codex::creative_codex_cancel,
+            opentu_mcp::opentu_mcp_pairing,
+            opentu_mcp::opentu_mcp_copy,
+            opentu_mcp::opentu_mcp_check,
+            opentu_mcp::opentu_mcp_set_ready,
+            opentu_mcp::opentu_mcp_respond,
             creative_http::check_update_ready,
+            creative_http::release_update_reservation,
             creative_images::creative_image_action,
             creative_media::creative_save_media,
+            creative_media::creative_video_action,
             creative_http::creative_manual_cancel,
             tuzi_account::creative::creative_account_bindings,
             tuzi_account::creative::creative_account_bind,
@@ -1258,6 +1275,9 @@ pub fn run() {
             commands::switch_provider,
             commands::import_default_config,
             commands::get_claude_desktop_status,
+            commands::get_claude_local_status,
+            commands::detect_official_claude_installation,
+            commands::claude_local_action,
             commands::get_claude_desktop_default_routes,
             commands::import_claude_desktop_providers_from_claude,
             commands::get_claude_config_status,
@@ -1352,6 +1372,7 @@ pub fn run() {
             commands::get_current_prompt_file_content,
             // model list fetch (OpenAI-compatible /v1/models)
             commands::fetch_models_for_config,
+            commands::fetch_claude_desktop_models,
             // ours: endpoint speed test + custom endpoint management
             commands::test_api_endpoints,
             commands::get_custom_endpoints,
@@ -1534,6 +1555,8 @@ pub fn run() {
             commands::auth_remove_account,
             commands::auth_set_default_account,
             commands::auth_logout,
+            commands::workbuddy_model_owners,
+            commands::workbuddy_account_open_app,
             // Copilot OAuth commands (multi-account support)
             commands::copilot_start_device_flow,
             commands::copilot_poll_for_auth,
@@ -1584,6 +1607,19 @@ pub fn run() {
         }
         // 处理退出请求（所有平台）
         if let RunEvent::ExitRequested { api, code, .. } = &event {
+            #[cfg(feature = "claude-desktop-local")]
+            if code.is_some() && *code != Some(tauri::RESTART_EXIT_CODE) {
+                if let Err(message) = claude_local_integration::begin_shutdown() {
+                    api.prevent_exit();
+                    log::warn!("{message}");
+                    let _ = app_handle.emit("claude-local-exit-blocked", message);
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                    return;
+                }
+            }
             if *code == Some(tauri::RESTART_EXIT_CODE) {
                 log::info!("收到应用重启请求，交由 Tauri 原生重启流程处理");
                 return;

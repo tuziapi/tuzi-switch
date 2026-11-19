@@ -81,6 +81,8 @@ pub struct RequestForwarder {
     failover_manager: Arc<FailoverSwitchManager>,
     /// AppHandle，用于发射事件和更新托盘
     app_handle: Option<tauri::AppHandle>,
+    /// A fixed local session bypasses router side effects and retries.
+    pinned_provider: bool,
     /// 请求开始时的"当前供应商 ID"（用于判断是否需要同步 UI/托盘）
     current_provider_id_at_start: String,
     /// 代理会话 ID（用于 Gemini Native shadow replay）
@@ -126,6 +128,7 @@ impl RequestForwarder {
             gemini_shadow,
             failover_manager,
             app_handle,
+            pinned_provider: false,
             current_provider_id_at_start,
             session_id,
             session_client_provided,
@@ -141,6 +144,11 @@ impl RequestForwarder {
 
     pub(crate) fn with_aggregation_model(mut self, model: Option<String>) -> Self {
         self.aggregation_model = model;
+        self
+    }
+
+    pub(crate) fn with_pinned_provider(mut self, pinned: bool) -> Self {
+        self.pinned_provider = pinned;
         self
     }
 
@@ -172,10 +180,12 @@ impl RequestForwarder {
             });
         }
         // Aggregation dispatch never changes failover queues, health, current provider or credentials.
-        if let Some(model) = &self.aggregation_model {
+        if self.pinned_provider || self.aggregation_model.is_some() {
             let provider = &providers[0];
             let mut body = body;
-            body["model"] = serde_json::json!(model);
+            if let Some(model) = &self.aggregation_model {
+                body["model"] = serde_json::json!(model);
+            }
             return self
                 .forward(
                     app_type,

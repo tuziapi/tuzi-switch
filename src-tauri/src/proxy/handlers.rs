@@ -91,7 +91,16 @@ pub async fn handle_messages(
     State(state): State<ProxyState>,
     request: axum::extract::Request,
 ) -> Result<axum::response::Response, ProxyError> {
-    handle_messages_for_app(state, request, AppType::Claude, "Claude", "claude", None).await
+    handle_messages_for_app(
+        state,
+        request,
+        AppType::Claude,
+        "Claude",
+        "claude",
+        None,
+        None,
+    )
+    .await
 }
 
 pub async fn handle_claude_desktop_messages(
@@ -106,6 +115,7 @@ pub async fn handle_claude_desktop_messages(
         "Claude Desktop",
         "claude-desktop",
         Some("/claude-desktop"),
+        None,
     )
     .await
 }
@@ -121,9 +131,39 @@ pub async fn handle_claude_desktop_models(
         .await
         .map_err(|e| ProxyError::DatabaseError(e.to_string()))?;
     let provider = providers.first().ok_or(ProxyError::NoAvailableProvider)?;
-    let response = crate::claude_desktop_config::model_list_response(provider)
+    let response = crate::claude_desktop_config::gateway_model_list_response(provider)
         .map_err(|e| ProxyError::ConfigError(e.to_string()))?;
     Ok(Json(response))
+}
+
+#[cfg(feature = "claude-desktop-local")]
+pub async fn handle_claude_local_messages(
+    State(state): State<ProxyState>,
+    request: axum::extract::Request,
+) -> Result<axum::response::Response, ProxyError> {
+    let provider = state.local_session.authorize(request.headers())?;
+    handle_messages_for_app(
+        state,
+        request,
+        AppType::ClaudeDesktop,
+        "Claude Local",
+        "claude-desktop",
+        Some("/claude-desktop-local"),
+        Some(provider),
+    )
+    .await
+}
+
+#[cfg(feature = "claude-desktop-local")]
+pub async fn handle_claude_local_models(
+    State(state): State<ProxyState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Value>, ProxyError> {
+    let provider = state.local_session.authorize(&headers)?;
+    Ok(Json(
+        crate::claude_desktop_config::model_list_response(&provider)
+            .map_err(|e| ProxyError::ConfigError(e.to_string()))?,
+    ))
 }
 
 async fn handle_messages_for_app(
@@ -133,6 +173,7 @@ async fn handle_messages_for_app(
     tag: &'static str,
     app_type_str: &'static str,
     strip_prefix: Option<&'static str>,
+    pinned: Option<crate::provider::Provider>,
 ) -> Result<axum::response::Response, ProxyError> {
     let (parts, body) = request.into_parts();
     let uri = parts.uri;
@@ -146,8 +187,11 @@ async fn handle_messages_for_app(
     let body: Value = serde_json::from_slice(&body_bytes)
         .map_err(|e| ProxyError::Internal(format!("Failed to parse request body: {e}")))?;
 
-    let mut ctx =
-        RequestContext::new(&state, &body, &headers, app_type.clone(), tag, app_type_str).await?;
+    let mut ctx = if let Some(provider) = pinned {
+        RequestContext::new_pinned(&state, &body, &headers, provider).await?
+    } else {
+        RequestContext::new(&state, &body, &headers, app_type.clone(), tag, app_type_str).await?
+    };
 
     let raw_endpoint = uri
         .path_and_query()
@@ -296,6 +340,7 @@ async fn handle_claude_transform(
             let state = state.clone();
             let provider_id = ctx.provider.id.clone();
             let model = ctx.request_model.clone();
+            let app_type_str = ctx.app_type_str;
             let status_code = status.as_u16();
             let start_time = ctx.start_time;
 
@@ -310,7 +355,7 @@ async fn handle_claude_transform(
                         log_usage(
                             &state,
                             &provider_id,
-                            "claude",
+                            app_type_str,
                             &model,
                             &model,
                             usage,
@@ -404,11 +449,12 @@ async fn handle_claude_transform(
             let state = state.clone();
             let provider_id = ctx.provider.id.clone();
             let model = model.to_string();
+            let app_type_str = ctx.app_type_str;
             async move {
                 log_usage(
                     &state,
                     &provider_id,
-                    "claude",
+                    app_type_str,
                     &model,
                     &request_model,
                     usage,

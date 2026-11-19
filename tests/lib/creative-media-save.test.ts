@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { nativeSaveMedia } from "@/features/creative/mediaSave";
+import {
+  nativeSaveMedia,
+  nativeVideoAction,
+} from "@/features/creative/mediaSave";
 import { createCreativeAccountBridge } from "@/features/creative/accountBridge";
 import { disconnectedAccount } from "@/lib/api/account";
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -52,12 +55,45 @@ describe("native media export", () => {
       nativeSaveMedia(new Blob(["fixture"]), "audio.mp3", "audio"),
     ).rejects.toThrow("磁盘空间不足");
   });
+  it.each([
+    ["copy", "copied"],
+    ["copy-path", "path-copied"],
+    ["reveal", "revealed"],
+  ] as const)(
+    "sends bounded original bytes for %s without an arbitrary path",
+    async (action, result) => {
+      invoke.mockResolvedValue(result);
+      expect(
+        await nativeVideoAction(action, new Blob(["original-video"])),
+      ).toBe(result);
+      const [command, bytes, options] = invoke.mock.calls[0];
+      expect(command).toBe("creative_video_action");
+      expect(new TextDecoder().decode(bytes)).toBe("original-video");
+      expect(options.headers).toEqual({ "x-media-action": action });
+    },
+  );
+  it("rejects empty/oversized video files and propagates native errors", async () => {
+    await expect(nativeVideoAction("copy", new Blob())).rejects.toThrow(
+      "128 MB",
+    );
+    await expect(
+      nativeVideoAction("reveal", { size: 128 * 1024 * 1024 + 1 } as Blob),
+    ).rejects.toThrow("128 MB");
+    expect(invoke).not.toHaveBeenCalled();
+    invoke.mockRejectedValueOnce("无法访问系统剪贴板");
+    await expect(
+      nativeVideoAction("copy", new Blob(["fixture"])),
+    ).rejects.toThrow("无法访问系统剪贴板");
+  });
   it("does not require account login", () => {
     vi.stubGlobal("__TAURI_INTERNALS__", {});
     try {
       expect(
         createCreativeAccountBridge(disconnectedAccount, () => {}).saveMedia,
       ).toBe(nativeSaveMedia);
+      expect(
+        createCreativeAccountBridge(disconnectedAccount, () => {}).videoAction,
+      ).toBe(nativeVideoAction);
     } finally {
       vi.unstubAllGlobals();
     }

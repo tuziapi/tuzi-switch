@@ -2,6 +2,7 @@
 
 mod auth;
 mod balance;
+mod claude_local;
 mod codex_image_compat;
 mod codex_oauth;
 mod codex_settings;
@@ -33,10 +34,12 @@ mod sync_support;
 mod lightweight;
 mod usage;
 mod webdav_sync;
+pub(crate) mod workbuddy_account;
 mod workspace;
 
 pub use auth::*;
 pub use balance::*;
+pub use claude_local::*;
 pub use codex_image_compat::*;
 pub use codex_oauth::*;
 pub use codex_settings::*;
@@ -68,3 +71,4 @@ pub use lightweight::*;
 pub use usage::*;
 pub use webdav_sync::*;
 pub use workspace::*;
+pub use workbuddy_account::*;

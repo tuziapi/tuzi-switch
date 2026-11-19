@@ -64,3 +64,18 @@ it('keeps video API request IDs visible and copyable in the native SVG card', as
     expect(onSizeChange.mock.lastCall?.[0].height).toBeGreaterThan(260);
   } finally { setAssistantAccount(undefined); }
 });
+
+
+it.each([false, true])('restores failed/cancelled editing in desktop and HTML cards (native=%s)', native => {
+  const onRestoreDraft = vi.fn();
+  const onPointerDown = vi.fn();
+  const source = {...workflow('video'), status:'cancelled' as const};
+  const props = {workflow:source,onRestoreDraft,...(native ? {nativeSize:{width:400,height:260}} : {})};
+  const content = <WorkZoneContent {...props} />;
+  render(native ? <svg onPointerDown={onPointerDown}>{content}</svg> : <div onPointerDown={onPointerDown}>{content}</div>);
+  const button=screen.getByRole('button',{name:'恢复编辑'});
+  fireEvent.pointerDown(button);
+  expect(onPointerDown).not.toHaveBeenCalled();
+  fireEvent.click(button);
+  expect(onRestoreDraft).toHaveBeenCalledTimes(1);
+});

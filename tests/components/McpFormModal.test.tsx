@@ -394,6 +394,7 @@ type = "stdio"
       grokbuild: false,
       pi: true,
       mcode: false,
+      workbuddy: false,
     });
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave).toHaveBeenCalledWith();
@@ -442,6 +443,7 @@ type = "stdio"
       grokbuild: false,
       pi: false,
       mcode: false,
+      workbuddy: false,
     });
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(toastErrorMock).not.toHaveBeenCalled();
@@ -461,7 +463,11 @@ type = "stdio"
     fireEvent.click(screen.getByText("common.add"));
     await waitFor(() => expect(upsertMock).toHaveBeenCalledTimes(1));
     const [entry] = upsertMock.mock.calls.at(-1) ?? [];
-    expect(entry.apps).toMatchObject({ grokbuild: true, pi: true, mcode: true });
+    expect(entry.apps).toMatchObject({
+      grokbuild: true,
+      pi: true,
+      mcode: true,
+    });
   });
 
   it("保存失败时展示翻译后的错误并恢复按钮", async () => {

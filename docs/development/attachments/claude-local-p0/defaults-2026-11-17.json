@@ -1,0 +1,34 @@
+{
+  "installed": "/Applications/兔子助手.app",
+  "backup": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/claude-defaults-20261117-110329",
+  "previousSha256": "4d9cfca4d52814cea04c61be6b1e0357fa15c917e5da0ed8aee1d628a44b614a",
+  "mainSha256": "91a0da7c172c83ac145b8ca7f8ce0176a864caa181894677619b176da7f4dedb",
+  "version": "1.6.2",
+  "unsignedTest": true,
+  "fullFeatureAcceptance": false,
+  "task": "CL-LOCAL-UI-03",
+  "date": "2026-11-17",
+  "tests": {
+    "panel": 15,
+    "rust": 3,
+    "typecheck": "passed",
+    "rendererAndNativeBundle": "passed"
+  },
+  "nativeUiVerified": true,
+  "preview": {
+    "platformSelector": false,
+    "wideCssWidth": 1342,
+    "cardCssWidth": 1295,
+    "sideMargin": 24,
+    "narrowLinuxCssWidth": 600,
+    "horizontalOverflow": false
+  },
+  "certificateChanges": false,
+  "realModelCalls": 0,
+  "releaseReady": false,
+  "sourceSha256": {
+    "src-tauri/src/claude_local_integration.rs": "64103a5252cb0d57962fd67689da4dd3952509b328f71be65ef03614b82ecfbb",
+    "src/components/proxy/ClaudeLocalPanel.tsx": "0fb060dde6477ef5bde51cccf47d711c2b0d38c48280ab3014626b11b581f637",
+    "tests/visual/claude-local.tsx": "24f72fd606e1f69012ba307c52ce241f30e95f2883b3f5b6b92018ad588c640d"
+  }
+}

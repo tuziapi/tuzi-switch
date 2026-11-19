@@ -1,0 +1,12 @@
+{
+  "bundleVersion": "072b6cbfe74f428a98bd86035f83b322b369d1f1",
+  "officialUrl": "https://downloads.claude.ai/vms/linux/arm64/072b6cbfe74f428a98bd86035f83b322b369d1f1/rootfs.img.zst",
+  "compressedSha256": "40818968b6929fcb32ab01f45116cf9fa7eebf5b078c1603b44a6da0eb262d69",
+  "rawSha256": "7e94ba2d3952af47dfb7bdeb7ace4e911b9b661df3ef7c19341a4c3bc719ce93",
+  "rawBytes": 10737418240,
+  "allocatedBytes": 5010210816,
+  "method": "official download with verified hashes and sparse decompression",
+  "sessionDataCopied": false,
+  "verifiedAt": "2026-11-17",
+  "acceptance": "VM asset preparation only; no end-to-end task acceptance"
+}

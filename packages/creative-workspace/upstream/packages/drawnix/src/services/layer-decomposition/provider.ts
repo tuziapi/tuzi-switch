@@ -13,11 +13,15 @@ import {
   settingsManager,
 } from '../../utils/settings-manager';
 import { readProviderResponseJson } from '../provider-routing';
+import { isImageSubmissionOutcomeUnknownError } from '../provider-routing/provider-transport';
+import { isTauriEnvironment } from '../../utils/tauri-env';
+import { isTuziRequestIdCorsBaseUrl, isTuziRequestRecoveryBaseUrl } from '../provider-routing/tuzi-api-endpoints';
+import { recoverLayerPayload, type LayerRecoveryHandle } from './recovery';
 import { supportsTextBindingImageInput } from '../provider-routing/text-binding-capabilities';
 import { buildAnalysisTextConfig, extractJsonObjects } from '../analysis-core';
 import { callApiWithRetry } from '../../utils/gemini-api/apiCalls';
 import type { GeminiMessagePart } from '../../utils/gemini-api/types';
-import { parseLayerDecompositionResponse } from './contract';
+import { parseLayerDecompositionResponse, MAX_SEEDREAM_55_FOREGROUND_LAYERS } from './contract';
 import { isPublicHttpImageSource } from './api';
 import { unifiedCacheService } from '../unified-cache-service';
 import { isVirtualMediaUrl } from '../../utils/virtual-media-url';
@@ -434,6 +438,9 @@ export function normalizeProviderLayerPayload(
       '当前图片模型只返回普通图片，不支持真实图层分层'
     );
   }
+  if (rawData.length > (options.seedream55 ? MAX_SEEDREAM_55_FOREGROUND_LAYERS + 1 : 17)) {
+    throw new LayerDecompositionProviderUnsupportedError('返回图层数量超过支持上限');
+  }
 
   if (
     record.error ||
@@ -597,6 +604,7 @@ export async function decomposeWithConfiguredImageProvider(
     onProgress?: (progress: LayerDecompositionProgress) => void;
     modelId?: string;
     profileId?: string;
+    onRecoveryAvailable?: (handle: LayerRecoveryHandle) => void;
   } = {}
 ): Promise<LayerDecompositionResponse | null> {
   await settingsManager.waitForInitialization();
@@ -682,6 +690,9 @@ export async function decomposeWithConfiguredImageProvider(
   if (request.prompt) payload.prompt = request.prompt;
   const seedream55 = requestedModelId.toLowerCase() === SEEDREAM55_MODEL_ID;
   if (seedream55) {
+    if (!Number.isInteger(request.maxLayers) || request.maxLayers < 1 || request.maxLayers > 99) {
+      throw new Error('Seedream 5.5 前景图层上限必须为 1–99 的整数');
+    }
     payload.size = request.size ?? 'auto';
     payload.output_format = request.outputFormat ?? 'png';
     payload.layer_decomposition_options = {
@@ -692,40 +703,120 @@ export async function decomposeWithConfiguredImageProvider(
     };
     validateSeedream55(payload);
   }
-  const response = await sendAdapterRequest(context, {
-    path:
-      capability.path || context.binding?.submitPath || '/images/generations',
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    signal: options.signal,
-    timeoutMs: SEEDREAM_LAYER_REQUEST_TIMEOUT_MS,
-  });
-  if (!response.ok) {
-    const error = await readProviderResponseJson<Record<string, unknown>>(
-      response
-    ).catch(() => null);
-    throw new LayerDecompositionProviderUnsupportedError(
-      typeof error?.message === 'string'
-        ? error.message
-        : `分层模型请求失败（HTTP ${response.status}）`
-    );
-  }
-  options.onProgress?.({
-    taskId: 'provider',
-    status: 'running',
-    progress: 80,
-    phase: 'extracting',
-  });
-  const result = requireNativeProviderQuality(
-    normalizeProviderLayerPayload(await readProviderResponseJson(response), {
-      trustedModel:
-        requestedModelId.toLowerCase() === SEEDREAM_LAYER_MODEL_ID ||
+  const recoverySupported =
+    seedream55 &&
+    (!isTauriEnvironment() || isTuziRequestIdCorsBaseUrl(context.provider?.baseUrl || context.baseUrl)) &&
+    isTuziRequestRecoveryBaseUrl(
+      context.provider?.baseUrl || context.baseUrl
+    ) &&
+    (!capability.path || capability.path === '/api/v3/images/generations');
+  const requestId = recoverySupported ? crypto.randomUUID() : undefined;
+  const parseResult = (raw: unknown) =>
+    requireNativeProviderQuality(
+      normalizeProviderLayerPayload(raw, {
+        trustedModel: requestedModelId.toLowerCase() === SEEDREAM_LAYER_MODEL_ID || seedream55,
         seedream55,
-      seedream55,
-      ...(seedream55 ? { maxImages: request.maxLayers + 1 } : {}),
-    })
-  );
+        ...(seedream55 ? { maxImages: request.maxLayers + 1 } : {}),
+      })
+    );
+  // Snapshot the provider/auth configuration once for automatic and manual GETs.
+  const submissionContext = {
+    ...context,
+    provider: context.provider
+      ? {
+          ...context.provider,
+          extraHeaders: { ...context.provider.extraHeaders },
+        }
+      : context.provider,
+    extraHeaders: { ...context.extraHeaders },
+    operation: 'image' as const,
+    requestId,
+    onSubmissionAttempt: () => {
+      if (recovery) options.onRecoveryAvailable?.(recovery);
+    },
+  };
+  const recovery: LayerRecoveryHandle | undefined = requestId
+    ? {
+        requestId,
+        recover: async (recoveryOptions) =>
+          parseResult(
+            await recoverLayerPayload(
+              submissionContext,
+              requestId,
+              recoveryOptions
+            )
+          ),
+      }
+    : undefined;
+  let result: LayerDecompositionResponse;
+  try {
+    const response = await sendAdapterRequest(
+      recovery ? submissionContext : context,
+      {
+        path:
+          capability.path ||
+          (seedream55 ? '/api/v3/images/generations' : undefined) ||
+          context.binding?.submitPath ||
+          '/images/generations',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        ...(seedream55
+          ? { baseUrlStrategy: context.binding?.baseUrlStrategy || 'trim-v1' }
+          : context.binding?.baseUrlStrategy
+          ? { baseUrlStrategy: context.binding.baseUrlStrategy }
+          : {}),
+        signal: options.signal,
+        timeoutMs: SEEDREAM_LAYER_REQUEST_TIMEOUT_MS,
+        ...(seedream55
+          ? {
+              allowImageSubmissionRetry: false,
+              allowImageSubmissionOutcomeRecovery: true,
+            }
+          : {}),
+      }
+    );
+    // Gateways can return HTML on 5xx; recovery does not depend on their body.
+    const raw = response.ok
+      ? await readProviderResponseJson<Record<string, unknown>>(response)
+      : await readProviderResponseJson<Record<string, unknown>>(response).catch(
+          () => null
+        );
+    if (!response.ok) {
+      if (recovery && response.status >= 500) {
+        result = await recovery.recover(options);
+      } else {
+        throw new LayerDecompositionProviderUnsupportedError(
+          typeof raw?.message === 'string'
+            ? raw.message
+            : `分层模型请求失败（HTTP ${response.status}）`
+        );
+      }
+    } else {
+      options.onProgress?.({
+        taskId: 'provider',
+        status: 'running',
+        progress: 80,
+        phase: 'extracting',
+      });
+      result = parseResult(
+        requestId && raw && typeof raw === 'object'
+          ? { ...raw, id: `seedream55-${requestId}` }
+          : raw
+      );
+    }
+  } catch (error) {
+    options.signal?.throwIfAborted();
+    if (
+      !recovery ||
+      !(
+        isImageSubmissionOutcomeUnknownError(error) ||
+        (error instanceof Error && error.name === 'TimeoutError')
+      )
+    )
+      throw error;
+    result = await recovery.recover(options);
+  }
   options.onProgress?.({
     taskId: 'provider',
     status: 'completed',

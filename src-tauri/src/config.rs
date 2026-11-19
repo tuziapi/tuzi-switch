@@ -45,7 +45,11 @@ pub fn get_home_dir() -> PathBuf {
 
 /// User-independent profile identity for explicit test/preview builds.
 #[cfg(feature = "isolated-profile")]
-pub(crate) const ISOLATED_PROFILE_ID: &str = if cfg!(feature = "local-preview") {
+pub(crate) const ISOLATED_PROFILE_ID: &str = if cfg!(feature = "opentu-preview") {
+    "com.tuziswitch.desktop.opentu-preview"
+} else if cfg!(feature = "claude-local-poc") {
+    "com.tuziswitch.desktop.claude-local-p0"
+} else if cfg!(feature = "local-preview") {
     "com.tuziswitch.desktop.preview"
 } else {
     "com.tuziswitch.desktop.acceptance"
@@ -357,8 +361,29 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), AppError> {
     Ok(())
 }
 
+/// 原子写入私有凭据文件，并在 Unix 上固定为仅所有者可读写。
+pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<(), AppError> {
+    atomic_write(path, data)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+            .map_err(|error| AppError::io(path, error))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    #[cfg(all(feature = "opentu-preview", feature = "claude-desktop-local"))]
+    #[test]
+    fn local_combined_preview_preserves_opentu_profile_identity() {
+        assert_eq!(
+            super::ISOLATED_PROFILE_ID,
+            "com.tuziswitch.desktop.opentu-preview"
+        );
+        assert!(cfg!(feature = "isolated-profile"));
+    }
     use super::*;
 
     #[test]

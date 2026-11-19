@@ -1,0 +1,20 @@
+[
+  {
+    "url": "https://tuziapi.github.io/tuzi-switch/",
+    "status": 200,
+    "bytes": 605,
+    "sha256": "e2d9d788f01856029425499fe179947bdd4e21cc8266d892dd5e95096558e21b"
+  },
+  {
+    "url": "https://tuziapi.github.io/tuzi-switch/release.json",
+    "status": 200,
+    "bytes": 2923,
+    "sha256": "8937eb813803852675af58927527c88fc2fdb00f64ac131ff719339bfa64416b"
+  },
+  {
+    "url": "https://aiw520.github.io/tuzi-switch/",
+    "status": 200,
+    "bytes": 605,
+    "sha256": "0b07d0b968a10dd52915ebcfc0e446332488f5df7d8220e4d6e3f8ddf69f05ce"
+  }
+]

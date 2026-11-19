@@ -26,6 +26,7 @@ mockIPC(async(command,args:any)=>{
   log('校验通过');return 2;
  }
  if(command==='check_update_ready'){log('原生任务检查');return;}
+ if(command==='release_update_reservation')return;
  if(command==='plugin:updater|install'){log('安装');return;}
  if(command==='plugin:process|restart'){log('重启');return;}
  if(command==='plugin:resources|close')return;

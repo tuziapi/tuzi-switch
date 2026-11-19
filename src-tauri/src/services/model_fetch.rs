@@ -14,6 +14,8 @@ use std::time::Duration;
 pub struct FetchedModel {
     pub id: String,
     pub owned_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<i64>,
     #[serde(default)]
     pub supported_endpoint_types: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -30,6 +32,10 @@ struct ModelsResponse {
 struct ModelEntry {
     id: String,
     owned_by: Option<String>,
+    #[serde(default)]
+    created: Option<serde_json::Value>,
+    #[serde(default)]
+    created_at: Option<serde_json::Value>,
     #[serde(default)]
     supported_endpoint_types: Option<Vec<String>>,
     #[serde(default)]
@@ -141,6 +147,7 @@ fn decode_models(bytes: &[u8]) -> Result<Vec<FetchedModel>, String> {
         .map(|m| FetchedModel {
             id: m.id,
             owned_by: m.owned_by,
+            created_at: model_timestamp(m.created_at.as_ref()).or_else(|| model_timestamp(m.created.as_ref())),
             supported_endpoint_types: m.supported_endpoint_types.unwrap_or_default(),
             endpoints: m.endpoints,
         })
@@ -148,6 +155,71 @@ fn decode_models(bytes: &[u8]) -> Result<Vec<FetchedModel>, String> {
     models.sort_by(|a, b| a.id.cmp(&b.id));
     models.dedup_by(|a, b| a.id == b.id);
     Ok(models)
+}
+
+
+fn model_timestamp(value: Option<&serde_json::Value>) -> Option<i64> {
+    let value = value?;
+    value.as_i64().or_else(|| value.as_str().and_then(|text| {
+        chrono::DateTime::parse_from_rfc3339(text).ok().map(|date| date.timestamp())
+    })).filter(|seconds| *seconds > 0)
+}
+
+/// Complete catalog for Desktop. Never follow redirects or a server-provided URL with a Key.
+/// Pagination is bounded and fails explicitly instead of returning a truncated catalog.
+pub async fn fetch_desktop_models(base_url: &str, api_key: &str) -> Result<Vec<FetchedModel>, String> {
+    if api_key.trim().is_empty() { return Err("API Key is required to fetch models".into()); }
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let candidates = build_models_url_candidates(base_url, false, None)?;
+    let client = crate::proxy::http_client::without_redirects()?;
+    for candidate in candidates {
+        let mut url = url::Url::parse(&candidate).map_err(|_| "Invalid models endpoint")?;
+        if !matches!(url.scheme(), "http" | "https") || !url.username().is_empty() || url.password().is_some() || url.query().is_some() || url.fragment().is_some() {
+            return Err("Invalid models endpoint".into());
+        }
+        let endpoint = url.clone();
+        let mut models = Vec::new();
+        let mut cursors = std::collections::HashSet::new();
+        for page in 0..100 {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() { return Err("Model list request timed out".into()); }
+            let response = client.get(url.clone())
+                .header("Authorization", format!("Bearer {api_key}"))
+                .header("x-api-key", api_key)
+                .header("anthropic-version", "2023-06-01")
+                .timeout(remaining.min(Duration::from_secs(FETCH_TIMEOUT_SECS)))
+                .send().await.map_err(|error| if error.is_timeout() { "Model list request timed out" } else { "Model list request failed" })?;
+            let status = response.status();
+            if page == 0 && matches!(status, StatusCode::NOT_FOUND | StatusCode::METHOD_NOT_ALLOWED) { break; }
+            if !status.is_success() { return Err(format!("HTTP {}", status.as_u16())); }
+            let bytes = read_bounded_models(response).await?;
+            let envelope: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| "Failed to parse model list")?;
+            models.extend(decode_models(&bytes)?);
+            if models.len() > 20000 { return Err("Model list too large".into()); }
+            if envelope.get("has_more").and_then(|v| v.as_bool()) != Some(true) {
+                models.sort_by(|a,b| a.id.cmp(&b.id));
+                models.dedup_by(|a,b| a.id == b.id);
+                return Ok(models);
+            }
+            let cursor = envelope.get("last_id").and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty()).ok_or("Missing model list cursor")?;
+            if !cursors.insert(cursor.to_string()) { return Err("Repeated model list cursor".into()); }
+            url = endpoint.clone();
+            url.query_pairs_mut().append_pair("after_id", cursor);
+        }
+        // A successful paginated response that exceeds the bound is not an empty endpoint.
+        if !models.is_empty() || !cursors.is_empty() { return Err("Model list pagination limit exceeded".into()); }
+    }
+    Err("All candidates failed".into())
+}
+
+async fn read_bounded_models(mut response: reqwest::Response) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| "Model list read failed")? {
+        if bytes.len() + chunk.len() > 8 * 1024 * 1024 { return Err("Model list too large".into()); }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
 }
 
 /// 构造「模型列表端点」的候选 URL 列表
@@ -466,5 +538,64 @@ mod tests {
         let json = r#"{"object":"list","data":[]}"#;
         let resp: ModelsResponse = serde_json::from_str(json).unwrap();
         assert!(resp.data.unwrap().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod desktop_catalog_tests {
+    use super::*;
+    use axum::{extract::Query, http::HeaderMap, response::{IntoResponse, Response}, routing::get, Json, Router};
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move { axum::serve(listener, router).await.unwrap(); });
+        (base, task)
+    }
+    async fn catalog(Query(query): Query<HashMap<String,String>>, headers: HeaderMap) -> Response {
+        assert_eq!(headers["authorization"], "Bearer synthetic-key");
+        assert_eq!(headers["x-api-key"], "synthetic-key");
+        if query.get("after_id").map(String::as_str) == Some("cursor-1") {
+            Json(json!({"data":[{"id":"claude-b","created_at":"2026-01-01T00:00:00Z"}],"has_more":false})).into_response()
+        } else {
+            Json(json!({"data":[{"id":"claude-a","created":100},{"id":"claude-a","created":100}],"has_more":true,"last_id":"cursor-1"})).into_response()
+        }
+    }
+    #[tokio::test]
+    async fn desktop_catalog_reads_all_pages_and_normalizes_dates() {
+        let (base, task) = serve(Router::new().route("/v1/models", get(catalog))).await;
+        let models = fetch_desktop_models(&base, "synthetic-key").await.unwrap();
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0].created_at, Some(100));
+        assert_eq!(models[1].created_at, Some(1767225600));
+        task.abort();
+    }
+    #[tokio::test]
+    async fn desktop_catalog_rejects_cursor_loops_and_never_returns_partial_results() {
+        let (base, task) = serve(Router::new().route("/v1/models", get(|| async {Json(json!({"data":[{"id":"claude-a"}],"has_more":true,"last_id":"same"}))}))).await;
+        assert!(fetch_desktop_models(&base, "synthetic-key").await.unwrap_err().contains("Repeated"));
+        task.abort();
+    }
+    #[tokio::test]
+    async fn desktop_catalog_does_not_follow_redirects_or_echo_error_bodies() {
+        for status in [StatusCode::FOUND, StatusCode::UNAUTHORIZED] {
+            let (base, task) = serve(Router::new().route("/v1/models", get(move || async move { (status, [("location", "http://127.0.0.1:1/stolen")], "synthetic-key") }))).await;
+            let error = fetch_desktop_models(&base, "synthetic-key").await.unwrap_err();
+            assert_eq!(error, format!("HTTP {}", status.as_u16()));
+            assert!(!error.contains("synthetic-key"));
+            task.abort();
+        }
+    }
+    #[test]
+    fn desktop_catalog_metadata_round_trips_and_legacy_fields_remain_optional() {
+        let old: crate::provider::ProviderMeta = serde_json::from_value(json!({})).unwrap();
+        assert!(old.claude_desktop_model_catalog.is_empty());
+        let value = json!({"claudeDesktopModelCatalog":[{"id":"claude-a","createdAt":100}]});
+        let meta: crate::provider::ProviderMeta = serde_json::from_value(value).unwrap();
+        assert_eq!(serde_json::to_value(meta).unwrap()["claudeDesktopModelCatalog"][0]["createdAt"], 100);
+        assert_eq!(model_timestamp(Some(&json!(0))), None);
+        assert_eq!(model_timestamp(Some(&json!("unknown"))), None);
     }
 }

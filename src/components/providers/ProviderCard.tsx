@@ -171,7 +171,8 @@ export function ProviderCard({
   // OMO and OMO Slim share the same card behavior
   const isAnyOmo = isOmo || isOmoSlim;
   const handleDisableAnyOmo = isOmoSlim ? onDisableOmoSlim : onDisableOmo;
-  const isAdditiveMode = appId === "opencode" && !isAnyOmo;
+  const workBuddyCustom = appId === "workbuddy" && provider.category !== "official";
+  const isAdditiveMode = (appId === "opencode" && !isAnyOmo) || workBuddyCustom;
 
   const { data: health } = useProviderHealth(provider.id, appId);
 
@@ -645,6 +646,7 @@ export function ProviderCard({
 
           <div className="flex items-center gap-1.5 flex-shrink-0 opacity-70 transition-opacity duration-200 hover:opacity-100 focus-within:opacity-100">
             <ProviderActions
+              workBuddyCustom={workBuddyCustom}
               appId={appId}
               isCurrent={isCurrent}
               isSwitching={isSwitching}

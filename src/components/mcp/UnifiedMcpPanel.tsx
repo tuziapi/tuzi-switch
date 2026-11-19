@@ -66,6 +66,7 @@ const UnifiedMcpPanel = React.forwardRef<
       opencode: 0,
       openclaw: 0,
       hermes: 0,
+      workbuddy: 0,
       grokbuild: 0,
       pi: 0,
       mcode: 0,

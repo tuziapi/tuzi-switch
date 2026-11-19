@@ -4255,6 +4255,10 @@
       "sha256": "5a69e3039229bb134e3a098982e89e527f899e939fdb8f919ccf8c46891e6540"
     },
     {
+      "path": "packages/drawnix/src/services/layer-decomposition/provider.test.ts",
+      "sha256": "d7c806435f6a3ba73a482504f84558d8349f8eb12a6a3dac181df33e5039c680"
+    },
+    {
       "path": "packages/drawnix/src/services/layer-decomposition/provider.ts",
       "sha256": "89b548d5ddfb54287899fc1d2cc4e323ecf2dde7308ab4411d4bb2c0c4c9abf2"
     },
@@ -5269,6 +5273,10 @@
     {
       "path": "packages/drawnix/src/utils/__tests__/image-generation-lineage-placement.test.ts",
       "sha256": "8a9437f3e76d82c075b1fc49e8c5e7ab74f686a49b992d450a9db7bba3fc9080"
+    },
+    {
+      "path": "packages/drawnix/src/utils/__tests__/image-task-prefill.test.ts",
+      "sha256": "2128de7f7e244094cf4dfd71097484047b0c2d869ba2f3cfba534ea309dd4836"
     },
     {
       "path": "packages/drawnix/src/utils/__tests__/model-pricing-service.test.ts",
@@ -6734,6 +6742,326 @@
       "path": "packages/drawnix/src/components/CanvasImageContextMenu.test.tsx",
       "origin": "assistant-integration",
       "reason": "Regression coverage for canvas image/video menus, native overlay targeting and delayed WebKit scroll dismissal"
+    },
+    {
+      "path": "docs/qa-canvas-generation-nodes.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "docs/qa-canvas-reroll.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/design.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/proposal.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/specs/ai-input-generation/spec.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/specs/canvas-generation-inputs/spec.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/tasks.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "openspec/changes/add-canvas-reroll-and-reference-connections/validation.md",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.generation-discussion.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/ai-input-bar/AIInputBar.reroll.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/generation-node-actions.test.tsx",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/generation-node-actions.tsx",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useAutoCompleteShapePicker.test.tsx",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useGenerationNodeDraft.test.tsx",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/hooks/useGenerationNodeDraft.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-generation-node.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-generation-node.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node-thumbnail.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node-thumbnail.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/image-generation-recipe.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/image-generation-recipe.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/image-reference-ports.test.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/services/image-reference-ports.ts",
+      "origin": "canvas-generation-session-integration",
+      "reason": "PR338/339 canvas generation integration and desktop compatibility verification",
+      "featureSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar-position.test.ts",
+      "origin": "desktop-canvas-integration",
+      "reason": "Regress desktop header/editor collision discovered during PR338/339 integration UI verification"
+    },
+    {
+      "path": "openspec/changes/add-discussion-canvas-awareness/design.md",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "openspec/changes/add-discussion-canvas-awareness/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "openspec/changes/add-discussion-canvas-awareness/specs/agent-discussion/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "openspec/changes/add-discussion-canvas-awareness/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-context.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-context.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-control.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-control.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "packages/drawnix/src/services/text-chat/canvas-schema.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-DISCUSS-CANVAS-02: approved sampled-video discussion, canvas snapshot, reversible actions and regression validation"
+    },
+    {
+      "path": "openspec/changes/complete-seedream-55-editing/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "openspec/changes/complete-seedream-55-editing/specs/image-generation/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "openspec/changes/complete-seedream-55-editing/specs/semantic-layer-decomposition/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "openspec/changes/complete-seedream-55-editing/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "openspec/changes/update-generation-node-in-place/design.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "openspec/changes/update-generation-node-in-place/proposal.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "openspec/changes/update-generation-node-in-place/specs/canvas-generation/spec.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "openspec/changes/update-generation-node-in-place/tasks.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "openspec/changes/update-generation-node-in-place/validation.md",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/seedream-continue-button.test.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/components/toolbar/popup-toolbar/seedream-continue-button.tsx",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-arrow-line-auto-complete-extend.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node-lifecycle.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/generation-node-lifecycle.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/canvas-ocr.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/provider.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/recovery.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/recovery.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/text-conversion.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/layer-decomposition/text-conversion.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/utils/restore-generation-model.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/utils/restore-generation-model.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: source ac719253 incremental desktop adaptation and regression coverage"
+    },
+    {
+      "path": "packages/drawnix/src/services/gemini-omni-request-budget.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: Gemini Omni request budget source working-tree snapshot; hashes in opentu-canvas-1117-source.json"
+    },
+    {
+      "path": "packages/drawnix/src/services/gemini-omni-request-budget.test.ts",
+      "origin": "assistant-integration",
+      "reason": "UC-CANVAS-1117: Gemini Omni request budget source working-tree snapshot; hashes in opentu-canvas-1117-source.json"
     }
   ],
   "integration": {
@@ -6752,6 +7080,28 @@
       "date": "2026-11-05",
       "strategy": "incremental three-way merge with native SVG diagnostics, native clipboard and original media preservation",
       "record": "docs/development/2026-11-05-opentu-develop-sync.md"
+    },
+    {
+      "task": "UC-CANVAS-339",
+      "repository": "ljquan/opentu",
+      "sourceThread": "01a1c98c-5c80-7f11-ab13-8c7344e32bb0",
+      "baseRevision": "73f6e925df2edd3723bef358a21fd51b48492f12",
+      "revision": "debc11bc56b59c0e06dc8185ae529668a8245cfb",
+      "assistantBase": "c299b8df5d03a69afa96b637a1370ebdf3e00f29",
+      "date": "2026-11-16",
+      "strategy": "scoped three-way integration of PR338 feature paths plus PR339 actions; retain desktop discussion, native transports, Seedream55 and update UI",
+      "record": "docs/development/2026-11-16-canvas-generation-integration.md"
+    }
+  ],
+  "incrementalIntegrations": [
+    {
+      "task": "UC-CANVAS-1117",
+      "sourceThread": "01a1c98c-5c80-7f11-ab13-8c7344e32bb0",
+      "sourceRevision": "ac719253192143e5c9e3721b69d20c07865b4bd9",
+      "previousSourceRevision": "debc11bc56b59c0e06dc8185ae529668a8245cfb",
+      "desktopBase": "d3e96c3e1ad57307db21d60a862b2c492c379e09",
+      "date": "2026-11-17",
+      "workingTreeSnapshot": "docs/development/opentu-canvas-1117-source.json#additionalWorkingTreeSnapshot"
     }
   ]
 }

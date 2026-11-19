@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-16T09:30:56.537289+00:00",
+  "stage": "native-session-stopped-version-change",
+  "installedClaudeVersion": "5.11492.5",
+  "initialClaudeVersion": "2.26454.0",
+  "bundleSha256": "8b6b5511533365ef07b4c290e93b7513499b01a0354a6ca0e2aad59ae4b54052",
+  "certificateTrusted": true,
+  "providerHost": "api.tu-zi.com",
+  "correctedUpstreamModel": "claude-sonnet-4-6",
+  "modelIdentifierVerifiedByAuthenticatedList": true,
+  "nativeChineseHomeLoaded": true,
+  "codeBundleVersion": "2.1.289",
+  "codeBundleBytes": 76620437,
+  "codeBundleVerifiedByDesktop": true,
+  "requestSummary": [
+    {
+      "appType": "claude-desktop",
+      "requestModel": "claude-sonnet-4-6",
+      "status": 400,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "localRecordedCostUSD": "0"
+    }
+  ],
+  "successfulModelReplies": 0,
+  "fileTaskCompleted": false,
+  "sessionMarkerPresent": false,
+  "personalConfigHashesUnchanged": true,
+  "scope": "Checks only six configured personal configuration locations. Native app self-updated globally; profile isolation did not isolate installation updates. No screenshot acquired. Exact final-version compatibility remains unverified."
+}

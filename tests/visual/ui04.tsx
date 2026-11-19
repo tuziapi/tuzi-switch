@@ -120,6 +120,11 @@ mockWindows("main");
 mockIPC(
   async (command, args) => {
     if (command.startsWith("creative_codex_")) return localCodexPreviewIPC(command, args);
+    if (command === "creative_video_action") {
+      const state = window as unknown as { __creativeVideoFixture?: { sizes: number[] } };
+      (state.__creativeVideoFixture ??= { sizes: [] }).sizes.push((args as ArrayBuffer).byteLength);
+      return "copied";
+    }
     if (command === "creative_save_media") {
       const state = window as unknown as { __creativeMediaFixture?: { sizes: number[] } };
       (state.__creativeMediaFixture ??= { sizes: [] }).sizes.push((args as ArrayBuffer).byteLength);
@@ -297,6 +302,7 @@ mockIPC(
       return { address: "127.0.0.1", port: 15721 };
     }
     if (command === "get_provider_health") return null;
+    if (command === "opentu_mcp_set_ready") return null;
     throw new Error(`Synthetic preview rejects IPC: ${command}`);
   },
   { shouldMockEvents: true },

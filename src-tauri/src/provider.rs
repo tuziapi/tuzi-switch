@@ -84,6 +84,10 @@ impl Provider {
             .map(|s| s.enabled)
             .unwrap_or(false)
     }
+
+    pub fn has_official_category(&self) -> bool {
+        self.category.as_deref() == Some("official")
+    }
 }
 
 /// 供应商管理器
@@ -256,6 +260,14 @@ pub struct CodexChatReasoning {
     pub output_format: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeDesktopCatalogModel {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<i64>,
+}
+
 /// 供应商元数据
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProviderMeta {
@@ -278,6 +290,8 @@ pub struct ProviderMeta {
         skip_serializing_if = "HashMap::is_empty"
     )]
     pub claude_desktop_model_routes: HashMap<String, ClaudeDesktopModelRoute>,
+    #[serde(default, rename = "claudeDesktopModelCatalog", skip_serializing_if = "Vec::is_empty")]
+    pub claude_desktop_model_catalog: Vec<ClaudeDesktopCatalogModel>,
     /// 用量查询脚本配置
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_script: Option<UsageScript>,

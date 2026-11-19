@@ -23,6 +23,7 @@ const ALL_APPS: AppId[] = [
   "opencode",
   "openclaw",
   "hermes",
+  "workbuddy",
 ];
 const STORAGE_KEY = "tuzi-switch-last-app";
 
@@ -60,6 +61,7 @@ export function AppSwitcher({
     opencode: "opencode",
     openclaw: "openclaw",
     hermes: "hermes",
+    workbuddy: "workbuddy",
   };
   const appDisplayName: Record<AppId, string> = {
     claude: "Claude",
@@ -69,6 +71,7 @@ export function AppSwitcher({
     opencode: "OpenCode",
     openclaw: "OpenClaw",
     hermes: "Hermes",
+    workbuddy: "WorkBuddy",
   };
   const appBadgeIcon: Partial<Record<AppId, React.ReactNode>> = {
     claude: <Terminal className="h-2.5 w-2.5" strokeWidth={2.4} />,

@@ -1,0 +1,57 @@
+name: Publish OpenTu test download page
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "packages/download-page/public/preview-release.json"
+permissions:
+  contents: read
+concurrency:
+  group: unified-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'AiW520/tuzi-switch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.3"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tuzi/download-page test
+      - name: Verify actual published beta files and build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node packages/download-page/scripts/check-preview-publication.mjs
+      - name: Build test page only
+        env:
+          VITE_RELEASE_REPOSITORY: AiW520/tuzi-switch
+          VITE_DOWNLOAD_CHANNEL: preview
+          VITE_DOWNLOAD_SOURCE_URL: https://github.com/${{ github.repository }}/tree/${{ github.sha }}/packages/download-page
+        run: pnpm --filter @tuzi/download-page exec vite build
+      - name: Package page
+        run: |
+          cp packages/download-page/dist/tuzi-switch.html packages/download-page/dist/index.html
+          cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/LICENSE packages/download-page/dist/
+          git archive --format=tar.gz --output=packages/download-page/dist/source.tar.gz HEAD packages/download-page
+          touch packages/download-page/dist/.nojekyll
+          test ! -f packages/download-page/dist/latest.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/download-page/dist
+      - uses: actions/deploy-pages@v4
+        id: deployment

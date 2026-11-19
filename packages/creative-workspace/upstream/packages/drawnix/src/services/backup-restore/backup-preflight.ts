@@ -1,6 +1,7 @@
 import type JSZip from 'jszip';
 import type { BackupManifest } from './types';
 import { checksumJson } from './backup-checksum';
+import { validateEmbeddedMedia } from '../../data/embedded-media';
 
 /** Validate the whole archive before any store is cleared or changed.
  * This is not a cross-database transaction: write/quota failures remain separate.
@@ -24,7 +25,11 @@ export async function validateBackupPayload(
     try { value = JSON.parse(await entry.async('string')); }
     catch { throw new Error(`备份文件损坏：${name}，原数据未修改`); }
     if (!value || typeof value !== 'object') throw new Error(`备份数据格式无效：${name}`);
-    if (name.endsWith('.drawnix') && !Array.isArray(value.elements)) throw new Error(`画板数据格式无效：${name}`);
+    if (name.endsWith('.drawnix')) {
+      if (!Array.isArray(value.elements)) throw new Error(`画板数据格式无效：${name}`);
+      try { validateEmbeddedMedia(value.embeddedMedia); }
+      catch { throw new Error(`画板媒体数据损坏：${name}，原数据未修改`); }
+    }
     if (name === 'tasks.json' && !Array.isArray(value)) throw new Error('任务数据格式无效');
     parsed.set(name, value);
   }

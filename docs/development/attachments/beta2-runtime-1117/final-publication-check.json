@@ -1,0 +1,23 @@
+{
+  "releaseId": 449389544,
+  "releaseTag": "opentu-preview-v1.6.3-beta.2",
+  "eightAssetDigestsMatch": true,
+  "publicManifestMatches": true,
+  "pageRun": 44213408165,
+  "pageResult": {
+    "conclusion": "success",
+    "headSha": "fee095625de7f152e3178a6c5060f0ee4578bf17",
+    "status": "completed"
+  },
+  "latest": {
+    "AiW520/tuzi-switch": "v1.5.4",
+    "tuziapi/tuzi-switch": "v1.6.2"
+  },
+  "publicHashes": {
+    "preview": "7cf588509a7bf648e03110ee6ac0b550f9d394a016ca2250af1a5255963ebc44",
+    "officialIndex": "e2d9d788f01856029425499fe179947bdd4e21cc8266d892dd5e95096558e21b",
+    "officialRelease": "8937eb813803852675af58927527c88fc2fdb00f64ac131ff719339bfa64416b"
+  },
+  "officialIndexMatchesPriorBaseline": true,
+  "officialManifestMatchesPriorBaseline": true
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "platform": "macos-arm64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-macos-arm64.dmg",
+    "status": 200,
+    "bytes": 77064493,
+    "expectedSha256": "612f11679139401f51f8573bb40cd46881b393114f2357e11b7535fa0a5d745c"
+  },
+  {
+    "platform": "macos-x64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-macos-x64.dmg",
+    "status": 200,
+    "bytes": 80220064,
+    "expectedSha256": "4bb1e60f1c1f7b3b6c918ede33691bff97b1423ce5bcd89a786308e21d427f47"
+  },
+  {
+    "platform": "windows-x64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-windows-x64.exe",
+    "status": 200,
+    "bytes": 54339917,
+    "expectedSha256": "556faaf9832ad558230acf654a08a4c072b5ee0737e84685a7c21a9d4f927b75"
+  },
+  {
+    "platform": "linux-x64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-linux-x64.deb",
+    "status": 200,
+    "bytes": 87672630,
+    "expectedSha256": "9ec121209fb1ab98b416004fe52b2953496d391fb7afc6fd867ec579e24b5def"
+  },
+  {
+    "platform": "linux-arm64",
+    "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.2/OpenTu-Preview-1.6.3-beta.2-linux-arm64.deb",
+    "status": 200,
+    "bytes": 85526852,
+    "expectedSha256": "a27efba1fee570602286dd8bd2fb6f18f81db310d1e4c6878ecece5fab1de375"
+  }
+]

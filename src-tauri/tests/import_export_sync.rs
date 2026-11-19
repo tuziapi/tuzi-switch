@@ -642,6 +642,7 @@ command = "echo"
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,
@@ -771,6 +772,7 @@ fn import_from_claude_merges_into_config() {
                 gemini: false,
                 opencode: false,
                 hermes: false,
+                ..Default::default()
             },
             description: None,
             homepage: None,

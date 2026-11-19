@@ -43,6 +43,7 @@ const labels: Record<TuziTool, string> = {
   opencode: "OpenCode",
   openclaw: "OpenClaw",
   hermes: "Hermes",
+  workbuddy: "WorkBuddy",
   grokbuild: "Grok Build",
   pi: "Pi",
   mcode: "MiniMax Code",
@@ -55,6 +56,7 @@ const icons: Record<TuziTool, string> = {
   opencode: "opencode",
   openclaw: "openclaw",
   hermes: "hermes",
+  workbuddy: "workbuddy",
   grokbuild: "xai",
   pi: "pi",
   mcode: "minimax",
@@ -284,7 +286,8 @@ function ConfigureToolSession({
         {(Object.keys(labels) as TuziTool[])
           .filter(
             (id) =>
-              id !== "claude-desktop" || !/linux/i.test(navigator.platform),
+              TUZI_TOOL_TARGETS.some((target) => target.appId === id) &&
+              (id !== "claude-desktop" || !/linux/i.test(navigator.platform)),
           )
           .map((id) => {
             const saved = existing.filter((s) => s.app === id);

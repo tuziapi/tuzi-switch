@@ -433,7 +433,7 @@ fn create_usage_collector(
     let state = state.clone();
     let provider_id = ctx.provider.id.clone();
     let request_model = ctx.request_model.clone();
-    let app_type_str = parser_config.app_type_str;
+    let app_type_str = ctx.app_type_str;
     let tag = ctx.tag;
     let start_time = ctx.start_time;
     let stream_parser = parser_config.stream_parser;
@@ -838,6 +838,8 @@ mod tests {
 
     fn build_state(db: Arc<Database>) -> ProxyState {
         ProxyState {
+            #[cfg(feature = "claude-desktop-local")]
+            local_session: Arc::default(),
             db: db.clone(),
             config: Arc::new(RwLock::new(ProxyConfig::default())),
             status: Arc::new(RwLock::new(ProxyStatus::default())),

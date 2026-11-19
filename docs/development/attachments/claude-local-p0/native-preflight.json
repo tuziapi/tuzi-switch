@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-16T08:49:50.589352+00:00",
+  "stage": "native-preflight",
+  "claudeVersion": "2.26454.0",
+  "bundleSha256": "69601e0e57c524826d82eda7e8e4beaf66428d93d3f6a75f83221abd140773b9",
+  "certificateTrusted": true,
+  "providerSelected": "tuzi-route",
+  "providerKeyAvailable": false,
+  "modelCalls": 0,
+  "personalConfigBaseline": {
+    "~/.claude/settings.json": "absent",
+    "~/.claude.json": "cbeeb291980b4c978724ad12100aa51fa7448617512459f06ff3d20a2375a1f2",
+    "~/Library/Application Support/Claude/claude_desktop_config.json": "a81f15304511079a21a375a0e0a2d6d1cffc840d252732a18e0f5bd627f2019b",
+    "~/Library/Application Support/Claude/configLibrary": "absent",
+    "~/Library/Application Support/Claude-3p/claude_desktop_config.json": "absent",
+    "~/Library/Application Support/Claude-3p/configLibrary/0257da31-ed40-4860-9c7c-5c80fd5100df.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "~/Library/Application Support/Claude-3p/configLibrary/_meta.json": "477745519074381ca6bcd76e580a2da1b2dc06e4a98f17324a6ec3d92f7f3ded"
+  },
+  "scope": "Native P0 panel and certificate trust verified; login/chat/Code pending API key. No screenshot: macOS capture failed with SCStreamErrorDomain -3811."
+}

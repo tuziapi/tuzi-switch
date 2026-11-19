@@ -1,0 +1,86 @@
+{
+  "repository": "AiW520/tuzi-switch",
+  "sourceCommit": "8fe9414d714960912ba6447b40e2773c053ed486",
+  "version": "1.6.3-beta.5",
+  "buildRunId": 44284675642,
+  "buildAttempt": 2,
+  "publicationRunId": 44298522258,
+  "pageRunId": 44299056728,
+  "pageCommit": "90f6f7d0e28a14ae775c5ba42e8f14a51fe5be2d",
+  "publishedAt": "2026-11-18T11:52:50Z",
+  "releaseUrl": "https://github.com/AiW520/tuzi-switch/releases/tag/opentu-preview-v1.6.3-beta.5",
+  "publicPageMetadataMatches": true,
+  "publicBuildManifestDownloadedAndHashVerified": true,
+  "publicAssetMetadataMatchesCloudProof": true,
+  "windowsInstallerMatchesInstalledSmoke": true,
+  "browserDownloadChoicesVerified": [
+    "macos-arm64",
+    "macos-x64",
+    "windows-x64",
+    "linux-x64",
+    "linux-arm64"
+  ],
+  "allInstallersDownloadedLocally": false,
+  "windowsRealClaudeConversationVerified": false,
+  "customerReady": false,
+  "formalLatest": "v1.6.2",
+  "testRepositoryStableLatest": "v1.5.4",
+  "assets": [
+    {
+      "file": "build-manifest.json",
+      "httpStatus": "200",
+      "exitCode": 0,
+      "expectedSha256": "sha256:f3bf3fbc62e5545740ef5765458c03d51ffd5a0a79ad620797a5be6fd19b82c9",
+      "expectedBytes": 4413
+    },
+    {
+      "file": "OpenTu-Preview-1.6.3-beta.5-linux-arm64.deb",
+      "httpStatus": "200",
+      "exitCode": 0,
+      "expectedSha256": "sha256:75003025434c11db7f89a7870447b7c94b9640d8768df03996cbfe1b5e3d3815",
+      "expectedBytes": 85474768
+    },
+    {
+      "file": "OpenTu-Preview-1.6.3-beta.5-linux-x64.deb",
+      "httpStatus": "200",
+      "exitCode": 0,
+      "expectedSha256": "sha256:fcd04b77190bb779b432dd969844457f1ecb0d1afe5119617a053cacc8bcc347",
+      "expectedBytes": 87617182
+    },
+    {
+      "file": "OpenTu-Preview-1.6.3-beta.5-macos-arm64.dmg",
+      "httpStatus": "200",
+      "exitCode": 0,
+      "expectedSha256": "sha256:e6a633356b135746d10acb215072818983f6feacddd91c4a9d4598a980e574ec",
+      "expectedBytes": 76969172
+    },
+    {
+      "file": "OpenTu-Preview-1.6.3-beta.5-macos-x64.dmg",
+      "httpStatus": "200",
+      "exitCode": 0,
+      "expectedSha256": "sha256:c94c1fc352bc1548195ef97574053f37ea781ba01b1c7d772913517e05e378fd",
+      "expectedBytes": 80190152
+    },
+    {
+      "file": "OpenTu-Preview-1.6.3-beta.5-windows-x64.exe",
+      "httpStatus": "200",
+      "exitCode": 0,
+      "expectedSha256": "sha256:a44fec2efbbde479144529443c793262a8c5c52c17e364e6308c7f2421a6b87f",
+      "expectedBytes": 54305105
+    },
+    {
+      "file": "opentu-preview-source-8fe9414d714960912ba6447b40e2773c053ed486.tar.gz",
+      "httpStatus": "200",
+      "exitCode": 0,
+      "expectedSha256": "sha256:38c49461832fa14c80a2acd9dba8c57a6b58aa134c91ff16067fd6532e8f90e5",
+      "expectedBytes": 32979724
+    },
+    {
+      "file": "SHA256SUMS",
+      "httpStatus": "200",
+      "exitCode": 0,
+      "expectedSha256": "sha256:205bafa5a136aafdae4525327ce0fcb3f6283d5937be48ad9b6b081efbb4193e",
+      "expectedBytes": 768
+    }
+  ]
+}

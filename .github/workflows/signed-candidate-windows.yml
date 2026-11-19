@@ -92,4 +92,5 @@ jobs:
           path: |
             ${{ runner.temp }}/signed-windows-evidence/results.json
             ${{ runner.temp }}/signed-windows-evidence/*.png
+            ${{ runner.temp }}/signed-windows-evidence/target-native/*.png
           if-no-files-found: warn

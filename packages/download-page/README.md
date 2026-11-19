@@ -6,9 +6,9 @@
 
 macOS 提供 ARM64 / Intel DMG，Windows 提供 EXE / MSI，Linux 提供 DEB / RPM / AppImage。直接下载公开 Release 附件，无需 GitHub 登录。页面清楚说明未签名及旧 opentu 数据迁移限制。
 
-`Unified desktop release` 在全部校验和四平台安装包构建成功后公开正式 Release，再构建部署 Pages。Pages 使用 GitHub Actions，github-pages 环境允许版本标签。版本标签和公开安装文件不覆写。若后续 Pages 发布失败，已发布安装包仍可直接下载，可从同一标签重新构建网站并部署，不能重新覆盖安装包。
+`Unified desktop release` 完成回归、四平台构建和签名校验后只生成候选。正式发布须先让 `scripts/update-acceptance.mjs verify` 核对真实安装升级证据与全部候选文件，再公开同一批字节；版本标签指向实际构建源码，不指向后续验收或网页提交。页面必须从已公开 Release 生成清单。当前正式仓库沿用 main 根目录 legacy Pages；计费锁定期间采用与发布工作流相同的本地门禁及附件校验，流程见 `docs/development/2026-11-19-v1.6.3-release.md`。公开标签和安装文件不覆写，页面重试不重新构建安装包。
 
-v1.5.2 起客户端使用分发仓库的签名更新清单，在应用内下载并校验，用户明确点击“重启并更新”后安装。网页仍直接下载对应平台的 DMG / EXE / MSI / DEB / RPM / AppImage。v1.5.0 / v1.5.1 及旧独立测试客户端须先手动安装新版本，旧测试数据保留在其独立目录。
+v1.6.2 已完成正式更新密钥过渡，升级到 v1.6.3 使用应用内签名更新，用户点击“重启并更新”后安装。v1.6.1 及更早版本须先手动安装新版；独立 OpenTu 验收版的数据目录不自动合并。网页继续提供七种直接安装文件，Mac 安装脚本固定版本及摘要，并保留历史脚本入口。更新签名不等同于 Apple Developer ID / 公证或 Windows Authenticode。
 
 `pnpm --filter @tuzi/download-page test` 检查来源、缺包、摘要和统计桥。历史 acceptance 模块保留用于旧元数据回归，不再用于公开下载入口。`VITE_DOWNLOAD_SOURCE_URL` 指向此页面对应的精确源码；Pages 和 Release 同时提供源码归档。
 
@@ -73,3 +73,12 @@ v1.5.7 改进三列批量布局、准备占位、结果固定位置与视口保�
 新增创作讨论与主输入框协同、跨媒体批量规划、可选本地 Codex、附件及 Gemini Omni 视频；完善播放、拖动和原生导出。正式手动安装交付，不提供本次签名自动安装。已知限制与实测范围见 `docs/releases/v1.6.0.md`。
 
 当前构建：`RELEASE_TAG=v1.6.0 VITE_RELEASE_REPOSITORY=tuziapi/tuzi-switch VITE_MANUAL_INSTALL_ONLY=true pnpm build:download`。加载器默认 v1.6.0，保留 v1.5.7/v1.5.6/v1.5.5 固定脚本。新 DMG 摘要必须与正式 Release 一致后才部署。
+
+
+## 2026-11-17 独立测试版
+
+测试站沿用同一 `TuziDownloadPage`，保留原布局、截图、导航与主题。`VITE_DOWNLOAD_CHANNEL=preview` 只允许测试仓库 `AiW520/tuzi-switch`；读取 `preview-release.json`，完整校验五个平台、固定版本/标签、独立应用身份、关闭自动更新、每个安装包的地址/大小/SHA256。校验失败时不显示可下载安装包，不回退到正式版。正式模式继续读取并严格校验 `release.json`。
+
+由 `opentu-test-release.yml` 在五个原生 runner 构建同一 SHA；全部成功后将安装包、构建清单、校验摘要和对应源码发布为非 Latest 的 prerelease。`publish-opentu-test-page.yml` 只在测试 main 执行，先核对真实 GitHub Release 附件摘要、不可变标签与成功构建，再部署原下载页。该流程不修改正式站或正式更新清单，测试版不发送正式下载统计。
+
+本地页面测试：`pnpm --filter @tuzi/download-page test`。测试模式构建：`VITE_RELEASE_REPOSITORY=AiW520/tuzi-switch VITE_DOWNLOAD_CHANNEL=preview pnpm --filter @tuzi/download-page exec vite build`。不要把合成验收清单提交至 public 目录或部署。

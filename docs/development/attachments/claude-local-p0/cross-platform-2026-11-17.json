@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-17",
+  "scope": "Cross-platform source adaptation; native acceptance remains incomplete",
+  "sourceBase": "37035824f8c0ecf3d86eac2045efe4662784da28",
+  "testedSourceSha256": {
+    ".github/workflows/claude-local-tests.yml": "a49ad8c0919f40408147c33de6bcd49faf3c4c8def8bbac85e4d3b9b6feff32c",
+    "scripts/build-claude-local-candidate.sh": "16cdd1333fd1c6f3b86800eda1a3aa74b7a9d05e78995f57a884896a68c48671",
+    "scripts/prepare-claude-local-node.py": "07b71575ed971a561d43bca57cc90ff8eb8ccef24d0eb45bf5a3983054595062",
+    "scripts/test_prepare_claude_local_node.py": "0e562013cd081a96393e7917dafe5f5e549ed287fe1f5351727034554d12ca8c",
+    "src-tauri/src/claude_local_copy.rs": "7a423a99a0abb53a20b6fb52e4b3f4f384e0cdac9a65e24d7232eccd4b4f10c2",
+    "src-tauri/src/claude_local_integration.rs": "63a19446dbb70004f49966a0dc5b6331be87c3560378f6e6fbcb16d3dafc0fa4",
+    "src-tauri/vendor/claude-local/TUZI-PATCHES.md": "c25c9f6b65ded63c23b0c113fe1c6ea7105dc1724c48f48d55e3b1c44a2acb3b",
+    "src-tauri/vendor/claude-local/runtime/managed.test.mjs": "0955f3a62e05315a5503d359e53ed65eba2aefe6eaa419e0cf8cbe9599c46636",
+    "src-tauri/vendor/claude-local/runtime/proxy.mjs": "045e8c33cc336aa4adcc0b64dad98fa723419a035bc927d8e35be5e85f09e588",
+    "src-tauri/vendor/claude-local/runtime/proxy.test.mjs": "f08d47122065bb5ec8c2a31ca30c28a093c14bfc3ada27e50654b617682601f7",
+    "src-tauri/vendor/claude-local/runtime/runtime.mjs": "e40a2db82a23cfe74ebc9f2afeff7a835b341eab9fc602a41ef45442d05e8b56",
+    "src-tauri/vendor/claude-local/runtime/tuzi-strict.test.mjs": "dbe396c7305efafab5173c2338a1e07d9f7fd400a49eca71b44db38137b3f967",
+    "src-tauri/vendor/claude-local/src/backend.rs": "68a94fabb9b392c0c2e1fe98fd87b91388b7b3bcb3d37577568ccb8489970651",
+    "src-tauri/vendor/claude-local/src/desktop.rs": "5e601e58c063f20c59d95c3954894b33013d42a19dbe9ae3df9c840ba1f4bfa9",
+    "src-tauri/vendor/claude-local/src/winproc.rs": "30d9f0648e6da3c73b30dec20952a350025b8dc9f4dad757043db42d24e2f6e6",
+    "src/components/proxy/ClaudeLocalPanel.tsx": "7a75cce3c552918a8bfb29c9ade8d7244fa42c47c0a044d9b45fc75d45ce6fdc",
+    "src/i18n/locales/en.json": "aaa7cb2adc18729f95f7f5136b038e747baa98f3f9955d310a2f96f18fabc8de",
+    "src/i18n/locales/ja.json": "c0e3e6ad6722879944e115b6d509c1d9202ec4099cc4e65a82bd298fdf832e47",
+    "src/i18n/locales/zh.json": "c1188437f895cfd98b7d4ce597f7de4b94f6c5351237a23a490915677dbb790e",
+    "src/lib/api/claudeDesktopLocal.ts": "beb65ac0ad691b8c164a05d6ec5e04ea6c129377864fe1acf86cb2f93c672ca7",
+    "tests/components/ClaudeLocalPanel.test.tsx": "746f05c4e46c094351b5bfdbfe0d7ca9254a9a5f08f8734d6b24e79bc341988a",
+    "scripts/build-claude-local-candidate.py": "2939797e092df89439c218b2c259f0f8fb1c56cfdf37aab6e170d1ac08399519",
+    "scripts/qa/claude-local-platform-preflight.py": "7337bd5977aa58f094b185d9e8b5967c9934127fd8e8d17b8593a0b33d19d852",
+    "src-tauri/vendor/claude-local/NOTICE-TUZI.txt": "3561ca08b5d2549900349382f09e9b09c435216a441ae5d04d63d35f14d286e3",
+    "src-tauri/vendor/claude-local/src/linux_ca.rs": "275e2cb1a32b6bc614dd2daee2e4b91da98806720a68c70fb3fbe003546c024e"
+  },
+  "runtimeArchives": [
+    {
+      "version": "24.22.3",
+      "target": "aarch64-apple-darwin",
+      "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-arm64.tar.gz",
+      "archiveSha256": "ff6e17d4874b76d272212b908cc020d6e815fba5a6c7eaaa06add725840307fd",
+      "binarySha256": "ba7073582822078d8c90bca3facacc46690bc5366fab4b815aeef9148cd6e854",
+      "architectureVerified": true,
+      "runtimeProbe": "passed"
+    },
+    {
+      "version": "24.22.3",
+      "target": "aarch64-pc-windows-msvc",
+      "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-arm64.zip",
+      "archiveSha256": "b3cc74a295b39d4f273271e96f58c06dd2b35757ca12abec64c7d0598b434f14",
+      "binarySha256": "172e320db179ce416fc012b96b9917dacfb442beb081de57c4deaed7b5a24644",
+      "architectureVerified": true,
+      "runtimeProbe": "not-run-cross-target"
+    },
+    {
+      "version": "24.22.3",
+      "target": "aarch64-unknown-linux-gnu",
+      "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-arm64.tar.xz",
+      "archiveSha256": "6e51a2ada00f0011cc266f65d98922b403d7ad88f809ca2aa615a5fe1ce6e86c",
+      "binarySha256": "8f9c2a55879e9705cb285b6cdd649d95df642c6720f052cb30f300d2677da99f",
+      "architectureVerified": true,
+      "runtimeProbe": "not-run-cross-target"
+    },
+    {
+      "version": "24.22.3",
+      "target": "x86_64-apple-darwin",
+      "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-x64.tar.gz",
+      "archiveSha256": "977614af0504c81045e7fd85596dbca0e5f951b96681516dadafedcca8c447f7",
+      "binarySha256": "796184b9a19ed300b1ba7cd0f7e49558fee9fc0f05080bb036025490a5a2edf3",
+      "architectureVerified": true,
+      "runtimeProbe": "not-run-cross-target"
+    },
+    {
+      "version": "24.22.3",
+      "target": "x86_64-pc-windows-msvc",
+      "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-x64.zip",
+      "archiveSha256": "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f",
+      "binarySha256": "86fc4785327db5f5c7558dc6156c543b433c313e813a222e088086222ab4afa6",
+      "architectureVerified": true,
+      "runtimeProbe": "not-run-cross-target"
+    },
+    {
+      "version": "24.22.3",
+      "target": "x86_64-unknown-linux-gnu",
+      "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-x64.tar.xz",
+      "archiveSha256": "4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb",
+      "binarySha256": "a7ec1b37e6ff9d187e4198c5b6df9a4eb1c74dd31804fb3bac55cc4ceca1ac01",
+      "architectureVerified": true,
+      "runtimeProbe": "not-run-cross-target"
+    }
+  ],
+  "tests": {
+    "hostVitest": 866,
+    "coreRustOnMac": 60,
+    "hostLocalFilterOnMac": 25,
+    "runtimeNode24": 90,
+    "pythonPackaging": 15,
+    "typecheck": "passed",
+    "rendererBuild": "passed",
+    "formatAndDiff": "passed"
+  },
+  "crossBuild": {
+    "linux": "blocked: missing target C toolchain/sysroot; no complete Linux build",
+    "windows": "not run",
+    "intelMac": "not run",
+    "remoteCI": "not started"
+  },
+  "candidate": {
+    "platform": "macOS",
+    "arch": "arm64",
+    "bundleId": "com.tuziswitch.desktop",
+    "version": "1.6.2",
+    "path": "/Users/sdy09/Documents/ChatGPT/tuzi-claude-local-p0/src-tauri/target/debug/bundle/macos/兔子助手.app",
+    "mainSha256": "669fdf618739487038f8adf4f37ab963f804ef0461a9cfc02a41c4146ea898b9",
+    "nodeSha256": "ba7073582822078d8c90bca3facacc46690bc5366fab4b815aeef9148cd6e854",
+    "signed": false,
+    "installed": true,
+    "launched": true,
+    "licenseResourcesVerified": true,
+    "archive": "/Users/sdy09/Documents/ChatGPT/ClaudeMom/deliverables/claude-local-cross-platform-2026-11-17/tuzi-claude-local-mac-arm64-1.6.2-669fdf6187-UNSIGNED-TEST.zip",
+    "archiveSha256": "3f9ed79baf16702309667b6e8adf8f28a1a30f9409b275aa13c600f9c813e8a6",
+    "archiveBytes": 99873601,
+    "archiveIntegrity": "CRC passed"
+  },
+  "officialLinuxResearchPackage": {
+    "version": "5.11492.5",
+    "architecture": "amd64",
+    "sha256": "b96208b207e450b740f7dbe304f6077fed80e7f3d37ddd545991c4e8201564cf",
+    "downloadAndChecksum": "passed",
+    "installed": false
+  },
+  "realModelCallsThisRound": 0,
+  "allPlatformAcceptance": false,
+  "releaseReady": false,
+  "packagingRecovery": {
+    "initialArchive": "failed: no space left on device; incomplete archive deleted",
+    "cleanup": "removed only reproducible debug/deps and debug/build caches from this task",
+    "retry": "passed"
+  },
+  "localInstallation": {
+    "installedAt": "20261117-103105",
+    "destination": "/Applications/兔子助手.app",
+    "backupDirectory": "/Users/sdy09/Library/Application Support/Tuzi Local Backups/claude-local-20261117-103105",
+    "previousMainSha256": "9b5be5bc91b7b76a7246323c4d76a312b989f8ad071a65b1f79a34878751caf8",
+    "installedMainSha256": "669fdf618739487038f8adf4f37ab963f804ef0461a9cfc02a41c4146ea898b9",
+    "version": "1.6.2",
+    "sourceCommit": "d50c1d50",
+    "candidate": "unsigned debug test build",
+    "launched": true,
+    "functionalAcceptance": false,
+    "uiVerified": "Claude Desktop native panel visible; Node ready; no provider configured; resources and certificate pending",
+    "activeGenerationTasksBeforeExit": 0,
+    "updatedVia": "local manual app replacement; not auto-update",
+    "userAuthorization": "2026-11-17: 更新一下本地的兔子助手，我去测试一下看看"
+  }
+}

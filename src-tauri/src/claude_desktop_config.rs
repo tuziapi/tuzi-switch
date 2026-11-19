@@ -1,5 +1,6 @@
 use serde::Serialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -540,14 +541,47 @@ pub fn proxy_model_routes(provider: &Provider) -> Result<Vec<ResolvedModelRoute>
 
 pub fn model_list_response(provider: &Provider) -> Result<Value, AppError> {
     let routes = proxy_model_routes(provider)?;
+    model_list_for_routes(&routes, false)
+}
+
+pub fn gateway_model_list_response(provider: &Provider) -> Result<Value, AppError> {
+    let routes = proxy_model_routes(provider)?;
+    model_list_for_routes(&routes, true)
+}
+
+fn gateway_route_id(route: &ResolvedModelRoute) -> String {
+    let source = strip_one_m_context_suffix(&route.route_id);
+    let digest = Sha256::digest(source.as_bytes());
+    let number = digest.iter().map(|byte| format!("{byte:03}")).collect::<String>();
+    desktop_model_id(&format!("claude-tuzi-route-{number}"), route.supports_1m)
+}
+
+fn gateway_model_label(route: &ResolvedModelRoute) -> String {
+    let model = strip_one_m_context_suffix(&route.upstream_model);
+    match route.display_name.as_deref().map(str::trim) {
+        Some(label) if !label.is_empty() && label != model => format!("{label} · {model}"),
+        _ => model,
+    }
+}
+
+fn model_list_for_routes(routes: &[ResolvedModelRoute], gateway: bool) -> Result<Value, AppError> {
     let data: Vec<Value> = routes
         .iter()
         .map(|route| {
-            let model_id = desktop_model_id(&route.route_id, route.supports_1m);
+            let model_id = if gateway {
+                gateway_route_id(route)
+            } else {
+                desktop_model_id(&route.route_id, route.supports_1m)
+            };
+            let display_name = if gateway {
+                gateway_model_label(route)
+            } else {
+                route.display_name.as_deref().unwrap_or(&route.route_id).to_string()
+            };
             let mut item = json!({
                 "type": "model",
                 "id": model_id,
-                "display_name": route.display_name.as_deref().unwrap_or(&route.route_id),
+                "display_name": display_name,
                 "created_at": DEFAULT_CREATED_AT,
             });
             if route.supports_1m {
@@ -591,7 +625,9 @@ pub fn map_proxy_request_model(mut body: Value, provider: &Provider) -> Result<V
         })?;
 
     let routes = proxy_model_routes(provider)?;
-    let route = routes.iter().find(|r| r.route_id == requested).or_else(|| {
+    let route = routes.iter().find(|route| {
+        strip_one_m_context_suffix(&gateway_route_id(route)) == strip_one_m_context_suffix(&requested)
+    }).or_else(|| routes.iter().find(|r| r.route_id == requested)).or_else(|| {
         let base = strip_one_m_context_suffix(&requested);
         routes
             .iter()
@@ -677,11 +713,17 @@ fn apply_provider_to_paths_inner(
             let base_url = proxy_gateway_base_url_from_db(db)?;
             let api_key = get_or_create_gateway_token(db)?;
             let routes = proxy_model_routes(provider)?;
-            let model_ids = routes
+            let models = routes
                 .iter()
-                .map(|route| desktop_model_id(&route.route_id, route.supports_1m))
+                .map(|route| json!({
+                    "name": gateway_route_id(route),
+                    "labelOverride": gateway_model_label(route),
+                    "supports1m": route.supports_1m,
+                }))
                 .collect::<Vec<_>>();
-            build_gateway_profile(&base_url, &api_key, Some(model_ids.as_slice()))
+            let mut profile = build_gateway_profile(&base_url, &api_key, None);
+            profile["inferenceModels"] = json!(models);
+            profile
         }
     };
 
@@ -893,32 +935,70 @@ fn meta_has_profile_entry(path: &Path) -> bool {
 }
 
 fn is_supported_platform() -> bool {
-    cfg!(any(target_os = "macos", windows))
+    cfg!(any(target_os = "macos", target_os = "linux", windows))
 }
 
 #[allow(clippy::needless_return)]
 fn current_platform_paths() -> Result<ClaudeDesktopPaths, AppError> {
-    #[cfg(target_os = "macos")]
+    #[cfg(feature = "isolated-profile")]
+    {
+        return isolated_gateway_paths(&get_home_dir(), std::env::consts::OS);
+    }
+
+    #[cfg(all(target_os = "macos", not(feature = "isolated-profile")))]
     {
         return Ok(macos_paths_from_home(&get_home_dir()));
     }
 
-    #[cfg(windows)]
+    #[cfg(all(windows, not(feature = "isolated-profile")))]
     {
         let local_app_data = windows_local_app_data_dir();
         return Ok(windows_paths_from_local_app_data(&local_app_data));
     }
 
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(all(target_os = "linux", not(feature = "isolated-profile")))]
+    {
+        let xdg = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from);
+        return Ok(linux_paths(&get_home_dir(), xdg.as_deref(), Path::new("/.flatpak-info").is_file()));
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
     {
         Err(unsupported_platform_error())
     }
+}
+
+#[cfg(any(feature = "isolated-profile", test))]
+fn isolated_gateway_paths(home: &Path, platform: &str) -> Result<ClaudeDesktopPaths, AppError> {
+    let root = match platform {
+        "macos" => home.join("Library/Application Support"),
+        "windows" => home.join("AppData/Local"),
+        "linux" => home.join(".config"),
+        _ => return Err(unsupported_platform_error()),
+    };
+    Ok(paths_from_dirs(root.join("Claude"), root.join("Claude-3p")))
+}
+
+pub(crate) fn gateway_launch_profile_dir() -> Result<Option<PathBuf>, AppError> {
+    #[cfg(feature = "isolated-profile")]
+    {
+        return Ok(current_platform_paths()?.normal_config_path.parent().map(Path::to_path_buf));
+    }
+    #[cfg(not(feature = "isolated-profile"))]
+    Ok(None)
 }
 
 #[cfg(target_os = "macos")]
 fn macos_paths_from_home(home: &Path) -> ClaudeDesktopPaths {
     let app_support = home.join("Library").join("Application Support");
     paths_from_dirs(app_support.join("Claude"), app_support.join("Claude-3p"))
+}
+
+#[cfg(any(target_os = "linux", all(unix, test)))]
+fn linux_paths(home: &Path, xdg: Option<&Path>, flatpak: bool) -> ClaudeDesktopPaths {
+    let default_config = home.join(".config");
+    let root = xdg.filter(|path| !flatpak && path.is_absolute()).unwrap_or(&default_config);
+    paths_from_dirs(root.join("Claude"), root.join("Claude-3p"))
 }
 
 #[cfg(windows)]
@@ -992,17 +1072,52 @@ fn proxy_origin_from_parts(listen_address: &str, listen_port: u16) -> String {
     format!("http://{}:{}", connect_host_for_url, listen_port)
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(any(feature = "isolated-profile", test, not(any(target_os = "macos", target_os = "linux", windows))))]
 fn unsupported_platform_error() -> AppError {
     AppError::localized(
         "claude_desktop.unsupported_platform",
-        "当前平台暂不支持 Claude Desktop 3P 配置。第一阶段仅支持 macOS 和 Windows。",
-        "Claude Desktop 3P configuration is not supported on this platform yet. Phase 1 only supports macOS and Windows.",
+        "当前平台暂不支持 Claude Desktop 网关配置。",
+        "Claude Desktop gateway configuration is unavailable on this platform.",
     )
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn claude_desktop_isolated_gateway_layout_keeps_mode_and_policy_together() {
+        let temp = tempfile::tempdir().unwrap();
+        for (platform, suffix) in [("macos", "Library/Application Support"), ("windows", "AppData/Local"), ("linux", ".config")] {
+            let paths = super::isolated_gateway_paths(temp.path(), platform).unwrap();
+            let root = temp.path().join(suffix);
+            assert_eq!(paths.normal_config_path, root.join("Claude/claude_desktop_config.json"));
+            assert_eq!(paths.threep_config_path, root.join("Claude-3p/claude_desktop_config.json"));
+            assert_eq!(paths.profile_path.parent().unwrap(), root.join("Claude-3p/configLibrary"));
+            assert!(paths.profile_path.starts_with(temp.path()));
+        }
+        assert!(super::isolated_gateway_paths(temp.path(), "unsupported").is_err());
+    }
+
+    #[test]
+    fn claude_desktop_launcher_uses_the_directory_written_by_configuration() {
+        let launch_dir = super::gateway_launch_profile_dir().unwrap();
+        if cfg!(feature = "isolated-profile") {
+            let paths = super::current_platform_paths().unwrap();
+            assert_eq!(launch_dir.as_deref(), paths.normal_config_path.parent());
+        } else {
+            assert_eq!(launch_dir, None);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn linux_gateway_uses_the_host_config_directory() {
+        let home = std::path::Path::new("/synthetic-home");
+        for (xdg, flatpak, expected) in [("/custom", false, "/custom"), ("relative", false, "/synthetic-home/.config"), ("/sandbox", true, "/synthetic-home/.config")] {
+            let paths = super::linux_paths(home, Some(std::path::Path::new(xdg)), flatpak);
+            assert!(paths.normal_config_path.starts_with(std::path::Path::new(expected).join("Claude")));
+            assert!(paths.profile_path.starts_with(std::path::Path::new(expected).join("Claude-3p")));
+        }
+    }
     use super::*;
     use crate::database::Database;
     use crate::provider::{ClaudeDesktopModelRoute, ProviderMeta};
@@ -1165,11 +1280,85 @@ mod tests {
             .as_str()
             .expect("gateway token")
             .starts_with("ccs-"));
-        assert_eq!(
-            profile["inferenceModels"],
-            json!(["claude-sonnet-4-6 [1M]"])
-        );
-        assert!(!profile.to_string().contains("kimi-k2"));
+        let models = gateway_model_list_response(&provider).expect("gateway model list");
+        let configured = &profile["inferenceModels"][0];
+        assert_eq!(configured["name"], models["data"][0]["id"]);
+        assert_eq!(configured["labelOverride"], json!("Kimi · kimi-k2"));
+        assert_eq!(configured["supports1m"], json!(true));
+        let mapped = map_proxy_request_model(json!({"model": configured["name"], "messages": []}), &provider)
+            .expect("configured gateway route resolves");
+        assert_eq!(mapped["model"], json!("kimi-k2 [1M]"));
+    }
+
+    #[test]
+    fn claude_desktop_gateway_keeps_real_labels_and_resolves_each_model() {
+        let mut provider = proxy_provider("synthetic-gateway");
+        let routes = &mut provider.meta.as_mut().unwrap().claude_desktop_model_routes;
+        routes.clear();
+        for model in ["gpt-6.1-sol", "codex-auto-review", "claude-sonnet-4-6"] {
+            routes.insert(format!("claude-{model}"), ClaudeDesktopModelRoute {
+                model: model.to_string(),
+                display_name: None,
+                supports_1m: Some(false),
+            });
+        }
+        let models = gateway_model_list_response(&provider).unwrap();
+        let items = models["data"].as_array().unwrap();
+        assert_eq!(items.len(), 3);
+        let identifiers = items.iter().map(|item| item["id"].as_str().unwrap())
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(identifiers.len(), 3);
+        for item in items {
+            let identifier = item["id"].as_str().unwrap();
+            assert!(identifier.starts_with("claude-tuzi-route-"));
+            assert!(!identifier.contains("gpt"));
+            assert!(!identifier.contains("codex"));
+            let request = json!({"model": identifier, "messages": [{"role": "user", "content": "SYNTHETIC"}], "stream": true});
+            let mapped = map_proxy_request_model(request.clone(), &provider).unwrap();
+            assert_eq!(mapped["model"], item["display_name"]);
+            assert_eq!(mapped["messages"], request["messages"]);
+            assert_eq!(mapped["stream"], request["stream"]);
+            let legacy = map_proxy_request_model(json!({"model": format!("claude-{}", item["display_name"].as_str().unwrap())}), &provider).unwrap();
+            assert_eq!(legacy["model"], mapped["model"]);
+        }
+        assert!(map_proxy_request_model(json!({"model": "claude-tuzi-route-unknown"}), &provider).is_err());
+    }
+
+    #[test]
+    fn claude_desktop_gateway_ids_survive_label_and_catalog_changes() {
+        let mut provider = proxy_provider("synthetic-stable");
+        provider.meta.as_mut().unwrap().claude_desktop_model_routes = std::collections::HashMap::from([
+            ("claude-gpt-6.1-sol".into(), ClaudeDesktopModelRoute {
+                model: "gpt-6.1-sol".into(), display_name: Some("gpt-6.1-sol".into()), supports_1m: Some(false),
+            }),
+        ]);
+        let before = gateway_model_list_response(&provider).unwrap();
+        assert_eq!(before["data"][0]["id"], json!("claude-tuzi-route-143108097123246043252197189210164040070230047011122100086081140104020145072084243117251218119158"));
+        assert_eq!(before["data"][0]["display_name"], json!("gpt-6.1-sol"));
+        let routes = &mut provider.meta.as_mut().unwrap().claude_desktop_model_routes;
+        routes.get_mut("claude-gpt-6.1-sol").unwrap().display_name = Some("主力".into());
+        routes.insert("claude-a-new-model".into(), ClaudeDesktopModelRoute {
+            model: "another-model".into(), display_name: None, supports_1m: Some(false),
+        });
+        let after = gateway_model_list_response(&provider).unwrap();
+        let same = after["data"].as_array().unwrap().iter().find(|item| item["id"] == before["data"][0]["id"]).unwrap();
+        assert_eq!(same["display_name"], json!("主力 · gpt-6.1-sol"));
+        assert_eq!(map_proxy_request_model(json!({"model": same["id"]}), &provider).unwrap()["model"], json!("gpt-6.1-sol"));
+    }
+
+    #[test]
+    fn claude_desktop_gateway_1m_suffix_resolves_without_changing_legacy_catalog() {
+        let provider = proxy_provider("synthetic-context");
+        let models = gateway_model_list_response(&provider).unwrap();
+        let identifier = models["data"][0]["id"].as_str().unwrap();
+        assert!(identifier.ends_with(" [1M]"));
+        let base = strip_one_m_context_suffix(identifier);
+        for requested in [identifier.to_string(), base.clone(), format!("{base} [1m]")] {
+            assert_eq!(map_proxy_request_model(json!({"model": requested}), &provider).unwrap()["model"], json!("kimi-k2 [1M]"));
+        }
+        let legacy = model_list_response(&provider).unwrap();
+        assert_eq!(legacy["data"][0]["id"], json!("claude-sonnet-4-6 [1M]"));
+        assert_eq!(legacy["data"][0]["display_name"], json!("Kimi"));
     }
 
     #[test]

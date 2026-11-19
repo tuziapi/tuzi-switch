@@ -284,6 +284,10 @@ fn write_set(app: &AppType, provider: &Provider) -> Result<Vec<PathBuf>, AppErro
         AppType::OpenCode => paths.push(crate::opencode_config::get_opencode_config_path()),
         AppType::OpenClaw => paths.push(crate::openclaw_config::get_openclaw_config_path()),
         AppType::Hermes => paths.push(crate::hermes_config::get_hermes_config_path()),
+        AppType::WorkBuddy => paths.extend([
+            crate::workbuddy_config::config_path(),
+            crate::mcp::workbuddy::config_path(),
+        ]),
     }
     paths.sort();
     paths.dedup();
@@ -637,6 +641,7 @@ fn model_key<'a>(app: &AppType, provider: &'a Provider) -> Option<&'a str> {
         AppType::OpenCode => "/options/apiKey",
         AppType::OpenClaw => "/apiKey",
         AppType::Hermes => "/api_key",
+        AppType::WorkBuddy => "/apiKey",
     };
     provider
         .settings_config
@@ -773,6 +778,9 @@ fn validate_provider(app: &AppType, provider: &Provider) -> Result<(), AppError>
                 "codex_responses" | "anthropic_messages"
             ),
         ),
+        AppType::WorkBuddy => {
+            return Err(AppError::Config("WorkBuddy 不使用兔子账户供应商校验流程".into()));
+        }
     };
     let expected = match app {
         AppType::Claude | AppType::ClaudeDesktop => "https://apius.tu-zi.com",
@@ -887,6 +895,12 @@ fn selected_models(
             } else {
                 "chat"
             }
+        }
+        AppType::WorkBuddy => {
+            if let Some(list) = c.get("models").and_then(|v| v.as_array()) {
+                models.extend(list.iter().filter_map(|item| item.get("id").and_then(|v| v.as_str()).map(str::to_string)));
+            }
+            "chat"
         }
     };
     models.sort();
@@ -1921,6 +1935,9 @@ mod tests {
             AppType::Hermes => {
                 json!({"base_url":"https://api.tu-zi.com/v1","api_key":key,"api_mode":"codex_responses","models":[{"id":"synthetic-model"}]})
             }
+            AppType::WorkBuddy => {
+                json!({"vendor":"Tu-Zi","url":"https://api.tu-zi.com/v1/chat/completions","apiKey":key,"models":[{"id":"synthetic-model","supportsToolCall":true}]})
+            }
         };
         let mut provider = Provider::with_id(
             uuid::Uuid::new_v4().to_string(),
@@ -1975,10 +1992,6 @@ mod tests {
             let _home = Home::new();
             let state = state();
             let provider: Provider = serde_json::from_str(payload).unwrap();
-            #[cfg(not(any(target_os = "macos", windows)))]
-            if matches!(app, AppType::ClaudeDesktop) {
-                continue;
-            }
             let plan = preview(&state, app.clone(), &provider)
                 .unwrap_or_else(|e| panic!("{} preview: {e}", app.as_str()));
             assert!(plan
@@ -1994,6 +2007,22 @@ mod tests {
             )
             .unwrap_or_else(|e| panic!("{} save: {e}", app.as_str()));
             assert!(!saved.tested);
+            if matches!(app, AppType::ClaudeDesktop) {
+                let persisted = state
+                    .db
+                    .get_provider_by_id(&provider.id, app.as_str())
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(
+                    serde_json::to_value(&persisted.meta).unwrap()["claudeDesktopModelCatalog"],
+                    json!([{ "id": "synthetic-model" }])
+                );
+                assert_eq!(
+                    serde_json::to_value(&persisted.meta).unwrap()["claudeDesktopModelRoutes"]
+                        ["claude-sonnet-4-6"]["displayName"],
+                    "synthetic-model"
+                );
+            }
             assert!(state
                 .db
                 .get_provider_by_id(&provider.id, app.as_str())
@@ -2010,15 +2039,10 @@ mod tests {
     #[test]
     #[serial]
     fn seven_adapters_save_complete_backup_restore_and_conflict() {
-        for app in AppType::all() {
+        for app in AppType::all().filter(|app| !matches!(app, AppType::WorkBuddy)) {
             let _home = Home::new();
             let state = state();
             let provider = provider(&app);
-            #[cfg(not(any(target_os = "macos", windows)))]
-            if matches!(app, AppType::ClaudeDesktop) {
-                assert!(preview(&state, app, &provider).is_err());
-                continue;
-            }
             let expected_paths = write_set(&app, &provider).unwrap();
             let before = state.db.snapshot_to_memory().unwrap();
             let p = preview(&state, app.clone(), &provider).unwrap();
@@ -2118,14 +2142,10 @@ mod tests {
     #[test]
     #[serial]
     fn every_supported_adapter_compensates_write_failure() {
-        for app in AppType::all() {
+        for app in AppType::all().filter(|app| !matches!(app, AppType::WorkBuddy)) {
             let _home = Home::new();
             let state = state();
             let provider = provider(&app);
-            #[cfg(not(any(target_os = "macos", windows)))]
-            if matches!(app, AppType::ClaudeDesktop) {
-                continue;
-            }
             let paths = write_set(&app, &provider).unwrap();
             let before = db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap();
             let p = preview(&state, app.clone(), &provider).unwrap();
@@ -2163,7 +2183,7 @@ mod tests {
     }
     #[test]
     fn native_matrix_rejects_wrong_protocol_endpoint_and_credential_destination() {
-        for app in AppType::all() {
+        for app in AppType::all().filter(|app| !matches!(app, AppType::WorkBuddy)) {
             let mut p = provider(&app);
             assert!(validate_provider(&app, &p).is_ok());
             p.category = Some("coding".into());
@@ -2175,6 +2195,30 @@ mod tests {
         let mut p = provider(&AppType::Codex);
         p.settings_config["config"]=json!("model_provider=\"custom\"\n[model_providers.custom]\nbase_url=\"https://coding.tu-zi.com/v1\"\nwire_api=\"responses\"\nenv_key=\"OPENAI_API_KEY\"");
         assert!(validate_provider(&AppType::Codex, &p).is_err());
+    }
+
+    #[test]
+    #[serial]
+    fn workbuddy_account_preview_rejects_without_changing_configuration_or_database() {
+        let _home = Home::new();
+        let state = state();
+        let provider = provider(&AppType::WorkBuddy);
+        let files = write_set(&AppType::WorkBuddy, &provider)
+            .unwrap()
+            .into_iter()
+            .map(capture)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        let before = db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap();
+        assert!(validate_provider(&AppType::WorkBuddy, &provider)
+            .unwrap_err().to_string().contains("WorkBuddy"));
+        assert!(preview(&state, AppType::WorkBuddy, &provider)
+            .err().unwrap().to_string().contains("WorkBuddy"));
+        files_unchanged(&files).unwrap();
+        assert_eq!(
+            db_signature(&state.db.snapshot_to_memory().unwrap()).unwrap(),
+            before
+        );
     }
     #[test]
     #[serial]

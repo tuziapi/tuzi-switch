@@ -69,6 +69,13 @@ export function AuthCenterPanel() {
 
         <CodexOAuthSection />
       </section>
+
+      <section className="rounded-xl border border-border/60 bg-card/60 p-6">
+        <div className="mb-4">
+          <h4 className="font-medium">WorkBuddy</h4>
+          <p className="text-sm text-muted-foreground">请在 WorkBuddy 客户端登录或切换账号。</p>
+        </div>
+      </section>
     </div>
   );
 }

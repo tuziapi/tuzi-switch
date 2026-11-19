@@ -36,6 +36,13 @@ beforeEach(() => {
     http.post("http://tauri.local/get_claude_desktop_default_routes", () =>
       HttpResponse.json([]),
     ),
+    http.post("http://tauri.local/fetch_claude_desktop_models", async ({ request }) => {
+      expect(await request.json()).toMatchObject({
+        baseUrl: "https://apius.tu-zi.com",
+        apiKey: draft.key,
+      });
+      return HttpResponse.json([{ id: draft.model, ownedBy: null }]);
+    }),
     http.post("http://tauri.local/get_hermes_live_provider_ids", () =>
       HttpResponse.json([]),
     ),

@@ -1,3 +1,4 @@
+import * as generationLifecycle from '../../services/generation-node-lifecycle';
 import { setAssistantAccount } from '../../services/assistant-account';
 import React from 'react';
 import {
@@ -390,4 +391,21 @@ describe('native SVG progress rendering', () => {
       host.remove(); vi.unstubAllGlobals(); mocks.tasks = [];
     }
   });
+});
+
+
+it('restores original inputs from a failed native SVG image card without retrying', async () => {
+  vi.stubGlobal('__TAURI_INTERNALS__', {});
+  const restore = vi.spyOn(generationLifecycle, 'restoreGenerationDraft').mockReturnValue(undefined);
+  const anchor = { ...createAnchor(), generationOrigin:{version:1 as const,draft:{id:'original-draft',type:'geometry',points:[[0,0],[344,224]],generationNode:{version:1 as const,generationType:'image' as const,prompt:'synthetic',params:{},count:1,references:[]}}} };
+  const board = {children:[anchor]} as unknown as PlaitBoard;
+  const host=document.createElementNS('http://www.w3.org/2000/svg','g');document.body.appendChild(host);
+  const generator=new ImageGenerationAnchorGenerator(board);
+  const retry=vi.fn();window.addEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT,retry);
+  try {
+    await act(async()=>{generator.processDrawing(anchor,host,false);});
+    fireEvent.click(host.querySelector('[aria-label="恢复编辑"]')!);
+    expect(restore).toHaveBeenCalledWith(board,anchor.id);
+    expect(retry).not.toHaveBeenCalled();
+  } finally {window.removeEventListener(IMAGE_GENERATION_ANCHOR_RETRY_EVENT,retry);generator.destroy();await act(async()=>{await new Promise(r=>setTimeout(r,5));});host.remove();restore.mockRestore();vi.unstubAllGlobals();}
 });

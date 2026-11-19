@@ -213,7 +213,15 @@ pub fn is_proxy_enabled() -> bool {
 }
 
 /// 构建 HTTP 客户端
+pub fn without_redirects() -> Result<Client, String> {
+    build_client_with_redirects(get_current_proxy_url().as_deref(), false)
+}
+
 fn build_client(proxy_url: Option<&str>) -> Result<Client, String> {
+    build_client_with_redirects(proxy_url, true)
+}
+
+fn build_client_with_redirects(proxy_url: Option<&str>, redirects: bool) -> Result<Client, String> {
     let mut builder = Client::builder()
         .timeout(Duration::from_secs(600))
         .connect_timeout(Duration::from_secs(30))
@@ -224,6 +232,8 @@ fn build_client(proxy_url: Option<&str>) -> Result<Client, String> {
         .no_gzip()
         .no_brotli()
         .no_deflate();
+
+    if !redirects { builder = builder.redirect(reqwest::redirect::Policy::none()); }
 
     // 有代理地址则使用代理，否则跟随系统代理
     if let Some(url) = proxy_url {

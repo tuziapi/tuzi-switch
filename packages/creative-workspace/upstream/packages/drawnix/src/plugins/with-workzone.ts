@@ -1,4 +1,8 @@
 import {
+  readGenerationOrigin,
+  restoreGenerationDraft,
+} from '../services/generation-node-lifecycle';
+import {
   setWorkZoneRenderedSize,
   clearWorkZoneRenderedSize,
 } from './workzone-transforms';
@@ -212,7 +216,10 @@ export class WorkZoneComponent extends CommonElementFlavour<
 
   private handleVisibilityChange = (): void => {
     if (!this.container) return;
-    this.container.style.display = isWorkZoneCardVisible() ? '' : 'none';
+    this.container.style.display =
+      readGenerationOrigin(this.element) || isWorkZoneCardVisible()
+        ? ''
+        : 'none';
   };
 
   /**
@@ -265,7 +272,10 @@ export class WorkZoneComponent extends CommonElementFlavour<
     if (!this.container) return;
 
     // 根据设置控制初始可见性
-    this.container.style.display = isWorkZoneCardVisible() ? '' : 'none';
+    this.container.style.display =
+      readGenerationOrigin(this.element) || isWorkZoneCardVisible()
+        ? ''
+        : 'none';
 
     // 创建 React root
     this.reactRoot = createRoot(this.container);
@@ -280,7 +290,12 @@ export class WorkZoneComponent extends CommonElementFlavour<
           onDelete: this.handleDelete,
           onWorkflowStateChange: this.handleWorkflowStateChange,
           onRetry: this.handleRetry,
-          onHideForever: this.handleHideForever,
+          onHideForever: readGenerationOrigin(this.element)
+            ? undefined
+            : this.handleHideForever,
+          onRestoreDraft: readGenerationOrigin(this.element)
+            ? () => restoreGenerationDraft(this.board, this.element.id)
+            : undefined,
         })
       )
     );
@@ -310,7 +325,12 @@ export class WorkZoneComponent extends CommonElementFlavour<
               onDelete: this.handleDelete,
               onWorkflowStateChange: this.handleWorkflowStateChange,
               onRetry: this.handleRetry,
-              onHideForever: this.handleHideForever,
+              onHideForever: readGenerationOrigin(this.element)
+                ? undefined
+                : this.handleHideForever,
+              onRestoreDraft: readGenerationOrigin(this.element)
+                ? () => restoreGenerationDraft(this.board, this.element.id)
+                : undefined,
             })
           )
         );

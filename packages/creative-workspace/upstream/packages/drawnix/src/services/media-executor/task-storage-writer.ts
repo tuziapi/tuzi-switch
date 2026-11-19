@@ -747,7 +747,10 @@ class TaskStorageWriter {
             : normalizedMediaResult;
 
         task.status = 'completed';
-        task.params = clearTransientMediaParams(task.params);
+        // Image reroll/adjust must retain the original inputs after completion.
+        if (task.type !== 'image') {
+          task.params = clearTransientMediaParams(task.params);
+        }
         task.result = normalizedResult;
         task.error = undefined;
         task.completedAt = Date.now();
@@ -815,7 +818,9 @@ class TaskStorageWriter {
             (task.remoteId === remoteId ? task.apiRequestId : undefined);
         }
         task.remoteId = remoteId;
-        task.params = clearTransientMediaParams(task.params);
+        if (task.type !== 'image') {
+          task.params = clearTransientMediaParams(task.params);
+        }
         if (invocationRoute) {
           task.invocationRoute = invocationRoute;
         }

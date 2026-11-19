@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-16",
+  "clientVersion": "5.11492.5",
+  "overall": "incomplete",
+  "codeResumeRead": "P0-FILE-OK",
+  "localization": {
+    "status": "main-screen verified",
+    "catalogRevision": "1.1",
+    "fullCoverage": false
+  },
+  "vm": {
+    "installed": true,
+    "bundle": "072b6cbfe74f428a98bd86035f83b322b369d1f1",
+    "sdk": "2.1.325",
+    "perAppEgressVerified": true,
+    "listener": "127.0.0.1",
+    "tls": "BAD_CERTIFICATE"
+  },
+  "caProbe": {
+    "ssl": true,
+    "basicX509": false,
+    "basicError": -67843,
+    "additionalTrust": "awaiting explicit user approval"
+  },
+  "chat": {
+    "successfulReply": false,
+    "stopRetryVerified": true,
+    "latestSession": "local_4429a175-3314-49c4-b978-b64a99bdf061"
+  },
+  "voice": {
+    "kind": "synthetic audio through real local model",
+    "inputText": "The local voice input test is successful.",
+    "messages": [
+      {
+        "type": "TranscriptText",
+        "data": "The local voice In test is successful."
+      },
+      {
+        "type": "TranscriptEndpoint"
+      }
+    ]
+  },
+  "voiceUi": "awaiting user choice; microphone UI not verified",
+  "computerUse": "option persisted; actual interaction not verified",
+  "cowork": "option persisted; actual task not verified",
+  "lifecycle": {
+    "sessionMarkerRemoved": true,
+    "dictationReceiptRemoved": true
+  },
+  "freeDiskBytesAtCapture": 4477624320,
+  "tests": {
+    "coreRust": 79,
+    "node": 64,
+    "hostLocal": 21,
+    "panel": 6
+  },
+  "publication": "no push / PR / release",
+  "build": {
+    "status": "success",
+    "flavor": "macOS arm64 debug, claude-local-poc",
+    "sha256": "7a067ebba678d474d1118a4cb99260f601d9cf77e19d513aa1df5d4e7fe8be49",
+    "certificatePolicyApplied": false,
+    "nativePanelVerified": true,
+    "launchDisabledUntilTrustComplete": true
+  }
+}

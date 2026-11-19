@@ -1,0 +1,178 @@
+{
+  "recordedAt": "2026-11-18T01:31:01.856408+00:00",
+  "sourceCommit": "5dd5d97600687af0fe30b91f09514e1da3fb342b",
+  "applications": {
+    "OpenTu 验收版": {
+      "version": "1.6.3-beta.2",
+      "identifier": "com.tuziswitch.desktop.opentu-preview",
+      "sha256": "420e6699202828a16400cbf354489e05212ae0bf22fc75f6f6db3fae46dd0360"
+    },
+    "兔子助手": {
+      "version": "1.6.2",
+      "identifier": "com.tuziswitch.desktop",
+      "sha256": "64c41bdd071736bd5e836a06050183c872e3e2587ab484725298ebb390e87b0d"
+    }
+  },
+  "providerDisplayName": "兔子coding",
+  "chat": {
+    "firstReply": "TUZI-BETA2-1118-OK",
+    "secondReply": "TUZI-BETA2-1118-OK CONTEXT-OK",
+    "coldRestartRestored": true
+  },
+  "code": {
+    "file": "beta2-1118-result.txt",
+    "content": "TUZI-BETA2-FILE-OK\n",
+    "sha256": "3af8358acdab092896b0b87a0c236600c7944e72c79ed865c8fc926fff39a21c",
+    "coldRestartRestored": true,
+    "permission": "Allow once, scoped synthetic file write"
+  },
+  "canvas": {
+    "projectCount": 2,
+    "syntheticProject": "SYNTHETIC OpenTu sync 1117",
+    "referenceImageCount": 1,
+    "draftRestored": true,
+    "coldRestartRestored": true,
+    "paidImageRequests": 0
+  },
+  "gatewayRequests": [
+    {
+      "app_type": "claude-desktop",
+      "model": "gpt-6.1-sol",
+      "request_model": "claude-gpt-6.1-sol",
+      "status_code": 200,
+      "is_streaming": 1,
+      "input_tokens": 7432,
+      "output_tokens": 14,
+      "created_at": 1794964794
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "gpt-6.1-sol",
+      "request_model": "claude-gpt-6.1-sol",
+      "status_code": 200,
+      "is_streaming": 1,
+      "input_tokens": 180,
+      "output_tokens": 18,
+      "created_at": 1794964836
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "gpt-6.1-sol",
+      "request_model": "claude-gpt-6.1-sol",
+      "status_code": 200,
+      "is_streaming": 1,
+      "input_tokens": 27874,
+      "output_tokens": 139,
+      "created_at": 1794964912
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "gpt-6.1-sol",
+      "request_model": "claude-gpt-6.1-sol",
+      "status_code": 200,
+      "is_streaming": 1,
+      "input_tokens": 280,
+      "output_tokens": 40,
+      "created_at": 1794965024
+    },
+    {
+      "app_type": "claude-desktop",
+      "model": "gpt-6.1-sol",
+      "request_model": "claude-gpt-6.1-sol",
+      "status_code": 200,
+      "is_streaming": 1,
+      "input_tokens": 216,
+      "output_tokens": 13,
+      "created_at": 1794965033
+    }
+  ],
+  "observedDefect": "Preview identity selected legacy acceptance feed and advertised test-f86531a4 (#15); no download clicked",
+  "unverified": [
+    "computer use",
+    "microphone UI",
+    "ChatGPT client MCP end-to-end",
+    "other platform physical installation",
+    "formal identity signed upgrade"
+  ],
+  "formalRelease": false,
+  "cowork": {
+    "status": "passed file task",
+    "file": "beta2-cowork-1118.txt",
+    "content": "TUZI-BETA2-FILE-OK\nCOWORK-FILE-OK\n",
+    "sha256": "dbd93c6462dfc4083f6ee833428d5d0c0de57232fbf477b7f70b96b9768eeee2",
+    "scope": "only named synthetic directory; one-session folder allowance, not always allow",
+    "coldRestartRestored": false,
+    "gatewayRequests": [
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 19570,
+        "output_tokens": 42,
+        "created_at": 1794965855
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 323,
+        "output_tokens": 65,
+        "created_at": 1794965860
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 297,
+        "output_tokens": 62,
+        "created_at": 1794965867
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 252,
+        "output_tokens": 47,
+        "created_at": 1794965872
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 232,
+        "output_tokens": 126,
+        "created_at": 1794965878
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 120,
+        "output_tokens": 49,
+        "created_at": 1794965883
+      },
+      {
+        "app_type": "claude-desktop",
+        "model": "gpt-6.1-sol",
+        "request_model": "claude-gpt-6.1-sol",
+        "status_code": 200,
+        "is_streaming": 1,
+        "input_tokens": 202,
+        "output_tokens": 62,
+        "created_at": 1794965890
+      }
+    ]
+  }
+}

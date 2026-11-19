@@ -10,6 +10,7 @@ export const WORKSPACE_TOOLS: WorkspaceTool[] = [
   "opencode",
   "openclaw",
   "hermes",
+  "workbuddy",
   "grokbuild",
   "pi",
   "mcode",
@@ -22,6 +23,7 @@ export const WORKSPACE_TOOL_NAMES: Record<WorkspaceTool, string> = {
   opencode: "OpenCode",
   openclaw: "OpenClaw",
   hermes: "Hermes",
+  workbuddy: "WorkBuddy",
   grokbuild: "Grok Build",
   pi: "Pi",
   mcode: "MiniMax Code",
@@ -33,8 +35,8 @@ export const WORKSPACE_SUPPORT: Record<
   mcp: MCP_APP_IDS,
   agents: ["claude", "opencode"],
   skills: SKILLS_APP_IDS,
-  prompts: ["claude", "codex", "gemini", "opencode", "openclaw", "hermes"],
-  sessions: ["claude", "codex", "gemini", "opencode", "openclaw", "hermes"],
+  prompts: ["claude", "codex", "gemini", "opencode", "openclaw", "hermes", "workbuddy"],
+  sessions: ["claude", "codex", "gemini", "opencode", "openclaw", "hermes", "workbuddy"],
 };
 export const GLOBAL_WORKSPACE_VIEWS = [
   "mcp",

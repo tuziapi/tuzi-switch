@@ -3,6 +3,7 @@ import {
   fakeNodeWeakMap,
   PlaitBoard,
   RectangleClient,
+  Transforms,
   type Point,
 } from '@plait/core';
 import {
@@ -16,6 +17,7 @@ import {
   CanvasAssociationLineComponent,
   drawCanvasAssociationLine,
   getCanvasAssociationPath,
+  isCanvasAssociationVisible,
 } from './canvas-association-line';
 import {
   withCanvasAssociation,
@@ -43,6 +45,67 @@ afterEach(() => {
 });
 
 describe('managed association line drawing', () => {
+  it('keeps explicit generation connections visible and interactive when legacy reference lines are hidden', () => {
+    const board = createTestingBoard(
+      [withCanvasAssociation],
+      [
+        {
+          id: 'source',
+          type: 'image',
+          points: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+        {
+          id: 'result',
+          type: 'image',
+          points: [
+            [300, 0],
+            [400, 100],
+          ],
+          generationOrigin: {
+            version: 1,
+            draft: {
+              id: 'draft',
+              type: 'geometry',
+              shape: 'roundRectangle',
+              angle: 0,
+              points: [
+                [300, 0],
+                [644, 224],
+              ],
+              generationNode: {
+                version: 1,
+                generationType: 'image',
+                prompt: 'original',
+                model: 'model',
+                params: {},
+                count: 1,
+                references: [],
+              },
+            },
+          },
+        },
+      ]
+    );
+    board.getRectangle = (element) =>
+      RectangleClient.getRectangleByPoints(element.points!);
+    const [line] = createCanvasAssociationLines(board, {
+      boardId: 'board',
+      sourceElementIds: ['source'],
+      resultElementId: 'result',
+    });
+    writeImageToolbarPreferences({ referenceLines: false });
+    expect(isCanvasAssociationVisible(board, line)).toBe(true);
+    expect(board.isHit(line, [200, 50])).toBe(true);
+    Transforms.setNode(board, { generationOrigin: undefined }, [
+      board.children.findIndex((element) => element.id === 'result'),
+    ]);
+    expect(isCanvasAssociationVisible(board, line)).toBe(false);
+    expect(board.isHit(line, [200, 50])).toBe(false);
+  });
+
   it('shares the departure lead for same-side siblings with different vertical offsets', () => {
     const upper = getCanvasAssociationPath([
       [100, 100],
@@ -125,7 +188,7 @@ describe('managed association line drawing', () => {
     ).toBe('');
   });
 
-  it('draws a crisp gray SVG path with rounded caps and stable screen width', () => {
+  it('draws a clear SVG path with rounded caps and stable screen width', () => {
     const line = createArrowLineElement(
       ArrowLineShape.curve,
       [
@@ -138,8 +201,8 @@ describe('managed association line drawing', () => {
     const snapshot = structuredClone(line);
     const group = drawCanvasAssociationLine(line);
     const path = group.querySelector('path');
-    expect(path?.getAttribute('stroke')).toBe('#9ca3af');
-    expect(path?.getAttribute('stroke-width')).toBe('1.5');
+    expect(path?.getAttribute('stroke')).toBe('#7f7aa8');
+    expect(path?.getAttribute('stroke-width')).toBe('2.5');
     expect(path?.getAttribute('stroke-linecap')).toBe('round');
     expect(path?.getAttribute('vector-effect')).toBe('non-scaling-stroke');
     expect(group.querySelectorAll('path')).toHaveLength(1);

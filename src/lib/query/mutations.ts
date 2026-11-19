@@ -66,6 +66,9 @@ export const useAddProviderMutation = (appId: AppId) => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({ queryKey: ["workbuddy", "modelOwners"] });
+      }
 
       if (appId === "opencode") {
         await queryClient.invalidateQueries({
@@ -141,6 +144,9 @@ export const useUpdateProviderMutation = (appId: AppId) => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({ queryKey: ["workbuddy", "modelOwners"] });
+      }
       if (appId === "openclaw") {
         await queryClient.invalidateQueries({
           queryKey: openclawKeys.health,
@@ -182,6 +188,9 @@ export const useDeleteProviderMutation = (appId: AppId) => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({ queryKey: ["workbuddy", "modelOwners"] });
+      }
 
       if (appId === "opencode") {
         await queryClient.invalidateQueries({
@@ -250,6 +259,13 @@ export const useSwitchProviderMutation = (appId: AppId) => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
+      if (appId === "workbuddy") {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["workbuddy", "modelOwners"] }),
+          queryClient.invalidateQueries({ queryKey: ["auth", "workbuddy_account"] }),
+          queryClient.invalidateQueries({ queryKey: ["workbuddy-quota"] }),
+        ]);
+      }
       if (appId === "claude-desktop") {
         await queryClient.invalidateQueries({ queryKey: ["proxyStatus"] });
         await queryClient.invalidateQueries({

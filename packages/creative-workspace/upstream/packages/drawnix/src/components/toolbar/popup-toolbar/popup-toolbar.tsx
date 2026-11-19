@@ -1,9 +1,12 @@
+import { generationOriginInput } from '../../../services/generation-node-lifecycle';
 import { LayerDecompositionDialog } from '../../layer-decomposition';
 import { SEEDREAM55_MODEL_ID } from '../../../services/model-adapters/seedream55';
 import { getAssistantAccount } from '../../../services/assistant-account';
 import { resizeCanvasImage } from '../../../services/canvas-operations/resize-canvas-image';
 import Stack from '../../stack';
 import { ImageToolbarContents } from './image-toolbar-contents';
+import { SeedreamContinueButton } from './seedream-continue-button';
+import { GenerationNodeActions } from './generation-node-actions';
 import type { ImageToolMode } from './canvas-image-tools-dialog';
 import { getCanvasBoardBinding, type CanvasBoardBinding } from '../../../services/canvas-operations/canvas-board-ref';
 import { insertSplitImages } from '../../../services/canvas-operations/insert-split-images';
@@ -109,6 +112,7 @@ import {
   PaintBucket,
   Orbit,
   Ungroup,
+  ScanText,
 } from 'lucide-react';
 import { useDrawnix, DialogType } from '../../../hooks/use-drawnix';
 import { useI18n } from '../../../i18n';
@@ -134,6 +138,7 @@ import { splitAndInsertImages } from '../../../utils/image-splitter';
 import {
   LayerDecompositionCorrectionRequiredError,
   startAutomaticLayerDecomposition,
+  getSemanticLayerMetadata,
 } from '../../../services/layer-decomposition';
 import {
   smartDownload,
@@ -174,8 +179,22 @@ import { isAudioNodeElement } from '../../../types/audio-node.types';
 import { getCanvasAudioPlaybackQueue } from '../../../data/audio';
 import { openMusicPlayerToolAndPlay } from '../../../services/tool-launch-service';
 import { useCanvasAudioPlayback } from '../../../hooks/useCanvasAudioPlayback';
-import { buildImageTaskAIInputPrefillData } from '../../../utils/image-task-prefill';
-import { AI_INPUT_LAYOUT_EVENT, requestAIInputPrefill } from '../../../services/ai-input-ui-events';
+import {
+  buildImageTaskAIInputPrefillData,
+  buildImageRerollPrefillData,
+} from '../../../utils/image-task-prefill';
+import {
+  AI_INPUT_LAYOUT_EVENT,
+  CANVAS_IMAGE_EDIT_EVENT,
+  CanvasImageEditDetail,
+  requestAIInputPrefill,
+  requestAIInputReroll,
+} from '../../../services/ai-input-ui-events';
+import {
+  readImageGenerationRecipe,
+  resolveRecipeCanvasSources,
+} from '../../../services/image-generation-recipe';
+import { taskStorageReader } from '../../../services/task-storage-reader';
 import {
   AUDIO_PLAYLIST_CANVAS_AUDIO_ID,
   AUDIO_PLAYLIST_CANVAS_AUDIO_LABEL,
@@ -229,9 +248,13 @@ const cancelPopupToolbarFrame = (frameId: number) => {
 export const PopupToolbar = () => {
   const board = useBoard();
   // 过滤掉 WorkZone 元素，避免点击 WorkZone 时弹出 popup-toolbar
-  const allSelectedElements = getSelectedElements(board);
+  const allSelectedElements = getSelectedElements(board).map(
+    (selected) => board.children.find((element) => element.id === selected.id) || selected
+  );
+  const generationSelection = allSelectedElements.length > 0 &&
+    allSelectedElements.every((element) => element.generationNode || element.generationInput);
   const selectedElements = allSelectedElements.filter(
-    (element) => !isWorkZoneElement(element)
+    (element) => !isWorkZoneElement(element) && !element.generationNode && !element.generationInput
   );
   const { openDialog } = useDrawnix();
   const { language, t } = useI18n();
@@ -259,6 +282,22 @@ export const PopupToolbar = () => {
   const [editingImageUrl, setEditingImageUrl] = useState('');
   const [editingImageElement, setEditingImageElement] =
     useState<PlaitDrawElement | null>(null);
+
+  useEffect(() => {
+    const openImageEditor = (event: Event) => {
+      const detail = (event as CustomEvent<CanvasImageEditDetail>).detail;
+      const binding = getCanvasBoardBinding();
+      if (!binding || binding.board !== board || (detail.boardId && binding.boardId !== detail.boardId)) return;
+      const source = board.children.find(element => element.id === detail.elementId);
+      if (!source || !PlaitDrawElement.isImage(source) || !source.url) return;
+      setEditingImageUrl(source.url);
+      setEditingImageElement(source);
+      setEditingImageBinding(binding);
+      setShowImageEditor(true);
+    };
+    window.addEventListener(CANVAS_IMAGE_EDIT_EVENT, openImageEditor);
+    return () => window.removeEventListener(CANVAS_IMAGE_EDIT_EVENT, openImageEditor);
+  }, [board]);
 
   // 属性面板状态
   const [showPropertyPanel, setShowPropertyPanel] = useState(false);
@@ -361,12 +400,12 @@ export const PopupToolbar = () => {
   }, [board, speechSelectionKey, movingOrDragging]);
 
   // popup-toolbar 的显示逻辑
-  const open = selectedElements.length > 0 && !isSelectionMoving(board);
+  const open = (selectedElements.length > 0 || generationSelection) && !isSelectionMoving(board);
   const { viewport, selection, children } = board;
   const { refs, floatingStyles } = useFloating({
     placement: popupToolbarPlacement,
     middleware: [
-      offset(12), // Close to reference point
+      offset(selectedElements.length === 1 && PlaitDrawElement.isImage(selectedElements[0]) ? 44 : 12), // Leave room for image connection buttons.
       shift({ padding: 16 }), // Ensure it stays within screen bounds
       flip({
         // 输入框下方的图片优先将工具栏固定到图片下方，避免 flip 又翻回输入框上方。
@@ -423,7 +462,7 @@ export const PopupToolbar = () => {
   } = {
     fill: 'red',
   };
-  if (open && !movingOrDragging) {
+  if (open && !movingOrDragging && !generationSelection) {
     const hasFill =
       selectedElements.some((value) => hasFillProperty(board, value)) &&
       !PlaitBoard.hasBeenTextEditing(board);
@@ -871,46 +910,94 @@ export const PopupToolbar = () => {
     }
   };
 
-  const prefillSelectedImageTaskToAIInput = useCallback(async () => {
-    const imageElement = selectedElements[0];
-    if (
-      selectedElements.length !== 1 ||
-      !PlaitDrawElement.isDrawElement(imageElement) ||
-      !PlaitDrawElement.isImage(imageElement) ||
-      !imageElement.url
-    ) {
-      return;
-    }
-
-    try {
-      const task = await taskQueueService.findImageTaskByResultUrl(
-        imageElement.url
-      );
-      if (!task) {
-        MessagePlugin.warning(
-          language === 'zh'
-            ? '未找到该图片的历史生成任务'
-            : 'No historical generation task found for this image'
-        );
+  const imageGenerationActionPending = useRef(false);
+  const prefillSelectedImageTaskToAIInput = useCallback(
+    async (action: 'reroll' | 'restore' | 'edit' = 'restore') => {
+      const imageElement = selectedElements[0];
+      if (
+        selectedElements.length !== 1 ||
+        !PlaitDrawElement.isDrawElement(imageElement) ||
+        !PlaitDrawElement.isImage(imageElement) ||
+        !imageElement.url
+      ) {
         return;
       }
 
-      requestAIInputPrefill({
-        ...buildImageTaskAIInputPrefillData(task),
-        source: 'canvas-toolbar',
-      });
-    } catch (error) {
-      console.error(
-        '[PopupToolbar] Failed to prefill image generation:',
-        error
-      );
-      MessagePlugin.error(
-        language === 'zh'
-          ? '回填失败，请稍后重试'
-          : 'Failed to load generation inputs, please try again'
-      );
-    }
-  }, [language, selectedElements]);
+      if (imageGenerationActionPending.current) return;
+      imageGenerationActionPending.current = true;
+      const binding = getCanvasBoardBinding();
+      try {
+        if (action === 'edit') {
+          requestAIInputPrefill({
+            intent: 'edit',
+            source: 'canvas-toolbar',
+            boardId: binding?.boardId || undefined,
+            generationType: 'image',
+            prompt: '',
+            count: 1,
+            images: [
+              {
+                url: imageElement.url,
+                name: '当前图片',
+                sourceElementId: imageElement.id,
+              },
+            ],
+          });
+          return;
+        }
+        const record = imageElement as typeof imageElement & {
+          generationTaskId?: string;
+        };
+        const savedInput = readImageGenerationRecipe(imageElement) || generationOriginInput(imageElement);
+        const matchedTask = savedInput
+          ? undefined
+          : (record.generationTaskId
+              ? await taskStorageReader.getTask(record.generationTaskId)
+              : undefined) ||
+            (await taskQueueService.findImageTaskByResultUrl(imageElement.url));
+        const task = matchedTask
+          ? await taskStorageReader.getTask(matchedTask.id)
+          : undefined;
+        if (getCanvasBoardBinding()?.boardId !== binding?.boardId) return;
+        if (!savedInput && !task) {
+          MessagePlugin.warning(
+            language === 'zh'
+              ? '原生成记录已缺失，无法恢复原参考图；可使用“以此图修改”'
+              : 'No historical generation task found for this image'
+          );
+          return;
+        }
+
+        const input = resolveRecipeCanvasSources(
+          savedInput || buildImageTaskAIInputPrefillData(task!),
+          board.children
+        );
+        const detail = {
+          ...input,
+          boardId: binding?.boardId || undefined,
+          source: 'canvas-toolbar',
+        } as const;
+        if (action === 'reroll')
+          requestAIInputReroll(buildImageRerollPrefillData(detail));
+        else requestAIInputPrefill(detail);
+      } catch (error) {
+        console.error(
+          '[PopupToolbar] Failed to prefill image generation:',
+          error
+        );
+        MessagePlugin.error(
+          language === 'zh'
+            ? error instanceof Error
+              ? error.message
+              : '恢复原输入失败，请稍后重试'
+            : 'Failed to load generation inputs, please try again'
+        );
+      } finally {
+        imageGenerationActionPending.current = false;
+      }
+    },
+    [board, language, selectedElements]
+  );
 
   const openAIImageGenerationDialog = useCallback(() => {
     const selectedFrame =
@@ -1059,7 +1146,7 @@ export const PopupToolbar = () => {
       screenStart[0] + (screenEnd[0] - screenStart[0]) / 2;
     const toolbarLeft = selectionCenterX - toolbarWidth / 2;
     const toolbarRight = toolbarLeft + toolbarWidth;
-    const spacing = 12;
+    const spacing = elements.length === 1 && PlaitDrawElement.isImage(elements[0]) ? 44 : 12;
     const topToolbarBottom = selectionTop - spacing;
     const topPlacementOverlapsInput = inputRects.some(
       (inputRect) =>
@@ -1068,13 +1155,29 @@ export const PopupToolbar = () => {
         topToolbarBottom > inputRect.top &&
         topToolbarBottom - toolbarHeight < inputRect.bottom
     );
-    const nextPlacement = topPlacementOverlapsInput ? 'bottom' : 'top';
+    const canvasTop = Math.max(0, PlaitBoard.getHost(board).getBoundingClientRect().top);
+    const topPlacementOutsideCanvas = topToolbarBottom - toolbarHeight < canvasTop + 8;
+    const nextPlacement = topPlacementOverlapsInput || topPlacementOutsideCanvas ? 'bottom' : 'top';
 
     setPopupToolbarPlacement((currentPlacement) =>
       currentPlacement === nextPlacement ? currentPlacement : nextPlacement
     );
 
-    const referenceX = selectionCenterX;
+    let referenceX = selectionCenterX;
+    const candidateTop = nextPlacement === 'bottom'
+      ? selectionBottom + spacing
+      : selectionTop - spacing - toolbarHeight;
+    // The card editor can sit immediately beside a narrow, zoomed-out card.
+    // Keep its wider action toolbar outside the editor's interactive surface.
+    for (const inputRect of inputRects) {
+      if (candidateTop >= inputRect.bottom || candidateTop + toolbarHeight <= inputRect.top) continue;
+      if (referenceX + toolbarWidth / 2 <= inputRect.left || referenceX - toolbarWidth / 2 >= inputRect.right) continue;
+      const hostRect = PlaitBoard.getHost(board).getBoundingClientRect();
+      const candidates = [inputRect.left - 12 - toolbarWidth / 2, inputRect.right + 12 + toolbarWidth / 2]
+        .filter((x) => x - toolbarWidth / 2 >= hostRect.left + 16 && x + toolbarWidth / 2 <= hostRect.right - 16)
+        .sort((a, b) => Math.abs(a - selectionCenterX) - Math.abs(b - selectionCenterX));
+      if (candidates.length) referenceX = candidates[0];
+    }
     const referenceY =
       nextPlacement === 'bottom' ? selectionBottom : selectionTop;
 
@@ -1377,6 +1480,9 @@ export const PopupToolbar = () => {
           data-testid="popup-toolbar"
         >
           <Stack.Row gap={1}>
+            {generationSelection ? (
+              <GenerationNodeActions board={board} elements={allSelectedElements} language={language} />
+            ) : (
             <ImageToolbarContents enabled={!!state.hasImageEdit} container={PlaitBoard.getBoardContainer(board)}>
             {/* ========== 左侧：公共属性图标（样式相关，位置相对固定） ========== */}
             {state.hasFill && (
@@ -1996,6 +2102,22 @@ export const PopupToolbar = () => {
                   }
                 }}
               />
+            )}
+            {selectedElements.length === 1 && getSemanticLayerMetadata(selectedElements[0])?.textRecognition && (
+              <ToolButton className="layer-ocr-to-text" type="icon" visible icon={<ScanText size={16} />}
+                aria-label="转换为可编辑文字" tooltip="近似还原文字与样式，保留原图片层，可撤销"
+                onClick={() => {
+                  const binding = getCanvasBoardBinding();
+                  const sourceId = selectedElements[0].id;
+                  const sourceUrl = selectedElements[0].url;
+                  void import('../../../services/layer-decomposition/text-conversion').then(({ convertLayerToEditableText }) => {
+                    const current = getCanvasBoardBinding();
+                    if (!binding || binding.board !== board || current?.board !== board || current.boardId !== binding.boardId) throw new Error('画板已切换，请重新选择图层');
+                    if (!board.children.some((element) => element.id === sourceId && element.url === sourceUrl)) throw new Error('原图片层已变更，请重新选择');
+                    const count = convertLayerToEditableText(board, sourceId);
+                    MessagePlugin.success(`已转换 ${count} 行可编辑文字；字体与字号为近似还原，可撤销恢复原图层`);
+                  }).catch((error) => MessagePlugin.error(error instanceof Error ? error.message : '文字转换失败'));
+                }} />
             )}
             {state.hasImageEdit && (['angle'] as const).map((mode) => (
               <ToolButton key={`local-image-${mode}`} className={`local-image-${mode}`} type="icon" visible
@@ -2723,7 +2845,21 @@ export const PopupToolbar = () => {
                 }
               }}
             />
+            {selectedElements.length === 1 && isVideoElement(selectedElements[0]) && generationOriginInput(selectedElements[0]) && (
+              <ToolButton type="icon" icon={<Pencil size={15} />} visible={true}
+                tooltip={language === 'zh' ? '调整后生成：恢复原视频输入' : 'Edit original video inputs'}
+                aria-label={language === 'zh' ? '调整后生成' : 'Edit original inputs'}
+                onPointerUp={() => {
+                  const input = generationOriginInput(selectedElements[0]);
+                  if (input) requestAIInputPrefill({
+                    ...resolveRecipeCanvasSources(input, board.children),
+                    boardId: getCanvasBoardBinding()?.boardId || undefined, source: 'canvas-toolbar',
+                  });
+                }} />
+            )}
+            {state.hasRegenerateImage && <SeedreamContinueButton board={board} element={selectedElements[0]} />}
             {state.hasRegenerateImage && (
+              <>
               <ToolButton
                 className="regenerate-image"
                 key="regenerate-image"
@@ -2732,15 +2868,26 @@ export const PopupToolbar = () => {
                 visible={true}
                 tooltip={
                   language === 'zh'
-                    ? '以当前提示词再次生成'
-                    : 'Generate again with the current prompt'
+                    ? '使用原提示词和原参考图，立即重新生成一张'
+                    : 'Generate one new image using the original inputs'
                 }
                 aria-label={language === 'zh' ? '再次生成' : 'Generate again'}
-                data-track="toolbar_click_regenerate_image_prefill"
+                data-track="toolbar_click_regenerate_image"
                 onPointerUp={() => {
-                  void prefillSelectedImageTaskToAIInput();
+                  void prefillSelectedImageTaskToAIInput('reroll');
                 }}
               />
+              <ToolButton type="icon" icon={<Pencil size={15} />} visible={true}
+                tooltip={language === 'zh' ? '调整后生成：恢复原提示词和参考图' : 'Restore inputs for editing'}
+                aria-label={language === 'zh' ? '调整后生成' : 'Edit original inputs'}
+                data-track="toolbar_click_regenerate_image_prefill"
+                onPointerUp={() => void prefillSelectedImageTaskToAIInput('restore')} />
+              <ToolButton type="icon" icon={<AIImageIcon />} visible={true}
+                tooltip={language === 'zh' ? '以此图修改：使用当前图片作为参考' : 'Use this image as a reference'}
+                aria-label={language === 'zh' ? '以此图修改' : 'Edit this image'}
+                data-track="toolbar_click_edit_image_input"
+                onPointerUp={() => void prefillSelectedImageTaskToAIInput('edit')} />
+              </>
             )}
             <ToolButton
               className="trash"
@@ -2769,6 +2916,7 @@ export const PopupToolbar = () => {
               />
             )}
             </ImageToolbarContents>
+            )}
           </Stack.Row>
         </Island>
       )}
