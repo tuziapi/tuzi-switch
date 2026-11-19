@@ -25,15 +25,17 @@ class NodeArchiveTests(unittest.TestCase):
     def test_official_build_preserves_identity_and_signed_updates_with_runtime(self):
         channel = {"plugins": {"updater": {"pubkey": "synthetic-public-key", "endpoints": ["https://github.com/tuziapi/tuzi-switch/releases/latest/download/latest.json"]}}}
         for target in stage_node.TARGETS:
-            config = build_candidate.official_config(target, channel)
+            config = build_candidate.stable_config(target, channel)
             self.assertTrue(config["bundle"]["createUpdaterArtifacts"])
             self.assertEqual(config["plugins"], channel["plugins"])
             self.assertNotIn("identifier", config)
             self.assertNotIn("mainBinaryName", config)
             self.assertIn("licenses/LICENSE-claude-local.txt", config["bundle"]["resources"].values())
             self.assertTrue(config["bundle"]["externalBin"][0].endswith("/tuzi-claude-node"))
-        with self.assertRaisesRegex(ValueError, "official updater"):
-            build_candidate.official_config("aarch64-apple-darwin", {"plugins": {"updater": {"endpoints": []}}})
+        test_channel = {"plugins": {"updater": {"pubkey": "synthetic-test-key", "endpoints": ["https://github.com/AiW520/tuzi-switch/releases/latest/download/latest.json"]}}}
+        self.assertEqual(build_candidate.stable_config("aarch64-apple-darwin", test_channel)["plugins"], test_channel["plugins"])
+        with self.assertRaisesRegex(ValueError, "supported updater"):
+            build_candidate.stable_config("aarch64-apple-darwin", {"plugins": {"updater": {"endpoints": []}}})
 
     def test_published_preview_is_versioned_isolated_and_has_linux_binary_names(self):
         with self.assertRaisesRegex(ValueError, "isolated"):

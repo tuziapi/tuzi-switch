@@ -256,7 +256,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
         run: |
           set -euo pipefail
-          python3 scripts/build-claude-local-candidate.py --target "$BUILD_TARGET" --official-release 2>&1 | tee "$RUNNER_TEMP/tuzi-bundle.log"
+          python3 scripts/build-claude-local-candidate.py --target "$BUILD_TARGET" --stable-release 2>&1 | tee "$RUNNER_TEMP/tuzi-bundle.log"
           if grep -Fq 'Failed to add bundler type' "$RUNNER_TEMP/tuzi-bundle.log"; then
             echo 'Installer type was not embedded; refusing an updater candidate with ambiguous package selection'
             exit 1
