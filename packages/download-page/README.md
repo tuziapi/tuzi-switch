@@ -6,9 +6,9 @@
 
 macOS 提供 ARM64 / Intel DMG，Windows 提供 EXE / MSI，Linux 提供 DEB / RPM / AppImage。直接下载公开 Release 附件，无需 GitHub 登录。页面清楚说明未签名及旧 opentu 数据迁移限制。
 
-`Unified desktop release` 在全部校验和四平台安装包构建成功后公开正式 Release，再构建部署 Pages。Pages 使用 GitHub Actions，github-pages 环境允许版本标签。版本标签和公开安装文件不覆写。若后续 Pages 发布失败，已发布安装包仍可直接下载，可从同一标签重新构建网站并部署，不能重新覆盖安装包。
+`Unified desktop release` 完成回归、四平台构建和签名校验后只生成候选。正式发布须先让 `scripts/update-acceptance.mjs verify` 核对真实安装升级证据与全部候选文件，再公开同一批字节；版本标签指向实际构建源码，不指向后续验收或网页提交。页面必须从已公开 Release 生成清单。当前正式仓库沿用 main 根目录 legacy Pages；计费锁定期间采用与发布工作流相同的本地门禁及附件校验，流程见 `docs/development/2026-11-19-v1.6.3-release.md`。公开标签和安装文件不覆写，页面重试不重新构建安装包。
 
-v1.5.2 起客户端使用分发仓库的签名更新清单，在应用内下载并校验，用户明确点击“重启并更新”后安装。网页仍直接下载对应平台的 DMG / EXE / MSI / DEB / RPM / AppImage。v1.5.0 / v1.5.1 及旧独立测试客户端须先手动安装新版本，旧测试数据保留在其独立目录。
+v1.6.2 已完成正式更新密钥过渡，升级到 v1.6.3 使用应用内签名更新，用户点击“重启并更新”后安装。v1.6.1 及更早版本须先手动安装新版；独立 OpenTu 验收版的数据目录不自动合并。网页继续提供七种直接安装文件，Mac 安装脚本固定版本及摘要，并保留历史脚本入口。更新签名不等同于 Apple Developer ID / 公证或 Windows Authenticode。
 
 `pnpm --filter @tuzi/download-page test` 检查来源、缺包、摘要和统计桥。历史 acceptance 模块保留用于旧元数据回归，不再用于公开下载入口。`VITE_DOWNLOAD_SOURCE_URL` 指向此页面对应的精确源码；Pages 和 Release 同时提供源码归档。
 
