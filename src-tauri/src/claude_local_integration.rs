@@ -429,9 +429,28 @@ fn needs_gateway_route(provider: &crate::provider::Provider) -> bool {
         && matches!(crate::claude_desktop_config::provider_mode(provider), crate::provider::ClaudeDesktopMode::Proxy)
 }
 
-fn configure_gateway_process(command: &mut std::process::Command) {
+fn configure_gateway_process(command: &mut std::process::Command, profile_dir: Option<&std::path::Path>) {
     for name in ["NODE_EXTRA_CA_CERTS", "NODE_TLS_REJECT_UNAUTHORIZED", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"] {
         command.env_remove(name);
+    }
+    if let Some(profile_dir) = profile_dir {
+        configure_gateway_profile(command, profile_dir, std::env::consts::OS);
+    }
+}
+
+fn configure_gateway_profile(command: &mut std::process::Command, profile_dir: &std::path::Path, platform: &str) {
+    let mut argument = std::ffi::OsString::from("--user-data-dir=");
+    argument.push(profile_dir);
+    command.arg(argument);
+    if let Some(config_root) = profile_dir.parent() {
+        if platform == "windows" {
+            command.env("LOCALAPPDATA", config_root);
+            if let Some(app_data) = config_root.parent() {
+                command.env("APPDATA", app_data.join("Roaming"));
+            }
+        } else if platform == "linux" {
+            command.env("XDG_CONFIG_HOME", config_root);
+        }
     }
 }
 
@@ -469,7 +488,8 @@ async fn prepare_gateway_connection(app: tauri::AppHandle, provider_id: String, 
             .map_err(|error| error.to_string())?;
         crate::claude_desktop_config::apply_provider(state.db.as_ref(), &provider).map_err(|error| error.to_string())?;
         if launch {
-            claude_local::launch_claude(&source, configure_gateway_process).map_err(|error| error.to_string())?;
+            let profile_dir = crate::claude_desktop_config::gateway_launch_profile_dir().map_err(|error| error.to_string())?;
+            claude_local::launch_claude(&source, |command| configure_gateway_process(command, profile_dir.as_deref())).map_err(|error| error.to_string())?;
         }
         Ok(())
     }).await.map_err(|error| error.to_string())?
@@ -531,10 +551,37 @@ mod tests {
         for name in ["NODE_EXTRA_CA_CERTS", "NODE_TLS_REJECT_UNAUTHORIZED", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"] {
             command.env(name, "synthetic-legacy-value");
         }
-        configure_gateway_process(&mut command);
+        configure_gateway_process(&mut command, None);
         assert!(command.get_args().next().is_none());
         assert!(command.get_envs().all(|(_, value)| value.is_none()));
         assert_eq!(command.get_envs().count(), 5);
+    }
+
+    #[test]
+    fn local_gateway_launch_passes_isolated_profile_as_one_argument() {
+        let temp = tempfile::tempdir().unwrap();
+        let profile = temp.path().join("Synthetic 验收/Claude");
+        let mut command = std::process::Command::new("synthetic-claude");
+        configure_gateway_process(&mut command, Some(&profile));
+        let mut expected = std::ffi::OsString::from("--user-data-dir=");
+        expected.push(&profile);
+        assert_eq!(command.get_args().collect::<Vec<_>>(), vec![expected.as_os_str()]);
+        assert!(command.get_envs().filter(|(name, _)| name.to_string_lossy().starts_with("NODE_") || name.to_string_lossy().starts_with("ANTHROPIC_")).all(|(_, value)| value.is_none()));
+    }
+
+    #[test]
+    fn local_gateway_windows_and_linux_configuration_roots_are_isolated() {
+        let temp = tempfile::tempdir().unwrap();
+        let profile = temp.path().join("AppData/Local/Claude");
+        let mut command = std::process::Command::new("synthetic-claude");
+        configure_gateway_profile(&mut command, &profile, "windows");
+        let environment = command.get_envs().map(|(name, value)| (name.to_string_lossy().into_owned(), value.map(std::path::PathBuf::from))).collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(environment["LOCALAPPDATA"], Some(temp.path().join("AppData/Local")));
+        assert_eq!(environment["APPDATA"], Some(temp.path().join("AppData/Roaming")));
+        let mut command = std::process::Command::new("synthetic-claude");
+        let profile = temp.path().join(".config/Claude");
+        configure_gateway_profile(&mut command, &profile, "linux");
+        assert_eq!(command.get_envs().next(), Some((std::ffi::OsStr::new("XDG_CONFIG_HOME"), profile.parent().map(|path| path.as_os_str()))));
     }
 
     #[test]
