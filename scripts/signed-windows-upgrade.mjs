@@ -407,6 +407,11 @@ $probe=Join-Path $directory 'restored-write-probe'
   await verifyCreativePreserved(page, currentCreative, root, 'signed-upgrade');
   report.checks.creativeImageLayerOcrTaskPreservation = 'passed';
   assert.ok(report.creativeRequests.filter(r => r.version === '1.6.2' && r.path === '/v1/images/generations').length >= 2);
+  const targetEvidence = path.join(root, 'target-native');
+  fs.mkdirSync(targetEvidence, { recursive: true });
+  report.creativeAfterUpgrade = await createLegacyCreative(page, targetEvidence);
+  assert.ok(report.creativeRequests.some(r => r.version === '1.6.3' && r.path === '/v1/images/generations' && r.channels?.length === 1 && r.channels[0] === '3'));
+  report.checks.targetNativeBusinessAttribution = 'passed';
   assert.ok(!report.creativeServerErrors?.length, 'All native synthetic provider requests must match the contract');
   report.checks.installedDesktopAttributionSynthetic = 'passed';
   report.creativeScope = 'Actual installed UI/native HTTP and persistence; synthetic provider only. No production consumption records, real model quality or complete project-format migration acceptance.';
