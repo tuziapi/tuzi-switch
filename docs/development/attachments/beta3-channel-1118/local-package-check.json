@@ -1,0 +1,39 @@
+{
+  "manifest": {
+    "version": "1.6.3-beta.3",
+    "channel": "preview",
+    "repository": "AiW520/tuzi-switch",
+    "commit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+    "runId": "44216753049",
+    "target": "aarch64-apple-darwin",
+    "platform": "macos-arm64",
+    "applicationId": "com.tuziswitch.desktop.opentu-preview",
+    "isolatedProfile": true,
+    "automaticUpdates": false,
+    "developerSigned": false,
+    "notarized": false,
+    "file": "OpenTu-Preview-1.6.3-beta.3-macos-arm64.dmg",
+    "bytes": 77060790,
+    "sha256": "a80ebea13f6c14f4e1914231021f84640e9217ae8f59c96ebefac232080fb0d0",
+    "checks": [
+      "native-runtime-probe",
+      "release-native-integration",
+      "dmg-mounted",
+      "isolated-identity",
+      "beta-version",
+      "ad-hoc-signature",
+      "node-jit-entitlement",
+      "packaged-node-script-executed"
+    ]
+  },
+  "nodeProbe": {
+    "version": "v24.22.3",
+    "script": true,
+    "fetch": true,
+    "websocket": true
+  },
+  "jitEntitlement": true,
+  "codesignDeepStrict": true,
+  "stagedApp": "/tmp/opentu-beta3-verified-app/OpenTu \u9a8c\u6536\u7248.app",
+  "binarySha256": "091ad0f5a9426258d4413155b9e97a5ef4feb56a41624cd2b980bbc3928804f2"
+}

@@ -1,0 +1,81 @@
+Window: "OpenTu 验收版", App: OpenTu 验收版.
+0 standard window OpenTu 验收版, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: 兔子助手, URL: tauri://localhost
+			3 container opentu 创作工作区
+				4 container 创作工具栏
+					5 pop up button 兔子助手导航
+					6 container 创作导航
+						7 button 我的项目
+						8 button 自由画布
+					9 button 创作配置
+					10 button (collapsed) 对话, Help: 展开对话, Secondary Actions: Expand
+				11 image
+				12 text ﻿
+				13 container 图片生成卡片
+					14 image
+					15 image
+					16 image
+					17 image
+					18 text 生成图片
+					19 text 草稿
+					20 image
+					21 image
+					22 image
+					23 text 1 张参考图
+					24 text SYNTHETIC 1117 ：
+					25 text 点击卡片，编辑提示词与参数
+					26 image
+					27 text gpt-image-2.5-sunburst
+					28 text 1 个结果
+					29 image
+				30 button 拖动工具栏位置，双击复位
+				31 button 应用菜单 (有新功能)
+				32 button GitHub
+				33 radio button 手形工具 — H, Value: 0
+				34 radio button 选择 — V, Value: 1
+				35 button 画笔 — P
+				36 button 形状
+				37 radio button 文本 — T, Value: 0
+				38 radio button 图片 — Cmd+U, Value: 0
+				39 radio button 素材库, Value: 0
+				40 radio button AI 图片生成, Value: 0
+				41 radio button AI 视频生成, Value: 0
+				42 button 更多
+				43 button OpenTu 资源
+				44 button 用户反馈群
+				45 button 打开项目
+				46 button 打开工具箱
+				47 button 任务队列
+				48 button 清理网站数据
+				49 container
+					50 button 上传图片或视频
+					51 button 从素材库选择
+					52 button (collapsed) 选择知识库笔记, Secondary Actions: Expand
+					53 toggle button 开启联想, Value: off
+					54 button 图片
+					55 pop up button GPT Image 2.5 Sunburst (↑↓ Tab)
+					56 button auto, 自动, 自动, 自动
+					57 button 1个
+					58 button (disabled) 发送生成请求
+					59 text entry area (settable) Value: [text entry area], Placeholder: 描述你想要创建的图片
+						60 text 描述你想要创建的图片
+					61 button (collapsed) 我的提示词, Secondary Actions: Expand
+					62 button 设置
+					63 button (collapsed) 打开讨论：用文本模型讨论，再预览并批量生成, Secondary Actions: Expand
+				64 button 缩小 — Cmd+-
+				65 pop up button 自适应
+				66 button 放大 — Cmd++
+				67 button 展开小地图
+			68 container Notifications alt+T
+	69 close button
+	70 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	71 minimize button
+	72 text OpenTu 验收版
+73 menu bar
+	74 OpenTu 验收版
+	75 File
+	76 Edit
+	77 View
+	78 Window
+	79 Help

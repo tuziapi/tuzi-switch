@@ -1,0 +1,67 @@
+{
+  "checkedAt": "2026-11-18T02:39:39.511493+00:00",
+  "status": "test-release-delivered",
+  "buildRun": 44216753049,
+  "buildCommit": "be5bd7bb2f61cdc289504837bbacc181a24b3d3a",
+  "releaseRun": 44223976786,
+  "releaseWorkflowCommit": "a288aff1e6e1bd607be9082a0f5c6a0135933d51",
+  "pageRun": 44224244282,
+  "pageCommit": "e06e2bfd2f6366ee4c75bd52ed47a5cb62ac8c82",
+  "pageUrl": "https://aiw520.github.io/tuzi-switch/",
+  "releaseUrl": "https://github.com/AiW520/tuzi-switch/releases/tag/opentu-preview-v1.6.3-beta.3",
+  "pagePlatformLinksMatchPublishedAssets": true,
+  "publicDownloads": {
+    "downloads": [
+      {
+        "platform": "macos-arm64",
+        "status": 200,
+        "bytes": 77060790,
+        "sha256": "a80ebea13f6c14f4e1914231021f84640e9217ae8f59c96ebefac232080fb0d0"
+      },
+      {
+        "platform": "macos-x64",
+        "status": 200,
+        "bytes": 80220300,
+        "sha256": "729f998c14150fbb3a6f305eded6b2fb5821909fad1c40330404e2345203f78d"
+      },
+      {
+        "platform": "windows-x64",
+        "status": 200,
+        "bytes": 54347297,
+        "sha256": "88c2ce8fa08feb9d03612fab392b3d57ae08f0ca84526f6cea6ceeba5235db6e"
+      },
+      {
+        "platform": "linux-x64",
+        "status": 200,
+        "bytes": 87673424,
+        "sha256": "b5fdf2f16e8eb90258ea4e265475db36e2fd54d715a444f0e1cc91a06f1be7a5"
+      },
+      {
+        "platform": "linux-arm64",
+        "status": 200,
+        "bytes": 85521662,
+        "sha256": "93f06cdb2b8b448cfb4db536f43d4adcd17cdca7052c639a08ae2ee21daa7c1f"
+      }
+    ],
+    "formalPage": {
+      "index.html": {
+        "sha256": "e2d9d788f01856029425499fe179947bdd4e21cc8266d892dd5e95096558e21b",
+        "unchanged": true
+      },
+      "release.json": {
+        "sha256": "8937eb813803852675af58927527c88fc2fdb00f64ac131ff719339bfa64416b",
+        "unchanged": true
+      }
+    },
+    "formalLatest": "v1.6.2"
+  },
+  "formalReleasePublishedThisTask": false,
+  "pendingFormalGates": [
+    "computer-control",
+    "microphone-ui",
+    "target-chatgpt-mcp-end-to-end",
+    "other-platform-real-devices",
+    "formal-identity-signed-upgrade",
+    "user-final-acceptance"
+  ]
+}

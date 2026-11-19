@@ -1,5 +1,5 @@
 export const previewRepository = "AiW520/tuzi-switch";
-export const previewVersion = "1.6.3-beta.3";
+export const previewVersion = "1.6.3-beta.5";
 export const previewTag = `opentu-preview-v${previewVersion}`;
 export const previewPlatforms = [
   {

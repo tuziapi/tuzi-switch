@@ -1,0 +1,2 @@
+There has been no change in the accessibility tree for Window: "Claude".
+The focused UI element is 6 HTML 内容 Synthetic Cowork acceptance te... - Claude, URL: claude.ai/cowork/local_a2edbd0f-66fd-4386-bc74-6723c09ed1dc

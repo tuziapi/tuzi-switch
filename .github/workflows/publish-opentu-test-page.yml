@@ -47,7 +47,7 @@ jobs:
         run: |
           cp packages/download-page/dist/tuzi-switch.html packages/download-page/dist/index.html
           cp packages/download-page/README.md packages/download-page/SOURCE.json packages/download-page/LICENSE packages/download-page/dist/
-          git archive --format=tar.gz --output=packages/download-page/dist/source.tar.gz HEAD
+          git archive --format=tar.gz --output=packages/download-page/dist/source.tar.gz HEAD packages/download-page
           touch packages/download-page/dist/.nojekyll
           test ! -f packages/download-page/dist/latest.json
       - uses: actions/upload-pages-artifact@v3
