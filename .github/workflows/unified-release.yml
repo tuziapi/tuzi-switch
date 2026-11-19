@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      windows_msi_packaging_probe_only:
+        description: Diagnose MSI packaging with a synthetic executable; no application build, signing or publication
+        type: boolean
+        default: false
       official_candidate:
         description: Build official-channel candidates on the protected test executor; never publish
         type: boolean
@@ -55,7 +59,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: unified-release-${{ inputs.signed_candidate_macos_probe_only && 'signed-macos-probe' || inputs.signed_candidate_linux_probe_only && 'signed-linux-probe' || inputs.signed_candidate_windows_only && 'signed-windows' || inputs.native_upgrade_lab_only && (inputs.native_upgrade_packages_only && 'native-packages' || 'native-lab') || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
+  group: unified-release-${{ inputs.windows_msi_packaging_probe_only && 'windows-msi-probe' || inputs.signed_candidate_macos_probe_only && 'signed-macos-probe' || inputs.signed_candidate_linux_probe_only && 'signed-linux-probe' || inputs.signed_candidate_windows_only && 'signed-windows' || inputs.native_upgrade_lab_only && (inputs.native_upgrade_packages_only && 'native-packages' || 'native-lab') || inputs.signing_preflight_only && 'signing-preflight' || 'candidate' }}
   cancel-in-progress: false
 
 env:
@@ -67,6 +71,32 @@ env:
   TUZI_OFFICIAL_TEST_CANDIDATE: ${{ inputs.official_candidate && '1' || '0' }}
 
 jobs:
+  windows-msi-packaging-probe:
+    if: inputs.windows_msi_packaging_probe_only && github.repository == 'AiW520/tuzi-switch'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the pinned bundler
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/tuzi-msi-tools" --ignore-scripts --no-package-lock @tauri-apps/cli@2.10.1
+      - name: Reproduce MSI packaging with synthetic application bytes
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/probe-windows-msi.py "$RUNNER_TEMP/tuzi-msi-tools/node_modules/@tauri-apps/cli/tauri.js" 2>&1 | tee "$RUNNER_TEMP/msi-probe.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-msi-packaging-diagnostics
+          path: |
+            ${{ runner.temp }}/msi-probe.log
+            src-tauri/target/x86_64-pc-windows-msvc/release/wix/x64/main.wxs
+          if-no-files-found: warn
+
   signed-candidate-macos:
     if: inputs.signed_candidate_macos_probe_only && github.repository == 'AiW520/tuzi-switch'
     uses: ./.github/workflows/signed-candidate-macos.yml
@@ -107,7 +137,7 @@ jobs:
       UPDATER_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
 
   verify:
-    if: ${{ !inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
+    if: ${{ !inputs.windows_msi_packaging_probe_only && !inputs.signing_preflight_only && !inputs.native_upgrade_lab_only && !inputs.signed_candidate_windows_only && !inputs.signed_candidate_linux_probe_only && !inputs.signed_candidate_macos_probe_only && (github.repository == 'tuziapi/tuzi-switch' || github.repository == 'AiW520/tuzi-switch') }}
     runs-on: ubuntu-22.04
     outputs:
       tag: ${{ steps.identity.outputs.tag }}
