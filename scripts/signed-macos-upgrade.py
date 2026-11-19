@@ -213,7 +213,7 @@ def wait_for(fn,message,seconds=90):
 
 def ax(body):
     script = 'tell application "System Events"\nset p to first application process whose unix id is '+str(pid)+'\nset frontmost of p to true\n'+body+'\nend tell'
-    return capture(['osascript','-e',script],text=True,stderr=subprocess.PIPE,timeout=25).strip()
+    return capture(['osascript','-e',script],text=True,stderr=subprocess.PIPE,timeout=60).strip()
 
 
 def tree():
@@ -269,8 +269,7 @@ return false'''.replace('LABELS',labels).replace('PRESS','perform action "AXPres
 
 def click(names):
     stage('press '+str(names))
-    wait_for(lambda: button(names),'Accessible enabled button missing: '+str(names))
-    assert button(names,True)
+    wait_for(lambda: button(names,True),'Accessible enabled button missing: '+str(names))
 
 
 def screenshot(name):
