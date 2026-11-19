@@ -242,6 +242,15 @@ def pointer_click(x, y):
 def button(names,press=False):
     labels='{'+','.join(json.dumps(s,ensure_ascii=False) for s in names)+'}'
     body='''set labels to LABELS
+repeat with itemRef in (get buttons of front window of p)
+try
+if name of itemRef is in labels then
+if not enabled of itemRef then return false
+PRESS
+return true
+end if
+end try
+end repeat
 set allItems to get entire contents of front window of p
 repeat with itemRef in allItems
 try
