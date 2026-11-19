@@ -59,6 +59,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  CARGO_INCREMENTAL: '0'
   # Creative workspace exceeds the 2 GiB heap default on macOS runners.
   NODE_OPTIONS: --max-old-space-size=4096
   TUZI_SWITCH_RELEASE_REPOSITORY: ${{ inputs.official_candidate && 'tuziapi/tuzi-switch' || github.repository }}
@@ -152,6 +153,8 @@ jobs:
           retention-days: 30
       - run: python3 scripts/test_release_assets.py
       - run: python3 scripts/test_windows_branding.py
+      - run: python3 scripts/test_prepare_claude_local_node.py
+      - run: python3 scripts/check-preview-gateway.py
       - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs scripts/verify-tauri-compatibility.mjs scripts/test-signed-candidate-pair.mjs
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
@@ -165,10 +168,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          - os: macos-15
             target: aarch64-apple-darwin
             name: macos-arm64
-          - os: macos-latest
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             name: macos-x64
           - os: windows-latest
@@ -184,7 +187,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get -o Acquire::Retries=3 install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libasound2-dev libgtk-3-dev
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -204,6 +207,17 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
           cache-on-failure: true
+      - name: Rehydrate native speech libraries after Cargo cache restore
+        shell: bash
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import shutil
+          cache = Path("src-tauri/target/sherpa-onnx-prebuilt")
+          if cache.exists():
+              shutil.rmtree(cache)
+          PYTHON
+          cargo clean --release --manifest-path src-tauri/Cargo.toml -p sherpa-onnx-sys
       - run: pnpm install --frozen-lockfile
       - name: Prepare updater signing key
         shell: bash
@@ -226,14 +240,14 @@ jobs:
       - run: pnpm build:renderer
       - name: Native regression (host target)
         shell: bash
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib -- --test-threads=1
       - name: Acceptance profile regression
         shell: bash
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --features isolated-profile acceptance_profile_ -- --test-threads=1
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --lib --features claude-desktop-local,isolated-profile acceptance_profile_ -- --test-threads=1
       - name: Isolated MCP service regression
         if: runner.os == 'macOS'
         shell: bash
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib native_mcp_service_ -- --ignored --test-threads=1
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local --lib native_mcp_service_ -- --ignored --test-threads=1
       - name: Build installers
         shell: bash
         env:
@@ -242,16 +256,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.official_candidate && secrets.OFFICIAL_UPDATER_PRIVATE_KEY_PASSWORD || (github.repository == 'tuziapi/tuzi-switch' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '') }}
         run: |
           set -euo pipefail
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs)"
-          else
-            RELEASE_CONFIG="$(node scripts/tauri-release-config.cjs --desktop-product-name)"
-          fi
-          pnpm tauri build --target "$BUILD_TARGET" --config "$RELEASE_CONFIG" 2>&1 | tee "$RUNNER_TEMP/tuzi-bundle.log"
+          python3 scripts/build-claude-local-candidate.py --target "$BUILD_TARGET" --official-release 2>&1 | tee "$RUNNER_TEMP/tuzi-bundle.log"
           if grep -Fq 'Failed to add bundler type' "$RUNNER_TEMP/tuzi-bundle.log"; then
             echo 'Installer type was not embedded; refusing an updater candidate with ambiguous package selection'
             exit 1
           fi
+      - name: Verify packaged runtime and stable identity
+        run: python3 scripts/verify-official-runtime.py --target ${{ matrix.target }}
       - name: Collect installers and source manifest
         shell: bash
         env:

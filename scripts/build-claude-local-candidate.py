@@ -62,6 +62,17 @@ def bundle_kind(target, test_release=False):
     return "deb"
 
 
+def official_config(target, channel_config):
+    config = build_config(target)
+    config.update(channel_config)
+    config["bundle"]["createUpdaterArtifacts"] = True
+    if "apple" in target:
+        config["bundle"]["macOS"]["signingIdentity"] = "-"
+    if config["plugins"]["updater"]["endpoints"] != ["https://github.com/tuziapi/tuzi-switch/releases/latest/download/latest.json"]:
+        raise ValueError("Official builds require the official updater channel")
+    return config
+
+
 def validate_host(target, native):
     if target not in stage_node.TARGETS or native not in stage_node.TARGETS:
         raise ValueError("Unsupported target or host")
@@ -90,7 +101,10 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Print the local build plan without downloading or building")
     parser.add_argument("--opentu-preview", action="store_true", help="Combine Claude and OpenTu in the independent OpenTu acceptance app and profile")
     parser.add_argument("--test-release", action="store_true", help="Build optimized isolated 1.6.3-beta.5 installers; does not publish")
+    parser.add_argument("--official-release", action="store_true", help="Build signed stable installers with the existing official identity and updater key; does not publish")
     args = parser.parse_args()
+    if args.official_release and (args.opentu_preview or args.test_release):
+        parser.error("Official and preview builds cannot be combined")
     target = args.target or stage_node.native_target()
     validate_host(target, stage_node.native_target())
     config_name = "opentu-candidate.conf.json" if args.opentu_preview else "candidate.conf.json"
@@ -101,9 +115,17 @@ def main():
         compiler_host = next((line.removeprefix("host: ") for line in version.stdout.splitlines() if line.startswith("host: ")), compiler_host)
     target_flags = [] if target == compiler_host else ["--target", target]
     config = build_config(target, args.opentu_preview, args.test_release)
-    command = ["pnpm", "tauri", "build", *([] if args.test_release else ["--debug"]), *target_flags,
-               "--features", "claude-desktop-local,opentu-preview" if args.opentu_preview else "claude-desktop-local", "--bundles", bundle_kind(target, args.test_release),
-               *([] if args.test_release else ["--no-sign"]), "--config", str(config_path)]
+    if args.official_release:
+        channel_command = ["node", "scripts/tauri-release-config.cjs"]
+        if "apple" not in target:
+            channel_command.append("--desktop-product-name")
+        config = official_config(target, json.loads(subprocess.check_output(channel_command, cwd=ROOT, text=True)))
+        target_flags = ["--target", target]
+    optimized = args.test_release or args.official_release
+    command = ["pnpm", "tauri", "build", *([] if optimized else ["--debug"]), *target_flags,
+               "--features", "claude-desktop-local,opentu-preview" if args.opentu_preview else "claude-desktop-local",
+               *([] if args.official_release else ["--bundles", bundle_kind(target, args.test_release)]),
+               *([] if optimized else ["--no-sign"]), "--config", str(config_path)]
     if args.dry_run:
         print(json.dumps({"target": target, "command": command, "config": config}, indent=2))
         return
