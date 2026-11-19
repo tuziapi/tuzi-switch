@@ -1,0 +1,769 @@
+{
+  "kind": "real-installed-linux-subset",
+  "officialAcceptance": false,
+  "installerType": "rpm",
+  "discovery": "synthetic-local-https",
+  "signingKey": "new-official-channel-key",
+  "base": {
+    "schemaVersion": 2,
+    "repository": "AiW520/tuzi-switch",
+    "releaseRepository": "tuziapi/tuzi-switch",
+    "commit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4",
+    "runId": "43804959005",
+    "tag": "v1.6.2",
+    "files": {
+      "SHA256SUMS": "58dc5e0e40800cba1111eb6dec721c2b081edcf52eb5455ddb23da7454308e6f",
+      "latest.json": "06b689bc1d31f546c3cac2889c497d75c9c8471dc20d8bcc50bf13029392696a",
+      "manifest-linux-x64.json": "658c8d1b7971c2affc40492c00df904f8060a925295e90d2a5d8d364432a8fdf",
+      "manifest-macos-arm64.json": "0c47cd2d4bed8cbb9d42b51b22ac1e110a701d85050c9089f45f45fd9f9ee6e8",
+      "manifest-macos-x64.json": "38f1748890fa6c76abea42cbdd259b6fcd972c4d8ba95150d093c1808f78d651",
+      "manifest-windows-x64.json": "8f7847ae4a75d07a17f5ea6e512759ce2d3abe1383609b36722ba07108993c76",
+      "tuzi-assistant-linux-x64.AppImage": "a60f5392af9eedbeceabeb806f8049ed706c4b2939d63ce56ef990728c707b7c",
+      "tuzi-assistant-linux-x64.AppImage.sig": "f76ffd540f52fffeaebf2a8589157a7c2deeec755e3d40dfb51554eabd6c8f85",
+      "tuzi-assistant-linux-x64.deb": "02dc580239f80d84b0afbaf672c18b9d84839aa9c2cb16ae0d8321572e9acdad",
+      "tuzi-assistant-linux-x64.deb.sig": "ebbd7a7595728a45507b24da458cd38eb1a2d216cf5cb7e6e7d01b4f07eaf1aa",
+      "tuzi-assistant-linux-x64.rpm": "0daae45ce1f30f3a314eb72b2b986021530cfaa74052b744b40c532c13879e00",
+      "tuzi-assistant-linux-x64.rpm.sig": "0640b0e385d35f12b80eba012d8dfb1c0a966ae5a5f62b23d03d9160f1fc9f21",
+      "tuzi-assistant-macos-arm64.app.tar.gz": "82b452cbee509c3a37df0e0292e1837c92bcda5282a7e23d9cf2647912454baf",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig": "d2cac582a90461917efed63fb27d317389541686000a85f835f3886d03a195ff",
+      "tuzi-assistant-macos-arm64.dmg": "419b6d1e0703328c3a24bde7e698d40144ee291b1068f70b44e13fa31ca23310",
+      "tuzi-assistant-macos-x64.app.tar.gz": "43140ca462c4840d36c6ae9d5a9cefaff4e4456230bd84774033b5e7a9db59ad",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig": "dff927d5b07edd219475d2d1bebf07fd5643506cafa4b89b77c775f84819b46a",
+      "tuzi-assistant-macos-x64.dmg": "17a51ab4d769da9bb58c9996116dace1f3df34104b9773d4cd0d952673b80fdc",
+      "tuzi-assistant-source.tar.gz": "397a3fc0b45523ca0c7c3fdea6b187880322c1a349b8e4c495461508e331c8b2",
+      "tuzi-assistant-windows-x64.exe": "0ed3f8aa921c1ad4e2ca4a8719176872a2b920e0e0cb1d4afb082021369d378e",
+      "tuzi-assistant-windows-x64.exe.sig": "6a9e813499c2a8979b5100a9a0caaf21d4b18b1f0261d5353dc92650cdd56770",
+      "tuzi-assistant-windows-x64.msi": "3a301dfcc221dd8ab417ab74903eb47e17135d19245c2d063882a707519d5484",
+      "tuzi-assistant-windows-x64.msi.sig": "798ba1c1162c530a665497d03659903587919b3ed09684100d137f1f3577ea2f"
+    },
+    "delivery": "manual-key-transition",
+    "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+    "publicationFiles": [
+      "SHA256SUMS",
+      "manifest-linux-x64.json",
+      "manifest-macos-arm64.json",
+      "manifest-macos-x64.json",
+      "manifest-windows-x64.json",
+      "tuzi-assistant-linux-x64.AppImage",
+      "tuzi-assistant-linux-x64.deb",
+      "tuzi-assistant-linux-x64.rpm",
+      "tuzi-assistant-macos-arm64.dmg",
+      "tuzi-assistant-macos-x64.dmg",
+      "tuzi-assistant-source.tar.gz",
+      "tuzi-assistant-windows-x64.exe",
+      "tuzi-assistant-windows-x64.msi"
+    ]
+  },
+  "target": {
+    "schemaVersion": 2,
+    "repository": "AiW520/tuzi-switch",
+    "releaseRepository": "tuziapi/tuzi-switch",
+    "commit": "af268ba32a4ee621e9388ea8fec35e7dead5d5be",
+    "runId": "44494743337",
+    "tag": "v1.6.3",
+    "files": {
+      "SHA256SUMS": "451a75d0dae54d8fb3533004d0e6f09cd3c72ed06ee4ad32c8e45cb2ad8a52a9",
+      "latest.json": "7956bf55bb49aa7d314e002cd90c929bce2a1dbad9eecb26d0e091b3abbc6a4e",
+      "manifest-linux-x64.json": "048119658237b9a55be72888c8b251dd1ac5a273033421f630c2c38a3bfe2056",
+      "manifest-macos-arm64.json": "2f9dfabb915e0d57c4db45668212cc5a1192fdbdcf8249b65451f947186a3468",
+      "manifest-macos-x64.json": "f08c70de33d844e198cc60e12cb4478931380fee0d7f966c7569795b64a7070f",
+      "manifest-windows-x64.json": "1a7ea9529a81c767a0a9982931f851d49e391c1b22b019500f4fd9b6c4748c37",
+      "tuzi-assistant-linux-x64.AppImage": "2f7e03d89d9f590085aa9c2ff428bc18293b8c6d12b594337a5b16d06a9784e8",
+      "tuzi-assistant-linux-x64.AppImage.sig": "65cb3f31d8b397eb04c6378879bc433dcda21f0c056792f2c0dd325b82de4d0f",
+      "tuzi-assistant-linux-x64.deb": "8559e912d78cd3998a5f9b37dc9c36b65bbd7c4d62d8d9e4379b12d34ca3864f",
+      "tuzi-assistant-linux-x64.deb.sig": "816843d797cc6cd47c8de9304de37026278c1bafc28bdc84891da875fcb43f6b",
+      "tuzi-assistant-linux-x64.rpm": "b054b39ef9f0b194bf5364ea4f9e98333a2208602c8bbb8bed4c7785d4a644bf",
+      "tuzi-assistant-linux-x64.rpm.sig": "2e2f2b76943e1bd042566a0a9d6e5cef24ca382daa54764a810cbca8d8242951",
+      "tuzi-assistant-macos-arm64.app.tar.gz": "417ff4f946de27285cedc11555bd66a6460b6700b0523dd95bcf8afd13b2a383",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig": "a06b771b8e094c28d1928173204949d8331f584315570764b8521f14a3959ca4",
+      "tuzi-assistant-macos-arm64.dmg": "2180fee36357a6f48450b53c7d70701caa7744f92ad4c162a191f9a9d91b5416",
+      "tuzi-assistant-macos-x64.app.tar.gz": "b6e264219918321744b88a46e23f2ce979e1b18dd30e95304e48d1c2c6087198",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig": "2cf49931bdb3d2d5e19101a979f03250eb76cb0a8485c64d813176dff3efa19b",
+      "tuzi-assistant-macos-x64.dmg": "b670fd44fc960b14e6884b890e2843096e21cf3542850f162aa749753a5265c5",
+      "tuzi-assistant-source.tar.gz": "fc8b7e09e7a0f7a24fa47d2a143d355d347f06421b417f9d75992e806f172e75",
+      "tuzi-assistant-windows-x64.exe": "c2a9a2f70635b4fff3d3caefb56bae6f543976b4f999fa25c5f1a1cd0e5c3159",
+      "tuzi-assistant-windows-x64.exe.sig": "c73a859cccc18ed4ab65cbf29e508b9a9646388488d6ab408bd119f892e3f33c",
+      "tuzi-assistant-windows-x64.msi": "bd8f5c7b2f5e89d12a7287e4a9825a3944464372ea74e86c11015d8fdc347429",
+      "tuzi-assistant-windows-x64.msi.sig": "6172b5616a57f7400a5b797125b3221b295d4bad2664b50327a0a95f1c3535b9"
+    },
+    "delivery": "signed-update",
+    "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+    "publicationFiles": [
+      "SHA256SUMS",
+      "latest.json",
+      "manifest-linux-x64.json",
+      "manifest-macos-arm64.json",
+      "manifest-macos-x64.json",
+      "manifest-windows-x64.json",
+      "tuzi-assistant-linux-x64.AppImage",
+      "tuzi-assistant-linux-x64.AppImage.sig",
+      "tuzi-assistant-linux-x64.deb",
+      "tuzi-assistant-linux-x64.deb.sig",
+      "tuzi-assistant-linux-x64.rpm",
+      "tuzi-assistant-linux-x64.rpm.sig",
+      "tuzi-assistant-macos-arm64.app.tar.gz",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig",
+      "tuzi-assistant-macos-arm64.dmg",
+      "tuzi-assistant-macos-x64.app.tar.gz",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig",
+      "tuzi-assistant-macos-x64.dmg",
+      "tuzi-assistant-source.tar.gz",
+      "tuzi-assistant-windows-x64.exe",
+      "tuzi-assistant-windows-x64.exe.sig",
+      "tuzi-assistant-windows-x64.msi",
+      "tuzi-assistant-windows-x64.msi.sig"
+    ]
+  },
+  "checks": {
+    "publishedLegacyManualTransition": "passed",
+    "legacyCreativeImageTaskPreservation": "passed",
+    "nativeSeedream55Synthetic": "passed",
+    "corrupt": "passed",
+    "interrupted": "passed",
+    "missing": "passed",
+    "validPackageInstallPermissionDenied": "passed",
+    "download": "passed",
+    "nativeSignature": "passed",
+    "install": "passed",
+    "automaticRestart": "passed",
+    "version": "passed",
+    "sqliteProviderAndWebviewPreference": "passed",
+    "sameInstallationRetry": "passed",
+    "targetNativeBusinessAttribution": "passed",
+    "creativeImageLayerOcrTaskPreservation": "passed",
+    "installedDesktopAttributionSynthetic": "passed"
+  },
+  "requests": [
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/latest/download/latest.json",
+      "mode": "normal"
+    },
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/latest/download/latest.json",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.rpm",
+      "mode": "corrupt"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.rpm",
+      "mode": "interrupted"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.rpm",
+      "mode": "missing"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.rpm",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.3/tuzi-assistant-linux-x64.rpm",
+      "mode": "normal"
+    },
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    }
+  ],
+  "remaining": [
+    "creative-project-migration",
+    "business-attribution",
+    "reviewed-cross-platform-acceptance"
+  ],
+  "creativeRequests": [
+    {
+      "version": "1.6.0",
+      "model": "doubao-seedream-4-5-251128",
+      "channels": [
+        "0"
+      ],
+      "layers": false,
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.2",
+      "model": "doubao-seedream-5-5-261028",
+      "channels": [
+        "3"
+      ],
+      "layers": false,
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.2",
+      "model": "doubao-seedream-5-5-261028",
+      "channels": [
+        "3"
+      ],
+      "layers": true,
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.3",
+      "model": "doubao-seedream-4-5-251128",
+      "channels": [
+        "3"
+      ],
+      "layers": false,
+      "syntheticAuthorizationMatched": true
+    }
+  ],
+  "legacy": {
+    "repository": "tuziapi/tuzi-switch",
+    "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+    "builderRepository": "AiW520/tuzi-switch",
+    "builderCommit": "3685725f3f76f9df607035024718421ffc78fd66",
+    "updaterSigned": false,
+    "publicationReady": false,
+    "run": "42974374413",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "1.6.0",
+    "developerSigned": false,
+    "notarized": false,
+    "channel": "stable",
+    "applicationId": "com.tuziswitch.desktop",
+    "isolatedLocalProfile": false,
+    "files": [
+      {
+        "file": "tuzi-assistant-linux-x64.AppImage",
+        "sha256": "8458f0ece093cb47b0550b8e80e0725401ac22cc2e54d51915fbb030f54ff0d6",
+        "bytes": 105261560
+      },
+      {
+        "file": "tuzi-assistant-linux-x64.deb",
+        "sha256": "17ec20c8a738ef7541b2be48285be0bc0a4e691a65cf970d71f9699bcab97f75",
+        "bytes": 26074618
+      },
+      {
+        "file": "tuzi-assistant-linux-x64.rpm",
+        "sha256": "90b7cef9ad7ad256dd6b2872c79e28bd7bb02a4817973e033a36f458f0f0deec",
+        "bytes": 26076185
+      }
+    ]
+  },
+  "legacyIdentity": {
+    "version": "1.6.0",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "platform": "linux",
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 19,
+      "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1"
+    }
+  },
+  "legacyPid": 1243,
+  "legacyExecutableSha256": "86d9255f55a456d377f66984168fc5a595325e28647f8a7f9eeceac1c8896026",
+  "legacyCloseMethod": "ordinary-window-close-with-minimize-to-tray-disabled; process disappearance observed; exit code not exposed by WebDriver",
+  "baseIdentity": {
+    "version": "1.6.2",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "platform": "linux",
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 82,
+      "commit": "8060ac8d21c37912f80b0cc75003ee4deeecbbe4"
+    }
+  },
+  "initialPid": 1407,
+  "inspectorAddress": "127.0.0.1:39693",
+  "initialExecutableSha256": "6f9ee91120e307a6a273d108da6ebb2a4bc1301de038a3b8461e6e97a282fab7",
+  "installPermissionDiagnostics": [
+    "sudo: a terminal is required to read the password; either use the -S option to read from standard input or configure an askpass helper",
+    "sudo: a password is required"
+  ],
+  "restartedPids": [
+    1573
+  ],
+  "targetIdentity": {
+    "version": "1.6.3",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "platform": "linux",
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 110,
+      "commit": "af268ba32a4ee621e9388ea8fec35e7dead5d5be"
+    }
+  },
+  "finalExecutableSha256": "12fbbe647f4d61a6d6841f0ecbfcf11fd8caf6b95d41595320fc0f2031ab7ea6",
+  "creativeAfterUpgrade": {
+    "boards": [
+      {
+        "id": "33f41870-518b-461b-be3f-8b9969064c16",
+        "name": "我的画板1",
+        "elements": [
+          {
+            "aiPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationAnchorId": "gen-anchor-mwne8ocw-bdyb7h1",
+            "generationTaskId": "e70b00b6-0306-42ac-8562-2a7971e6e6f9",
+            "points": [
+              [
+                -700,
+                -303
+              ],
+              [
+                -300,
+                97
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "type": "image",
+            "id": "eBNdZ",
+            "prompt": "SYNTHETIC installed upgrade 4.5"
+          },
+          {
+            "metadata": {
+              "semanticLayer": {
+                "providerGroupId": "provider-layer-mwne9l42",
+                "schemaVersion": 1,
+                "description": "SYNTHETIC",
+                "zIndex": 0,
+                "providerMetadata": {
+                  "z_index": 0,
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "opaque",
+                  "description": "SYNTHETIC",
+                  "name": "底图",
+                  "size": "64x64"
+                },
+                "background": "opaque",
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                },
+                "kind": "background",
+                "name": "底图"
+              }
+            },
+            "generationAnchorId": "gen-anchor-mwne9cbl-bqeo1a5",
+            "generationTaskId": "51db3f73-24b7-44cb-8c1f-e428e73a3768",
+            "points": [
+              [
+                -700,
+                217
+              ],
+              [
+                -300,
+                617
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "type": "image",
+            "angle": 0,
+            "id": "f3612c20-8e08-4558-95ec-21302b96ada3",
+            "groupId": "fnpZR"
+          },
+          {
+            "metadata": {
+              "semanticLayer": {
+                "providerGroupId": "provider-layer-mwne9l42",
+                "schemaVersion": 1,
+                "description": "SYNTHETIC",
+                "zIndex": 1,
+                "providerMetadata": {
+                  "z_index": 1,
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "transparent",
+                  "description": "SYNTHETIC",
+                  "text_recognition": {
+                    "text": "你好 1",
+                    "lines": []
+                  },
+                  "name": "标题1",
+                  "size": "64x64"
+                },
+                "background": "transparent",
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                },
+                "kind": "foreground",
+                "name": "标题1",
+                "textRecognition": {
+                  "text": "你好 1",
+                  "lines": []
+                }
+              }
+            },
+            "generationAnchorId": "gen-anchor-mwne9cbl-bqeo1a5",
+            "generationTaskId": "51db3f73-24b7-44cb-8c1f-e428e73a3768",
+            "points": [
+              [
+                -700,
+                217
+              ],
+              [
+                -300,
+                617
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "type": "image",
+            "angle": 0,
+            "id": "e885e25c-1c92-40f4-8440-de39f6ad6419",
+            "groupId": "fnpZR"
+          },
+          {
+            "metadata": {
+              "semanticLayer": {
+                "providerGroupId": "provider-layer-mwne9l42",
+                "schemaVersion": 1,
+                "description": "SYNTHETIC",
+                "zIndex": 2,
+                "providerMetadata": {
+                  "z_index": 2,
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "transparent",
+                  "description": "SYNTHETIC",
+                  "text_recognition": {
+                    "text": "你好 2",
+                    "lines": []
+                  },
+                  "name": "标题2",
+                  "size": "64x64"
+                },
+                "background": "transparent",
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                },
+                "kind": "foreground",
+                "name": "标题2",
+                "textRecognition": {
+                  "text": "你好 2",
+                  "lines": []
+                }
+              }
+            },
+            "generationAnchorId": "gen-anchor-mwne9cbl-bqeo1a5",
+            "generationTaskId": "51db3f73-24b7-44cb-8c1f-e428e73a3768",
+            "points": [
+              [
+                -700,
+                217
+              ],
+              [
+                -300,
+                617
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "type": "image",
+            "angle": 0,
+            "id": "a92ccd5e-dc5d-4ddd-88f1-9b794d8688f6",
+            "groupId": "fnpZR"
+          },
+          {
+            "type": "group",
+            "metadata": {
+              "semanticLayerGroup": {
+                "originalCompositeUrl": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                "providerGroupId": "provider-layer-mwne9l42",
+                "schemaVersion": 1,
+                "manifest": {
+                  "schemaVersion": 1,
+                  "layers": [
+                    {
+                      "description": "SYNTHETIC",
+                      "zIndex": 0,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "background": "opaque",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "kind": "background",
+                      "providerMetadata": {
+                        "z_index": 0,
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "opaque",
+                        "description": "SYNTHETIC",
+                        "name": "底图",
+                        "size": "64x64"
+                      },
+                      "name": "底图",
+                      "groupId": "provider-layer-mwne9l42"
+                    },
+                    {
+                      "description": "SYNTHETIC",
+                      "zIndex": 1,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "background": "transparent",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "kind": "foreground",
+                      "providerMetadata": {
+                        "z_index": 1,
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "transparent",
+                        "description": "SYNTHETIC",
+                        "text_recognition": {
+                          "text": "你好 1",
+                          "lines": []
+                        },
+                        "name": "标题1",
+                        "size": "64x64"
+                      },
+                      "name": "标题1",
+                      "textRecognition": {
+                        "text": "你好 1",
+                        "lines": []
+                      },
+                      "groupId": "provider-layer-mwne9l42"
+                    },
+                    {
+                      "description": "SYNTHETIC",
+                      "zIndex": 2,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "background": "transparent",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "kind": "foreground",
+                      "providerMetadata": {
+                        "z_index": 2,
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "transparent",
+                        "description": "SYNTHETIC",
+                        "text_recognition": {
+                          "text": "你好 2",
+                          "lines": []
+                        },
+                        "name": "标题2",
+                        "size": "64x64"
+                      },
+                      "name": "标题2",
+                      "textRecognition": {
+                        "text": "你好 2",
+                        "lines": []
+                      },
+                      "groupId": "provider-layer-mwne9l42"
+                    }
+                  ],
+                  "groupId": "provider-layer-mwne9l42"
+                }
+              }
+            },
+            "id": "fnpZR"
+          },
+          {
+            "aiPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationAnchorId": "gen-anchor-mwnea6ww-8yuc8bf",
+            "generationTaskId": "ec78da04-030b-4b29-b49b-2f549a5c789f",
+            "imageGenerationRecipe": {
+              "version": 1,
+              "id": "ec78da04-030b-4b29-b49b-2f549a5c789f",
+              "input": {
+                "model": "doubao-seedream-4-5-251128",
+                "modelRef": {
+                  "modelId": "doubao-seedream-4-5-251128",
+                  "profileId": "legacy-default"
+                },
+                "generationType": "image",
+                "images": [],
+                "count": 1,
+                "intent": "restore",
+                "sourceTaskId": "ec78da04-030b-4b29-b49b-2f549a5c789f",
+                "params": {
+                  "sourceTaskId": "ec78da04-030b-4b29-b49b-2f549a5c789f",
+                  "seedream_quality": "2k",
+                  "size": "1x1"
+                },
+                "prompt": "SYNTHETIC installed upgrade 4.5"
+              }
+            },
+            "points": [
+              [
+                -700,
+                737
+              ],
+              [
+                -300,
+                1137
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "type": "image",
+            "id": "Kwzfi",
+            "prompt": "SYNTHETIC installed upgrade 4.5"
+          }
+        ]
+      }
+    ],
+    "taskIds": [
+      "51db3f73-24b7-44cb-8c1f-e428e73a3768",
+      "e70b00b6-0306-42ac-8562-2a7971e6e6f9",
+      "ec78da04-030b-4b29-b49b-2f549a5c789f"
+    ],
+    "pixelElementId": "Kwzfi"
+  },
+  "creativeScope": "Installed UI, native HTTP, persisted images/layers/OCR/tasks and exact pixels; synthetic provider. No production billing claim.",
+  "subsetStatus": "passed",
+  "installedPackageOwner": "tuzi-switch-1.6.3-1.x86_64",
+  "finalPackageVersion": "1.6.3"
+}
