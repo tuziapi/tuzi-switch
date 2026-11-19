@@ -28,7 +28,7 @@ def main():
     files = builder.per_user_msi.prepare_template(ROOT, config, output, runtime / "per-user-runtime.wxs")
     config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
     subprocess.run(["node", sys.argv[1], "bundle", "--verbose", "--target", target,
-                    "--bundles", "msi", "--no-sign", "--config", str(config_path)], cwd=ROOT, check=True)
+                    "--bundles", "msi,nsis", "--no-sign", "--config", str(config_path)], cwd=ROOT, check=True)
     installers = list((output / "bundle/msi").glob("*.msi"))
     if len(installers) != 1:
         raise RuntimeError("Expected exactly one synthetic MSI")
@@ -43,6 +43,7 @@ def main():
             raise RuntimeError("MSI resource name or contents differ: " + str(destination))
     subprocess.run([str(nodes[0]), "--version"], check=True, timeout=15)
     print("Synthetic MSI passed WiX validation, resource byte checks and packaged Node execution")
+    subprocess.run([sys.executable, "scripts/verify-official-runtime.py", "--target", target], cwd=ROOT, check=True)
 
 
 if __name__ == "__main__":
