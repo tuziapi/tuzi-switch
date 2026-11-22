@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import type { CreativeAccountBridge } from './bridge-types';
 export type { CreativeAccountBridge, CreativeAccountBinding, CreativeAccountKey } from './bridge-types';
 export type { CreativeCodexBridge, CreativeCodexModel } from './bridge-types';
-export type CreativePage = 'projects' | 'canvas';
+export type CreativePage = 'projects' | 'canvas' | 'ecommerce';
 export interface CreativeWorkspaceProps {
   active?: boolean;
   page: CreativePage;

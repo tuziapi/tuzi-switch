@@ -26,6 +26,7 @@ function CreativeTaskRuntime() {
 
 const attach = () => document.getElementById('creative-portals')!;
 const CreativeSettings = lazy(() => import('./CreativeSettings').then(module => ({default:module.CreativeSettings})));
+const EcommerceWorkbench = lazy(() => import('./EcommerceWorkbench').then(module => ({default:module.EcommerceWorkbench})));
 
 export function CreativeWorkspace({ active = true, page, onPageChange, settingsOpen = false, onSettingsOpenChange, accountBridge }: CreativeWorkspaceProps) {
   useEffect(() => {
@@ -177,7 +178,8 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
         {pairingError && <div role="alert" className="creative-error">{pairingError}</div>}
         {boards.length === 0 ? <div className="creative-empty"><LayoutGrid size={30} /><h3>从第一个项目开始</h3><p>你的作品保存在当前设备。创建一个空白画布，开始编辑。</p><button onClick={createBoard} disabled={busy}>创建项目 <ArrowUpRight size={15} /></button></div> : <div className="creative-project-grid">{boards.filter(b => b.name.toLowerCase().includes(search.toLowerCase())).sort((a,b) => b.updatedAt-a.updatedAt).map(board => <article className="creative-project-card" key={board.id}><button disabled={busy} onClick={() => openBoard(board.id)} className="creative-project-open"><span className="creative-project-thumbnail"><LayoutGrid size={28}/></span><strong>{board.name}</strong><span>{new Date(board.updatedAt).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></button><button aria-label={`重命名 ${board.name}`} onClick={() => setRenaming({ id: board.id, name: board.name })} className="creative-rename"><Pencil size={14}/></button></article>)}</div>}
       </section>}
-      {ready && editor && page !== 'projects' && <div className="creative-editor"><App /></div>}
+      {ready && page === 'ecommerce' && <Suspense fallback={<div className="creative-loading" role="status">正在打开电商生图…</div>}><EcommerceWorkbench accountBridge={accountBridge} /></Suspense>}
+      {ready && editor && page === 'canvas' && <div className="creative-editor"><App /></div>}
     </div>}
   </ConfigProvider>;
 }
