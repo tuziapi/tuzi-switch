@@ -183,6 +183,100 @@ type QuickOption = {
   defaultSelected?: boolean;
 };
 
+export const ECOMMERCE_PLATFORMS = [
+  "亚马逊",
+  "淘宝天猫",
+  "1688",
+  "Temu",
+  "TikTok Shop",
+  "拼多多",
+  "抖音电商",
+  "OZON",
+  "独立站",
+  "Shopee",
+  "阿里国际站",
+  "速卖通",
+  "SHEIN",
+  "京东",
+  "美客多",
+  "Coupang",
+  "Wayfair",
+  "Lazada",
+  "eBay",
+] as const;
+
+export const ECOMMERCE_LANGUAGES = [
+  "英文",
+  "中文",
+  "日文",
+  "韩文",
+  "西班牙文",
+  "俄语",
+  "泰语",
+  "马来语",
+] as const;
+
+export const ECOMMERCE_RATIOS = [
+  { id: "a-plus-web", label: "高级A+（Web端）", size: "1472x608" },
+  { id: "a-plus-mobile", label: "高级A+（移动端）", size: "1024x768" },
+  { id: "a-plus", label: "普通A+", size: "1040x640" },
+  { id: "1:1", label: "1:1", size: "1024x1024" },
+  { id: "4:3", label: "4:3", size: "1152x864" },
+  { id: "16:9", label: "16:9", size: "1536x864" },
+  { id: "9:16", label: "9:16", size: "864x1536" },
+] as const;
+
+export const DETAIL_PAGE_MODULES = [
+  { id: "hero", label: "首屏主视觉", hint: "传递核心价值", required: true },
+  { id: "selling-point", label: "核心卖点图", hint: "突出差异化优势" },
+  { id: "scene", label: "使用场景图", hint: "呈现真实使用场景" },
+  { id: "angle", label: "多角度图", hint: "多角度呈现外观" },
+  { id: "brand", label: "品牌故事图", hint: "传递品牌价值" },
+  { id: "comparison", label: "效果对比图", hint: "展示使用前后差异" },
+  { id: "craft", label: "工艺制作图", hint: "展示工艺制作过程" },
+  { id: "size", label: "尺寸尺码图", hint: "展示规格信息" },
+  { id: "spec", label: "规格/参数表", hint: "展示详细商品数据" },
+  { id: "accessories", label: "配件/赠品图", hint: "明确收货所有物品" },
+  { id: "series", label: "系列展示图", hint: "多色或多 SKU 展示" },
+  { id: "ingredient", label: "商品成分图", hint: "清晰呈现成分与材质" },
+  { id: "after-sale", label: "售后保障图", hint: "说明质保退换政策" },
+  { id: "usage", label: "使用建议图", hint: "提供正确使用建议" },
+] as const;
+
+const previewTemplates: Record<"product-set" | "detail-page", Array<{ id: string; label: string; caption: string }>> = {
+  "product-set": [
+    { id: "original", label: "商品原图", caption: "上传素材" },
+    { id: "hero", label: "主图", caption: "首图主视觉" },
+    { id: "selling-point", label: "卖点解析", caption: "信息表达" },
+    { id: "detail", label: "细节特写", caption: "材质做工" },
+    { id: "spec", label: "商品规格", caption: "规格信息" },
+  ],
+  "detail-page": [
+    { id: "product", label: "产品图", caption: "主体展示" },
+    { id: "long-image", label: "电商长图", caption: "详情页结构" },
+    { id: "platform", label: "平台规范图", caption: "尺寸适配" },
+    { id: "template", label: "示例模板", caption: "模块组合" },
+  ],
+};
+
+export type EcommerceModuleCounts = {
+  whiteBackground: number;
+  scene: number;
+  sellingPoint: number;
+  other: number;
+};
+
+export function normalizeEcommerceModuleCounts(
+  counts: EcommerceModuleCounts,
+): EcommerceModuleCounts {
+  return Object.fromEntries(
+    Object.entries(counts).map(([key, value]) => [
+      key,
+      Math.max(0, Math.min(12, Number.isFinite(value) ? value : 0)),
+    ]),
+  ) as EcommerceModuleCounts;
+}
+
 const quickOptions: Record<ToolId, QuickOption[]> = {
   "product-set": [
     {
@@ -249,7 +343,9 @@ const quickOptions: Record<ToolId, QuickOption[]> = {
     { id: "spec", label: "规格/参数表", hint: "展示详细商品数据" },
     { id: "accessories", label: "配件/赠品图", hint: "明确收货所有物品" },
     { id: "series", label: "系列展示图", hint: "多色或多 SKU 展示" },
+    { id: "ingredient", label: "商品成分图", hint: "清晰呈现成分与材质" },
     { id: "after-sale", label: "售后保障图", hint: "说明质保退换政策" },
+    { id: "usage", label: "使用建议图", hint: "提供正确使用建议" },
   ],
   "viral-replicate": [
     {
@@ -725,6 +821,14 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const [ratio, setRatio] = useState("1:1");
   const [prompt, setPrompt] = useState("");
   const [structure, setStructure] = useState<"smart" | "custom">("smart");
+  const [customCounts, setCustomCounts] = useState({
+    whiteBackground: 1,
+    scene: 3,
+    sellingPoint: 3,
+    other: 1,
+  });
+  const [activeTemplate, setActiveTemplate] = useState("original");
+  const [assistBusy, setAssistBusy] = useState(false);
   const [apparelTypes, setApparelTypes] = useState(
     () => new Set(["白底精修图", "3D 立体效果图", "人台图"]),
   );
@@ -780,6 +884,18 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const selectedModelConfig = modelOptions.find(
     (model) => model.id === selectedModel,
   );
+  const templates =
+    tool === "product-set" || tool === "detail-page"
+      ? previewTemplates[tool]
+      : [];
+  const selectedRatio = ECOMMERCE_RATIOS.find((item) => item.id === ratio) ?? ECOMMERCE_RATIOS[3];
+  const selectedQuickLabels = quickOptions[tool]
+    .filter((option) => quickSelections[tool].has(option.id))
+    .map((option) => option.label);
+  const customTotal = Object.values(customCounts).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
 
   useEffect(
     () => () => previews.forEach((url) => URL.revokeObjectURL(url)),
@@ -830,13 +946,44 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       ),
     }));
 
+  const writeSellingPoint = async () => {
+    if (assistBusy) return;
+    setAssistBusy(true);
+    await wait(240);
+    const platformHint = `${platform}${market ? `（${market}市场）` : ""}`;
+    const generated =
+      prompt.trim() ||
+      `请围绕商品的核心功能、材质质感、使用场景和购买理由，生成适合${platformHint}的简洁卖点文案。每条不超过20字，避免夸大承诺，突出真实可验证的优势。`;
+    setPrompt(generated);
+    setAssistBusy(false);
+  };
+
+  const updateCustomCount = (key: keyof typeof customCounts, value: number) =>
+    setCustomCounts((current) =>
+      normalizeEcommerceModuleCounts({ ...current, [key]: value || 0 }),
+    );
+
   const buildRequest = () => {
     const body = new FormData();
     const isVideo = currentTool.media === "video";
-    const selectedQuickLabels = quickOptions[tool]
-      .filter((option) => quickSelections[tool].has(option.id))
-      .map((option) => option.label);
     body.append("model", selectedModel);
+    body.append("platform", platform);
+    body.append("market", market);
+    body.append("language", language);
+    body.append("aspect_ratio", ratio);
+    body.append("image_size", selectedRatio.size);
+    body.append("quick_options", JSON.stringify(selectedQuickLabels));
+    body.append("module_types", JSON.stringify(selectedQuickLabels));
+    body.append("structure", tool === "product-set" ? structure : "");
+    if (tool === "product-set")
+      body.append("module_counts", JSON.stringify(customCounts));
+    if (tool === "detail-page")
+      body.append(
+        "detail_modules",
+        JSON.stringify(
+          selectedQuickLabels.length ? selectedQuickLabels : ["首屏主视觉"],
+        ),
+      );
     body.append(
       "prompt",
       [
@@ -844,14 +991,14 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
         `平台：${platform}`,
         `市场：${market}`,
         `语言：${language}`,
-        `比例：${ratio}`,
+        `比例：${selectedRatio.label}（${selectedRatio.size}）`,
         prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放",
         `快捷优化：${selectedQuickLabels.length ? selectedQuickLabels.join("、") : "按默认商业规范处理"}`,
         `模型：${selectedModel}`,
-        `工具参数：${tool === "product-set" ? structure : tool === "apparel-set" ? Array.from(apparelTypes).join("、") : tool === "video-replicate" ? videoMode : "按工具默认参数处理"}`,
+        `工具参数：${tool === "product-set" ? `${structure}，白底图${customCounts.whiteBackground}张、场景图${customCounts.scene}张、卖点图${customCounts.sellingPoint}张、其他${customCounts.other}张` : tool === "detail-page" ? `详情模块：${selectedQuickLabels.join("、") || "首屏主视觉"}` : tool === "apparel-set" ? Array.from(apparelTypes).join("、") : tool === "video-replicate" ? videoMode : "按工具默认参数处理"}`,
       ].join("。"),
     );
-    body.append("size", ratio);
+    body.append("size", selectedRatio.size);
     body.append("tool", tool);
     files.forEach((file) => body.append("input_reference", file, file.name));
     if (referenceVideo)
@@ -958,6 +1105,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setReferenceVideo(null);
     setResultUrls([]);
     setResultKind("image");
+    setActiveTemplate("original");
     setError("");
   };
   const changeTool = (next: ToolId) => {
@@ -966,6 +1114,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setReferenceVideo(null);
     setResultUrls([]);
     setResultKind(toolMeta[next].media);
+    setActiveTemplate(next === "detail-page" ? "product" : "original");
     setError("");
   };
 
@@ -1000,6 +1149,21 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           <h1>{currentTool.title}</h1>
           <p>{currentTool.description}</p>
         </div>
+        {templates.length > 0 && (
+          <div className="ecommerce-template-row" aria-label="结果模板预览">
+            {templates.map((template) => (
+              <button
+                key={template.id}
+                className={activeTemplate === template.id ? "is-active" : ""}
+                onClick={() => setActiveTemplate(template.id)}
+                type="button"
+              >
+                {template.label}
+                <span>{template.caption}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="ecommerce-preview">
           <div className="ecommerce-preview__strip">
             {previews.length ? (
@@ -1064,17 +1228,31 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                 </div>
               </>
             ) : (
-              <div>
-                <Sparkles size={34} />
-                <strong>
-                  {busy ? `生成中 ${progress}%` : "生成结果将在这里展示"}
-                </strong>
-                <span>
-                  {busy
-                    ? "正在提交并查询模型任务"
-                    : "先上传素材，再完善右侧生成参数"}
-                </span>
-              </div>
+              templates.length > 0 ? (
+                <div className={`ecommerce-template-mock ecommerce-template-mock--${activeTemplate}`}>
+                  <div className="ecommerce-template-mock__topline" />
+                  <div className="ecommerce-template-mock__image" />
+                  <div className="ecommerce-template-mock__copy">
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                  <strong>{templates.find((item) => item.id === activeTemplate)?.label}</strong>
+                  <span>{busy ? `生成中 ${progress}%` : "先预览结构，再上传素材生成"}</span>
+                </div>
+              ) : (
+                <div>
+                  <Sparkles size={34} />
+                  <strong>
+                    {busy ? `生成中 ${progress}%` : "生成结果将在这里展示"}
+                  </strong>
+                  <span>
+                    {busy
+                      ? "正在提交并查询模型任务"
+                      : "先上传素材，再完善右侧生成参数"}
+                  </span>
+                </div>
+              )
             )}
           </div>
         </div>
@@ -1136,9 +1314,9 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               value={platform}
               onChange={(event) => setPlatform(event.target.value)}
             >
-              <option>亚马逊</option>
-              <option>淘宝</option>
-              <option>独立站</option>
+              {ECOMMERCE_PLATFORMS.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -1158,9 +1336,9 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               value={language}
               onChange={(event) => setLanguage(event.target.value)}
             >
-              <option>英文</option>
-              <option>中文</option>
-              <option>日文</option>
+              {ECOMMERCE_LANGUAGES.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -1169,19 +1347,33 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               value={ratio}
               onChange={(event) => setRatio(event.target.value)}
             >
-              <option value="1:1">1:1</option>
-              <option value="adaptive">A+ 长图</option>
-              <option value="3:4">3:4</option>
-              <option value="9:16">9:16</option>
+              {ECOMMERCE_RATIOS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label} · {item.size}
+                </option>
+              ))}
             </select>
           </label>
         </div>
         <label className="ecommerce-prompt">
-          {currentTool.media === "video"
-            ? "商品卖点（可选）"
-            : category === "apparel"
-              ? "补充要求"
-              : "商品卖点与要求"}
+          <span className="ecommerce-prompt__label">
+            {currentTool.media === "video"
+              ? "商品卖点（可选）"
+              : category === "apparel"
+                ? "补充要求"
+                : "商品卖点与要求"}
+            {currentTool.media === "image" && (
+              <button
+                type="button"
+                className="ecommerce-assist"
+                onClick={() => void writeSellingPoint()}
+                disabled={assistBusy}
+              >
+                <Sparkles size={12} />
+                {assistBusy ? "生成中…" : "AI 帮写"}
+              </button>
+            )}
+          </span>
           <textarea
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
@@ -1248,6 +1440,70 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                   />
                   自定义配置<span>自由调整各类型图片数量</span>
                 </label>
+                {structure === "custom" && (
+                  <div className="ecommerce-counts" aria-label="商品套图数量">
+                    {(
+                      [
+                        ["whiteBackground", "白底图"],
+                        ["scene", "场景图"],
+                        ["sellingPoint", "卖点图"],
+                        ["other", "其他图片"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <label key={key}>
+                        <span>{label}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={12}
+                          value={customCounts[key]}
+                          onChange={(event) =>
+                            updateCustomCount(key, Number(event.target.value))
+                          }
+                        />
+                      </label>
+                    ))}
+                    <small>
+                      共 {Object.values(customCounts).reduce((sum, count) => sum + count, 0)} 张，至少保留 1 张
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
+            {tool === "detail-page" && (
+              <div className="ecommerce-modules ecommerce-detail-modules">
+                <div className="ecommerce-modules__title">
+                  <span>
+                    <strong>详情页模块</strong>
+                    <em>首屏主视觉为必选</em>
+                  </span>
+                  <button type="button" onClick={restoreQuickDefaults}>
+                    恢复推荐
+                  </button>
+                </div>
+                <div className="ecommerce-modules__grid">
+                  {DETAIL_PAGE_MODULES.map((module) => {
+                    const checked = quickSelections[tool].has(module.id);
+                    return (
+                      <button
+                        key={module.id}
+                        type="button"
+                        className={checked ? "is-selected" : ""}
+                        aria-pressed={checked}
+                        disabled={module.required}
+                        onClick={() => toggleQuickOption(module.id)}
+                      >
+                        <span className="ecommerce-check">
+                          {checked && <Check size={12} />}
+                        </span>
+                        <span>
+                          <strong>{module.label}</strong>
+                          <small>{module.hint}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {tool === "video-replicate" && (
@@ -1320,7 +1576,8 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           disabled={
             busy ||
             (currentTool.media === "image" && !files.length) ||
-            (currentTool.media === "video" && !files.length && !referenceVideo)
+            (currentTool.media === "video" && !files.length && !referenceVideo) ||
+            (tool === "product-set" && structure === "custom" && customTotal < 1)
           }
           onClick={() => void generate()}
         >
