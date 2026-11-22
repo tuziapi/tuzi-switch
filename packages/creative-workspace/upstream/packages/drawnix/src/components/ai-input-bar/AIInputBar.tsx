@@ -5500,8 +5500,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         const effectiveGenerationType = activeBoundImageTarget && !(discussionEnabled && !override)
           ? activeBoundImageTarget.type
           : override?.generationType ?? generationType;
-        const effectiveSelectedModel = override?.selectedModel ?? selectedModel;
-        const effectiveSelectedModelRef = override
+        let effectiveSelectedModel = override?.selectedModel ?? selectedModel;
+        let effectiveSelectedModelRef = override
           ? override.selectedModelRef ?? null
           : selectedModelRef;
         const rawSelectedParams = override?.selectedParams ?? selectedParams;
