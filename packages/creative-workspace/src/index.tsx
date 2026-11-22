@@ -1,5 +1,10 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { ASSISTANT_OPEN_SETTINGS, setAssistantAccount } from '../upstream/packages/drawnix/src/services/assistant-account';
+import {
+  ASSISTANT_QUICK_SETUP,
+  type AssistantCreationSetupRequest,
+} from '../upstream/packages/drawnix/src/services/assistant-creation-setup';
+import { AssistantAccountQuickPicker } from './AssistantAccountQuickPicker';
 import ConfigProvider from 'tdesign-react/es/config-provider';
 import { Plus, LayoutGrid, ArrowUpRight, Search, Pencil, Plug, Copy } from 'lucide-react';
 import App from '../upstream/apps/web/src/app/app';
@@ -41,6 +46,24 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
     const open = () => onSettingsOpenChange?.(true);
     window.addEventListener(ASSISTANT_OPEN_SETTINGS, open);
     return () => window.removeEventListener(ASSISTANT_OPEN_SETTINGS, open);
+  }, [onSettingsOpenChange]);
+  const [quickSetupRequest, setQuickSetupRequest] = useState<AssistantCreationSetupRequest | null>(null);
+  const closeQuickSetup = useCallback(() => setQuickSetupRequest(null), []);
+  const fallbackQuickSetup = useCallback(() => {
+    setQuickSetupRequest(null);
+    onSettingsOpenChange?.(true);
+  }, [onSettingsOpenChange]);
+  useEffect(() => {
+    const open = (event: Event) => {
+      const detail = (event as CustomEvent<{ type?: string; model?: AssistantCreationSetupRequest['model'] }>).detail;
+      if (detail?.type !== 'image') {
+        onSettingsOpenChange?.(true);
+        return;
+      }
+      setQuickSetupRequest({ type: 'image', model: detail.model });
+    };
+    window.addEventListener(ASSISTANT_QUICK_SETUP, open);
+    return () => window.removeEventListener(ASSISTANT_QUICK_SETUP, open);
   }, [onSettingsOpenChange]);
   const [boards, setBoards] = useState<BoardMetadata[]>([]);
   const [ready, setReady] = useState(false);
@@ -148,6 +171,7 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
     <CreativeTaskRuntime />
     {active && <div className="creative-root" data-page={page} data-theme={dark ? "dark" : "light"} theme-mode={dark ? "dark" : "light"}>
       <div id="creative-portals" />
+      {quickSetupRequest && <AssistantAccountQuickPicker request={quickSetupRequest} onFallback={fallbackQuickSetup} onComplete={closeQuickSetup} />}
       {settingsOpen && <Suspense fallback={<div className="creative-loading" role="status">正在打开创作配置…</div>}><CreativeSettings onClose={() => onSettingsOpenChange?.(false)} /></Suspense>}
       {renaming && <div className="creative-rename-backdrop"><form role="dialog" aria-modal="true" aria-label="重命名项目" className="creative-rename-dialog" onSubmit={event => { event.preventDefault(); void rename(); }} onKeyDown={event => { if(event.key === 'Escape' && !busy) setRenaming(null); }}><h3>重命名项目</h3><input autoFocus aria-label="项目名称" value={renaming.name} onChange={event => setRenaming({...renaming, name:event.target.value})}/><div><button type="button" disabled={busy} onClick={() => setRenaming(null)}>取消</button><button type="submit" disabled={busy || !renaming.name.trim()}>保存</button></div></form></div>}
       {pairing && <div className="creative-rename-backdrop"><section role="dialog" aria-modal="true" aria-label="连接 Codex / MCP 客户端" className="creative-rename-dialog creative-mcp-pairing">
