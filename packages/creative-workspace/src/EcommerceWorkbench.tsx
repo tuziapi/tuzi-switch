@@ -1000,7 +1000,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     );
     body.append("size", selectedRatio.size);
     body.append("tool", tool);
-    files.forEach((file) => body.append("input_reference", file, file.name));
+    // Tuzi's OpenAI-compatible image edit endpoint accepts repeated `image`
+    // parts. Keep the field aligned with the live API contract so the
+    // workbench request is usable outside the mock transport as well.
+    files.forEach((file) => body.append("image", file, file.name));
     if (referenceVideo)
       body.append("reference_video", referenceVideo, referenceVideo.name);
     return body;
