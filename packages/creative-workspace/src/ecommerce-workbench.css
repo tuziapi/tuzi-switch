@@ -249,6 +249,18 @@
 .ecommerce-upload--video {
   margin-top: 8px;
 }
+.ecommerce-model-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  color: #656862;
+  font-size: 12px;
+}
+.ecommerce-model-field small {
+  color: #9b9e97;
+  font-size: 10px;
+  line-height: 1.35;
+}
 .ecommerce-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;

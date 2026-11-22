@@ -10,6 +10,8 @@ import {
   X,
 } from "lucide-react";
 import type { CreativeAccountBridge } from "./bridge-types";
+import { useSelectableModels } from "../upstream/packages/drawnix/src/hooks/use-runtime-models";
+import { getFallbackDefaultModelId } from "../upstream/packages/drawnix/src/utils/runtime-model-discovery";
 import "./ecommerce-workbench.css";
 
 type Category = "product" | "video" | "apparel";
@@ -727,7 +729,12 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     () => new Set(["白底精修图", "3D 立体效果图", "人台图"]),
   );
   const [videoMode, setVideoMode] = useState("完全复刻");
-  const [modelSource, setModelSource] = useState("AI 生成");
+  const imageModels = useSelectableModels("image");
+  const videoModels = useSelectableModels("video");
+  const [selectedModels, setSelectedModels] = useState(() => ({
+    image: getFallbackDefaultModelId("image"),
+    video: getFallbackDefaultModelId("video"),
+  }));
   const [quickSelections, setQuickSelections] = useState<
     Record<ToolId, Set<string>>
   >(
@@ -754,6 +761,25 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     [files],
   );
   const currentTool = toolMeta[tool];
+  const activeModelType = currentTool.media;
+  const activeModels = activeModelType === "image" ? imageModels : videoModels;
+  const modelOptions = activeModels.length
+    ? activeModels
+    : [
+        {
+          id: getFallbackDefaultModelId(activeModelType),
+          label: getFallbackDefaultModelId(activeModelType),
+          description: "当前默认模型",
+        },
+      ];
+  const selectedModel = modelOptions.some(
+    (model) => model.id === selectedModels[activeModelType],
+  )
+    ? selectedModels[activeModelType]
+    : modelOptions[0].id;
+  const selectedModelConfig = modelOptions.find(
+    (model) => model.id === selectedModel,
+  );
 
   useEffect(
     () => () => previews.forEach((url) => URL.revokeObjectURL(url)),
@@ -762,6 +788,18 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   useEffect(() => {
     setTool(tools[category][0].id);
   }, [category]);
+  useEffect(() => {
+    setSelectedModels((current) => {
+      const image = imageModels.some((model) => model.id === current.image)
+        ? current.image
+        : imageModels[0]?.id || current.image;
+      const video = videoModels.some((model) => model.id === current.video)
+        ? current.video
+        : videoModels[0]?.id || current.video;
+      if (image === current.image && video === current.video) return current;
+      return { image, video };
+    });
+  }, [imageModels, videoModels]);
 
   const selectFiles = (event: React.ChangeEvent<HTMLInputElement>) =>
     setFiles(Array.from(event.target.files ?? []).slice(0, 3));
@@ -798,10 +836,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     const selectedQuickLabels = quickOptions[tool]
       .filter((option) => quickSelections[tool].has(option.id))
       .map((option) => option.label);
-    body.append(
-      "model",
-      isVideo ? "doubao-seedance-2-0-260128" : "doubao-seedream-4-0-250828",
-    );
+    body.append("model", selectedModel);
     body.append(
       "prompt",
       [
@@ -812,7 +847,8 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
         `比例：${ratio}`,
         prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放",
         `快捷优化：${selectedQuickLabels.length ? selectedQuickLabels.join("、") : "按默认商业规范处理"}`,
-        `工具参数：${tool === "product-set" ? structure : tool === "apparel-set" ? Array.from(apparelTypes).join("、") : tool === "video-replicate" ? videoMode : modelSource}`,
+        `模型：${selectedModel}`,
+        `工具参数：${tool === "product-set" ? structure : tool === "apparel-set" ? Array.from(apparelTypes).join("、") : tool === "video-replicate" ? videoMode : "按工具默认参数处理"}`,
       ].join("。"),
     );
     body.append("size", ratio);
@@ -1070,6 +1106,29 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             <small>支持 MP4、MOV，视频复刻时使用</small>
           </label>
         )}
+        <label className="ecommerce-model-field">
+          生成模型
+          <select
+            aria-label="生成模型"
+            value={selectedModel}
+            onChange={(event) =>
+              setSelectedModels((current) => ({
+                ...current,
+                [activeModelType]: event.target.value,
+              }))
+            }
+          >
+            {modelOptions.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.shortLabel || model.label || model.id}
+              </option>
+            ))}
+          </select>
+          <small>
+            {selectedModelConfig?.description ||
+              `${activeModels.length} 个已配置${currentTool.media === "image" ? "图片" : "视频"}模型`}
+          </small>
+        </label>
         <div className="ecommerce-fields">
           <label>
             上架平台
