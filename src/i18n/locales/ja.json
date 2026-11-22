@@ -1,8 +1,8 @@
 {
   "opentuConnection": {
     "tab": "OpenTu 接続",
-    "title": "ChatGPT / MCP クライアント接続",
-    "description": "ローカルクライアントから OpenTu のモデルと現在のキャンバスを操作できます。Streamable HTTP を選び、以下のアドレスとトークンを設定してください。",
+    "title": "Codex / MCP クライアントを接続",
+    "description": "ローカルクライアントから OpenTu のモデルとキャンバスを操作します。Codex はワンクリック接続がおすすめです。",
     "name": "名前",
     "transport": "接続方式",
     "http": "Streamable HTTP",
@@ -12,8 +12,8 @@
     "auth": "認証には専用の Bearer Token を使います。モデル API キーは使用しません。",
     "copyToken": "トークンをコピー",
     "copyHeader": "Authorization 値をコピー",
-    "headerHelp": "Token 欄にはトークンを貼り付けます。カスタムヘッダーの場合、名前は Authorization、値は Bearer 接頭辞付きの内容です。",
-    "restart": "兔子助手を起動したままにしてください。再起動のたびにアドレスとトークンが変わるので、再コピーが必要です。トークンは画面に表示しません。チャットに送信しないでください。",
+    "headerHelp": "トークンは直接入力欄へ貼り付けてください。Bearer トークン環境変数欄は変数名専用です。Authorization ヘッダーにはコピーした値を貼り付けられます。",
+    "restart": "以下の手動 HTTP 設定は再起動後に更新が必要です。上の Codex コネクターは再設定不要です。トークンをチャットに送らないでください。",
     "check": "接続を確認",
     "checking": "確認中…",
     "passed": "ローカル HTTP の初期化、認証、ツール一覧を確認しました（{{count}} ツール）。",
@@ -25,7 +25,19 @@
       "endpoint": "アドレスをコピーしました。",
       "token": "トークンをコピーしました。クライアントの認証欄に貼り付けてください。",
       "authorization": "Bearer 接頭辞付きの Authorization 値をコピーしました。"
-    }
+    },
+    "codexTitle": "Codex ローカルコネクター",
+    "connectorHelp": "一度設定すれば、アプリ再起動後も接続情報を自動取得します。アプリを起動し、対象キャンバスを開いてください。",
+    "install": "Codex に接続",
+    "repair": "Codex 接続を修復",
+    "remove": "接続を解除",
+    "configuring": "設定中…",
+    "installed": "設定を保存しました。Codex の MCP を更新してください。ツールが表示されない場合は会話を開き直してください。 手動設定の OpenTu がある場合は、古い項目を無効にし、tuzi-opentu を残してください。",
+    "removed": "兔子助手が作成したコネクター設定を削除しました。",
+    "awaitingClient": "設定済み。クライアントからの実際の呼び出しを待っています。",
+    "clientCalled": "今回の起動中にコネクター経由のツール呼び出しが成功しました。",
+    "connectorError": "設定できませんでした。他の設定は保持されています。Codex の設定形式、書き込み権限、同名の tuzi-opentu 設定を確認してください。",
+    "manual": "他のクライアント / 手動 HTTP 設定"
   },
   "workbuddyForm": { "invalidJson": "JSON 設定とモデルの項目を確認してください。", "selectAccount": "WorkBuddy アカウントを選択してください。" },
   "workbuddyQuota": {

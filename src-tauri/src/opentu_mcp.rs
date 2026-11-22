@@ -385,6 +385,14 @@ async fn rpc_inner(
                 }
             };
             state.pending.lock().await.remove(&request_id);
+            if headers
+                .get("x-opentu-connector")
+                .and_then(|v| v.to_str().ok())
+                == Some("stdio-v1")
+                && result.get("isError").and_then(Value::as_bool) != Some(true)
+            {
+                crate::opentu_connector::record_call();
+            }
             (
                 StatusCode::OK,
                 Json(json!({"jsonrpc":"2.0","id":id,"result":result})),
@@ -469,6 +477,7 @@ pub fn start(app: &AppHandle) {
             ready: Arc::new(AtomicBool::new(false)),
             pending: Arc::new(Mutex::new(HashMap::new())),
         };
+        crate::opentu_connector::publish_if_enabled(&state.endpoint, &state.token);
         let _ = STATE.set(state.clone());
         log::info!("OpenTu MCP bridge listening at {}", state.endpoint);
         if let Err(error) = axum::serve(listener, router(state)).await {
@@ -744,4 +753,10 @@ mod tests {
             json!(["op", "ids"])
         );
     }
+}
+
+// Only the native installer receives the per-process local capability.
+pub(crate) fn connector_pairing() -> Result<(String, String), String> {
+    let state = STATE.get().ok_or("OpenTu MCP 服务尚未启动，请稍后重试。")?;
+    Ok(((*state.endpoint).clone(), (*state.token).clone()))
 }

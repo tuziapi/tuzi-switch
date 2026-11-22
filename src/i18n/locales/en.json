@@ -1,8 +1,8 @@
 {
   "opentuConnection": {
     "tab": "OpenTu connection",
-    "title": "Connect ChatGPT / MCP clients",
-    "description": "Let a local client use OpenTu models and the current canvas. Choose Streamable HTTP and enter the address and pairing token below.",
+    "title": "Connect Codex / MCP clients",
+    "description": "Let local clients use OpenTu models and the canvas. Use one-click setup for Codex.",
     "name": "Name",
     "transport": "Transport",
     "http": "Streamable HTTP",
@@ -12,8 +12,8 @@
     "auth": "Authentication uses a dedicated Bearer Token, not your model API key.",
     "copyToken": "Copy pairing token",
     "copyHeader": "Copy Authorization value",
-    "headerHelp": "For a Token field, paste the pairing token. For custom headers, use Authorization as the name and paste the value with the Bearer prefix.",
-    "restart": "Keep Tuzi Assistant running. The address and token change after every restart; copy them again. The token is hidden. Never send it in chat.",
+    "headerHelp": "Paste the token into a direct Token field, not a bearer-token environment variable field. Alternatively, set Authorization using Copy Authorization value.",
+    "restart": "Manual HTTP setup below needs new connection details after each restart. The Codex connector above does not need pairing again. Do not share the token in chat.",
     "check": "Check connection",
     "checking": "Checking…",
     "passed": "Local HTTP initialization, authentication and tool discovery passed: {{count}} tools.",
@@ -25,7 +25,19 @@
       "endpoint": "Local address copied.",
       "token": "Pairing token copied. Paste it into the client authentication field.",
       "authorization": "Authorization value copied, including the Bearer prefix."
-    }
+    },
+    "codexTitle": "Codex local connector",
+    "connectorHelp": "Configure once; connection details refresh when Tuzi Assistant restarts. Keep the app running and open the target canvas.",
+    "install": "Connect Codex",
+    "repair": "Repair Codex connection",
+    "remove": "Disconnect",
+    "configuring": "Configuring…",
+    "installed": "Configuration saved. Refresh MCP in Codex; reopen the conversation if tools are still missing. If you previously added OpenTu manually, disable the old entry and keep tuzi-opentu.",
+    "removed": "Removed the connector configuration created by Tuzi Assistant.",
+    "awaitingClient": "Configured; waiting for an actual client tool call.",
+    "clientCalled": "A successful tool call was received through the connector during this app session.",
+    "connectorError": "Could not configure the connector. Other settings were preserved. Check Codex configuration, write access, or an existing tuzi-opentu entry.",
+    "manual": "Other clients / manual HTTP setup"
   },
   "workbuddyForm": { "invalidJson": "Check the JSON configuration and model fields.", "selectAccount": "Select a WorkBuddy account first." },
   "workbuddyQuota": {

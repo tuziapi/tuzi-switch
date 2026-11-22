@@ -3801,6 +3801,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentu-connector"
+version = "0.1.0"
+dependencies = [
+ "fs2",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml_edit 0.22.27",
+]
+
+[[package]]
 name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6854,6 +6867,7 @@ dependencies = [
  "objc2 0.5.2",
  "objc2-app-kit 0.2.2",
  "once_cell",
+ "opentu-connector",
  "rand 0.8.5",
  "regex",
  "reqwest 0.12.28",

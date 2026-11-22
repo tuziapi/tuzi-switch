@@ -10,7 +10,17 @@ export interface OpenTuConnectionCheck {
   toolCount: number;
   canvasReady: boolean;
 }
+export interface OpenTuConnectorStatus {
+  configured: boolean;
+  lastToolCallAt: number | null;
+}
 export const opentuMcpApi = {
+  connectorStatus: () =>
+    invoke<OpenTuConnectorStatus>("opentu_connector_status"),
+  installConnector: () =>
+    invoke<OpenTuConnectorStatus>("opentu_connector_install"),
+  removeConnector: () =>
+    invoke<OpenTuConnectorStatus>("opentu_connector_remove"),
   pairing: () => invoke<OpenTuPairing>("opentu_mcp_pairing"),
   copy: (field: "endpoint" | "token" | "authorization") =>
     invoke<void>("opentu_mcp_copy", { field }),

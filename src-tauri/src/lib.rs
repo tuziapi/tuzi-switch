@@ -34,6 +34,7 @@ mod native_tools;
 mod native_mcp;
 mod openclaw_config;
 mod opentu_mcp;
+mod opentu_connector;
 mod opencode_config;
 mod panic_hook;
 mod prompt;
@@ -1237,6 +1238,9 @@ pub fn run() {
             creative_codex::creative_codex_probe,
             creative_codex::creative_codex_chat,
             creative_codex::creative_codex_cancel,
+            opentu_connector::opentu_connector_install,
+            opentu_connector::opentu_connector_remove,
+            opentu_connector::opentu_connector_status,
             opentu_mcp::opentu_mcp_pairing,
             opentu_mcp::opentu_mcp_copy,
             opentu_mcp::opentu_mcp_check,
