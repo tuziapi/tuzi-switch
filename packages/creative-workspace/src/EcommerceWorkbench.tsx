@@ -1045,7 +1045,13 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     try {
       if (!accountBridge?.request || !accountBridge.selectedKeyId)
         throw new Error("请先在创作配置中选择账户 API Key。");
-      const reference = `tuzi-account:${accountBridge.selectedKeyId}`;
+      // The desktop bridge receives the account Key ID from the account page,
+      // while the native transport accepts the durable creative binding ID.
+      // Resolve the binding immediately before the request so a newly selected
+      // or reconnected account key can be used without relying on stale local
+      // state.
+      const binding = await accountBridge.bindKey(accountBridge.selectedKeyId);
+      const reference = `tuzi-account:${binding.id}`;
       const endpoint =
         currentTool.media === "video"
           ? "https://api.tu-zi.com/v1/videos"
