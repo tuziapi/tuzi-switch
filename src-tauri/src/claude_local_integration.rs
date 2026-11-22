@@ -436,6 +436,10 @@ fn configure_gateway_process(command: &mut std::process::Command, profile_dir: O
     if let Some(profile_dir) = profile_dir {
         configure_gateway_profile(command, profile_dir, std::env::consts::OS);
     }
+    // Request the native Claude locale while keeping the certificate-free
+    // gateway path. The profile locale is the persisted preference; this
+    // switch also covers Electron's initial locale selection.
+    command.arg("--lang=zh-CN");
 }
 
 fn configure_gateway_profile(command: &mut std::process::Command, profile_dir: &std::path::Path, platform: &str) {
@@ -555,6 +559,7 @@ mod tests {
         assert!(command.get_args().next().is_none());
         assert!(command.get_envs().all(|(_, value)| value.is_none()));
         assert_eq!(command.get_envs().count(), 5);
+        assert_eq!(command.get_args().collect::<Vec<_>>(), vec![std::ffi::OsStr::new("--lang=zh-CN")]);
     }
 
     #[test]
@@ -565,7 +570,7 @@ mod tests {
         configure_gateway_process(&mut command, Some(&profile));
         let mut expected = std::ffi::OsString::from("--user-data-dir=");
         expected.push(&profile);
-        assert_eq!(command.get_args().collect::<Vec<_>>(), vec![expected.as_os_str()]);
+        assert_eq!(command.get_args().collect::<Vec<_>>(), vec![expected.as_os_str(), std::ffi::OsStr::new("--lang=zh-CN")]);
         assert!(command.get_envs().filter(|(name, _)| name.to_string_lossy().starts_with("NODE_") || name.to_string_lossy().starts_with("ANTHROPIC_")).all(|(_, value)| value.is_none()));
     }
 
