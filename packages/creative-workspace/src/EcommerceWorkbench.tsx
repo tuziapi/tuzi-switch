@@ -16,6 +16,7 @@ import {
   getActiveInvocationPreset,
   type ModelRef,
 } from "../upstream/packages/drawnix/src/utils/settings-manager";
+import { resolveInvocationPlanFromRoute } from "../upstream/packages/drawnix/src/services/provider-routing";
 import {
   generateEcommerceImage,
   generateEcommerceVideo,
@@ -860,6 +861,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     activePreset?.[activeModelType].defaultModelRef,
     selectedModelConfig?.sourceProfileId,
   );
+  const selectedInvocationPlan = resolveInvocationPlanFromRoute(
+    activeModelType,
+    selectedModelRef,
+  );
   const templates =
     tool === "product-set" || tool === "detail-page"
       ? previewTemplates[tool]
@@ -1275,6 +1280,17 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           <small>
             {selectedModelConfig?.description ||
               `${activeModels.length} 个已配置${currentTool.media === "image" ? "图片" : "视频"}模型`}
+          </small>
+          <small
+            className={
+              selectedInvocationPlan
+                ? "ecommerce-model-status"
+                : "ecommerce-model-status is-warning"
+            }
+          >
+            {selectedInvocationPlan
+              ? `已连接：${selectedInvocationPlan.provider.profileName} · ${selectedInvocationPlan.binding.submitPath}`
+              : "未找到有效接口绑定，请刷新模型列表或重新保存创作配置"}
           </small>
         </label>
         <div className="ecommerce-fields">

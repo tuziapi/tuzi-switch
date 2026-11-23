@@ -319,6 +319,12 @@
   font-size: 10px;
   line-height: 1.35;
 }
+.ecommerce-model-field .ecommerce-model-status {
+  color: #547051;
+}
+.ecommerce-model-field .ecommerce-model-status.is-warning {
+  color: #b34e4e;
+}
 .ecommerce-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
