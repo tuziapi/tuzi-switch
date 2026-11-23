@@ -12,6 +12,7 @@ import {
 import type { CreativeAccountBridge } from "./bridge-types";
 import { useSelectableModels } from "../upstream/packages/drawnix/src/hooks/use-runtime-models";
 import { getFallbackDefaultModelId } from "../upstream/packages/drawnix/src/utils/runtime-model-discovery";
+import { getActiveInvocationPreset } from "../upstream/packages/drawnix/src/utils/settings-manager";
 import "./ecommerce-workbench.css";
 
 type Category = "product" | "video" | "apparel";
@@ -243,7 +244,10 @@ export const DETAIL_PAGE_MODULES = [
   { id: "usage", label: "使用建议图", hint: "提供正确使用建议" },
 ] as const;
 
-const previewTemplates: Record<"product-set" | "detail-page", Array<{ id: string; label: string; caption: string }>> = {
+const previewTemplates: Record<
+  "product-set" | "detail-page",
+  Array<{ id: string; label: string; caption: string }>
+> = {
   "product-set": [
     { id: "original", label: "商品原图", caption: "上传素材" },
     { id: "hero", label: "主图", caption: "首图主视觉" },
@@ -835,9 +839,14 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const [videoMode, setVideoMode] = useState("完全复刻");
   const imageModels = useSelectableModels("image");
   const videoModels = useSelectableModels("video");
+  const activePreset = getActiveInvocationPreset();
+  const presetDefaultModelIds = {
+    image: activePreset?.image.defaultModelRef?.modelId || "",
+    video: activePreset?.video.defaultModelRef?.modelId || "",
+  };
   const [selectedModels, setSelectedModels] = useState(() => ({
-    image: getFallbackDefaultModelId("image"),
-    video: getFallbackDefaultModelId("video"),
+    image: presetDefaultModelIds.image || getFallbackDefaultModelId("image"),
+    video: presetDefaultModelIds.video || getFallbackDefaultModelId("video"),
   }));
   const [quickSelections, setQuickSelections] = useState<
     Record<ToolId, Set<string>>
@@ -867,8 +876,22 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const currentTool = toolMeta[tool];
   const activeModelType = currentTool.media;
   const activeModels = activeModelType === "image" ? imageModels : videoModels;
-  const modelOptions = activeModels.length
-    ? activeModels
+  const presetDefaultModelId = presetDefaultModelIds[activeModelType];
+  const modelOptions = [
+    ...(presetDefaultModelId &&
+    !activeModels.some((model) => model.id === presetDefaultModelId)
+      ? [
+          {
+            id: presetDefaultModelId,
+            label: presetDefaultModelId,
+            description: "当前模型预设",
+          },
+        ]
+      : []),
+    ...activeModels,
+  ];
+  const normalizedModelOptions = modelOptions.length
+    ? modelOptions
     : [
         {
           id: getFallbackDefaultModelId(activeModelType),
@@ -880,15 +903,16 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     (model) => model.id === selectedModels[activeModelType],
   )
     ? selectedModels[activeModelType]
-    : modelOptions[0].id;
-  const selectedModelConfig = modelOptions.find(
+    : normalizedModelOptions[0].id;
+  const selectedModelConfig = normalizedModelOptions.find(
     (model) => model.id === selectedModel,
   );
   const templates =
     tool === "product-set" || tool === "detail-page"
       ? previewTemplates[tool]
       : [];
-  const selectedRatio = ECOMMERCE_RATIOS.find((item) => item.id === ratio) ?? ECOMMERCE_RATIOS[3];
+  const selectedRatio =
+    ECOMMERCE_RATIOS.find((item) => item.id === ratio) ?? ECOMMERCE_RATIOS[3];
   const selectedQuickLabels = quickOptions[tool]
     .filter((option) => quickSelections[tool].has(option.id))
     .map((option) => option.label);
@@ -906,16 +930,23 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   }, [category]);
   useEffect(() => {
     setSelectedModels((current) => {
+      const imageDefault = presetDefaultModelIds.image;
+      const videoDefault = presetDefaultModelIds.video;
       const image = imageModels.some((model) => model.id === current.image)
         ? current.image
-        : imageModels[0]?.id || current.image;
+        : imageDefault || imageModels[0]?.id || current.image;
       const video = videoModels.some((model) => model.id === current.video)
         ? current.video
-        : videoModels[0]?.id || current.video;
+        : videoDefault || videoModels[0]?.id || current.video;
       if (image === current.image && video === current.video) return current;
       return { image, video };
     });
-  }, [imageModels, videoModels]);
+  }, [
+    imageModels,
+    videoModels,
+    presetDefaultModelIds.image,
+    presetDefaultModelIds.video,
+  ]);
 
   const selectFiles = (event: React.ChangeEvent<HTMLInputElement>) =>
     setFiles(Array.from(event.target.files ?? []).slice(0, 3));
@@ -1236,32 +1267,36 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                   )}
                 </div>
               </>
+            ) : templates.length > 0 ? (
+              <div
+                className={`ecommerce-template-mock ecommerce-template-mock--${activeTemplate}`}
+              >
+                <div className="ecommerce-template-mock__topline" />
+                <div className="ecommerce-template-mock__image" />
+                <div className="ecommerce-template-mock__copy">
+                  <i />
+                  <i />
+                  <i />
+                </div>
+                <strong>
+                  {templates.find((item) => item.id === activeTemplate)?.label}
+                </strong>
+                <span>
+                  {busy ? `生成中 ${progress}%` : "先预览结构，再上传素材生成"}
+                </span>
+              </div>
             ) : (
-              templates.length > 0 ? (
-                <div className={`ecommerce-template-mock ecommerce-template-mock--${activeTemplate}`}>
-                  <div className="ecommerce-template-mock__topline" />
-                  <div className="ecommerce-template-mock__image" />
-                  <div className="ecommerce-template-mock__copy">
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                  <strong>{templates.find((item) => item.id === activeTemplate)?.label}</strong>
-                  <span>{busy ? `生成中 ${progress}%` : "先预览结构，再上传素材生成"}</span>
-                </div>
-              ) : (
-                <div>
-                  <Sparkles size={34} />
-                  <strong>
-                    {busy ? `生成中 ${progress}%` : "生成结果将在这里展示"}
-                  </strong>
-                  <span>
-                    {busy
-                      ? "正在提交并查询模型任务"
-                      : "先上传素材，再完善右侧生成参数"}
-                  </span>
-                </div>
-              )
+              <div>
+                <Sparkles size={34} />
+                <strong>
+                  {busy ? `生成中 ${progress}%` : "生成结果将在这里展示"}
+                </strong>
+                <span>
+                  {busy
+                    ? "正在提交并查询模型任务"
+                    : "先上传素材，再完善右侧生成参数"}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -1473,7 +1508,12 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                       </label>
                     ))}
                     <small>
-                      共 {Object.values(customCounts).reduce((sum, count) => sum + count, 0)} 张，至少保留 1 张
+                      共{" "}
+                      {Object.values(customCounts).reduce(
+                        (sum, count) => sum + count,
+                        0,
+                      )}{" "}
+                      张，至少保留 1 张
                     </small>
                   </div>
                 )}
@@ -1585,8 +1625,12 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           disabled={
             busy ||
             (currentTool.media === "image" && !files.length) ||
-            (currentTool.media === "video" && !files.length && !referenceVideo) ||
-            (tool === "product-set" && structure === "custom" && customTotal < 1)
+            (currentTool.media === "video" &&
+              !files.length &&
+              !referenceVideo) ||
+            (tool === "product-set" &&
+              structure === "custom" &&
+              customTotal < 1)
           }
           onClick={() => void generate()}
         >
