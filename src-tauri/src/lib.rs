@@ -35,6 +35,7 @@ mod native_mcp;
 mod openclaw_config;
 mod opentu_mcp;
 mod opentu_connector;
+mod official_mcp;
 mod opencode_config;
 mod panic_hook;
 mod prompt;
@@ -1241,6 +1242,10 @@ pub fn run() {
             opentu_connector::opentu_connector_install,
             opentu_connector::opentu_connector_remove,
             opentu_connector::opentu_connector_status,
+            official_mcp::tuzi_mcp_status,
+            official_mcp::tuzi_mcp_start,
+            official_mcp::tuzi_mcp_cancel,
+            official_mcp::tuzi_mcp_manage,
             opentu_mcp::opentu_mcp_pairing,
             opentu_mcp::opentu_mcp_copy,
             opentu_mcp::opentu_mcp_check,

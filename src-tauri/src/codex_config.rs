@@ -290,7 +290,7 @@ pub fn get_codex_version() -> Option<(u32, u32, u32)> {
     }
 }
 
-fn codex_app_server_candidates() -> Vec<PathBuf> {
+pub(crate) fn codex_app_server_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
     // The desktop bundle is the closest match for the Codex process whose

@@ -842,6 +842,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     ecommerceJobs.getSnapshot,
   );
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const resultPreview = useRef<HTMLDivElement>(null);
   const batches = jobState.batches.filter((batch) => batch.tool === tool);
   const batch =
     batches.find((batch) => batch.id === selectedBatchId) || batches[0];
@@ -1278,7 +1279,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             ))}
           </div>
         )}
-        <div className="ecommerce-preview">
+        <div className="ecommerce-preview" ref={resultPreview}>
           <div className="ecommerce-preview__strip">
             {previews.length ? (
               previews.map((src, index) => (
@@ -1382,40 +1383,57 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             )}
           </div>
         </div>
-        {resultKind === "image" && batches.length > 0 && (
-          <>
-            <label className="ecommerce-history">
-              生成记录
-              <select
-                aria-label="生成记录"
-                value={batch?.id || ""}
-                onChange={(event) => {
-                  setSelectedBatchId(event.target.value);
-                  setActiveResult(0);
-                }}
-              >
-                {batches.map((record) => (
-                  <option key={record.id} value={record.id}>
-                    {new Date(record.createdAt).toLocaleString()} ·{" "}
-                    {
-                      record.items.filter((item) => item.status === "complete")
-                        .length
-                    }
-                    /{record.items.length} 张
-                  </option>
-                ))}
-              </select>
-            </label>
-            {batch && (
-              <EcommerceBatchPanel
-                batch={batch}
-                busy={busy}
-                onResume={() => void resumeBatch()}
-                onRetry={(id) => void resumeBatch(id)}
-                onSave={(blob, name) => void saveImage(blob, name)}
-              />
+        {resultKind === "image" && batch && (
+          <EcommerceBatchPanel
+            key={batch.id}
+            batch={batch}
+            busy={busy}
+            onResume={() => void resumeBatch()}
+            onRetry={(id) => void resumeBatch(id)}
+            onSave={(blob, name) => void saveImage(blob, name)}
+            previewUrls={Object.fromEntries(
+              batch.items
+                .filter((item) => item.image)
+                .map((item, i) => [item.id, imageUrls[i]]),
             )}
-          </>
+            selectedItemId={
+              batch.items.filter((item) => item.image)[activeResult]?.id
+            }
+            onPreview={(id) => {
+              const index = batch.items
+                .filter((item) => item.image)
+                .findIndex((item) => item.id === id);
+              if (index >= 0) {
+                setActiveResult(index);
+                resultPreview.current?.scrollIntoView?.({ block: "nearest" });
+              }
+            }}
+            history={
+              <label className="ecommerce-history">
+                生成记录
+                <select
+                  aria-label="生成记录"
+                  value={batch?.id || ""}
+                  onChange={(event) => {
+                    setSelectedBatchId(event.target.value);
+                    setActiveResult(0);
+                  }}
+                >
+                  {batches.map((record) => (
+                    <option key={record.id} value={record.id}>
+                      {new Date(record.createdAt).toLocaleString()} ·{" "}
+                      {
+                        record.items.filter(
+                          (item) => item.status === "complete",
+                        ).length
+                      }
+                      /{record.items.length} 张
+                    </option>
+                  ))}
+                </select>
+              </label>
+            }
+          />
         )}
       </main>
       <aside className="ecommerce-workbench__panel">

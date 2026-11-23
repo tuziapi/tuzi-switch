@@ -52,6 +52,7 @@ import { EcommerceWorkbench } from "../src/EcommerceWorkbench";
 import { EcommerceJobStore } from "../src/ecommerce-jobs";
 
 beforeEach(() => {
+  let objectUrlId = 0;
   mocks.generate.mockReset();
   const records = new Map<string, any>();
   mocks.store = new EcommerceJobStore({
@@ -65,7 +66,7 @@ beforeEach(() => {
   vi.stubGlobal(
     "URL",
     Object.assign(URL, {
-      createObjectURL: vi.fn(() => "blob:synthetic"),
+      createObjectURL: vi.fn(() => `blob:synthetic-${objectUrlId++}`),
       revokeObjectURL: vi.fn(),
     }),
   );
@@ -114,6 +115,13 @@ describe("sequential image workbench", () => {
     });
     await waitFor(() =>
       expect(screen.getByText("已完成 4 / 4 张")).toBeTruthy(),
+    );
+    expect(mocks.generate).toHaveBeenCalledTimes(4);
+    const thumbnail = screen.getByRole("button", { name: "查看核心卖点图" });
+    fireEvent.click(thumbnail);
+    expect(thumbnail.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByAltText("生成结果").getAttribute("src")).toBe(
+      thumbnail.querySelector("img")?.getAttribute("src"),
     );
     expect(mocks.generate).toHaveBeenCalledTimes(4);
     expect(screen.queryByRole("button", { name: "暂停生成" })).toBeNull();

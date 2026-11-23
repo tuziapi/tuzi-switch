@@ -1,4 +1,13 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  Download,
+  ImageIcon,
+  Loader2,
+  CircleAlert,
+} from "lucide-react";
 import { imageStageLabels, type EcommerceBatch } from "./ecommerce-jobs";
 
 export function EcommerceBatchPanel({
@@ -7,34 +16,68 @@ export function EcommerceBatchPanel({
   onResume,
   onRetry,
   onSave,
+  history,
+  previewUrls = {},
+  selectedItemId,
+  onPreview,
 }: {
   batch: EcommerceBatch;
   busy: boolean;
   onResume: () => void;
   onRetry: (id: string) => void;
   onSave: (blob: Blob, name: string) => void;
+  history?: ReactNode;
+  previewUrls?: Record<string, string>;
+  selectedItemId?: string;
+  onPreview?: (id: string) => void;
 }) {
   const [confirmId, setConfirmId] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const completed = batch.items.filter(
     (item) => item.status === "complete",
   ).length;
+  const allComplete = completed === batch.items.length;
   return (
     <section className="ecommerce-batch" aria-label="逐张生成任务">
-      <div className="ecommerce-batch__heading">
-        <strong>
-          已完成 {completed} / {batch.items.length} 张
-        </strong>
-        <span>{batch.modelRef.modelId}</span>
+      <header className="ecommerce-batch__header">
+        <div className="ecommerce-batch__heading">
+          <strong>
+            {allComplete ? (
+              <CheckCircle2 size={16} aria-hidden="true" />
+            ) : (
+              <ImageIcon size={16} aria-hidden="true" />
+            )}
+            已完成 {completed} / {batch.items.length} 张
+          </strong>
+          <span
+            className="ecommerce-batch__model"
+            title={batch.modelRef.modelId}
+          >
+            {batch.modelRef.modelId}
+          </span>
+        </div>
+        {history}
         {!busy && batch.items.some((item) => item.status === "pending") && (
           <button onClick={onResume}>继续未发送的图片</button>
         )}
-      </div>
-      <p>
-        图片逐张保存，可切换页面。退出应用会中断当前请求；重新打开后不会自动重发。
-      </p>
+        <p className="ecommerce-batch__hint">
+          {allComplete
+            ? "图片已保存到本机，点击缩略图查看。"
+            : "完成一张即保存一张，可切换页面继续等待。"}
+        </p>
+      </header>
       <ol>
         {batch.items.map((item) => {
           const attempt = item.attempts.at(-1);
+          const isExpanded = expanded.has(item.id);
+          const StatusIcon =
+            item.status === "complete"
+              ? CheckCircle2
+              : item.status === "running"
+                ? Loader2
+                : item.status === "pending"
+                  ? Clock3
+                  : CircleAlert;
           const label =
             item.status === "complete"
               ? "已保存"
@@ -48,38 +91,97 @@ export function EcommerceBatchPanel({
           return (
             <li
               key={item.id}
-              className={`ecommerce-batch__item is-${item.status}`}
+              className={`ecommerce-batch__item is-${item.status}${selectedItemId === item.id ? " is-selected" : ""}`}
             >
-              <div>
-                <strong>{item.label}</strong>
-                <span role="status">{label}</span>
-                {item.image && (
+              <div className="ecommerce-batch__row">
+                {previewUrls[item.id] && onPreview ? (
                   <button
-                    onClick={() => onSave(item.image!, `${item.label}.png`)}
+                    className="ecommerce-batch__thumbnail"
+                    onClick={() => onPreview(item.id)}
+                    aria-label={`查看${item.label}`}
+                    aria-pressed={selectedItemId === item.id}
                   >
-                    保存图片
+                    <img src={previewUrls[item.id]} alt="" loading="lazy" />
                   </button>
+                ) : (
+                  <div
+                    className="ecommerce-batch__placeholder"
+                    aria-hidden="true"
+                  >
+                    <StatusIcon
+                      size={19}
+                      className={item.status === "running" ? "spin" : ""}
+                    />
+                  </div>
                 )}
-                {!busy &&
-                  (item.status === "failed" || item.status === "unknown") && (
+                <div className="ecommerce-batch__info">
+                  <strong>{item.label}</strong>
+                  <span role="status">
+                    <StatusIcon
+                      size={12}
+                      className={item.status === "running" ? "spin" : ""}
+                      aria-hidden="true"
+                    />
+                    {label}
+                  </span>
+                </div>
+                <div className="ecommerce-batch__actions">
+                  {item.image && (
                     <button
-                      onClick={() =>
-                        item.resultUrl || item.image
-                          ? onRetry(item.id)
-                          : setConfirmId(item.id)
-                      }
+                      className="ecommerce-batch__save"
+                      onClick={() => onSave(item.image!, `${item.label}.png`)}
                     >
-                      {item.resultUrl || item.image ? "重试保存" : "重试这一张"}
+                      <Download size={14} aria-hidden="true" />
+                      保存图片
                     </button>
                   )}
+                  {!busy &&
+                    (item.status === "failed" || item.status === "unknown") && (
+                      <button
+                        onClick={() =>
+                          item.resultUrl || item.image
+                            ? onRetry(item.id)
+                            : setConfirmId(item.id)
+                        }
+                      >
+                        {item.resultUrl || item.image
+                          ? "重试保存"
+                          : "重试这一张"}
+                      </button>
+                    )}
+                  {attempt && (
+                    <button
+                      className="ecommerce-batch__details-toggle"
+                      aria-label={`${item.label}请求详情`}
+                      aria-expanded={isExpanded}
+                      aria-controls={`ecommerce-details-${item.id}`}
+                      onClick={() =>
+                        setExpanded((current) => {
+                          const next = new Set(current);
+                          if (next.has(item.id)) next.delete(item.id);
+                          else next.add(item.id);
+                          return next;
+                        })
+                      }
+                    >
+                      详情
+                      <ChevronDown size={13} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               </div>
-              {item.error && <p>{item.error}</p>}
-              {attempt && (
-                <details>
-                  <summary>
+              {item.error && (
+                <p className="ecommerce-batch__error">{item.error}</p>
+              )}
+              {attempt && isExpanded && (
+                <div
+                  className="ecommerce-batch__details"
+                  id={`ecommerce-details-${item.id}`}
+                >
+                  <strong>
                     请求详情
                     {attempt.httpStatus ? ` · HTTP ${attempt.httpStatus}` : ""}
-                  </summary>
+                  </strong>
                   {item.attempts.map((a) => (
                     <p key={a.requestId}>
                       本地请求编号：<code>{a.requestId}</code>
@@ -105,7 +207,7 @@ export function EcommerceBatchPanel({
                   <p>
                     “正在发送”表示已进入网络请求；收到响应前不能确认服务端已受理。
                   </p>
-                </details>
+                </div>
               )}
               {confirmId === item.id && (
                 <div role="alert" className="ecommerce-retry-confirm">
@@ -125,6 +227,11 @@ export function EcommerceBatchPanel({
           );
         })}
       </ol>
+      {!allComplete && (
+        <p className="ecommerce-batch__notice">
+          退出应用会中断当前请求；重新打开后不会自动重发。
+        </p>
+      )}
     </section>
   );
 }

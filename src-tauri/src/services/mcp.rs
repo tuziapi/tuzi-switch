@@ -269,6 +269,29 @@ mod native_integration_tests {
 }
 
 impl McpService {
+    /// Install only the official Codex entry under the same mutation locks and
+    /// file/database rollback transaction as normal MCP edits.
+    pub(crate) fn install_official_tuzi(state: &AppState, home: &std::path::Path) -> Result<(), AppError> {
+        let _provider_guard = crate::services::provider::OperationGuard::acquire()?;
+        let _guard = mutation_lock()?;
+        let next = crate::official_mcp::server();
+        let previous = state.db.get_all_mcp_servers()?.get(&next.id).cloned();
+        if previous.as_ref().is_some_and(|p| p.server != next.server || !p.apps.codex) {
+            return Err(AppError::Message("官方 MCP 配置存在冲突".into()));
+        }
+        let configured = crate::official_mcp::validate_config(home).map_err(|_| AppError::Message("官方 MCP 配置存在冲突".into()))?;
+        if previous.is_some() && !configured {
+            return Err(AppError::Message("官方 MCP 配置已被移除，请先处理配置冲突".into()));
+        }
+        // Existing desired state: don't rewrite or enable other tools.
+        if previous.is_some() && configured {
+            return Ok(());
+        }
+        crate::native_mcp::commit(None, Some(&next), || {
+            state.db.commit_mcp_change(None, Some(&next))
+        })
+    }
+
     /// Each source commits atomically. Successful sources are retained and retries
     /// are idempotent; the UI keeps this recovery message visible on failure.
     pub fn import_all(state: &AppState) -> Result<usize, AppError> {
