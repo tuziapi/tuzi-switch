@@ -1,3 +1,5 @@
+2026-11-23 ECOM-NATIVE-1123：独立本地构建、图片等待状态与模型凭证来源修复完成。21 项创作及 42 项宿主测试、类型检查、最终 Mac ARM 包与完整性校验通过；已在 `tauri://localhost` 原生窗口上传陶瓷杯参考图并用 gpt-image-2.5 实际生成 A+ 图片，结果已目视检查。测试包留本机，无 push/PR/发布；其他模型/工具与正式自动更新不据此放行。见 [修复及实测记录](2026-11-23-ecommerce-native-repair.md)。
+
 2026-11-22 ACCOUNT-QUICK-01：已实现 OpenTu 首次图片发送的账户 Key/模型快捷选择；成功后继续原始发送，取消、失败、无账户 Key 回到完整设置。普通工具账户 Key 选择沿用现有流程，手动配置保留。定向测试 10 项通过；类型检查和创作构建受现有缺失依赖限制，详见 [验证记录](2026-11-22-account-key-quick-picker.md)。
 
 2026-11-18 WorkBuddy 移植补验。集成分支 `codex/canvas-loading-warm-cards` 已验证表单提交、模型写入与回滚、统一 MCP 导入、子代理用量和账号额度展示。前端 848 项、WorkBuddy 原生 47 项、统一 MCP 集成 15 项通过，类型检查和渲染构建通过。真实 WorkBuddy 登录与额度联调待验收。详见 [移植记录](workbuddy-migration-2026-11-18.md)。

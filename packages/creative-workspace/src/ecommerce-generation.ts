@@ -66,7 +66,9 @@ export async function generateEcommerceImage(params: {
   referenceImages: string[];
   accountReference?: string;
   count?: number;
+  signal?: AbortSignal;
 }): Promise<string[]> {
+  params.signal?.throwIfAborted();
   const plan = resolveInvocationPlanFromRoute("image", params.modelRef);
   if (!plan) {
     throw new Error(
@@ -101,6 +103,7 @@ export async function generateEcommerceImage(params: {
         referenceImages: params.referenceImages,
       },
       {
+        signal: params.signal,
         requestContext: {
           providerContext: provider,
           binding: plan.binding,
@@ -120,6 +123,7 @@ export async function generateEcommerceImage(params: {
         count: params.count,
         model,
         modelRef: plan.modelRef,
+        signal: params.signal,
       },
       model,
       plan.modelRef,
@@ -150,6 +154,7 @@ export async function generateEcommerceImage(params: {
   const result = await adapter.generateImage(
     {
       ...baseContext,
+      signal: params.signal,
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       provider,

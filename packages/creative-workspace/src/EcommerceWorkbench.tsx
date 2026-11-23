@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ImagePlus,
@@ -23,6 +23,12 @@ import {
   resolveEcommerceModelRef,
 } from "./ecommerce-generation";
 import "./ecommerce-workbench.css";
+import {
+  ECOMMERCE_IMAGE_TIMEOUT_MS,
+  readEcommerceImage,
+  resolveEcommerceAccountReference,
+  waitForEcommerceRequest,
+} from "./ecommerce-request";
 
 type Category = "product" | "video" | "apparel";
 type ToolId =
@@ -814,10 +820,24 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   );
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [generationPhase, setGenerationPhase] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const activeRequest = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
   const [resultUrls, setResultUrls] = useState<string[]>([]);
   const [resultKind, setResultKind] = useState<"image" | "video">("image");
   const [activeResult, setActiveResult] = useState(0);
+  useEffect(() => () => activeRequest.current?.abort(), []);
+  useEffect(() => {
+    if (!busy) return;
+    const started = Date.now();
+    const timer = setInterval(
+      () => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [busy]);
+  const generationStatus = `${generationPhase}${resultKind === "video" && progress > 0 ? ` ${progress}%` : ""} · ${elapsedSeconds} 秒`;
   const previews = useMemo(
     () => files.map((file) => URL.createObjectURL(file)),
     [files],
@@ -999,71 +1019,92 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   };
 
   const generate = async () => {
-    if ((!files.length && currentTool.media === "image") || busy) return;
+    if (
+      (!files.length && currentTool.media === "image") ||
+      busy ||
+      activeRequest.current
+    )
+      return;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    const { signal } = controller;
+    const timeout =
+      currentTool.media === "image"
+        ? setTimeout(
+            () =>
+              controller.abort(
+                new Error(
+                  "等待图片结果超时。服务端可能仍在处理，请先核对调用记录，避免重复付费。",
+                ),
+              ),
+            ECOMMERCE_IMAGE_TIMEOUT_MS,
+          )
+        : undefined;
     setBusy(true);
-    setProgress(8);
+    setProgress(0);
+    setElapsedSeconds(0);
+    setGenerationPhase("准备素材");
     setError("");
     setResultUrls([]);
     setResultKind(currentTool.media);
     setActiveResult(0);
     try {
-      let reference: string | undefined;
-      if (accountBridge?.request && accountBridge.selectedKeyId) {
-        // The desktop bridge receives the account Key ID from the account page,
-        // while the native transport accepts the durable creative binding ID.
-        // Resolve the binding immediately before the request so a newly selected
-        // or reconnected account key can be used without relying on stale local
-        // state.
-        const binding = await accountBridge.bindKey(
-          accountBridge.selectedKeyId,
-        );
-        reference = `tuzi-account:${binding.id}`;
-      } else if (!selectedInvocationPlan?.provider.apiKey?.trim()) {
-        throw new Error(
-          "请先在创作配置中选择账户 API Key，或在当前模型供应商中配置 API Key。",
-        );
-      }
-      const referenceImages = await Promise.all(
-        files.map(
-          (file) =>
-            new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(String(reader.result));
-              reader.onerror = () =>
-                reject(new Error(`读取图片失败：${file.name}`));
-              reader.readAsDataURL(file);
-            }),
+      const reference = await waitForEcommerceRequest(
+        resolveEcommerceAccountReference(
+          selectedInvocationPlan?.provider.apiKey,
+          accountBridge,
         ),
+        signal,
       );
+      signal.throwIfAborted();
+      const referenceImages = await Promise.all(
+        files.map((file) => readEcommerceImage(file, signal)),
+      );
+      signal.throwIfAborted();
+      setGenerationPhase("等待模型返回");
       const requestPrompt = buildRequest().get("prompt")?.toString() || prompt;
-      const urls =
+      const urls = await waitForEcommerceRequest(
         currentTool.media === "video"
-          ? await generateEcommerceVideo({
+          ? generateEcommerceVideo({
               modelRef: selectedModelRef,
               prompt: requestPrompt,
               size: selectedRatio.size,
               referenceImages,
               accountReference: reference,
               onProgress: (value) =>
-                setProgress(Math.max(8, Math.min(98, value))),
+                !signal.aborted &&
+                setProgress(Math.max(0, Math.min(99, value))),
             })
-          : await generateEcommerceImage({
+          : generateEcommerceImage({
               modelRef: selectedModelRef,
               prompt: requestPrompt,
               size: selectedRatio.size,
               referenceImages,
               accountReference: reference,
               count: tool === "product-set" ? customTotal : 1,
-            });
+              signal,
+            }),
+        signal,
+      );
+      signal.throwIfAborted();
       if (!urls.length)
         throw new Error("模型未返回图片或视频结果，请检查模型响应格式。");
       setProgress(100);
       setResultUrls(urls);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "生成失败，请稍后重试。",
+        signal.aborted
+          ? signal.reason instanceof Error &&
+            signal.reason.name !== "AbortError"
+            ? signal.reason.message
+            : "已停止等待。服务端可能仍在生成，请先核对调用记录，避免重复付费。"
+          : cause instanceof Error
+            ? cause.message
+            : "生成失败，请稍后重试。",
       );
     } finally {
+      clearTimeout(timeout);
+      if (activeRequest.current === controller) activeRequest.current = null;
       setBusy(false);
     }
   };
@@ -1220,18 +1261,18 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                   {templates.find((item) => item.id === activeTemplate)?.label}
                 </strong>
                 <span>
-                  {busy ? `生成中 ${progress}%` : "先预览结构，再上传素材生成"}
+                  {busy ? generationStatus : "先预览结构，再上传素材生成"}
                 </span>
               </div>
             ) : (
               <div>
                 <Sparkles size={34} />
                 <strong>
-                  {busy ? `生成中 ${progress}%` : "生成结果将在这里展示"}
+                  {busy ? generationStatus : "生成结果将在这里展示"}
                 </strong>
                 <span>
                   {busy
-                    ? "正在提交并查询模型任务"
+                    ? "图片生成通常需要数分钟，请勿重复提交"
                     : "先上传素材，再完善右侧生成参数"}
                 </span>
               </div>
@@ -1296,7 +1337,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             }
           >
             {selectedInvocationPlan
-              ? `已连接：${selectedInvocationPlan.provider.profileName} · ${selectedInvocationPlan.binding.submitPath}`
+              ? `已配置：${selectedInvocationPlan.provider.profileName} · ${selectedInvocationPlan.binding.submitPath}`
               : "未找到有效接口绑定，请刷新模型列表或重新保存创作配置"}
           </small>
         </label>
@@ -1586,7 +1627,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           {busy ? (
             <>
               <LoaderCircle className="spin" size={17} />
-              正在生成 {progress}%
+              {generationStatus}
             </>
           ) : (
             <>
@@ -1595,6 +1636,15 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             </>
           )}
         </button>
+        {busy && resultKind === "image" && (
+          <button
+            type="button"
+            className="ecommerce-stop"
+            onClick={() => activeRequest.current?.abort()}
+          >
+            停止等待
+          </button>
+        )}
       </aside>
     </section>
   );
