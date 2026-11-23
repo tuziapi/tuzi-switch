@@ -461,7 +461,17 @@ fn supports_action(model: &Value, action: &str) -> bool {
         ),
         "image.edit" => (
             "/v1/images/edits",
-            &["openai-image", "openai-images", "image-edit", "edit"],
+            // Tuzi's live model catalog uses `image-generation` for GPT Image
+            // models that also accept the OpenAI-compatible edits endpoint.
+            // Keep the preflight permissive here and let the upstream endpoint
+            // remain the final authority for model-specific edit support.
+            &[
+                "openai-image",
+                "openai-images",
+                "image-generation",
+                "image-edit",
+                "edit",
+            ],
         ),
         "video.create" => ("/v1/videos", &["openai-video", "openai-videos"]),
         "audio.speech" => (
@@ -918,6 +928,12 @@ mod tests {
         assert!(!supports_action(
             &json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/images/generations","method":"GET"}}}),
             "image.generate"
+        ));
+        // Tuzi's GPT Image catalog advertises the shared image-generation
+        // capability while the same model also supports /images/edits.
+        assert!(supports_action(
+            &json!({"supported_endpoint_types":["image-generation"]}),
+            "image.edit"
         ));
     }
     #[test]

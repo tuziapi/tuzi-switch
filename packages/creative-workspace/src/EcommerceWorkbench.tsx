@@ -1007,15 +1007,22 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setResultKind(currentTool.media);
     setActiveResult(0);
     try {
-      if (!accountBridge?.request || !accountBridge.selectedKeyId)
-        throw new Error("请先在创作配置中选择账户 API Key。");
-      // The desktop bridge receives the account Key ID from the account page,
-      // while the native transport accepts the durable creative binding ID.
-      // Resolve the binding immediately before the request so a newly selected
-      // or reconnected account key can be used without relying on stale local
-      // state.
-      const binding = await accountBridge.bindKey(accountBridge.selectedKeyId);
-      const reference = `tuzi-account:${binding.id}`;
+      let reference: string | undefined;
+      if (accountBridge?.request && accountBridge.selectedKeyId) {
+        // The desktop bridge receives the account Key ID from the account page,
+        // while the native transport accepts the durable creative binding ID.
+        // Resolve the binding immediately before the request so a newly selected
+        // or reconnected account key can be used without relying on stale local
+        // state.
+        const binding = await accountBridge.bindKey(
+          accountBridge.selectedKeyId,
+        );
+        reference = `tuzi-account:${binding.id}`;
+      } else if (!selectedInvocationPlan?.provider.apiKey?.trim()) {
+        throw new Error(
+          "请先在创作配置中选择账户 API Key，或在当前模型供应商中配置 API Key。",
+        );
+      }
       const referenceImages = await Promise.all(
         files.map(
           (file) =>
