@@ -67,9 +67,16 @@ export async function generateEcommerceImage(params: {
   accountReference?: string;
   count?: number;
   signal?: AbortSignal;
+  requestId?: string;
+  onSubmissionAttempt?: () => void | Promise<void>;
+  onResponse?: (response: Response) => void | Promise<void>;
+  onSubmitted?: (taskId: string) => void | Promise<void>;
+  invocationPlan?: ReturnType<typeof resolveInvocationPlanFromRoute>;
 }): Promise<string[]> {
   params.signal?.throwIfAborted();
-  const plan = resolveInvocationPlanFromRoute("image", params.modelRef);
+  const plan =
+    params.invocationPlan ||
+    resolveInvocationPlanFromRoute("image", params.modelRef);
   if (!plan) {
     throw new Error(
       `创作配置中没有找到模型 ${params.modelRef.modelId} 的可用接口绑定，请刷新模型列表或重新保存模型配置。`,
@@ -104,6 +111,9 @@ export async function generateEcommerceImage(params: {
       },
       {
         signal: params.signal,
+        requestId: params.requestId,
+        onSubmissionAttempt: params.onSubmissionAttempt,
+        onSubmitted: params.onSubmitted,
         requestContext: {
           providerContext: provider,
           binding: plan.binding,
@@ -124,6 +134,9 @@ export async function generateEcommerceImage(params: {
         model,
         modelRef: plan.modelRef,
         signal: params.signal,
+        requestId: params.requestId,
+        onSubmissionAttempt: params.onSubmissionAttempt,
+        onResponse: params.onResponse,
       },
       model,
       plan.modelRef,
@@ -155,6 +168,9 @@ export async function generateEcommerceImage(params: {
     {
       ...baseContext,
       signal: params.signal,
+      requestId: params.requestId,
+      onSubmissionAttempt: params.onSubmissionAttempt,
+      onResponse: params.onResponse,
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       provider,

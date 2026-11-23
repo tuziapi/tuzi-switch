@@ -143,6 +143,7 @@ async fn bind_reload_qualify_and_execute_with_only_model_key_at_model_endpoint()
     execute(&service, req, &path, channel).await.unwrap();
     let chunks = chunks.lock().unwrap();
     assert_eq!(chunks.first().unwrap()["type"], "ready");
+    assert_eq!(chunks.get(1).unwrap()["type"], "sending");
     assert_eq!(chunks.last().unwrap()["type"], "end");
     assert_eq!(*fixture.submissions.lock().unwrap(), 1);
     drop(chunks);

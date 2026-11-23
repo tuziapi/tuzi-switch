@@ -61,6 +61,7 @@ async fn native_binary_request_stream_and_error_redaction() {
         .unwrap();
         let chunks = chunks.lock().unwrap();
         assert!(matches!(chunks.first(), Some(CreativeChunk::Ready)));
+        assert!(matches!(chunks.get(1), Some(CreativeChunk::Sending)));
         assert!(chunks
             .iter()
             .any(|c| matches!(c, CreativeChunk::Start {status: s, ..} if *s == status)));

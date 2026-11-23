@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   Check,
   ImagePlus,
@@ -18,17 +24,22 @@ import {
 } from "../upstream/packages/drawnix/src/utils/settings-manager";
 import { resolveInvocationPlanFromRoute } from "../upstream/packages/drawnix/src/services/provider-routing";
 import {
-  generateEcommerceImage,
   generateEcommerceVideo,
   resolveEcommerceModelRef,
 } from "./ecommerce-generation";
 import "./ecommerce-workbench.css";
 import {
-  ECOMMERCE_IMAGE_TIMEOUT_MS,
   readEcommerceImage,
   resolveEcommerceAccountReference,
   waitForEcommerceRequest,
 } from "./ecommerce-request";
+import {
+  ecommerceJobs,
+  imageStageLabels,
+  planEcommerceImages,
+} from "./ecommerce-jobs";
+import { createEcommerceExecutor } from "./ecommerce-executor";
+import { EcommerceBatchPanel } from "./EcommerceBatchPanel";
 
 type Category = "product" | "video" | "apparel";
 type ToolId =
@@ -818,26 +829,70 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
         ]),
       ) as Record<ToolId, Set<string>>,
   );
-  const [busy, setBusy] = useState(false);
+  const [videoBusy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [generationPhase, setGenerationPhase] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const activeRequest = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
-  const [resultUrls, setResultUrls] = useState<string[]>([]);
-  const [resultKind, setResultKind] = useState<"image" | "video">("image");
+  const [videoResultUrls, setResultUrls] = useState<string[]>([]);
+  const resultKind = toolMeta[tool].media;
+  const jobState = useSyncExternalStore(
+    ecommerceJobs.subscribe,
+    ecommerceJobs.getSnapshot,
+  );
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const batches = jobState.batches.filter((batch) => batch.tool === tool);
+  const batch =
+    batches.find((batch) => batch.id === selectedBatchId) || batches[0];
+  const busy = videoBusy || Boolean(jobState.activeId);
+  const imageBlobs =
+    batch?.items.filter((item) => item.image).map((item) => item.image!) || [];
+  const imageKey = batch?.items
+    .filter((item) => item.image)
+    .map((item) => item.id)
+    .join(",");
+  const imageUrls = useMemo(
+    () => imageBlobs.map((blob) => URL.createObjectURL(blob)),
+    [batch?.id, imageKey],
+  );
+  useEffect(
+    () => () => imageUrls.forEach((url) => URL.revokeObjectURL(url)),
+    [imageUrls],
+  );
+  const resultUrls = resultKind === "image" ? imageUrls : videoResultUrls;
+  useEffect(() => {
+    void ecommerceJobs.load();
+  }, []);
+  useEffect(() => {
+    if (batch) setFiles(batch.references);
+    setActiveResult(0);
+  }, [batch?.id]);
   const [activeResult, setActiveResult] = useState(0);
   useEffect(() => () => activeRequest.current?.abort(), []);
   useEffect(() => {
     if (!busy) return;
-    const started = Date.now();
+    const running = jobState.batches
+      .find((b) => b.id === jobState.activeId)
+      ?.items.find((item) => item.status === "running");
+    const started = running?.attempts.at(-1)?.startedAt || Date.now();
     const timer = setInterval(
       () => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)),
       1000,
     );
     return () => clearInterval(timer);
-  }, [busy]);
-  const generationStatus = `${generationPhase}${resultKind === "video" && progress > 0 ? ` ${progress}%` : ""} · ${elapsedSeconds} 秒`;
+  }, [
+    busy,
+    jobState.activeId,
+    batch?.items.find((item) => item.status === "running")?.id,
+  ]);
+  const runningItem = batch?.items.find((item) => item.status === "running");
+  const generationStatus =
+    resultKind === "image"
+      ? runningItem
+        ? `${runningItem.label} · ${imageStageLabels[runningItem.attempts.at(-1)?.stage || "preparing"]} · ${elapsedSeconds} 秒`
+        : "图片任务处理中"
+      : `${generationPhase}${progress > 0 ? ` ${progress}%` : ""} · ${elapsedSeconds} 秒`;
   const previews = useMemo(
     () => files.map((file) => URL.createObjectURL(file)),
     [files],
@@ -898,6 +953,45 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     (sum, count) => sum + count,
     0,
   );
+  const imagePlan = planEcommerceImages({
+    tool,
+    structure,
+    labels: selectedQuickLabels,
+    apparelTypes: Array.from(apparelTypes),
+    counts: customCounts,
+    prompt: `${currentTool.title}。平台：${platform}。市场：${market}。语言：${language}。尺寸：${selectedRatio.size}。${prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放"}。整体要求：${selectedQuickLabels.join("、")}`,
+  });
+  const taskOwner = accountBridge?.state.identity?.userId || null;
+  const resumeBatch = async (itemId?: string) => {
+    if (!batch) return;
+    setError("");
+    try {
+      await ecommerceJobs.resume(
+        batch.id,
+        createEcommerceExecutor(accountBridge),
+        taskOwner,
+        itemId,
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "无法继续任务。");
+    }
+  };
+  const saveImage = async (blob: Blob, name: string) => {
+    try {
+      if (accountBridge?.imageAction)
+        await accountBridge.imageAction("save", blob, name);
+      else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = name;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+    } catch {
+      setError("保存图片失败，请重试。");
+    }
+  };
 
   useEffect(
     () => () => previews.forEach((url) => URL.revokeObjectURL(url)),
@@ -1025,28 +1119,37 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       activeRequest.current
     )
       return;
+    if (currentTool.media === "image") {
+      setError("");
+      try {
+        const id = await ecommerceJobs.start(
+          {
+            title: currentTool.title,
+            tool,
+            modelRef: selectedModelRef,
+            owner: taskOwner,
+            size: selectedRatio.size,
+            references: files,
+            items: imagePlan,
+          },
+          createEcommerceExecutor(accountBridge),
+        );
+        setSelectedBatchId(id);
+        setActiveResult(0);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "无法创建图片任务。");
+      }
+      return;
+    }
     const controller = new AbortController();
     activeRequest.current = controller;
     const { signal } = controller;
-    const timeout =
-      currentTool.media === "image"
-        ? setTimeout(
-            () =>
-              controller.abort(
-                new Error(
-                  "等待图片结果超时。服务端可能仍在处理，请先核对调用记录，避免重复付费。",
-                ),
-              ),
-            ECOMMERCE_IMAGE_TIMEOUT_MS,
-          )
-        : undefined;
     setBusy(true);
     setProgress(0);
     setElapsedSeconds(0);
     setGenerationPhase("准备素材");
     setError("");
     setResultUrls([]);
-    setResultKind(currentTool.media);
     setActiveResult(0);
     try {
       const reference = await waitForEcommerceRequest(
@@ -1064,26 +1167,15 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       setGenerationPhase("等待模型返回");
       const requestPrompt = buildRequest().get("prompt")?.toString() || prompt;
       const urls = await waitForEcommerceRequest(
-        currentTool.media === "video"
-          ? generateEcommerceVideo({
-              modelRef: selectedModelRef,
-              prompt: requestPrompt,
-              size: selectedRatio.size,
-              referenceImages,
-              accountReference: reference,
-              onProgress: (value) =>
-                !signal.aborted &&
-                setProgress(Math.max(0, Math.min(99, value))),
-            })
-          : generateEcommerceImage({
-              modelRef: selectedModelRef,
-              prompt: requestPrompt,
-              size: selectedRatio.size,
-              referenceImages,
-              accountReference: reference,
-              count: tool === "product-set" ? customTotal : 1,
-              signal,
-            }),
+        generateEcommerceVideo({
+          modelRef: selectedModelRef,
+          prompt: requestPrompt,
+          size: selectedRatio.size,
+          referenceImages,
+          accountReference: reference,
+          onProgress: (value) =>
+            !signal.aborted && setProgress(Math.max(0, Math.min(99, value))),
+        }),
         signal,
       );
       signal.throwIfAborted();
@@ -1103,16 +1195,19 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             : "生成失败，请稍后重试。",
       );
     } finally {
-      clearTimeout(timeout);
       if (activeRequest.current === controller) activeRequest.current = null;
       setBusy(false);
     }
   };
 
-  const queueCanvasInsert = () => {
+  const queueCanvasInsert = async () => {
     if (resultKind !== "image") return;
-    const url = resultUrls[activeResult];
-    if (!url) return;
+    const blob = imageBlobs[activeResult];
+    if (!blob) return;
+    const url = await readEcommerceImage(
+      new File([blob], "ecommerce.png", { type: blob.type }),
+      new AbortController().signal,
+    );
     sessionStorage.setItem(PENDING_CANVAS_IMAGE_KEY, url);
     window.dispatchEvent(new CustomEvent(PENDING_CANVAS_IMAGE_EVENT));
     onOpenCanvas?.();
@@ -1123,7 +1218,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setFiles([]);
     setReferenceVideo(null);
     setResultUrls([]);
-    setResultKind("image");
+    setSelectedBatchId(null);
     setActiveTemplate("original");
     setError("");
   };
@@ -1132,7 +1227,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setFiles([]);
     setReferenceVideo(null);
     setResultUrls([]);
-    setResultKind(toolMeta[next].media);
+    setSelectedBatchId(null);
     setActiveTemplate(next === "detail-page" ? "product" : "original");
     setError("");
   };
@@ -1242,7 +1337,15 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     下一张
                   </button>
                   {resultKind === "image" && (
-                    <button onClick={queueCanvasInsert}>插入画布</button>
+                    <button
+                      onClick={() =>
+                        void queueCanvasInsert().catch(() =>
+                          setError("图片插入失败，请重试。"),
+                        )
+                      }
+                    >
+                      插入画布
+                    </button>
                   )}
                 </div>
               </>
@@ -1279,6 +1382,41 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             )}
           </div>
         </div>
+        {resultKind === "image" && batches.length > 0 && (
+          <>
+            <label className="ecommerce-history">
+              生成记录
+              <select
+                aria-label="生成记录"
+                value={batch?.id || ""}
+                onChange={(event) => {
+                  setSelectedBatchId(event.target.value);
+                  setActiveResult(0);
+                }}
+              >
+                {batches.map((record) => (
+                  <option key={record.id} value={record.id}>
+                    {new Date(record.createdAt).toLocaleString()} ·{" "}
+                    {
+                      record.items.filter((item) => item.status === "complete")
+                        .length
+                    }
+                    /{record.items.length} 张
+                  </option>
+                ))}
+              </select>
+            </label>
+            {batch && (
+              <EcommerceBatchPanel
+                batch={batch}
+                busy={busy}
+                onResume={() => void resumeBatch()}
+                onRetry={(id) => void resumeBatch(id)}
+                onSave={(blob, name) => void saveImage(blob, name)}
+              />
+            )}
+          </>
+        )}
       </main>
       <aside className="ecommerce-workbench__panel">
         <label className="ecommerce-upload">
@@ -1464,7 +1602,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     checked={structure === "smart"}
                     onChange={() => setStructure("smart")}
                   />
-                  智能匹配<span>AI 分析商品图并匹配 Listing 套图</span>
+                  按所选模块<span>每个快捷优化模块生成一张独立图片</span>
                 </label>
                 <label>
                   <input
@@ -1605,15 +1743,23 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             )}
           </details>
         )}
-        {error && (
+        {currentTool.media === "image" && (
+          <div className="ecommerce-plan" aria-label="本次生成计划">
+            <strong>本次生成 {imagePlan.length} 张 · 逐张出图</strong>
+            <p>{imagePlan.map((item) => item.label).join(" · ")}</p>
+            <small>每张单独请求和计费，完成后立即显示并保存。</small>
+          </div>
+        )}
+        {(error || jobState.storageError) && (
           <p className="ecommerce-error" role="alert">
-            {error}
+            {error || jobState.storageError}
           </p>
         )}
         <button
           className="ecommerce-generate"
           disabled={
             busy ||
+            (currentTool.media === "image" && !jobState.ready) ||
             (currentTool.media === "image" && !files.length) ||
             (currentTool.media === "video" &&
               !files.length &&
@@ -1632,7 +1778,9 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           ) : (
             <>
               <Sparkles size={17} />
-              生成{currentTool.media === "video" ? "视频" : "图片"}
+              {currentTool.media === "video"
+                ? "生成视频"
+                : `生成 ${imagePlan.length} 张图片`}
             </>
           )}
         </button>
@@ -1640,9 +1788,9 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           <button
             type="button"
             className="ecommerce-stop"
-            onClick={() => activeRequest.current?.abort()}
+            onClick={() => ecommerceJobs.pause()}
           >
-            停止等待
+            暂停生成
           </button>
         )}
       </aside>

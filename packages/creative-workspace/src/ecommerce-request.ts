@@ -1,6 +1,6 @@
 import type { CreativeAccountBridge } from "./bridge-types";
 
-export const ECOMMERCE_IMAGE_TIMEOUT_MS = 15 * 60 * 1000;
+export const ECOMMERCE_IMAGE_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** Bound the complete operation, including preparation and result decoding. */
 export function waitForEcommerceRequest<T>(

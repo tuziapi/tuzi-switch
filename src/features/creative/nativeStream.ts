@@ -2,6 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 
 export type CreativeChunk =
   | { type: "ready" }
+  | { type: "sending" }
   | {
       type: "start";
       status: number;
@@ -68,6 +69,24 @@ export function nativeCreativeResponse(
       },
     });
     const onChunk = new Channel<CreativeChunk>();
+    const trace = (
+      stage: "sending" | "receiving",
+      status?: number,
+      upstreamId?: string,
+    ) => {
+      const headers = request.headers as Record<string, string> | undefined;
+      const requestId = request.upstreamRequestId || headers?.["x-request-id"];
+      if (
+        typeof requestId === "string" &&
+        /^[a-zA-Z0-9_.-]{1,200}$/.test(requestId)
+      ) {
+        window.dispatchEvent(
+          new CustomEvent("tuzi:creative-request-status", {
+            detail: { requestId, stage, status, upstreamId },
+          }),
+        );
+      }
+    };
     onChunk.onmessage = (message) => {
       // An abort can reach Rust before its request is registered. Acknowledge
       // registration and resend cancellation even if the JS promise has ended.
@@ -77,7 +96,15 @@ export function nativeCreativeResponse(
       }
       if (finished) return;
       try {
-        if (message.type === "start") {
+        if (message.type === "sending") {
+          trace("sending");
+        } else if (message.type === "start") {
+          trace(
+            "receiving",
+            message.status,
+            message.headers?.["x-oneapi-request-id"] ||
+              message.headers?.["x-request-id"],
+          );
           if (started) throw new Error("duplicate_headers");
           const response = new Response(
             [204, 205, 304].includes(message.status) ? null : stream,
@@ -99,7 +126,10 @@ export function nativeCreativeResponse(
         } else if (message.type === "error") {
           // Keep buffered response data readable before surfacing the transport
           // failure on the next read. controller.error discards queued bytes.
-          if (!started) { fail(message.code); return; }
+          if (!started) {
+            fail(message.code);
+            return;
+          }
           pendingError = errorFor(message.code);
           finished = true;
           cleanup();

@@ -59,6 +59,7 @@ pub struct FormPart {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum CreativeChunk {
     Ready,
+    Sending,
     Start {
         status: u16,
         content_type: String,
@@ -726,6 +727,7 @@ async fn execute(
             if let Some((body, content_type)) = payload {
                 builder = builder.header("Content-Type", content_type).body(body);
             }
+            on_chunk.send(CreativeChunk::Sending).map_err(|_| "consumer_closed")?;
             let response = builder
                 .send()
                 .await
@@ -742,6 +744,11 @@ async fn execute(
                 .unwrap_or("application/octet-stream")
                 .to_string();
             if !status.is_success() {
+                on_chunk.send(CreativeChunk::Start {
+                    status: status.as_u16(),
+                    content_type: "application/json".into(),
+                    headers: BTreeMap::new(),
+                }).map_err(|_| "consumer_closed")?;
                 // Do not expose upstream error bodies or authentication diagnostics.
                 return Err(format!("creative_upstream_{}", status.as_u16()));
             }
