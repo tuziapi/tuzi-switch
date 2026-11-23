@@ -1271,7 +1271,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               }))
             }
           >
-            {modelOptions.map((model) => (
+            {normalizedModelOptions.map((model) => (
               <option key={model.id} value={model.id}>
                 {model.shortLabel || model.label || model.id}
               </option>
