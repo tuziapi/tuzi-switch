@@ -14,11 +14,13 @@ const mocks = vi.hoisted(() => ({
   videoGenerate: vi.fn(),
   store: null as any,
   videoStore: null as any,
+  models: null as Record<string, any[]> | null,
 }));
 vi.mock("../upstream/packages/drawnix/src/hooks/use-runtime-models", () => ({
-  useSelectableModels: () => [
-    { id: "synthetic-image", label: "Synthetic image" },
-  ],
+  useSelectableModels: (type: string) =>
+    mocks.models?.[type] || [
+      { id: "synthetic-image", label: "Synthetic image" },
+    ],
 }));
 vi.mock(
   "../upstream/packages/drawnix/src/utils/runtime-model-discovery",
@@ -83,6 +85,7 @@ beforeEach(() => {
   let objectUrlId = 0;
   mocks.generate.mockReset();
   mocks.videoGenerate.mockReset();
+  mocks.models = null;
   const videoRecords = new Map<string, any>();
   mocks.videoStore = new EcommerceVideoStore({
     keys: async () => [...videoRecords.keys()],
@@ -129,6 +132,56 @@ async function setup() {
 }
 
 describe("sequential image workbench", () => {
+  it("removes all image options when switching to video with multiple provider entries", async () => {
+    const images = [
+      {
+        id: "gpt-image-2",
+        label: "gpt-image-2",
+        sourceProfileId: "synthetic-a",
+      },
+      {
+        id: "gpt-image-2",
+        label: "gpt-image-2",
+        sourceProfileId: "synthetic-b",
+      },
+      {
+        id: "gpt-image-2.6",
+        label: "gpt-image-2.6",
+        sourceProfileId: "synthetic-a",
+      },
+      {
+        id: "gpt-image-2.6",
+        label: "gpt-image-2.6",
+        sourceProfileId: "synthetic-b",
+      },
+    ];
+    mocks.models = {
+      image: images,
+      video: [...images, { id: "MiniMax-H3", label: "MiniMax-H3" }],
+    };
+    render(React.createElement(EcommerceWorkbench));
+    const imageSelect = screen.getByRole("combobox", {
+      name: "生成模型",
+    }) as HTMLSelectElement;
+    const chosen = [...imageSelect.options].find(
+      (option) => option.textContent === "gpt-image-2 · synthetic-b",
+    )!;
+    expect(chosen).toBeTruthy();
+    fireEvent.change(imageSelect, { target: { value: chosen.value } });
+    expect(imageSelect.value).toBe(chosen.value);
+    fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
+    const select = screen.getByRole("combobox", {
+      name: "生成模型",
+    }) as HTMLSelectElement;
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "MiniMax-H3",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "商品", exact: true }));
+    expect(
+      (screen.getByRole("combobox", { name: "生成模型" }) as HTMLSelectElement)
+        .value,
+    ).toBe(chosen.value);
+  });
   it("submits video parameters and restores a saved video after leaving the page", async () => {
     mocks.videoGenerate.mockImplementation(async (params) => {
       await params.onSubmitted("synthetic-task");
@@ -172,7 +225,7 @@ describe("sequential image workbench", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
     fireEvent.click(
-      screen.getByRole("button", { name: "视频压缩", exact: true }),
+      screen.getByRole("button", { name: "视频背景移除", exact: true }),
     );
     expect(screen.getByRole("status").textContent).toContain(
       "尚未接入专用视频处理服务",

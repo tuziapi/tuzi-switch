@@ -43,6 +43,12 @@ import { EcommerceBatchPanel } from "./EcommerceBatchPanel";
 import { ecommerceVideos, type VideoExecutor } from "./ecommerce-video-jobs";
 import { getVideoModelConfig } from "../upstream/packages/drawnix/src/constants/video-model-config";
 import { downloadEcommerceVideo } from "./ecommerce-video-media";
+import { prepareEcommerceImageExport } from "./ecommerce-image-output";
+import { VideoCompressionPanel } from "./VideoCompressionPanel";
+import {
+  ecommerceModelSelectionKey,
+  matchesEcommerceModelType,
+} from "./ecommerce-model-capabilities";
 
 type Category = "product" | "video" | "apparel";
 type ToolId =
@@ -806,12 +812,36 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     () => new Set(["白底精修图", "3D 立体效果图", "人台图"]),
   );
   const [videoMode, setVideoMode] = useState("商品替换优先");
-  const imageModels = useSelectableModels("image");
-  const videoModels = useSelectableModels("video");
+  const discoveredImageModels = useSelectableModels("image");
+  const discoveredVideoModels = useSelectableModels("video");
+  const imageModels = useMemo(
+    () =>
+      discoveredImageModels.filter((model) =>
+        matchesEcommerceModelType(model.id, "image"),
+      ),
+    [discoveredImageModels],
+  );
+  const videoModels = useMemo(
+    () =>
+      discoveredVideoModels.filter((model) =>
+        matchesEcommerceModelType(model.id, "video"),
+      ),
+    [discoveredVideoModels],
+  );
   const activePreset = getActiveInvocationPreset();
   const presetDefaultModelIds = {
-    image: activePreset?.image.defaultModelRef?.modelId || "",
-    video: activePreset?.video.defaultModelRef?.modelId || "",
+    image: matchesEcommerceModelType(
+      activePreset?.image.defaultModelRef?.modelId,
+      "image",
+    )
+      ? activePreset?.image.defaultModelRef?.modelId || ""
+      : "",
+    video: matchesEcommerceModelType(
+      activePreset?.video.defaultModelRef?.modelId,
+      "video",
+    )
+      ? activePreset?.video.defaultModelRef?.modelId || ""
+      : "",
   };
   const [selectedModels, setSelectedModels] = useState(() => ({
     image: presetDefaultModelIds.image || getFallbackDefaultModelId("image"),
@@ -948,14 +978,22 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           description: "当前默认模型",
         },
       ];
-  const selectedModel = modelOptions.some(
-    (model) => model.id === selectedModels[activeModelType],
-  )
-    ? selectedModels[activeModelType]
-    : normalizedModelOptions[0].id;
-  const selectedModelConfig = normalizedModelOptions.find(
-    (model) => model.id === selectedModel,
-  );
+  const selectedModelConfig =
+    normalizedModelOptions.find(
+      (model) =>
+        ecommerceModelSelectionKey(model) === selectedModels[activeModelType],
+    ) ||
+    normalizedModelOptions.find(
+      (model) =>
+        model.id === selectedModels[activeModelType] &&
+        model.sourceProfileId ===
+          activePreset?.[activeModelType].defaultModelRef?.profileId,
+    ) ||
+    normalizedModelOptions.find(
+      (model) => model.id === selectedModels[activeModelType],
+    ) ||
+    normalizedModelOptions[0];
+  const selectedModel = selectedModelConfig.id;
   const selectedModelRef: ModelRef = resolveEcommerceModelRef(
     selectedModel,
     activePreset?.[activeModelType].defaultModelRef,
@@ -994,7 +1032,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             !["video/mp4", "video/quicktime"].includes(referenceVideo.type)
           ? "MiniMax-H3 的参考视频只支持 MP4 或 MOV。"
           : referenceVideo && !supportsEcommerceVideoReference(selectedModel)
-            ? "本地参考视频目前支持 MiniMax-H3 / Gemini Omni 1.2 Flash，请切换模型。"
+            ? "本地参考视频请使用 MiniMax-H3 或 Gemini Omni 1.2 Flash。Seedance 目前要求公网视频地址，尚未接入素材上传服务。"
             : files.length > videoConfig.imageUpload.maxCount
               ? `当前模型最多支持 ${videoConfig.imageUpload.maxCount} 张商品图。`
               : "";
@@ -1036,18 +1074,22 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   };
   const saveImage = async (blob: Blob, name: string) => {
     try {
+      if (!batch) throw new Error("请先选择生成记录。");
+      const output = await prepareEcommerceImageExport(blob, batch.size);
       if (accountBridge?.imageAction)
-        await accountBridge.imageAction("save", blob, name);
+        await accountBridge.imageAction("save", output, name);
       else {
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(output);
         const link = document.createElement("a");
         link.href = url;
         link.download = name;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       }
-    } catch {
-      setError("保存图片失败，请重试。");
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "保存图片失败，请重试。",
+      );
     }
   };
 
@@ -1062,10 +1104,18 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setSelectedModels((current) => {
       const imageDefault = presetDefaultModelIds.image;
       const videoDefault = presetDefaultModelIds.video;
-      const image = imageModels.some((model) => model.id === current.image)
+      const image = imageModels.some(
+        (model) =>
+          model.id === current.image ||
+          ecommerceModelSelectionKey(model) === current.image,
+      )
         ? current.image
         : imageDefault || imageModels[0]?.id || current.image;
-      const video = videoModels.some((model) => model.id === current.video)
+      const video = videoModels.some(
+        (model) =>
+          model.id === current.video ||
+          ecommerceModelSelectionKey(model) === current.video,
+      )
         ? current.video
         : videoDefault || videoModels[0]?.id || current.video;
       if (image === current.image && video === current.video) return current;
@@ -1324,702 +1374,742 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           </button>
         ))}
       </nav>
-      <main className="ecommerce-workbench__main">
-        <div className="ecommerce-workbench__heading">
-          <h1>{currentTool.title}</h1>
-          <p>{currentTool.description}</p>
-        </div>
-        {templates.length > 0 && (
-          <div className="ecommerce-template-row" aria-label="结果模板预览">
-            {templates.map((template) => (
-              <button
-                key={template.id}
-                className={activeTemplate === template.id ? "is-active" : ""}
-                onClick={() => setActiveTemplate(template.id)}
-                type="button"
-              >
-                {template.label}
-                <span>{template.caption}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="ecommerce-preview" ref={resultPreview}>
-          <div className="ecommerce-preview__strip">
-            {previews.length ? (
-              previews.map((src, index) => (
-                <div className="ecommerce-preview__source" key={src}>
-                  <img src={src} alt={`上传素材 ${index + 1}`} />
+      {tool === "video-compress" ? (
+        <VideoCompressionPanel bridge={accountBridge} />
+      ) : (
+        <>
+          <main className="ecommerce-workbench__main">
+            <div className="ecommerce-workbench__heading">
+              <h1>{currentTool.title}</h1>
+              <p>{currentTool.description}</p>
+            </div>
+            {templates.length > 0 && (
+              <div className="ecommerce-template-row" aria-label="结果模板预览">
+                {templates.map((template) => (
                   <button
-                    aria-label="移除素材"
-                    onClick={() =>
-                      setFiles((current) =>
-                        current.filter((_, i) => i !== index),
-                      )
+                    key={template.id}
+                    className={
+                      activeTemplate === template.id ? "is-active" : ""
                     }
+                    onClick={() => setActiveTemplate(template.id)}
+                    type="button"
                   >
-                    <X size={13} />
+                    {template.label}
+                    <span>{template.caption}</span>
                   </button>
-                </div>
-              ))
-            ) : (
-              <div className="ecommerce-preview__empty">
-                <ImagePlus size={24} />
-                <span>
-                  {currentTool.media === "video"
-                    ? "上传商品图或视频素材"
-                    : "上传 1–3 张商品原图"}
-                </span>
+                ))}
               </div>
             )}
-          </div>
-          <div className="ecommerce-preview__canvas">
-            {resultUrls.length ? (
-              <>
-                {resultKind === "video" ? (
-                  <video
-                    src={resultUrls[activeResult]}
-                    controls
-                    playsInline
-                    aria-label="生成视频"
-                  />
+            <div className="ecommerce-preview" ref={resultPreview}>
+              <div className="ecommerce-preview__strip">
+                {previews.length ? (
+                  previews.map((src, index) => (
+                    <div className="ecommerce-preview__source" key={src}>
+                      <img src={src} alt={`上传素材 ${index + 1}`} />
+                      <button
+                        aria-label="移除素材"
+                        onClick={() =>
+                          setFiles((current) =>
+                            current.filter((_, i) => i !== index),
+                          )
+                        }
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))
                 ) : (
-                  <img src={resultUrls[activeResult]} alt="生成结果" />
-                )}
-                <div className="ecommerce-result-nav">
-                  <button
-                    disabled={activeResult === 0}
-                    onClick={() => setActiveResult((index) => index - 1)}
-                  >
-                    上一张
-                  </button>
-                  <span>
-                    {activeResult + 1} / {resultUrls.length}
-                  </span>
-                  <button
-                    disabled={activeResult === resultUrls.length - 1}
-                    onClick={() => setActiveResult((index) => index + 1)}
-                  >
-                    下一张
-                  </button>
-                  {resultKind === "image" && (
-                    <button
-                      onClick={() =>
-                        void queueCanvasInsert().catch(() =>
-                          setError("图片插入失败，请重试。"),
-                        )
-                      }
-                    >
-                      插入画布
-                    </button>
-                  )}
-                </div>
-              </>
-            ) : templates.length > 0 ? (
-              <div
-                className={`ecommerce-template-mock ecommerce-template-mock--${activeTemplate}`}
-              >
-                <div className="ecommerce-template-mock__topline" />
-                <div className="ecommerce-template-mock__image" />
-                <div className="ecommerce-template-mock__copy">
-                  <i />
-                  <i />
-                  <i />
-                </div>
-                <strong>
-                  {templates.find((item) => item.id === activeTemplate)?.label}
-                </strong>
-                <span>
-                  {busy ? generationStatus : "先预览结构，再上传素材生成"}
-                </span>
-              </div>
-            ) : (
-              <div>
-                <Sparkles size={34} />
-                <strong>
-                  {busy ? generationStatus : "生成结果将在这里展示"}
-                </strong>
-                <span>
-                  {busy
-                    ? "生成通常需要数分钟，请勿重复提交"
-                    : "先上传素材，再完善右侧生成参数"}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-        {resultKind === "image" && batch && (
-          <EcommerceBatchPanel
-            key={batch.id}
-            batch={batch}
-            busy={busy}
-            onResume={() => void resumeBatch()}
-            onRetry={(id) => void resumeBatch(id)}
-            onSave={(blob, name) => void saveImage(blob, name)}
-            previewUrls={Object.fromEntries(
-              batch.items
-                .filter((item) => item.image)
-                .map((item, i) => [item.id, imageUrls[i]]),
-            )}
-            selectedItemId={
-              batch.items.filter((item) => item.image)[activeResult]?.id
-            }
-            onPreview={(id) => {
-              const index = batch.items
-                .filter((item) => item.image)
-                .findIndex((item) => item.id === id);
-              if (index >= 0) {
-                setActiveResult(index);
-                resultPreview.current?.scrollIntoView?.({ block: "nearest" });
-              }
-            }}
-            history={
-              <label className="ecommerce-history">
-                生成记录
-                <select
-                  aria-label="生成记录"
-                  value={batch?.id || ""}
-                  onChange={(event) => {
-                    setSelectedBatchId(event.target.value);
-                    setActiveResult(0);
-                  }}
-                >
-                  {batches.map((record) => (
-                    <option key={record.id} value={record.id}>
-                      {new Date(record.createdAt).toLocaleString()} ·{" "}
-                      {
-                        record.items.filter(
-                          (item) => item.status === "complete",
-                        ).length
-                      }
-                      /{record.items.length} 张
-                    </option>
-                  ))}
-                </select>
-              </label>
-            }
-          />
-        )}
-        {resultKind === "video" && videoJob && (
-          <section
-            className="ecommerce-plan ecommerce-video-record"
-            aria-label="视频任务记录"
-          >
-            <label>
-              生成记录{" "}
-              <select
-                aria-label="视频生成记录"
-                value={videoJob.id}
-                onChange={(event) => setSelectedVideoId(event.target.value)}
-              >
-                {videoRecords.map((job) => (
-                  <option key={job.id} value={job.id}>
-                    {new Date(job.createdAt).toLocaleString()} ·{" "}
-                    {job.modelRef.modelId} ·{" "}
-                    {job.status === "complete"
-                      ? "已保存"
-                      : job.status === "waiting"
-                        ? "生成中"
-                        : "待核对"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p>
-              {videoJob.status === "complete"
-                ? "视频已保存到本机，可播放和导出。"
-                : videoJob.error || "正在生成视频，切换页面后仍可查看任务。"}
-            </p>
-            {videoJob.taskId && <small>任务编号：{videoJob.taskId}</small>}
-            {videoJob.video && (
-              <button
-                type="button"
-                onClick={() =>
-                  void (async () => {
-                    try {
-                      const blob = videoJob.video!;
-                      const name = `ecommerce-${videoJob.id}.${blob.type.includes("webm") ? "webm" : "mp4"}`;
-                      if (accountBridge?.saveMedia)
-                        await accountBridge.saveMedia(blob, name, "video");
-                      else {
-                        const a = document.createElement("a");
-                        a.href = videoResultUrls[0];
-                        a.download = name;
-                        a.click();
-                      }
-                    } catch {
-                      setError("视频导出失败，请重试。");
-                    }
-                  })()
-                }
-              >
-                保存视频
-              </button>
-            )}
-            {!videoBusy &&
-              videoJob.status !== "complete" &&
-              (videoJob.taskId || videoJob.resultUrl || videoJob.video) && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    void ecommerceVideos
-                      .resume(videoJob.id, taskOwner, createVideoExecutor())
-                      .catch((cause) => setError(cause.message))
-                  }
-                >
-                  继续获取结果（不重新生成）
-                </button>
-              )}
-            {!videoBusy &&
-              videoJob.status === "interrupted" &&
-              !videoJob.taskId && (
-                <small>
-                  未取得服务端任务编号，请核对调用记录后再决定是否新建任务，避免重复计费。
-                </small>
-              )}
-          </section>
-        )}
-      </main>
-      <aside className="ecommerce-workbench__panel">
-        <label className="ecommerce-upload">
-          <input type="file" accept="image/*" multiple onChange={selectFiles} />
-          <Upload size={18} />
-          <span>
-            {files.length ? `已选择 ${files.length} 张图片` : "上传商品原图"}
-          </span>
-          <small>支持 JPG、PNG，最多 3 张</small>
-        </label>
-        {currentTool.media === "video" && (
-          <label className="ecommerce-upload ecommerce-upload--video">
-            <input
-              type="file"
-              accept="video/mp4,video/quicktime,video/webm"
-              onChange={(event) =>
-                setReferenceVideo(event.target.files?.[0] ?? null)
-              }
-            />
-            <Video size={18} />
-            <span>
-              {referenceVideo
-                ? `已选择 ${referenceVideo.name}`
-                : "上传参考视频"}
-            </span>
-            <small>MP4、MOV、WebM，最多 20 MB；需支持视频参考的模型</small>
-          </label>
-        )}
-        <label className="ecommerce-model-field">
-          生成模型
-          <select
-            aria-label="生成模型"
-            value={selectedModel}
-            onChange={(event) =>
-              setSelectedModels((current) => ({
-                ...current,
-                [activeModelType]: event.target.value,
-              }))
-            }
-          >
-            {normalizedModelOptions.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.shortLabel || model.label || model.id}
-              </option>
-            ))}
-          </select>
-          <small>
-            {selectedModelConfig?.description ||
-              `${activeModels.length} 个已配置${currentTool.media === "image" ? "图片" : "视频"}模型`}
-          </small>
-          <small
-            className={
-              selectedInvocationPlan
-                ? "ecommerce-model-status"
-                : "ecommerce-model-status is-warning"
-            }
-          >
-            {selectedInvocationPlan
-              ? `已配置：${selectedInvocationPlan.provider.profileName} · ${selectedInvocationPlan.binding.submitPath}`
-              : "未找到有效接口绑定，请刷新模型列表或重新保存创作配置"}
-          </small>
-        </label>
-        <div className="ecommerce-fields">
-          <label>
-            上架平台
-            <select
-              value={platform}
-              onChange={(event) => setPlatform(event.target.value)}
-            >
-              {ECOMMERCE_PLATFORMS.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            市场地区
-            <select
-              value={market}
-              onChange={(event) => setMarket(event.target.value)}
-            >
-              <option>美国</option>
-              <option>中国</option>
-              <option>日本</option>
-            </select>
-          </label>
-          <label>
-            语言
-            <select
-              value={language}
-              onChange={(event) => setLanguage(event.target.value)}
-            >
-              {ECOMMERCE_LANGUAGES.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-          {currentTool.media === "image" ? (
-            <label>
-              图片/视频比例
-              <select
-                value={ratio}
-                onChange={(event) => setRatio(event.target.value)}
-              >
-                {ECOMMERCE_RATIOS.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label} · {item.size}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <>
-              <label>
-                视频时长
-                <select
-                  aria-label="视频时长"
-                  value={selectedVideoDuration}
-                  onChange={(event) => setVideoDuration(event.target.value)}
-                >
-                  {videoConfig.durationOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                视频尺寸
-                <select
-                  aria-label="视频尺寸"
-                  value={selectedVideoSize}
-                  onChange={(event) => setVideoSize(event.target.value)}
-                >
-                  {videoConfig.sizeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                视频比例
-                <select
-                  aria-label="视频比例"
-                  disabled={Boolean(sizeRatio && /^\d+:\d+$/.test(sizeRatio))}
-                  value={effectiveVideoRatio}
-                  onChange={(event) => setVideoRatio(event.target.value)}
-                >
-                  {[...new Set(["16:9", "9:16", effectiveVideoRatio])].map(
-                    (value) => (
-                      <option key={value}>{value}</option>
-                    ),
-                  )}
-                </select>
-              </label>
-            </>
-          )}
-        </div>
-        <label className="ecommerce-prompt">
-          <span className="ecommerce-prompt__label">
-            {currentTool.media === "video"
-              ? "商品卖点（可选）"
-              : category === "apparel"
-                ? "补充要求"
-                : "商品卖点与要求"}
-            {currentTool.media === "image" && (
-              <button
-                type="button"
-                className="ecommerce-assist"
-                onClick={() => void writeSellingPoint()}
-                disabled={assistBusy}
-              >
-                <Sparkles size={12} />
-                {assistBusy ? "生成中…" : "AI 帮写"}
-              </button>
-            )}
-          </span>
-          <textarea
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder="例如：突出材质、核心卖点、使用场景和画面风格"
-          />
-        </label>
-        <div className="ecommerce-modules ecommerce-quick-options">
-          <div className="ecommerce-modules__title">
-            <span>
-              <strong>快捷优化项</strong>
-              <em>选择常用优化方向，可多选</em>
-            </span>
-            <button type="button" onClick={restoreQuickDefaults}>
-              恢复推荐
-            </button>
-          </div>
-          <div className="ecommerce-modules__grid">
-            {quickOptions[tool].map((option) => {
-              const checked = quickSelections[tool].has(option.id);
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={checked ? "is-selected" : ""}
-                  aria-pressed={checked}
-                  onClick={() => toggleQuickOption(option.id)}
-                >
-                  <span className="ecommerce-check">
-                    {checked && <Check size={12} />}
-                  </span>
-                  <span>
-                    <strong>{option.label}</strong>
-                    <small>{option.hint}</small>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        {(tool === "product-set" ||
-          tool === "video-replicate" ||
-          category === "apparel" ||
-          tool === "detail-page") && (
-          <details className="ecommerce-advanced">
-            <summary>
-              更多设置 <span>按需调整</span>
-            </summary>
-            {tool === "product-set" && (
-              <div className="ecommerce-choice">
-                <strong>套图结构配置</strong>
-                <label>
-                  <input
-                    type="radio"
-                    checked={structure === "smart"}
-                    onChange={() => setStructure("smart")}
-                  />
-                  按所选模块<span>每个快捷优化模块生成一张独立图片</span>
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    checked={structure === "custom"}
-                    onChange={() => setStructure("custom")}
-                  />
-                  自定义配置<span>自由调整各类型图片数量</span>
-                </label>
-                {structure === "custom" && (
-                  <div className="ecommerce-counts" aria-label="商品套图数量">
-                    {(
-                      [
-                        ["whiteBackground", "白底图"],
-                        ["scene", "场景图"],
-                        ["sellingPoint", "卖点图"],
-                        ["other", "其他图片"],
-                      ] as const
-                    ).map(([key, label]) => (
-                      <label key={key}>
-                        <span>{label}</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={12}
-                          value={customCounts[key]}
-                          onChange={(event) =>
-                            updateCustomCount(key, Number(event.target.value))
-                          }
-                        />
-                      </label>
-                    ))}
-                    <small>
-                      共{" "}
-                      {Object.values(customCounts).reduce(
-                        (sum, count) => sum + count,
-                        0,
-                      )}{" "}
-                      张，至少保留 1 张
-                    </small>
+                  <div className="ecommerce-preview__empty">
+                    <ImagePlus size={24} />
+                    <span>
+                      {currentTool.media === "video"
+                        ? "上传商品图或视频素材"
+                        : "上传 1–3 张商品原图"}
+                    </span>
                   </div>
                 )}
               </div>
-            )}
-            {tool === "detail-page" && (
-              <div className="ecommerce-modules ecommerce-detail-modules">
-                <div className="ecommerce-modules__title">
-                  <span>
-                    <strong>详情页模块</strong>
-                    <em>首屏主视觉为必选</em>
-                  </span>
-                  <button type="button" onClick={restoreQuickDefaults}>
-                    恢复推荐
-                  </button>
-                </div>
-                <div className="ecommerce-modules__grid">
-                  {DETAIL_PAGE_MODULES.map((module) => {
-                    const checked = quickSelections[tool].has(module.id);
-                    return (
+              <div className="ecommerce-preview__canvas">
+                {resultUrls.length ? (
+                  <>
+                    {resultKind === "video" ? (
+                      <video
+                        src={resultUrls[activeResult]}
+                        controls
+                        playsInline
+                        aria-label="生成视频"
+                      />
+                    ) : (
+                      <img src={resultUrls[activeResult]} alt="生成结果" />
+                    )}
+                    <div className="ecommerce-result-nav">
                       <button
-                        key={module.id}
-                        type="button"
-                        className={checked ? "is-selected" : ""}
-                        aria-pressed={checked}
-                        disabled={module.required}
-                        onClick={() => toggleQuickOption(module.id)}
+                        disabled={activeResult === 0}
+                        onClick={() => setActiveResult((index) => index - 1)}
                       >
-                        <span className="ecommerce-check">
-                          {checked && <Check size={12} />}
-                        </span>
-                        <span>
-                          <strong>{module.label}</strong>
-                          <small>{module.hint}</small>
-                        </span>
+                        上一张
                       </button>
-                    );
-                  })}
-                </div>
+                      <span>
+                        {activeResult + 1} / {resultUrls.length}
+                      </span>
+                      <button
+                        disabled={activeResult === resultUrls.length - 1}
+                        onClick={() => setActiveResult((index) => index + 1)}
+                      >
+                        下一张
+                      </button>
+                      {resultKind === "image" && (
+                        <button
+                          onClick={() =>
+                            void queueCanvasInsert().catch(() =>
+                              setError("图片插入失败，请重试。"),
+                            )
+                          }
+                        >
+                          插入画布
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : templates.length > 0 ? (
+                  <div
+                    className={`ecommerce-template-mock ecommerce-template-mock--${activeTemplate}`}
+                  >
+                    <div className="ecommerce-template-mock__topline" />
+                    <div className="ecommerce-template-mock__image" />
+                    <div className="ecommerce-template-mock__copy">
+                      <i />
+                      <i />
+                      <i />
+                    </div>
+                    <strong>
+                      {
+                        templates.find((item) => item.id === activeTemplate)
+                          ?.label
+                      }
+                    </strong>
+                    <span>
+                      {busy ? generationStatus : "先预览结构，再上传素材生成"}
+                    </span>
+                  </div>
+                ) : (
+                  <div>
+                    <Sparkles size={34} />
+                    <strong>
+                      {busy ? generationStatus : "生成结果将在这里展示"}
+                    </strong>
+                    <span>
+                      {busy
+                        ? "生成通常需要数分钟，请勿重复提交"
+                        : "先上传素材，再完善右侧生成参数"}
+                    </span>
+                  </div>
+                )}
               </div>
+            </div>
+            {resultKind === "image" && batch && (
+              <EcommerceBatchPanel
+                key={batch.id}
+                batch={batch}
+                busy={busy}
+                onResume={() => void resumeBatch()}
+                onRetry={(id) => void resumeBatch(id)}
+                onSave={(blob, name) => void saveImage(blob, name)}
+                previewUrls={Object.fromEntries(
+                  batch.items
+                    .filter((item) => item.image)
+                    .map((item, i) => [item.id, imageUrls[i]]),
+                )}
+                selectedItemId={
+                  batch.items.filter((item) => item.image)[activeResult]?.id
+                }
+                onPreview={(id) => {
+                  const index = batch.items
+                    .filter((item) => item.image)
+                    .findIndex((item) => item.id === id);
+                  if (index >= 0) {
+                    setActiveResult(index);
+                    resultPreview.current?.scrollIntoView?.({
+                      block: "nearest",
+                    });
+                  }
+                }}
+                history={
+                  <label className="ecommerce-history">
+                    生成记录
+                    <select
+                      aria-label="生成记录"
+                      value={batch?.id || ""}
+                      onChange={(event) => {
+                        setSelectedBatchId(event.target.value);
+                        setActiveResult(0);
+                      }}
+                    >
+                      {batches.map((record) => (
+                        <option key={record.id} value={record.id}>
+                          {new Date(record.createdAt).toLocaleString()} ·{" "}
+                          {
+                            record.items.filter(
+                              (item) => item.status === "complete",
+                            ).length
+                          }
+                          /{record.items.length} 张
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                }
+              />
             )}
-            {tool === "video-replicate" && (
-              <div className="ecommerce-choice">
-                <strong>视频复刻模式</strong>
+            {resultKind === "video" && videoJob && (
+              <section
+                className="ecommerce-plan ecommerce-video-record"
+                aria-label="视频任务记录"
+              >
                 <label>
-                  <input
-                    type="radio"
-                    checked={videoMode === "商品替换优先"}
-                    onChange={() => setVideoMode("商品替换优先")}
-                  />
-                  商品替换优先<span>参考原片生成，不能保证逐帧一致</span>
+                  生成记录{" "}
+                  <select
+                    aria-label="视频生成记录"
+                    value={videoJob.id}
+                    onChange={(event) => setSelectedVideoId(event.target.value)}
+                  >
+                    {videoRecords.map((job) => (
+                      <option key={job.id} value={job.id}>
+                        {new Date(job.createdAt).toLocaleString()} ·{" "}
+                        {job.modelRef.modelId} ·{" "}
+                        {job.status === "complete"
+                          ? "已保存"
+                          : job.status === "waiting"
+                            ? "生成中"
+                            : "待核对"}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <label>
-                  <input
-                    type="radio"
-                    checked={videoMode === "相似复刻"}
-                    onChange={() => setVideoMode("相似复刻")}
-                  />
-                  相似复刻<span>复刻镜头和转场但保持差异</span>
-                </label>
-              </div>
-            )}
-            {category === "apparel" && (
-              <div className="ecommerce-modules">
-                <div className="ecommerce-modules__title">
-                  <strong>生成类型</strong>
-                  <span>可多选</span>
-                </div>
-                <div className="ecommerce-modules__grid">
-                  {[
-                    "白底精修图",
-                    "3D 立体效果图",
-                    "人台图",
-                    "细节特写图",
-                    "卖点图",
-                  ].map((name) => (
+                <p>
+                  {videoJob.status === "complete"
+                    ? "视频已保存到本机，可播放和导出。"
+                    : videoJob.error ||
+                      "正在生成视频，切换页面后仍可查看任务。"}
+                </p>
+                {videoJob.taskId && <small>任务编号：{videoJob.taskId}</small>}
+                {videoJob.video && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void (async () => {
+                        try {
+                          const blob = videoJob.video!;
+                          const name = `ecommerce-${videoJob.id}.${blob.type.includes("webm") ? "webm" : "mp4"}`;
+                          if (accountBridge?.saveMedia)
+                            await accountBridge.saveMedia(blob, name, "video");
+                          else {
+                            const a = document.createElement("a");
+                            a.href = videoResultUrls[0];
+                            a.download = name;
+                            a.click();
+                          }
+                        } catch {
+                          setError("视频导出失败，请重试。");
+                        }
+                      })()
+                    }
+                  >
+                    保存视频
+                  </button>
+                )}
+                {!videoBusy &&
+                  videoJob.status !== "complete" &&
+                  (videoJob.taskId || videoJob.resultUrl || videoJob.video) && (
                     <button
-                      key={name}
-                      className={apparelTypes.has(name) ? "is-selected" : ""}
-                      onClick={() => toggleSet(setApparelTypes, name)}
+                      type="button"
+                      onClick={() =>
+                        void ecommerceVideos
+                          .resume(videoJob.id, taskOwner, createVideoExecutor())
+                          .catch((cause) => setError(cause.message))
+                      }
+                    >
+                      继续获取结果（不重新生成）
+                    </button>
+                  )}
+                {!videoBusy &&
+                  videoJob.status === "interrupted" &&
+                  !videoJob.taskId && (
+                    <small>
+                      未取得服务端任务编号，请核对调用记录后再决定是否新建任务，避免重复计费。
+                    </small>
+                  )}
+              </section>
+            )}
+          </main>
+          <aside className="ecommerce-workbench__panel">
+            <label className="ecommerce-upload">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={selectFiles}
+              />
+              <Upload size={18} />
+              <span>
+                {files.length
+                  ? `已选择 ${files.length} 张图片`
+                  : "上传商品原图"}
+              </span>
+              <small>支持 JPG、PNG，最多 3 张</small>
+            </label>
+            {currentTool.media === "video" && (
+              <label className="ecommerce-upload ecommerce-upload--video">
+                <input
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm"
+                  onChange={(event) =>
+                    setReferenceVideo(event.target.files?.[0] ?? null)
+                  }
+                />
+                <Video size={18} />
+                <span>
+                  {referenceVideo
+                    ? `已选择 ${referenceVideo.name}`
+                    : "上传参考视频"}
+                </span>
+                <small>MP4、MOV、WebM，最多 20 MB；需支持视频参考的模型</small>
+              </label>
+            )}
+            <label className="ecommerce-model-field">
+              生成模型
+              <select
+                key={activeModelType}
+                aria-label="生成模型"
+                value={ecommerceModelSelectionKey(selectedModelConfig)}
+                onChange={(event) =>
+                  setSelectedModels((current) => ({
+                    ...current,
+                    [activeModelType]: event.target.value,
+                  }))
+                }
+              >
+                {normalizedModelOptions.map((model) => (
+                  <option
+                    key={ecommerceModelSelectionKey(model)}
+                    value={ecommerceModelSelectionKey(model)}
+                  >
+                    {model.shortLabel || model.label || model.id}
+                    {normalizedModelOptions.filter(
+                      (other) => other.id === model.id,
+                    ).length > 1
+                      ? ` · ${model.sourceProfileName || model.sourceProfileId || "默认配置"}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              <small>
+                {selectedModelConfig?.description ||
+                  `${activeModels.length} 个已配置${currentTool.media === "image" ? "图片" : "视频"}模型`}
+              </small>
+              <small
+                className={
+                  selectedInvocationPlan
+                    ? "ecommerce-model-status"
+                    : "ecommerce-model-status is-warning"
+                }
+              >
+                {selectedInvocationPlan
+                  ? `已配置：${selectedInvocationPlan.provider.profileName} · ${selectedInvocationPlan.binding.submitPath}`
+                  : "未找到有效接口绑定，请刷新模型列表或重新保存创作配置"}
+              </small>
+            </label>
+            <div className="ecommerce-fields">
+              <label>
+                上架平台
+                <select
+                  value={platform}
+                  onChange={(event) => setPlatform(event.target.value)}
+                >
+                  {ECOMMERCE_PLATFORMS.map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                市场地区
+                <select
+                  value={market}
+                  onChange={(event) => setMarket(event.target.value)}
+                >
+                  <option>美国</option>
+                  <option>中国</option>
+                  <option>日本</option>
+                </select>
+              </label>
+              <label>
+                语言
+                <select
+                  value={language}
+                  onChange={(event) => setLanguage(event.target.value)}
+                >
+                  {ECOMMERCE_LANGUAGES.map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
+              {currentTool.media === "image" ? (
+                <label>
+                  图片/视频比例
+                  <select
+                    value={ratio}
+                    onChange={(event) => setRatio(event.target.value)}
+                  >
+                    {ECOMMERCE_RATIOS.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label} · {item.size}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <>
+                  <label>
+                    视频时长
+                    <select
+                      aria-label="视频时长"
+                      value={selectedVideoDuration}
+                      onChange={(event) => setVideoDuration(event.target.value)}
+                    >
+                      {videoConfig.durationOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    视频尺寸
+                    <select
+                      aria-label="视频尺寸"
+                      value={selectedVideoSize}
+                      onChange={(event) => setVideoSize(event.target.value)}
+                    >
+                      {videoConfig.sizeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    视频比例
+                    <select
+                      aria-label="视频比例"
+                      disabled={Boolean(
+                        sizeRatio && /^\d+:\d+$/.test(sizeRatio),
+                      )}
+                      value={effectiveVideoRatio}
+                      onChange={(event) => setVideoRatio(event.target.value)}
+                    >
+                      {[...new Set(["16:9", "9:16", effectiveVideoRatio])].map(
+                        (value) => (
+                          <option key={value}>{value}</option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                </>
+              )}
+            </div>
+            <label className="ecommerce-prompt">
+              <span className="ecommerce-prompt__label">
+                {currentTool.media === "video"
+                  ? "商品卖点（可选）"
+                  : category === "apparel"
+                    ? "补充要求"
+                    : "商品卖点与要求"}
+                {currentTool.media === "image" && (
+                  <button
+                    type="button"
+                    className="ecommerce-assist"
+                    onClick={() => void writeSellingPoint()}
+                    disabled={assistBusy}
+                  >
+                    <Sparkles size={12} />
+                    {assistBusy ? "生成中…" : "AI 帮写"}
+                  </button>
+                )}
+              </span>
+              <textarea
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="例如：突出材质、核心卖点、使用场景和画面风格"
+              />
+            </label>
+            <div className="ecommerce-modules ecommerce-quick-options">
+              <div className="ecommerce-modules__title">
+                <span>
+                  <strong>快捷优化项</strong>
+                  <em>选择常用优化方向，可多选</em>
+                </span>
+                <button type="button" onClick={restoreQuickDefaults}>
+                  恢复推荐
+                </button>
+              </div>
+              <div className="ecommerce-modules__grid">
+                {quickOptions[tool].map((option) => {
+                  const checked = quickSelections[tool].has(option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={checked ? "is-selected" : ""}
+                      aria-pressed={checked}
+                      onClick={() => toggleQuickOption(option.id)}
                     >
                       <span className="ecommerce-check">
-                        {apparelTypes.has(name) && <Check size={12} />}
+                        {checked && <Check size={12} />}
                       </span>
                       <span>
-                        <strong>{name}</strong>
-                        <small>
-                          {name === "白底精修图"
-                            ? "正面/背面产品精修"
-                            : name === "人台图"
-                              ? "使用人台展示服装"
-                              : "突出产品细节和卖点"}
-                        </small>
+                        <strong>{option.label}</strong>
+                        <small>{option.hint}</small>
                       </span>
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
+              </div>
+            </div>
+            {(tool === "product-set" ||
+              tool === "video-replicate" ||
+              category === "apparel" ||
+              tool === "detail-page") && (
+              <details className="ecommerce-advanced">
+                <summary>
+                  更多设置 <span>按需调整</span>
+                </summary>
+                {tool === "product-set" && (
+                  <div className="ecommerce-choice">
+                    <strong>套图结构配置</strong>
+                    <label>
+                      <input
+                        type="radio"
+                        checked={structure === "smart"}
+                        onChange={() => setStructure("smart")}
+                      />
+                      按所选模块<span>每个快捷优化模块生成一张独立图片</span>
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        checked={structure === "custom"}
+                        onChange={() => setStructure("custom")}
+                      />
+                      自定义配置<span>自由调整各类型图片数量</span>
+                    </label>
+                    {structure === "custom" && (
+                      <div
+                        className="ecommerce-counts"
+                        aria-label="商品套图数量"
+                      >
+                        {(
+                          [
+                            ["whiteBackground", "白底图"],
+                            ["scene", "场景图"],
+                            ["sellingPoint", "卖点图"],
+                            ["other", "其他图片"],
+                          ] as const
+                        ).map(([key, label]) => (
+                          <label key={key}>
+                            <span>{label}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={12}
+                              value={customCounts[key]}
+                              onChange={(event) =>
+                                updateCustomCount(
+                                  key,
+                                  Number(event.target.value),
+                                )
+                              }
+                            />
+                          </label>
+                        ))}
+                        <small>
+                          共{" "}
+                          {Object.values(customCounts).reduce(
+                            (sum, count) => sum + count,
+                            0,
+                          )}{" "}
+                          张，至少保留 1 张
+                        </small>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {tool === "detail-page" && (
+                  <div className="ecommerce-modules ecommerce-detail-modules">
+                    <div className="ecommerce-modules__title">
+                      <span>
+                        <strong>详情页模块</strong>
+                        <em>首屏主视觉为必选</em>
+                      </span>
+                      <button type="button" onClick={restoreQuickDefaults}>
+                        恢复推荐
+                      </button>
+                    </div>
+                    <div className="ecommerce-modules__grid">
+                      {DETAIL_PAGE_MODULES.map((module) => {
+                        const checked = quickSelections[tool].has(module.id);
+                        return (
+                          <button
+                            key={module.id}
+                            type="button"
+                            className={checked ? "is-selected" : ""}
+                            aria-pressed={checked}
+                            disabled={module.required}
+                            onClick={() => toggleQuickOption(module.id)}
+                          >
+                            <span className="ecommerce-check">
+                              {checked && <Check size={12} />}
+                            </span>
+                            <span>
+                              <strong>{module.label}</strong>
+                              <small>{module.hint}</small>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {tool === "video-replicate" && (
+                  <div className="ecommerce-choice">
+                    <strong>视频复刻模式</strong>
+                    <label>
+                      <input
+                        type="radio"
+                        checked={videoMode === "商品替换优先"}
+                        onChange={() => setVideoMode("商品替换优先")}
+                      />
+                      商品替换优先<span>参考原片生成，不能保证逐帧一致</span>
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        checked={videoMode === "相似复刻"}
+                        onChange={() => setVideoMode("相似复刻")}
+                      />
+                      相似复刻<span>复刻镜头和转场但保持差异</span>
+                    </label>
+                  </div>
+                )}
+                {category === "apparel" && (
+                  <div className="ecommerce-modules">
+                    <div className="ecommerce-modules__title">
+                      <strong>生成类型</strong>
+                      <span>可多选</span>
+                    </div>
+                    <div className="ecommerce-modules__grid">
+                      {[
+                        "白底精修图",
+                        "3D 立体效果图",
+                        "人台图",
+                        "细节特写图",
+                        "卖点图",
+                      ].map((name) => (
+                        <button
+                          key={name}
+                          className={
+                            apparelTypes.has(name) ? "is-selected" : ""
+                          }
+                          onClick={() => toggleSet(setApparelTypes, name)}
+                        >
+                          <span className="ecommerce-check">
+                            {apparelTypes.has(name) && <Check size={12} />}
+                          </span>
+                          <span>
+                            <strong>{name}</strong>
+                            <small>
+                              {name === "白底精修图"
+                                ? "正面/背面产品精修"
+                                : name === "人台图"
+                                  ? "使用人台展示服装"
+                                  : "突出产品细节和卖点"}
+                            </small>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </details>
+            )}
+            {currentTool.media === "image" && (
+              <div className="ecommerce-plan" aria-label="本次生成计划">
+                <strong>本次生成 {imagePlan.length} 张 · 逐张出图</strong>
+                <p>{imagePlan.map((item) => item.label).join(" · ")}</p>
+                <small>每张单独请求和计费，完成后立即显示并保存。</small>
               </div>
             )}
-          </details>
-        )}
-        {currentTool.media === "image" && (
-          <div className="ecommerce-plan" aria-label="本次生成计划">
-            <strong>本次生成 {imagePlan.length} 张 · 逐张出图</strong>
-            <p>{imagePlan.map((item) => item.label).join(" · ")}</p>
-            <small>每张单独请求和计费，完成后立即显示并保存。</small>
-          </div>
-        )}
-        {resultKind === "video" && videoInputError && (
-          <p className="ecommerce-error" role="status">
-            {videoInputError}
-          </p>
-        )}
-        {(error || jobState.storageError || videoState.storageError) && (
-          <p className="ecommerce-error" role="alert">
-            {error || jobState.storageError || videoState.storageError}
-          </p>
-        )}
-        <button
-          className="ecommerce-generate"
-          disabled={
-            busy ||
-            (currentTool.media === "video" &&
-              (!videoState.ready || Boolean(videoInputError))) ||
-            (currentTool.media === "image" && !jobState.ready) ||
-            (currentTool.media === "image" && !files.length) ||
-            (currentTool.media === "video" &&
-              !files.length &&
-              !referenceVideo) ||
-            (tool === "product-set" &&
-              structure === "custom" &&
-              customTotal < 1)
-          }
-          onClick={() => void generate()}
-        >
-          {busy ? (
-            <>
-              <LoaderCircle className="spin" size={17} />
-              {generationStatus}
-            </>
-          ) : (
-            <>
-              <Sparkles size={17} />
-              {currentTool.media === "video"
-                ? "生成视频"
-                : `生成 ${imagePlan.length} 张图片`}
-            </>
-          )}
-        </button>
-        {Boolean(jobState.activeId) && resultKind === "image" && (
-          <button
-            type="button"
-            className="ecommerce-stop"
-            onClick={() => ecommerceJobs.pause()}
-          >
-            暂停生成
-          </button>
-        )}
-        {videoBusy && (
-          <button
-            type="button"
-            className="ecommerce-stop"
-            onClick={() => ecommerceVideos.pause()}
-          >
-            停止等待视频
-          </button>
-        )}
-      </aside>
+            {resultKind === "video" && videoInputError && (
+              <p className="ecommerce-error" role="status">
+                {videoInputError}
+              </p>
+            )}
+            {(error || jobState.storageError || videoState.storageError) && (
+              <p className="ecommerce-error" role="alert">
+                {error || jobState.storageError || videoState.storageError}
+              </p>
+            )}
+            <button
+              className="ecommerce-generate"
+              disabled={
+                busy ||
+                (currentTool.media === "video" &&
+                  (!videoState.ready || Boolean(videoInputError))) ||
+                (currentTool.media === "image" && !jobState.ready) ||
+                (currentTool.media === "image" && !files.length) ||
+                (currentTool.media === "video" &&
+                  !files.length &&
+                  !referenceVideo) ||
+                (tool === "product-set" &&
+                  structure === "custom" &&
+                  customTotal < 1)
+              }
+              onClick={() => void generate()}
+            >
+              {busy ? (
+                <>
+                  <LoaderCircle className="spin" size={17} />
+                  {generationStatus}
+                </>
+              ) : (
+                <>
+                  <Sparkles size={17} />
+                  {currentTool.media === "video"
+                    ? "生成视频"
+                    : `生成 ${imagePlan.length} 张图片`}
+                </>
+              )}
+            </button>
+            {Boolean(jobState.activeId) && resultKind === "image" && (
+              <button
+                type="button"
+                className="ecommerce-stop"
+                onClick={() => ecommerceJobs.pause()}
+              >
+                暂停生成
+              </button>
+            )}
+            {videoBusy && (
+              <button
+                type="button"
+                className="ecommerce-stop"
+                onClick={() => ecommerceVideos.pause()}
+              >
+                停止等待视频
+              </button>
+            )}
+          </aside>
+        </>
+      )}
     </section>
   );
 }

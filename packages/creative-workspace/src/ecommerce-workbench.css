@@ -917,3 +917,45 @@
     animation: none;
   }
 }
+.ecommerce-compression-previews {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.ecommerce-compression-previews section {
+  min-width: 0;
+}
+.ecommerce-compression-previews h2 {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.ecommerce-compression-previews video,
+.ecommerce-compression-empty {
+  width: 100%;
+  height: 320px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: rgba(128, 128, 128, 0.08);
+}
+.ecommerce-compression-empty {
+  display: grid;
+  place-items: center;
+  color: #858585;
+  font-size: 13px;
+}
+.ecommerce-compression-audio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+@media (max-width: 1100px) {
+  .ecommerce-compression-previews {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ecommerce-compression-previews video,
+  .ecommerce-compression-empty {
+    height: 240px;
+  }
+}

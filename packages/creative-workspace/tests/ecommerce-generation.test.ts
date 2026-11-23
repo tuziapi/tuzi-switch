@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   asyncGenerate: vi.fn(),
   videoSubmit: vi.fn(),
   videoPoll: vi.fn(),
+  seedanceSubmit: vi.fn(),
+  seedancePoll: vi.fn(),
   modelId: "synthetic-image",
 }));
 vi.mock("../upstream/packages/drawnix/src/services/provider-routing", () => ({
@@ -43,9 +45,22 @@ vi.mock("../upstream/packages/drawnix/src/services/video-api-service", () => ({
     resumePolling: mocks.videoPoll,
   },
 }));
+vi.mock(
+  "../upstream/packages/drawnix/src/services/model-adapters/seedance2-adapter",
+  () => ({
+    submitSeedance2Request: mocks.seedanceSubmit,
+  }),
+);
+vi.mock(
+  "../upstream/packages/drawnix/src/services/media-api/video-api",
+  () => ({
+    pollVideoUntilComplete: mocks.seedancePoll,
+  }),
+);
 import {
   generateEcommerceImage,
   generateEcommerceVideo,
+  supportsEcommerceVideoReference,
 } from "../src/ecommerce-generation";
 
 beforeEach(() => {
@@ -97,6 +112,64 @@ describe("ecommerce video routing", () => {
     await generateEcommerceVideo({ ...params(), taskId: "existing-task" });
     expect(mocks.videoSubmit).not.toHaveBeenCalled();
     expect(mocks.videoPoll.mock.calls[0][0]).toBe("existing-task");
+  });
+  it("submits Seedance reference videos through its content-JSON adapter and saves the ID before polling", async () => {
+    mocks.modelId = "doubao-seedance-2-5-260628";
+    mocks.seedanceSubmit.mockResolvedValue({ taskId: "synthetic-seedance" });
+    let saved = false;
+    mocks.seedancePoll.mockImplementationOnce(async () => {
+      expect(saved).toBe(true);
+      return {
+        status: "succeeded",
+        content: { video_url: "https://example.invalid/seedance.mp4" },
+      };
+    });
+    const result = await generateEcommerceVideo({
+      ...params(),
+      seconds: "4",
+      size: "720p",
+      referenceVideo: "https://example.invalid/reference.mp4",
+      onSubmitted: async () => {
+        saved = true;
+      },
+    });
+    expect(mocks.videoSubmit).not.toHaveBeenCalled();
+    expect(mocks.seedanceSubmit.mock.calls[0][1]).toMatchObject({
+      duration: 4,
+      size: "720p",
+      params: { input_videos: ["https://example.invalid/reference.mp4"] },
+    });
+    expect(result).toEqual(["https://example.invalid/seedance.mp4"]);
+  });
+  it("rejects local Seedance video before submission and does not advertise file-upload support", async () => {
+    mocks.modelId = "doubao-seedance-2-5-260628";
+    expect(supportsEcommerceVideoReference(mocks.modelId)).toBe(false);
+    for (const referenceVideo of [
+      "data:video/mp4;base64,AAAA",
+      "blob:tauri://localhost/synthetic",
+      "http://127.0.0.1/reference.mp4",
+    ]) {
+      await expect(
+        generateEcommerceVideo({ ...params(), referenceVideo }),
+      ).rejects.toThrow("尚未接入素材上传服务");
+    }
+    expect(mocks.seedanceSubmit).not.toHaveBeenCalled();
+    expect(mocks.videoSubmit).not.toHaveBeenCalled();
+  });
+  it("resumes a Seedance task without new submission and rejects an image model before billing", async () => {
+    mocks.modelId = "doubao-seedance-2-5-260628";
+    mocks.seedancePoll.mockResolvedValue({
+      status: "completed",
+      url: "https://example.invalid/seedance.mp4",
+    });
+    await generateEcommerceVideo({ ...params(), taskId: "existing-seedance" });
+    expect(mocks.seedanceSubmit).not.toHaveBeenCalled();
+    expect(mocks.seedancePoll.mock.calls[0][0]).toBe("existing-seedance");
+    mocks.modelId = "gpt-image-2";
+    await expect(generateEcommerceVideo(params())).rejects.toThrow(
+      "不是视频模型",
+    );
+    expect(mocks.videoSubmit).not.toHaveBeenCalled();
   });
   it("routes MiniMax-H3 local video references through its actual video field", async () => {
     mocks.modelId = "MiniMax-H3";

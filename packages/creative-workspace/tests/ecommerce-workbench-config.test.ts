@@ -73,4 +73,13 @@ describe("ecommerce workbench PixPix-aligned configuration", () => {
       modelId: "seedream-5-5",
     });
   });
+  it("keeps an explicitly selected provider for a model also present in the default preset", () => {
+    expect(
+      resolveEcommerceModelRef(
+        "gpt-image-2",
+        { profileId: "synthetic-default", modelId: "gpt-image-2" },
+        "synthetic-selected",
+      ),
+    ).toEqual({ profileId: "synthetic-selected", modelId: "gpt-image-2" });
+  });
 });

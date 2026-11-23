@@ -59,7 +59,7 @@ flate2 = "1"
 tar = "0.4"
 brotli = "7"
 zstd = "0.13"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "fs", "io-util"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "fs", "io-util", "process"] }
 futures = "0.3"
 async-stream = "0.3"
 bytes = "1.5"

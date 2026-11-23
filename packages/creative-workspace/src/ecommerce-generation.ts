@@ -11,15 +11,32 @@ import {
   resolveAdapterForInvocation,
 } from "../upstream/packages/drawnix/src/services/model-adapters";
 import { getVideoModelConfig } from "../upstream/packages/drawnix/src/constants/video-model-config";
+import { isSeedance2ModelId } from "../upstream/packages/drawnix/src/utils/seedance-model";
+import { submitSeedance2Request } from "../upstream/packages/drawnix/src/services/model-adapters/seedance2-adapter";
+import { pollVideoUntilComplete } from "../upstream/packages/drawnix/src/services/media-api/video-api";
+import {
+  extractInlineVideoUrl,
+  downloadVideoContentToLocalUrl,
+  shouldDownloadVideoContent,
+} from "../upstream/packages/drawnix/src/services/video-binding-utils";
+import { matchesEcommerceModelType } from "./ecommerce-model-capabilities";
+import { isPublicHttpMediaUrl } from "../upstream/packages/drawnix/src/utils/virtual-media-url";
 
 export type EcommerceMediaReference = {
   value: string;
   name?: string;
 };
 
-export function supportsEcommerceVideoReference(modelId: string | null) {
-  return ["gemini-omni-1.2-flash", "minimax-h3"].includes(
-    modelId?.toLowerCase() || "",
+export function supportsEcommerceVideoReference(
+  modelId: string | null,
+  referenceVideo?: string,
+) {
+  return (
+    (isSeedance2ModelId(modelId) &&
+      Boolean(referenceVideo && isPublicHttpMediaUrl(referenceVideo))) ||
+    ["gemini-omni-1.2-flash", "minimax-h3"].includes(
+      modelId?.toLowerCase() || "",
+    )
   );
 }
 
@@ -29,6 +46,9 @@ export function resolveEcommerceModelRef(
   sourceProfileId?: string | null,
 ): ModelRef {
   const normalizedModelId = modelId.trim();
+  if (sourceProfileId?.trim()) {
+    return { profileId: sourceProfileId.trim(), modelId: normalizedModelId };
+  }
   if (presetModelRef?.modelId === normalizedModelId) {
     return {
       profileId: presetModelRef.profileId || null,
@@ -216,6 +236,8 @@ export async function generateEcommerceVideo(params: {
   }
   const provider = withAccountReference(plan.provider, params.accountReference);
   const config = getVideoModelConfig(plan.modelRef.modelId as any);
+  if (!matchesEcommerceModelType(plan.modelRef.modelId, "video"))
+    throw new Error("所选模型不是视频模型，请在创作配置中选择视频模型。");
   if (
     !params.taskId &&
     params.referenceImages.length > config.imageUpload.maxCount
@@ -230,17 +252,22 @@ export async function generateEcommerceVideo(params: {
   )
     throw new Error("当前视频模型需要商品参考图。");
   if (
+    !params.taskId &&
     params.referenceVideo &&
-    !supportsEcommerceVideoReference(plan.modelRef.modelId)
+    !supportsEcommerceVideoReference(
+      plan.modelRef.modelId,
+      params.referenceVideo,
+    )
   )
     throw new Error(
-      "当前模型尚未接入本地参考视频，请选择 MiniMax-H3 或 Gemini Omni 1.2 Flash。不会忽略视频继续计费生成。",
+      "当前模型尚未接入本地参考视频，请选择 MiniMax-H3 或 Gemini Omni 1.2 Flash。Seedance 目前要求公网视频地址，尚未接入素材上传服务。不会忽略视频继续计费生成。",
     );
   const videoParams: Record<string, unknown> = {
     aspect_ratio: params.aspectRatio || "16:9",
     ratio: params.aspectRatio || "16:9",
     ...(params.referenceVideo
-      ? plan.modelRef.modelId.toLowerCase() === "minimax-h3"
+      ? plan.modelRef.modelId.toLowerCase() === "minimax-h3" ||
+        isSeedance2ModelId(plan.modelRef.modelId)
         ? { input_videos: [params.referenceVideo] }
         : { video_media: [{ type: "video", url: params.referenceVideo }] }
       : {}),
@@ -265,6 +292,74 @@ export async function generateEcommerceVideo(params: {
   // Persist the remote ID before polling. Resuming only queries this ID and
   // never repeats a paid submission, even after a desktop restart.
   let taskId = params.taskId;
+  if (isSeedance2ModelId(plan.modelRef.modelId)) {
+    // Seedance uses content JSON, not the legacy multipart video endpoint.
+    if (!taskId) {
+      const submitted = await submitSeedance2Request(
+        {
+          baseUrl: provider.baseUrl,
+          apiKey: provider.apiKey,
+          provider,
+          binding: plan.binding,
+        },
+        {
+          model: plan.modelRef.modelId,
+          modelRef: plan.modelRef,
+          prompt: params.prompt,
+          size: params.size,
+          duration: Number(request.seconds),
+          referenceImages: params.referenceImages,
+          params: videoParams,
+        },
+      );
+      taskId = submitted.taskId;
+      if (!taskId)
+        throw new Error("服务端未返回任务编号，请先核对调用记录，勿重复提交。");
+      await params.onSubmitted?.(taskId);
+    }
+    params.signal?.throwIfAborted();
+    const result = await pollVideoUntilComplete(
+      taskId,
+      {
+        baseUrl: provider.baseUrl,
+        apiKey: provider.apiKey || "",
+        provider,
+        binding: plan.binding,
+        defaultModel: plan.modelRef.modelId,
+        params: videoParams,
+      },
+      { signal: params.signal, interval: 5000, onProgress: params.onProgress },
+    );
+    params.signal?.throwIfAborted();
+    const content = (
+      result as { content?: { url?: string; video_url?: string } }
+    ).content;
+    const inlineUrl =
+      extractInlineVideoUrl(result) || content?.video_url || content?.url;
+    const url =
+      (inlineUrl &&
+      !shouldDownloadVideoContent(plan.modelRef.modelId, plan.binding, {
+        ...result,
+        video_url: inlineUrl,
+      })
+        ? inlineUrl
+        : undefined) ||
+      (shouldDownloadVideoContent(plan.modelRef.modelId, plan.binding, {
+        ...result,
+        video_url: inlineUrl,
+      })
+        ? await downloadVideoContentToLocalUrl({
+            videoId: taskId,
+            provider,
+            binding: plan.binding,
+            modelId: plan.modelRef.modelId,
+            cacheKey: taskId,
+          })
+        : undefined);
+    params.signal?.throwIfAborted();
+    if (!url) throw new Error("模型未返回可展示的视频结果。");
+    return [url];
+  }
   if (!taskId) {
     const submitted = await videoAPIService.submitVideoGeneration(
       request,
