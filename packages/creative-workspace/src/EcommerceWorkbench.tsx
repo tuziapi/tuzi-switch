@@ -12,7 +12,15 @@ import {
 import type { CreativeAccountBridge } from "./bridge-types";
 import { useSelectableModels } from "../upstream/packages/drawnix/src/hooks/use-runtime-models";
 import { getFallbackDefaultModelId } from "../upstream/packages/drawnix/src/utils/runtime-model-discovery";
-import { getActiveInvocationPreset } from "../upstream/packages/drawnix/src/utils/settings-manager";
+import {
+  getActiveInvocationPreset,
+  type ModelRef,
+} from "../upstream/packages/drawnix/src/utils/settings-manager";
+import {
+  generateEcommerceImage,
+  generateEcommerceVideo,
+  resolveEcommerceModelRef,
+} from "./ecommerce-generation";
 import "./ecommerce-workbench.css";
 
 type Category = "product" | "video" | "apparel";
@@ -748,68 +756,8 @@ type Props = {
   accountBridge?: CreativeAccountBridge;
   onOpenCanvas?: () => void;
 };
-type ResultPayload = { urls: string[]; taskId?: string; status?: string };
 export const PENDING_CANVAS_IMAGE_KEY = "opentu-pending-canvas-image";
 export const PENDING_CANVAS_IMAGE_EVENT = "opentu:canvas-image-pending";
-
-function responseItems(payload: unknown): Array<Record<string, unknown>> {
-  const items: Array<Record<string, unknown>> = [];
-  const visit = (value: unknown, depth: number) => {
-    if (depth > 4 || value == null) return;
-    if (Array.isArray(value)) {
-      value.forEach((item) => visit(item, depth + 1));
-      return;
-    }
-    if (typeof value !== "object") {
-      items.push({ value });
-      return;
-    }
-    const record = value as Record<string, unknown>;
-    items.push(record);
-    [
-      record.data,
-      record.images,
-      record.outputs,
-      record.results,
-      record.output,
-    ].forEach((candidate) => {
-      if (candidate !== undefined && candidate !== value)
-        visit(candidate, depth + 1);
-    });
-  };
-  visit(payload, 0);
-  return items;
-}
-
-function parseResult(payload: unknown): ResultPayload {
-  const value = (
-    payload && typeof payload === "object" ? payload : {}
-  ) as Record<string, unknown>;
-  const urls = Array.from(
-    new Set(
-      responseItems(payload).flatMap((item) => {
-        const candidate =
-          item.url ??
-          item.output_url ??
-          item.image_url ??
-          item.video_url ??
-          item.value;
-        if (typeof candidate === "string" && candidate) return [candidate];
-        const b64 = item.b64_json ?? item.base64;
-        return typeof b64 === "string" && b64
-          ? [`data:image/png;base64,${b64}`]
-          : [];
-      }),
-    ),
-  );
-  const taskId = responseItems(payload)
-    .flatMap((item) => [item.task_id, item.request_id, item.id])
-    .find((v) => typeof v === "string") as string | undefined;
-  const status = responseItems(payload)
-    .map((item) => item.status)
-    .find((v) => typeof v === "string") as string | undefined;
-  return { urls, taskId, status };
-}
 
 const wait = (ms: number) =>
   new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -906,6 +854,11 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     : normalizedModelOptions[0].id;
   const selectedModelConfig = normalizedModelOptions.find(
     (model) => model.id === selectedModel,
+  );
+  const selectedModelRef: ModelRef = resolveEcommerceModelRef(
+    selectedModel,
+    activePreset?.[activeModelType].defaultModelRef,
+    selectedModelConfig?.sourceProfileId,
   );
   const templates =
     tool === "product-set" || tool === "detail-page"
@@ -1040,31 +993,6 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     return body;
   };
 
-  const poll = async (
-    reference: string,
-    taskId: string,
-    kind: "image" | "video",
-  ) => {
-    for (let attempt = 0; attempt < 24; attempt += 1) {
-      await wait(1500);
-      setProgress(Math.min(95, 35 + attempt * 3));
-      const url =
-        kind === "image"
-          ? `https://api.tu-zi.com/v1/images/generations/result?request_id=${encodeURIComponent(taskId)}`
-          : `https://api.tu-zi.com/v1/videos/${encodeURIComponent(taskId)}`;
-      const response = await accountBridge!.request(reference, url, {
-        method: "GET",
-      });
-      if (!response.ok)
-        throw new Error(`查询生成任务失败（HTTP ${response.status}）。`);
-      const parsed = parseResult(await response.json());
-      if (parsed.urls.length) return parsed.urls;
-      if (["failed", "error", "cancelled"].includes(parsed.status ?? ""))
-        throw new Error("生成任务失败，请检查模型权限或稍后重试。");
-    }
-    throw new Error("生成任务超时，请稍后在任务记录中查询结果。");
-  };
-
   const generate = async () => {
     if ((!files.length && currentTool.media === "image") || busy) return;
     setBusy(true);
@@ -1083,40 +1011,38 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       // state.
       const binding = await accountBridge.bindKey(accountBridge.selectedKeyId);
       const reference = `tuzi-account:${binding.id}`;
-      const endpoint =
+      const referenceImages = await Promise.all(
+        files.map(
+          (file) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result));
+              reader.onerror = () =>
+                reject(new Error(`读取图片失败：${file.name}`));
+              reader.readAsDataURL(file);
+            }),
+        ),
+      );
+      const requestPrompt = buildRequest().get("prompt")?.toString() || prompt;
+      const urls =
         currentTool.media === "video"
-          ? "https://api.tu-zi.com/v1/videos"
-          : "https://api.tu-zi.com/v1/images/edits";
-      const response = await accountBridge.request(reference, endpoint, {
-        method: "POST",
-        body: buildRequest(),
-      });
-      if (!response.ok) {
-        let detail = "";
-        try {
-          const body = (await response.clone().json()) as Record<
-            string,
-            unknown
-          >;
-          detail =
-            typeof body.error === "string"
-              ? body.error
-              : typeof body.message === "string"
-                ? body.message
-                : "";
-        } catch {
-          /* keep generic HTTP error */
-        }
-        throw new Error(
-          detail || `提交生成任务失败（HTTP ${response.status}）。`,
-        );
-      }
-      const parsed = parseResult(await response.json());
-      const urls = parsed.urls.length
-        ? parsed.urls
-        : parsed.taskId
-          ? await poll(reference, parsed.taskId, currentTool.media)
-          : [];
+          ? await generateEcommerceVideo({
+              modelRef: selectedModelRef,
+              prompt: requestPrompt,
+              size: selectedRatio.size,
+              referenceImages,
+              accountReference: reference,
+              onProgress: (value) =>
+                setProgress(Math.max(8, Math.min(98, value))),
+            })
+          : await generateEcommerceImage({
+              modelRef: selectedModelRef,
+              prompt: requestPrompt,
+              size: selectedRatio.size,
+              referenceImages,
+              accountReference: reference,
+              count: tool === "product-set" ? customTotal : 1,
+            });
       if (!urls.length)
         throw new Error("模型未返回图片或视频结果，请检查模型响应格式。");
       setProgress(100);

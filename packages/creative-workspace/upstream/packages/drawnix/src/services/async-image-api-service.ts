@@ -16,6 +16,7 @@ import {
   providerTransport,
   resolveInvocationPlanFromRoute,
   type ProviderAuthStrategy,
+  type ProviderModelBinding,
   type ResolvedProviderContext,
 } from './provider-routing';
 import { IMAGE_GENERATION_TIMEOUT_MS } from '../constants/TASK_CONSTANTS';
@@ -63,6 +64,7 @@ export interface AsyncImageQueryResponse {
 
 interface LocalImageContext {
   providerContext: ResolvedProviderContext;
+  binding?: ProviderModelBinding | null;
   fetcher?: typeof fetch;
 }
 interface PollingOptions {
@@ -112,6 +114,13 @@ function getReferenceFileName(
   index: number
 ): string {
   return field === 'mask' ? 'mask.png' : `reference-${index + 1}.png`;
+}
+
+function resolvePathTemplate(template: string, taskId?: string): string {
+  return template.replace(
+    /\{taskId\}/g,
+    encodeURIComponent(taskId || '')
+  );
 }
 
 async function prepareReferenceImage(
@@ -170,7 +179,8 @@ class AsyncImageAPIService {
 
     const response = await providerTransport.send(providerContext, {
       fetcher: requestContext?.fetcher,
-      path: '/videos',
+      path: requestContext?.binding?.submitPath || '/videos',
+      baseUrlStrategy: requestContext?.binding?.baseUrlStrategy,
       method: 'POST',
       requestId,
       body: formData,
@@ -202,7 +212,11 @@ class AsyncImageAPIService {
 
     const response = await providerTransport.send(providerContext, {
       fetcher: requestContext?.fetcher,
-      path: `/videos/${id}`,
+      path: resolvePathTemplate(
+        requestContext?.binding?.pollPathTemplate || '/videos/{taskId}',
+        id
+      ),
+      baseUrlStrategy: requestContext?.binding?.baseUrlStrategy,
       method: 'GET',
       signal,
       timeoutMs: IMAGE_GENERATION_TIMEOUT_MS,

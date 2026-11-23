@@ -6,6 +6,7 @@ import {
   ECOMMERCE_RATIOS,
   normalizeEcommerceModuleCounts,
 } from "../src/EcommerceWorkbench";
+import { resolveEcommerceModelRef } from "../src/ecommerce-generation";
 
 describe("ecommerce workbench PixPix-aligned configuration", () => {
   it("exposes the complete platform, language and ratio catalog", () => {
@@ -24,7 +25,9 @@ describe("ecommerce workbench PixPix-aligned configuration", () => {
   });
 
   it("keeps the mandatory A+ hero module and the newly added content modules", () => {
-    expect(DETAIL_PAGE_MODULES.find((module) => module.id === "hero")?.required).toBe(true);
+    expect(
+      DETAIL_PAGE_MODULES.find((module) => module.id === "hero")?.required,
+    ).toBe(true);
     expect(DETAIL_PAGE_MODULES.map((module) => module.id)).toEqual(
       expect.arrayContaining(["ingredient", "usage", "after-sale"]),
     );
@@ -43,6 +46,31 @@ describe("ecommerce workbench PixPix-aligned configuration", () => {
       scene: 4,
       sellingPoint: 12,
       other: 0,
+    });
+  });
+
+  it("preserves the active preset provider when the preset model is selected", () => {
+    expect(
+      resolveEcommerceModelRef("gemini-image", {
+        profileId: "assistant-account-token-1",
+        modelId: "gemini-image",
+      }),
+    ).toEqual({
+      profileId: "assistant-account-token-1",
+      modelId: "gemini-image",
+    });
+  });
+
+  it("uses the selected catalog model's provider for a model override", () => {
+    expect(
+      resolveEcommerceModelRef(
+        "seedream-5-5",
+        { profileId: "preset-profile", modelId: "other-model" },
+        "discovered-profile",
+      ),
+    ).toEqual({
+      profileId: "discovered-profile",
+      modelId: "seedream-5-5",
     });
   });
 });

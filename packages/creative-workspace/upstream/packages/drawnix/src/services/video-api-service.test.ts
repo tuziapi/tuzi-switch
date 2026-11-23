@@ -73,6 +73,24 @@ describe('VideoAPIService Tuzi JSON submission', () => {
     if (model === 'kling-4.0') expect(body.settings).toEqual({ duration: 10, resolution: '1080p', aspect_ratio: 'adaptive' });
   });
 
+  it('uses the ecommerce account transport override while preserving the selected route binding', async () => {
+    const send = vi.spyOn(providerTransport, 'send').mockResolvedValue(
+      new Response(JSON.stringify({ id: 'task', status: 'queued' }))
+    );
+    const accountProvider = {
+      ...testProvider,
+      apiKey: 'tuzi-account:synthetic-binding',
+    };
+    await videoAPIService.submitVideoGeneration(
+      { model: 'wan3.0-video', prompt: 'animate' },
+      { providerContext: accountProvider, binding: null },
+    );
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+      profileId: testProvider.profileId,
+      apiKey: 'tuzi-account:synthetic-binding',
+    });
+  });
+
   it('submits Kling reference images as native contents in the main-thread path', async () => {
     const send = vi.spyOn(providerTransport, 'send').mockResolvedValue(
       new Response(JSON.stringify({ id: 'task', status: 'queued' }))
