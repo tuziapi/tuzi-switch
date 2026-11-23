@@ -51,7 +51,7 @@ export function EcommerceBatchPanel({
           </strong>
           <span
             className="ecommerce-batch__model"
-            title={batch.modelRef.modelId}
+            title={batch.modelRef.modelId || undefined}
           >
             {batch.modelRef.modelId}
           </span>

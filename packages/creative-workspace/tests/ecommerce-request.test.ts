@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import { Blob as NodeBlob } from "node:buffer";
 import type { CreativeAccountBridge } from "../src/bridge-types";
 import {
   readEcommerceImage,
+  readEcommerceVideoResponse,
   resolveEcommerceAccountReference,
   waitForEcommerceRequest,
 } from "../src/ecommerce-request";
@@ -15,6 +17,29 @@ function bridge(native = true) {
 }
 
 describe("ecommerce request lifecycle", () => {
+  it("recognizes MP4 bytes even when a CDN declares generic binary", async () => {
+    const blob = new NodeBlob(["\0\0\0 ftypisom", new Uint8Array(32)], {
+      type: "application/octet-stream",
+    });
+    const result = await readEcommerceVideoResponse({
+      ok: true,
+      blob: async () => blob,
+    } as Response);
+    expect(result.type).toBe("video/mp4");
+    expect(await result.arrayBuffer()).toEqual(await blob.arrayBuffer());
+  });
+  it("rejects a JSON/HTML error body even if it claims to be video", async () => {
+    const blob = new NodeBlob(
+      ["<html>access denied; this is not video content</html>"],
+      { type: "video/mp4" },
+    );
+    await expect(
+      readEcommerceVideoResponse({
+        ok: true,
+        blob: async () => blob,
+      } as Response),
+    ).rejects.toThrow("不是可识别");
+  });
   it("keeps the configured model credential even with an unrelated selected account key", async () => {
     const host = bridge();
     expect(

@@ -1,4 +1,5 @@
 import React from "react";
+import { Blob as NodeBlob } from "node:buffer";
 import {
   act,
   cleanup,
@@ -8,7 +9,12 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ generate: vi.fn(), store: null as any }));
+const mocks = vi.hoisted(() => ({
+  generate: vi.fn(),
+  videoGenerate: vi.fn(),
+  store: null as any,
+  videoStore: null as any,
+}));
 vi.mock("../upstream/packages/drawnix/src/hooks/use-runtime-models", () => ({
   useSelectableModels: () => [
     { id: "synthetic-image", label: "Synthetic image" },
@@ -28,8 +34,29 @@ vi.mock("../upstream/packages/drawnix/src/services/provider-routing", () => ({
   }),
 }));
 vi.mock("../src/ecommerce-generation", () => ({
-  generateEcommerceVideo: vi.fn(),
+  generateEcommerceVideo: mocks.videoGenerate,
+  supportsEcommerceVideoReference: () => false,
   resolveEcommerceModelRef: (modelId: string) => ({ modelId }),
+}));
+vi.mock("../upstream/packages/drawnix/src/services/assistant-account", () => ({
+  fetchOutputMedia: async () => ({
+    ok: true,
+    blob: async () =>
+      new NodeBlob(["\0\0\0 ftypisom", new Uint8Array(32)], {
+        type: "application/octet-stream",
+      }),
+  }),
+}));
+vi.mock("../src/ecommerce-video-jobs", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  ecommerceVideos: {
+    getSnapshot: () => mocks.videoStore.getSnapshot(),
+    subscribe: (fn: any) => mocks.videoStore.subscribe(fn),
+    load: () => mocks.videoStore.load(),
+    start: (...args: any[]) => mocks.videoStore.start(...args),
+    resume: (...args: any[]) => mocks.videoStore.resume(...args),
+    pause: () => mocks.videoStore.pause(),
+  },
 }));
 vi.mock("../src/ecommerce-executor", () => ({
   createEcommerceExecutor: () => ({
@@ -50,10 +77,21 @@ vi.mock("../src/ecommerce-jobs", async (importOriginal) => ({
 }));
 import { EcommerceWorkbench } from "../src/EcommerceWorkbench";
 import { EcommerceJobStore } from "../src/ecommerce-jobs";
+import { EcommerceVideoStore } from "../src/ecommerce-video-jobs";
 
 beforeEach(() => {
   let objectUrlId = 0;
   mocks.generate.mockReset();
+  mocks.videoGenerate.mockReset();
+  const videoRecords = new Map<string, any>();
+  mocks.videoStore = new EcommerceVideoStore({
+    keys: async () => [...videoRecords.keys()],
+    getItem: async (key) => videoRecords.get(key),
+    setItem: async (key, value) => {
+      videoRecords.set(key, structuredClone(value));
+      return value;
+    },
+  });
   const records = new Map<string, any>();
   mocks.store = new EcommerceJobStore({
     keys: async () => [...records.keys()],
@@ -73,6 +111,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   mocks.store.pause();
+  mocks.videoStore.pause();
   cleanup();
   vi.unstubAllGlobals();
 });
@@ -90,6 +129,59 @@ async function setup() {
 }
 
 describe("sequential image workbench", () => {
+  it("submits video parameters and restores a saved video after leaving the page", async () => {
+    mocks.videoGenerate.mockImplementation(async (params) => {
+      await params.onSubmitted("synthetic-task");
+      return ["https://example.invalid/video.mp4"];
+    });
+    let ui = render(React.createElement(EcommerceWorkbench));
+    await waitFor(() =>
+      expect(mocks.videoStore.getSnapshot().ready).toBe(true),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "带货视频", exact: true }),
+    );
+    fireEvent.change(ui.container.querySelector('input[type="file"]')!, {
+      target: {
+        files: [new File(["synthetic"], "product.png", { type: "image/png" })],
+      },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "生成视频", exact: true }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存视频" })).toBeTruthy(),
+    );
+    expect(mocks.videoGenerate).toHaveBeenCalledTimes(1);
+    expect(mocks.videoGenerate.mock.calls[0][0].size).not.toBe("1024x1024");
+    expect(mocks.videoGenerate.mock.calls[0][0].seconds).toBeTruthy();
+    ui.unmount();
+    ui = render(React.createElement(EcommerceWorkbench));
+    fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "带货视频", exact: true }),
+    );
+    expect(screen.getByRole("button", { name: "保存视频" })).toBeTruthy();
+    expect(mocks.videoGenerate).toHaveBeenCalledTimes(1);
+  });
+  it("does not bill ordinary generation for an unimplemented video processor", async () => {
+    render(React.createElement(EcommerceWorkbench));
+    await waitFor(() =>
+      expect(mocks.videoStore.getSnapshot().ready).toBe(true),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "视频压缩", exact: true }),
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "尚未接入专用视频处理服务",
+    );
+    expect(
+      screen.getByRole("button", { name: "生成视频" }).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(mocks.videoGenerate).not.toHaveBeenCalled();
+  });
   it("shows first image while the next is running, and keeps working across page remounts", async () => {
     let finish!: (url: string) => void;
     mocks.generate

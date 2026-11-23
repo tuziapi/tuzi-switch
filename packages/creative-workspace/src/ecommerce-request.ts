@@ -2,6 +2,30 @@ import type { CreativeAccountBridge } from "./bridge-types";
 
 export const ECOMMERCE_IMAGE_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** Some output CDNs use application/octet-stream for valid MP4 files. */
+export async function readEcommerceVideoResponse(
+  response: Response,
+): Promise<Blob> {
+  if (!response.ok)
+    throw new Error("视频下载失败，可继续获取原任务结果，无需重新生成。");
+  const blob = await response.blob();
+  const header = new Uint8Array(await blob.slice(0, 32).arrayBuffer());
+  const text = String.fromCharCode(...header);
+  const mp4 =
+    text.slice(4, 8) === "ftyp" &&
+    !["avif", "avis", "heic", "heix", "mif1"].includes(text.slice(8, 12));
+  const webm =
+    header[0] === 0x1a &&
+    header[1] === 0x45 &&
+    header[2] === 0xdf &&
+    header[3] === 0xa3;
+  if (blob.size < 32 || (!mp4 && !webm))
+    throw new Error(
+      `下载内容不是可识别的 MP4/MOV/WebM 视频（${blob.type || "未声明类型"}，${blob.size} 字节），请核对原任务结果。`,
+    );
+  return blob.slice(0, blob.size, mp4 ? "video/mp4" : "video/webm");
+}
+
 /** Bound the complete operation, including preparation and result decoding. */
 export function waitForEcommerceRequest<T>(
   operation: Promise<T>,

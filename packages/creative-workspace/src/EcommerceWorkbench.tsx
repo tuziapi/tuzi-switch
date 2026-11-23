@@ -26,12 +26,12 @@ import { resolveInvocationPlanFromRoute } from "../upstream/packages/drawnix/src
 import {
   generateEcommerceVideo,
   resolveEcommerceModelRef,
+  supportsEcommerceVideoReference,
 } from "./ecommerce-generation";
 import "./ecommerce-workbench.css";
 import {
   readEcommerceImage,
   resolveEcommerceAccountReference,
-  waitForEcommerceRequest,
 } from "./ecommerce-request";
 import {
   ecommerceJobs,
@@ -40,6 +40,9 @@ import {
 } from "./ecommerce-jobs";
 import { createEcommerceExecutor } from "./ecommerce-executor";
 import { EcommerceBatchPanel } from "./EcommerceBatchPanel";
+import { ecommerceVideos, type VideoExecutor } from "./ecommerce-video-jobs";
+import { getVideoModelConfig } from "../upstream/packages/drawnix/src/constants/video-model-config";
+import { downloadEcommerceVideo } from "./ecommerce-video-media";
 
 type Category = "product" | "video" | "apparel";
 type ToolId =
@@ -802,7 +805,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const [apparelTypes, setApparelTypes] = useState(
     () => new Set(["白底精修图", "3D 立体效果图", "人台图"]),
   );
-  const [videoMode, setVideoMode] = useState("完全复刻");
+  const [videoMode, setVideoMode] = useState("商品替换优先");
   const imageModels = useSelectableModels("image");
   const videoModels = useSelectableModels("video");
   const activePreset = getActiveInvocationPreset();
@@ -829,13 +832,28 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
         ]),
       ) as Record<ToolId, Set<string>>,
   );
-  const [videoBusy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [generationPhase, setGenerationPhase] = useState("");
+  const videoState = useSyncExternalStore(
+    ecommerceVideos.subscribe,
+    ecommerceVideos.getSnapshot,
+  );
+  const [selectedVideoId, setSelectedVideoId] = useState("");
+  const [videoDuration, setVideoDuration] = useState("");
+  const [videoSize, setVideoSize] = useState("");
+  const [videoRatio, setVideoRatio] = useState("16:9");
+  const videoRecords = videoState.jobs.filter((job) => job.tool === tool);
+  const videoJob =
+    videoRecords.find((job) => job.id === selectedVideoId) || videoRecords[0];
+  const videoBusy = Boolean(videoState.activeId);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const activeRequest = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
-  const [videoResultUrls, setResultUrls] = useState<string[]>([]);
+  const videoResultUrls = useMemo(
+    () => (videoJob?.video ? [URL.createObjectURL(videoJob.video)] : []),
+    [videoJob?.id, videoJob?.video],
+  );
+  useEffect(
+    () => () => videoResultUrls.forEach((url) => URL.revokeObjectURL(url)),
+    [videoResultUrls],
+  );
   const resultKind = toolMeta[tool].media;
   const jobState = useSyncExternalStore(
     ecommerceJobs.subscribe,
@@ -864,19 +882,23 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const resultUrls = resultKind === "image" ? imageUrls : videoResultUrls;
   useEffect(() => {
     void ecommerceJobs.load();
+    void ecommerceVideos.load();
   }, []);
   useEffect(() => {
     if (batch) setFiles(batch.references);
     setActiveResult(0);
   }, [batch?.id]);
   const [activeResult, setActiveResult] = useState(0);
-  useEffect(() => () => activeRequest.current?.abort(), []);
   useEffect(() => {
     if (!busy) return;
     const running = jobState.batches
       .find((b) => b.id === jobState.activeId)
       ?.items.find((item) => item.status === "running");
-    const started = running?.attempts.at(-1)?.startedAt || Date.now();
+    const started =
+      running?.attempts.at(-1)?.startedAt ||
+      videoState.jobs.find((job) => job.id === videoState.activeId)
+        ?.createdAt ||
+      Date.now();
     const timer = setInterval(
       () => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)),
       1000,
@@ -885,15 +907,17 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   }, [
     busy,
     jobState.activeId,
+    videoState.activeId,
     batch?.items.find((item) => item.status === "running")?.id,
   ]);
   const runningItem = batch?.items.find((item) => item.status === "running");
-  const generationStatus =
-    resultKind === "image"
+  const generationStatus = videoBusy
+    ? `视频后台生成中${videoState.progress > 0 ? ` ${videoState.progress}%` : ""} · ${elapsedSeconds} 秒`
+    : resultKind === "image"
       ? runningItem
         ? `${runningItem.label} · ${imageStageLabels[runningItem.attempts.at(-1)?.stage || "preparing"]} · ${elapsedSeconds} 秒`
         : "图片任务处理中"
-      : `${generationPhase}${progress > 0 ? ` ${progress}%` : ""} · ${elapsedSeconds} 秒`;
+      : `等待视频结果${videoState.progress > 0 ? ` ${videoState.progress}%` : ""} · ${elapsedSeconds} 秒`;
   const previews = useMemo(
     () => files.map((file) => URL.createObjectURL(file)),
     [files],
@@ -941,6 +965,39 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     activeModelType,
     selectedModelRef,
   );
+  const videoConfig = getVideoModelConfig(selectedModel as any);
+  const selectedVideoDuration = videoConfig.durationOptions.some(
+    (option) => option.value === videoDuration,
+  )
+    ? videoDuration
+    : videoConfig.defaultDuration;
+  const selectedVideoSize = videoConfig.sizeOptions.some(
+    (option) => option.value === videoSize,
+  )
+    ? videoSize
+    : videoConfig.defaultSize;
+  const sizeRatio = videoConfig.sizeOptions.find(
+    (option) => option.value === selectedVideoSize,
+  )?.aspectRatio;
+  const effectiveVideoRatio =
+    sizeRatio && /^\d+:\d+$/.test(sizeRatio) ? sizeRatio : videoRatio;
+  const videoToolSupported =
+    tool === "video-commerce" || tool === "video-replicate";
+  const videoInputError = !videoToolSupported
+    ? "此工具尚未接入专用视频处理服务，暂不能执行。普通视频生成不能替代压缩、超分或背景移除。"
+    : tool === "video-replicate" && !referenceVideo
+      ? "请上传参考视频，再生成复刻视频。"
+      : referenceVideo && referenceVideo.size > 20 * 1024 * 1024
+        ? "参考视频超过 20 MB，请选择较短的视频片段。"
+        : referenceVideo &&
+            selectedModel.toLowerCase() === "minimax-h3" &&
+            !["video/mp4", "video/quicktime"].includes(referenceVideo.type)
+          ? "MiniMax-H3 的参考视频只支持 MP4 或 MOV。"
+          : referenceVideo && !supportsEcommerceVideoReference(selectedModel)
+            ? "本地参考视频目前支持 MiniMax-H3 / Gemini Omni 1.2 Flash，请切换模型。"
+            : files.length > videoConfig.imageUpload.maxCount
+              ? `当前模型最多支持 ${videoConfig.imageUpload.maxCount} 张商品图。`
+              : "";
   const templates =
     tool === "product-set" || tool === "detail-page"
       ? previewTemplates[tool]
@@ -1095,11 +1152,19 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
         `平台：${platform}`,
         `市场：${market}`,
         `语言：${language}`,
-        `比例：${selectedRatio.label}（${selectedRatio.size}）`,
+        isVideo
+          ? `视频比例：${effectiveVideoRatio}；时长：${selectedVideoDuration}秒；尺寸：${selectedVideoSize}`
+          : `比例：${selectedRatio.label}（${selectedRatio.size}）`,
         prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放",
         `快捷优化：${selectedQuickLabels.length ? selectedQuickLabels.join("、") : "按默认商业规范处理"}`,
         `模型：${selectedModel}`,
         `工具参数：${tool === "product-set" ? `${structure}，白底图${customCounts.whiteBackground}张、场景图${customCounts.scene}张、卖点图${customCounts.sellingPoint}张、其他${customCounts.other}张` : tool === "detail-page" ? `详情模块：${selectedQuickLabels.join("、") || "首屏主视觉"}` : tool === "apparel-set" ? Array.from(apparelTypes).join("、") : tool === "video-replicate" ? videoMode : "按工具默认参数处理"}`,
+        isVideo
+          ? "商品事实约束：只使用用户明确提供的事实；禁止推断或虚构功效、舒适度、耐用性、材质、认证。保持商品几何结构、颜色、标识和数量；未明确要求时不要添加字幕或营销文案。"
+          : "",
+        tool === "video-replicate"
+          ? "参考视频是场景、背景、构图和镜头运动的唯一依据。除用户明确指定的修改外，不得重新布景，不得新增桌布、植物、道具或其他商品，不得添加或删改镜头。白底必须保留白底；单一商品始终只保留一个。相似复刻仅允许微调节奏，不能改变原片场景。未提供替换商品图时保留原商品。"
+          : "",
       ].join("。"),
     );
     body.append("size", selectedRatio.size);
@@ -1113,13 +1178,45 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     return body;
   };
 
+  const createVideoExecutor = (): VideoExecutor => ({
+    async generate(job, signal, onSubmitted, onProgress) {
+      const plan = resolveInvocationPlanFromRoute("video", job.modelRef);
+      const accountReference = await resolveEcommerceAccountReference(
+        plan?.provider.apiKey,
+        accountBridge,
+      );
+      const referenceImages = job.taskId
+        ? []
+        : await Promise.all(
+            files.map((file) => readEcommerceImage(file, signal)),
+          );
+      if (
+        !job.taskId &&
+        referenceVideo &&
+        referenceVideo.size > 20 * 1024 * 1024
+      )
+        throw new Error("参考视频超过 20 MB，请选择较短的视频片段。");
+      const video =
+        !job.taskId && referenceVideo
+          ? await readEcommerceImage(referenceVideo, signal)
+          : undefined;
+      const urls = await generateEcommerceVideo({
+        ...job,
+        referenceImages,
+        referenceVideo: video,
+        signal,
+        accountReference,
+        onSubmitted,
+        onProgress,
+      });
+      return urls[0];
+    },
+    async download(url, signal) {
+      return downloadEcommerceVideo(url, signal);
+    },
+  });
   const generate = async () => {
-    if (
-      (!files.length && currentTool.media === "image") ||
-      busy ||
-      activeRequest.current
-    )
-      return;
+    if ((!files.length && currentTool.media === "image") || busy) return;
     if (currentTool.media === "image") {
       setError("");
       try {
@@ -1142,62 +1239,30 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       }
       return;
     }
-    const controller = new AbortController();
-    activeRequest.current = controller;
-    const { signal } = controller;
-    setBusy(true);
-    setProgress(0);
+    if (videoInputError) {
+      setError(videoInputError);
+      return;
+    }
     setElapsedSeconds(0);
-    setGenerationPhase("准备素材");
     setError("");
-    setResultUrls([]);
     setActiveResult(0);
     try {
-      const reference = await waitForEcommerceRequest(
-        resolveEcommerceAccountReference(
-          selectedInvocationPlan?.provider.apiKey,
-          accountBridge,
-        ),
-        signal,
-      );
-      signal.throwIfAborted();
-      const referenceImages = await Promise.all(
-        files.map((file) => readEcommerceImage(file, signal)),
-      );
-      signal.throwIfAborted();
-      setGenerationPhase("等待模型返回");
       const requestPrompt = buildRequest().get("prompt")?.toString() || prompt;
-      const urls = await waitForEcommerceRequest(
-        generateEcommerceVideo({
+      const id = await ecommerceVideos.start(
+        {
+          tool,
+          owner: taskOwner,
           modelRef: selectedModelRef,
           prompt: requestPrompt,
-          size: selectedRatio.size,
-          referenceImages,
-          accountReference: reference,
-          onProgress: (value) =>
-            !signal.aborted && setProgress(Math.max(0, Math.min(99, value))),
-        }),
-        signal,
+          size: selectedVideoSize,
+          seconds: selectedVideoDuration,
+          aspectRatio: effectiveVideoRatio,
+        },
+        createVideoExecutor(),
       );
-      signal.throwIfAborted();
-      if (!urls.length)
-        throw new Error("模型未返回图片或视频结果，请检查模型响应格式。");
-      setProgress(100);
-      setResultUrls(urls);
+      setSelectedVideoId(id);
     } catch (cause) {
-      setError(
-        signal.aborted
-          ? signal.reason instanceof Error &&
-            signal.reason.name !== "AbortError"
-            ? signal.reason.message
-            : "已停止等待。服务端可能仍在生成，请先核对调用记录，避免重复付费。"
-          : cause instanceof Error
-            ? cause.message
-            : "生成失败，请稍后重试。",
-      );
-    } finally {
-      if (activeRequest.current === controller) activeRequest.current = null;
-      setBusy(false);
+      setError(cause instanceof Error ? cause.message : "视频任务创建失败。");
     }
   };
 
@@ -1218,7 +1283,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setCategory(next);
     setFiles([]);
     setReferenceVideo(null);
-    setResultUrls([]);
+    setSelectedVideoId("");
     setSelectedBatchId(null);
     setActiveTemplate("original");
     setError("");
@@ -1227,7 +1292,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setTool(next);
     setFiles([]);
     setReferenceVideo(null);
-    setResultUrls([]);
+    setSelectedVideoId("");
     setSelectedBatchId(null);
     setActiveTemplate(next === "detail-page" ? "product" : "original");
     setError("");
@@ -1376,7 +1441,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                 </strong>
                 <span>
                   {busy
-                    ? "图片生成通常需要数分钟，请勿重复提交"
+                    ? "生成通常需要数分钟，请勿重复提交"
                     : "先上传素材，再完善右侧生成参数"}
                 </span>
               </div>
@@ -1435,6 +1500,85 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             }
           />
         )}
+        {resultKind === "video" && videoJob && (
+          <section
+            className="ecommerce-plan ecommerce-video-record"
+            aria-label="视频任务记录"
+          >
+            <label>
+              生成记录{" "}
+              <select
+                aria-label="视频生成记录"
+                value={videoJob.id}
+                onChange={(event) => setSelectedVideoId(event.target.value)}
+              >
+                {videoRecords.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {new Date(job.createdAt).toLocaleString()} ·{" "}
+                    {job.modelRef.modelId} ·{" "}
+                    {job.status === "complete"
+                      ? "已保存"
+                      : job.status === "waiting"
+                        ? "生成中"
+                        : "待核对"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p>
+              {videoJob.status === "complete"
+                ? "视频已保存到本机，可播放和导出。"
+                : videoJob.error || "正在生成视频，切换页面后仍可查看任务。"}
+            </p>
+            {videoJob.taskId && <small>任务编号：{videoJob.taskId}</small>}
+            {videoJob.video && (
+              <button
+                type="button"
+                onClick={() =>
+                  void (async () => {
+                    try {
+                      const blob = videoJob.video!;
+                      const name = `ecommerce-${videoJob.id}.${blob.type.includes("webm") ? "webm" : "mp4"}`;
+                      if (accountBridge?.saveMedia)
+                        await accountBridge.saveMedia(blob, name, "video");
+                      else {
+                        const a = document.createElement("a");
+                        a.href = videoResultUrls[0];
+                        a.download = name;
+                        a.click();
+                      }
+                    } catch {
+                      setError("视频导出失败，请重试。");
+                    }
+                  })()
+                }
+              >
+                保存视频
+              </button>
+            )}
+            {!videoBusy &&
+              videoJob.status !== "complete" &&
+              (videoJob.taskId || videoJob.resultUrl || videoJob.video) && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void ecommerceVideos
+                      .resume(videoJob.id, taskOwner, createVideoExecutor())
+                      .catch((cause) => setError(cause.message))
+                  }
+                >
+                  继续获取结果（不重新生成）
+                </button>
+              )}
+            {!videoBusy &&
+              videoJob.status === "interrupted" &&
+              !videoJob.taskId && (
+                <small>
+                  未取得服务端任务编号，请核对调用记录后再决定是否新建任务，避免重复计费。
+                </small>
+              )}
+          </section>
+        )}
       </main>
       <aside className="ecommerce-workbench__panel">
         <label className="ecommerce-upload">
@@ -1449,7 +1593,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           <label className="ecommerce-upload ecommerce-upload--video">
             <input
               type="file"
-              accept="video/*"
+              accept="video/mp4,video/quicktime,video/webm"
               onChange={(event) =>
                 setReferenceVideo(event.target.files?.[0] ?? null)
               }
@@ -1460,7 +1604,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                 ? `已选择 ${referenceVideo.name}`
                 : "上传参考视频"}
             </span>
-            <small>支持 MP4、MOV，视频复刻时使用</small>
+            <small>MP4、MOV、WebM，最多 20 MB；需支持视频参考的模型</small>
           </label>
         )}
         <label className="ecommerce-model-field">
@@ -1531,19 +1675,67 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               ))}
             </select>
           </label>
-          <label>
-            图片/视频比例
-            <select
-              value={ratio}
-              onChange={(event) => setRatio(event.target.value)}
-            >
-              {ECOMMERCE_RATIOS.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label} · {item.size}
-                </option>
-              ))}
-            </select>
-          </label>
+          {currentTool.media === "image" ? (
+            <label>
+              图片/视频比例
+              <select
+                value={ratio}
+                onChange={(event) => setRatio(event.target.value)}
+              >
+                {ECOMMERCE_RATIOS.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label} · {item.size}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <>
+              <label>
+                视频时长
+                <select
+                  aria-label="视频时长"
+                  value={selectedVideoDuration}
+                  onChange={(event) => setVideoDuration(event.target.value)}
+                >
+                  {videoConfig.durationOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                视频尺寸
+                <select
+                  aria-label="视频尺寸"
+                  value={selectedVideoSize}
+                  onChange={(event) => setVideoSize(event.target.value)}
+                >
+                  {videoConfig.sizeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                视频比例
+                <select
+                  aria-label="视频比例"
+                  disabled={Boolean(sizeRatio && /^\d+:\d+$/.test(sizeRatio))}
+                  value={effectiveVideoRatio}
+                  onChange={(event) => setVideoRatio(event.target.value)}
+                >
+                  {[...new Set(["16:9", "9:16", effectiveVideoRatio])].map(
+                    (value) => (
+                      <option key={value}>{value}</option>
+                    ),
+                  )}
+                </select>
+              </label>
+            </>
+          )}
         </div>
         <label className="ecommerce-prompt">
           <span className="ecommerce-prompt__label">
@@ -1707,10 +1899,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                 <label>
                   <input
                     type="radio"
-                    checked={videoMode === "完全复刻"}
-                    onChange={() => setVideoMode("完全复刻")}
+                    checked={videoMode === "商品替换优先"}
+                    onChange={() => setVideoMode("商品替换优先")}
                   />
-                  完全复刻<span>仅替换视频中的商品</span>
+                  商品替换优先<span>参考原片生成，不能保证逐帧一致</span>
                 </label>
                 <label>
                   <input
@@ -1768,15 +1960,22 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             <small>每张单独请求和计费，完成后立即显示并保存。</small>
           </div>
         )}
-        {(error || jobState.storageError) && (
+        {resultKind === "video" && videoInputError && (
+          <p className="ecommerce-error" role="status">
+            {videoInputError}
+          </p>
+        )}
+        {(error || jobState.storageError || videoState.storageError) && (
           <p className="ecommerce-error" role="alert">
-            {error || jobState.storageError}
+            {error || jobState.storageError || videoState.storageError}
           </p>
         )}
         <button
           className="ecommerce-generate"
           disabled={
             busy ||
+            (currentTool.media === "video" &&
+              (!videoState.ready || Boolean(videoInputError))) ||
             (currentTool.media === "image" && !jobState.ready) ||
             (currentTool.media === "image" && !files.length) ||
             (currentTool.media === "video" &&
@@ -1802,13 +2001,22 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             </>
           )}
         </button>
-        {busy && resultKind === "image" && (
+        {Boolean(jobState.activeId) && resultKind === "image" && (
           <button
             type="button"
             className="ecommerce-stop"
             onClick={() => ecommerceJobs.pause()}
           >
             暂停生成
+          </button>
+        )}
+        {videoBusy && (
+          <button
+            type="button"
+            className="ecommerce-stop"
+            onClick={() => ecommerceVideos.pause()}
+          >
+            停止等待视频
           </button>
         )}
       </aside>

@@ -1,5 +1,4 @@
 import localforage from "localforage";
-import type { ModelRef } from "../upstream/packages/drawnix/src/utils/settings-manager";
 
 export const ECOMMERCE_ITEM_TIMEOUT_MS = 10 * 60 * 1000;
 export type ImageStage =
@@ -41,7 +40,8 @@ export type EcommerceBatch = {
   createdAt: number;
   title: string;
   tool: string;
-  modelRef: ModelRef;
+  // Persist only the route identity, independent of runtime provider settings.
+  modelRef: { profileId: string | null; modelId: string | null };
   owner: string | null;
   size: string;
   references: File[];
@@ -105,7 +105,7 @@ export function planEcommerceImages(input: {
   } else labels = ["商品图片"];
   return labels.map((label, i) => ({
     label,
-    prompt: `${input.prompt}。本次仅生成一张独立的「${label}」，这是整套第 ${i + 1}/${labels.length} 张。只呈现此模块，不要把整套内容拼接到一张图，不要绘制缩略图列表或编号。保持参考商品的形状、颜色、标识和材质一致，各张保持同一视觉风格。未提供的规格、功效和认证不得编造。`,
+    prompt: `${input.prompt}。本次仅生成一张独立的「${label}」，这是整套第 ${i + 1}/${labels.length} 张。只呈现此模块，不要把整套内容拼接到一张图，不要绘制缩略图列表或编号。保持参考商品的形状、颜色、标识和材质一致，各张保持同一视觉风格。商品事实约束：仅使用用户明确提供的商品事实和原图可见的外观信息。不得推断内衬、鞋底底面等不可见结构，不得虚构材质成分、尺寸、耐用性、舒适度、功效、认证、质保或赠品；缺少依据时省略对应文案、图标和特写。没有明确要求时不得改变商品颜色、数量或磨损状态。${label.includes("对比") ? "对比图专项约束：没有提供真实前后素材和效果依据时，只展示原图中已有颜色或角度的中性并列展示，不使用 Before/After、优劣、改善、升级等暗示，不得把任何一款商品画旧、损坏或贬低。" : ""}${label.includes("角度") ? "多角度图不得凭空设计不可见的底纹、标识或内部结构，只展示有参考依据的视角。" : ""}`,
   }));
 }
 

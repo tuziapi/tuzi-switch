@@ -24,7 +24,7 @@ const batch: EcommerceBatch = {
   createdAt: 1795420800000,
   title: "AI 商品套图",
   tool: "product-set",
-  modelRef: { modelId: "gpt-image-2.5-1k" },
+  modelRef: { profileId: null, modelId: "gpt-image-2.5-1k" },
   owner: null,
   size: "1024x1024",
   references: [],

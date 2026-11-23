@@ -35,6 +35,27 @@ const waitIdle = async (store: EcommerceJobStore) =>
   vi.waitFor(() => expect(store.getSnapshot().activeId).toBe(""));
 
 describe("durable sequential ecommerce images", () => {
+  it("grounds commercial claims and avoids fabricated before/after degradation", () => {
+    const plan = planEcommerceImages({
+      tool: "detail-page",
+      structure: "smart",
+      labels: ["效果对比图", "多角度图"],
+      apparelTypes: [],
+      counts: {},
+      prompt: "synthetic shoes",
+    });
+    expect(plan.find((item) => item.label === "效果对比图")?.prompt).toContain(
+      "不得把任何一款商品画旧、损坏或贬低",
+    );
+    expect(plan.find((item) => item.label === "多角度图")?.prompt).toContain(
+      "只展示有参考依据的视角",
+    );
+    expect(
+      plan.every((item) =>
+        item.prompt.includes("不得虚构材质成分、尺寸、耐用性、舒适度"),
+      ),
+    ).toBe(true);
+  });
   it("plans selected modules instead of hidden eight-image count; custom counts stay exact", () => {
     const base = {
       tool: "product-set",

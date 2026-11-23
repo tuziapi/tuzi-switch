@@ -239,6 +239,7 @@
 }
 .ecommerce-preview__canvas video {
   background: #111;
+  height: auto;
 }
 .ecommerce-preview__canvas > div:not(.ecommerce-result-nav) {
   display: grid;
@@ -255,8 +256,8 @@
 }
 .ecommerce-result-nav {
   display: flex !important;
-  position: absolute;
-  bottom: 14px;
+  position: relative;
+  margin: 10px;
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
@@ -637,6 +638,32 @@
 }
 .ecommerce-plan small {
   color: #68706b;
+}
+.ecommerce-video-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  text-align: left;
+}
+.ecommerce-video-record > label,
+.ecommerce-video-record > p,
+.ecommerce-video-record > small {
+  flex-basis: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ecommerce-video-record > label {
+  display: grid;
+  gap: 8px;
+}
+.ecommerce-video-record button {
+  border: 1px solid #d8dcd8;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #f6f7f5;
+  color: #303b34;
 }
 .ecommerce-batch {
   --batch-surface: #fff;

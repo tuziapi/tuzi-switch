@@ -10,11 +10,18 @@ import {
   getAdapterContextFromSettings,
   resolveAdapterForInvocation,
 } from "../upstream/packages/drawnix/src/services/model-adapters";
+import { getVideoModelConfig } from "../upstream/packages/drawnix/src/constants/video-model-config";
 
 export type EcommerceMediaReference = {
   value: string;
   name?: string;
 };
+
+export function supportsEcommerceVideoReference(modelId: string | null) {
+  return ["gemini-omni-1.2-flash", "minimax-h3"].includes(
+    modelId?.toLowerCase() || "",
+  );
+}
 
 export function resolveEcommerceModelRef(
   modelId: string,
@@ -191,9 +198,16 @@ export async function generateEcommerceVideo(params: {
   prompt: string;
   size: string;
   referenceImages: string[];
+  referenceVideo?: string;
+  seconds?: string;
+  aspectRatio?: string;
+  signal?: AbortSignal;
+  taskId?: string;
+  onSubmitted?: (taskId: string) => Promise<void>;
   accountReference?: string;
   onProgress?: (progress: number) => void;
 }): Promise<string[]> {
+  params.signal?.throwIfAborted();
   const plan = resolveInvocationPlanFromRoute("video", params.modelRef);
   if (!plan) {
     throw new Error(
@@ -201,26 +215,78 @@ export async function generateEcommerceVideo(params: {
     );
   }
   const provider = withAccountReference(plan.provider, params.accountReference);
-  const result = await videoAPIService.generateVideoWithPolling(
-    {
-      model: plan.modelRef.modelId as any,
-      modelRef: plan.modelRef,
-      prompt: params.prompt,
-      size: params.size,
-      inputReferences: params.referenceImages.map((value, slot) => ({
-        value,
-        slot,
-        url: value,
-        name: `reference-${slot + 1}.png`,
-      })) as any,
+  const config = getVideoModelConfig(plan.modelRef.modelId as any);
+  if (
+    !params.taskId &&
+    params.referenceImages.length > config.imageUpload.maxCount
+  )
+    throw new Error(
+      `当前模型最多支持 ${config.imageUpload.maxCount} 张商品图。`,
+    );
+  if (
+    !params.taskId &&
+    config.imageUpload.required &&
+    !params.referenceImages.length
+  )
+    throw new Error("当前视频模型需要商品参考图。");
+  if (
+    params.referenceVideo &&
+    !supportsEcommerceVideoReference(plan.modelRef.modelId)
+  )
+    throw new Error(
+      "当前模型尚未接入本地参考视频，请选择 MiniMax-H3 或 Gemini Omni 1.2 Flash。不会忽略视频继续计费生成。",
+    );
+  const videoParams: Record<string, unknown> = {
+    aspect_ratio: params.aspectRatio || "16:9",
+    ratio: params.aspectRatio || "16:9",
+    ...(params.referenceVideo
+      ? plan.modelRef.modelId.toLowerCase() === "minimax-h3"
+        ? { input_videos: [params.referenceVideo] }
+        : { video_media: [{ type: "video", url: params.referenceVideo }] }
+      : {}),
+  };
+  const request = {
+    model: plan.modelRef.modelId as any,
+    modelRef: plan.modelRef,
+    prompt: params.prompt,
+    size: params.size,
+    seconds: params.seconds || config.defaultDuration,
+    params: videoParams,
+    inputReferences: params.referenceImages.map((value, slot) => ({
+      slot,
+      url: value,
+      name: `reference-${slot + 1}.png`,
+    })),
+  };
+  const context = {
+    providerContext: provider,
+    binding: plan.binding,
+  };
+  // Persist the remote ID before polling. Resuming only queries this ID and
+  // never repeats a paid submission, even after a desktop restart.
+  let taskId = params.taskId;
+  if (!taskId) {
+    const submitted = await videoAPIService.submitVideoGeneration(
+      request,
+      context,
+    );
+    taskId = submitted.id;
+    if (!taskId)
+      throw new Error("服务端未返回任务编号，请先核对调用记录，勿重复提交。");
+    await params.onSubmitted?.(taskId);
+  }
+  params.signal?.throwIfAborted();
+  const result = await videoAPIService.resumePolling(taskId, {
+    ...context,
+    routeModel: plan.modelRef,
+    params: videoParams,
+    interval: 5000,
+    assertAvailable: async () => {
+      params.signal?.throwIfAborted();
     },
-    {
-      interval: 1500,
-      onProgress: (progress) => params.onProgress?.(progress),
-      providerContext: provider,
-      binding: plan.binding,
-    },
-  );
+    onProgress: (progress) => params.onProgress?.(progress),
+  });
+  params.signal?.throwIfAborted();
   const url = result.video_url || result.url;
   if (!url) throw new Error("模型未返回可展示的视频结果。");
   return [url];
