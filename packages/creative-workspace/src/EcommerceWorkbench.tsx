@@ -10,6 +10,8 @@ import {
   ImagePlus,
   LayoutTemplate,
   LoaderCircle,
+  Pause,
+  Play,
   Sparkles,
   Upload,
   Video,
@@ -920,6 +922,44 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setActiveResult(0);
   }, [batch?.id]);
   const [activeResult, setActiveResult] = useState(0);
+  const [slideshowPlaying, setSlideshowPlaying] = useState(false);
+  const [previewHovered, setPreviewHovered] = useState(false);
+  useEffect(() => {
+    setSlideshowPlaying(false);
+  }, [tool, batch?.id]);
+  useEffect(() => {
+    const pause = () => setSlideshowPlaying(false);
+    const onVisibilityChange = () => {
+      if (document.hidden) pause();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("blur", pause);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("blur", pause);
+    };
+  }, []);
+  useEffect(() => {
+    if (
+      !slideshowPlaying ||
+      previewHovered ||
+      document.hidden ||
+      resultKind !== "image" ||
+      resultUrls.length < 2
+    )
+      return;
+    const timer = window.setInterval(() => {
+      setActiveResult((index) => (index + 1) % resultUrls.length);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [
+    slideshowPlaying,
+    previewHovered,
+    resultKind,
+    resultUrls.length,
+    tool,
+    batch?.id,
+  ]);
   useEffect(() => {
     if (!busy) return;
     const running = jobState.batches
@@ -1348,6 +1388,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   };
 
   const queueCanvasInsert = async () => {
+    setSlideshowPlaying(false);
     if (resultKind !== "image") return;
     const blob = imageBlobs[activeResult];
     if (!blob) return;
@@ -1469,7 +1510,21 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                   </button>
                 )}
               </div>
-              <div className="ecommerce-preview__canvas">
+              <div
+                className="ecommerce-preview__canvas"
+                onMouseEnter={() => setPreviewHovered(true)}
+                onMouseLeave={() => setPreviewHovered(false)}
+                onFocusCapture={(event) => {
+                  // The explicit play/pause button must remain usable by keyboard.
+                  if (
+                    !(event.target as HTMLElement).closest(
+                      "[data-slideshow-toggle]",
+                    )
+                  ) {
+                    setSlideshowPlaying(false);
+                  }
+                }}
+              >
                 {resultUrls.length ? (
                   <>
                     {resultKind === "video" ? (
@@ -1480,12 +1535,20 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                         aria-label="生成视频"
                       />
                     ) : (
-                      <img src={resultUrls[activeResult]} alt="生成结果" />
+                      <img
+                        key={resultUrls[activeResult]}
+                        className="ecommerce-preview__result"
+                        src={resultUrls[activeResult]}
+                        alt="生成结果"
+                      />
                     )}
                     <div className="ecommerce-result-nav">
                       <button
                         disabled={activeResult === 0}
-                        onClick={() => setActiveResult((index) => index - 1)}
+                        onClick={() => {
+                          setSlideshowPlaying(false);
+                          setActiveResult((index) => index - 1);
+                        }}
                       >
                         上一张
                       </button>
@@ -1494,10 +1557,31 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                       </span>
                       <button
                         disabled={activeResult === resultUrls.length - 1}
-                        onClick={() => setActiveResult((index) => index + 1)}
+                        onClick={() => {
+                          setSlideshowPlaying(false);
+                          setActiveResult((index) => index + 1);
+                        }}
                       >
                         下一张
                       </button>
+                      {resultKind === "image" && resultUrls.length > 1 && (
+                        <button
+                          type="button"
+                          data-slideshow-toggle
+                          aria-pressed={slideshowPlaying}
+                          title="每 4 秒切换一张，鼠标悬停暂停；手动切图或离开窗口后停止"
+                          onClick={() =>
+                            setSlideshowPlaying((playing) => !playing)
+                          }
+                        >
+                          {slideshowPlaying ? (
+                            <Pause size={12} aria-hidden="true" />
+                          ) : (
+                            <Play size={12} aria-hidden="true" />
+                          )}
+                          {slideshowPlaying ? "暂停播放" : "自动播放"}
+                        </button>
+                      )}
                       {resultKind === "image" && (
                         <button
                           onClick={() =>
@@ -1564,6 +1648,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                   batch.items.filter((item) => item.image)[activeResult]?.id
                 }
                 onPreview={(id) => {
+                  setSlideshowPlaying(false);
                   const index = batch.items
                     .filter((item) => item.image)
                     .findIndex((item) => item.id === id);
