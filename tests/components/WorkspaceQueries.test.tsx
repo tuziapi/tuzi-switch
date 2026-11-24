@@ -9,13 +9,14 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Mcp from "@/components/mcp/UnifiedMcpPanel";
 import Skills from "@/components/skills/UnifiedSkillsPanel";
 import { SessionManagerPage } from "@/components/sessions/SessionManagerPage";
 import { mcpApi } from "@/lib/api/mcp";
 import { skillsApi } from "@/lib/api/skills";
 import { sessionsApi } from "@/lib/api/sessions";
+import { officialMcpApi } from "@/lib/api/officialMcp";
 
 function mount(children: React.ReactNode) {
   const client = new QueryClient({
@@ -26,6 +27,23 @@ function mount(children: React.ReactNode) {
   );
 }
 
+beforeEach(() => {
+  // The independent official-MCP status must not call native IPC while this
+  // suite exercises list/import recovery. Its failures have their own suite.
+  vi.spyOn(officialMcpApi, "status").mockResolvedValue({
+    configPath: "/synthetic/.codex/config.toml",
+    scope: "local",
+    configured: false,
+    busy: false,
+    phase: "not_configured",
+    error: null,
+    accountId: null,
+    accountName: null,
+    assistantAccountName: null,
+    accountMismatch: false,
+    checkedAt: null,
+  });
+});
 afterEach(() => vi.restoreAllMocks());
 
 describe("workspace query recovery", () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OfficialTuziMcpCard } from "@/components/mcp/OfficialTuziMcpCard";
@@ -37,11 +37,12 @@ function show(status = empty) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <OfficialTuziMcpCard />
     </QueryClientProvider>,
   );
+  return { ...view, client };
 }
 describe("official Tuzi MCP customer setup", () => {
   beforeEach(() => {
@@ -49,6 +50,30 @@ describe("official Tuzi MCP customer setup", () => {
     vi.mocked(officialMcpApi.start).mockResolvedValue();
     vi.mocked(officialMcpApi.cancel).mockResolvedValue();
     vi.mocked(officialMcpApi.manage).mockResolvedValue();
+  });
+  it("refreshes the MCP list on completed changes, not on the initial status read", async () => {
+    const { client } = show();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    await screen.findByText("officialMcp.assistantAccount: customer");
+    expect(invalidate).not.toHaveBeenCalled();
+    await act(async () => {
+      client.setQueryData(["official-tuzi-mcp"], {
+        ...empty,
+        busy: true,
+        phase: "authorizing",
+      });
+    });
+    expect(invalidate).not.toHaveBeenCalled();
+    await act(async () => {
+      client.setQueryData(["official-tuzi-mcp"], {
+        ...empty,
+        configured: true,
+        phase: "configured",
+      });
+    });
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(1));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["mcp", "all"] });
+    invalidate.mockRestore();
   });
   it("connects with one action and asks for no credentials", async () => {
     show();

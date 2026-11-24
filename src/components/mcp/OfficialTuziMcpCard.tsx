@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { CheckCircle2, ExternalLink, Loader2, Rabbit } from "lucide-react";
@@ -52,10 +52,21 @@ export function OfficialTuziMcpCard() {
     retry: false,
   });
   const data = status.data;
+  const previousStatus = useRef<typeof data>(undefined);
   useEffect(() => {
-    if (data && !data.busy)
+    if (!data) return;
+    const previous = previousStatus.current;
+    previousStatus.current = data;
+    // Initial status is read alongside the list. Only subsequent configuration
+    // changes or completed operations need a refresh; otherwise a first status
+    // response can silently retry and hide an unrelated list-read failure.
+    if (
+      previous &&
+      !data.busy &&
+      (previous.busy || previous.configured !== data.configured)
+    )
       void client.invalidateQueries({ queryKey: ["mcp", "all"] });
-  }, [client, data?.busy, data?.configured]);
+  }, [client, data]);
   const busy = pending || !!data?.busy;
   const phase = data && phases.has(data.phase) ? data.phase : "not_configured";
   const connected =
