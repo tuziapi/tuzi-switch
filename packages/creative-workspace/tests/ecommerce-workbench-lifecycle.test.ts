@@ -271,21 +271,56 @@ describe("sequential image workbench", () => {
     expect(screen.getByRole("button", { name: "保存视频" })).toBeTruthy();
     expect(mocks.videoGenerate).toHaveBeenCalledTimes(1);
   });
-  it("does not bill ordinary generation for an unimplemented video processor", async () => {
+  it("hides unimplemented processors without deleting existing video records or billing", async () => {
+    const legacyRecords = [
+      "video-remove-background",
+      "video-4k",
+      "video-enhance",
+      "video-remove-watermark",
+    ].map((tool) => ({
+      version: 1,
+      id: `synthetic-legacy-${tool}`,
+      tool,
+      owner: null,
+      createdAt: 1,
+      modelRef: { modelId: "synthetic-video" },
+      prompt: "SYNTHETIC",
+      size: "768P",
+      seconds: "5",
+      aspectRatio: "16:9",
+      status: "complete",
+    }));
+    const write = vi.fn();
+    mocks.videoStore = new EcommerceVideoStore({
+      keys: async () => legacyRecords.map((record) => record.id),
+      getItem: async (id) =>
+        structuredClone(
+          legacyRecords.find((record) => record.id === id),
+        ) as any,
+      setItem: write,
+    });
     render(React.createElement(EcommerceWorkbench));
     await waitFor(() =>
       expect(mocks.videoStore.getSnapshot().ready).toBe(true),
     );
     fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "视频背景移除", exact: true }),
-    );
-    expect(screen.getByRole("status").textContent).toContain(
-      "尚未接入专用视频处理服务",
-    );
-    expect(
-      screen.getByRole("button", { name: "生成视频" }).hasAttribute("disabled"),
-    ).toBe(true);
+    const records = mocks.videoStore.getSnapshot().jobs;
+    for (const name of [
+      "视频背景移除",
+      "视频4K超分",
+      "视频变清晰",
+      "视频去水印",
+    ]) {
+      expect(screen.queryByRole("button", { name, exact: true })).toBeNull();
+    }
+    for (const name of ["视频复刻", "带货视频", "视频压缩"]) {
+      expect(screen.getByRole("button", { name, exact: true })).toBeTruthy();
+    }
+    fireEvent.click(screen.getByRole("button", { name: "商品", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
+    expect(mocks.videoStore.getSnapshot().jobs).toEqual(records);
+    expect(records).toHaveLength(4);
+    expect(write).not.toHaveBeenCalled();
     expect(mocks.videoGenerate).not.toHaveBeenCalled();
   });
   it("shows first image while the next is running, and keeps working across page remounts", async () => {

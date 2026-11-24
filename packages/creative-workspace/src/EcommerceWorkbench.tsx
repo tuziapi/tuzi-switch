@@ -7,10 +7,26 @@ import {
 } from "react";
 import {
   Check,
+  Clapperboard,
+  CopyPlus,
+  FileImage,
   ImagePlus,
+  Layers2,
   LayoutTemplate,
   LoaderCircle,
+  PackageOpen,
+  PanelsTopLeft,
+  PlaySquare,
+  ScanEye,
+  ScanLine,
+  Shirt,
+  Shrink,
   Sparkles,
+  SwatchBook,
+  Footprints,
+  Gem,
+  PersonStanding,
+  UserRound,
   Upload,
   Video,
   X,
@@ -77,37 +93,53 @@ const categories: Array<{
   label: string;
   icon: typeof ImagePlus;
 }> = [
-  { id: "product", label: "商品", icon: ImagePlus },
-  { id: "video", label: "视频", icon: Video },
-  { id: "apparel", label: "穿戴", icon: LayoutTemplate },
+  { id: "product", label: "商品", icon: PackageOpen },
+  { id: "apparel", label: "穿戴", icon: Shirt },
+  { id: "video", label: "视频", icon: Clapperboard },
 ];
 
 const tools: Record<Category, Array<{ id: ToolId; label: string }>> = {
   product: [
     { id: "product-set", label: "商品套图" },
+    { id: "product-retouch", label: "产品精修" },
+    { id: "white-retouch", label: "白底精修" },
+    { id: "product-color", label: "产品换色" },
     { id: "detail-page", label: "A+/详情页" },
     { id: "viral-replicate", label: "爆款复刻" },
-    { id: "product-retouch", label: "产品精修" },
-    { id: "product-color", label: "产品换色" },
-    { id: "white-retouch", label: "白底精修" },
   ],
   video: [
     { id: "video-replicate", label: "视频复刻" },
     { id: "video-commerce", label: "带货视频" },
-    { id: "video-remove-background", label: "视频背景移除" },
-    { id: "video-4k", label: "视频4K超分" },
-    { id: "video-enhance", label: "视频变清晰" },
-    { id: "video-remove-watermark", label: "视频去水印" },
+    // Dedicated processing is not available through the configured service.
+    // Keep legacy ToolIds/records intact, but expose only executable tasks.
     { id: "video-compress", label: "视频压缩" },
   ],
   apparel: [
     { id: "apparel-set", label: "服装组图" },
     { id: "model-wear", label: "模特穿戴" },
-    { id: "underwear-change", label: "内衣更换" },
-    { id: "shoe-tryon", label: "AI 试鞋" },
-    { id: "ai-wear", label: "AI 万戴" },
     { id: "pose-change", label: "模特换姿" },
+    { id: "ai-wear", label: "AI 万戴" },
+    { id: "shoe-tryon", label: "AI 试鞋" },
+    { id: "underwear-change", label: "内衣更换" },
   ],
+};
+
+const toolIcons: Partial<Record<ToolId, typeof ImagePlus>> = {
+  "product-set": Layers2,
+  "detail-page": PanelsTopLeft,
+  "viral-replicate": CopyPlus,
+  "product-retouch": ScanEye,
+  "product-color": SwatchBook,
+  "white-retouch": ScanLine,
+  "video-replicate": Clapperboard,
+  "video-commerce": PlaySquare,
+  "video-compress": Shrink,
+  "apparel-set": Shirt,
+  "model-wear": UserRound,
+  "pose-change": PersonStanding,
+  "ai-wear": Gem,
+  "shoe-tryon": Footprints,
+  "underwear-change": FileImage,
 };
 
 const toolMeta: Record<
@@ -116,43 +148,43 @@ const toolMeta: Record<
 > = {
   "product-set": {
     title: "AI 商品套图",
-    description:
-      "上传商品图，AI 即刻生成符合多电商平台规范的高转化率商品套图。",
+    description: "从商品原图出发，组合主图、场景与细节，逐张完善你的上架素材。",
     media: "image",
   },
   "detail-page": {
     title: "A+ 详情页",
-    description: "上传商品图，生成适配电商平台规范的高转化率详情页素材。",
+    description: "按信息模块准备详情页，把商品特点和使用方式讲清楚。",
     media: "image",
   },
   "viral-replicate": {
     title: "AI 爆款复刻",
-    description: "上传参考图和商品图，复刻爆款构图、风格与营销表达。",
+    description: "添加商品与风格参考，探索适合自己品牌的构图和视觉表达。",
     media: "image",
   },
   "product-retouch": {
     title: "AI 产品精修",
-    description: "自动修复光影、瑕疵和材质表现，得到可直接使用的产品图。",
+    description: "调整光线与材质表现，查看原图和新作品，再挑选合适的版本。",
     media: "image",
   },
   "product-color": {
     title: "AI 产品换色",
-    description: "保持产品结构和材质，生成指定颜色的商品视觉。",
+    description: "描述目标配色，探索商品颜色方案；完成后核对结构与材质。",
     media: "image",
   },
   "white-retouch": {
     title: "AI 白底精修",
-    description: "生成符合平台规范的白底商品精修图。",
+    description: "为商品准备简洁白底，突出主体，减少画面干扰。",
     media: "image",
   },
   "video-replicate": {
     title: "AI 视频复刻",
-    description: "上传参考视频和商品图，复刻原片结构、转场与风格。",
+    description:
+      "用已有视频提供镜头与风格参考，生成新片；商品细节和动作需逐段核对。",
     media: "video",
   },
   "video-commerce": {
     title: "AI 带货视频",
-    description: "将商品图转化为适合投放和带货的短视频内容。",
+    description: "把商品和创意交给视频模型，制作一段动态展示素材。",
     media: "video",
   },
   "video-remove-background": {
@@ -182,32 +214,32 @@ const toolMeta: Record<
   },
   "apparel-set": {
     title: "AI 服装组图",
-    description: "分析款式和面料，生成模特穿戴、白底精修、3D 展示等图组。",
+    description: "为同一款服装准备多种展示角度，选择白底、立体或人台作品。",
     media: "image",
   },
   "model-wear": {
     title: "AI 模特穿戴",
-    description: "将服装自然穿戴到指定模特形象上，保持款式和材质准确。",
+    description: "搭配服装与模特参考，尝试上身展示，核对版型和面料细节。",
     media: "image",
   },
   "underwear-change": {
     title: "AI 内衣更换",
-    description: "替换模特服装并保留姿态、光线和身体结构。",
+    description: "为成人服饰目录尝试不同内衣款式，逐张检查穿戴效果。",
     media: "image",
   },
   "shoe-tryon": {
     title: "AI 试鞋",
-    description: "将鞋款自然呈现在脚部或模特穿搭场景中。",
+    description: "从鞋款参考出发，制作足部特写或完整穿搭展示。",
     media: "image",
   },
   "ai-wear": {
     title: "AI 万戴",
-    description: "将商品应用到不同人物和场景，生成可投放的穿戴素材。",
+    description: "为耳饰、眼镜等配件搭配人物参考，查看佩戴效果。",
     media: "image",
   },
   "pose-change": {
     title: "模特换姿",
-    description: "保持服装和人物特征，生成新的模特姿势和构图。",
+    description: "基于已有模特作品尝试新姿态，选出适合商品的展示角度。",
     media: "image",
   },
 };
@@ -1381,29 +1413,44 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
 
   return (
     <section className="ecommerce-workbench" aria-label="电商生图工作台">
-      <nav className="ecommerce-category-tabs" aria-label="工具分类">
-        {categories.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            className={category === id ? "is-active" : ""}
-            onClick={() => changeCategory(id)}
-          >
-            <Icon size={14} />
-            {label}
-          </button>
-        ))}
-      </nav>
+      <header className="ecommerce-workbench__header">
+        <div className="ecommerce-workbench__identity">
+          <PackageOpen size={23} aria-hidden="true" />
+          <span>
+            <strong>电商创作</strong>
+            <small>从素材到作品</small>
+          </span>
+        </div>
+        <nav className="ecommerce-category-tabs" aria-label="工具分类">
+          {categories.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              className={category === id ? "is-active" : ""}
+              aria-pressed={category === id}
+              onClick={() => changeCategory(id)}
+            >
+              <Icon size={17} aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </nav>
+      </header>
       <nav className="ecommerce-tool-tabs" aria-label="工具类型">
-        {tools[category].map(({ id, label }) => (
-          <button
-            key={id}
-            className={tool === id ? "is-active" : ""}
-            onClick={() => changeTool(id)}
-          >
-            <LayoutTemplate size={14} />
-            {label}
-          </button>
-        ))}
+        <span className="ecommerce-tool-tabs__label">选择创作任务</span>
+        {tools[category].map(({ id, label }) => {
+          const Icon = toolIcons[id] || LayoutTemplate;
+          return (
+            <button
+              key={id}
+              className={tool === id ? "is-active" : ""}
+              aria-pressed={tool === id}
+              onClick={() => changeTool(id)}
+            >
+              <Icon size={17} aria-hidden="true" />
+              {label}
+            </button>
+          );
+        })}
       </nav>
       {tool === "video-compress" ? (
         <VideoCompressionPanel bridge={accountBridge} />
@@ -1541,7 +1588,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     <span>
                       {busy
                         ? "生成通常需要数分钟，请勿重复提交"
-                        : "先上传素材，再完善右侧生成参数"}
+                        : "添加素材和创作要求，完成的作品会保存在这里"}
                     </span>
                   </div>
                 )}
@@ -1683,6 +1730,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             )}
           </main>
           <aside className="ecommerce-workbench__panel">
+            <div className="ecommerce-panel-title">
+              <span>创作设置</span>
+              <small>素材与模型</small>
+            </div>
             <input
               ref={imageInput}
               type="file"
@@ -1706,7 +1757,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               </span>
               <small>
                 {files.length >= 3
-                  ? "移除左侧图片后可继续添加"
+                  ? "移除一张参考图片后可继续添加"
                   : "点击添加图片，最多 3 张"}
               </small>
             </button>
