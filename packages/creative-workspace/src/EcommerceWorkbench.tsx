@@ -1512,16 +1512,18 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               <div className="ecommerce-preview__canvas">
                 {resultUrls.length ? (
                   <>
-                    {resultKind === "video" ? (
-                      <video
-                        src={resultUrls[activeResult]}
-                        controls
-                        playsInline
-                        aria-label="生成视频"
-                      />
-                    ) : (
-                      <img src={resultUrls[activeResult]} alt="生成结果" />
-                    )}
+                    <div className="ecommerce-preview__media">
+                      {resultKind === "video" ? (
+                        <video
+                          src={resultUrls[activeResult]}
+                          controls
+                          playsInline
+                          aria-label="生成视频"
+                        />
+                      ) : (
+                        <img src={resultUrls[activeResult]} alt="生成结果" />
+                      )}
+                    </div>
                     <div className="ecommerce-result-nav">
                       <button
                         disabled={activeResult === 0}
