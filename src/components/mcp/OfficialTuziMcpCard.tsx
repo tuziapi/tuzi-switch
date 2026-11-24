@@ -7,6 +7,7 @@ import { officialMcpApi } from "@/lib/api/officialMcp";
 
 const phases = new Set([
   "preparing",
+  "checking_service",
   "configuring",
   "authorizing",
   "checking",
@@ -22,6 +23,7 @@ const errors = new Set([
   "codex_protocol_error",
   "config_conflict",
   "config_home_mismatch",
+  "target_changed",
   "authorization_failed",
   "authorization_url_rejected",
   "browser_failed",
@@ -40,7 +42,7 @@ export function OfficialTuziMcpCard() {
   const { t } = useTranslation();
   const client = useQueryClient();
   const [pending, setPending] = useState(false);
-  const [localError, setLocalError] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const status = useQuery({
     queryKey: ["official-tuzi-mcp"],
     queryFn: officialMcpApi.status,
@@ -57,7 +59,19 @@ export function OfficialTuziMcpCard() {
   const busy = pending || !!data?.busy;
   const phase = data && phases.has(data.phase) ? data.phase : "not_configured";
   const connected =
-    phase === "connected" && !!data?.checkedAt && !data?.accountMismatch;
+    phase === "connected" &&
+    !!data?.configured &&
+    !!data?.checkedAt &&
+    !data?.accountMismatch &&
+    !data?.error &&
+    !localError &&
+    !status.isError;
+  const displayPhase =
+    phase === "connected" && !connected
+      ? data?.configured
+        ? "configured"
+        : "not_configured"
+      : phase;
   const error =
     data?.error && errors.has(data.error)
       ? data.error
@@ -68,11 +82,13 @@ export function OfficialTuziMcpCard() {
   const act = async (operation: () => Promise<void>) => {
     if (pending) return;
     setPending(true);
-    setLocalError(false);
+    setLocalError(null);
     try {
       await operation();
-    } catch {
-      setLocalError(true);
+    } catch (cause) {
+      setLocalError(
+        typeof cause === "string" && errors.has(cause) ? cause : "local_error",
+      );
     } finally {
       await Promise.all([
         client.invalidateQueries({ queryKey: ["official-tuzi-mcp"] }),
@@ -118,13 +134,25 @@ export function OfficialTuziMcpCard() {
             <CheckCircle2 size={15} />
           ) : null}
           {t(
-            `officialMcp.phases.${data?.accountMismatch ? "account_mismatch" : phase}`,
+            `officialMcp.phases.${data?.accountMismatch ? "account_mismatch" : displayPhase}`,
           )}
         </div>
       </div>
       <p className="mt-4 text-sm text-muted-foreground">
         {t("officialMcp.steps")}
       </p>
+      {data?.configPath && (
+        <details className="mt-2 text-xs text-muted-foreground">
+          <summary className="cursor-pointer">
+            {t(
+              data.scope === "local"
+                ? "officialMcp.desktopTarget"
+                : "officialMcp.isolatedTarget",
+            )}
+          </summary>
+          <code className="mt-1 block break-all">{data.configPath}</code>
+        </details>
+      )}
       {data?.assistantAccountName && (
         <p className="mt-2 text-sm">
           {t("officialMcp.assistantAccount", {
@@ -145,7 +173,7 @@ export function OfficialTuziMcpCard() {
       {(error || status.isError || localError) && (
         <p role="alert" className="mt-3 text-sm text-amber-600">
           {t(
-            `officialMcp.errors.${localError || status.isError ? "local_error" : error}`,
+            `officialMcp.errors.${localError || (status.isError ? "local_error" : error)}`,
           )}
         </p>
       )}
@@ -156,10 +184,20 @@ export function OfficialTuziMcpCard() {
           })}
         </p>
       )}
+      {connected && data?.scope === "local" && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t("officialMcp.desktopReady")}
+        </p>
+      )}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
-          disabled={busy || status.isLoading}
-          onClick={() => void act(() => officialMcpApi.start("connect"))}
+          disabled={
+            busy || status.isLoading || status.isError || !data?.configPath
+          }
+          onClick={() =>
+            data?.configPath &&
+            void act(() => officialMcpApi.start("connect", data.configPath!))
+          }
         >
           {t(
             data?.configured
@@ -170,8 +208,11 @@ export function OfficialTuziMcpCard() {
         {data?.configured && (
           <Button
             variant="outline"
-            disabled={busy}
-            onClick={() => void act(() => officialMcpApi.start("check"))}
+            disabled={busy || status.isError || !data?.configPath}
+            onClick={() =>
+              data?.configPath &&
+              void act(() => officialMcpApi.start("check", data.configPath!))
+            }
           >
             {t("officialMcp.check")}
           </Button>

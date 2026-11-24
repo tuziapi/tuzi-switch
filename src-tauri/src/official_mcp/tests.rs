@@ -2,6 +2,73 @@ use super::*;
 use std::fs;
 
 #[test]
+fn local_target_requires_the_displayed_path_and_keeps_test_profiles_isolated() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("desktop");
+    assert_eq!(check_target(&home, true, None), Err("target_changed"));
+    assert_eq!(
+        check_target(&home, true, Some("/old/config.toml")),
+        Err("target_changed")
+    );
+    assert!(check_target(&home, true, home.join("config.toml").to_str()).is_ok());
+    assert!(check_target(&home, false, None).is_ok());
+    let (path, scope) = crate::codex_mcp_target::select_config_path(
+        true,
+        true,
+        Some(temp.path().join("synthetic")),
+        temp.path().join("preview"),
+        Some(home),
+        Some(temp.path().join("override")),
+        Some(temp.path().join("env")),
+    )
+    .unwrap();
+    assert_eq!(path, temp.path().join("synthetic/.codex/config.toml"));
+    assert_eq!(scope, "isolated");
+    assert!(!path.exists());
+}
+
+#[test]
+fn registration_requires_the_official_public_client_contract() {
+    let valid = json!({"issuer":"https://api.tu-zi.com", "registration_endpoint":"https://api.tu-zi.com/mcp/oauth/register", "token_endpoint_auth_methods_supported":["none"]});
+    assert!(validate_registration_metadata(&valid).is_ok());
+    for patch in [
+        json!({"issuer":"https://other.invalid"}),
+        json!({"registration_endpoint":null}),
+        json!({"token_endpoint_auth_methods_supported":["client_secret_basic"]}),
+    ] {
+        let mut bad = valid.clone();
+        for (key, value) in patch.as_object().unwrap() {
+            bad[key] = value.clone();
+        }
+        assert_eq!(
+            validate_registration_metadata(&bad),
+            Err("server_upgrade_required")
+        );
+    }
+}
+
+#[test]
+fn explicit_desktop_install_preserves_settings_and_does_not_claim_the_preview_database() {
+    let temp = tempfile::tempdir().unwrap();
+    let state = crate::store::AppState::new(Arc::new(crate::database::Database::memory().unwrap()));
+    let path = temp.path().join("config.toml");
+    let original =
+        "# SYNTHETIC settings\nmodel = 'synthetic'\n[mcp_servers.keep]\ncommand = 'untouched'\n";
+    fs::write(&path, original).unwrap();
+    crate::services::McpService::install_official_tuzi(&state, temp.path()).unwrap();
+    assert_eq!(validate_config(temp.path()), Ok(true));
+    let installed = fs::read_to_string(&path).unwrap();
+    assert!(installed.starts_with(original));
+    assert!(state.db.get_all_mcp_servers().unwrap().is_empty());
+    crate::services::McpService::install_official_tuzi(&state, temp.path()).unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), installed);
+    let conflicting = installed.replace(ENDPOINT, "https://other.invalid/mcp");
+    fs::write(&path, &conflicting).unwrap();
+    assert!(crate::services::McpService::install_official_tuzi(&state, temp.path()).is_err());
+    assert_eq!(fs::read_to_string(&path).unwrap(), conflicting);
+}
+
+#[test]
 fn config_accepts_only_official_transport_and_preserves_other_entries() {
     let dir = tempfile::tempdir().unwrap();
     assert_eq!(validate_config(dir.path()), Ok(false));

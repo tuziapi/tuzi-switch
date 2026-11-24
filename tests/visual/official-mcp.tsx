@@ -7,7 +7,7 @@ import i18n from '@/i18n';
 import '@/index.css';
 const params = new URLSearchParams(location.search);
 await i18n.changeLanguage(params.get('lang') || 'zh');
-let state = { configured:false, busy:false, phase:'not_configured', error:null as string|null, accountId:null as string|null, accountName:null as string|null, assistantAccountName:'演示客户', accountMismatch:false, checkedAt:null as number|null };
+let state = { configPath:'/synthetic/desktop/.codex/config.toml', scope:'local', configured:false, busy:false, phase:'not_configured', error:null as string|null, accountId:null as string|null, accountName:null as string|null, assistantAccountName:'演示客户', accountMismatch:false, checkedAt:null as number|null };
 if (params.has('connected')) state = { ...state, configured:true, phase:'connected', accountId:'1', accountName:'演示客户', checkedAt:1795420800 };
 if (params.has('mismatch')) state = { ...state, configured:true, phase:'connected', accountId:'2', accountName:'另一演示账号', checkedAt:1795420800, accountMismatch:true };
 mockIPC((command,args) => {

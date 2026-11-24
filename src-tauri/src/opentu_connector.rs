@@ -27,32 +27,8 @@ fn runtime_path(local_client: bool) -> Result<PathBuf, String> {
         })
         .join("runtime.json"))
 }
-// Explicit local-client setup is the only exception to preview config isolation.
-// Synthetic test launches remain isolated even when the option is requested.
-fn select_config_path(
-    isolated: bool,
-    connect_local: bool,
-    test_home: Option<PathBuf>,
-    profile_home: PathBuf,
-    live_home: Option<PathBuf>,
-    override_dir: Option<PathBuf>,
-    codex_home: Option<PathBuf>,
-) -> Result<(PathBuf, &'static str), String> {
-    if let Some(home) = test_home {
-        return Ok((home.join(".codex/config.toml"), "isolated"));
-    }
-    if isolated && !connect_local {
-        return Ok((profile_home.join(".codex/config.toml"), "isolated"));
-    }
-    let directory = override_dir
-        .or(codex_home)
-        .or_else(|| live_home.map(|h| h.join(".codex")))
-        .ok_or("无法确定本机 Codex 配置目录。")?;
-    if !directory.is_absolute() {
-        return Err("Codex 配置目录必须是绝对路径。".into());
-    }
-    Ok((directory.join("config.toml"), "local"))
-}
+#[cfg(test)]
+use crate::codex_mcp_target::select_config_path;
 
 struct ConnectorPaths {
     config: PathBuf,
@@ -61,17 +37,7 @@ struct ConnectorPaths {
 }
 
 fn connector_paths(connect_local: bool) -> Result<ConnectorPaths, String> {
-    let (config, scope) = select_config_path(
-        cfg!(feature = "isolated-profile"),
-        connect_local,
-        std::env::var_os("CC_SWITCH_TEST_HOME")
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from),
-        crate::config::get_home_dir(),
-        dirs::home_dir(),
-        crate::settings::get_codex_override_dir(),
-        std::env::var_os("CODEX_HOME").map(PathBuf::from),
-    )?;
+    let (config, scope) = crate::codex_mcp_target::resolve(connect_local)?;
     Ok(ConnectorPaths {
         config,
         runtime: runtime_path(connect_local && scope == "local")?,

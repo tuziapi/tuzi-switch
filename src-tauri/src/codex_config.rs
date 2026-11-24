@@ -297,9 +297,14 @@ pub(crate) fn codex_app_server_candidates() -> Vec<PathBuf> {
     // effective configuration the user sees. Prefer it over a possibly older
     // CLI on PATH.
     #[cfg(target_os = "macos")]
-    candidates.push(PathBuf::from(
+    for path in [
+        "/Applications/Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        "/Applications/Codex.app/Contents/Resources/codex",
         "/Applications/ChatGPT.app/Contents/Resources/codex",
-    ));
+    ] {
+        candidates.push(PathBuf::from(path));
+    }
 
     candidates.push(PathBuf::from("codex"));
     let home = get_home_dir();

@@ -37,6 +37,7 @@ mod openclaw_config;
 mod opentu_mcp;
 mod opentu_connector;
 mod official_mcp;
+mod codex_mcp_target;
 mod opencode_config;
 mod panic_hook;
 mod prompt;

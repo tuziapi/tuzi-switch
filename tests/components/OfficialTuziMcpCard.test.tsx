@@ -20,6 +20,8 @@ vi.mock("react-i18next", () => ({
 }));
 
 const empty: OfficialMcpStatus = {
+  configPath: "/synthetic/desktop/.codex/config.toml",
+  scope: "local",
   configured: false,
   busy: false,
   phase: "not_configured",
@@ -55,7 +57,10 @@ describe("official Tuzi MCP customer setup", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
     fireEvent.click(screen.getByText("officialMcp.connect"));
     await waitFor(() =>
-      expect(officialMcpApi.start).toHaveBeenCalledWith("connect"),
+      expect(officialMcpApi.start).toHaveBeenCalledWith(
+        "connect",
+        empty.configPath,
+      ),
     );
     expect(screen.queryByText("officialMcp.phases.connected")).toBeNull();
   });
@@ -66,7 +71,10 @@ describe("official Tuzi MCP customer setup", () => {
     ).toBeVisible();
     fireEvent.click(screen.getByText("officialMcp.check"));
     await waitFor(() =>
-      expect(officialMcpApi.start).toHaveBeenCalledWith("check"),
+      expect(officialMcpApi.start).toHaveBeenCalledWith(
+        "check",
+        empty.configPath,
+      ),
     );
     expect(screen.queryByText("officialMcp.phases.connected")).toBeNull();
   });
@@ -124,5 +132,52 @@ describe("official Tuzi MCP customer setup", () => {
       "officialMcp.errors.local_error",
     );
     expect(screen.queryByText(/SYNTHETIC-secret/)).toBeNull();
+  });
+  it("shows the local target and blocks connecting without a resolved path", async () => {
+    show({
+      ...empty,
+      configPath: null,
+      scope: "unknown",
+      error: "config_home_mismatch",
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "officialMcp.errors.config_home_mismatch",
+    );
+    expect(screen.getByText("officialMcp.connect")).toBeDisabled();
+    expect(officialMcpApi.start).not.toHaveBeenCalled();
+  });
+  it("distinguishes isolated targets and an unavailable server from a connected desktop", async () => {
+    show({ ...empty, scope: "isolated", error: "server_upgrade_required" });
+    expect(await screen.findByText("officialMcp.isolatedTarget")).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "officialMcp.errors.server_upgrade_required",
+    );
+    expect(screen.queryByText("officialMcp.desktopReady")).toBeNull();
+  });
+  it("does not show a stale successful check when the configuration is missing", async () => {
+    show({ ...empty, phase: "connected", checkedAt: 1 });
+    await screen.findByText("officialMcp.desktopTarget");
+    expect(screen.queryByText("officialMcp.phases.connected")).toBeNull();
+    expect(screen.queryByText("officialMcp.desktopReady")).toBeNull();
+  });
+  it("does not advertise desktop readiness for an isolated connection", async () => {
+    show({
+      ...empty,
+      scope: "isolated",
+      configured: true,
+      phase: "connected",
+      checkedAt: 1,
+    });
+    await screen.findByText("officialMcp.phases.connected");
+    expect(screen.queryByText("officialMcp.desktopReady")).toBeNull();
+  });
+  it("reports a changed target without hiding it behind a generic error", async () => {
+    vi.mocked(officialMcpApi.start).mockRejectedValue("target_changed");
+    show();
+    await screen.findByText("officialMcp.desktopTarget");
+    fireEvent.click(screen.getByText("officialMcp.connect"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "officialMcp.errors.target_changed",
+    );
   });
 });

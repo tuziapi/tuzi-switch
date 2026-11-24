@@ -21,6 +21,8 @@ const CONNECTIONS: &str = "https://api.tu-zi.com/mcp/connections";
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
+    config_path: Option<String>,
+    scope: String,
     configured: bool,
     busy: bool,
     phase: String,
@@ -77,6 +79,36 @@ fn config_home() -> Result<PathBuf, &'static str> {
         }
     }
     Ok(home)
+}
+
+fn target_home(connect_local: bool) -> Result<(PathBuf, &'static str), &'static str> {
+    if connect_local {
+        let (path, scope) =
+            crate::codex_mcp_target::resolve(true).map_err(|_| "config_home_mismatch")?;
+        return Ok((path.parent().ok_or("config_conflict")?.to_owned(), scope));
+    }
+    Ok((
+        config_home()?,
+        if cfg!(feature = "isolated-profile") {
+            "isolated"
+        } else {
+            "local"
+        },
+    ))
+}
+
+fn check_target(
+    home: &Path,
+    connect_local: bool,
+    expected: Option<&str>,
+) -> Result<(), &'static str> {
+    let path = home.join("config.toml");
+    if expected.is_some_and(|value| path.to_str() != Some(value))
+        || (connect_local && expected.is_none())
+    {
+        return Err("target_changed");
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_config(home: &Path) -> Result<bool, &'static str> {
@@ -140,6 +172,10 @@ async fn registration_ready() -> Result<(), &'static str> {
         body.extend_from_slice(&chunk);
     }
     let data: Value = serde_json::from_slice(&body).map_err(|_| "service_unavailable")?;
+    validate_registration_metadata(&data)
+}
+
+fn validate_registration_metadata(data: &Value) -> Result<(), &'static str> {
     if data["issuer"] != "https://api.tu-zi.com"
         || data["registration_endpoint"] != "https://api.tu-zi.com/mcp/oauth/register"
         || !data["token_endpoint_auth_methods_supported"]
@@ -265,10 +301,31 @@ fn run(
     app: &tauri::AppHandle,
     action: Action,
     cancelled: &AtomicBool,
+    home: PathBuf,
+    connect_local: bool,
 ) -> Result<(PathBuf, String, String), &'static str> {
-    let home = config_home()?;
+    if target_home(connect_local)?.0 != home {
+        return Err("target_changed");
+    }
     if !home.is_dir() {
         return Err("codex_not_initialized");
+    }
+    if cancelled.load(Ordering::Acquire) {
+        return Err("cancelled");
+    }
+    match action {
+        Action::Connect => {
+            // Fail before writing settings or starting OAuth if production
+            // cannot support this client. Existing authorized clients may
+            // still use Check without requiring dynamic registration again.
+            phase("checking_service");
+            tauri::async_runtime::block_on(registration_ready())?;
+        }
+        Action::Check => {
+            if !validate_config(&home)? {
+                return Err("not_configured");
+            }
+        }
     }
     let cwd = tempfile::tempdir().map_err(|_| "local_error")?;
     // Reuse installed Codex discovery, preferring the desktop bundle. No shell.
@@ -286,10 +343,12 @@ fn run(
     }
     match action {
         Action::Connect => {
+            if target_home(connect_local)?.0 != home {
+                return Err("target_changed");
+            }
             phase("configuring");
             crate::services::McpService::install_official_tuzi(&app.state(), &home)
                 .map_err(|_| "config_conflict")?;
-            tauri::async_runtime::block_on(registration_ready())?;
             if cancelled.load(Ordering::Acquire) {
                 return Err("cancelled");
             }
@@ -324,33 +383,49 @@ fn run(
             }
             rpc = fresh.ok_or("codex_missing")?;
         }
-        Action::Check => {
-            if !validate_config(&home)? {
-                return Err("not_configured");
-            }
-        }
+        Action::Check => {}
     }
     phase("checking");
     let (id, name) = verify(&mut rpc, cwd.path(), cancelled)?;
     // If another configuration edit happened while authorizing, don't display
     // success for a transport which is no longer installed.
-    if config_home()? != home || !validate_config(&home)? {
+    if target_home(connect_local)?.0 != home || !validate_config(&home)? {
         return Err("config_conflict");
     }
     Ok((home, id, name))
 }
 
 #[tauri::command]
-pub fn tuzi_mcp_status(account: State<'_, Arc<crate::tuzi_account::AccountService>>) -> Status {
+pub fn tuzi_mcp_status(
+    account: State<'_, Arc<crate::tuzi_account::AccountService>>,
+    connect_local: Option<bool>,
+) -> Status {
     let mut r = RUNTIME.lock().unwrap_or_else(|e| e.into_inner());
-    let home = config_home();
+    let target = target_home(connect_local.unwrap_or(false));
+    let home = target
+        .as_ref()
+        .map(|(home, _)| home.clone())
+        .map_err(|e| *e);
     let valid = home
         .as_ref()
         .map_err(|e| *e)
         .and_then(|h| validate_config(h));
     let mut status = r.status.clone();
+    status.config_path = home
+        .as_ref()
+        .ok()
+        .map(|h| h.join("config.toml").to_string_lossy().into_owned());
+    status.scope = target
+        .as_ref()
+        .map(|(_, scope)| *scope)
+        .unwrap_or("unknown")
+        .into();
     status.configured = valid == Ok(true);
     if !status.busy && (!status.configured || home.as_ref().ok() != r.home.as_ref()) {
+        if home.as_ref().ok() != r.home.as_ref() {
+            status.error = None;
+            r.status.error = None;
+        }
         status.phase = if status.configured {
             "configured"
         } else {
@@ -388,13 +463,26 @@ pub fn tuzi_mcp_status(account: State<'_, Arc<crate::tuzi_account::AccountServic
 }
 
 #[tauri::command]
-pub fn tuzi_mcp_start(app: tauri::AppHandle, action: Action) -> Result<(), String> {
+pub fn tuzi_mcp_start(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    action: Action,
+    connect_local: Option<bool>,
+    expected_config_path: Option<String>,
+) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("local_error".into());
+    }
+    let connect_local = connect_local.unwrap_or(false);
+    let (home, _) = target_home(connect_local)?;
+    check_target(&home, connect_local, expected_config_path.as_deref())?;
     let cancel = {
         let mut r = RUNTIME.lock().map_err(|_| "local_error")?;
         if r.status.busy {
             return Err("busy".into());
         }
         r.cancel = Arc::new(AtomicBool::new(false));
+        r.home = Some(home.clone());
         r.status = Status {
             busy: true,
             phase: "preparing".into(),
@@ -403,7 +491,7 @@ pub fn tuzi_mcp_start(app: tauri::AppHandle, action: Action) -> Result<(), Strin
         r.cancel.clone()
     };
     tauri::async_runtime::spawn_blocking(move || {
-        let result = run(&app, action, &cancel);
+        let result = run(&app, action, &cancel, home, connect_local);
         if let Ok(mut r) = RUNTIME.lock() {
             r.status.busy = false;
             match result {
