@@ -56,7 +56,13 @@ for (const source of sources) {
 }
 const jobs = "-j2";
 const prefixArg = `--prefix=${shellPath(prefix)}`;
-run("sh", ["./configure",prefixArg,"--disable-shared","--enable-static","--disable-dependency-tracking"],path.join(build,"pkgconf"));
+// pkgconf's autotools build does not set the static API macro on MinGW.
+// Without it the CLI imports DLL symbols while linking the static archive.
+const pkgconfEnv = platform === "win32"
+  ? { CPPFLAGS: [process.env.CPPFLAGS, "-DPKGCONFIG_IS_STATIC"].filter(Boolean).join(" ") }
+  : {};
+run("sh", ["./configure",prefixArg,"--disable-shared","--enable-static","--disable-dependency-tracking"],path.join(build,"pkgconf"),pkgconfEnv);
+if (platform === "win32") run("make",["clean"],path.join(build,"pkgconf"));
 run("make",[jobs],path.join(build,"pkgconf"));
 run("make",["install"],path.join(build,"pkgconf"));
 const env = {PKG_CONFIG_PATH:shellPath(path.join(prefix,"lib/pkgconfig"))};

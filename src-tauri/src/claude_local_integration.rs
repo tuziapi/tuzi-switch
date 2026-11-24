@@ -556,7 +556,6 @@ mod tests {
             command.env(name, "synthetic-legacy-value");
         }
         configure_gateway_process(&mut command, None);
-        assert!(command.get_args().next().is_none());
         assert!(command.get_envs().all(|(_, value)| value.is_none()));
         assert_eq!(command.get_envs().count(), 5);
         assert_eq!(command.get_args().collect::<Vec<_>>(), vec![std::ffi::OsStr::new("--lang=zh-CN")]);
