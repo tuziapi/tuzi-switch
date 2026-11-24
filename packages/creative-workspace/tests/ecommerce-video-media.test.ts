@@ -1,5 +1,5 @@
 import { Blob as NodeBlob } from "node:buffer";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 const mocks = vi.hoisted(() => ({ cache: vi.fn(), fetch: vi.fn() }));
 vi.mock("../upstream/packages/drawnix/src/services/assistant-account", () => ({
   fetchOutputMedia: mocks.fetch,
@@ -9,7 +9,13 @@ vi.mock(
   () => ({ unifiedCacheService: { getCachedBlob: mocks.cache } }),
 );
 import { downloadEcommerceVideo } from "../src/ecommerce-video-media";
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Node 24 Response.blob() uses the global Blob constructor. Keep it paired
+  // with Node's Response rather than jsdom's incomplete Blob implementation.
+  vi.stubGlobal("Blob", NodeBlob);
+});
+afterEach(() => vi.unstubAllGlobals());
 describe("native ecommerce video cache", () => {
   it("reads a generated virtual video from persistent cache instead of fetching app HTML", async () => {
     const blob = new NodeBlob(["\0\0\0 ftypisom", new Uint8Array(32)], {
