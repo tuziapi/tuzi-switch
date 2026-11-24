@@ -51,7 +51,7 @@ def build_config(target, opentu_preview=False, test_release=False):
             config["productName"] = "OpenTu Preview"
             config["bundle"]["externalBin"] = [f"{directory}/tuzi-opentu-preview-node"]
     if test_release:
-        config["version"] = "1.6.3-beta.5"
+        config["version"] = "1.6.3-beta.6"
         if "apple" in target:
             config["bundle"]["macOS"]["signingIdentity"] = "-"
     return config
@@ -106,7 +106,7 @@ def main():
     parser.add_argument("--target", choices=sorted(stage_node.TARGETS))
     parser.add_argument("--dry-run", action="store_true", help="Print the local build plan without downloading or building")
     parser.add_argument("--opentu-preview", action="store_true", help="Combine Claude and OpenTu in the independent OpenTu acceptance app and profile")
-    parser.add_argument("--test-release", action="store_true", help="Build optimized isolated 1.6.3-beta.5 installers; does not publish")
+    parser.add_argument("--test-release", action="store_true", help="Build optimized isolated 1.6.3-beta.6 installers; does not publish")
     parser.add_argument("--stable-release", action="store_true", help="Build signed stable installers with the existing channel identity and updater key; does not publish")
     args = parser.parse_args()
     if args.stable_release and (args.opentu_preview or args.test_release):
