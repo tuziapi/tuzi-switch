@@ -215,11 +215,37 @@
   align-content: center;
   gap: 8px;
   height: 100%;
+  width: 100%;
+  min-height: 104px;
+  padding: 10px 6px;
   border: 1px dashed #cfd0cc;
   border-radius: 9px;
-  color: #9a9c96;
+  background: #fafaf8;
+  color: #656862;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 12px;
   text-align: center;
+}
+.ecommerce-preview__empty--add {
+  height: auto;
+}
+.ecommerce-preview__empty small {
+  font-size: 11px;
+  color: #858880;
+}
+.ecommerce-preview__empty:hover,
+.ecommerce-upload:not(:disabled):hover {
+  border-color: #737b64;
+  background: #f1f3ec;
+}
+.ecommerce-preview__empty:focus-visible,
+.ecommerce-upload:focus-visible {
+  outline: 2px solid #737b64;
+  outline-offset: 3px;
+}
+.ecommerce-upload:disabled {
+  cursor: default;
 }
 .ecommerce-preview__canvas {
   position: relative;
@@ -284,6 +310,9 @@
 }
 .ecommerce-upload {
   display: grid;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
   grid-template-columns: 22px 1fr;
   gap: 2px 10px;
   align-items: center;

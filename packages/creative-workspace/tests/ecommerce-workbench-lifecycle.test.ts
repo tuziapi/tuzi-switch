@@ -132,6 +132,59 @@ async function setup() {
 }
 
 describe("sequential image workbench", () => {
+  it("shares reference uploads across both entries and submits the remaining selection", async () => {
+    mocks.generate.mockResolvedValue("synthetic-result");
+    render(React.createElement(EcommerceWorkbench));
+    await waitFor(() => expect(mocks.store.getSnapshot().ready).toBe(true));
+    const input = screen.getByLabelText("选择参考图片文件") as HTMLInputElement;
+    const picker = vi.spyOn(input, "click");
+    const first = new File(["first"], "first.png", { type: "image/png" });
+    const second = new File(["second"], "second.png", { type: "image/png" });
+    const third = new File(["third"], "third.png", { type: "image/png" });
+    const fourth = new File(["fourth"], "fourth.png", { type: "image/png" });
+    const choose = (files: File[]) =>
+      fireEvent.change(input, { target: { files } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "上传参考图片", exact: true }),
+    );
+    expect(picker).toHaveBeenCalledTimes(1);
+    choose([first]);
+    expect(screen.getByAltText("上传素材 1")).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: /已选择 1\/3 张参考图片/ }),
+    );
+    expect(picker).toHaveBeenCalledTimes(2);
+    choose([first, second]);
+    expect(screen.getAllByAltText(/上传素材/)).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "继续添加参考图片" }));
+    expect(picker).toHaveBeenCalledTimes(3);
+    choose([]); // Cancelling the picker keeps existing references.
+    expect(screen.getAllByAltText(/上传素材/)).toHaveLength(2);
+    choose([third, fourth]);
+    expect(screen.getAllByAltText(/上传素材/)).toHaveLength(3);
+    expect(screen.getByText(/多余图片未添加/)).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: /已选择 3\/3 张参考图片/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen.queryByRole("button", { name: "继续添加参考图片" }),
+    ).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "移除素材" })[1]);
+    choose([new File(["video"], "clip.mp4", { type: "video/mp4" })]);
+    expect(screen.getAllByAltText(/上传素材/)).toHaveLength(2);
+    expect(screen.getByText("请选择图片文件。")).toBeTruthy();
+    choose([second]);
+    expect(input.value).toBe("");
+    fireEvent.click(screen.getAllByRole("button", { name: "移除素材" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "生成 4 张图片" }));
+    await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(4));
+    for (const [batch] of mocks.generate.mock.calls) {
+      expect(batch.references).toEqual([third, second]);
+    }
+  });
+
   it("removes all image options when switching to video with multiple provider entries", async () => {
     const images = [
       {

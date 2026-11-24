@@ -26,7 +26,9 @@ describe("ecommerce model execution", () => {
       tool: "product-set",
       modelRef: { modelId: "synthetic" },
       owner: null,
-      references: [],
+      references: [
+        new File(["synthetic"], "reference.png", { type: "image/png" }),
+      ],
       size: "1024x1024",
       items: [],
     };
@@ -48,6 +50,9 @@ describe("ecommerce model execution", () => {
       expect(params.count).toBe(1);
       expect(params.requestId).toBe("synthetic-id");
       expect(params.prompt).toBe("only hero");
+      expect(params.referenceImages).toEqual([
+        "data:image/png;base64,c3ludGhldGlj",
+      ]);
       await params.onSubmissionAttempt();
       expect(report.mock.calls.at(-1)?.[0]).toEqual({ stage: "submitting" });
       window.dispatchEvent(

@@ -793,6 +793,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const [category, setCategory] = useState<Category>("product");
   const [tool, setTool] = useState<ToolId>("product-set");
   const [files, setFiles] = useState<File[]>([]);
+  const imageInput = useRef<HTMLInputElement>(null);
   const [referenceVideo, setReferenceVideo] = useState<File | null>(null);
   const [platform, setPlatform] = useState("亚马逊");
   const [market, setMarket] = useState("美国");
@@ -1128,8 +1129,38 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     presetDefaultModelIds.video,
   ]);
 
-  const selectFiles = (event: React.ChangeEvent<HTMLInputElement>) =>
-    setFiles(Array.from(event.target.files ?? []).slice(0, 3));
+  const selectFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.currentTarget.files ?? []);
+    // Reset so removing and then picking the same file triggers change again.
+    event.currentTarget.value = "";
+    if (!selected.length) return;
+    const next = [...files];
+    const notices: string[] = [];
+    for (const file of selected) {
+      if (!file.type.startsWith("image/")) {
+        if (!notices.includes("请选择图片文件。"))
+          notices.push("请选择图片文件。");
+        continue;
+      }
+      if (
+        next.some(
+          (existing) =>
+            existing.name === file.name &&
+            existing.size === file.size &&
+            existing.type === file.type &&
+            existing.lastModified === file.lastModified,
+        )
+      )
+        continue;
+      next.push(file);
+    }
+    if (next.length > 3)
+      notices.push(
+        "最多上传 3 张参考图片，多余图片未添加。可移除已有图片后重新选择。",
+      );
+    setFiles(next.slice(0, 3));
+    setError(notices.join(" "));
+  };
   const toggleSet = (
     setter: React.Dispatch<React.SetStateAction<Set<string>>>,
     name: string,
@@ -1402,31 +1433,40 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             )}
             <div className="ecommerce-preview" ref={resultPreview}>
               <div className="ecommerce-preview__strip">
-                {previews.length ? (
-                  previews.map((src, index) => (
-                    <div className="ecommerce-preview__source" key={src}>
-                      <img src={src} alt={`上传素材 ${index + 1}`} />
-                      <button
-                        aria-label="移除素材"
-                        onClick={() =>
-                          setFiles((current) =>
-                            current.filter((_, i) => i !== index),
-                          )
-                        }
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <div className="ecommerce-preview__empty">
+                {previews.map((src, index) => (
+                  <div className="ecommerce-preview__source" key={src}>
+                    <img src={src} alt={`上传素材 ${index + 1}`} />
+                    <button
+                      aria-label="移除素材"
+                      onClick={() =>
+                        setFiles((current) =>
+                          current.filter((_, i) => i !== index),
+                        )
+                      }
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+                {files.length < 3 && (
+                  <button
+                    type="button"
+                    className={`ecommerce-preview__empty${files.length ? " ecommerce-preview__empty--add" : ""}`}
+                    onClick={() => imageInput.current?.click()}
+                    aria-label={
+                      files.length ? "继续添加参考图片" : "上传参考图片"
+                    }
+                  >
                     <ImagePlus size={24} />
                     <span>
-                      {currentTool.media === "video"
-                        ? "上传商品图或视频素材"
-                        : "上传 1–3 张商品原图"}
+                      {files.length ? "添加参考图片" : "上传参考图片"}
                     </span>
-                  </div>
+                    <small>
+                      {files.length
+                        ? `${files.length}/3 张`
+                        : "商品原图 · 最多 3 张"}
+                    </small>
+                  </button>
                 )}
               </div>
               <div className="ecommerce-preview__canvas">
@@ -1643,21 +1683,33 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             )}
           </main>
           <aside className="ecommerce-workbench__panel">
-            <label className="ecommerce-upload">
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={selectFiles}
-              />
+            <input
+              ref={imageInput}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              aria-label="选择参考图片文件"
+              onChange={selectFiles}
+            />
+            <button
+              type="button"
+              className="ecommerce-upload"
+              onClick={() => imageInput.current?.click()}
+              disabled={files.length >= 3}
+            >
               <Upload size={18} />
               <span>
                 {files.length
-                  ? `已选择 ${files.length} 张图片`
-                  : "上传商品原图"}
+                  ? `已选择 ${files.length}/3 张参考图片`
+                  : "上传商品原图 / 参考图片"}
               </span>
-              <small>支持 JPG、PNG，最多 3 张</small>
-            </label>
+              <small>
+                {files.length >= 3
+                  ? "移除左侧图片后可继续添加"
+                  : "点击添加图片，最多 3 张"}
+              </small>
+            </button>
             {currentTool.media === "video" && (
               <label className="ecommerce-upload ecommerce-upload--video">
                 <input
