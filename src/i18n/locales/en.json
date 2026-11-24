@@ -27,7 +27,9 @@
       "authorization": "Authorization value copied, including the Bearer prefix."
     },
     "codexTitle": "Codex local connector",
-    "connectorHelp": "Configure once; connection details refresh when Tuzi Assistant restarts. Keep the app running and open the target canvas.",
+    "connectorHelp": "Allow local Codex to use OpenTu creation tools and the current canvas. Only tuzi-opentu is added; other settings are preserved. Reconnects after the assistant restarts.",
+    "localTarget": "Local client configuration:",
+    "isolatedTarget": "Synthetic test environment; isolated configuration only:",
     "install": "Connect Codex",
     "repair": "Repair Codex connection",
     "remove": "Disconnect",

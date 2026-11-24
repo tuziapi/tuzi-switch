@@ -23,14 +23,20 @@ describe("OpenTu connection setup", () => {
     vi.mocked(opentuMcpApi.connectorStatus).mockResolvedValue({
       configured: false,
       lastToolCallAt: null,
+      configPath: "/synthetic/home/.codex/config.toml",
+      scope: "local",
     });
     vi.mocked(opentuMcpApi.installConnector).mockResolvedValue({
       configured: true,
       lastToolCallAt: null,
+      configPath: "/synthetic/home/.codex/config.toml",
+      scope: "local",
     });
     vi.mocked(opentuMcpApi.removeConnector).mockResolvedValue({
       configured: false,
       lastToolCallAt: null,
+      configPath: "/synthetic/home/.codex/config.toml",
+      scope: "local",
     });
     vi.mocked(opentuMcpApi.pairing).mockResolvedValue({
       endpoint: "http://127.0.0.1:54321/mcp",
@@ -99,6 +105,21 @@ describe("OpenTu connection setup", () => {
 });
 
 describe("one-click Codex connector", () => {
+  it("shows the exact local destination and removes only that selected connection", async () => {
+    vi.mocked(opentuMcpApi.connectorStatus).mockResolvedValue({
+      configured: true, lastToolCallAt: null,
+      configPath: "/synthetic/selected/config.toml", scope: "local",
+    });
+    vi.mocked(opentuMcpApi.removeConnector).mockResolvedValue({
+      configured: false, lastToolCallAt: null,
+      configPath: "/synthetic/selected/config.toml", scope: "local",
+    });
+    render(<OpenTuConnectionPanel />);
+    expect(await screen.findByText("/synthetic/selected/config.toml")).toBeVisible();
+    fireEvent.click(screen.getByText("opentuConnection.remove"));
+    await waitFor(() => expect(opentuMcpApi.removeConnector).toHaveBeenCalledWith("/synthetic/selected/config.toml"));
+    expect(await screen.findByText("opentuConnection.removed")).toBeVisible();
+  });
   it("distinguishes configuration from an actual client tool call", async () => {
     vi.mocked(opentuMcpApi.pairing).mockResolvedValue({
       endpoint: "http://127.0.0.1:54321/mcp",
@@ -108,10 +129,14 @@ describe("one-click Codex connector", () => {
     vi.mocked(opentuMcpApi.connectorStatus).mockResolvedValue({
       configured: false,
       lastToolCallAt: null,
+      configPath: "/synthetic/home/.codex/config.toml",
+      scope: "local",
     });
     vi.mocked(opentuMcpApi.installConnector).mockResolvedValue({
       configured: true,
       lastToolCallAt: null,
+      configPath: "/synthetic/home/.codex/config.toml",
+      scope: "local",
     });
     render(<OpenTuConnectionPanel />);
     await waitFor(() =>
@@ -119,6 +144,12 @@ describe("one-click Codex connector", () => {
     );
     fireEvent.click(screen.getByText("opentuConnection.install"));
     expect(await screen.findByText("opentuConnection.installed")).toBeVisible();
+    expect(
+      screen.getByText("/synthetic/home/.codex/config.toml"),
+    ).toBeVisible();
+    expect(opentuMcpApi.installConnector).toHaveBeenCalledWith(
+      "/synthetic/home/.codex/config.toml",
+    );
     expect(screen.getByText("opentuConnection.awaitingClient")).toBeVisible();
     expect(screen.queryByText("opentuConnection.clientCalled")).toBeNull();
   });
@@ -126,6 +157,8 @@ describe("one-click Codex connector", () => {
     vi.mocked(opentuMcpApi.connectorStatus).mockResolvedValue({
       configured: false,
       lastToolCallAt: null,
+      configPath: "/synthetic/home/.codex/config.toml",
+      scope: "local",
     });
     vi.mocked(opentuMcpApi.installConnector).mockRejectedValue(
       new Error("SYNTHETIC-secret"),

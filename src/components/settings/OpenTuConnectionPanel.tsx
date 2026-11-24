@@ -43,14 +43,15 @@ export function OpenTuConnectionPanel() {
     };
   }, []);
   const configureConnector = async (remove: boolean) => {
+    if (!connector?.configPath) return;
     setConnectorBusy(true);
     setConnectorError(false);
     setConnectorMessage("");
     try {
       setConnector(
         await (remove
-          ? opentuMcpApi.removeConnector()
-          : opentuMcpApi.installConnector()),
+          ? opentuMcpApi.removeConnector(connector.configPath)
+          : opentuMcpApi.installConnector(connector.configPath)),
       );
       setConnectorMessage(remove ? "removed" : "installed");
     } catch {
@@ -117,9 +118,20 @@ export function OpenTuConnectionPanel() {
         <p className="text-sm text-muted-foreground">
           {t("opentuConnection.connectorHelp")}
         </p>
+        {connector && (
+          <p className="text-xs text-muted-foreground break-all">
+            {t(
+              connector.scope === "local"
+                ? "opentuConnection.localTarget"
+                : "opentuConnection.isolatedTarget",
+            )}
+            <br />
+            <span>{connector.configPath}</span>
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button
-            disabled={connectorBusy || !pairing}
+            disabled={connectorBusy || !pairing || !connector?.configPath}
             onClick={() => void configureConnector(false)}
           >
             {t(

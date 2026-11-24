@@ -27,7 +27,9 @@
       "authorization": "Bearer 接頭辞付きの Authorization 値をコピーしました。"
     },
     "codexTitle": "Codex ローカルコネクター",
-    "connectorHelp": "一度設定すれば、アプリ再起動後も接続情報を自動取得します。アプリを起動し、対象キャンバスを開いてください。",
+    "connectorHelp": "ローカル Codex から OpenTu の生成ツールと現在のキャンバスを操作できます。tuzi-opentu のみ追加し、他の設定は保持します。アプリ再起動後も自動で再接続します。",
+    "localTarget": "ローカルクライアントの設定先：",
+    "isolatedTarget": "合成テスト環境：隔離された設定先のみ使用します。",
     "install": "Codex に接続",
     "repair": "Codex 接続を修復",
     "remove": "接続を解除",

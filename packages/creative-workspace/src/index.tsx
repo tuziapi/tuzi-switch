@@ -75,16 +75,27 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
   const [pairing, setPairing] = useState<{ endpoint: string; protocolVersion: string } | null>(null);
   const [pairingError, setPairingError] = useState('');
   const [pairingMessage, setPairingMessage] = useState('');
-  const [connector, setConnector] = useState<{configured: boolean; lastToolCallAt: number | null} | null>(null);
+  const [connector, setConnector] = useState<{configured: boolean; lastToolCallAt: number | null; configPath: string; scope: 'local' | 'isolated'} | null>(null);
   const [connectorBusy, setConnectorBusy] = useState(false);
   const configureConnector = async (remove: boolean) => {
+    if (!connector?.configPath) return;
     setConnectorBusy(true); setPairingError(''); setPairingMessage('');
     try {
-      setConnector(await invoke(remove ? 'opentu_connector_remove' : 'opentu_connector_install'));
+      setConnector(await invoke(remove ? 'opentu_connector_remove' : 'opentu_connector_install', { connectLocal: true, expectedConfigPath: connector.configPath }));
       setPairingMessage(remove ? '已解除兔子助手创建的连接器配置。' : '配置已写入。请在 Codex 刷新 MCP；若工具仍未出现，请重新打开会话。已有手动 OpenTu 项时，请停用旧项并保留 tuzi-opentu。');
     } catch { setPairingError('配置失败，其他配置已保留。请检查 Codex 配置格式、目录权限及同名 tuzi-opentu 服务。'); }
     finally { setConnectorBusy(false); }
   };
+  useEffect(() => {
+    if (!pairing) return;
+    let active = true;
+    const timer = setInterval(() => {
+      invoke<NonNullable<typeof connector>>('opentu_connector_status', { connectLocal: true })
+        .then(value => { if (active) setConnector(value); })
+        .catch(() => { if (active) setPairingError('无法读取连接状态，请重新打开连接面板。'); });
+    }, 3000);
+    return () => { active = false; clearInterval(timer); };
+  }, [pairing]);
   useEffect(() => registerEditorUpdateGuard(async () => {
     if (!ready || busy || error) throw new Error('创作工作区正在处理操作，请完成后再更新。');
     if (settingsOpen || renaming) throw new Error('请先保存或关闭创作配置/重命名窗口，再更新。');
@@ -145,7 +156,7 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
     setPairingMessage('');
     try {
       setPairing(await invoke<{ endpoint: string; protocolVersion: string }>('opentu_mcp_pairing'));
-      setConnector(await invoke('opentu_connector_status'));
+      setConnector(await invoke('opentu_connector_status', { connectLocal: true }));
     } catch {
       setPairingError('OpenTu MCP 服务尚未启动，请确认桌面验收版正在运行。');
     }
@@ -162,7 +173,7 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
     setPairingMessage(''); setPairingError('');
     try {
       const result = await invoke<{ toolCount: number }>('opentu_mcp_check');
-      setConnector(await invoke('opentu_connector_status'));
+      setConnector(await invoke('opentu_connector_status', { connectLocal: true }));
       setPairingMessage(`本地认证、初始化和 ${result.toolCount} 个工具检查通过。仍需在目标客户端连接并调用工具。`);
     } catch { setPairingError('本地连接检查失败，请重试。'); }
   };
@@ -176,8 +187,9 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
       {renaming && <div className="creative-rename-backdrop"><form role="dialog" aria-modal="true" aria-label="重命名项目" className="creative-rename-dialog" onSubmit={event => { event.preventDefault(); void rename(); }} onKeyDown={event => { if(event.key === 'Escape' && !busy) setRenaming(null); }}><h3>重命名项目</h3><input autoFocus aria-label="项目名称" value={renaming.name} onChange={event => setRenaming({...renaming, name:event.target.value})}/><div><button type="button" disabled={busy} onClick={() => setRenaming(null)}>取消</button><button type="submit" disabled={busy || !renaming.name.trim()}>保存</button></div></form></div>}
       {pairing && <div className="creative-rename-backdrop"><section role="dialog" aria-modal="true" aria-label="连接 Codex / MCP 客户端" className="creative-rename-dialog creative-mcp-pairing">
         <h3>连接 Codex / MCP 客户端</h3>
-        <p>Codex 配置一次即可。兔子助手重启后，连接器会自动使用新的连接信息。使用时保持兔子助手运行，并打开目标画布。</p>
-        <div><button type="button" disabled={connectorBusy} onClick={() => void configureConnector(false)}>{connectorBusy ? '正在配置…' : connector?.configured ? '修复 Codex 连接' : '一键连接 Codex'}</button>{connector?.configured && <button type="button" disabled={connectorBusy} onClick={() => void configureConnector(true)}>解除连接</button>}</div>
+        <p>连接本机 Codex 后，可调用 OpenTu 创作工具并操作当前画布。只添加 tuzi-opentu 配置，保留其他设置；助手重启后自动重连。</p>
+        {connector && <p style={{fontSize:12, overflowWrap:'anywhere'}}>{connector.scope === 'local' ? '写入本机客户端配置：' : '当前为合成测试环境，仅写隔离配置：'}<br />{connector.configPath}</p>}
+        <div><button type="button" disabled={connectorBusy || !connector?.configPath} onClick={() => void configureConnector(false)}>{connectorBusy ? '正在配置…' : connector?.configured ? '修复本机连接' : '连接本机 Codex'}</button>{connector?.configured && <button type="button" disabled={connectorBusy} onClick={() => void configureConnector(true)}>解除连接</button>}</div>
         {connector?.configured && <p role="status">{connector.lastToolCallAt ? '本次运行已收到连接器转发的成功工具调用。' : '已配置，等待客户端实际调用。'}</p>}
         <details><summary>其他客户端 / 手动 HTTP 配置</summary>
           <p>名称填“兔子助手 OpenTu”，类型选“流式 HTTP”。以下手动配置在重启后需要更新；上方 Codex 连接器不需要重新配对。云端客户端需要另行配置 Tunnel。</p>
