@@ -427,10 +427,20 @@ export async function pollVideoUntilComplete(
   let attempts = 0;
   let consecutiveErrors = 0;
   const maxConsecutiveErrors = 10;
+  const maxAttempts = options.maxAttempts ?? 1080;
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 1080) {
+    throw new Error('maxAttempts must be an integer between 1 and 1080');
+  }
 
   for (;;) {
     if (signal?.aborted) {
       throw new Error('Video generation cancelled');
+    }
+    if (attempts >= maxAttempts) {
+      throw Object.assign(
+        new Error('视频结果等待超时，远端任务可能仍在处理。请继续查询原任务，不要重新生成。'),
+        { remoteId: videoId, code: 'VIDEO_POLL_TIMEOUT' }
+      );
     }
 
     try {

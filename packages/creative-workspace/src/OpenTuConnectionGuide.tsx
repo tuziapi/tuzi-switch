@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import './OpenTuConnectionGuide.css';
+import "./OpenTuConnectionGuide.css";
 
 const messages = {
   zh: {
@@ -14,11 +14,14 @@ const messages = {
     read: "请调用 tuzi-opentu 读取当前画布，告诉我有多少个元素。",
     imageTitle: "生成图片并显示到画布",
     image:
-      "请使用 tuzi-opentu，先查看可用图片模型，再生成一张奶白色陶瓷兔子台灯的产品图，完成后放入当前画布。只生成 1 张，并查询任务确认完成；不要重复提交生成。",
+      "请使用 tuzi-opentu，先查看可用图片模型，再生成一张奶白色陶瓷兔子台灯的产品图，完成后放入当前画布，并获取任务结果在对话中展示。只生成 1 张，并查询任务确认完成；不要重复提交生成。",
+    videoTitle: "生成指定时长的视频",
+    video:
+      "请用 tuzi-opentu 查看 MiniMax-H3 的可用参数，生成一个4秒、768P、16:9的海边列车动漫视频，放入当前画布。只提交一次，保存任务编号并续查；完成后获取任务结果，在支持本机文件的对话中展示视频。",
     copy: "复制指令",
     copied: "已复制，请粘贴到客户端发送。",
     failed: "复制失败，请选中文字手动复制。",
-    note: "生成使用“创作配置”中的模型，可能产生费用。复制指令不会自动生成。",
+    note: "生成使用“创作配置”中的模型，可能产生费用。复制指令不会自动生成。图片可返回预览；原图和视频保存在本机，对话展示取决于客户端是否支持本机媒体。",
     help: "工具没出现 / 图片没显示？",
     tips: "没有 tuzi-opentu：重新打开客户端并检查 MCP 是否启用。提示没有画布：回到助手，打开一个项目的画布。已提交生成：先查询任务，完成后插入已有结果，避免重复扣费。",
   },
@@ -33,11 +36,14 @@ const messages = {
     read: "Use tuzi-opentu to read the current canvas and tell me how many elements it contains.",
     imageTitle: "Generate an image on the canvas",
     image:
-      "Use tuzi-opentu to list available image models, then generate one product photo of a cream ceramic rabbit-shaped lamp and insert it into the current canvas. Generate exactly one image and check the task until it completes; do not submit duplicate generation requests.",
+      "Use tuzi-opentu to list available image models, then generate one product photo of a cream ceramic rabbit-shaped lamp and insert it into the current canvas. Retrieve the task result and display it in this conversation. Generate exactly one image and check the task until it completes; do not submit duplicate generation requests.",
+    videoTitle: "Generate a video with an exact duration",
+    video:
+      "Use tuzi-opentu to inspect MiniMax-H3 parameters, then create one 4-second, 768P, 16:9 anime seaside train video and insert it into the current canvas. Submit once and retain the task ID for polling. Retrieve the completed result and display its local video file if this client supports it.",
     copy: "Copy prompt",
     copied: "Copied. Paste it into the client and send.",
     failed: "Copy failed. Select the text and copy it manually.",
-    note: "Generation uses your Creation settings and may incur charges. Copying a prompt does not start generation.",
+    note: "Generation uses your Creation settings and may incur charges. Copying does not start generation. Image previews are returned; original images and videos are saved locally and require a client that supports local media.",
     help: "Missing tools or images?",
     tips: "No tuzi-opentu: reopen the client and check that the MCP server is enabled. No canvas: open a project canvas in the assistant. Generation submitted: check the task and insert its existing result when complete; avoid duplicate charges.",
   },
@@ -53,11 +59,14 @@ const messages = {
     imageTitle: "画像を生成してキャンバスに表示",
     image:
       "tuzi-opentu で利用可能な画像モデルを確認し、クリーム色の陶器製ウサギ型ランプの商品写真を1枚だけ生成して、現在のキャンバスに挿入してください。タスクの完了を確認し、生成リクエストを重複送信しないでください。",
+    videoTitle: "長さを指定して動画を生成",
+    video:
+      "tuzi-opentu で MiniMax-H3 のパラメータを確認し、4秒、768P、16:9の海辺の列車のアニメ動画を1本生成してキャンバスに挿入してください。送信は1回だけとし、タスクIDで完了を確認してください。完了後に結果を取得し、対応クライアントでローカル動画を表示してください。",
     copy: "指示をコピー",
     copied: "コピーしました。クライアントに貼り付けて送信してください。",
     failed:
       "コピーできませんでした。テキストを選択して手動でコピーしてください。",
-    note: "生成には創作設定のモデルを使用し、料金が発生する場合があります。コピーだけでは生成しません。",
+    note: "生成には創作設定のモデルを使用し、料金が発生する場合があります。コピーだけでは生成しません。画像プレビューを返し、元画像と動画はローカル保存します。表示にはローカルメディア対応クライアントが必要です。",
     help: "ツールや画像が表示されない場合",
     tips: "tuzi-opentu がない場合はクライアントを開き直し、MCP の有効状態を確認してください。キャンバスがない場合は助手でプロジェクトを開いてください。生成済みの場合はタスクを確認し、既存の結果を挿入して重複課金を避けてください。",
   },
@@ -93,6 +102,7 @@ export function OpenTuConnectionGuide({
       {[
         { title: text.readTitle, prompt: text.read },
         { title: text.imageTitle, prompt: text.image },
+        { title: text.videoTitle, prompt: text.video },
       ].map((example) => (
         <article className="opentu-guide-example" key={example.title}>
           <header>

@@ -34,7 +34,7 @@ pub struct ImageRequest {
     name: Option<String>,
 }
 
-fn decode(data: &str) -> Result<(Vec<u8>, DynamicImage, &'static str), String> {
+pub(crate) fn decode(data: &str) -> Result<(Vec<u8>, DynamicImage, &'static str), String> {
     if data.len() > MAX_BYTES.div_ceil(3) * 4 {
         return Err("图片超过 64 MB".into());
     }
@@ -141,7 +141,11 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8], replace: bool) -> Result<(
     Ok(())
 }
 
-pub(crate) fn ensure_export_copy(root: &Path, bytes: &[u8], extension: &str) -> Result<PathBuf, String> {
+pub(crate) fn ensure_export_copy(
+    root: &Path,
+    bytes: &[u8],
+    extension: &str,
+) -> Result<PathBuf, String> {
     if std::fs::symlink_metadata(root).is_ok_and(|m| m.file_type().is_symlink()) {
         return Err("媒体导出目录是符号链接，请使用另存为".into());
     }
@@ -325,7 +329,10 @@ mod tests {
         assert_ne!(first, second);
         assert_eq!(std::fs::read(&first).unwrap(), modified);
         assert_eq!(std::fs::read(&second).unwrap(), bytes);
-        assert_eq!(ensure_export_copy(temp.path(), &bytes, "png").unwrap(), second);
+        assert_eq!(
+            ensure_export_copy(temp.path(), &bytes, "png").unwrap(),
+            second
+        );
     }
 
     #[test]

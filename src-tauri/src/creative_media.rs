@@ -1,6 +1,7 @@
 //! Explicit media export. Accepts bounded binary content, never a URL or path.
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::{path::PathBuf, sync::Mutex};
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -8,6 +9,84 @@ const MAX_BYTES: usize = 128 * 1024 * 1024;
 static VIDEO_OPERATIONS: Mutex<()> = Mutex::new(());
 // Retain clipboard ownership on Linux after the IPC call returns.
 static CLIPBOARD: Mutex<Option<arboard::Clipboard>> = Mutex::new(None);
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpMediaExport {
+    path: String,
+    mime_type: String,
+    bytes: usize,
+    preview: Option<String>,
+}
+
+fn export_mcp_media(
+    root: &std::path::Path,
+    bytes: &[u8],
+    kind: &str,
+) -> Result<McpMediaExport, String> {
+    // No caller-selected path, URL, filename, clipboard operation or save dialog.
+    let (extension, preview) = if kind == "image" {
+        let (_, decoded, extension) = crate::creative_images::decode(&STANDARD.encode(bytes))?;
+        let thumbnail = decoded.thumbnail(768, 768).to_rgb8();
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 75)
+            .encode_image(&image::DynamicImage::ImageRgb8(thumbnail))
+            .map_err(|_| "无法生成结果预览")?;
+        let preview = (jpeg.len() <= 512 * 1024).then(|| STANDARD.encode(jpeg));
+        (extension, preview)
+    } else if matches!(kind, "video" | "audio") {
+        (media_extension(bytes, kind)?, None)
+    } else {
+        return Err("不支持的结果类型".into());
+    };
+    let mime_type = match extension {
+        "jpg" => "image/jpeg".to_string(),
+        "mp3" => "audio/mpeg".to_string(),
+        "m4a" => "audio/mp4".to_string(),
+        other => format!("{kind}/{other}"),
+    };
+    let path = crate::creative_images::ensure_export_copy(root, bytes, extension)?;
+    Ok(McpMediaExport {
+        path: path.to_string_lossy().into_owned(),
+        mime_type,
+        bytes: bytes.len(),
+        preview,
+    })
+}
+
+#[tauri::command]
+pub async fn creative_export_mcp_media(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    request: tauri::ipc::Request<'_>,
+) -> Result<McpMediaExport, String> {
+    if window.label() != "main" {
+        return Err("仅主窗口可导出创作结果".into());
+    }
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(bytes) if !bytes.is_empty() && bytes.len() <= MAX_BYTES => {
+            bytes.clone()
+        }
+        _ => return Err("媒体为空或超过 128 MB".into()),
+    };
+    let kind = request
+        .headers()
+        .get("x-media-kind")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let root = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| "无法定位应用目录")?
+        .join("opentu-results");
+    tauri::async_runtime::spawn_blocking(move || {
+        let _lock = VIDEO_OPERATIONS.lock().map_err(|_| "媒体导出正忙")?;
+        export_mcp_media(&root, &bytes, &kind)
+    })
+    .await
+    .map_err(|_| "结果导出未完成".to_string())?
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum VideoAction {
@@ -173,6 +252,39 @@ pub async fn creative_save_media(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mcp_result_exports_original_and_reuses_copy_without_dialog() {
+        let bytes = include_bytes!("../../tests/visual/fixtures/synthetic-video.mp4");
+        let temp = tempfile::tempdir().unwrap();
+        let first = export_mcp_media(temp.path(), bytes, "video").unwrap();
+        assert!(std::path::Path::new(&first.path).is_absolute());
+        assert_eq!(first.mime_type, "video/mp4");
+        assert_eq!(std::fs::read(&first.path).unwrap(), bytes);
+        assert_eq!(
+            export_mcp_media(temp.path(), bytes, "video").unwrap().path,
+            first.path
+        );
+        assert!(first.preview.is_none());
+        assert!(export_mcp_media(temp.path(), bytes, "archive").is_err());
+        assert!(export_mcp_media(temp.path(), b"<html>failure</html>", "image").is_err());
+    }
+
+    #[test]
+    fn mcp_image_preview_is_bounded_and_original_is_preserved() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::new_rgb8(1200, 800)
+            .write_to(&mut bytes, image::ImageFormat::Png)
+            .unwrap();
+        let result = export_mcp_media(temp.path(), bytes.get_ref(), "image").unwrap();
+        assert_eq!(std::fs::read(&result.path).unwrap(), *bytes.get_ref());
+        assert_eq!(result.mime_type, "image/png");
+        let preview = STANDARD.decode(result.preview.unwrap()).unwrap();
+        assert!(preview.len() <= 512 * 1024);
+        let image = image::load_from_memory(&preview).unwrap();
+        assert_eq!((image.width(), image.height()), (768, 512));
+    }
 
     #[test]
     fn accepts_only_explicit_video_actions() {

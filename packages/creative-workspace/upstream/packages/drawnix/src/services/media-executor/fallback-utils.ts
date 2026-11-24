@@ -198,11 +198,13 @@ export async function pollVideoStatus(
   signal?: AbortSignal,
   isCurrentAttempt: () => boolean = () => true
 ): Promise<{ url: string }> {
-  const maxAttempts = 120; // 最多轮询 10 分钟
+  const isMiniMaxH3 = isMiniMaxH3Model(config.model);
+  // H3 jobs can exceed an hour. Match the main poller's bounded 90-minute
+  // budget on recovery rather than abandoning an accepted job after 10 minutes.
+  const maxAttempts = isMiniMaxH3 ? 1080 : 120;
   const interval = 5000; // 5 秒轮询间隔
   const maxConsecutiveErrors = 3; // 连续 HTTP 错误超过此数才放弃
   let consecutiveErrors = 0;
-  const isMiniMaxH3 = isMiniMaxH3Model(config.model);
   const assertPollingActive = () => {
     signal?.throwIfAborted();
     if (!isCurrentAttempt()) {
@@ -339,7 +341,10 @@ export async function pollVideoStatus(
     assertPollingActive();
   }
 
-  throw new Error('Video generation timeout');
+  throw Object.assign(
+    new Error('视频结果等待超时，远端任务可能仍在处理。请继续查询原任务，不要重新生成。'),
+    { remoteId: videoId, code: 'VIDEO_POLL_TIMEOUT' }
+  );
 }
 
 // 从共享模块导入异步图片生成

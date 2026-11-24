@@ -19,12 +19,14 @@ import { useBeforeUnload } from '../upstream/packages/drawnix/src/hooks/useBefor
 import { startOpenTuMcpBridge, stopOpenTuMcpBridge } from './opentuMcpBridge';
 import { invoke } from '@tauri-apps/api/core';
 import { OpenTuConnectionGuide } from './OpenTuConnectionGuide';
+import { startVideoTaskRecovery } from './videoTaskRecovery';
 
 // Host lifetime, independent of canvas/project/assistant navigation. The editor
 // still unmounts so its keyboard handlers and board observers cannot leak.
 function CreativeTaskRuntime() {
   const ready = useTaskStorage();
   useTaskExecutor(ready);
+  useEffect(() => { if (ready) return startVideoTaskRecovery(); }, [ready]);
   useEffect(() => { setCreativeRuntimeReady(ready); return () => setCreativeRuntimeReady(false); }, [ready]);
   useBeforeUnload();
   return null;

@@ -38,5 +38,5 @@ it.each([
 ])("provides the guide in %s", (language, title) => {
   render(<OpenTuConnectionGuide language={language} />);
   expect(screen.getByRole("heading", { name: title })).toBeVisible();
-  expect(screen.getAllByRole("button")).toHaveLength(2);
+  expect(screen.getAllByRole("button")).toHaveLength(3);
 });

@@ -84,11 +84,31 @@ fn tool_definitions() -> Value {
             "inputSchema": { "type": "object", "properties": {} }
         },
         {
+            "name": "opentu_list_tasks",
+            "description": "查找最近的创作任务。提交结果不确定或断线后先查找已有任务，避免重复付费。",
+            "inputSchema": { "type": "object", "properties": {
+                "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 },
+                "type": { "type": "string", "enum": ["image", "video", "audio", "text"] },
+                "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed", "cancelled"] }
+            } }
+        },
+        {
+            "name": "opentu_get_task_result",
+            "description": "交付已完成任务的单个媒体结果：导出本机文件并返回绝对路径，图片附带有界预览。只读取该任务，不重新生成；本机文件需支持本地媒体的客户端展示。",
+            "inputSchema": { "type": "object", "properties": {
+                "taskId": { "type": "string" },
+                "index": { "type": "integer", "minimum": 0, "default": 0 }
+            }, "required": ["taskId"] }
+        },
+        {
             "name": "opentu_get_task",
-            "description": "查询 OpenTu 创作任务状态和结果。",
+            "description": "查询原任务状态，可等待最多20秒。返回插入画布状态和下一步建议；完成后用 opentu_get_task_result 交付媒体。",
             "inputSchema": {
                 "type": "object",
-                "properties": { "taskId": { "type": "string", "description": "OpenTu 任务 ID" } },
+                "properties": {
+                    "taskId": { "type": "string", "description": "OpenTu 任务 ID" },
+                    "waitMs": { "type": "integer", "minimum": 0, "maximum": 20000, "default": 0 }
+                },
                 "required": ["taskId"]
             }
         },
@@ -114,6 +134,9 @@ fn tool_definitions() -> Value {
                 "properties": {
                     "prompt": { "type": "string", "description": "视频描述" },
                     "model": { "type": "string", "description": "可选模型 ID" },
+                    "seconds": { "type": "integer", "description": "从 opentu_list_models 的 capabilities.seconds 选择；不支持值在付费前拒绝" },
+                    "size": { "type": "string", "description": "从 capabilities.sizes 选择，例如 MiniMax-H3 的 768P" },
+                    "aspectRatio": { "type": "string", "description": "从 capabilities.aspectRatios 选择，例如16:9；尺寸与比例须一致" },
                     "insertToCanvas": { "type": "boolean", "description": "完成后插入当前画布" }
                 },
                 "required": ["prompt"]
@@ -174,12 +197,12 @@ fn tool_definitions() -> Value {
         let name = tool["name"].as_str().unwrap().to_string();
         let read_only = matches!(
             name.as_str(),
-            "opentu_list_models" | "opentu_get_canvas" | "opentu_get_task"
+            "opentu_list_models" | "opentu_get_canvas" | "opentu_get_task" | "opentu_list_tasks"
         );
         tool["annotations"] = json!({
             "readOnlyHint": read_only,
             "destructiveHint": name == "opentu_apply_canvas_edit",
-            "idempotentHint": read_only,
+            "idempotentHint": read_only || name == "opentu_get_task_result",
             "openWorldHint": name.starts_with("opentu_create_") || name == "opentu_insert_to_canvas"
         });
         let schema = &mut tool["inputSchema"];
@@ -292,7 +315,8 @@ async fn rpc_inner(
                 "result": {
                     "protocolVersion": PROTOCOL_VERSION,
                     "capabilities": {"tools": {"listChanged": false}},
-                    "serverInfo": {"name": "OpenTu Desktop", "version": env!("CARGO_PKG_VERSION")}
+                    "serverInfo": {"name": "OpenTu Desktop", "version": env!("CARGO_PKG_VERSION")},
+                    "instructions": "Use tools first; UI is a fallback. List models once, choose the exact modelRef and supported parameters. Create exactly one task per requested result; set insertToCanvas=true when the user wants canvas output. Creation is paid and NOT idempotent: never retry an uncertain submission. Keep the taskId; use list_tasks to recover it and get_task with waitMs<=20000 to wait. Completion, canvas insertion and chat delivery are separate. After completion call get_task_result and display its image preview or absolute local media path in the conversation. Do not claim playback in remote clients that cannot access local files. Report provider output-count/size discrepancies honestly. Never treat a pending task as successful."
                 }
             })),
         ),
@@ -630,7 +654,7 @@ mod tests {
     async fn live_http_pairing_check_and_secret_free_metadata() {
         let (state, server) = serve_test().await;
         let result = check_connection(&state).await.unwrap();
-        assert_eq!(result.tool_count, 9);
+        assert_eq!(result.tool_count, 11);
         assert!(!result.canvas_ready);
         let pairing = PairingInfo {
             endpoint: (*state.endpoint).clone(),

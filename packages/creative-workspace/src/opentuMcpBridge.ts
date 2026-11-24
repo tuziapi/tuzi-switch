@@ -14,7 +14,8 @@ import {
 import { getConfiguredSelectableModels } from "../upstream/packages/drawnix/src/utils/runtime-model-discovery";
 import type { ModelType } from "../upstream/packages/drawnix/src/constants/model-config";
 import { workspaceService } from "../upstream/packages/drawnix/src/services/workspace-service";
-import { taskQueueService } from "../upstream/packages/drawnix/src/services/task-queue-service";
+import { getEffectiveVideoModelConfigForSelection } from "../upstream/packages/drawnix/src/services/video-binding-utils";
+import { deliverTaskResult, listTasks, queryTask } from "./opentuTaskDelivery";
 import type { MCPResult } from "../upstream/packages/drawnix/src/mcp/types";
 
 interface McpCallPayload {
@@ -26,6 +27,30 @@ interface McpCallPayload {
 
 let unlisten: UnlistenFn | null = null;
 let starting: Promise<void> | null = null;
+
+function videoCapabilities(modelId: string, profileId: string | null) {
+  const config = getEffectiveVideoModelConfigForSelection(modelId, {
+    modelId,
+    profileId,
+  });
+  return {
+    source: "local-model-configuration",
+    seconds: config.durationOptions.map((option) => Number(option.value)),
+    sizes: config.sizeOptions.map((option) => option.value),
+    aspectRatios:
+      modelId.toLowerCase() === "minimax-h3"
+        ? ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]
+        : [
+            ...new Set(
+              config.sizeOptions
+                .map((option) => option.aspectRatio)
+                .filter((ratio) => /^\d+:\d+$/.test(ratio)),
+            ),
+          ],
+    defaultSeconds: Number(config.defaultDuration),
+    defaultSize: config.defaultSize,
+  };
+}
 
 function resultToMcp(result: MCPResult): Record<string, unknown> {
   const text = result.success
@@ -94,6 +119,14 @@ export async function handleOpenTuMcpCall(
                     modelId: model.id,
                     profileId: model.sourceProfileId || null,
                   },
+                  ...(type === "video"
+                    ? {
+                        capabilities: videoCapabilities(
+                          model.id,
+                          model.sourceProfileId || null,
+                        ),
+                      }
+                    : {}),
                 })),
             ),
           }),
@@ -124,26 +157,11 @@ export async function handleOpenTuMcpCall(
   }
 
   if (payload.name === "opentu_get_task") {
-    const taskId = typeof args.taskId === "string" ? args.taskId : "";
-    const task = taskId ? taskQueueService.getTask(taskId) : undefined;
-    if (!task) return errorResult(new Error("找不到该 OpenTu 任务"));
-    return {
-      isError: false,
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            id: task.id,
-            type: task.type,
-            status: task.status,
-            progress: task.progress,
-            error: task.error,
-            result: task.result,
-          }),
-        },
-      ],
-    };
+    return queryTask(args, assertActive);
   }
+  if (payload.name === "opentu_list_tasks") return listTasks(args);
+  if (payload.name === "opentu_get_task_result")
+    return deliverTaskResult(args, assertActive);
 
   if (payload.name === "opentu_apply_canvas_edit") {
     const plan = args.plan;
@@ -192,6 +210,9 @@ export async function handleOpenTuMcpCall(
       "modelRef",
       "size",
       "insertToCanvas",
+      ...(payload.name === "opentu_create_video"
+        ? ["seconds", "aspectRatio"]
+        : []),
     ]);
     if (Object.keys(args).some((key) => !allowed.has(key)))
       throw new Error("包含未支持的创作参数");
@@ -208,7 +229,10 @@ export async function handleOpenTuMcpCall(
       throw new Error("insertToCanvas 必须是布尔值");
     if (
       args.size !== undefined &&
-      (payload.name !== "opentu_create_image" || typeof args.size !== "string")
+      (!["opentu_create_image", "opentu_create_video"].includes(payload.name) ||
+        typeof args.size !== "string" ||
+        !args.size ||
+        args.size.length > 80)
     )
       throw new Error("尺寸参数无效");
     const type = payload.name.slice("opentu_create_".length) as ModelType;
@@ -254,6 +278,61 @@ export async function handleOpenTuMcpCall(
     }
     if (toolArgs.autoInsertToCanvas && !getCanvasBoardBinding())
       throw new Error("请先打开目标画布");
+    if (
+      type === "video" &&
+      (args.seconds !== undefined ||
+        args.size !== undefined ||
+        args.aspectRatio !== undefined)
+    ) {
+      if (typeof toolArgs.model !== "string")
+        throw new Error("指定视频参数时请同时选择 modelRef，以校验模型能力");
+      const ref = toolArgs.modelRef as { profileId: string | null };
+      const capabilities = videoCapabilities(toolArgs.model, ref.profileId);
+      if (args.seconds !== undefined) {
+        if (
+          !Number.isInteger(args.seconds) ||
+          !capabilities.seconds.includes(Number(args.seconds))
+        )
+          throw new Error(
+            `该模型支持的秒数：${capabilities.seconds.join("、")}`,
+          );
+        toolArgs.seconds = String(args.seconds);
+      }
+      if (
+        args.size !== undefined &&
+        !capabilities.sizes.includes(String(args.size))
+      )
+        throw new Error(`该模型支持的尺寸：${capabilities.sizes.join("、")}`);
+      if (args.aspectRatio !== undefined) {
+        if (
+          typeof args.aspectRatio !== "string" ||
+          !capabilities.aspectRatios.includes(args.aspectRatio)
+        )
+          throw new Error(
+            `该模型支持的比例：${capabilities.aspectRatios.join("、")}`,
+          );
+        if (toolArgs.model.toLowerCase() === "minimax-h3") {
+          toolArgs.params = {
+            ratio: args.aspectRatio,
+            prompt_enhancement: false,
+          };
+        } else {
+          const config = getEffectiveVideoModelConfigForSelection(
+            toolArgs.model,
+            toolArgs.modelRef as any,
+          );
+          const sizes = config.sizeOptions.filter(
+            (option) => option.aspectRatio === args.aspectRatio,
+          );
+          if (
+            args.size !== undefined &&
+            !sizes.some((option) => option.value === args.size)
+          )
+            throw new Error("所选尺寸与比例不一致，请使用模型列表中的匹配值");
+          toolArgs.size = args.size ?? sizes[0].value;
+        }
+      }
+    }
     assertActive();
     const result = await mcpRegistry.executeTool(
       { name: toolName, arguments: toolArgs },
@@ -294,7 +373,7 @@ export async function startOpenTuMcpBridge(): Promise<void> {
   })
     .then((off) => {
       unlisten = off;
-      return invoke("opentu_mcp_set_ready", { ready: true }).catch((error) => {
+      return invoke<void>("opentu_mcp_set_ready", { ready: true }).catch((error) => {
         off();
         unlisten = null;
         throw error;

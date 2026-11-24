@@ -1256,6 +1256,7 @@ pub fn run() {
             creative_http::release_update_reservation,
             creative_images::creative_image_action,
             creative_media::creative_save_media,
+            creative_media::creative_export_mcp_media,
             creative_media::creative_video_action,
             creative_compression::creative_compress_video,
             creative_compression::creative_cancel_compression,
