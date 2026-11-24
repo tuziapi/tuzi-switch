@@ -83,4 +83,5 @@ try {
   process.exitCode = 1;
 } finally {
   child.kill();
+  process.stdin.pause();
 }
