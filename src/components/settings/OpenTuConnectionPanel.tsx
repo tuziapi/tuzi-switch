@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OpenTuConnectionGuide } from "@tuzi/creative-workspace/connection-guide";
+import "@tuzi/creative-workspace/connection-guide.css";
 import {
   opentuMcpApi,
   type OpenTuPairing,
@@ -10,7 +12,7 @@ import {
 } from "@/lib/api/opentuMcp";
 
 export function OpenTuConnectionPanel() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [pairing, setPairing] = useState<OpenTuPairing | null>(null);
   const [check, setCheck] = useState<OpenTuConnectionCheck | null>(null);
   const [busy, setBusy] = useState(false);
@@ -172,6 +174,7 @@ export function OpenTuConnectionPanel() {
           </p>
         )}
       </div>
+      <OpenTuConnectionGuide language={i18n?.resolvedLanguage || i18n?.language} />
       <details className="space-y-3">
         <summary className="cursor-pointer text-sm">
           {t("opentuConnection.manual")}

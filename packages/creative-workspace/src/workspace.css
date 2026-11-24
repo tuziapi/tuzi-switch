@@ -46,7 +46,7 @@
 .creative-rename-dialog input { width:100%; padding:10px; border:1px solid #ddd6ca; border-radius:6px; background:transparent; color:inherit; }
 .creative-rename-dialog > div { display:flex; justify-content:flex-end; gap:14px; margin-top:20px; }
 .creative-rename-dialog button { background:transparent; border:0; font-size:13px; padding:6px 12px; }
-.creative-mcp-pairing { width:min(520px,92%); }
+.creative-mcp-pairing { width:min(560px,92%); max-height:calc(100% - 32px); overflow-y:auto; }
 .creative-mcp-pairing p { color:#6f6b63; font-size:12px; line-height:1.5; margin:0 0 16px; }
 .creative-mcp-pairing label { display:block; color:#6f6b63; font-size:12px; margin-top:10px; }
 .creative-mcp-pairing label input { margin-top:6px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; }

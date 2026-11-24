@@ -18,6 +18,7 @@ import { setCreativeRuntimeReady, registerEditorUpdateGuard } from './updateGuar
 import { useBeforeUnload } from '../upstream/packages/drawnix/src/hooks/useBeforeUnload';
 import { startOpenTuMcpBridge, stopOpenTuMcpBridge } from './opentuMcpBridge';
 import { invoke } from '@tauri-apps/api/core';
+import { OpenTuConnectionGuide } from './OpenTuConnectionGuide';
 
 // Host lifetime, independent of canvas/project/assistant navigation. The editor
 // still unmounts so its keyboard handlers and board observers cannot leak.
@@ -191,6 +192,7 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
         {connector && <p style={{fontSize:12, overflowWrap:'anywhere'}}>{connector.scope === 'local' ? '写入本机客户端配置：' : '当前为合成测试环境，仅写隔离配置：'}<br />{connector.configPath}</p>}
         <div><button type="button" disabled={connectorBusy || !connector?.configPath} onClick={() => void configureConnector(false)}>{connectorBusy ? '正在配置…' : connector?.configured ? '修复本机连接' : '连接本机 Codex'}</button>{connector?.configured && <button type="button" disabled={connectorBusy} onClick={() => void configureConnector(true)}>解除连接</button>}</div>
         {connector?.configured && <p role="status">{connector.lastToolCallAt ? '本次运行已收到连接器转发的成功工具调用。' : '已配置，等待客户端实际调用。'}</p>}
+        <OpenTuConnectionGuide />
         <details><summary>其他客户端 / 手动 HTTP 配置</summary>
           <p>名称填“兔子助手 OpenTu”，类型选“流式 HTTP”。以下手动配置在重启后需要更新；上方 Codex 连接器不需要重新配对。云端客户端需要另行配置 Tunnel。</p>
           <label>本地 MCP 地址<input readOnly value={pairing.endpoint} /></label>

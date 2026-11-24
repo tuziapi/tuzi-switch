@@ -9,6 +9,11 @@
       "default": "./dist/creative.js"
     },
     "./style.css": "./dist/creative-workspace.css",
+    "./connection-guide": {
+      "types": "./src/OpenTuConnectionGuide.tsx",
+      "default": "./dist/connection-guide.js"
+    },
+    "./connection-guide.css": "./src/OpenTuConnectionGuide.css",
     "./model-sync": {
       "types": "./src/modelSync.d.ts",
       "default": "./dist/model-sync.js"

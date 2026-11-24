@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OpenTuConnectionPanel } from "@/components/settings/OpenTuConnectionPanel";
 import { opentuMcpApi } from "@/lib/api/opentuMcp";
 
+vi.mock("@tuzi/creative-workspace/connection-guide", async () => import("../../packages/creative-workspace/src/OpenTuConnectionGuide"));
+
 vi.mock("@/lib/api/opentuMcp", () => ({
   opentuMcpApi: {
     pairing: vi.fn(),

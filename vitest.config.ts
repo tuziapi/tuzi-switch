@@ -14,6 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@tuzi/creative-workspace/connection-guide": path.resolve(__dirname, "packages/creative-workspace/src/OpenTuConnectionGuide.tsx"),
       "@aitu/utils": path.resolve(__dirname, "packages/creative-workspace/upstream/packages/utils/src/index.ts"),
     },
   },
