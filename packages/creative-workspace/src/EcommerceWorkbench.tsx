@@ -1414,13 +1414,6 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   return (
     <section className="ecommerce-workbench" aria-label="电商生图工作台">
       <header className="ecommerce-workbench__header">
-        <div className="ecommerce-workbench__identity">
-          <PackageOpen size={23} aria-hidden="true" />
-          <span>
-            <strong>电商创作</strong>
-            <small>从素材到作品</small>
-          </span>
-        </div>
         <nav className="ecommerce-category-tabs" aria-label="工具分类">
           {categories.map(({ id, label, icon: Icon }) => (
             <button
@@ -1429,7 +1422,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               aria-pressed={category === id}
               onClick={() => changeCategory(id)}
             >
-              <Icon size={17} aria-hidden="true" />
+              <Icon size={19} aria-hidden="true" />
               {label}
             </button>
           ))}
