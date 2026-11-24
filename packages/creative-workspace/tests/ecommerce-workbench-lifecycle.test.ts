@@ -116,8 +116,6 @@ afterEach(() => {
   mocks.store.pause();
   mocks.videoStore.pause();
   cleanup();
-  vi.useRealTimers();
-  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -134,77 +132,6 @@ async function setup() {
 }
 
 describe("sequential image workbench", () => {
-  it("cycles only after opting in, wraps around, and pauses on hover and on demand", async () => {
-    mocks.generate.mockResolvedValue("synthetic-result");
-    const ui = await setup();
-    await waitFor(() =>
-      expect(screen.getByText("已完成 4 / 4 张")).toBeTruthy(),
-    );
-    vi.spyOn(document, "hidden", "get").mockReturnValue(false);
-    vi.useFakeTimers();
-    const tick = (ms = 4000) => act(() => vi.advanceTimersByTime(ms));
-    tick();
-    expect(screen.getByText("1 / 4")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "自动播放" }));
-    tick(3999);
-    expect(screen.getByText("1 / 4")).toBeTruthy();
-    tick(1);
-    expect(screen.getByText("2 / 4")).toBeTruthy();
-    tick(12000);
-    expect(screen.getByText("1 / 4")).toBeTruthy();
-    const preview = ui.container.querySelector(".ecommerce-preview__canvas")!;
-    fireEvent.mouseEnter(preview);
-    tick(12000);
-    expect(screen.getByText("1 / 4")).toBeTruthy();
-    fireEvent.mouseLeave(preview);
-    tick();
-    expect(screen.getByText("2 / 4")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "暂停播放" }));
-    tick(12000);
-    expect(screen.getByText("2 / 4")).toBeTruthy();
-    expect(mocks.generate).toHaveBeenCalledTimes(4);
-  });
-
-  it("stops playback for manual selection, keyboard focus, backgrounding and remount", async () => {
-    mocks.generate.mockResolvedValue("synthetic-result");
-    const ui = await setup();
-    await waitFor(() =>
-      expect(screen.getByText("已完成 4 / 4 张")).toBeTruthy(),
-    );
-    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(false);
-    vi.useFakeTimers();
-    const play = () =>
-      fireEvent.click(screen.getByRole("button", { name: "自动播放" }));
-    const stays = (page: string) => {
-      act(() => vi.advanceTimersByTime(8000));
-      expect(screen.getByText(page)).toBeTruthy();
-      expect(screen.getByRole("button", { name: "自动播放" })).toBeTruthy();
-    };
-    play();
-    fireEvent.click(screen.getByRole("button", { name: "下一张" }));
-    stays("2 / 4");
-    play();
-    fireEvent.click(screen.getByRole("button", { name: "查看首图主视觉" }));
-    stays("1 / 4");
-    play();
-    fireEvent.focus(screen.getByRole("button", { name: "插入画布" }));
-    stays("1 / 4");
-    play();
-    fireEvent(window, new Event("blur"));
-    stays("1 / 4");
-    play();
-    hidden.mockReturnValue(true);
-    fireEvent(document, new Event("visibilitychange"));
-    hidden.mockReturnValue(false);
-    fireEvent(document, new Event("visibilitychange"));
-    stays("1 / 4");
-    play();
-    ui.unmount();
-    render(React.createElement(EcommerceWorkbench));
-    stays("1 / 4");
-    expect(mocks.generate).toHaveBeenCalledTimes(4);
-  });
-
   it("shares reference uploads across both entries and submits the remaining selection", async () => {
     mocks.generate.mockResolvedValue("synthetic-result");
     render(React.createElement(EcommerceWorkbench));
@@ -376,7 +303,6 @@ describe("sequential image workbench", () => {
     await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(2));
     expect(screen.getByAltText("生成结果")).toBeTruthy();
     expect(screen.getByText("已完成 1 / 4 张")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "自动播放" })).toBeNull();
     const signal = mocks.generate.mock.calls[1][2];
     ui.unmount();
     render(React.createElement(EcommerceWorkbench));
