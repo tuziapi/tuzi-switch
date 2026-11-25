@@ -1,13 +1,13 @@
 #!/bin/bash
   set -e
-  version="${TUZI_SWITCH_TAG:-v1.6.3}"
+  version="${TUZI_SWITCH_TAG:-v1.6.4}"
   args=()
   version_seen=false
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --version)
         if [ "$version_seen" = true ] || [ "$#" -lt 2 ] || [ -z "$2" ]; then
-          printf '%s\n' '用法：--version v1.6.3（仅指定一次）' >&2
+          printf '%s\n' '用法：--version v1.6.4（仅指定一次）' >&2
           exit 2
         fi
         version="$2"
@@ -25,7 +25,8 @@
     'v1.6.1'|'1.6.1') url='https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.1.sh'; sha256='a1cfe907c72f4a5fedb82142d4b204c1eedbb72b884616911fa0f7ff3d388ecf' ;;
     'v1.6.2'|'1.6.2') url='https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.2.sh'; sha256='7bf1dc2fc7d4dcbcc7f5345823339f71c5ba73b2a69c1cd48991464ca0d9fb21' ;;
     'v1.6.3'|'1.6.3') url='https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.3.sh'; sha256='751f67c81c0c5a3de8135216c155f3aadb5e473c37664487da8735d7c08a6be8' ;;
-    *) printf '不支持的版本：%s。当前可安装：v1.5.5, v1.5.6, v1.5.7, v1.6.0, v1.6.1, v1.6.2, v1.6.3。\n' "$version" >&2; exit 2 ;;
+    'v1.6.4'|'1.6.4') url='https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.4.sh'; sha256='4c77e510261179671a58cbb86ee19c9c98207c08cb576046195affcdd4b8a3de' ;;
+    *) printf '不支持的版本：%s。当前可安装：v1.5.5, v1.5.6, v1.5.7, v1.6.0, v1.6.1, v1.6.2, v1.6.3, v1.6.4。\n' "$version" >&2; exit 2 ;;
   esac
   installer="$(mktemp -t tuzi-install.XXXXXX)"
   trap 'rm -f "$installer"' EXIT

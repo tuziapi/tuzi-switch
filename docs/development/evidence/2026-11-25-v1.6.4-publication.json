@@ -1,0 +1,152 @@
+{
+  "checkedAt": "2026-11-25T03:51:32.135Z",
+  "repository": "tuziapi/tuzi-switch",
+  "tag": "v1.6.4",
+  "releaseId": 457623594,
+  "draft": false,
+  "publishedAt": "2026-11-25T03:51:34Z",
+  "sourceCommit": "7547f00dbba240e591911d71a0a9036143e9868a",
+  "candidateRunId": "45531779918",
+  "files": [
+    {
+      "name": "SHA256SUMS",
+      "bytes": 2137,
+      "sha256": "e8ad9421276e0eb7d83f764224445665cdaa2ad69953b0ed383ab265b2cacf74",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/SHA256SUMS"
+    },
+    {
+      "name": "latest.json",
+      "bytes": 7367,
+      "sha256": "e277694489817a7d207807975e63f8d1eee8a591f34403cb1d69caa50703e5b1",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/latest.json"
+    },
+    {
+      "name": "manifest-linux-x64.json",
+      "bytes": 906,
+      "sha256": "f99fcda51f9170c5b53c37255401e96a403dfb88f2817ef848681be14c2a5d2d",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/manifest-linux-x64.json"
+    },
+    {
+      "name": "manifest-macos-arm64.json",
+      "bytes": 562,
+      "sha256": "202b4202809bf0fc7a840566cd011cc06921213991258129afedb52590ce0b64",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/manifest-macos-arm64.json"
+    },
+    {
+      "name": "manifest-macos-x64.json",
+      "bytes": 559,
+      "sha256": "01e9e7eb839436d7e84409275f324c481a87001790bc6c1c37bb1cbfd08d9eba",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/manifest-macos-x64.json"
+    },
+    {
+      "name": "manifest-windows-x64.json",
+      "bytes": 758,
+      "sha256": "29b1483533dcf530cb2b4246e0b66ab93913ab0612cc904c1133091c6111c88f",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/manifest-windows-x64.json"
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.AppImage",
+      "bytes": 177465848,
+      "sha256": "de498842599551fcedbbf6394c506610c58f391db7ab6ce2aff4faf780ac18b9",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-linux-x64.AppImage"
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.AppImage.sig",
+      "bytes": 424,
+      "sha256": "0ab13aa7056221d9bc1eb88fe30a12f73199b028274e8157fde488c86180101b",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-linux-x64.AppImage.sig"
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.deb",
+      "bytes": 105457212,
+      "sha256": "2286612485f74eba5368ac56fe09d9d6b83f9bad45a0290d06b2e6deec75a3de",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-linux-x64.deb"
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.deb.sig",
+      "bytes": 420,
+      "sha256": "3741ff1734de43fba1608acdd0069ab31ae4e08dd5daaa4ddd4d949415a7d936",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-linux-x64.deb.sig"
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.rpm",
+      "bytes": 105442100,
+      "sha256": "925d4f5121534584a502dd9aaf39054ffc5416306bbae7028b62bfe2c46885e4",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-linux-x64.rpm"
+    },
+    {
+      "name": "tuzi-assistant-linux-x64.rpm.sig",
+      "bytes": 420,
+      "sha256": "771a55d5707224723bb21504f8c6701f5054550c94da5f498ce0256e4e850c7b",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-linux-x64.rpm.sig"
+    },
+    {
+      "name": "tuzi-assistant-macos-arm64.app.tar.gz",
+      "bytes": 95362572,
+      "sha256": "ab669d44c0b904384e5510d49e82040543f976d492ab83dff290a50b80426971",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-macos-arm64.app.tar.gz"
+    },
+    {
+      "name": "tuzi-assistant-macos-arm64.app.tar.gz.sig",
+      "bytes": 432,
+      "sha256": "f65b3a1093f390320098f04c3fb3758dd4d8fea4959d49b5b533b03162ef9947",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-macos-arm64.app.tar.gz.sig"
+    },
+    {
+      "name": "tuzi-assistant-macos-arm64.dmg",
+      "bytes": 93881958,
+      "sha256": "09cb64e65abf1bc6c980e1e1145dcbed8d012f808d8c087118dc341c689ea423",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-macos-arm64.dmg"
+    },
+    {
+      "name": "tuzi-assistant-macos-x64.app.tar.gz",
+      "bytes": 99214462,
+      "sha256": "19e5e87de327b695ffc3ca2c3d350591e066c04301349ae05ac10c50b6cfd39c",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-macos-x64.app.tar.gz"
+    },
+    {
+      "name": "tuzi-assistant-macos-x64.app.tar.gz.sig",
+      "bytes": 428,
+      "sha256": "6a2487bf27c8395a9f90fee167e1645abf4e68966ccbcb45400d5195e83c9581",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-macos-x64.app.tar.gz.sig"
+    },
+    {
+      "name": "tuzi-assistant-macos-x64.dmg",
+      "bytes": 98251874,
+      "sha256": "ae3b1c133bf7e3e7ae58086553f29e16707dafee09682e2e80829011cff75a32",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-macos-x64.dmg"
+    },
+    {
+      "name": "tuzi-assistant-source.tar.gz",
+      "bytes": 33553920,
+      "sha256": "72b0e596fcad2494bd75bcfa0d382228662be268daa3d5d53b490b4db58a4060",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-source.tar.gz"
+    },
+    {
+      "name": "tuzi-assistant-windows-x64.exe",
+      "bytes": 71889234,
+      "sha256": "cb845e47a260e0cf3663691ee4b979ec69c290e22fc435718e2a7d75c3926483",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-windows-x64.exe"
+    },
+    {
+      "name": "tuzi-assistant-windows-x64.exe.sig",
+      "bytes": 420,
+      "sha256": "d566fa70ae3d1cbe8d8d559e46808402accb44094d7ac3f7f1658e274d1dc27b",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-windows-x64.exe.sig"
+    },
+    {
+      "name": "tuzi-assistant-windows-x64.msi",
+      "bytes": 90357760,
+      "sha256": "07e8ad8e4dd81bcfa87c2064aa49af5553c7a98fb17703f13e24a00222caba4e",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-windows-x64.msi"
+    },
+    {
+      "name": "tuzi-assistant-windows-x64.msi.sig",
+      "bytes": 420,
+      "sha256": "931853a2415dde850463c2384f1c1388cfbf905b953c404cd95b404fb2580e4c",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/untagged-d1066c0f33dbe09a98e2/tuzi-assistant-windows-x64.msi.sig"
+    }
+  ],
+  "pageSourceCommit": "fa79458ee449eaf72413c9d7f8962826075113f3",
+  "uploadHashesAndSizesVerified": true
+}
