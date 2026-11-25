@@ -27,13 +27,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
+          - os: macos-26
             platform: macos-arm64
             legacy: '1.6.0'
           - os: macos-15-intel
             platform: macos-x64
             legacy: '1.6.0'
-          - os: macos-15
+          - os: macos-26
             platform: macos-arm64
             legacy: '1.6.1'
           - os: macos-15-intel
