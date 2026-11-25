@@ -11,6 +11,18 @@ export function ecommerceModelSelectionKey(model: {
   return JSON.stringify([model.sourceProfileId || null, model.id]);
 }
 
+export function ecommerceVideoFollowsFirstFrame(
+  modelId: string,
+  imageCount: number,
+  hasReferenceVideo: boolean,
+) {
+  return (
+    modelId.toLowerCase() === "minimax-h3" &&
+    imageCount > 0 &&
+    !hasReferenceVideo
+  );
+}
+
 /** Remote endpoint lists can incorrectly mark image models as video models. */
 export function matchesEcommerceModelType(
   id: string | null | undefined,

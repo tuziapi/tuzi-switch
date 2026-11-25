@@ -82,6 +82,7 @@ import { EcommerceJobStore } from "../src/ecommerce-jobs";
 import { EcommerceVideoStore } from "../src/ecommerce-video-jobs";
 
 beforeEach(() => {
+  localStorage.clear();
   let objectUrlId = 0;
   mocks.generate.mockReset();
   mocks.videoGenerate.mockReset();
@@ -132,6 +133,146 @@ async function setup() {
 }
 
 describe("sequential image workbench", () => {
+  it("preserves an explicit provider through delayed catalog loading and never submits through another provider", async () => {
+    localStorage.setItem(
+      "opentu-ecommerce-preferences-v1",
+      JSON.stringify({
+        version: 1,
+        selectedModels: {
+          image: '["synthetic-b","gpt-image-2"]',
+          video: "MiniMax-H3",
+        },
+      }),
+    );
+    mocks.models = {
+      image: [
+        { id: "gpt-image-2", label: "Image", sourceProfileId: "synthetic-a" },
+      ],
+      video: [],
+    };
+    const ui = render(React.createElement(EcommerceWorkbench));
+    await waitFor(() => expect(mocks.store.getSnapshot().ready).toBe(true));
+    fireEvent.change(screen.getByLabelText("选择参考图片文件"), {
+      target: {
+        files: [new File(["synthetic"], "image.png", { type: "image/png" })],
+      },
+    });
+    const generate = screen.getByRole("button", {
+      name: "生成 4 张图片",
+    }) as HTMLButtonElement;
+    expect(generate.disabled).toBe(true);
+    expect(
+      (screen.getByRole("combobox", { name: "生成模型" }) as HTMLSelectElement)
+        .selectedOptions[0].textContent,
+    ).toContain("之前选择暂不可用");
+    fireEvent.click(generate);
+    expect(mocks.generate).not.toHaveBeenCalled();
+    mocks.models.image = [
+      ...mocks.models.image,
+      { id: "gpt-image-2", label: "Image", sourceProfileId: "synthetic-b" },
+    ];
+    ui.rerender(React.createElement(EcommerceWorkbench));
+    expect(
+      (screen.getByRole("combobox", { name: "生成模型" }) as HTMLSelectElement)
+        .value,
+    ).toBe('["synthetic-b","gpt-image-2"]');
+    expect(generate.disabled).toBe(false);
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+  it("keeps the selected provider, brief, quick options and video settings after remount without submitting", async () => {
+    mocks.models = {
+      image: [
+        { id: "gpt-image-2", label: "Image", sourceProfileId: "synthetic-a" },
+        { id: "gpt-image-2", label: "Image", sourceProfileId: "synthetic-b" },
+      ],
+      video: [{ id: "MiniMax-H3", label: "MiniMax-H3" }],
+    };
+    const ui = render(React.createElement(EcommerceWorkbench));
+    await waitFor(() => expect(mocks.store.getSnapshot().ready).toBe(true));
+    const model = screen.getByRole("combobox", {
+      name: "生成模型",
+    }) as HTMLSelectElement;
+    const chosen = model.options[1].value;
+    fireEvent.change(model, { target: { value: chosen } });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Synthetic retained brief" },
+    });
+    const quick = ui.container.querySelector(
+      '.ecommerce-modules__grid button[aria-pressed="true"]',
+    )!;
+    const quickName = quick.textContent!;
+    fireEvent.click(quick);
+    fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
+    fireEvent.change(screen.getByRole("combobox", { name: "生成模型" }), {
+      target: { value: '[null,"MiniMax-H3"]' },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "视频比例" }), {
+      target: { value: "9:16" },
+    });
+    ui.unmount();
+    const restored = render(React.createElement(EcommerceWorkbench));
+    expect(
+      (screen.getByRole("combobox", { name: "生成模型" }) as HTMLSelectElement)
+        .value,
+    ).toBe(chosen);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "Synthetic retained brief",
+    );
+    const restoredQuick = [
+      ...restored.container.querySelectorAll(".ecommerce-modules__grid button"),
+    ].find((button) => button.textContent === quickName)!;
+    expect(restoredQuick.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
+    expect(
+      (screen.getByRole("combobox", { name: "生成模型" }) as HTMLSelectElement)
+        .value,
+    ).toBe('[null,"MiniMax-H3"]');
+    expect(
+      (screen.getByRole("combobox", { name: "视频比例" }) as HTMLSelectElement)
+        .value,
+    ).toBe("9:16");
+    expect(mocks.generate).not.toHaveBeenCalled();
+    expect(mocks.videoGenerate).not.toHaveBeenCalled();
+  });
+
+  it("locks MiniMax image-to-video to the first frame and restores the chosen text-to-video ratio after removal", async () => {
+    mocks.models = { video: [{ id: "MiniMax-H3", label: "MiniMax-H3" }] };
+    mocks.videoGenerate.mockImplementation(async (params) => {
+      await params.onSubmitted("synthetic-ratio-task");
+      return ["https://example.invalid/video.mp4"];
+    });
+    render(React.createElement(EcommerceWorkbench));
+    await waitFor(() =>
+      expect(mocks.videoStore.getSnapshot().ready).toBe(true),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "带货视频", exact: true }),
+    );
+    const ratio = screen.getByRole("combobox", {
+      name: "视频比例",
+    }) as HTMLSelectElement;
+    fireEvent.change(ratio, { target: { value: "9:16" } });
+    fireEvent.change(screen.getByLabelText("选择参考图片文件"), {
+      target: {
+        files: [new File(["synthetic"], "square.png", { type: "image/png" })],
+      },
+    });
+    expect(ratio.disabled).toBe(true);
+    expect(ratio.value).toBe("adaptive");
+    expect(ratio.selectedOptions[0].textContent).toBe("跟随首帧图片");
+    fireEvent.click(
+      screen.getByRole("button", { name: "生成视频", exact: true }),
+    );
+    await waitFor(() => expect(mocks.videoGenerate).toHaveBeenCalledTimes(1));
+    expect(mocks.videoGenerate.mock.calls[0][0]).toMatchObject({
+      aspectRatio: "adaptive",
+      prompt: expect.stringContaining("视频比例：跟随首帧图片"),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "移除素材" }));
+    expect(ratio.disabled).toBe(false);
+    expect(ratio.value).toBe("9:16");
+  });
   it("shares reference uploads across both entries and submits the remaining selection", async () => {
     mocks.generate.mockResolvedValue("synthetic-result");
     render(React.createElement(EcommerceWorkbench));

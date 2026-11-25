@@ -171,6 +171,25 @@ describe("ecommerce video routing", () => {
     );
     expect(mocks.videoSubmit).not.toHaveBeenCalled();
   });
+  it("uses the first-frame ratio for MiniMax image generation, retaining ratios for video references and text", async () => {
+    mocks.modelId = "MiniMax-H3";
+    await generateEcommerceVideo({
+      ...params(),
+      referenceImages: ["data:image/png;base64,AAAA"],
+    });
+    expect(mocks.videoSubmit.mock.calls[0][0].params).toMatchObject({
+      ratio: "adaptive",
+      aspect_ratio: "adaptive",
+    });
+    await generateEcommerceVideo({
+      ...params(),
+      referenceImages: ["data:image/png;base64,AAAA"],
+      referenceVideo: "data:video/mp4;base64,AAAA",
+    });
+    expect(mocks.videoSubmit.mock.calls[1][0].params.ratio).toBe("16:9");
+    await generateEcommerceVideo(params());
+    expect(mocks.videoSubmit.mock.calls[2][0].params.ratio).toBe("16:9");
+  });
   it("routes MiniMax-H3 local video references through its actual video field", async () => {
     mocks.modelId = "MiniMax-H3";
     await generateEcommerceVideo({

@@ -19,7 +19,10 @@ import {
   downloadVideoContentToLocalUrl,
   shouldDownloadVideoContent,
 } from "../upstream/packages/drawnix/src/services/video-binding-utils";
-import { matchesEcommerceModelType } from "./ecommerce-model-capabilities";
+import {
+  ecommerceVideoFollowsFirstFrame,
+  matchesEcommerceModelType,
+} from "./ecommerce-model-capabilities";
 import { isPublicHttpMediaUrl } from "../upstream/packages/drawnix/src/utils/virtual-media-url";
 
 export type EcommerceMediaReference = {
@@ -262,9 +265,16 @@ export async function generateEcommerceVideo(params: {
     throw new Error(
       "当前模型尚未接入本地参考视频，请选择 MiniMax-H3 或 Gemini Omni 1.2 Flash。Seedance 目前要求公网视频地址，尚未接入素材上传服务。不会忽略视频继续计费生成。",
     );
+  const aspectRatio = ecommerceVideoFollowsFirstFrame(
+    plan.modelRef.modelId,
+    params.referenceImages.length,
+    Boolean(params.referenceVideo),
+  )
+    ? "adaptive"
+    : params.aspectRatio || "16:9";
   const videoParams: Record<string, unknown> = {
-    aspect_ratio: params.aspectRatio || "16:9",
-    ratio: params.aspectRatio || "16:9",
+    aspect_ratio: aspectRatio,
+    ratio: aspectRatio,
     ...(params.referenceVideo
       ? plan.modelRef.modelId.toLowerCase() === "minimax-h3" ||
         isSeedance2ModelId(plan.modelRef.modelId)

@@ -63,8 +63,13 @@ import { prepareEcommerceImageExport } from "./ecommerce-image-output";
 import { VideoCompressionPanel } from "./VideoCompressionPanel";
 import {
   ecommerceModelSelectionKey,
+  ecommerceVideoFollowsFirstFrame,
   matchesEcommerceModelType,
 } from "./ecommerce-model-capabilities";
+import {
+  readEcommercePreferences,
+  saveEcommercePreferences,
+} from "./ecommerce-preferences";
 
 type Category = "product" | "video" | "apparel";
 type ToolId =
@@ -822,6 +827,11 @@ const wait = (ms: number) =>
   new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
+  const [savedPreferences] = useState(readEcommercePreferences);
+  const explicitModelSelection = useRef({
+    image: Boolean(savedPreferences.selectedModels?.image),
+    video: Boolean(savedPreferences.selectedModels?.video),
+  });
   const [category, setCategory] = useState<Category>("product");
   const [tool, setTool] = useState<ToolId>("product-set");
   const [files, setFiles] = useState<File[]>([]);
@@ -831,7 +841,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const [market, setMarket] = useState("美国");
   const [language, setLanguage] = useState("英文");
   const [ratio, setRatio] = useState("1:1");
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(savedPreferences.prompt ?? "");
   const [structure, setStructure] = useState<"smart" | "custom">("smart");
   const [customCounts, setCustomCounts] = useState({
     whiteBackground: 1,
@@ -877,8 +887,14 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       : "",
   };
   const [selectedModels, setSelectedModels] = useState(() => ({
-    image: presetDefaultModelIds.image || getFallbackDefaultModelId("image"),
-    video: presetDefaultModelIds.video || getFallbackDefaultModelId("video"),
+    image:
+      savedPreferences.selectedModels?.image ||
+      presetDefaultModelIds.image ||
+      getFallbackDefaultModelId("image"),
+    video:
+      savedPreferences.selectedModels?.video ||
+      presetDefaultModelIds.video ||
+      getFallbackDefaultModelId("video"),
   }));
   const [quickSelections, setQuickSelections] = useState<
     Record<ToolId, Set<string>>
@@ -889,7 +905,11 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           id,
           new Set(
             options
-              .filter((option) => option.defaultSelected)
+              .filter((option) =>
+                savedPreferences.quickSelections?.[id]
+                  ? savedPreferences.quickSelections[id].includes(option.id)
+                  : option.defaultSelected,
+              )
               .map((option) => option.id),
           ),
         ]),
@@ -900,9 +920,35 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     ecommerceVideos.getSnapshot,
   );
   const [selectedVideoId, setSelectedVideoId] = useState("");
-  const [videoDuration, setVideoDuration] = useState("");
-  const [videoSize, setVideoSize] = useState("");
-  const [videoRatio, setVideoRatio] = useState("16:9");
+  const [videoDuration, setVideoDuration] = useState(
+    savedPreferences.videoDuration ?? "",
+  );
+  const [videoSize, setVideoSize] = useState(savedPreferences.videoSize ?? "");
+  const [videoRatio, setVideoRatio] = useState(
+    savedPreferences.videoRatio ?? "16:9",
+  );
+  useEffect(() => {
+    saveEcommercePreferences({
+      selectedModels,
+      prompt,
+      videoDuration,
+      videoSize,
+      videoRatio,
+      quickSelections: Object.fromEntries(
+        Object.entries(quickSelections).map(([id, selected]) => [
+          id,
+          [...selected],
+        ]),
+      ),
+    });
+  }, [
+    selectedModels,
+    prompt,
+    quickSelections,
+    videoDuration,
+    videoSize,
+    videoRatio,
+  ]);
   const videoRecords = videoState.jobs.filter((job) => job.tool === tool);
   const videoJob =
     videoRecords.find((job) => job.id === selectedVideoId) || videoRecords[0];
@@ -1011,6 +1057,13 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           description: "当前默认模型",
         },
       ];
+  const modelSelectionUnavailable =
+    explicitModelSelection.current[activeModelType] &&
+    !normalizedModelOptions.some(
+      (model) =>
+        ecommerceModelSelectionKey(model) === selectedModels[activeModelType] ||
+        model.id === selectedModels[activeModelType],
+    );
   const selectedModelConfig =
     normalizedModelOptions.find(
       (model) =>
@@ -1050,8 +1103,19 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const sizeRatio = videoConfig.sizeOptions.find(
     (option) => option.value === selectedVideoSize,
   )?.aspectRatio;
-  const effectiveVideoRatio =
-    sizeRatio && /^\d+:\d+$/.test(sizeRatio) ? sizeRatio : videoRatio;
+  const followsFirstFrame = ecommerceVideoFollowsFirstFrame(
+    selectedModel,
+    files.length,
+    Boolean(referenceVideo),
+  );
+  const effectiveVideoRatio = followsFirstFrame
+    ? "adaptive"
+    : sizeRatio && /^\d+:\d+$/.test(sizeRatio)
+      ? sizeRatio
+      : videoRatio;
+  const videoRatioLabel = followsFirstFrame
+    ? "跟随首帧图片"
+    : effectiveVideoRatio;
   const videoToolSupported =
     tool === "video-commerce" || tool === "video-replicate";
   const videoInputError = !videoToolSupported
@@ -1137,20 +1201,24 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setSelectedModels((current) => {
       const imageDefault = presetDefaultModelIds.image;
       const videoDefault = presetDefaultModelIds.video;
-      const image = imageModels.some(
-        (model) =>
-          model.id === current.image ||
-          ecommerceModelSelectionKey(model) === current.image,
-      )
-        ? current.image
-        : imageDefault || imageModels[0]?.id || current.image;
-      const video = videoModels.some(
-        (model) =>
-          model.id === current.video ||
-          ecommerceModelSelectionKey(model) === current.video,
-      )
-        ? current.video
-        : videoDefault || videoModels[0]?.id || current.video;
+      const image =
+        explicitModelSelection.current.image ||
+        imageModels.some(
+          (model) =>
+            model.id === current.image ||
+            ecommerceModelSelectionKey(model) === current.image,
+        )
+          ? current.image
+          : imageDefault || imageModels[0]?.id || current.image;
+      const video =
+        explicitModelSelection.current.video ||
+        videoModels.some(
+          (model) =>
+            model.id === current.video ||
+            ecommerceModelSelectionKey(model) === current.video,
+        )
+          ? current.video
+          : videoDefault || videoModels[0]?.id || current.video;
       if (image === current.image && video === current.video) return current;
       return { image, video };
     });
@@ -1266,7 +1334,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
         `市场：${market}`,
         `语言：${language}`,
         isVideo
-          ? `视频比例：${effectiveVideoRatio}；时长：${selectedVideoDuration}秒；尺寸：${selectedVideoSize}`
+          ? `视频比例：${videoRatioLabel}；时长：${selectedVideoDuration}秒；尺寸：${selectedVideoSize}`
           : `比例：${selectedRatio.label}（${selectedRatio.size}）`,
         prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放",
         `快捷优化：${selectedQuickLabels.length ? selectedQuickLabels.join("、") : "按默认商业规范处理"}`,
@@ -1330,6 +1398,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   });
   const generate = async () => {
     if ((!files.length && currentTool.media === "image") || busy) return;
+    if (modelSelectionUnavailable) {
+      setError("之前选择的模型配置暂不可用，请刷新模型列表或重新选择。");
+      return;
+    }
     if (currentTool.media === "image") {
       setError("");
       try {
@@ -1779,14 +1851,24 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               <select
                 key={activeModelType}
                 aria-label="生成模型"
-                value={ecommerceModelSelectionKey(selectedModelConfig)}
-                onChange={(event) =>
+                value={
+                  modelSelectionUnavailable
+                    ? selectedModels[activeModelType]
+                    : ecommerceModelSelectionKey(selectedModelConfig)
+                }
+                onChange={(event) => {
+                  explicitModelSelection.current[activeModelType] = true;
                   setSelectedModels((current) => ({
                     ...current,
                     [activeModelType]: event.target.value,
-                  }))
-                }
+                  }));
+                }}
               >
+                {modelSelectionUnavailable && (
+                  <option value={selectedModels[activeModelType]} disabled>
+                    之前选择暂不可用，请刷新或重新选择
+                  </option>
+                )}
                 {normalizedModelOptions.map((model) => (
                   <option
                     key={ecommerceModelSelectionKey(model)}
@@ -1807,14 +1889,16 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               </small>
               <small
                 className={
-                  selectedInvocationPlan
+                  selectedInvocationPlan && !modelSelectionUnavailable
                     ? "ecommerce-model-status"
                     : "ecommerce-model-status is-warning"
                 }
               >
-                {selectedInvocationPlan
-                  ? `已配置：${selectedInvocationPlan.provider.profileName} · ${selectedInvocationPlan.binding.submitPath}`
-                  : "未找到有效接口绑定，请刷新模型列表或重新保存创作配置"}
+                {modelSelectionUnavailable
+                  ? "已保留原选择；模型列表恢复前不会自动换用其他配置。"
+                  : selectedInvocationPlan
+                    ? `已配置：${selectedInvocationPlan.provider.profileName} · ${selectedInvocationPlan.binding.submitPath}`
+                    : "未找到有效接口绑定，请刷新模型列表或重新保存创作配置"}
               </small>
             </label>
             <div className="ecommerce-fields">
@@ -1899,18 +1983,26 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     视频比例
                     <select
                       aria-label="视频比例"
-                      disabled={Boolean(
-                        sizeRatio && /^\d+:\d+$/.test(sizeRatio),
-                      )}
+                      disabled={
+                        followsFirstFrame ||
+                        Boolean(sizeRatio && /^\d+:\d+$/.test(sizeRatio))
+                      }
                       value={effectiveVideoRatio}
                       onChange={(event) => setVideoRatio(event.target.value)}
                     >
                       {[...new Set(["16:9", "9:16", effectiveVideoRatio])].map(
                         (value) => (
-                          <option key={value}>{value}</option>
+                          <option key={value} value={value}>
+                            {value === "adaptive" ? "跟随首帧图片" : value}
+                          </option>
                         ),
                       )}
                     </select>
+                    {followsFirstFrame && (
+                      <small>
+                        输出比例由第一张图片决定。横屏或竖屏视频请上传对应比例的首图。
+                      </small>
+                    )}
                   </label>
                 </>
               )}
@@ -2160,6 +2252,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               className="ecommerce-generate"
               disabled={
                 busy ||
+                modelSelectionUnavailable ||
                 (currentTool.media === "video" &&
                   (!videoState.ready || Boolean(videoInputError))) ||
                 (currentTool.media === "image" && !jobState.ready) ||
