@@ -1,7 +1,7 @@
 """Probe actual unchanged macOS candidate UI on a disposable hosted runner."""
 import hashlib
 import json
-from signed_candidate_identity import PAIR
+from signed_candidate_identity import PAIR, BASE_VERSION
 import os
 from pathlib import Path
 import plistlib
@@ -23,7 +23,7 @@ report = dict(kind='installed-macos-control-probe', officialAcceptance=False,
 mount = process = None
 try:
     m = json.loads((source/f'manifest-{platform}.json').read_text())
-    assert m['commit'] == report['candidateCommit'] and m['version'] == '1.6.2'
+    assert m['commit'] == report['candidateCommit'] and m['version'] == BASE_VERSION
     dmg = source/f'tuzi-assistant-{platform}.dmg'
     entry = next(f for f in m['files'] if f['file'] == dmg.name)
     assert hashlib.sha256(dmg.read_bytes()).hexdigest() == entry['sha256']
@@ -38,7 +38,7 @@ try:
     subprocess.run(['hdiutil','detach',mount],check=True,stdout=subprocess.DEVNULL)
     mount = None
     info = plistlib.loads((app/'Contents/Info.plist').read_bytes())
-    assert info['CFBundleIdentifier']=='com.tuziswitch.desktop' and info['CFBundleShortVersionString']=='1.6.2'
+    assert info['CFBundleIdentifier']=='com.tuziswitch.desktop' and info['CFBundleShortVersionString']==BASE_VERSION
     executable = app/'Contents/MacOS'/info['CFBundleExecutable']
     report['architecture'] = subprocess.check_output(['lipo','-archs',str(executable)],text=True).strip()
     assert report['architecture'] == ('arm64' if platform=='macos-arm64' else 'x86_64')
