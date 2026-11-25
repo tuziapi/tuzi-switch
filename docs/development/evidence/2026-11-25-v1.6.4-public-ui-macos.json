@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-25",
+  "page": "https://tuziapi.github.io/tuzi-switch/",
+  "pageCommit": "6e3e215088938c6a6e0484900b690202c94ec9fb",
+  "browser": "Codex in-app browser, actual rendered public page",
+  "version": "1.6.4",
+  "downloadChoices": {
+    "macos-arm64": "passed",
+    "macos-x64": "passed",
+    "windows-exe": "passed",
+    "windows-msi": "passed",
+    "linux-deb": "passed",
+    "linux-rpm": "passed",
+    "linux-appimage": "passed"
+  },
+  "checks": [
+    "Rendered version is v1.6.4",
+    "Each selection links to the corresponding official v1.6.4 installer",
+    "Mac current and fixed-version commands point to official scripts",
+    "Page source link names exact page source fa79458ee449eaf72413c9d7f8962826075113f3",
+    "Update guidance distinguishes 1.6.2+ from 1.6.1 and older"
+  ],
+  "publicMacVerification": [
+    {
+      "architecture": "arm64",
+      "command": "bash scripts/install-macos.sh --verify-only --arch arm64",
+      "transport": "Existing configured proxy; second transfer requested HTTP/1.1 after the initial transfer was slow",
+      "sha256": "09cb64e65abf1bc6c980e1e1145dcbed8d012f808d8c087118dc341c689ea423",
+      "fullDownload": "passed",
+      "identityVersionArchitectureAndCodesignIntegrity": "passed",
+      "exitCode": 0
+    },
+    {
+      "architecture": "x64",
+      "command": "bash scripts/install-macos.sh --verify-only --arch x64",
+      "transport": "Existing configured proxy",
+      "sha256": "ae3b1c133bf7e3e7ae58086553f29e16707dafee09682e2e80829011cff75a32",
+      "fullDownload": "passed",
+      "identityVersionArchitectureAndCodesignIntegrity": "passed",
+      "exitCode": 0
+    }
+  ],
+  "scope": "No application installation, launch, removal of quarantine, user-profile modification or Apple notarization claim. Slow duplicate ARM transfer stopped only after the second complete transfer passed. Browser label locator/native key attempts were ineffective; observed combobox role selection succeeded. No download links or application code changed during this verification."
+}

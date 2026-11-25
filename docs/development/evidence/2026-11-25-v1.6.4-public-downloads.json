@@ -1,0 +1,167 @@
+{
+  "checkedAt": "2026-11-25T03:52:08.878Z",
+  "scope": "Anonymous public route checks. Large assets read first 64 bytes; whole-file SHA256 separately compared with GitHub release digest.",
+  "results": [
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/manifest-linux-x64.json",
+      "mode": "full-file",
+      "bytes": 906,
+      "sha256": "f99fcda51f9170c5b53c37255401e96a403dfb88f2817ef848681be14c2a5d2d",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/manifest-macos-arm64.json",
+      "mode": "full-file",
+      "bytes": 562,
+      "sha256": "202b4202809bf0fc7a840566cd011cc06921213991258129afedb52590ce0b64",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/SHA256SUMS",
+      "mode": "full-file",
+      "bytes": 2137,
+      "sha256": "e8ad9421276e0eb7d83f764224445665cdaa2ad69953b0ed383ab265b2cacf74",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/latest.json",
+      "mode": "full-file",
+      "bytes": 7367,
+      "sha256": "e277694489817a7d207807975e63f8d1eee8a591f34403cb1d69caa50703e5b1",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/manifest-windows-x64.json",
+      "mode": "full-file",
+      "bytes": 758,
+      "sha256": "29b1483533dcf530cb2b4246e0b66ab93913ab0612cc904c1133091c6111c88f",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-linux-x64.AppImage",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "76ce835ec4bacbb391ebdab9b26a56397f09989403bae11d3eed71cc22262290",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/manifest-macos-x64.json",
+      "mode": "full-file",
+      "bytes": 559,
+      "sha256": "01e9e7eb839436d7e84409275f324c481a87001790bc6c1c37bb1cbfd08d9eba",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-linux-x64.AppImage.sig",
+      "mode": "full-file",
+      "bytes": 424,
+      "sha256": "0ab13aa7056221d9bc1eb88fe30a12f73199b028274e8157fde488c86180101b",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-linux-x64.deb",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "19060a8403c91a159655d43c13a98a988bfbcbbee152ca312d887d9902e3be12",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-linux-x64.deb.sig",
+      "mode": "full-file",
+      "bytes": 420,
+      "sha256": "3741ff1734de43fba1608acdd0069ab31ae4e08dd5daaa4ddd4d949415a7d936",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-linux-x64.rpm.sig",
+      "mode": "full-file",
+      "bytes": 420,
+      "sha256": "771a55d5707224723bb21504f8c6701f5054550c94da5f498ce0256e4e850c7b",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-macos-arm64.app.tar.gz",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "c854ebd973dcd9a94b72d11befa17a5338eb79ef3dba34119194f3a104714d64",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-linux-x64.rpm",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "e9950d494b62b64f9d93e4ceb3232bb292c18cd25ba15d074ad15f89419a9c73",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-macos-arm64.app.tar.gz.sig",
+      "mode": "full-file",
+      "bytes": 432,
+      "sha256": "f65b3a1093f390320098f04c3fb3758dd4d8fea4959d49b5b533b03162ef9947",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-macos-arm64.dmg",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "d4f13e9f22456d1d8f9f2972607d2c45b6ced79101f52fd76effbe3e2dd63349",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-macos-x64.app.tar.gz.sig",
+      "mode": "full-file",
+      "bytes": 428,
+      "sha256": "6a2487bf27c8395a9f90fee167e1645abf4e68966ccbcb45400d5195e83c9581",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-macos-x64.app.tar.gz",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "d7b25c4c9210b925d72c5170f3ff70f296cc2e9aada4a444cbc52542652874d7",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-macos-x64.dmg",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "e3d87b55be61a55f6adf008ceb3b34262d84d69e3853415a677e98f8b021c505",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.exe.sig",
+      "mode": "full-file",
+      "bytes": 420,
+      "sha256": "d566fa70ae3d1cbe8d8d559e46808402accb44094d7ac3f7f1658e274d1dc27b",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.exe",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "720facc4408fc9406eb3c06f41676fe828405dc69d1b16dcf492f3aa6fea6287",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-source.tar.gz",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "216d22d991fe6c67702bfb4b9ffe0c364b01cfcca6916bc929a6f3bb128af9a2",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.msi",
+      "mode": "first-64-bytes",
+      "bytes": 64,
+      "sha256": "a20beb2f65a3e19ac1409bf98b917060bb2a5c37e146c640901764d8097edff0",
+      "status": "passed"
+    },
+    {
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.msi.sig",
+      "mode": "full-file",
+      "bytes": 420,
+      "sha256": "931853a2415dde850463c2384f1c1388cfbf905b953c404cd95b404fb2580e4c",
+      "status": "passed"
+    }
+  ]
+}

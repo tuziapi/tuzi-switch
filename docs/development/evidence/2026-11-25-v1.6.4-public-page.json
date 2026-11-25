@@ -1,0 +1,153 @@
+{
+  "checkedAt": "2026-11-25T03:54:49.508Z",
+  "pageCommit": "6e3e215088938c6a6e0484900b690202c94ec9fb",
+  "results": [
+    {
+      "file": "install-macos-v1.5.5.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.5.sh",
+      "bytes": 9541,
+      "sha256": "4384f7885226c6cb7c1ea8b797141ad5e7ee542f09cc74ddb9c6d4fb0f7e4b49",
+      "status": "passed"
+    },
+    {
+      "file": "LICENSE.txt",
+      "url": "https://tuziapi.github.io/tuzi-switch/LICENSE.txt",
+      "bytes": 34523,
+      "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+      "status": "passed"
+    },
+    {
+      "file": "assets/tuzi-switch-D32FSEU9.css",
+      "url": "https://tuziapi.github.io/tuzi-switch/assets/tuzi-switch-D32FSEU9.css",
+      "bytes": 18880,
+      "sha256": "36e7c6fd79dbdb4186ba7b6af9235ac66141c1019df68297791a8ded64df1082",
+      "status": "passed"
+    },
+    {
+      "file": "assets/tuzi-switch-B2Ui_TNF.js",
+      "url": "https://tuziapi.github.io/tuzi-switch/assets/tuzi-switch-B2Ui_TNF.js",
+      "bytes": 174727,
+      "sha256": "a3e722e401b16cbed53ca930ffba307bd333d88c2ec8553a7f3f35641f183c2f",
+      "status": "passed"
+    },
+    {
+      "file": "install-macos-v1.5.6.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.6.sh",
+      "bytes": 9541,
+      "sha256": "06c4932d60768acc2bb8f9e7a0929f3c8884b2e054874a154856ca01082b80f6",
+      "status": "passed"
+    },
+    {
+      "file": "install-macos-v1.5.7.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.5.7.sh",
+      "bytes": 9541,
+      "sha256": "d961d779546e20aa088f0b8b505c1c2b617a1357007dacbb60ae2f4d839a95d8",
+      "status": "passed"
+    },
+    {
+      "file": "install-macos-v1.6.2.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.2.sh",
+      "bytes": 9541,
+      "sha256": "7bf1dc2fc7d4dcbcc7f5345823339f71c5ba73b2a69c1cd48991464ca0d9fb21",
+      "status": "passed"
+    },
+    {
+      "file": "install-macos-v1.6.0.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.0.sh",
+      "bytes": 9541,
+      "sha256": "8b815171738be8417163a50cc85e59d59c959275ccc86779b7631e746fe625c3",
+      "status": "passed"
+    },
+    {
+      "file": "install-macos-v1.6.1.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.1.sh",
+      "bytes": 9541,
+      "sha256": "a1cfe907c72f4a5fedb82142d4b204c1eedbb72b884616911fa0f7ff3d388ecf",
+      "status": "passed"
+    },
+    {
+      "file": "install-macos-v1.6.3.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.3.sh",
+      "bytes": 9541,
+      "sha256": "751f67c81c0c5a3de8135216c155f3aadb5e473c37664487da8735d7c08a6be8",
+      "status": "passed"
+    },
+    {
+      "file": "install.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install.sh",
+      "bytes": 2248,
+      "sha256": "74109b30ab8b8121d12b12034924fe50895eda860ba7c31ea335f42f10360e74",
+      "status": "passed"
+    },
+    {
+      "file": "install-macos-v1.6.4.sh",
+      "url": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.4.sh",
+      "bytes": 9541,
+      "sha256": "4c77e510261179671a58cbb86ee19c9c98207c08cb576046195affcdd4b8a3de",
+      "status": "passed"
+    },
+    {
+      "file": "release.json",
+      "url": "https://tuziapi.github.io/tuzi-switch/release.json",
+      "bytes": 2925,
+      "sha256": "3456cc7c18aedf2a4a12d834e08bd0e3db8c9d022ead6c51760232335dbc7f83",
+      "status": "passed"
+    },
+    {
+      "file": "tuzi-assistant-assets/configuration.png",
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-assistant-assets/configuration.png",
+      "bytes": 95500,
+      "sha256": "57f28915982f499f9e089ada427c76bedb5eeda97eedcee5e70648a1a0b0b2b1",
+      "status": "passed"
+    },
+    {
+      "file": "tuzi-assistant-assets/icon.png",
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-assistant-assets/icon.png",
+      "bytes": 123307,
+      "sha256": "0ac46b55e71b60d46874ca24ded5a98228967753e9dc9333d52f4faa157cf9bc",
+      "status": "passed"
+    },
+    {
+      "file": "tuzi-assistant-assets/projects.png",
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-assistant-assets/projects.png",
+      "bytes": 53433,
+      "sha256": "e2de881f14cd73fe8d7066a3ff84744d697a5e3c5fc2d4efb9353451959c4caa",
+      "status": "passed"
+    },
+    {
+      "file": "tuzi-assistant-assets/tools.png",
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-assistant-assets/tools.png",
+      "bytes": 78751,
+      "sha256": "5bde352fcb30dac958ba4f130d2511d533bb5c53d01548db5cdea985e2e1feb9",
+      "status": "passed"
+    },
+    {
+      "file": "tuzi-download-analytics.html",
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-download-analytics.html",
+      "bytes": 1416,
+      "sha256": "8d3ef99572f00d8826c49630c9ade6d082c8e3cb261d81f3dc458cd01460d389",
+      "status": "passed"
+    },
+    {
+      "file": "index.html",
+      "url": "https://tuziapi.github.io/tuzi-switch/index.html",
+      "bytes": 605,
+      "sha256": "b32519b8eb238f984217e97fba8f2a16bf47b74bf83d96506b310444a03dd9e8",
+      "status": "passed"
+    },
+    {
+      "file": "tuzi-switch.html",
+      "url": "https://tuziapi.github.io/tuzi-switch/tuzi-switch.html",
+      "bytes": 605,
+      "sha256": "b32519b8eb238f984217e97fba8f2a16bf47b74bf83d96506b310444a03dd9e8",
+      "status": "passed"
+    },
+    {
+      "file": "download-SOURCE.json",
+      "url": "https://tuziapi.github.io/tuzi-switch/download-SOURCE.json",
+      "bytes": 2835,
+      "sha256": "8fe945923b354ec5351a475e231bd7151cd6e4df71f84113fb6cdb08a07e7f27",
+      "status": "passed"
+    }
+  ]
+}
