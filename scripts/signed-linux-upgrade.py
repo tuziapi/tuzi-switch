@@ -249,15 +249,19 @@ class Handler(BaseHTTPRequestHandler):
                                            endpoints={'image-generation': {'path': '/v1/images/generations', 'method': 'POST'}})
                                        for id in [MODEL45, MODEL55]]}
                 else:
-                    assert self.command == 'POST' and url.path == '/v1/images/generations'
+                    assert self.command == 'POST' and url.path in ['/v1/images/generations', '/api/v3/images/generations']
                     length = int(self.headers.get('Content-Length', '0'))
                     assert 0 < length < 1024 * 1024
                     body = json.loads(self.rfile.read(length))
+                    is_layer_request = bool(body.get('layer_decomposition_options'))
+                    assert url.path == ('/api/v3/images/generations' if is_layer_request else '/v1/images/generations')
                     channels = parse_qs(url.query).get('ch', [])
                     if active_version in [BASE_VERSION, TARGET_VERSION]:
-                        assert channels == ['3'], 'Official native generation must carry ch=3 exactly once'
+                        # The published base does not attribute its v3 layer path.
+                        # Ordinary generation retains the exact ch=3 assertion.
+                        assert channels == ([] if is_layer_request else ['3'])
                     result = model_response(body)
-                    report['creativeRequests'].append(dict(version=active_version, model=body['model'],
+                    report['creativeRequests'].append(dict(version=active_version, path=url.path, model=body['model'],
                         channels=channels, layers=bool(body.get('layer_decomposition_options')), syntheticAuthorizationMatched=True))
             content = json.dumps(result).encode()
             self.send_response(200)
@@ -519,6 +523,8 @@ if(e)e.click();return Boolean(e);'''
     screenshot('05-automatically-restarted')
     creative.preserved(current_creative, 'signed-upgrade')
     assert len([r for r in report['creativeRequests'] if r['version'] == BASE_VERSION]) == 2
+    assert len([r for r in report['creativeRequests'] if r['version'] == BASE_VERSION and r['path'] == '/v1/images/generations']) == 1
+    assert len([r for r in report['creativeRequests'] if r['version'] == BASE_VERSION and r['path'] == '/api/v3/images/generations' and r['layers']]) == 1
     report['creativeAfterUpgrade'] = creative.create()
     assert any(record['version'] == TARGET_VERSION and record['channels'] == ['3'] for record in report['creativeRequests'])
     report['checks']['targetNativeBusinessAttribution'] = 'passed'

@@ -185,13 +185,18 @@ foreach ($program in $programs) {
           report.creativeRequests.push({ version: activeVersion, path: url.pathname, syntheticAuthorizationMatched: true });
           res.end(JSON.stringify({ data: [model45, model55].map(id => ({ id, supported_endpoint_types: ['image-generation'], endpoints: { 'image-generation': { path: '/v1/images/generations', method: 'POST' } } })) })); return;
         }
-        assert.equal(req.method, 'POST'); assert.equal(url.pathname, '/v1/images/generations');
+        assert.equal(req.method, 'POST');
+        assert.ok(['/v1/images/generations', '/api/v3/images/generations'].includes(url.pathname));
         let chunks = [], length = 0;
         for await (const chunk of req) { length += chunk.length; assert.ok(length < 1024 * 1024); chunks.push(chunk); }
         const body = JSON.parse(Buffer.concat(chunks).toString());
+        const isLayerRequest = Boolean(body.layer_decomposition_options);
+        assert.equal(url.pathname, isLayerRequest ? '/api/v3/images/generations' : '/v1/images/generations');
         const response = syntheticModelResponse(body);
         const channels = url.searchParams.getAll('ch');
-        if (activeVersion === BASE_VERSION || activeVersion === TARGET_VERSION) assert.deepEqual(channels, ['3'], 'Official native model request must identify desktop channel once');
+        // Published 1.6.3 moved layers to v3, outside its attribution allowlist.
+        // Preserve that legacy behavior; ordinary generation still requires ch=3.
+        if (activeVersion === BASE_VERSION || activeVersion === TARGET_VERSION) assert.deepEqual(channels, isLayerRequest ? [] : ['3']);
         report.creativeRequests.push({ version: activeVersion, path: url.pathname, channels, body, syntheticAuthorizationMatched: true });
         res.end(JSON.stringify(response)); return;
       } catch (error) {
@@ -406,7 +411,8 @@ $probe=Join-Path $directory 'restored-write-probe'
   await page.screenshot({ path: path.join(root, '04-real-restarted-application.png') });
   await verifyCreativePreserved(page, currentCreative, root, 'signed-upgrade');
   report.checks.creativeImageLayerOcrTaskPreservation = 'passed';
-  assert.ok(report.creativeRequests.filter(r => r.version === BASE_VERSION && r.path === '/v1/images/generations').length >= 2);
+  assert.equal(report.creativeRequests.filter(r => r.version === BASE_VERSION && r.path === '/v1/images/generations').length, 1);
+  assert.equal(report.creativeRequests.filter(r => r.version === BASE_VERSION && r.path === '/api/v3/images/generations' && r.body.layer_decomposition_options).length, 1);
   const targetEvidence = path.join(root, 'target-native');
   fs.mkdirSync(targetEvidence, { recursive: true });
   report.creativeAfterUpgrade = await createLegacyCreative(page, targetEvidence);
