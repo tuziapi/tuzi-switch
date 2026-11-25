@@ -347,6 +347,20 @@ pub(crate) fn commit<T>(
     commit_all_at_paths(previous, next, targets, legacy, save)
 }
 
+/// An explicitly displayed desktop target can differ from the preview profile.
+/// Reuse the same locks, conflict detection and compensating file transaction.
+pub(crate) fn install_codex_at_path(path: PathBuf, next: &McpServer) -> Result<(), AppError> {
+    let _mode_operation = crate::aggregation::read_operation().map_err(AppError::Message)?;
+    crate::aggregation::ensure_inactive("codex").map_err(AppError::Message)?;
+    commit_all_at_paths(
+        None,
+        Some(next),
+        Vec::new(),
+        vec![(crate::app_config::AppType::Codex, path)],
+        || Ok(()),
+    )
+}
+
 fn commit_at_paths<T>(
     previous: Option<&McpServer>,
     next: Option<&McpServer>,

@@ -1,8 +1,8 @@
 {
   "opentuConnection": {
     "tab": "OpenTu 接入",
-    "title": "连接 ChatGPT / MCP 客户端",
-    "description": "让本机客户端调用 OpenTu 模型并操作当前画布。选择流式 HTTP，填写下方地址和配对令牌。",
+    "title": "连接 Codex / MCP 客户端",
+    "description": "让本机客户端使用 OpenTu 创作模型并操作画布。Codex 推荐使用一键连接。",
     "name": "名称",
     "transport": "类型",
     "http": "流式 HTTP（Streamable HTTP）",
@@ -12,8 +12,8 @@
     "auth": "配对认证：使用此服务专用的 Bearer Token，不使用模型 API Key。",
     "copyToken": "复制配对令牌",
     "copyHeader": "复制 Authorization 值",
-    "headerHelp": "如果客户端提供 Token 输入框，粘贴配对令牌；如果提供自定义请求头，名称填 Authorization，值粘贴带 Bearer 前缀的内容。",
-    "restart": "请保持兔子助手运行。每次重启后地址和令牌会变化，需要重新复制。令牌不显示在页面上，不要发送到聊天中。",
+    "headerHelp": "直接 Token 栏可粘贴令牌；“Bearer 令牌环境变量”栏只能填环境变量名。也可设置 Authorization 标头，粘贴“复制 Authorization 值”的完整内容。",
+    "restart": "以下手动 HTTP 配置在每次重启后需要更新地址和令牌；上方 Codex 本地连接器不需要重新配对。不要把令牌发送到聊天中。",
     "check": "检查连接",
     "checking": "正在检查…",
     "passed": "本地 HTTP 初始化、认证与工具列表检查通过，共 {{count}} 个工具。",
@@ -25,9 +25,26 @@
       "endpoint": "已复制本地地址。",
       "token": "已复制配对令牌，请粘贴到客户端认证字段。",
       "authorization": "已复制 Authorization 值，包含 Bearer 前缀。"
-    }
+    },
+    "codexTitle": "Codex 本地连接器",
+    "connectorHelp": "连接后，本机 Codex 可调用 OpenTu 创作工具并操作当前画布。只添加 tuzi-opentu，保留其他设置；助手重启后自动重连。",
+    "localTarget": "写入本机客户端配置：",
+    "isolatedTarget": "当前为合成测试环境，仅写隔离配置：",
+    "install": "连接本机 Codex",
+    "repair": "修复本机连接",
+    "remove": "解除连接",
+    "configuring": "正在配置…",
+    "installed": "配置已写入。请在 Codex 刷新 MCP；若工具仍未出现，请重新打开会话。已有手动 OpenTu 项时，请停用旧项并保留 tuzi-opentu。",
+    "removed": "已移除兔子助手创建的连接器配置。",
+    "awaitingClient": "已配置，等待客户端实际调用。",
+    "clientCalled": "本次运行已收到连接器转发的成功工具调用。",
+    "connectorError": "连接器配置失败，其他配置已保留。请检查 Codex 配置是否有效、目录是否可写，或是否已有同名 tuzi-opentu 服务。",
+    "manual": "其他客户端 / 手动 HTTP 配置"
   },
-  "workbuddyForm": { "invalidJson": "请检查 JSON 配置和模型字段。", "selectAccount": "请先选择 WorkBuddy 账号。" },
+  "workbuddyForm": {
+    "invalidJson": "请检查 JSON 配置和模型字段。",
+    "selectAccount": "请先选择 WorkBuddy 账号。"
+  },
   "workbuddyQuota": {
     "expiry": "{{amount}} 积分 · {{until}}",
     "noExpiry": "长期有效",
@@ -3365,5 +3382,56 @@
     "configureModels": "配置模型",
     "modelsConfigured": "已获取或配置 {{count}} 个模型",
     "manageModels": "管理模型"
+  },
+  "officialMcp": {
+    "title": "兔子官方 MCP",
+    "description": "查询接口文档、接入指南和账户用量，执行经确认的业务操作。",
+    "steps": "点击连接 → 在浏览器确认兔子账号和授权 → 返回后自动检查。无需填写令牌或客户端密钥。",
+    "assistantAccount": "助手当前账号：{{name}}",
+    "authorizedAccount": "MCP 授权账号：{{name}}",
+    "mismatch": "MCP 授权账号与助手当前账号不同。请核对账号，必要时重新授权；尚未确认关联成功。",
+    "connect": "连接到桌面 Codex",
+    "desktopTarget": "连接目标：本机 Codex（查看配置位置）",
+    "isolatedTarget": "连接目标：隔离测试环境（不会连接本机 Codex）",
+    "desktopReady": "配置与授权已验证。请在桌面 Codex 新建对话，发送“通过兔子 MCP 查询我的账户用量”。若尚未加载，请重新打开 Codex。",
+    "reauthorize": "重新授权",
+    "check": "检查连接",
+    "cancel": "取消等待",
+    "manage": "管理 / 撤销授权",
+    "verified": "{{time}} 已通过 Codex 实际查询文档与账户。此结果是上次检查记录。",
+    "note": "首版支持 Codex。系统令牌不会写入工具配置；敏感操作仍需确认。已打开的 Codex 会话可能需要重新开启才能加载新配置。撤销授权请在网站完成后再检查连接。",
+    "phases": {
+      "preparing": "正在准备",
+      "checking_service": "正在检查官方服务",
+      "configuring": "正在配置",
+      "authorizing": "请在浏览器确认授权",
+      "checking": "正在验证实际调用",
+      "connected": "已连接",
+      "configured": "已配置，待验证授权",
+      "not_configured": "尚未配置",
+      "account_mismatch": "账号不一致，待确认"
+    },
+    "errors": {
+      "codex_missing": "未找到 Codex，请先安装 Codex 并启动一次，再重试。",
+      "codex_not_initialized": "Codex 配置目录尚未准备好，请先启动 Codex，或在助手设置中核对 Codex 配置目录。",
+      "codex_upgrade_required": "当前 Codex 不支持所需连接接口，请更新 Codex 后重试。",
+      "codex_unavailable": "无法与 Codex 通信，请确认安装正常后重试。",
+      "codex_protocol_error": "Codex 返回了不兼容的响应，请更新 Codex 后重试。",
+      "config_conflict": "已有同名配置、配置被更改或保存失败。请检查下方服务器与 Codex 配置；现有配置不会被强制覆盖。",
+      "config_home_mismatch": "CODEX_HOME 与助手设置的 Codex 配置目录不同，请先将两者指向同一个目录。",
+      "authorization_failed": "授权未完成或已被拒绝，请重新授权。",
+      "authorization_url_rejected": "授权地址校验未通过，未打开该地址。请检查官方 MCP 服务。",
+      "browser_failed": "无法打开系统浏览器，请恢复浏览器后重新操作。",
+      "verification_failed": "文档或账户查询未通过，请检查授权、服务状态后重试。",
+      "request_failed": "Codex 未能完成请求。请确认官方 MCP 已升级并启用自动授权，且当前 Codex 支持 MCP 登录与工具检查。",
+      "timeout": "等待超时，可重新授权或检查连接；不会自动重复提交。",
+      "cancelled": "已取消等待。已保存的配置保留；如果已在网页确认授权，可检查连接，或到网站撤销。",
+      "not_configured": "请先连接兔子 MCP。",
+      "server_upgrade_required": "官方服务尚未提供桌面自动授权，本次未修改 Codex 配置。请等待服务升级后重试；已有授权可点“检查连接”。",
+      "target_changed": "Codex 配置位置已变化，请等待页面刷新并核对目标位置后重试。",
+      "service_unavailable": "暂时无法访问官方 MCP 服务，请检查网络后重试。",
+      "busy": "已有连接操作正在进行，请等待完成或取消。",
+      "local_error": "暂时无法读取或更新连接状态，请稍后重试。"
+    }
   }
 }

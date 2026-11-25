@@ -1,8 +1,8 @@
 {
   "opentuConnection": {
     "tab": "OpenTu connection",
-    "title": "Connect ChatGPT / MCP clients",
-    "description": "Let a local client use OpenTu models and the current canvas. Choose Streamable HTTP and enter the address and pairing token below.",
+    "title": "Connect Codex / MCP clients",
+    "description": "Let local clients use OpenTu models and the canvas. Use one-click setup for Codex.",
     "name": "Name",
     "transport": "Transport",
     "http": "Streamable HTTP",
@@ -12,8 +12,8 @@
     "auth": "Authentication uses a dedicated Bearer Token, not your model API key.",
     "copyToken": "Copy pairing token",
     "copyHeader": "Copy Authorization value",
-    "headerHelp": "For a Token field, paste the pairing token. For custom headers, use Authorization as the name and paste the value with the Bearer prefix.",
-    "restart": "Keep Tuzi Assistant running. The address and token change after every restart; copy them again. The token is hidden. Never send it in chat.",
+    "headerHelp": "Paste the token into a direct Token field, not a bearer-token environment variable field. Alternatively, set Authorization using Copy Authorization value.",
+    "restart": "Manual HTTP setup below needs new connection details after each restart. The Codex connector above does not need pairing again. Do not share the token in chat.",
     "check": "Check connection",
     "checking": "Checking…",
     "passed": "Local HTTP initialization, authentication and tool discovery passed: {{count}} tools.",
@@ -25,9 +25,26 @@
       "endpoint": "Local address copied.",
       "token": "Pairing token copied. Paste it into the client authentication field.",
       "authorization": "Authorization value copied, including the Bearer prefix."
-    }
+    },
+    "codexTitle": "Codex local connector",
+    "connectorHelp": "Allow local Codex to use OpenTu creation tools and the current canvas. Only tuzi-opentu is added; other settings are preserved. Reconnects after the assistant restarts.",
+    "localTarget": "Local client configuration:",
+    "isolatedTarget": "Synthetic test environment; isolated configuration only:",
+    "install": "Connect Codex",
+    "repair": "Repair Codex connection",
+    "remove": "Disconnect",
+    "configuring": "Configuring…",
+    "installed": "Configuration saved. Refresh MCP in Codex; reopen the conversation if tools are still missing. If you previously added OpenTu manually, disable the old entry and keep tuzi-opentu.",
+    "removed": "Removed the connector configuration created by Tuzi Assistant.",
+    "awaitingClient": "Configured; waiting for an actual client tool call.",
+    "clientCalled": "A successful tool call was received through the connector during this app session.",
+    "connectorError": "Could not configure the connector. Other settings were preserved. Check Codex configuration, write access, or an existing tuzi-opentu entry.",
+    "manual": "Other clients / manual HTTP setup"
   },
-  "workbuddyForm": { "invalidJson": "Check the JSON configuration and model fields.", "selectAccount": "Select a WorkBuddy account first." },
+  "workbuddyForm": {
+    "invalidJson": "Check the JSON configuration and model fields.",
+    "selectAccount": "Select a WorkBuddy account first."
+  },
   "workbuddyQuota": {
     "expiry": "{{amount}} credits · {{until}}",
     "noExpiry": "No expiry",
@@ -3365,5 +3382,56 @@
     "configureModels": "Configure models",
     "modelsConfigured": "{{count}} models fetched or configured",
     "manageModels": "Manage models"
+  },
+  "officialMcp": {
+    "title": "Tuzi official MCP",
+    "description": "Read API documentation, integration guides and account usage; run approved business operations.",
+    "steps": "Connect → confirm your Tuzi account and permissions in the browser → return for automatic verification. No tokens or client secrets to fill in.",
+    "assistantAccount": "Assistant account: {{name}}",
+    "authorizedAccount": "MCP account: {{name}}",
+    "mismatch": "The MCP account differs from your assistant account. Check the account and authorize again if needed. The association has not been confirmed.",
+    "connect": "Connect desktop Codex",
+    "desktopTarget": "Target: Codex on this computer (view configuration path)",
+    "isolatedTarget": "Target: isolated test profile (not desktop Codex)",
+    "desktopReady": "Configuration and authorization verified. Start a new desktop Codex chat and ask Tuzi MCP to read your account usage. Reopen Codex if the tools have not loaded.",
+    "reauthorize": "Authorize again",
+    "check": "Check connection",
+    "cancel": "Cancel waiting",
+    "manage": "Manage / revoke access",
+    "verified": "Codex queried documentation and the account at {{time}}. This is the last check result.",
+    "note": "Codex is supported in this first version. Your system token is never written to tool settings. Sensitive actions still require confirmation. Reopen existing Codex sessions to load new settings if needed. Revoke access on the website, then check the connection again.",
+    "phases": {
+      "preparing": "Preparing",
+      "checking_service": "Checking official service",
+      "configuring": "Configuring",
+      "authorizing": "Confirm access in your browser",
+      "checking": "Verifying actual calls",
+      "connected": "Connected",
+      "configured": "Configured; authorization not verified",
+      "not_configured": "Not configured",
+      "account_mismatch": "Account mismatch"
+    },
+    "errors": {
+      "codex_missing": "Codex was not found. Install and open Codex once, then retry.",
+      "codex_not_initialized": "Open Codex first, or check its configuration directory in assistant settings.",
+      "codex_upgrade_required": "Update Codex to use the required connection interfaces.",
+      "codex_unavailable": "Cannot communicate with Codex. Check the installation and retry.",
+      "codex_protocol_error": "Codex returned an incompatible response. Update Codex and retry.",
+      "config_conflict": "The entry conflicts, was modified, or could not be saved. Check the server below and Codex settings. Existing settings will not be overwritten.",
+      "config_home_mismatch": "CODEX_HOME differs from the Codex directory in assistant settings. Point both to the same directory.",
+      "authorization_failed": "Authorization was not completed or was denied. Please retry.",
+      "authorization_url_rejected": "The authorization URL failed validation and was not opened. Check the official MCP service.",
+      "browser_failed": "Cannot open the system browser. Restore it and retry.",
+      "verification_failed": "Documentation or account verification failed. Check authorization and service availability.",
+      "request_failed": "The request failed. Ensure the official MCP supports automatic authorization and Codex supports MCP login and tool checks.",
+      "timeout": "The operation timed out. Retry authorization or check the connection; no automatic retry is performed.",
+      "cancelled": "Waiting cancelled. Saved settings remain. If you already approved access, check the connection or revoke access on the website.",
+      "not_configured": "Connect Tuzi MCP first.",
+      "server_upgrade_required": "The service does not support desktop automatic authorization yet. This attempt did not change Codex settings. Retry after the service upgrade, or check an existing authorized connection.",
+      "target_changed": "The Codex configuration path changed. Wait for the page to refresh, check the target and retry.",
+      "service_unavailable": "Cannot reach the official MCP service. Check your network and retry.",
+      "busy": "Another operation is running. Wait or cancel it.",
+      "local_error": "Cannot read or update connection status. Please retry."
+    }
   }
 }

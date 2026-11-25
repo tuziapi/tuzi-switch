@@ -1,0 +1,85 @@
+import { describe, expect, it } from "vitest";
+import {
+  DETAIL_PAGE_MODULES,
+  ECOMMERCE_LANGUAGES,
+  ECOMMERCE_PLATFORMS,
+  ECOMMERCE_RATIOS,
+  normalizeEcommerceModuleCounts,
+} from "../src/EcommerceWorkbench";
+import { resolveEcommerceModelRef } from "../src/ecommerce-generation";
+
+describe("ecommerce workbench PixPix-aligned configuration", () => {
+  it("exposes the complete platform, language and ratio catalog", () => {
+    expect(ECOMMERCE_PLATFORMS).toContain("TikTok Shop");
+    expect(ECOMMERCE_PLATFORMS).toContain("eBay");
+    expect(ECOMMERCE_LANGUAGES).toEqual(
+      expect.arrayContaining(["英文", "中文", "日文", "韩文", "西班牙文"]),
+    );
+    expect(ECOMMERCE_RATIOS).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "a-plus-web", size: "1472x608" }),
+        expect.objectContaining({ id: "1:1", size: "1024x1024" }),
+        expect.objectContaining({ id: "9:16", size: "864x1536" }),
+      ]),
+    );
+  });
+
+  it("keeps the mandatory A+ hero module and the newly added content modules", () => {
+    expect(
+      DETAIL_PAGE_MODULES.find((module) => module.id === "hero")?.required,
+    ).toBe(true);
+    expect(DETAIL_PAGE_MODULES.map((module) => module.id)).toEqual(
+      expect.arrayContaining(["ingredient", "usage", "after-sale"]),
+    );
+  });
+
+  it("clamps custom product-set counts to the supported range", () => {
+    expect(
+      normalizeEcommerceModuleCounts({
+        whiteBackground: -2,
+        scene: 4,
+        sellingPoint: 99,
+        other: Number.NaN,
+      }),
+    ).toEqual({
+      whiteBackground: 0,
+      scene: 4,
+      sellingPoint: 12,
+      other: 0,
+    });
+  });
+
+  it("preserves the active preset provider when the preset model is selected", () => {
+    expect(
+      resolveEcommerceModelRef("gemini-image", {
+        profileId: "assistant-account-token-1",
+        modelId: "gemini-image",
+      }),
+    ).toEqual({
+      profileId: "assistant-account-token-1",
+      modelId: "gemini-image",
+    });
+  });
+
+  it("uses the selected catalog model's provider for a model override", () => {
+    expect(
+      resolveEcommerceModelRef(
+        "seedream-5-5",
+        { profileId: "preset-profile", modelId: "other-model" },
+        "discovered-profile",
+      ),
+    ).toEqual({
+      profileId: "discovered-profile",
+      modelId: "seedream-5-5",
+    });
+  });
+  it("keeps an explicitly selected provider for a model also present in the default preset", () => {
+    expect(
+      resolveEcommerceModelRef(
+        "gpt-image-2",
+        { profileId: "synthetic-default", modelId: "gpt-image-2" },
+        "synthetic-selected",
+      ),
+    ).toEqual({ profileId: "synthetic-selected", modelId: "gpt-image-2" });
+  });
+});

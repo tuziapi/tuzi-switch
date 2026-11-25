@@ -119,6 +119,7 @@ async fn execute(
     }
     let operation = async {
         send(CreativeChunk::Ready)?;
+        send(CreativeChunk::Sending)?;
         let response = builder
             .send()
             .await

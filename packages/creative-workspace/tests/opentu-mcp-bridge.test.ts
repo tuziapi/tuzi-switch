@@ -134,6 +134,65 @@ it("rejects ambiguous model IDs before creating any task", async () => {
   expect(mocks.execute).not.toHaveBeenCalled();
 });
 
+it("preserves MiniMax duration, resolution and ratio before creating one queue task", async () => {
+  mocks.models.mockReturnValue([
+    { id: "MiniMax-H3", sourceProfileId: "source-a" },
+  ]);
+  await call("opentu_create_video", {
+    prompt: "synthetic train",
+    modelRef: { modelId: "MiniMax-H3", profileId: "source-a" },
+    seconds: 4,
+    size: "768P",
+    aspectRatio: "16:9",
+    insertToCanvas: true,
+  });
+  expect(mocks.execute).toHaveBeenCalledOnce();
+  expect(mocks.execute.mock.calls[0][0]).toMatchObject({
+    name: "generate_video",
+    arguments: {
+      seconds: "4",
+      size: "768P",
+      autoInsertToCanvas: true,
+      params: { ratio: "16:9", prompt_enhancement: false },
+    },
+  });
+});
+
+it.each([
+  { seconds: 3 },
+  { seconds: "4" },
+  { size: "1080p" },
+  { aspectRatio: "2:1" },
+  { aspectRatio: "adaptive" },
+])(
+  "rejects unsupported MiniMax parameters without charging: %o",
+  async (invalid) => {
+    mocks.models.mockReturnValue([
+      { id: "MiniMax-H3", sourceProfileId: "source-a" },
+    ]);
+    await expect(
+      call("opentu_create_video", {
+        prompt: "synthetic",
+        model: "MiniMax-H3",
+        ...invalid,
+      }),
+    ).rejects.toThrow();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  },
+);
+
+it("publishes per-model video capability values without credentials", async () => {
+  mocks.models.mockImplementation((type) =>
+    type === "video" ? [{ id: "MiniMax-H3", sourceProfileId: "source-a" }] : [],
+  );
+  const result = await call("opentu_list_models");
+  const data = JSON.parse((result.content as any[])[0].text);
+  expect(data.models[0].capabilities).toMatchObject({
+    seconds: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    sizes: ["768P", "2K"],
+  });
+});
+
 it("refuses unavailable provider references and mismatched model IDs", async () => {
   await expect(
     call("opentu_create_image", {

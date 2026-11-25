@@ -5,7 +5,7 @@ unprivileged, network-blocked user. Discovery/TLS are local; signatures and the
 package manager are real. This is a subset, never a release acceptance record.
 """
 import hashlib
-from signed_candidate_identity import verify_candidate
+from signed_candidate_identity import verify_candidate, BASE_VERSION, TARGET_VERSION
 from signed_creative_webdriver import CreativeChecks, MODEL45, MODEL55, model_response
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -249,15 +249,19 @@ class Handler(BaseHTTPRequestHandler):
                                            endpoints={'image-generation': {'path': '/v1/images/generations', 'method': 'POST'}})
                                        for id in [MODEL45, MODEL55]]}
                 else:
-                    assert self.command == 'POST' and url.path == '/v1/images/generations'
+                    assert self.command == 'POST' and url.path in ['/v1/images/generations', '/api/v3/images/generations']
                     length = int(self.headers.get('Content-Length', '0'))
                     assert 0 < length < 1024 * 1024
                     body = json.loads(self.rfile.read(length))
+                    is_layer_request = bool(body.get('layer_decomposition_options'))
+                    assert url.path == ('/api/v3/images/generations' if is_layer_request else '/v1/images/generations')
                     channels = parse_qs(url.query).get('ch', [])
-                    if active_version in ['1.6.2', '1.6.3']:
-                        assert channels == ['3'], 'Official native generation must carry ch=3 exactly once'
+                    if active_version in [BASE_VERSION, TARGET_VERSION]:
+                        # The published base does not attribute its v3 layer path.
+                        # Ordinary generation retains the exact ch=3 assertion.
+                        assert channels == ([] if is_layer_request else ['3'])
                     result = model_response(body)
-                    report['creativeRequests'].append(dict(version=active_version, model=body['model'],
+                    report['creativeRequests'].append(dict(version=active_version, path=url.path, model=body['model'],
                         channels=channels, layers=bool(body.get('layer_decomposition_options')), syntheticAuthorizationMatched=True))
             content = json.dumps(result).encode()
             self.send_response(200)
@@ -423,9 +427,9 @@ window.__TAURI_INTERNALS__.invoke('get_settings').then(settings=>window.__TAURI_
             pass
         session = None
         manual_install(base_dir)
-    active_version = '1.6.2'
+    active_version = BASE_VERSION
     attach()
-    report['baseIdentity'] = identity('1.6.2', base['commit'])
+    report['baseIdentity'] = identity(BASE_VERSION, base['commit'])
     initial_pids = application_processes()
     assert len(initial_pids) == 1, initial_pids
     report['initialPid'] = initial_pids[0]
@@ -449,9 +453,10 @@ window.__TAURI_INTERNALS__.invoke('get_settings').then(settings=>window.__TAURI_
     report['checks']['nativeSeedream55Synthetic'] = 'passed'
     creative.leave()
     # The header notice is persistent even after the initial toast expires.
-    wait_for(lambda: execute('''const names=['检测到新版本：1.6.3','New version available: 1.6.3'];
+    update_control_script = 'const names=' + json.dumps([f'检测到新版本：{TARGET_VERSION}', f'New version available: {TARGET_VERSION}']) + ''';
 const e=[...document.querySelectorAll('button')].find(e=>e.getClientRects().length && names.includes(e.getAttribute('aria-label')));
-if(e)e.click();return Boolean(e);'''), 'Persistent update control missing')
+if(e)e.click();return Boolean(e);'''
+    wait_for(lambda: execute(update_control_script), 'Persistent update control missing')
     screenshot('01-update-dialog')
     for failure in ['corrupt', 'interrupted', 'missing']:
         mode = failure
@@ -459,7 +464,7 @@ if(e)e.click();return Boolean(e);'''), 'Persistent update control missing')
         wait_for(lambda: buttons(['重新下载']), failure + ' must be rejected', 90)
         assert any(r['path'].endswith(asset) and r['mode'] == failure for r in report['requests'])
         assert digest_executable() == before_hash
-        identity('1.6.2', base['commit'])
+        identity(BASE_VERSION, base['commit'])
         assert not buttons(['重启并更新'])
         report['checks'][failure] = 'passed'
         screenshot('02-' + failure)
@@ -473,7 +478,7 @@ if(e)e.click();return Boolean(e);'''), 'Persistent update control missing')
     click(['重启并更新'])
     wait_for(lambda: buttons(['重新下载']), 'Expected package-manager permission failure', 60)
     assert digest_executable() == before_hash
-    identity('1.6.2', base['commit'])
+    identity(BASE_VERSION, base['commit'])
     if installer != 'appimage':
         permission_diagnostics = (output/'driver.log').read_text(errors='replace')
         denial = re.findall(r'[^\n]*(?:not in the sudoers|a password is required|a terminal is required|no tty present|No authentication agent)[^\n]*', permission_diagnostics, flags=re.IGNORECASE)
@@ -507,8 +512,8 @@ if(e)e.click();return Boolean(e);'''), 'Persistent update control missing')
         pass
     session = None
     attach(inspector)
-    report['targetIdentity'] = identity('1.6.3', target['commit'])
-    active_version = '1.6.3'
+    report['targetIdentity'] = identity(TARGET_VERSION, target['commit'])
+    active_version = TARGET_VERSION
     assert_preserved()
     report['finalExecutableSha256'] = digest_executable()
     if installer == 'appimage':
@@ -517,9 +522,11 @@ if(e)e.click();return Boolean(e);'''), 'Persistent update control missing')
     report['checks'].update({k: 'passed' for k in ['download', 'nativeSignature', 'install', 'automaticRestart', 'version', 'sqliteProviderAndWebviewPreference', 'sameInstallationRetry']})
     screenshot('05-automatically-restarted')
     creative.preserved(current_creative, 'signed-upgrade')
-    assert len([r for r in report['creativeRequests'] if r['version'] == '1.6.2']) == 2
+    assert len([r for r in report['creativeRequests'] if r['version'] == BASE_VERSION]) == 2
+    assert len([r for r in report['creativeRequests'] if r['version'] == BASE_VERSION and r['path'] == '/v1/images/generations']) == 1
+    assert len([r for r in report['creativeRequests'] if r['version'] == BASE_VERSION and r['path'] == '/api/v3/images/generations' and r['layers']]) == 1
     report['creativeAfterUpgrade'] = creative.create()
-    assert any(record['version'] == '1.6.3' and record['channels'] == ['3'] for record in report['creativeRequests'])
+    assert any(record['version'] == TARGET_VERSION and record['channels'] == ['3'] for record in report['creativeRequests'])
     report['checks']['targetNativeBusinessAttribution'] = 'passed'
     assert not report.get('creativeServerErrors')
     report['checks']['creativeImageLayerOcrTaskPreservation'] = 'passed'

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Tuzi Assistant v1.6.3. Only official, checksum-pinned macOS installers.
+# Tuzi Assistant v1.6.4. Only official, checksum-pinned macOS installers.
 set -euo pipefail
 umask 077
 
-VERSION=1.6.3
+VERSION=1.6.4
 REPO=tuziapi/tuzi-switch
 APP_NAME='兔子助手.app'
 APP_ID=com.tuziswitch.desktop
@@ -44,7 +44,7 @@ trap 'exit 143' TERM
 
 usage() {
   cat <<'EOF'
-兔子助手 v1.6.3 macOS 安装器（仅从 tuziapi/tuzi-switch 下载）
+兔子助手 v1.6.4 macOS 安装器（仅从 tuziapi/tuzi-switch 下载）
   bash install-macos.sh                         交互安装
   bash install-macos.sh --verify-only           仅下载、挂载并校验，不安装
   bash install-macos.sh --verify-only --arch x64 校验 Intel 包
@@ -75,10 +75,10 @@ fi
 case "$ARCH" in
   arm64|aarch64)
     ARCH=arm64; MACH_ARCH=arm64
-    SHA256=2180fee36357a6f48450b53c7d70701caa7744f92ad4c162a191f9a9d91b5416 ;;
+    SHA256=09cb64e65abf1bc6c980e1e1145dcbed8d012f808d8c087118dc341c689ea423 ;;
   x64|x86_64)
     ARCH=x64; MACH_ARCH=x86_64
-    SHA256=b670fd44fc960b14e6884b890e2843096e21cf3542850f162aa749753a5265c5 ;;
+    SHA256=ae3b1c133bf7e3e7ae58086553f29e16707dafee09682e2e80829011cff75a32 ;;
   *) fail "不支持的 Mac 架构：$ARCH" ;;
 esac
 FILE="tuzi-assistant-macos-$ARCH.dmg"

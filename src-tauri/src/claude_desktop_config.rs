@@ -754,7 +754,12 @@ fn build_gateway_profile(base_url: &str, api_key: &str, model_ids: Option<&[Stri
         "inferenceGatewayApiKey": api_key,
         "inferenceGatewayAuthScheme": "bearer",
         "inferenceGatewayBaseUrl": base_url,
-        "inferenceProvider": "gateway"
+        "inferenceProvider": "gateway",
+        // Claude Desktop reads this account-profile preference before the
+        // bootstrap payload is served. Keep it in the isolated gateway
+        // profile so the certificate-free launch can request Chinese UI
+        // without changing the user's normal Claude profile.
+        "locale": "zh-Hans"
     });
 
     if let Some(model_ids) = model_ids {
@@ -1228,6 +1233,7 @@ mod tests {
             profile["inferenceGatewayBaseUrl"],
             json!("https://gateway.example.com")
         );
+        assert_eq!(profile["locale"], json!("zh-Hans"));
         assert_eq!(profile["inferenceGatewayApiKey"], json!("test-token"));
         assert_eq!(profile["inferenceGatewayAuthScheme"], json!("bearer"));
         assert_eq!(profile["disableDeploymentModeChooser"], json!(true));

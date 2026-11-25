@@ -59,6 +59,7 @@ pub struct FormPart {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum CreativeChunk {
     Ready,
+    Sending,
     Start {
         status: u16,
         content_type: String,
@@ -461,7 +462,17 @@ fn supports_action(model: &Value, action: &str) -> bool {
         ),
         "image.edit" => (
             "/v1/images/edits",
-            &["openai-image", "openai-images", "image-edit", "edit"],
+            // Tuzi's live model catalog uses `image-generation` for GPT Image
+            // models that also accept the OpenAI-compatible edits endpoint.
+            // Keep the preflight permissive here and let the upstream endpoint
+            // remain the final authority for model-specific edit support.
+            &[
+                "openai-image",
+                "openai-images",
+                "image-generation",
+                "image-edit",
+                "edit",
+            ],
         ),
         "video.create" => ("/v1/videos", &["openai-video", "openai-videos"]),
         "audio.speech" => (
@@ -716,6 +727,7 @@ async fn execute(
             if let Some((body, content_type)) = payload {
                 builder = builder.header("Content-Type", content_type).body(body);
             }
+            on_chunk.send(CreativeChunk::Sending).map_err(|_| "consumer_closed")?;
             let response = builder
                 .send()
                 .await
@@ -732,6 +744,11 @@ async fn execute(
                 .unwrap_or("application/octet-stream")
                 .to_string();
             if !status.is_success() {
+                on_chunk.send(CreativeChunk::Start {
+                    status: status.as_u16(),
+                    content_type: "application/json".into(),
+                    headers: BTreeMap::new(),
+                }).map_err(|_| "consumer_closed")?;
                 // Do not expose upstream error bodies or authentication diagnostics.
                 return Err(format!("creative_upstream_{}", status.as_u16()));
             }
@@ -918,6 +935,12 @@ mod tests {
         assert!(!supports_action(
             &json!({"supported_endpoint_types":["generate"],"endpoints":{"generate":{"path":"/v1/images/generations","method":"GET"}}}),
             "image.generate"
+        ));
+        // Tuzi's GPT Image catalog advertises the shared image-generation
+        // capability while the same model also supports /images/edits.
+        assert!(supports_action(
+            &json!({"supported_endpoint_types":["image-generation"]}),
+            "image.edit"
         ));
     }
     #[test]

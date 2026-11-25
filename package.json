@@ -1,11 +1,12 @@
 {
   "name": "tu-zi-switch",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI - 兔子助手",
   "type": "module",
   "scripts": {
     "dev": "pnpm tauri dev",
     "build": "pnpm tauri build",
+    "build:local": "pnpm tauri build --features isolated-profile --config src-tauri/tauri.acceptance.conf.json",
     "tauri": "tauri",
     "dev:renderer": "pnpm build:creative && vite",
     "build:renderer": "pnpm build:creative && vite build",

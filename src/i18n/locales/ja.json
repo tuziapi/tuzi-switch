@@ -1,8 +1,8 @@
 {
   "opentuConnection": {
     "tab": "OpenTu 接続",
-    "title": "ChatGPT / MCP クライアント接続",
-    "description": "ローカルクライアントから OpenTu のモデルと現在のキャンバスを操作できます。Streamable HTTP を選び、以下のアドレスとトークンを設定してください。",
+    "title": "Codex / MCP クライアントを接続",
+    "description": "ローカルクライアントから OpenTu のモデルとキャンバスを操作します。Codex はワンクリック接続がおすすめです。",
     "name": "名前",
     "transport": "接続方式",
     "http": "Streamable HTTP",
@@ -12,8 +12,8 @@
     "auth": "認証には専用の Bearer Token を使います。モデル API キーは使用しません。",
     "copyToken": "トークンをコピー",
     "copyHeader": "Authorization 値をコピー",
-    "headerHelp": "Token 欄にはトークンを貼り付けます。カスタムヘッダーの場合、名前は Authorization、値は Bearer 接頭辞付きの内容です。",
-    "restart": "兔子助手を起動したままにしてください。再起動のたびにアドレスとトークンが変わるので、再コピーが必要です。トークンは画面に表示しません。チャットに送信しないでください。",
+    "headerHelp": "トークンは直接入力欄へ貼り付けてください。Bearer トークン環境変数欄は変数名専用です。Authorization ヘッダーにはコピーした値を貼り付けられます。",
+    "restart": "以下の手動 HTTP 設定は再起動後に更新が必要です。上の Codex コネクターは再設定不要です。トークンをチャットに送らないでください。",
     "check": "接続を確認",
     "checking": "確認中…",
     "passed": "ローカル HTTP の初期化、認証、ツール一覧を確認しました（{{count}} ツール）。",
@@ -25,9 +25,26 @@
       "endpoint": "アドレスをコピーしました。",
       "token": "トークンをコピーしました。クライアントの認証欄に貼り付けてください。",
       "authorization": "Bearer 接頭辞付きの Authorization 値をコピーしました。"
-    }
+    },
+    "codexTitle": "Codex ローカルコネクター",
+    "connectorHelp": "ローカル Codex から OpenTu の生成ツールと現在のキャンバスを操作できます。tuzi-opentu のみ追加し、他の設定は保持します。アプリ再起動後も自動で再接続します。",
+    "localTarget": "ローカルクライアントの設定先：",
+    "isolatedTarget": "合成テスト環境：隔離された設定先のみ使用します。",
+    "install": "Codex に接続",
+    "repair": "Codex 接続を修復",
+    "remove": "接続を解除",
+    "configuring": "設定中…",
+    "installed": "設定を保存しました。Codex の MCP を更新してください。ツールが表示されない場合は会話を開き直してください。 手動設定の OpenTu がある場合は、古い項目を無効にし、tuzi-opentu を残してください。",
+    "removed": "兔子助手が作成したコネクター設定を削除しました。",
+    "awaitingClient": "設定済み。クライアントからの実際の呼び出しを待っています。",
+    "clientCalled": "今回の起動中にコネクター経由のツール呼び出しが成功しました。",
+    "connectorError": "設定できませんでした。他の設定は保持されています。Codex の設定形式、書き込み権限、同名の tuzi-opentu 設定を確認してください。",
+    "manual": "他のクライアント / 手動 HTTP 設定"
   },
-  "workbuddyForm": { "invalidJson": "JSON 設定とモデルの項目を確認してください。", "selectAccount": "WorkBuddy アカウントを選択してください。" },
+  "workbuddyForm": {
+    "invalidJson": "JSON 設定とモデルの項目を確認してください。",
+    "selectAccount": "WorkBuddy アカウントを選択してください。"
+  },
   "workbuddyQuota": {
     "expiry": "{{amount}} クレジット · {{until}}",
     "noExpiry": "無期限",
@@ -3358,5 +3375,56 @@
     "configureModels": "モデルを設定",
     "modelsConfigured": "{{count}} 個のモデルを取得・設定済み",
     "manageModels": "モデルを管理"
+  },
+  "officialMcp": {
+    "title": "兔子公式 MCP",
+    "description": "API ドキュメント、接続ガイド、アカウント使用量の照会と、承認済みの操作。",
+    "steps": "接続 → ブラウザーで兔子アカウントと権限を確認 → 戻ると自動検証。トークンやクライアントシークレットの入力は不要です。",
+    "assistantAccount": "アシスタントのアカウント：{{name}}",
+    "authorizedAccount": "MCP の認証アカウント：{{name}}",
+    "mismatch": "MCP とアシスタントのアカウントが異なります。アカウントを確認し、必要なら再認証してください。連携は未確認です。",
+    "connect": "デスクトップ Codex に接続",
+    "desktopTarget": "接続先：この端末の Codex（設定場所を表示）",
+    "isolatedTarget": "接続先：隔離テスト環境（本機の Codex ではありません）",
+    "desktopReady": "設定と認証を検証しました。デスクトップ Codex で新しい会話を開き、兔子 MCP にアカウント使用量を照会してください。ツールが読み込まれない場合は Codex を開き直してください。",
+    "reauthorize": "再認証",
+    "check": "接続を確認",
+    "cancel": "待機を中止",
+    "manage": "認証の管理・取消",
+    "verified": "{{time}} に Codex でドキュメントとアカウントを照会しました。前回の確認結果です。",
+    "note": "初版は Codex に対応。システムトークンはツール設定に保存しません。重要な操作には確認が必要です。設定の反映には Codex セッションの再起動が必要な場合があります。認証を取り消した後は接続を再確認してください。",
+    "phases": {
+      "preparing": "準備中",
+      "checking_service": "公式サービスを確認中",
+      "configuring": "設定中",
+      "authorizing": "ブラウザーで認証してください",
+      "checking": "実際の呼び出しを検証中",
+      "connected": "接続済み",
+      "configured": "設定済み・認証未検証",
+      "not_configured": "未設定",
+      "account_mismatch": "アカウントが不一致"
+    },
+    "errors": {
+      "codex_missing": "Codex が見つかりません。インストールして一度起動してください。",
+      "codex_not_initialized": "Codex を起動するか、設定ディレクトリを確認してください。",
+      "codex_upgrade_required": "必要な接続機能を利用するには Codex を更新してください。",
+      "codex_unavailable": "Codex と通信できません。インストールを確認してください。",
+      "codex_protocol_error": "Codex の応答が非互換です。更新して再試行してください。",
+      "config_conflict": "同名の設定が競合、変更されたか、保存に失敗しました。既存の設定は強制上書きしません。",
+      "config_home_mismatch": "CODEX_HOME とアシスタントの Codex 設定ディレクトリを一致させてください。",
+      "authorization_failed": "認証が未完了または拒否されました。再認証してください。",
+      "authorization_url_rejected": "認証 URL の検証に失敗したため開きませんでした。公式サービスを確認してください。",
+      "browser_failed": "システムブラウザーを開けません。復旧して再試行してください。",
+      "verification_failed": "ドキュメントまたはアカウント照会に失敗しました。認証とサービスを確認してください。",
+      "request_failed": "リクエストに失敗しました。公式サービスの自動認証と Codex の対応状況を確認してください。",
+      "timeout": "タイムアウトしました。自動再送は行いません。再認証または接続確認を行ってください。",
+      "cancelled": "待機を中止しました。保存済みの設定は残ります。承認済みの場合は接続確認かウェブサイトで取消を行ってください。",
+      "not_configured": "先に兔子 MCP に接続してください。",
+      "server_upgrade_required": "公式サービスはまだデスクトップの自動認証に対応していません。今回 Codex 設定は変更していません。更新後に再試行するか、既存の認証済み接続を確認してください。",
+      "target_changed": "Codex の設定場所が変わりました。画面の更新を待ち、接続先を確認して再試行してください。",
+      "service_unavailable": "公式 MCP に接続できません。ネットワークを確認してください。",
+      "busy": "別の操作が進行中です。完了を待つか中止してください。",
+      "local_error": "接続状態を取得または更新できません。再試行してください。"
+    }
   }
 }

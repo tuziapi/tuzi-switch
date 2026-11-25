@@ -115,6 +115,8 @@ interface PollingOptions {
   onSubmitted?: (videoId: string) => void; // Callback when video is submitted (for saving remoteId)
   routeModel?: string | ModelRef | null;
   params?: Record<string, unknown>;
+  providerContext?: ResolvedProviderContext;
+  binding?: NonNullable<ReturnType<typeof resolveInvocationPlanFromRoute>>['binding'] | null;
 }
 
 function inferAuthType(
@@ -164,11 +166,12 @@ class VideoAPIService {
    * Submit video generation task
    */
   async submitVideoGeneration(
-    params: VideoGenerationParams
+    params: VideoGenerationParams,
+    contextOverride?: Pick<PollingOptions, 'providerContext' | 'binding'>
   ): Promise<VideoSubmitResponse> {
-    const { providerContext, binding } = resolveVideoPlanContext(
-      params.modelRef || params.model
-    );
+    const resolved = resolveVideoPlanContext(params.modelRef || params.model);
+    const providerContext = contextOverride?.providerContext || resolved.providerContext;
+    const binding = contextOverride?.binding ?? resolved.binding;
     const startTime = Date.now();
 
     if (!providerContext.apiKey) {
@@ -455,9 +458,12 @@ class VideoAPIService {
   async queryVideoStatus(
     videoId: string,
     routeModel?: string | ModelRef | null,
-    params?: Record<string, unknown>
+    params?: Record<string, unknown>,
+    contextOverride?: Pick<PollingOptions, 'providerContext' | 'binding'>
   ): Promise<VideoQueryResponse> {
-    const { providerContext, binding } = resolveVideoPlanContext(routeModel);
+    const resolved = resolveVideoPlanContext(routeModel);
+    const providerContext = contextOverride?.providerContext || resolved.providerContext;
+    const binding = contextOverride?.binding ?? resolved.binding;
 
     if (!providerContext.apiKey) {
       throw new Error('API Key 未配置');
@@ -514,11 +520,16 @@ class VideoAPIService {
       maxAttempts = 1080,
       onProgress,
       onSubmitted,
+      providerContext,
+      binding,
     } = options;
 
     // Submit video generation task
     // console.log('[VideoAPI] Submitting video generation task...');
-    const submitResponse = await this.submitVideoGeneration(params);
+    const submitResponse = await this.submitVideoGeneration(params, {
+      providerContext,
+      binding,
+    });
     // console.log('[VideoAPI] Task submitted:', submitResponse.id, 'Status:', submitResponse.status);
 
     // Notify that video has been submitted (for saving remoteId)
@@ -553,6 +564,8 @@ class VideoAPIService {
       onProgress,
       routeModel: params.modelRef || params.model,
       params: params.params,
+      providerContext,
+      binding,
     });
   }
 
@@ -574,7 +587,11 @@ class VideoAPIService {
     const immediateStatus = await this.queryVideoStatus(
       videoId,
       options.routeModel,
-      options.params
+      options.params,
+      {
+        providerContext: options.providerContext,
+        binding: options.binding,
+      }
     );
     const immediateProgress =
       immediateStatus.progress ??
@@ -595,7 +612,11 @@ class VideoAPIService {
       return this.resolveCompletedVideoStatus(
         videoId,
         immediateStatus,
-        options.routeModel
+        options.routeModel,
+        {
+          providerContext: options.providerContext,
+          binding: options.binding,
+        }
       );
     }
 
@@ -645,7 +666,11 @@ class VideoAPIService {
         const status = await this.queryVideoStatus(
           videoId,
           options.routeModel,
-          options.params
+          options.params,
+          {
+            providerContext: options.providerContext,
+            binding: options.binding,
+          }
         );
 
         // 请求成功，重置连续错误计数
@@ -668,7 +693,11 @@ class VideoAPIService {
           return this.resolveCompletedVideoStatus(
             videoId,
             status,
-            options.routeModel
+            options.routeModel,
+            {
+              providerContext: options.providerContext,
+              binding: options.binding,
+            }
           );
         }
 
@@ -727,11 +756,12 @@ class VideoAPIService {
   private async resolveCompletedVideoStatus(
     videoId: string,
     status: VideoQueryResponse,
-    routeModel?: string | ModelRef | null
+    routeModel?: string | ModelRef | null,
+    contextOverride?: Pick<PollingOptions, 'providerContext' | 'binding'>
   ): Promise<VideoQueryResponse> {
-    const { providerContext, binding } = resolveVideoPlanContext(
-      routeModel || status.model
-    );
+    const resolved = resolveVideoPlanContext(routeModel || status.model);
+    const providerContext = contextOverride?.providerContext || resolved.providerContext;
+    const binding = contextOverride?.binding ?? resolved.binding;
     const inlineUrl = extractInlineVideoUrl(status as Record<string, any>);
 
     if (

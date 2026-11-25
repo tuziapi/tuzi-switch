@@ -241,6 +241,41 @@ describe('pollVideoStatus', () => {
     providerSend.mockReset();
   });
 
+  it('retrieves a slow H3 job after the former ten-minute recovery limit using GET only', async () => {
+    vi.useFakeTimers();
+    try {
+      let queries = 0;
+      providerSend.mockImplementation(async () => new Response(JSON.stringify({
+        task: ++queries > 720
+          ? { status: 'succeeded', content: { url: 'https://cdn.example.com/slow.mp4' } }
+          : { status: 'processing' },
+      })));
+      const { pollVideoStatus } = await import('./fallback-utils');
+      const polling = pollVideoStatus('task_slow', {
+        apiKey: 'synthetic', baseUrl: 'https://example.com/v1', model: 'MiniMax-H3',
+      }, vi.fn());
+      await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+      await expect(polling).resolves.toEqual({ url: 'https://cdn.example.com/slow.mp4' });
+      expect(queries).toBe(721);
+      expect(providerSend.mock.calls.every(([, request]) => request.method === 'GET' && request.path.endsWith('/task_slow'))).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each(['MiniMax-H3', 'other-video-model'])('bounds recovery for %s and retains the remote ID on timeout', async model => {
+    vi.useFakeTimers();
+    try {
+      providerSend.mockImplementation(async () => new Response(JSON.stringify({ status: 'processing' })));
+      const { pollVideoStatus } = await import('./fallback-utils');
+      const polling = pollVideoStatus('task_pending', {
+        apiKey: 'synthetic', baseUrl: 'https://example.com/v1', model,
+      }, vi.fn());
+      const rejection = expect(polling).rejects.toMatchObject({ remoteId: 'task_pending', code: 'VIDEO_POLL_TIMEOUT' });
+      await vi.advanceTimersByTimeAsync(90 * 60 * 1000);
+      await rejection;
+      expect(providerSend).toHaveBeenCalledTimes(model === 'MiniMax-H3' ? 1080 : 120);
+    } finally { vi.useRealTimers(); }
+  });
+
   it.each([undefined, 'site-original'])(
     'keeps only an explicit original submission ID on polling failure: %s',
     async (originalRequestId) => {

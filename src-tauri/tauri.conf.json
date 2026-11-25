@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "兔子助手",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "identifier": "com.tuziswitch.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "pnpm run dev:renderer",
-    "beforeBuildCommand": "pnpm run build:renderer"
+    "beforeBuildCommand": "node scripts/prepare-media-runtime.mjs && pnpm run build:renderer"
   },
   "app": {
     "windows": [
@@ -38,6 +38,7 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
+    "resources": { "target/media-runtime/": "media-runtime/" },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

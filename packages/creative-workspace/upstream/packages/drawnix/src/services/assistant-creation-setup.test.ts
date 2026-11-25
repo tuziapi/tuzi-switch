@@ -7,7 +7,12 @@ vi.mock('./assistant-account', () => ({
   getAssistantAccount: mocks.account,
   isAccountReference: (key: string) => key?.startsWith('tuzi-account:'),
 }));
-import { ensureAssistantCreationConfigured } from './assistant-creation-setup';
+import {
+  ASSISTANT_QUICK_SETUP,
+  completeAssistantQuickSetup,
+  ensureAssistantCreationConfigured,
+  ensureAssistantCreationConfiguredAsync,
+} from './assistant-creation-setup';
 describe('desktop send configuration handoff', () => {
   let open: ReturnType<typeof vi.fn>;
   beforeEach(() => {
@@ -53,5 +58,23 @@ describe('desktop send configuration handoff', () => {
     vi.stubEnv('VITE_TUZI_ASSISTANT', 'false');
     expect(ensureAssistantCreationConfigured('image')).toBe(true);
     expect(mocks.route).not.toHaveBeenCalled();
+  });
+  it('waits for the account quick setup and resumes with its selected model', async () => {
+    mocks.route.mockReturnValue({ baseUrl: 'https://synthetic.invalid', apiKey: '', modelId: 'model' });
+    const quickSetup = vi.fn((event: Event) => {
+      expect((event as CustomEvent).detail.type).toBe('image');
+      completeAssistantQuickSetup({
+        configured: true,
+        model: { profileId: 'account-profile', modelId: 'image-model' },
+      });
+    });
+    window.addEventListener(ASSISTANT_QUICK_SETUP, quickSetup);
+    const result = await ensureAssistantCreationConfiguredAsync('image', 'image-model');
+    window.removeEventListener(ASSISTANT_QUICK_SETUP, quickSetup);
+    expect(result).toEqual({
+      configured: true,
+      model: { profileId: 'account-profile', modelId: 'image-model' },
+    });
+    expect(quickSetup).toHaveBeenCalledTimes(1);
   });
 });

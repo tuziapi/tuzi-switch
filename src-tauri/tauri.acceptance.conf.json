@@ -16,6 +16,9 @@
   },
   "bundle": {
     "createUpdaterArtifacts": false,
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "windows": {
       "wix": {
         "upgradeCode": "8bf582de-0c01-4f65-b338-17ed8d4b95ba"

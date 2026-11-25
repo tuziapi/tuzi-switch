@@ -893,6 +893,50 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     return { remoteOnly };
   }, [currentBoardId]);
 
+  // The ecommerce workbench queues generated images before switching back to
+  // the canvas. Consume the hand-off after the board is actually mounted, and
+  // also listen for the case where the canvas was already open.
+  useEffect(() => {
+    let active = true;
+    let consuming = false;
+    const consumePendingImage = () => {
+      if (!active || consuming || !boardRef.current || !currentBoardId) return;
+      let url: string | null = null;
+      try {
+        url = window.sessionStorage.getItem('opentu-pending-canvas-image');
+      } catch {
+        return;
+      }
+      if (!url) return;
+      consuming = true;
+      void insertRecoveredImage(url)
+        .then(() => {
+          try {
+            window.sessionStorage.removeItem('opentu-pending-canvas-image');
+          } catch {
+            // Storage can be unavailable in restricted browser contexts.
+          }
+        })
+        .catch((error) => {
+          if (!active) return;
+          MessagePlugin.error(
+            error instanceof Error && error.message
+              ? `插入生成图片失败：${error.message}`
+              : '插入生成图片失败，请重试。'
+          );
+        })
+        .finally(() => {
+          consuming = false;
+        });
+    };
+    window.addEventListener('opentu:canvas-image-pending', consumePendingImage);
+    consumePendingImage();
+    return () => {
+      active = false;
+      window.removeEventListener('opentu:canvas-image-pending', consumePendingImage);
+    };
+  }, [board, currentBoardId, insertRecoveredImage]);
+
   // 创建新项目并刷新页面（用于释放内存）
   const handleCreateProjectForMemory = useCallback(async () => {
     // 先保存当前画布

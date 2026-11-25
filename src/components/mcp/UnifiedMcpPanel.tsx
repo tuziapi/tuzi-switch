@@ -22,6 +22,7 @@ import { AppCountBar } from "@/components/common/AppCountBar";
 import { AppToggleGroup } from "@/components/common/AppToggleGroup";
 import { ListItemRow } from "@/components/common/ListItemRow";
 import { WorkspaceQueryError } from "@/components/common/WorkspaceQueryError";
+import { OfficialTuziMcpCard } from "./OfficialTuziMcpCard";
 
 interface UnifiedMcpPanelProps {
   onOpenChange: (open: boolean) => void;
@@ -160,6 +161,7 @@ const UnifiedMcpPanel = React.forwardRef<
       />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24">
+        <OfficialTuziMcpCard />
         {importError && (
           <div
             role="alert"

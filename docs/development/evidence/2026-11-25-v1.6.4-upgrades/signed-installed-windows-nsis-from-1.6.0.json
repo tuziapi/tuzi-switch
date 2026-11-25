@@ -1,0 +1,1518 @@
+{
+  "kind": "real-installed-app-subset",
+  "platform": "windows-x64",
+  "installerType": "nsis",
+  "officialAcceptance": false,
+  "discovery": "synthetic-local-https",
+  "signingKey": "new-official-channel-key",
+  "fromVersion": "1.6.3",
+  "toVersion": "1.6.4",
+  "base": {
+    "schemaVersion": 2,
+    "repository": "AiW520/tuzi-switch",
+    "releaseRepository": "tuziapi/tuzi-switch",
+    "commit": "af268ba32a4ee621e9388ea8fec35e7dead5d5be",
+    "runId": "44494743337",
+    "tag": "v1.6.3",
+    "files": {
+      "SHA256SUMS": "451a75d0dae54d8fb3533004d0e6f09cd3c72ed06ee4ad32c8e45cb2ad8a52a9",
+      "latest.json": "7956bf55bb49aa7d314e002cd90c929bce2a1dbad9eecb26d0e091b3abbc6a4e",
+      "manifest-linux-x64.json": "048119658237b9a55be72888c8b251dd1ac5a273033421f630c2c38a3bfe2056",
+      "manifest-macos-arm64.json": "2f9dfabb915e0d57c4db45668212cc5a1192fdbdcf8249b65451f947186a3468",
+      "manifest-macos-x64.json": "f08c70de33d844e198cc60e12cb4478931380fee0d7f966c7569795b64a7070f",
+      "manifest-windows-x64.json": "1a7ea9529a81c767a0a9982931f851d49e391c1b22b019500f4fd9b6c4748c37",
+      "tuzi-assistant-linux-x64.AppImage": "2f7e03d89d9f590085aa9c2ff428bc18293b8c6d12b594337a5b16d06a9784e8",
+      "tuzi-assistant-linux-x64.AppImage.sig": "65cb3f31d8b397eb04c6378879bc433dcda21f0c056792f2c0dd325b82de4d0f",
+      "tuzi-assistant-linux-x64.deb": "8559e912d78cd3998a5f9b37dc9c36b65bbd7c4d62d8d9e4379b12d34ca3864f",
+      "tuzi-assistant-linux-x64.deb.sig": "816843d797cc6cd47c8de9304de37026278c1bafc28bdc84891da875fcb43f6b",
+      "tuzi-assistant-linux-x64.rpm": "b054b39ef9f0b194bf5364ea4f9e98333a2208602c8bbb8bed4c7785d4a644bf",
+      "tuzi-assistant-linux-x64.rpm.sig": "2e2f2b76943e1bd042566a0a9d6e5cef24ca382daa54764a810cbca8d8242951",
+      "tuzi-assistant-macos-arm64.app.tar.gz": "417ff4f946de27285cedc11555bd66a6460b6700b0523dd95bcf8afd13b2a383",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig": "a06b771b8e094c28d1928173204949d8331f584315570764b8521f14a3959ca4",
+      "tuzi-assistant-macos-arm64.dmg": "2180fee36357a6f48450b53c7d70701caa7744f92ad4c162a191f9a9d91b5416",
+      "tuzi-assistant-macos-x64.app.tar.gz": "b6e264219918321744b88a46e23f2ce979e1b18dd30e95304e48d1c2c6087198",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig": "2cf49931bdb3d2d5e19101a979f03250eb76cb0a8485c64d813176dff3efa19b",
+      "tuzi-assistant-macos-x64.dmg": "b670fd44fc960b14e6884b890e2843096e21cf3542850f162aa749753a5265c5",
+      "tuzi-assistant-source.tar.gz": "fc8b7e09e7a0f7a24fa47d2a143d355d347f06421b417f9d75992e806f172e75",
+      "tuzi-assistant-windows-x64.exe": "c2a9a2f70635b4fff3d3caefb56bae6f543976b4f999fa25c5f1a1cd0e5c3159",
+      "tuzi-assistant-windows-x64.exe.sig": "c73a859cccc18ed4ab65cbf29e508b9a9646388488d6ab408bd119f892e3f33c",
+      "tuzi-assistant-windows-x64.msi": "bd8f5c7b2f5e89d12a7287e4a9825a3944464372ea74e86c11015d8fdc347429",
+      "tuzi-assistant-windows-x64.msi.sig": "6172b5616a57f7400a5b797125b3221b295d4bad2664b50327a0a95f1c3535b9"
+    },
+    "delivery": "signed-update",
+    "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+    "publicationFiles": [
+      "SHA256SUMS",
+      "latest.json",
+      "manifest-linux-x64.json",
+      "manifest-macos-arm64.json",
+      "manifest-macos-x64.json",
+      "manifest-windows-x64.json",
+      "tuzi-assistant-linux-x64.AppImage",
+      "tuzi-assistant-linux-x64.AppImage.sig",
+      "tuzi-assistant-linux-x64.deb",
+      "tuzi-assistant-linux-x64.deb.sig",
+      "tuzi-assistant-linux-x64.rpm",
+      "tuzi-assistant-linux-x64.rpm.sig",
+      "tuzi-assistant-macos-arm64.app.tar.gz",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig",
+      "tuzi-assistant-macos-arm64.dmg",
+      "tuzi-assistant-macos-x64.app.tar.gz",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig",
+      "tuzi-assistant-macos-x64.dmg",
+      "tuzi-assistant-source.tar.gz",
+      "tuzi-assistant-windows-x64.exe",
+      "tuzi-assistant-windows-x64.exe.sig",
+      "tuzi-assistant-windows-x64.msi",
+      "tuzi-assistant-windows-x64.msi.sig"
+    ]
+  },
+  "target": {
+    "schemaVersion": 2,
+    "repository": "AiW520/tuzi-switch",
+    "releaseRepository": "tuziapi/tuzi-switch",
+    "commit": "7547f00dbba240e591911d71a0a9036143e9868a",
+    "runId": "45531779918",
+    "tag": "v1.6.4",
+    "files": {
+      "SHA256SUMS": "e8ad9421276e0eb7d83f764224445665cdaa2ad69953b0ed383ab265b2cacf74",
+      "latest.json": "e277694489817a7d207807975e63f8d1eee8a591f34403cb1d69caa50703e5b1",
+      "manifest-linux-x64.json": "f99fcda51f9170c5b53c37255401e96a403dfb88f2817ef848681be14c2a5d2d",
+      "manifest-macos-arm64.json": "202b4202809bf0fc7a840566cd011cc06921213991258129afedb52590ce0b64",
+      "manifest-macos-x64.json": "01e9e7eb839436d7e84409275f324c481a87001790bc6c1c37bb1cbfd08d9eba",
+      "manifest-windows-x64.json": "29b1483533dcf530cb2b4246e0b66ab93913ab0612cc904c1133091c6111c88f",
+      "tuzi-assistant-linux-x64.AppImage": "de498842599551fcedbbf6394c506610c58f391db7ab6ce2aff4faf780ac18b9",
+      "tuzi-assistant-linux-x64.AppImage.sig": "0ab13aa7056221d9bc1eb88fe30a12f73199b028274e8157fde488c86180101b",
+      "tuzi-assistant-linux-x64.deb": "2286612485f74eba5368ac56fe09d9d6b83f9bad45a0290d06b2e6deec75a3de",
+      "tuzi-assistant-linux-x64.deb.sig": "3741ff1734de43fba1608acdd0069ab31ae4e08dd5daaa4ddd4d949415a7d936",
+      "tuzi-assistant-linux-x64.rpm": "925d4f5121534584a502dd9aaf39054ffc5416306bbae7028b62bfe2c46885e4",
+      "tuzi-assistant-linux-x64.rpm.sig": "771a55d5707224723bb21504f8c6701f5054550c94da5f498ce0256e4e850c7b",
+      "tuzi-assistant-macos-arm64.app.tar.gz": "ab669d44c0b904384e5510d49e82040543f976d492ab83dff290a50b80426971",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig": "f65b3a1093f390320098f04c3fb3758dd4d8fea4959d49b5b533b03162ef9947",
+      "tuzi-assistant-macos-arm64.dmg": "09cb64e65abf1bc6c980e1e1145dcbed8d012f808d8c087118dc341c689ea423",
+      "tuzi-assistant-macos-x64.app.tar.gz": "19e5e87de327b695ffc3ca2c3d350591e066c04301349ae05ac10c50b6cfd39c",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig": "6a2487bf27c8395a9f90fee167e1645abf4e68966ccbcb45400d5195e83c9581",
+      "tuzi-assistant-macos-x64.dmg": "ae3b1c133bf7e3e7ae58086553f29e16707dafee09682e2e80829011cff75a32",
+      "tuzi-assistant-source.tar.gz": "72b0e596fcad2494bd75bcfa0d382228662be268daa3d5d53b490b4db58a4060",
+      "tuzi-assistant-windows-x64.exe": "cb845e47a260e0cf3663691ee4b979ec69c290e22fc435718e2a7d75c3926483",
+      "tuzi-assistant-windows-x64.exe.sig": "d566fa70ae3d1cbe8d8d559e46808402accb44094d7ac3f7f1658e274d1dc27b",
+      "tuzi-assistant-windows-x64.msi": "07e8ad8e4dd81bcfa87c2064aa49af5553c7a98fb17703f13e24a00222caba4e",
+      "tuzi-assistant-windows-x64.msi.sig": "931853a2415dde850463c2384f1c1388cfbf905b953c404cd95b404fb2580e4c"
+    },
+    "delivery": "signed-update",
+    "publicKeySha256": "8118379cd76c3f4be522498e732856efd5b1a56aed12f0e50a1155993e7d0fb5",
+    "publicationFiles": [
+      "SHA256SUMS",
+      "latest.json",
+      "manifest-linux-x64.json",
+      "manifest-macos-arm64.json",
+      "manifest-macos-x64.json",
+      "manifest-windows-x64.json",
+      "tuzi-assistant-linux-x64.AppImage",
+      "tuzi-assistant-linux-x64.AppImage.sig",
+      "tuzi-assistant-linux-x64.deb",
+      "tuzi-assistant-linux-x64.deb.sig",
+      "tuzi-assistant-linux-x64.rpm",
+      "tuzi-assistant-linux-x64.rpm.sig",
+      "tuzi-assistant-macos-arm64.app.tar.gz",
+      "tuzi-assistant-macos-arm64.app.tar.gz.sig",
+      "tuzi-assistant-macos-arm64.dmg",
+      "tuzi-assistant-macos-x64.app.tar.gz",
+      "tuzi-assistant-macos-x64.app.tar.gz.sig",
+      "tuzi-assistant-macos-x64.dmg",
+      "tuzi-assistant-source.tar.gz",
+      "tuzi-assistant-windows-x64.exe",
+      "tuzi-assistant-windows-x64.exe.sig",
+      "tuzi-assistant-windows-x64.msi",
+      "tuzi-assistant-windows-x64.msi.sig"
+    ]
+  },
+  "checks": {
+    "manualTransition": "passed",
+    "nativeSeedream55Synthetic": "passed",
+    "completedGenerationPlaceholderRemoved": "passed",
+    "legacyCreativeImageAndTaskPreservation": "passed",
+    "corrupt": "passed",
+    "interrupted": "passed",
+    "missing": "passed",
+    "validSignedPackageStagingPermissionDenied": "passed",
+    "download": "passed",
+    "nativeSignature": "passed",
+    "install": "passed",
+    "automaticRestart": "passed",
+    "version": "passed",
+    "sqliteProviderAndWebviewPreference": "passed",
+    "sameInstallationRetry": "passed",
+    "creativeImageLayerOcrTaskPreservation": "passed",
+    "targetNativeBusinessAttribution": "passed",
+    "installedDesktopAttributionSynthetic": "passed"
+  },
+  "requests": [
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/latest/download/latest.json",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/api/status",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/v1/models",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/v1/images/generations",
+      "mode": "normal"
+    },
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/latest/download/latest.json",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/v1/models",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/api/status",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/v1/images/generations",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/api/v3/images/generations",
+      "mode": "normal"
+    },
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/latest/download/latest.json",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.exe",
+      "mode": "corrupt"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.exe",
+      "mode": "interrupted"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.exe",
+      "mode": "missing"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.exe",
+      "mode": "normal"
+    },
+    {
+      "host": "github.com",
+      "path": "/tuziapi/tuzi-switch/releases/download/v1.6.4/tuzi-assistant-windows-x64.exe",
+      "mode": "normal"
+    },
+    {
+      "host": "api.github.com",
+      "path": "/repos/tuziapi/tuzi-switch/releases/latest",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/api/status",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/v1/models",
+      "mode": "normal"
+    },
+    {
+      "host": "api.tu-zi.com",
+      "path": "/v1/images/generations",
+      "mode": "normal"
+    }
+  ],
+  "remaining": [
+    "installer-failure",
+    "full-creative-project-migration",
+    "business-attribution",
+    "reviewed-cross-platform-acceptance"
+  ],
+  "creativeRequests": [
+    {
+      "version": "1.6.0",
+      "path": "/v1/models",
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.0",
+      "path": "/v1/images/generations",
+      "channels": [
+        "0"
+      ],
+      "body": {
+        "model": "doubao-seedream-4-5-251128",
+        "prompt": "SYNTHETIC installed upgrade 4.5",
+        "response_format": "b64_json",
+        "size": "2048x2048"
+      },
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.3",
+      "path": "/v1/models",
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.3",
+      "path": "/v1/images/generations",
+      "channels": [
+        "3"
+      ],
+      "body": {
+        "model": "doubao-seedream-5-5-261028",
+        "prompt": "SYNTHETIC installed upgrade 5.5\n透明图",
+        "size": "2048x2048",
+        "response_format": "b64_json",
+        "background": "transparent",
+        "output_format": "png"
+      },
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.3",
+      "path": "/api/v3/images/generations",
+      "channels": [],
+      "body": {
+        "model": "doubao-seedream-5-5-261028",
+        "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAc0lEQVR4nO3QQQ0AIAwAsb0RgbrpRAkicAAilj1IeskZaJyZt/OxdutRDQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPgf4AFC+3nDnYDTzQAAAABJRU5ErkJggg==",
+        "layer_decomposition": true,
+        "size": "1.5K",
+        "response_format": "url",
+        "output_format": "png",
+        "watermark": false,
+        "layer_decomposition_options": {
+          "max_images": 30,
+          "text_recognition": true
+        }
+      },
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.4",
+      "path": "/v1/models",
+      "syntheticAuthorizationMatched": true
+    },
+    {
+      "version": "1.6.4",
+      "path": "/v1/images/generations",
+      "channels": [
+        "3"
+      ],
+      "body": {
+        "model": "doubao-seedream-4-5-251128",
+        "prompt": "SYNTHETIC installed upgrade 4.5",
+        "response_format": "b64_json",
+        "size": "2048x2048"
+      },
+      "syntheticAuthorizationMatched": true
+    }
+  ],
+  "connectionErrors": {
+    "http://127.0.0.1:9222": "Error: browserType.connectOverCDP: connect ECONNREFUSED 127.0.0.1:9222\nCall log:\n\u001b[2m  - <ws preparing> retrieving websocket url from http://127.0.0.1:9222\u001b[22m\n",
+    "http://localhost:9222": "Error: browserType.connectOverCDP: connect ECONNREFUSED ::1:9222\nCall log:\n\u001b[2m  - <ws preparing> retrieving websocket url from http://localhost:9222\u001b[22m\n",
+    "http://[::1]:9222": "Error: browserType.connectOverCDP: connect ECONNREFUSED ::1:9222\nCall log:\n\u001b[2m  - <ws preparing> retrieving websocket url from http://[::1]:9222\u001b[22m\n"
+  },
+  "cdpPages": [
+    "http://tauri.localhost/"
+  ],
+  "legacyIdentity": {
+    "version": "1.6.0",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 19,
+      "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+      "platform": "windows"
+    }
+  },
+  "legacyExecutableSha256": "fad8dc0e656b35ef49e77c4204c973f9be671eafa8bc00e4084ea802dce6b5f7",
+  "legacyExitCode": 0,
+  "initialExecutableSha256": "16825087e63e3f286c5a1df96e38a2c9dd26e6c17d349633620fe5ad5f72ceba",
+  "initialPid": 6800,
+  "baseIdentity": {
+    "version": "1.6.3",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 110,
+      "commit": "af268ba32a4ee621e9388ea8fec35e7dead5d5be",
+      "platform": "windows"
+    }
+  },
+  "manualTransition": {
+    "status": "passed",
+    "fromVersion": "1.6.0",
+    "toVersion": "1.6.3",
+    "publishedSource": {
+      "repository": "tuziapi/tuzi-switch",
+      "commit": "21cad50c7f5b916b94bccf39c6d594724241bfb1",
+      "builderRepository": "AiW520/tuzi-switch",
+      "builderCommit": "3685725f3f76f9df607035024718421ffc78fd66",
+      "updaterSigned": false,
+      "publicationReady": false,
+      "run": "42974374413",
+      "target": "x86_64-pc-windows-msvc",
+      "version": "1.6.0",
+      "developerSigned": false,
+      "notarized": false,
+      "channel": "stable",
+      "applicationId": "com.tuziswitch.desktop",
+      "isolatedLocalProfile": false,
+      "files": [
+        {
+          "file": "tuzi-assistant-windows-x64.msi",
+          "sha256": "2cf974ecbb3620b7b3a2d151ded64eeb81c19156bb910874a0b96bf5be5f30f6",
+          "bytes": 25993216
+        },
+        {
+          "file": "tuzi-assistant-windows-x64.exe",
+          "sha256": "0495fe632dd23d9afb134e59d12db52fe071e23d2cfde3f716e82caa05a1dd1a",
+          "bytes": 22673572
+        }
+      ]
+    },
+    "sqliteProviderAndWebviewPreference": "passed"
+  },
+  "creativeBeforeUpgrade": {
+    "boards": [
+      {
+        "id": "d6b5465a-fbab-4d73-8259-c5961a0e3ae4",
+        "name": "我的画板1",
+        "elements": [
+          {
+            "id": "jFmbx",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                0
+              ],
+              [
+                200,
+                400
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "prompt": "SYNTHETIC installed upgrade 4.5",
+            "aiPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationTaskId": "128835f5-1ffe-4a0c-83fd-0e148b794274",
+            "generationAnchorId": "gen-anchor-mwvkgwf0-pezpdt5"
+          },
+          {
+            "id": "c557a473-126a-4cde-a313-ce81d20eb764",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                520
+              ],
+              [
+                200,
+                920
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "groupId": "GfAEK",
+            "angle": 0,
+            "generationTaskId": "dfb93ed1-818e-491c-b22c-7d6932a4224a",
+            "generationAnchorId": "gen-anchor-mwvkhij2-if4lmzo",
+            "metadata": {
+              "semanticLayer": {
+                "schemaVersion": 1,
+                "providerGroupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                "kind": "background",
+                "zIndex": 0,
+                "name": "底图",
+                "description": "SYNTHETIC",
+                "background": "opaque",
+                "providerMetadata": {
+                  "z_index": 0,
+                  "name": "底图",
+                  "description": "SYNTHETIC",
+                  "size": "64x64",
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "opaque",
+                  "future_extension": {
+                    "preserve": true
+                  }
+                },
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": "0fee22fb-96f0-4cea-9760-e804744d669b",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                520
+              ],
+              [
+                200,
+                920
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "groupId": "GfAEK",
+            "angle": 0,
+            "generationTaskId": "dfb93ed1-818e-491c-b22c-7d6932a4224a",
+            "generationAnchorId": "gen-anchor-mwvkhij2-if4lmzo",
+            "metadata": {
+              "semanticLayer": {
+                "schemaVersion": 1,
+                "providerGroupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                "kind": "foreground",
+                "zIndex": 1,
+                "name": "标题1",
+                "description": "SYNTHETIC",
+                "background": "transparent",
+                "textRecognition": {
+                  "text": "你好 1",
+                  "lines": [
+                    {
+                      "font": {
+                        "family": "Synthetic"
+                      },
+                      "styles": [
+                        {
+                          "bold": true
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "providerMetadata": {
+                  "z_index": 1,
+                  "name": "标题1",
+                  "description": "SYNTHETIC",
+                  "size": "64x64",
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "transparent",
+                  "text_recognition": {
+                    "text": "你好 1",
+                    "lines": [
+                      {
+                        "font": {
+                          "family": "Synthetic"
+                        },
+                        "styles": [
+                          {
+                            "bold": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "future_extension": {
+                    "preserve": true
+                  }
+                },
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": "4ac0711b-5913-47ea-8f79-6acb348c3f73",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                520
+              ],
+              [
+                200,
+                920
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "groupId": "GfAEK",
+            "angle": 0,
+            "generationTaskId": "dfb93ed1-818e-491c-b22c-7d6932a4224a",
+            "generationAnchorId": "gen-anchor-mwvkhij2-if4lmzo",
+            "metadata": {
+              "semanticLayer": {
+                "schemaVersion": 1,
+                "providerGroupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                "kind": "foreground",
+                "zIndex": 2,
+                "name": "标题2",
+                "description": "SYNTHETIC",
+                "background": "transparent",
+                "textRecognition": {
+                  "text": "你好 2",
+                  "lines": [
+                    {
+                      "font": {
+                        "family": "Synthetic"
+                      },
+                      "styles": [
+                        {
+                          "bold": true
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "providerMetadata": {
+                  "z_index": 2,
+                  "name": "标题2",
+                  "description": "SYNTHETIC",
+                  "size": "64x64",
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "transparent",
+                  "text_recognition": {
+                    "text": "你好 2",
+                    "lines": [
+                      {
+                        "font": {
+                          "family": "Synthetic"
+                        },
+                        "styles": [
+                          {
+                            "bold": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "future_extension": {
+                    "preserve": true
+                  }
+                },
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": "GfAEK",
+            "type": "group",
+            "metadata": {
+              "semanticLayerGroup": {
+                "schemaVersion": 1,
+                "providerGroupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                "manifest": {
+                  "schemaVersion": 1,
+                  "groupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                  "layers": [
+                    {
+                      "groupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "zIndex": 0,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "name": "底图",
+                      "description": "SYNTHETIC",
+                      "background": "opaque",
+                      "providerMetadata": {
+                        "z_index": 0,
+                        "name": "底图",
+                        "description": "SYNTHETIC",
+                        "size": "64x64",
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "opaque",
+                        "future_extension": {
+                          "preserve": true
+                        }
+                      },
+                      "kind": "background"
+                    },
+                    {
+                      "groupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "zIndex": 1,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "name": "标题1",
+                      "description": "SYNTHETIC",
+                      "background": "transparent",
+                      "textRecognition": {
+                        "text": "你好 1",
+                        "lines": [
+                          {
+                            "font": {
+                              "family": "Synthetic"
+                            },
+                            "styles": [
+                              {
+                                "bold": true
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "providerMetadata": {
+                        "z_index": 1,
+                        "name": "标题1",
+                        "description": "SYNTHETIC",
+                        "size": "64x64",
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "transparent",
+                        "text_recognition": {
+                          "text": "你好 1",
+                          "lines": [
+                            {
+                              "font": {
+                                "family": "Synthetic"
+                              },
+                              "styles": [
+                                {
+                                  "bold": true
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "future_extension": {
+                          "preserve": true
+                        }
+                      },
+                      "kind": "foreground"
+                    },
+                    {
+                      "groupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "zIndex": 2,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "name": "标题2",
+                      "description": "SYNTHETIC",
+                      "background": "transparent",
+                      "textRecognition": {
+                        "text": "你好 2",
+                        "lines": [
+                          {
+                            "font": {
+                              "family": "Synthetic"
+                            },
+                            "styles": [
+                              {
+                                "bold": true
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "providerMetadata": {
+                        "z_index": 2,
+                        "name": "标题2",
+                        "description": "SYNTHETIC",
+                        "size": "64x64",
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "transparent",
+                        "text_recognition": {
+                          "text": "你好 2",
+                          "lines": [
+                            {
+                              "font": {
+                                "family": "Synthetic"
+                              },
+                              "styles": [
+                                {
+                                  "bold": true
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "future_extension": {
+                          "preserve": true
+                        }
+                      },
+                      "kind": "foreground"
+                    }
+                  ]
+                },
+                "originalCompositeUrl": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "taskIds": [
+      "128835f5-1ffe-4a0c-83fd-0e148b794274",
+      "dfb93ed1-818e-491c-b22c-7d6932a4224a"
+    ],
+    "pixelElementId": "c557a473-126a-4cde-a313-ce81d20eb764"
+  },
+  "tempAclRestoration": {
+    "writeProbePassed": true,
+    "ownerGroupAndRulesMatch": true,
+    "restoredSddl": "O:BAG:S-1-5-21-3414932011-3134797172-3625386099-513D:AI(A;;FA;;;BA)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;CO)(A;OICIID;0x1200a9;;;BU)(A;CIID;LC;;;BU)(A;CIID;DC;;;BU)",
+    "originalSddl": "O:BAG:S-1-5-21-3414932011-3134797172-3625386099-513D:(A;;FA;;;BA)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;CO)(A;OICIID;0x1200a9;;;BU)(A;CIID;LC;;;BU)(A;CIID;DC;;;BU)"
+  },
+  "installerFailureScope": "OS denies temporary installer directory creation after signature verification; application remains alive. External installer failure remains unverified.",
+  "initialExit": {
+    "code": 0,
+    "signal": null
+  },
+  "targetIdentity": {
+    "version": "1.6.4",
+    "identifier": "com.tuziswitch.desktop",
+    "build": {
+      "channel": "stable",
+      "repository": "tuziapi/tuzi-switch",
+      "runNumber": 117,
+      "commit": "7547f00dbba240e591911d71a0a9036143e9868a",
+      "platform": "windows"
+    }
+  },
+  "finalExecutableSha256": "100520a4ac625351f4319afe6c33af222d12dda3678f33abec73b6bc8121472a",
+  "creativeAfterUpgrade": {
+    "boards": [
+      {
+        "id": "d6b5465a-fbab-4d73-8259-c5961a0e3ae4",
+        "name": "我的画板1",
+        "elements": [
+          {
+            "id": "jFmbx",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                0
+              ],
+              [
+                200,
+                400
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "prompt": "SYNTHETIC installed upgrade 4.5",
+            "aiPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationTaskId": "128835f5-1ffe-4a0c-83fd-0e148b794274",
+            "generationAnchorId": "gen-anchor-mwvkgwf0-pezpdt5"
+          },
+          {
+            "id": "c557a473-126a-4cde-a313-ce81d20eb764",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                520
+              ],
+              [
+                200,
+                920
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "groupId": "GfAEK",
+            "angle": 0,
+            "generationTaskId": "dfb93ed1-818e-491c-b22c-7d6932a4224a",
+            "generationAnchorId": "gen-anchor-mwvkhij2-if4lmzo",
+            "metadata": {
+              "semanticLayer": {
+                "schemaVersion": 1,
+                "providerGroupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                "kind": "background",
+                "zIndex": 0,
+                "name": "底图",
+                "description": "SYNTHETIC",
+                "background": "opaque",
+                "providerMetadata": {
+                  "z_index": 0,
+                  "name": "底图",
+                  "description": "SYNTHETIC",
+                  "size": "64x64",
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "opaque",
+                  "future_extension": {
+                    "preserve": true
+                  }
+                },
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": "0fee22fb-96f0-4cea-9760-e804744d669b",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                520
+              ],
+              [
+                200,
+                920
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "groupId": "GfAEK",
+            "angle": 0,
+            "generationTaskId": "dfb93ed1-818e-491c-b22c-7d6932a4224a",
+            "generationAnchorId": "gen-anchor-mwvkhij2-if4lmzo",
+            "metadata": {
+              "semanticLayer": {
+                "schemaVersion": 1,
+                "providerGroupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                "kind": "foreground",
+                "zIndex": 1,
+                "name": "标题1",
+                "description": "SYNTHETIC",
+                "background": "transparent",
+                "textRecognition": {
+                  "text": "你好 1",
+                  "lines": [
+                    {
+                      "font": {
+                        "family": "Synthetic"
+                      },
+                      "styles": [
+                        {
+                          "bold": true
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "providerMetadata": {
+                  "z_index": 1,
+                  "name": "标题1",
+                  "description": "SYNTHETIC",
+                  "size": "64x64",
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "transparent",
+                  "text_recognition": {
+                    "text": "你好 1",
+                    "lines": [
+                      {
+                        "font": {
+                          "family": "Synthetic"
+                        },
+                        "styles": [
+                          {
+                            "bold": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "future_extension": {
+                    "preserve": true
+                  }
+                },
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": "4ac0711b-5913-47ea-8f79-6acb348c3f73",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                520
+              ],
+              [
+                200,
+                920
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "groupId": "GfAEK",
+            "angle": 0,
+            "generationTaskId": "dfb93ed1-818e-491c-b22c-7d6932a4224a",
+            "generationAnchorId": "gen-anchor-mwvkhij2-if4lmzo",
+            "metadata": {
+              "semanticLayer": {
+                "schemaVersion": 1,
+                "providerGroupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                "kind": "foreground",
+                "zIndex": 2,
+                "name": "标题2",
+                "description": "SYNTHETIC",
+                "background": "transparent",
+                "textRecognition": {
+                  "text": "你好 2",
+                  "lines": [
+                    {
+                      "font": {
+                        "family": "Synthetic"
+                      },
+                      "styles": [
+                        {
+                          "bold": true
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "providerMetadata": {
+                  "z_index": 2,
+                  "name": "标题2",
+                  "description": "SYNTHETIC",
+                  "size": "64x64",
+                  "bounding_box": {
+                    "absolute": [
+                      0,
+                      0,
+                      64,
+                      64
+                    ],
+                    "normalized": [
+                      0,
+                      0,
+                      1000,
+                      1000
+                    ]
+                  },
+                  "background": "transparent",
+                  "text_recognition": {
+                    "text": "你好 2",
+                    "lines": [
+                      {
+                        "font": {
+                          "family": "Synthetic"
+                        },
+                        "styles": [
+                          {
+                            "bold": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "future_extension": {
+                    "preserve": true
+                  }
+                },
+                "boundingBox": {
+                  "absolute": [
+                    0,
+                    0,
+                    64,
+                    64
+                  ],
+                  "normalized": [
+                    0,
+                    0,
+                    1000,
+                    1000
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": "GfAEK",
+            "type": "group",
+            "metadata": {
+              "semanticLayerGroup": {
+                "schemaVersion": 1,
+                "providerGroupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                "manifest": {
+                  "schemaVersion": 1,
+                  "groupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                  "layers": [
+                    {
+                      "groupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "zIndex": 0,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "name": "底图",
+                      "description": "SYNTHETIC",
+                      "background": "opaque",
+                      "providerMetadata": {
+                        "z_index": 0,
+                        "name": "底图",
+                        "description": "SYNTHETIC",
+                        "size": "64x64",
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "opaque",
+                        "future_extension": {
+                          "preserve": true
+                        }
+                      },
+                      "kind": "background"
+                    },
+                    {
+                      "groupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "zIndex": 1,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "name": "标题1",
+                      "description": "SYNTHETIC",
+                      "background": "transparent",
+                      "textRecognition": {
+                        "text": "你好 1",
+                        "lines": [
+                          {
+                            "font": {
+                              "family": "Synthetic"
+                            },
+                            "styles": [
+                              {
+                                "bold": true
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "providerMetadata": {
+                        "z_index": 1,
+                        "name": "标题1",
+                        "description": "SYNTHETIC",
+                        "size": "64x64",
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "transparent",
+                        "text_recognition": {
+                          "text": "你好 1",
+                          "lines": [
+                            {
+                              "font": {
+                                "family": "Synthetic"
+                              },
+                              "styles": [
+                                {
+                                  "bold": true
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "future_extension": {
+                          "preserve": true
+                        }
+                      },
+                      "kind": "foreground"
+                    },
+                    {
+                      "groupId": "seedream55-45bf9c4d-4d11-43ae-95e4-b9aed7c90811",
+                      "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+                      "zIndex": 2,
+                      "boundingBox": {
+                        "absolute": [
+                          0,
+                          0,
+                          64,
+                          64
+                        ],
+                        "normalized": [
+                          0,
+                          0,
+                          1000,
+                          1000
+                        ]
+                      },
+                      "name": "标题2",
+                      "description": "SYNTHETIC",
+                      "background": "transparent",
+                      "textRecognition": {
+                        "text": "你好 2",
+                        "lines": [
+                          {
+                            "font": {
+                              "family": "Synthetic"
+                            },
+                            "styles": [
+                              {
+                                "bold": true
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      "providerMetadata": {
+                        "z_index": 2,
+                        "name": "标题2",
+                        "description": "SYNTHETIC",
+                        "size": "64x64",
+                        "bounding_box": {
+                          "absolute": [
+                            0,
+                            0,
+                            64,
+                            64
+                          ],
+                          "normalized": [
+                            0,
+                            0,
+                            1000,
+                            1000
+                          ]
+                        },
+                        "background": "transparent",
+                        "text_recognition": {
+                          "text": "你好 2",
+                          "lines": [
+                            {
+                              "font": {
+                                "family": "Synthetic"
+                              },
+                              "styles": [
+                                {
+                                  "bold": true
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "future_extension": {
+                          "preserve": true
+                        }
+                      },
+                      "kind": "foreground"
+                    }
+                  ]
+                },
+                "originalCompositeUrl": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png"
+              }
+            }
+          },
+          {
+            "id": "ZTRBB",
+            "type": "image",
+            "points": [
+              [
+                -200,
+                1040
+              ],
+              [
+                200,
+                1440
+              ]
+            ],
+            "url": "/__aitu_cache__/image/content-b73ef1016b4f4446998ec2f1030f12f0851432c170b782b503c3edd9dec78516.png",
+            "imageGenerationRecipe": {
+              "version": 1,
+              "id": "19f3f2b5-b615-4fe1-99a0-edfc8f8da345",
+              "input": {
+                "intent": "restore",
+                "sourceTaskId": "19f3f2b5-b615-4fe1-99a0-edfc8f8da345",
+                "generationType": "image",
+                "prompt": "SYNTHETIC installed upgrade 4.5",
+                "images": [],
+                "model": "doubao-seedream-4-5-251128",
+                "modelRef": {
+                  "profileId": "legacy-default",
+                  "modelId": "doubao-seedream-4-5-251128"
+                },
+                "params": {
+                  "seedream_quality": "2k",
+                  "sourceTaskId": "19f3f2b5-b615-4fe1-99a0-edfc8f8da345",
+                  "size": "1x1"
+                },
+                "count": 1
+              }
+            },
+            "prompt": "SYNTHETIC installed upgrade 4.5",
+            "aiPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationPrompt": "SYNTHETIC installed upgrade 4.5",
+            "generationTaskId": "19f3f2b5-b615-4fe1-99a0-edfc8f8da345",
+            "generationAnchorId": "gen-anchor-mwvkidi1-gr9mt80"
+          }
+        ]
+      }
+    ],
+    "taskIds": [
+      "128835f5-1ffe-4a0c-83fd-0e148b794274",
+      "19f3f2b5-b615-4fe1-99a0-edfc8f8da345",
+      "dfb93ed1-818e-491c-b22c-7d6932a4224a"
+    ],
+    "pixelElementId": "ZTRBB"
+  },
+  "creativeScope": "Actual installed UI/native HTTP and persistence; synthetic provider only. No production consumption records, real model quality or complete project-format migration acceptance.",
+  "subsetStatus": "passed"
+}

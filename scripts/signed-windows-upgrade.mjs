@@ -38,8 +38,8 @@ function candidate(dir, role) {
   }
   return c;
 }
-assert.equal(pair.base.version, '1.6.2');
-assert.equal(pair.target.version, '1.6.3');
+const BASE_VERSION = pair.base.version;
+const TARGET_VERSION = pair.target.version;
 const base = candidate(baseDir, 'base');
 const next = candidate(nextDir, 'target');
 const legacyDir = process.env.LEGACY_INSTALLER_DIR || null;
@@ -80,7 +80,7 @@ function powershell(script) {
 const report = {
   kind: 'real-installed-app-subset', platform: 'windows-x64', installerType: installer,
   officialAcceptance: false, discovery: 'synthetic-local-https', signingKey: 'new-official-channel-key',
-  fromVersion: '1.6.2', toVersion: '1.6.3', base, target: next, checks: {}, requests: [],
+  fromVersion: BASE_VERSION, toVersion: TARGET_VERSION, base, target: next, checks: {}, requests: [],
   remaining: ['older-official-manual-transition', 'installer-failure', 'full-creative-project-migration', 'business-attribution', 'reviewed-cross-platform-acceptance'],
 };
 let server, browser;
@@ -185,13 +185,18 @@ foreach ($program in $programs) {
           report.creativeRequests.push({ version: activeVersion, path: url.pathname, syntheticAuthorizationMatched: true });
           res.end(JSON.stringify({ data: [model45, model55].map(id => ({ id, supported_endpoint_types: ['image-generation'], endpoints: { 'image-generation': { path: '/v1/images/generations', method: 'POST' } } })) })); return;
         }
-        assert.equal(req.method, 'POST'); assert.equal(url.pathname, '/v1/images/generations');
+        assert.equal(req.method, 'POST');
+        assert.ok(['/v1/images/generations', '/api/v3/images/generations'].includes(url.pathname));
         let chunks = [], length = 0;
         for await (const chunk of req) { length += chunk.length; assert.ok(length < 1024 * 1024); chunks.push(chunk); }
         const body = JSON.parse(Buffer.concat(chunks).toString());
+        const isLayerRequest = Boolean(body.layer_decomposition_options);
+        assert.equal(url.pathname, isLayerRequest ? '/api/v3/images/generations' : '/v1/images/generations');
         const response = syntheticModelResponse(body);
         const channels = url.searchParams.getAll('ch');
-        if (activeVersion === '1.6.2' || activeVersion === '1.6.3') assert.deepEqual(channels, ['3'], 'Official native model request must identify desktop channel once');
+        // Published 1.6.3 moved layers to v3, outside its attribution allowlist.
+        // Preserve that legacy behavior; ordinary generation still requires ch=3.
+        if (activeVersion === BASE_VERSION || activeVersion === TARGET_VERSION) assert.deepEqual(channels, isLayerRequest ? [] : ['3']);
         report.creativeRequests.push({ version: activeVersion, path: url.pathname, channels, body, syntheticAuthorizationMatched: true });
         res.end(JSON.stringify(response)); return;
       } catch (error) {
@@ -290,20 +295,20 @@ foreach ($program in $programs) {
     await browser.close(); browser = undefined;
   }
   manualInstall(baseDir);
-  activeVersion = '1.6.2';
+  activeVersion = BASE_VERSION;
   const beforeHash = sha(fs.readFileSync(executable));
   report.initialExecutableSha256 = beforeHash;
   const initial = manualLaunch();
   report.initialPid = initial.pid;
   initial.on('exit', (code, signal) => { report.initialExit = { code, signal }; });
-  let page = await connect('1.6.2', 60000);
-  report.baseIdentity = await identity(page, '1.6.2', base.commit);
+  let page = await connect(BASE_VERSION, 60000);
+  report.baseIdentity = await identity(page, BASE_VERSION, base.commit);
   await acknowledgeWelcome(page);
   if (legacyDir) {
     await assertPreserved(page);
     await verifyCreativePreserved(page, legacyCreative, root, 'manual-transition');
     assert.notEqual(beforeHash, report.legacyExecutableSha256);
-    report.manualTransition = { status: 'passed', fromVersion: legacyVersion, toVersion: '1.6.2', publishedSource: legacy, sqliteProviderAndWebviewPreference: 'passed' };
+    report.manualTransition = { status: 'passed', fromVersion: legacyVersion, toVersion: BASE_VERSION, publishedSource: legacy, sqliteProviderAndWebviewPreference: 'passed' };
     report.checks.manualTransition = 'passed';
     report.remaining = report.remaining.filter(check => check !== 'older-official-manual-transition');
   } else await seed(page);
@@ -315,7 +320,7 @@ foreach ($program in $programs) {
   await leaveCreative(page);
   await page.reload();
   await openUpdateDialogFromCanvas(page);
-  const dialog = page.getByRole('dialog').filter({ hasText: '1.6.3' });
+  const dialog = page.getByRole('dialog').filter({ hasText: TARGET_VERSION });
   await dialog.waitFor();
   await page.screenshot({ path: path.join(root, '01-real-update-dialog.png') });
   for (const failure of ['corrupt', 'interrupted', 'missing']) {
@@ -324,7 +329,7 @@ foreach ($program in $programs) {
     await dialog.getByRole('button', { name: '重新下载', exact: true }).waitFor({ timeout: 90000 });
     assert.ok(report.requests.some(r => r.path.endsWith(assetName) && r.mode === failure), 'Failure must reach the actual native payload request');
     assert.equal(sha(fs.readFileSync(executable)), beforeHash);
-    await identity(page, '1.6.2', base.commit);
+    await identity(page, BASE_VERSION, base.commit);
     assert.equal(await dialog.getByRole('button', { name: '重启并更新', exact: true }).count(), 0);
     report.checks[failure] = 'passed';
     await page.screenshot({ path: path.join(root, `02-${failure}-rejected.png`) });
@@ -352,7 +357,7 @@ if (-not $denied) { throw 'Test temp directory did not reject OS directory creat
 `);
   await dialog.getByRole('button', { name: '重启并更新', exact: true }).click();
   await dialog.getByRole('button', { name: '重新下载', exact: true }).waitFor({ timeout: 30000 });
-  await identity(page, '1.6.2', base.commit);
+  await identity(page, BASE_VERSION, base.commit);
   assert.equal(sha(fs.readFileSync(executable)), beforeHash);
   assert.match(await dialog.innerText(), /安装未完成/);
   await page.screenshot({ path: path.join(root, '03-valid-package-staging-denied.png') });
@@ -388,10 +393,10 @@ $probe=Join-Path $directory 'restored-write-probe'
   await dialog.getByRole('button', { name: '重新下载', exact: true }).click();
   await dialog.getByRole('button', { name: '重启并更新', exact: true }).waitFor({ timeout: 120000 });
   await dialog.getByRole('button', { name: '重启并更新', exact: true }).click();
-  activeVersion = '1.6.3';
+  activeVersion = TARGET_VERSION;
   // No manual launch here: the native updater/installer must restart the app.
-  page = await connect('1.6.3');
-  report.targetIdentity = await identity(page, '1.6.3', next.commit);
+  page = await connect(TARGET_VERSION);
+  report.targetIdentity = await identity(page, TARGET_VERSION, next.commit);
   const preserved = await page.evaluate(async () => ({
     providers: await window.__TAURI_INTERNALS__.invoke('get_providers', { app: 'claude' }),
     preference: localStorage.getItem('SYNTHETIC-SIGNED-UPGRADE'),
@@ -406,11 +411,12 @@ $probe=Join-Path $directory 'restored-write-probe'
   await page.screenshot({ path: path.join(root, '04-real-restarted-application.png') });
   await verifyCreativePreserved(page, currentCreative, root, 'signed-upgrade');
   report.checks.creativeImageLayerOcrTaskPreservation = 'passed';
-  assert.ok(report.creativeRequests.filter(r => r.version === '1.6.2' && r.path === '/v1/images/generations').length >= 2);
+  assert.equal(report.creativeRequests.filter(r => r.version === BASE_VERSION && r.path === '/v1/images/generations').length, 1);
+  assert.equal(report.creativeRequests.filter(r => r.version === BASE_VERSION && r.path === '/api/v3/images/generations' && r.body.layer_decomposition_options).length, 1);
   const targetEvidence = path.join(root, 'target-native');
   fs.mkdirSync(targetEvidence, { recursive: true });
   report.creativeAfterUpgrade = await createLegacyCreative(page, targetEvidence);
-  assert.ok(report.creativeRequests.some(r => r.version === '1.6.3' && r.path === '/v1/images/generations' && r.channels?.length === 1 && r.channels[0] === '3'));
+  assert.ok(report.creativeRequests.some(r => r.version === TARGET_VERSION && r.path === '/v1/images/generations' && r.channels?.length === 1 && r.channels[0] === '3'));
   report.checks.targetNativeBusinessAttribution = 'passed';
   assert.ok(!report.creativeServerErrors?.length, 'All native synthetic provider requests must match the contract');
   report.checks.installedDesktopAttributionSynthetic = 'passed';

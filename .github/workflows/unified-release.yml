@@ -184,6 +184,7 @@ jobs:
       - run: python3 scripts/test_release_assets.py
       - run: python3 scripts/test_windows_branding.py
       - run: python3 scripts/test_prepare_windows_msi.py
+      - run: python3 scripts/test_signed_candidate_identity.py
       - run: python3 scripts/test_prepare_claude_local_node.py
       - run: python3 scripts/check-preview-gateway.py
       - run: node --test scripts/verify-updater-assets.mjs scripts/verify-update-acceptance.mjs scripts/verify-tauri-compatibility.mjs scripts/test-signed-candidate-pair.mjs
@@ -199,7 +200,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
+          - os: macos-26
             target: aarch64-apple-darwin
             name: macos-arm64
           - os: macos-15-intel
@@ -250,6 +251,23 @@ jobs:
           PYTHON
           cargo clean --release --manifest-path src-tauri/Cargo.toml -p sherpa-onnx-sys
       - run: pnpm install --frozen-lockfile
+      - name: Prepare Windows offline media compiler
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          path-type: inherit
+          update: false
+          install: make tar mingw-w64-ucrt-x86_64-gcc
+      - name: Build Windows offline video engine
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          export PATH="/ucrt64/bin:/usr/bin:$PATH"
+          node scripts/prepare-media-runtime.mjs
+      - name: Build Unix offline video engine
+        if: runner.os != 'Windows'
+        run: node scripts/prepare-media-runtime.mjs
       - name: Prepare updater signing key
         shell: bash
         env:

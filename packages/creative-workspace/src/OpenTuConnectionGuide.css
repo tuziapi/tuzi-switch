@@ -1,0 +1,16 @@
+.opentu-connection-guide { border-top:1px solid #ddd6ca; padding-top:16px; margin:16px 0; text-align:left; }
+.opentu-connection-guide h4 { margin:0 0 10px; font-size:13px; font-weight:600; }
+.opentu-connection-guide ol { margin:0 0 14px; padding-left:20px; font-size:12px; line-height:1.65; }
+.opentu-connection-guide li + li { margin-top:5px; }
+.opentu-guide-example { padding:10px 12px; border:1px solid #e6e2da; border-radius:8px; margin-bottom:8px; background:#88888808; }
+.opentu-guide-example header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+.opentu-guide-example strong { font-size:12px; font-weight:600; }
+.opentu-guide-example button { flex-shrink:0; border:1px solid #d7d2c8; border-radius:6px; color:inherit; background:transparent; padding:4px 8px; font-size:12px; cursor:pointer; }
+.opentu-connection-guide .opentu-guide-example p { margin:0; font-size:12px; line-height:1.6; user-select:text; }
+.opentu-connection-guide .opentu-guide-note { margin:10px 0; font-size:11px; line-height:1.5; opacity:.8; }
+.opentu-connection-guide details { font-size:12px; line-height:1.6; }
+.opentu-connection-guide summary { cursor:pointer; }
+.opentu-connection-guide details p { margin:8px 0; font-size:12px; }
+.dark .opentu-connection-guide, .creative-root[data-theme=dark] .opentu-connection-guide { border-color:#4d4940; }
+.dark .opentu-guide-example, .dark .opentu-guide-example button, .creative-root[data-theme=dark] .opentu-guide-example, .creative-root[data-theme=dark] .opentu-guide-example button { border-color:#4d4940; }
+.opentu-connection-guide button:focus-visible { outline:2px solid #be8b43; outline-offset:2px; }

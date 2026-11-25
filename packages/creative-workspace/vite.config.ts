@@ -90,7 +90,7 @@ export default defineConfig({
   },
   worker: { format: 'es' },
   build: {
-    lib: { entry: { creative: 'src/index.tsx', 'model-sync': 'src/modelSync.ts' }, formats: ['es'], fileName: (_format, name) => `${name}.js`, cssFileName: 'creative-workspace' },
+    lib: { entry: { creative: 'src/index.tsx', 'model-sync': 'src/modelSync.ts', 'connection-guide': 'src/OpenTuConnectionGuide.tsx' }, formats: ['es'], fileName: (_format, name) => `${name}.js`, cssFileName: 'creative-workspace' },
     rollupOptions: { external: [/^react(?:\/|$)/, /^react-dom(?:\/|$)/] },
     commonjsOptions: { transformMixedEsModules: true },
     sourcemap: true,

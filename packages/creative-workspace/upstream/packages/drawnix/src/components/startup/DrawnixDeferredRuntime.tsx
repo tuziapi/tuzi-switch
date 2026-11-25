@@ -112,7 +112,8 @@ export function DrawnixDeferredRuntime({
   }, [board]);
 
   useEffect(() => {
-    if (!isTaskStorageReady) {
+    // The desktop host keeps recovery alive across project/page navigation.
+    if (!isTaskStorageReady || import.meta.env.VITE_TUZI_ASSISTANT === 'true') {
       return;
     }
 

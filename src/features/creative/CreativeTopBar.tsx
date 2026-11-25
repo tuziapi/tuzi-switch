@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { LayoutGrid, MousePointer2, Settings2 } from "lucide-react";
+import { LayoutGrid, MousePointer2, Settings2, WandSparkles } from "lucide-react";
 import type { CreativePage } from "@tuzi/creative-workspace";
 import { DRAG_REGION_ATTR, DRAG_REGION_STYLE } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import "./creative-top-bar.css";
 const pages = [
   { id: "projects", label: "我的项目", icon: LayoutGrid },
   { id: "canvas", label: "自由画布", icon: MousePointer2 },
+  { id: "ecommerce", label: "电商生图", icon: WandSparkles },
 ] as const;
 
 export function CreativeTopBar({

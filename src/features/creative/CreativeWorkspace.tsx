@@ -55,7 +55,7 @@ const noAccountAction = () => {};
 
 function initialCreativePage(): CreativePage {
   const saved = sessionStorage.getItem("tuzi-creative-page");
-  return saved === "canvas" ? saved : "projects";
+  return saved === "canvas" || saved === "ecommerce" ? saved : "projects";
 }
 
 export function CreativeWorkspace({

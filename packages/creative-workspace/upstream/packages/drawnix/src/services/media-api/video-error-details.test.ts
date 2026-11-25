@@ -18,6 +18,13 @@ const config = {
 };
 
 describe('video provider diagnostics', () => {
+  it('bounds polling and preserves the remote ID for safe continuation', async () => {
+    send.mockImplementation(async () => new Response(JSON.stringify({ status: 'processing', progress: 10 })));
+    const error = await pollVideoUntilComplete('existing-remote-video', config, { interval: 1, maxAttempts: 2 }).catch(error => error);
+    expect(error).toMatchObject({ remoteId: 'existing-remote-video', code: 'VIDEO_POLL_TIMEOUT' });
+    expect(error.message).toContain('不要重新生成');
+    expect(send).toHaveBeenCalledTimes(2);
+  });
   it('keeps header-only request IDs, status, code and model on submission failure', async () => {
     send.mockResolvedValue(
       new Response(

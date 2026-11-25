@@ -40,6 +40,17 @@ export interface CreativeAccountBridge {
     name?: string,
   ) => Promise<"copied" | "saved" | "revealed" | "cancelled">;
   copyText?: (text: string) => Promise<void>;
+  /** Offline video compression. Bounded bytes and fixed presets; no paths or model credentials. */
+  compressVideo?: (
+    input: Blob,
+    options: {
+      quality: "balanced" | "small" | "high";
+      resolution: "original" | "1080p" | "720p";
+      keepAudio: boolean;
+    },
+    signal: AbortSignal,
+    onProgress: (seconds: number) => void,
+  ) => Promise<Blob>;
   /** Materialize original video and copy its file, copy its path, or reveal it. */
   videoAction?: (
     action: "copy" | "copy-path" | "reveal",

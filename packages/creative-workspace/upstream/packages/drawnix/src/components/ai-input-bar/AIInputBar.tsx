@@ -6,7 +6,7 @@ import {
   getTuziVideoComposerParams,
 } from '../../constants/tuzi-video-models';
 import { discussionDefaultModel } from "../../services/text-chat/discussion-ui";
-import { ensureAssistantCreationConfigured } from '../../services/assistant-creation-setup';
+import { ensureAssistantCreationConfiguredAsync } from '../../services/assistant-creation-setup';
 import { AttachedDiscussion } from './AttachedDiscussion';
 import { textChatRuntime } from '../../services/text-chat/runtime';
 import { createImageBatchPreparation, yieldBatchPreparationPaint } from '../../utils/image-batch-preparation';
@@ -5500,8 +5500,8 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
         const effectiveGenerationType = activeBoundImageTarget && !(discussionEnabled && !override)
           ? activeBoundImageTarget.type
           : override?.generationType ?? generationType;
-        const effectiveSelectedModel = override?.selectedModel ?? selectedModel;
-        const effectiveSelectedModelRef = override
+        let effectiveSelectedModel = override?.selectedModel ?? selectedModel;
+        let effectiveSelectedModelRef = override
           ? override.selectedModelRef ?? null
           : selectedModelRef;
         const rawSelectedParams = override?.selectedParams ?? selectedParams;
@@ -6021,10 +6021,18 @@ export const AIInputBar: React.FC<AIInputBarProps> = React.memo(
               : 'image';
           await settingsManager.waitForInitialization();
           if (abortIfSubmittedBoardChanged('settings_initialization')) return;
-          if (!ensureAssistantCreationConfigured(currentRouteType, effectiveSelectedModelRef || effectiveSelectedModel)) {
+          const quickSetup = await ensureAssistantCreationConfiguredAsync(
+            currentRouteType,
+            effectiveSelectedModelRef || effectiveSelectedModel,
+          );
+          if (!quickSetup.configured) {
             submitLockRef.current = false;
             setIsSubmitting(false);
             return;
+          }
+          if (quickSetup.model) {
+            effectiveSelectedModel = quickSetup.model.modelId || effectiveSelectedModel;
+            effectiveSelectedModelRef = quickSetup.model;
           }
           const initialRoute = resolveInvocationRoute(
             currentRouteType,

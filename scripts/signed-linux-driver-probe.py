@@ -3,7 +3,7 @@
 This probes the installed WebKit UI/IPC control path, not upgrade acceptance.
 """
 import json
-from signed_candidate_identity import PAIR
+from signed_candidate_identity import PAIR, BASE_VERSION
 import os
 from pathlib import Path
 import subprocess
@@ -73,7 +73,7 @@ Promise.all([
 ]).then(([version, identifier, build]) => done({version, identifier, build}), e => done({error:String(e)}));
 ''', 'args': []})
         report['identity'] = identity
-        assert identity['version'] == '1.6.2'
+        assert identity['version'] == BASE_VERSION
         assert identity['identifier'] == 'com.tuziswitch.desktop'
         assert identity['build']['repository'] == 'tuziapi/tuzi-switch'
         assert identity['build']['channel'] == 'stable'

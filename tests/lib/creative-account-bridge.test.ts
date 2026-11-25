@@ -33,6 +33,25 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("creative account native boundary", () => {
+  it("reports network entry only on native sending, with safe request correlation", async () => {
+    const events: unknown[] = [];
+    const observer = (event: Event) => events.push((event as CustomEvent).detail);
+    window.addEventListener("tuzi:creative-request-status", observer);
+    mocks.invoke.mockImplementation(async (_command, args) => {
+      args.onChunk.onmessage({ type: "ready" });
+      expect(events).toHaveLength(0);
+      args.onChunk.onmessage({ type: "sending" });
+      expect(events).toEqual([{ requestId: "synthetic-item-request", stage: "sending", status: undefined, upstreamId: undefined }]);
+      args.onChunk.onmessage({ type: "start", status: 200, content_type: "application/json", headers: { "x-request-id": "synthetic-server-id" } });
+      args.onChunk.onmessage({ type: "data", data: btoa('{}') });
+      args.onChunk.onmessage({ type: "end" });
+    });
+    try {
+      await (await send("/v1/images/generations", { method: "POST", headers: { "X-Request-Id": "synthetic-item-request" }, body: JSON.stringify({ model: "synthetic", n: 1 }) })).text();
+      expect(events[1]).toMatchObject({ stage: "receiving", status: 200, upstreamId: "synthetic-server-id" });
+      expect(JSON.stringify(events)).not.toContain("synthetic-binding");
+    } finally { window.removeEventListener("tuzi:creative-request-status", observer); }
+  });
   it.each([
     ["network_uncertain", "尚未提交生成请求"],
     ["model_list_unavailable", "模型列表无法读取"],

@@ -19,6 +19,7 @@ mod creative_attribution;
 mod creative_codex;
 mod creative_images;
 mod creative_media;
+mod creative_compression;
 mod database;
 mod deeplink;
 mod error;
@@ -34,6 +35,9 @@ mod native_tools;
 mod native_mcp;
 mod openclaw_config;
 mod opentu_mcp;
+mod opentu_connector;
+mod official_mcp;
+mod codex_mcp_target;
 mod opencode_config;
 mod panic_hook;
 mod prompt;
@@ -1237,6 +1241,13 @@ pub fn run() {
             creative_codex::creative_codex_probe,
             creative_codex::creative_codex_chat,
             creative_codex::creative_codex_cancel,
+            opentu_connector::opentu_connector_install,
+            opentu_connector::opentu_connector_remove,
+            opentu_connector::opentu_connector_status,
+            official_mcp::tuzi_mcp_status,
+            official_mcp::tuzi_mcp_start,
+            official_mcp::tuzi_mcp_cancel,
+            official_mcp::tuzi_mcp_manage,
             opentu_mcp::opentu_mcp_pairing,
             opentu_mcp::opentu_mcp_copy,
             opentu_mcp::opentu_mcp_check,
@@ -1246,7 +1257,10 @@ pub fn run() {
             creative_http::release_update_reservation,
             creative_images::creative_image_action,
             creative_media::creative_save_media,
+            creative_media::creative_export_mcp_media,
             creative_media::creative_video_action,
+            creative_compression::creative_compress_video,
+            creative_compression::creative_cancel_compression,
             creative_http::creative_manual_cancel,
             tuzi_account::creative::creative_account_bindings,
             tuzi_account::creative::creative_account_bind,
@@ -1621,6 +1635,7 @@ pub fn run() {
                 }
             }
             if *code == Some(tauri::RESTART_EXIT_CODE) {
+                creative_compression::cancel_all();
                 log::info!("收到应用重启请求，交由 Tauri 原生重启流程处理");
                 return;
             }
@@ -1726,6 +1741,7 @@ pub fn run() {
 /// 确保 Claude Code/Codex/Gemini 的配置不会处于损坏状态。
 /// 使用 stop_with_restore_keep_state 保留 settings 表中的代理状态，下次启动时自动恢复。
 pub async fn cleanup_before_exit(app_handle: &tauri::AppHandle) {
+    creative_compression::shutdown().await;
     if let Some(state) = app_handle.try_state::<store::AppState>() {
         let proxy_service = &state.proxy_service;
 
