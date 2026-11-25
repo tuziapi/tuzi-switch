@@ -6,7 +6,7 @@ child inherit a loopback-only sandbox. Discovery is synthetic; packages are not.
 import hashlib
 import base64
 import ctypes
-from signed_candidate_identity import verify_candidate
+from signed_candidate_identity import verify_candidate, BASE_VERSION, TARGET_VERSION
 from signed_creative_webdriver import PNG
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -480,7 +480,7 @@ try:
     report['architecture']=capture(['lipo','-archs',str(executable)],text=True).strip()
     assert report['architecture']==('arm64' if platform=='macos-arm64' else 'x86_64')
     assert capture(['uname','-m'],text=True).strip()==report['architecture']
-    report['installedBase']=assert_app(expected_base,'1.6.2')
+    report['installedBase']=assert_app(expected_base,BASE_VERSION)
     stage('create temporary TLS certificates')
     # Ephemeral HTTPS trust, separate from the immutable official update key.
     openssl = os.environ.get('TUZI_TEST_OPENSSL','openssl')
@@ -559,8 +559,8 @@ try:
         legacy_creative=wait_for(creative_record,'Project lost on normal legacy exit')
         app.rename(lab/'published-legacy.app')
         base_backup.rename(app)
-        assert_app(expected_base,'1.6.2')
-        report['manualTransition']={'fromVersion':legacy_version,'toVersion':'1.6.2',
+        assert_app(expected_base,BASE_VERSION)
+        report['manualTransition']={'fromVersion':legacy_version,'toVersion':BASE_VERSION,
             'source':legacy,'oldExitCode':process.returncode,'dataScope':'welcome preference and complete UI-created image project record'}
     stage('launch original installed application')
     process=subprocess.Popen(['sandbox-exec','-f',str(sandbox),str(executable)],env=app_env,stdout=application_log,stderr=application_log)
@@ -573,21 +573,21 @@ try:
         report['remaining'].remove('published-old-version-manual-transition')
         assert_creative_preserved(legacy_creative,'manual-transition')
         report['checks']['legacyCreativeImageProjectPreservation']='passed'
-        native_business_attribution('1.6.2',configure=True)
+        native_business_attribution(BASE_VERSION,configure=True)
         # Wait for the app's own persistence after the synthetic request.
         time.sleep(5)
         before_upgrade_creative=wait_for(creative_record,'Project absent before signed upgrade')
     else:
         click(['Got it','我知道了'])
     # Use the persistent toolbar control, not the expiring 15-second toast.
-    click(['New version available: 1.6.3','检测到新版本：1.6.3'])
+    click([f'New version available: {TARGET_VERSION}',f'检测到新版本：{TARGET_VERSION}'])
     screenshot('01-update-dialog')
     for failure in ['corrupt','interrupted','missing']:
         (lab/'mode').write_text(failure)
         click(['下载更新','重新下载'])
         wait_for(lambda: button(['重新下载']),failure+' was not rejected',120)
         assert process.poll() is None
-        assert_app(expected_base,'1.6.2')
+        assert_app(expected_base,BASE_VERSION)
         assert not button(['重启并更新'])
         requests=[json.loads(line) for line in (lab/'requests.jsonl').read_text().splitlines()]
         assert any(r['path'].endswith(asset) and r['mode']==failure for r in requests)
@@ -609,7 +609,7 @@ try:
         click(['重启并更新'])
         wait_for(lambda: button(['重新下载']),'Staging permission error was not recoverable',60)
         assert process.poll() is None
-        assert_app(expected_base,'1.6.2')
+        assert_app(expected_base,BASE_VERSION)
         assert '安装未完成' in tree()
         screenshot('03-staging-permission-denied')
     finally:
@@ -627,14 +627,14 @@ try:
     restarted=wait_for(lambda: [p for p in app_pids() if p!=pid],'No automatically restarted app',120)
     assert len(restarted)==1
     pid=restarted[0]; report['restartedPid']=pid
-    report['installedTarget']=assert_app(expected_target,'1.6.3')
+    report['installedTarget']=assert_app(expected_target,TARGET_VERSION)
     wait_for(lambda: 'Codex' in tree(),'Restarted actual app UI missing')
     assert not button(['Got it','我知道了']), 'Welcome dismissal was lost'
     screenshot('04-automatically-restarted')
     if legacy_dir:
         assert_creative_preserved(before_upgrade_creative,'signed-upgrade')
         report['checks']['creativeImageProjectPreservation']='passed'
-        native_business_attribution('1.6.3')
+        native_business_attribution(TARGET_VERSION)
         report['checks']['nativeBusinessAttribution']='passed'
         report['remaining'].remove('creative-project-migration')
         report['remaining'].remove('native-runtime-IPC-identity')

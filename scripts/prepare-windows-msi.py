@@ -9,23 +9,37 @@ def identifier(prefix, destination):
     return prefix + hashlib.sha256(destination.casefold().encode()).hexdigest()[:24]
 
 
-def prepare_template(root, config, build_output, template_output):
+def prepare_template(root, config, build_output, template_output, base_resources=None):
     root = Path(root)
-    resources = config["bundle"].get("resources", {})
-    if not isinstance(resources, dict):
+    overrides = config["bundle"].get("resources", {})
+    if not isinstance(overrides, dict) or (base_resources is not None and not isinstance(base_resources, dict)):
         raise ValueError("Per-user MSI resources require explicit source and destination paths")
+    # Match Tauri's effective base + override resource map. Otherwise resources
+    # added to tauri.conf.json (e.g. the offline engine) disappear from MSI only.
+    resources = {**(base_resources or {}), **overrides}
     files = {}
     for source, destination in resources.items():
         destination = PurePosixPath(destination.replace("\\", "/"))
         if destination.is_absolute() or not destination.parts or any(part in ("..", ".") or ":" in part for part in destination.parts):
             raise ValueError("MSI resource destination must stay inside the installation")
         source = (root / "src-tauri" / source).resolve(strict=True)
-        if not source.is_file():
-            raise ValueError("MSI resources must resolve to individual files")
-        key = str(destination).casefold()
-        if key in files:
-            raise ValueError("Duplicate MSI resource destination")
-        files[key] = (source, destination)
+        entries = [(source, destination)]
+        if source.is_dir():
+            entries = []
+            for child in sorted(source.rglob("*")):
+                if child.is_symlink():
+                    raise ValueError("MSI resource directories must not contain symlinks")
+                if child.is_file():
+                    entries.append((child, destination / child.relative_to(source).as_posix()))
+            if not entries:
+                raise ValueError("MSI resource directory is empty")
+        for file, target in entries:
+            if not file.is_file():
+                raise ValueError("MSI resources must resolve to files")
+            key = str(target).casefold()
+            if key in files:
+                raise ValueError("Duplicate MSI resource destination")
+            files[key] = (file, target)
     for source in sorted(Path(build_output).glob("*.dll")):
         key = source.name.casefold()
         if key in files:

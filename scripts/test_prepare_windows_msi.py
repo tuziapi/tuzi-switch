@@ -60,6 +60,28 @@ class PerUserResources(unittest.TestCase):
         with self.assertRaises(ValueError):
             msi.prepare_template(self.root, self.config, self.output, self.template)
 
+    def test_includes_base_media_directory_and_nested_source_notices(self):
+        media = self.root / "src-tauri/target/media-runtime"
+        (media / "sources").mkdir(parents=True)
+        (media / "ffmpeg.exe").write_bytes(b"SYNTHETIC ENGINE")
+        (media / "sources/source.tar.xz").write_bytes(b"SYNTHETIC SOURCE")
+        base = {"target/media-runtime/": "media-runtime/"}
+        files = msi.prepare_template(self.root, self.config, self.output, self.template, base)
+        self.assertEqual(set(files), {"licenses/nested/license-renamed.txt", "media-runtime/ffmpeg.exe", "media-runtime/sources/source.tar.xz"})
+        self.assertEqual(files["media-runtime/ffmpeg.exe"][0].read_bytes(), b"SYNTHETIC ENGINE")
+        document = ET.parse(self.template)
+        names = {entry.get("Name") for entry in document.findall(".//w:File", NAMESPACE)}
+        self.assertTrue({"ffmpeg.exe", "source.tar.xz"} <= names)
+
+    def test_rejects_collision_between_directory_and_explicit_resource(self):
+        media = self.root / "src-tauri/target/media-runtime"
+        media.mkdir(parents=True)
+        (media / "LICENSE").write_bytes(b"SYNTHETIC")
+        self.config["bundle"]["resources"]["LICENSE"] = "media-runtime/LICENSE"
+        with self.assertRaises(ValueError):
+            msi.prepare_template(self.root, self.config, self.output, self.template,
+                                 {"target/media-runtime/": "media-runtime/"})
+
 
 if __name__ == "__main__":
     unittest.main()

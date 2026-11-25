@@ -4,6 +4,8 @@ from pathlib import Path
 import re
 
 PAIR = json.loads(Path(__file__).with_name('signed-candidate-pair.json').read_text())
+BASE_VERSION = PAIR['base']['version']
+TARGET_VERSION = PAIR['target']['version']
 
 
 def verify_candidate(candidate, role):
@@ -14,9 +16,10 @@ def verify_candidate(candidate, role):
     expected = PAIR[role]
     assert re.fullmatch(r'[1-9]\d*', expected['runId'])
     assert re.fullmatch(r'[a-f0-9]{40}', expected['commit'])
-    # These UI experiments are specifically for the new-key 1.6.2 transition.
-    assert PAIR['base']['version'] == '1.6.2'
-    assert PAIR['target']['version'] == '1.6.3'
+    # Versions are pinned by the reviewed source/run pair, not artifact metadata.
+    assert re.fullmatch(r'\d+\.\d+\.\d+', BASE_VERSION)
+    assert re.fullmatch(r'\d+\.\d+\.\d+', TARGET_VERSION)
+    assert tuple(map(int, BASE_VERSION.split('.'))) < tuple(map(int, TARGET_VERSION.split('.')))
     assert PAIR['base']['runId'] != PAIR['target']['runId']
     assert PAIR['base']['commit'] != PAIR['target']['commit']
     assert candidate['schemaVersion'] == 2

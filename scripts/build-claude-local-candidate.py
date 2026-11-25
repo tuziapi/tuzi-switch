@@ -151,7 +151,8 @@ def main():
     environment["CARGO_INCREMENTAL"] = "0"
     subprocess.run(command, cwd=ROOT, env=environment, check=True)
     if windows_stable:
-        per_user_msi.prepare_template(ROOT, config, ROOT / "src-tauri/target" / target / "release", output / "per-user-runtime.wxs")
+        base_resources = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))["bundle"].get("resources", {})
+        per_user_msi.prepare_template(ROOT, config, ROOT / "src-tauri/target" / target / "release", output / "per-user-runtime.wxs", base_resources)
         config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
         bundle = pnpm_command(["tauri", "bundle", "--verbose", *target_flags, "--features", "claude-desktop-local", "--config", str(config_path)],
                               shutil.which("pnpm") or shutil.which("pnpm.cmd") or "pnpm", os.name == "nt")

@@ -19,6 +19,23 @@ def verify_resources(root, node, provenance):
     for resource in ["claude-local-runtime/LICENSE-node.txt", "licenses/LICENSE-claude-local.txt", "licenses/NOTICE-claude-local.txt", "licenses/TUZI-PATCHES.md"]:
         assert (root / resource).is_file(), f"Missing redistribution material: {resource}"
     collector.probe_packaged_node(node, provenance["version"])
+    verify_media_resources(root)
+
+
+def verify_media_resources(root):
+    media = root / "media-runtime"
+    expected = json.loads(Path("src-tauri/target/media-runtime/provenance.json").read_text(encoding="utf-8"))
+    packaged = json.loads((media / "provenance.json").read_text(encoding="utf-8"))
+    assert packaged == expected, "Packaged compression provenance differs from build"
+    engine = media / ("ffmpeg.exe" if expected["platform"] == "win32" else "ffmpeg")
+    assert collector.digest(engine) == expected["binarySha256"], "Compression engine bytes changed"
+    for source in expected["sources"]:
+        assert Path(source["file"]).name == source["file"]
+        assert collector.digest(media / "sources" / source["file"]) == source["sha256"]
+    for name in ["COPYING.GPLv2", "COPYING.x264", "COPYING.pkgconf", "README.txt", "sources/prepare-media-runtime.mjs"]:
+        assert (media / name).is_file(), f"Missing compression source or notice: {name}"
+    output = subprocess.check_output([str(engine.resolve()), "-version"], text=True, timeout=15)
+    assert "--disable-network" in output and "--enable-libx264" in output
 
 
 def main():
@@ -54,6 +71,15 @@ def main():
         with tempfile.TemporaryDirectory() as directory:
             extractor = shutil.which("7z") or str(Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "7-Zip/7z.exe")
             subprocess.run([extractor, "x", "-y", str(installers[0].resolve()), "-o" + directory], check=True, stdout=subprocess.DEVNULL)
+            nodes = list(Path(directory).rglob("tuzi-claude-node.exe"))
+            assert len(nodes) == 1
+            verify_resources(nodes[0].parent, nodes[0], provenance)
+        msi_files = list(bundle.rglob("*.msi"))
+        assert len(msi_files) == 1
+        with tempfile.TemporaryDirectory() as directory:
+            # Administrative extraction checks MSI's actual resource table;
+            # NSIS success cannot prove MSI includes newly added resources.
+            subprocess.run(["msiexec", "/a", str(msi_files[0].resolve()), "/qn", "TARGETDIR=" + directory], check=True, timeout=120)
             nodes = list(Path(directory).rglob("tuzi-claude-node.exe"))
             assert len(nodes) == 1
             verify_resources(nodes[0].parent, nodes[0], provenance)
