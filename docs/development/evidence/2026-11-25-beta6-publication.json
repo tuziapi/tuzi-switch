@@ -1,0 +1,59 @@
+{
+  "repository": "AiW520/tuzi-switch",
+  "tag": "opentu-preview-v1.6.3-beta.6",
+  "commit": "23d4c71c86208a87d4e82d6080f608c146107d29",
+  "runId": 45527773975,
+  "releaseId": 457597935,
+  "releaseUrl": "https://github.com/AiW520/tuzi-switch/releases/tag/opentu-preview-v1.6.3-beta.6",
+  "previousLatest": "v1.5.4",
+  "assets": [
+    {
+      "name": "build-manifest.json",
+      "size": 4415,
+      "digest": "sha256:2c0608d96fac327669708cb355bf5736d0cb2b1861078ca010a6bb2ebeb82b28",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.6/build-manifest.json"
+    },
+    {
+      "name": "OpenTu-Preview-1.6.3-beta.6-linux-arm64.deb",
+      "size": 104554810,
+      "digest": "sha256:b374ba47c196d7a20c6a39259e780bac475a21b30fcd7a7e00750acbb6e7e717",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.6/OpenTu-Preview-1.6.3-beta.6-linux-arm64.deb"
+    },
+    {
+      "name": "OpenTu-Preview-1.6.3-beta.6-linux-x64.deb",
+      "size": 105455522,
+      "digest": "sha256:e9e8008eba80fce1fa91db2501c9479936d291b821dfe08dea23e807eb0a30b8",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.6/OpenTu-Preview-1.6.3-beta.6-linux-x64.deb"
+    },
+    {
+      "name": "OpenTu-Preview-1.6.3-beta.6-macos-arm64.dmg",
+      "size": 93869213,
+      "digest": "sha256:72e7deba52c41ee6e3541606e0e275c2a90745a54ebf8612a799c0b4f95f7f7a",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.6/OpenTu-Preview-1.6.3-beta.6-macos-arm64.dmg"
+    },
+    {
+      "name": "OpenTu-Preview-1.6.3-beta.6-macos-x64.dmg",
+      "size": 98235620,
+      "digest": "sha256:88033215b014688bb7e022df2362470fd7457b226486887e5144fd72a0b327ba",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.6/OpenTu-Preview-1.6.3-beta.6-macos-x64.dmg"
+    },
+    {
+      "name": "OpenTu-Preview-1.6.3-beta.6-windows-x64.exe",
+      "size": 71897199,
+      "digest": "sha256:e8a9b7f0c3dbd2e2c84a1f63df9368f72ff1daf30582052c3f8a966dbc75c542",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.6/OpenTu-Preview-1.6.3-beta.6-windows-x64.exe"
+    },
+    {
+      "name": "opentu-preview-source-23d4c71c86208a87d4e82d6080f608c146107d29.tar.gz",
+      "size": 33552782,
+      "digest": "sha256:34cc4f2cc1d8e18f578ee4b5155926dac1045fca0ec130a8b913dafe32945d1e",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.6/opentu-preview-source-23d4c71c86208a87d4e82d6080f608c146107d29.tar.gz"
+    },
+    {
+      "name": "SHA256SUMS",
+      "size": 768,
+      "digest": "sha256:5690474bb3f4b0aa83d3276947aa0a12cefacee5861cf649ed54e8940a4e1957",
+      "url": "https://github.com/AiW520/tuzi-switch/releases/download/opentu-preview-v1.6.3-beta.6/SHA256SUMS"
+    }
+  ]
+}
