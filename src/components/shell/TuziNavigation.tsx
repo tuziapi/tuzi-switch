@@ -8,10 +8,10 @@ import {
 } from "@/components/ui/popover";
 import { TuziSidebar, type TuziSidebarProps } from "./TuziSidebar";
 
-/** Creative work uses a top dropdown without changing the saved sidebar width. */
+/** Primary workspaces use a top dropdown without changing the saved sidebar width. */
 export function TuziNavigation(props: TuziSidebarProps) {
   const [open, setOpen] = useState(false);
-  if (!["creative", "direct", "shop"].includes(props.currentView))
+  if (!["account", "creative", "direct", "shop"].includes(props.currentView))
     return <TuziSidebar {...props} />;
 
   return (

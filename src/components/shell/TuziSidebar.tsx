@@ -144,7 +144,7 @@ export function TuziSidebar({
             type="button"
             aria-label="兔子助手，返回首页"
             title="返回首页"
-            onClick={() => onNavigate("account")}
+            onClick={() => onNavigate("providers")}
             className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center">

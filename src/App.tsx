@@ -315,10 +315,10 @@ function App() {
   const useAppWindowControls =
     isLinux() && (settingsData?.useAppWindowControls ?? false);
   const dragBarHeight = useAppWindowControls ? 32 : DEFAULT_DRAG_BAR_HEIGHT;
-  const fullWorkspace = ["creative", "direct", "shop"].includes(
+  const fullWorkspace = ["account", "creative", "direct", "shop"].includes(
     currentView,
   );
-  const primaryWorkspace = fullWorkspace || currentView === "account";
+  const primaryWorkspace = fullWorkspace;
   const websiteView = currentView === "direct" || currentView === "shop";
   const contentTopOffset =
     currentView === "creative"
@@ -1455,7 +1455,6 @@ function App() {
         setActiveApp(app);
       }}
       onNavigate={(view) => {
-        if (view === "account") setSidebarCollapsed(false);
         if (
           (GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(view) &&
           !(GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(currentView)
@@ -1497,7 +1496,6 @@ function App() {
                 ? { pointerEvents: "none" }
                 : DRAG_REGION_STYLE),
               height: primaryWorkspace ? 44 : dragBarHeight,
-              ...(currentView === "account" && !useAppWindowControls ? { right: "auto", width: sidebarWidth } : {}),
             } as any
           }
         >
