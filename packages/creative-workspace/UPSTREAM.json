@@ -6119,6 +6119,26 @@
   ],
   "localFiles": [
     {
+      "path": "packages/drawnix/src/canvas.ts",
+      "origin": "ljquan/opentu@9358b102ae4b26a65c2f371236afb2c79a802233",
+      "reason": "UC-OPENTU-SYNC-1125: dedicated canvas lazy entry"
+    },
+    {
+      "path": "packages/drawnix/src/constants/vidu-video-models.ts",
+      "origin": "ljquan/opentu@9358b102ae4b26a65c2f371236afb2c79a802233",
+      "reason": "UC-OPENTU-SYNC-1125: Vidu Q3/Q4 and Mix contracts"
+    },
+    {
+      "path": "packages/drawnix/src/plugins/with-gradient-fill.test.ts",
+      "origin": "ljquan/opentu@9358b102ae4b26a65c2f371236afb2c79a802233",
+      "reason": "UC-OPENTU-SYNC-1125: per-board gradient initialization regression"
+    },
+    {
+      "path": "packages/drawnix/src/services/vidu-video-request.test.ts",
+      "origin": "ljquan/opentu@9358b102ae4b26a65c2f371236afb2c79a802233",
+      "reason": "UC-OPENTU-SYNC-1125: Vidu contracts adapted to desktop native transport"
+    },
+    {
       "path": "packages/drawnix/src/services/query-image-result.ts",
       "derivedFrom": "packages/drawnix/src/workflow-mode/web/src/services/api/image-recovery.ts",
       "sourceSha256": "c1d044b0d3c043a0701f34a2dc644a686f8fc55efdc0f82c2f1d81b6ad242591"
@@ -7094,6 +7114,16 @@
     }
   ],
   "incrementalIntegrations": [
+    {
+      "task": "UC-OPENTU-SYNC-1125",
+      "sourceThread": "01a211eb-538e-7011-97df-3d67ea770b61",
+      "sourceRevision": "9358b102ae4b26a65c2f371236afb2c79a802233",
+      "previousSourceRevision": "ac719253192143e5c9e3721b69d20c07865b4bd9",
+      "desktopBase": "48cef23770e2525d9e952d3a842a16fd1a636843",
+      "date": "2026-11-25",
+      "strategy": "three-way incremental integration; native transport and ecommerce preserved; no web deployment config",
+      "record": "docs/development/2026-11-25-opentu-web-integration.md"
+    },
     {
       "task": "UC-CANVAS-1117",
       "sourceThread": "01a1c98c-5c80-7f11-ab13-8c7344e32bb0",

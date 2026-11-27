@@ -81,7 +81,7 @@ pub fn navigate_main_window_if_available(app: &AppHandle) {
         return;
     }
 
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_webview("main") {
         match url::Url::parse("tuziweb://localhost/index.html") {
             Ok(url) => {
                 if let Err(err) = window.navigate(url) {

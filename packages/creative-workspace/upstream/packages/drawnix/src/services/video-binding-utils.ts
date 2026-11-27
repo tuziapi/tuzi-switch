@@ -1,3 +1,4 @@
+import { getViduDurationOptions, getViduVideoContract } from '../constants/vidu-video-models';
 import {
   getCompatibleParams,
   SORA_MODE_PARAM_ID,
@@ -537,6 +538,10 @@ export function getEffectiveVideoModelConfig(
   params?: Record<string, unknown> | null
 ): VideoModelConfig {
   const baseConfig = getVideoModelConfig(modelId);
+  if (getViduVideoContract(modelId)) {
+    const durationOptions = getViduDurationOptions(modelId, params?.vidu_action);
+    return { ...baseConfig, durationOptions };
+  }
   const metadata = getResolvedVideoBindingMetadata(modelId, binding, params);
 
   if (!metadata?.allowedDurations?.length) {
@@ -759,7 +764,7 @@ export function resolveVideoSubmission(
 export function extractInlineVideoUrl(
   payload: Record<string, any> | null | undefined
 ): string | undefined {
-  return payload?.video_url || payload?.url || payload?.output?.url;
+  return payload?.video_url || payload?.url || payload?.output?.url || payload?.metadata?.url;
 }
 
 function resolveTemplatePath(

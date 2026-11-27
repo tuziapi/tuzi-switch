@@ -181,7 +181,7 @@ pub(crate) fn ensure_export_copy(
 #[tauri::command]
 pub async fn creative_image_action(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     request: ImageRequest,
 ) -> Result<String, String> {
     if window.label() != "main" {

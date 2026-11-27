@@ -11,7 +11,8 @@ import { TuziSidebar, type TuziSidebarProps } from "./TuziSidebar";
 /** Creative work uses a top dropdown without changing the saved sidebar width. */
 export function TuziNavigation(props: TuziSidebarProps) {
   const [open, setOpen] = useState(false);
-  if (props.currentView !== "creative") return <TuziSidebar {...props} />;
+  if (!["creative", "direct", "shop"].includes(props.currentView))
+    return <TuziSidebar {...props} />;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -21,10 +22,7 @@ export function TuziNavigation(props: TuziSidebarProps) {
           aria-label="兔子助手导航"
           className="tuzi-creative-navigation tuzi-top-navigation-arrival mr-3 flex h-8 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
         >
-          <TuziAccountIcon
-            size={22}
-            className="tuzi-navigation-icon"
-          />
+          <TuziAccountIcon size={22} className="tuzi-navigation-icon" />
           <span className="tuzi-navigation-label">兔子助手</span>
           <ChevronDown
             size={14}

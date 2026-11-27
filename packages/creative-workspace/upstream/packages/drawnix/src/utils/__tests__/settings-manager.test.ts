@@ -457,7 +457,7 @@ describe('settings-manager', () => {
     const { getStaticModelConfig } = await import('../../constants/model-config');
     const expected = {
       image: 'gpt-image-2.5-sunburst',
-      video: 'doubao-seedance-2-5-260628',
+      video: 'viduq4-preview',
       text: 'gpt-6-sol',
       audio: 'suno_music',
     } as const;
@@ -467,10 +467,11 @@ describe('settings-manager', () => {
     });
     for (const [type, id] of Object.entries(expected)) {
       expect(getStaticModelConfig(id)?.type).toBe(type);
+      expect(settingsManager.resolveInvocationRoute(type as 'image' | 'video' | 'text' | 'audio').modelId).toBe(id);
     }
   });
 
-  it('upgrades old Tuzi compatibility defaults once and keeps custom presets', async () => {
+  it('upgrades old Tuzi compatibility defaults once while preserving video selections and custom presets', async () => {
     mockSettingsManagerDeps();
     const route = (modelId: string) => ({
       defaultModelRef: { profileId: 'legacy-default', modelId },
@@ -491,11 +492,11 @@ describe('settings-manager', () => {
     const { settingsManager } = await import('../settings-manager');
     const settings = settingsManager.getSettings();
     expect(settings.gemini).toMatchObject({
-      imageModelName: 'gpt-image-2.5-sunburst', videoModelName: 'doubao-seedance-2-5-260628',
+      imageModelName: 'gpt-image-2.5-sunburst', videoModelName: 'seedance-1.5-pro',
       textModelName: 'gpt-6-sol', chatModel: 'gpt-6-sol',
     });
     const defaultPreset = settings.invocationPresets.find((preset) => preset.id === 'default');
-    expect(defaultPreset?.video.defaultModelRef?.modelId).toBe('doubao-seedance-2-5-260628');
+    expect(defaultPreset?.video.defaultModelRef?.modelId).toBe('seedance-1.5-pro');
     expect(defaultPreset?.text.defaultModelRef?.modelId).toBe('gpt-6-sol');
     expect(settings.invocationPresets.find((preset) => preset.id === 'custom-preset')?.video.defaultModelRef?.modelId)
       .toBe('seedance-1.5-pro');
@@ -516,6 +517,8 @@ describe('settings-manager', () => {
 
   it.each([
     ['https://api.tu-zi.com/v1', 'custom-image', 'veo3.1', 'custom-text'],
+    ['https://api.tu-zi.com/v1', 'custom-image', 'doubao-seedance-2-5-260628', 'custom-text'],
+    ['https://api.tu-zi.com/v1', 'custom-image', 'seedance-1.5-pro', 'custom-text'],
     ['https://gateway.example.com/v1', 'gpt-image-2', 'seedance-1.5-pro', 'gpt-5.5'],
   ])('preserves explicit models for %s', async (baseUrl, imageModelName, videoModelName, textModelName) => {
     mockSettingsManagerDeps();

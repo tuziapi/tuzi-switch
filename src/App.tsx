@@ -1,3 +1,4 @@
+import { EmbeddedSite } from "@/components/shell/EmbeddedSite";
 import { CreativeWorkspace } from "@/features/creative/CreativeWorkspace";
 import { useAnalyticsView } from "@/hooks/useAnalyticsView";
 import { trackInteraction } from "@/lib/analytics";
@@ -128,6 +129,8 @@ import HermesMemoryPanel from "@/components/hermes/HermesMemoryPanel";
 type View =
   | "account"
   | "creative"
+  | "direct"
+  | "shop"
   | "providers"
   | "settings"
   | "prompts"
@@ -312,8 +315,17 @@ function App() {
   const useAppWindowControls =
     isLinux() && (settingsData?.useAppWindowControls ?? false);
   const dragBarHeight = useAppWindowControls ? 32 : DEFAULT_DRAG_BAR_HEIGHT;
+  const fullWorkspace = ["creative", "direct", "shop"].includes(
+    currentView,
+  );
+  const primaryWorkspace = fullWorkspace || currentView === "account";
+  const websiteView = currentView === "direct" || currentView === "shop";
   const contentTopOffset =
-    currentView === "creative" ? 0 : dragBarHeight + HEADER_HEIGHT;
+    currentView === "creative"
+      ? 0
+      : primaryWorkspace
+        ? 44
+        : dragBarHeight + HEADER_HEIGHT;
   const visibleApps: VisibleApps = settingsData?.visibleApps ?? {
     claude: true,
     "claude-desktop": true,
@@ -432,7 +444,8 @@ function App() {
     activeApp === "opencode" ||
     activeApp === "openclaw" ||
     activeApp === "gemini" ||
-    activeApp === "hermes" || activeApp === "workbuddy";
+    activeApp === "hermes" ||
+    activeApp === "workbuddy";
 
   const {
     addProvider,
@@ -820,7 +833,9 @@ function App() {
     });
 
     if (appId === "workbuddy") {
-      await queryClient.invalidateQueries({ queryKey: ["workbuddy", "modelOwners"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["workbuddy", "modelOwners"],
+      });
     } else if (appId === "opencode") {
       await queryClient.invalidateQueries({
         queryKey: ["opencodeLiveProviderIds"],
@@ -1124,6 +1139,8 @@ function App() {
         case "usage":
           return <WorkspaceUsagePage />;
         case "creative":
+        case "direct":
+        case "shop":
           return null;
         case "account":
           return (
@@ -1389,7 +1406,9 @@ function App() {
                           if (providers[id]) void switchProvider(providers[id]);
                         }}
                         onAddProvider={() => setIsAddOpen(true)}
-                        onEditProvider={(id) => { if (providers[id]) setEditingProvider(providers[id]); }}
+                        onEditProvider={(id) => {
+                          if (providers[id]) setEditingProvider(providers[id]);
+                        }}
                       >
                         {providerList}
                       </ClaudeLocalPanel>
@@ -1422,8 +1441,7 @@ function App() {
     );
   };
 
-  const sidebarWidth =
-    currentView === "creative" ? 0 : sidebarCollapsed ? 68 : 228;
+  const sidebarWidth = fullWorkspace ? 0 : sidebarCollapsed ? 68 : 228;
   const assistantNavigation = (
     <TuziNavigation
       activeApp={activeApp}
@@ -1437,6 +1455,7 @@ function App() {
         setActiveApp(app);
       }}
       onNavigate={(view) => {
+        if (view === "account") setSidebarCollapsed(false);
         if (
           (GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(view) &&
           !(GLOBAL_WORKSPACE_VIEWS as readonly string[]).includes(currentView)
@@ -1465,20 +1484,20 @@ function App() {
       className="tuzi-shell flex flex-col h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30"
       style={{ overflowX: "hidden", paddingTop: contentTopOffset }}
     >
-      <TuziSidebarTransition visible={currentView !== "creative"}>
+      <TuziSidebarTransition visible={!fullWorkspace}>
         {assistantNavigation}
       </TuziSidebarTransition>
-      {((currentView !== "creative" && dragBarHeight > 0) ||
-        useAppWindowControls) && (
+      {((!fullWorkspace && dragBarHeight > 0) || useAppWindowControls) && (
         <div
           className="fixed top-0 left-0 right-0 z-[35] flex items-center justify-end px-2"
-          {...(currentView === "creative" ? {} : DRAG_REGION_ATTR)}
+          {...(primaryWorkspace ? {} : DRAG_REGION_ATTR)}
           style={
             {
-              ...(currentView === "creative"
+              ...(primaryWorkspace
                 ? { pointerEvents: "none" }
                 : DRAG_REGION_STYLE),
-              height: currentView === "creative" ? 44 : dragBarHeight,
+              height: primaryWorkspace ? 44 : dragBarHeight,
+              ...(currentView === "account" && !useAppWindowControls ? { right: "auto", width: sidebarWidth } : {}),
             } as any
           }
         >
@@ -1537,7 +1556,7 @@ function App() {
           }}
           onDeleted={async () => {
             try {
-              const allConflicts = await checkAllEnvConflicts();
+              const allConflicts = await checkAllEnvConflicts(true);
               const flatConflicts = Object.values(allConflicts).flat();
               setEnvConflicts(flatConflicts);
               if (flatConflicts.length === 0) {
@@ -1548,6 +1567,7 @@ function App() {
                 "[App] Failed to re-check conflicts after deletion:",
                 error,
               );
+              throw error;
             }
           }}
         />
@@ -1560,15 +1580,15 @@ function App() {
           style={
             {
               ...DRAG_REGION_STYLE,
-              top: dragBarHeight,
-              height: HEADER_HEIGHT,
+              top: primaryWorkspace ? 0 : dragBarHeight,
+              height: primaryWorkspace ? 44 : HEADER_HEIGHT,
               left: sidebarWidth,
               width: `calc(100% - ${sidebarWidth}px)`,
             } as any
           }
         >
           <div
-            className="flex h-full items-center justify-between gap-2 px-6"
+            className={`flex h-full items-center justify-between gap-2 ${fullWorkspace && isMac() ? "pl-24 pr-5" : "px-6"} ${primaryWorkspace && useAppWindowControls ? "pr-28" : ""}`}
             {...DRAG_REGION_ATTR}
             style={{ ...DRAG_REGION_STYLE } as any}
           >
@@ -1576,7 +1596,12 @@ function App() {
               className="workspace-header-title flex min-w-0 items-center gap-1"
               style={{ WebkitAppRegion: "no-drag" } as any}
             >
-              {currentView !== "providers" && currentView !== "account" ? (
+              {fullWorkspace && assistantNavigation}
+              {websiteView ? (
+                <h1 className="text-sm font-medium">
+                  {currentView === "direct" ? "直连站" : "兔小店"}
+                </h1>
+              ) : currentView !== "providers" && currentView !== "account" ? (
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -2011,7 +2036,10 @@ function App() {
           reserveMacControls={isMac()}
           reserveWindowControls={useAppWindowControls}
         />
-        {currentView !== "creative" && renderContent()}
+        <EmbeddedSite
+          site={websiteView ? (currentView as "direct" | "shop") : null}
+        />
+        {currentView !== "creative" && !websiteView && renderContent()}
       </main>
 
       {configureKey && account.state.identity && (

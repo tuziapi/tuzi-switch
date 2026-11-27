@@ -13,25 +13,25 @@
   pointer-events: none;
 }
 
-/* Header and content travel together while the old sidebar folds upward. */
+/* Keep header and content aligned with a short, quiet sidebar transition. */
 .tuzi-workspace-layout {
   transition-property: margin-left, left, width;
-  transition-duration: 350ms;
+  transition-duration: 180ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tuzi-creative-arrival {
-  animation: tuzi-creative-arrival 240ms ease-out 100ms backwards;
+  animation: tuzi-creative-arrival 160ms ease-out;
 }
 
 .tuzi-top-navigation-arrival {
-  animation: tuzi-creative-arrival 200ms ease-out 120ms backwards;
+  animation: tuzi-creative-arrival 160ms ease-out;
 }
 
 @keyframes tuzi-creative-arrival {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: none;
   }
   to {
     opacity: 1;

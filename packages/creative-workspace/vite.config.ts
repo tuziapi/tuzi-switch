@@ -66,6 +66,7 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: [
+      { find: '@drawnix/drawnix/canvas', replacement: `${source}/packages/drawnix/src/canvas.ts` },
       { find: '@drawnix/drawnix/runtime', replacement: `${source}/packages/drawnix/src/runtime.ts` },
       { find: '@drawnix/drawnix', replacement: `${source}/packages/drawnix/src/index.ts` },
       { find: '@aitu/utils', replacement: `${source}/packages/utils/src/index.ts` },

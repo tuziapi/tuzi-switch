@@ -522,6 +522,31 @@ describe('provider routing', () => {
     expect(prepared.headers['Content-Type']).toBe('application/json');
   });
 
+  it.each(['GET', 'POST'])('preserves the apioss origin for desktop %s requests', (method) => {
+    vi.stubEnv('DEV', true);
+    vi.stubGlobal('window', { location: new URL('http://localhost:7206') });
+    try {
+      const prepared = providerTransport.prepareRequest(
+        {
+          profileId: 'provider-apioss',
+          profileName: 'Tuzi apioss',
+          providerType: 'openai-compatible',
+          baseUrl: 'https://apioss.tu-zi.com/v1',
+          apiKey: 'secret',
+          authType: 'bearer',
+        },
+        { path: '/videos', method }
+      );
+      expect(prepared.url).toBe(
+        'https://apioss.tu-zi.com/v1/videos'
+      );
+      expect(prepared.headers.Authorization).toBe('Bearer secret');
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('collapses a duplicated API version at the URL join boundary', () => {
     const prepared = providerTransport.prepareRequest(
       {

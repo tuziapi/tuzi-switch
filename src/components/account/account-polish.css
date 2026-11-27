@@ -381,3 +381,18 @@
     grid-template-columns: 85px minmax(0, 1fr);
   }
 }
+
+/* Keep the connection form comfortable in the minimum-height desktop window. */
+@media (max-height: 700px) {
+  .account-shell.account-phase1.account-disconnected {
+    padding-block: 24px;
+  }
+  .account-disconnected .account-connect-card {
+    padding: 24px;
+  }
+  .account-disconnected .account-connect-emblem {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+  }
+}

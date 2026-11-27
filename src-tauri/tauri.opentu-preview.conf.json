@@ -2,8 +2,8 @@
   "productName": "OpenTu 验收版",
   "mainBinaryName": "tuzi-opentu-preview",
   "identifier": "com.tuziswitch.desktop.opentu-preview",
-  "app": { "windows": [{ "label": "main", "title": "OpenTu 验收版" }] },
-  "bundle": { "createUpdaterArtifacts": false },
+  "app": { "windows": [{ "label": "main", "title": "OpenTu 验收版", "dragDropEnabled": false, "titleBarStyle": "Overlay", "hiddenTitle": true, "width": 1200, "height": 800, "visible": false }] },
+  "bundle": { "createUpdaterArtifacts": false, "macOS": { "infoPlist": "Info.opentu-preview.plist" } },
   "plugins": {
     "deep-link": { "desktop": { "schemes": ["tuzi-opentu-preview"] } },
     "updater": { "endpoints": [] }

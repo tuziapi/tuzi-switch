@@ -117,7 +117,7 @@ fn status(paths: &ConnectorPaths) -> Result<ConnectorStatus, String> {
 
 #[tauri::command]
 pub fn opentu_connector_status(
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     connect_local: Option<bool>,
 ) -> Result<ConnectorStatus, String> {
     if window.label() != "main" {
@@ -149,7 +149,7 @@ fn install_at(
 
 #[tauri::command]
 pub fn opentu_connector_install(
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     connect_local: Option<bool>,
     expected_config_path: Option<String>,
 ) -> Result<ConnectorStatus, String> {
@@ -184,7 +184,7 @@ fn remove_at(paths: &ConnectorPaths, executable: &std::path::Path) -> Result<(),
 
 #[tauri::command]
 pub fn opentu_connector_remove(
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     connect_local: Option<bool>,
     expected_config_path: Option<String>,
 ) -> Result<ConnectorStatus, String> {

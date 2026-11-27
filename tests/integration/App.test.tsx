@@ -1,7 +1,7 @@
 import { UpdateProvider } from "@/contexts/UpdateContext";
-import { Suspense, type ComponentType } from "react";
+import { Suspense, type ComponentType, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../msw/server";
@@ -33,8 +33,8 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("@/features/creative/CreativeWorkspace", () => ({
-  CreativeWorkspace: ({ active }: { active: boolean }) =>
-    active ? <section data-testid="creative-workspace">Creative workspace</section> : null,
+  CreativeWorkspace: ({ active, navigation }: { active: boolean; navigation?: ReactNode }) =>
+    active ? <section data-testid="creative-workspace">{navigation}Creative workspace</section> : null,
 }));
 
 vi.mock("@/components/providers/ProviderList", () => ({
@@ -166,6 +166,8 @@ vi.mock("@/components/shell/TuziSidebar", () => ({
       <span>{activeApp}</span>
       {[
         "creative",
+        "direct",
+        "shop",
         "prompts",
         "skills",
         "sessions",
@@ -360,6 +362,29 @@ describe("App integration with MSW", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.getByTestId("creative-workspace")).toBeInTheDocument();
     expect(screen.queryByTestId("provider-list")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["direct", "直连站页面"],
+    ["shop", "兔小店页面"],
+  ])("returns from %s to the existing creative workspace and account home", async (view, label) => {
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    fireEvent.click(await screen.findByRole("button", { name: "firstRunNotice.confirm" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(await screen.findByText(`nav-${view}`));
+    expect(await screen.findByRole("region", { name: label })).toBeVisible();
+    expect(screen.getByText("请在兔子助手桌面应用中使用内嵌网站")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "兔子助手导航" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByText("nav-creative"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByTestId("creative-workspace")).toBeVisible();
+    expect(screen.queryByRole("region", { name: label })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "兔子助手导航" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByText("account.title"));
+    expect(await screen.findByTestId("app-switcher")).toBeVisible();
+    expect(screen.queryByTestId("creative-workspace")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "兔子助手导航" })).not.toBeInTheDocument();
   });
 
   it("requires an explicit target when entering a global editor from a native tool", async () => {

@@ -22,6 +22,9 @@ export interface EnvConflict {
 export interface BackupInfo {
   /** 备份文件路径 */
   backupPath: string;
+  /** Older native versions omit these fields. */
+  restartRequired?: boolean;
+  unresolvedVars?: string[];
   /** 备份时间戳 */
   timestamp: string;
   /** 被备份的环境变量冲突列表 */

@@ -1,5 +1,12 @@
 /** Local editor preferences only. Never store providers, credentials or media here. */
 export const ECOMMERCE_PREFERENCES_KEY = "opentu-ecommerce-preferences-v1";
+export type CreationPreferences = {
+  paramsByModel: Record<string, Record<string, string>>;
+  modes: Record<string, "combined" | "separate">;
+  counts: Record<string, number>;
+  perOutput: Record<string, Record<string, number>>;
+  purpose: "main" | "gallery" | "marketing";
+};
 
 export type EcommercePreferences = {
   selectedModels: { image: string; video: string };
@@ -8,6 +15,7 @@ export type EcommercePreferences = {
   videoDuration: string;
   videoSize: string;
   videoRatio: string;
+  creation?: CreationPreferences;
 };
 
 const object = (value: unknown): value is Record<string, unknown> =>
@@ -22,6 +30,50 @@ export function readEcommercePreferences(): Partial<EcommercePreferences> {
     const data: unknown = JSON.parse(raw);
     if (!object(data) || data.version !== 1) return {};
     const result: Partial<EcommercePreferences> = {};
+    if (object(data.creation)) {
+      const c = data.creation;
+      const maps = <T>(
+        value: unknown,
+        valid: (v: unknown) => v is T,
+      ): Record<string, T> =>
+        object(value)
+          ? Object.fromEntries(
+              Object.entries(value)
+                .filter(
+                  (entry): entry is [string, T] =>
+                    shortText(entry[0], 200) && valid(entry[1]),
+                )
+                .slice(0, 100),
+            )
+          : {};
+      const count = (v: unknown): v is number =>
+        typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 4;
+      result.creation = {
+        paramsByModel: Object.fromEntries(
+          Object.entries(object(c.paramsByModel) ? c.paramsByModel : {})
+            .slice(0, 100)
+            .map(([k, v]) => [
+              k,
+              maps(v, (x): x is string => shortText(x, 64)),
+            ]),
+        ),
+        modes: maps(
+          c.modes,
+          (v): v is "combined" | "separate" =>
+            v === "combined" || v === "separate",
+        ),
+        counts: maps(c.counts, count),
+        perOutput: Object.fromEntries(
+          Object.entries(object(c.perOutput) ? c.perOutput : {})
+            .slice(0, 100)
+            .map(([k, v]) => [k, maps(v, count)]),
+        ),
+        purpose:
+          c.purpose === "main" || c.purpose === "marketing"
+            ? c.purpose
+            : "gallery",
+      };
+    }
     if (
       object(data.selectedModels) &&
       shortText(data.selectedModels.image) &&
@@ -36,7 +88,10 @@ export function readEcommercePreferences(): Partial<EcommercePreferences> {
     if (shortText(data.videoDuration, 16))
       result.videoDuration = data.videoDuration;
     if (shortText(data.videoSize, 64)) result.videoSize = data.videoSize;
-    if (data.videoRatio === "16:9" || data.videoRatio === "9:16")
+    if (
+      typeof data.videoRatio === "string" &&
+      ["16:9", "9:16", "1:1", "3:4", "4:3", "auto"].includes(data.videoRatio)
+    )
       result.videoRatio = data.videoRatio;
     if (object(data.quickSelections)) {
       result.quickSelections = Object.fromEntries(
@@ -71,6 +126,7 @@ export function saveEcommercePreferences(value: EcommercePreferences) {
         videoDuration: value.videoDuration,
         videoSize: value.videoSize,
         videoRatio: value.videoRatio,
+        creation: value.creation,
       }),
     );
   } catch {

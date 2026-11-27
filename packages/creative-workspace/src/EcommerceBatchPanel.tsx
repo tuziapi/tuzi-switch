@@ -62,7 +62,9 @@ export function EcommerceBatchPanel({
         )}
         <p className="ecommerce-batch__hint">
           {allComplete
-            ? `原图已保存到本机；保存图片按 ${batch.size} 导出，比例不同时等比留边。`
+            ? batch.generationParams
+              ? "图片已保存到本机；导出保留模型返回的原始尺寸与格式。"
+              : `原图已保存到本机；保存图片按 ${batch.size} 导出，比例不同时等比留边。`
             : "完成一张即保存一张，可切换页面继续等待。"}
         </p>
       </header>

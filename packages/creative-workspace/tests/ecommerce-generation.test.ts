@@ -108,6 +108,63 @@ describe("ecommerce video routing", () => {
       },
     });
   });
+  it("carries Mix parameters into the shared request contract without provider fields", async () => {
+    mocks.modelId = "viduq3-mix";
+    await generateEcommerceVideo({
+      ...params(),
+      referenceImages: ["https://example.com/product.png"],
+      aspectRatio: "3:4",
+      generationParams: {
+        vidu_sound_urls: "https://example.com/sound.mp3",
+        seed: "42",
+        watermark: "false",
+        apiKey: "synthetic-do-not-forward",
+      },
+    });
+    const request = mocks.videoSubmit.mock.calls[0][0];
+    expect(request.params).toEqual({
+      vidu_sound_urls: "https://example.com/sound.mp3",
+      seed: "42",
+      watermark: "false",
+      aspect_ratio: "3:4",
+      ratio: "3:4",
+    });
+    const { buildTuziVideoRequest } = await import(
+      "../upstream/packages/drawnix/src/services/tuzi-video-request"
+    );
+    expect(
+      await buildTuziVideoRequest({
+        ...request,
+        duration: request.seconds,
+        referenceImages: request.inputReferences.map((r: any) => r.url),
+      }),
+    ).toMatchObject({
+      model: "viduq3-mix",
+      sounds: ["https://example.com/sound.mp3"],
+      seed: 42,
+      watermark: false,
+      aspect_ratio: "3:4",
+      metadata: { action: "referenceGenerate" },
+    });
+  });
+  it("blocks mismatched Vidu actions before submit, but resumes an existing task without references", async () => {
+    mocks.modelId = "viduq3-turbo";
+    await expect(
+      generateEcommerceVideo({
+        ...params(),
+        generationParams: { vidu_action: "firstTailGenerate" },
+        referenceImages: ["https://example.com/one.png"],
+      }),
+    ).rejects.toThrow("需要 2 张");
+    expect(mocks.videoSubmit).not.toHaveBeenCalled();
+    await generateEcommerceVideo({
+      ...params(),
+      taskId: "task_existing",
+      generationParams: { vidu_action: "firstTailGenerate" },
+    });
+    expect(mocks.videoSubmit).not.toHaveBeenCalled();
+    expect(mocks.videoPoll.mock.calls[0][0]).toBe("task_existing");
+  });
   it("resume queries the existing remote task without paid submission", async () => {
     await generateEcommerceVideo({ ...params(), taskId: "existing-task" });
     expect(mocks.videoSubmit).not.toHaveBeenCalled();
@@ -232,6 +289,48 @@ describe("ecommerce video routing", () => {
   });
 });
 describe("ecommerce image cancellation routing", () => {
+  it("passes image parameters into the adapter request rather than only the prompt", async () => {
+    mocks.generate.mockResolvedValue({ url: "synthetic-result" });
+    await generateEcommerceImage({
+      modelRef: { modelId: "synthetic-image" },
+      prompt: "synthetic",
+      size: "1x1",
+      referenceImages: ["product", "style"],
+      generationParams: {
+        size: "1x1",
+        resolution: "4k",
+        quality: "xhigh",
+        background: "opaque",
+      },
+      count: 1,
+    });
+    expect(mocks.generate.mock.calls[0][1]).toMatchObject({
+      size: "1x1",
+      referenceImages: ["product", "style"],
+      params: {
+        n: 1,
+        resolution: "4k",
+        quality: "xhigh",
+        background: "opaque",
+      },
+    });
+  });
+  it("passes Gemini resolution quality and thinking to the direct request", async () => {
+    mocks.protocol = "google.generateContent";
+    mocks.direct.mockResolvedValue({ url: "synthetic-result" });
+    await generateEcommerceImage({
+      modelRef: { modelId: "synthetic-image" },
+      prompt: "synthetic",
+      size: "9x16",
+      referenceImages: [],
+      generationParams: { quality: "4k", thinking: "high" },
+    });
+    expect(mocks.direct.mock.calls[0][1]).toMatchObject({
+      size: "9x16",
+      quality: "4k",
+      thinking: "high",
+    });
+  });
   it.each(["openai.images", "google.generateContent", "openai.async.media"])(
     "forwards abort to %s without replay",
     async (protocol) => {

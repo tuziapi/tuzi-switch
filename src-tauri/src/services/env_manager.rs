@@ -15,27 +15,80 @@ pub struct BackupInfo {
     pub backup_path: String,
     pub timestamp: String,
     pub conflicts: Vec<EnvConflict>,
+    /// Process snapshots cannot be safely mutated in a multithreaded Unix app.
+    #[serde(default)]
+    pub restart_required: bool,
+    #[serde(default)]
+    pub unresolved_vars: Vec<String>,
 }
 
 /// Delete environment variables with automatic backup
 pub fn delete_env_vars(conflicts: Vec<EnvConflict>) -> Result<BackupInfo, String> {
-    // Step 1: Create backup
-    let backup_info = create_backup(&conflicts)?;
-
-    // Step 2: Delete variables
-    for conflict in &conflicts {
-        match delete_single_env(conflict) {
-            Ok(_) => {}
-            Err(e) => {
-                // If deletion fails, we keep the backup but return error
-                return Err(format!(
-                    "删除环境变量失败: {}. 备份已保存到: {}",
-                    e, backup_info.backup_path
-                ));
+    if conflicts.is_empty() {
+        return Err("请选择要删除的环境变量".into());
+    }
+    let mut targets = conflicts.clone();
+    let mut unresolved = Vec::new();
+    let mut restart = false;
+    #[cfg(not(target_os = "windows"))]
+    {
+        targets.retain(|c| c.source_type != "system");
+        let files = super::env_checker::check_env_conflicts("claude")?
+            .into_iter()
+            .chain(super::env_checker::check_env_conflicts("codex")?)
+            .chain(super::env_checker::check_env_conflicts("gemini")?)
+            .filter(|c| c.source_type == "file")
+            .collect::<Vec<_>>();
+        for conflict in &conflicts {
+            if conflict.source_type == "system" {
+                restart = true;
+                let matching = files
+                    .iter()
+                    .filter(|c| {
+                        c.var_name == conflict.var_name && c.var_value == conflict.var_value
+                    })
+                    .collect::<Vec<_>>();
+                if matching.is_empty() {
+                    unresolved.push(conflict.var_name.clone());
+                }
+                for source in matching {
+                    if !targets.iter().any(|c| {
+                        c.var_name == source.var_name && c.source_path == source.source_path
+                    }) {
+                        targets.push(source.clone());
+                    }
+                }
+            } else if std::env::var_os(&conflict.var_name).is_some() {
+                restart = true;
             }
         }
     }
-
+    let mut seen = std::collections::HashSet::new();
+    targets.retain(|c| {
+        seen.insert((
+            c.var_name.clone(),
+            c.var_value.clone(),
+            c.source_path
+                .rsplit_once(':')
+                .map(|(p, _)| p)
+                .unwrap_or(&c.source_path)
+                .to_string(),
+        ))
+    });
+    if targets.is_empty() {
+        return Err("这些变量来自启动助手的父进程，未找到可删除的配置来源。请在启动终端或启动器中移除变量，再完全退出并重开助手；本次未删除任何变量。".into());
+    }
+    let mut backup_info = create_backup(&targets)?;
+    for conflict in &targets {
+        if let Err(e) = delete_single_env(conflict) {
+            return Err(format!(
+                "删除环境变量失败: {}. 已完成的部分不会自动回滚，备份保存在: {}",
+                e, backup_info.backup_path
+            ));
+        }
+    }
+    backup_info.restart_required = restart;
+    backup_info.unresolved_vars = unresolved;
     Ok(backup_info)
 }
 
@@ -46,7 +99,7 @@ fn create_backup(conflicts: &[EnvConflict]) -> Result<BackupInfo, String> {
     fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {e}"))?;
 
     // Generate backup file name with timestamp
-    let timestamp = Utc::now().format("%Y%m%d_%H%M%S").to_string();
+    let timestamp = Utc::now().format("%Y%m%d_%H%M%S_%f").to_string();
     let backup_file = backup_dir.join(format!("env-backup-{timestamp}.json"));
 
     // Create backup data
@@ -54,20 +107,36 @@ fn create_backup(conflicts: &[EnvConflict]) -> Result<BackupInfo, String> {
         backup_path: backup_file.to_string_lossy().to_string(),
         timestamp: timestamp.clone(),
         conflicts: conflicts.to_vec(),
+        restart_required: false,
+        unresolved_vars: Vec::new(),
     };
 
     // Write backup file
     let json = serde_json::to_string_pretty(&backup_info)
         .map_err(|e| format!("序列化备份数据失败: {e}"))?;
 
-    fs::write(&backup_file, json).map_err(|e| format!("写入备份文件失败: {e}"))?;
+    use std::io::Write;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        options.mode(0o600);
+        fs::set_permissions(&backup_dir, fs::Permissions::from_mode(0o700))
+            .map_err(|e| format!("设置备份权限失败: {e}"))?;
+    }
+    let mut file = options
+        .open(&backup_file)
+        .map_err(|e| format!("创建备份文件失败: {e}"))?;
+    file.write_all(json.as_bytes())
+        .map_err(|e| format!("写入备份文件失败: {e}"))?;
 
     Ok(backup_info)
 }
 
 /// Get backup directory path
 fn get_backup_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
+    let home = crate::config::get_home_dir();
     Ok(home.join(".tuzi-switch").join("backups"))
 }
 
@@ -105,48 +174,59 @@ fn delete_single_env(conflict: &EnvConflict) -> Result<(), String> {
 fn delete_single_env(conflict: &EnvConflict) -> Result<(), String> {
     match conflict.source_type.as_str() {
         "file" => {
-            // Parse file path and line number from source_path (format: "path:line")
-            let parts: Vec<&str> = conflict.source_path.split(':').collect();
-            if parts.len() < 2 {
-                return Err("无效的文件路径格式".to_string());
-            }
-
-            let file_path = parts[0];
-
-            // Read file content
+            let (file_path, _) = conflict
+                .source_path
+                .rsplit_once(':')
+                .ok_or("无效的文件路径格式")?;
             let content = fs::read_to_string(file_path)
                 .map_err(|e| format!("读取文件失败 {file_path}: {e}"))?;
-
-            // Filter out the line containing the environment variable
-            let new_content: Vec<String> = content
-                .lines()
-                .filter(|line| {
-                    let trimmed = line.trim();
-                    let export_line = trimmed.strip_prefix("export ").unwrap_or(trimmed);
-
-                    // Check if this line sets the target variable
-                    if let Some(eq_pos) = export_line.find('=') {
-                        let var_name = export_line[..eq_pos].trim();
-                        var_name != conflict.var_name
-                    } else {
-                        true
-                    }
-                })
-                .map(|s| s.to_string())
-                .collect();
-
-            // Write back to file
-            fs::write(file_path, new_content.join("\n"))
-                .map_err(|e| format!("写入文件失败 {file_path}: {e}"))?;
-
+            let new_content = remove_assignment(&content, conflict)?;
+            // Persist atomically, retaining the source permissions and trailing newlines.
+            use std::io::Write;
+            let path = fs::canonicalize(file_path).map_err(|e| e.to_string())?;
+            let mut temp = tempfile::NamedTempFile::new_in(path.parent().ok_or("无效路径")?)
+                .map_err(|e| e.to_string())?;
+            temp.as_file()
+                .set_permissions(
+                    fs::metadata(&path)
+                        .map_err(|e| e.to_string())?
+                        .permissions(),
+                )
+                .map_err(|e| e.to_string())?;
+            temp.write_all(new_content.as_bytes())
+                .map_err(|e| e.to_string())?;
+            temp.as_file().sync_all().map_err(|e| e.to_string())?;
+            temp.persist(&path)
+                .map_err(|e| format!("写入文件失败: {}", e.error))?;
+            if fs::read_to_string(&path).map_err(|e| e.to_string())? != new_content {
+                return Err("删除后校验失败".into());
+            }
             Ok(())
         }
-        "system" => {
-            // On Unix, we can't directly delete process environment variables
-            Ok(())
-        }
+        "system" => Err("进程继承变量无法直接删除，请清理启动来源并重启助手".into()),
         _ => Err(format!("未知的环境变量来源类型: {}", conflict.source_type)),
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn remove_assignment(content: &str, conflict: &EnvConflict) -> Result<String, String> {
+    let mut removed = false;
+    let mut result = String::new();
+    for line in content.split_inclusive('\n') {
+        if let Some((name, value)) = super::env_checker::parse_assignment(line) {
+            if name == conflict.var_name {
+                if value == conflict.var_value {
+                    removed = true;
+                    continue;
+                }
+            }
+        }
+        result.push_str(line);
+    }
+    if !removed {
+        return Err("未找到可安全删除的独立赋值，请刷新检查或手动修改配置".into());
+    }
+    Ok(result)
 }
 
 /// Restore environment variables from backup
@@ -201,19 +281,21 @@ fn restore_single_env(conflict: &EnvConflict) -> Result<(), String> {
     match conflict.source_type.as_str() {
         "file" => {
             // Parse file path from source_path
-            let parts: Vec<&str> = conflict.source_path.split(':').collect();
-            if parts.is_empty() {
-                return Err("无效的文件路径格式".to_string());
-            }
-
-            let file_path = parts[0];
+            let (file_path, _) = conflict
+                .source_path
+                .rsplit_once(':')
+                .ok_or("无效的文件路径格式")?;
 
             // Read file content
             let mut content = fs::read_to_string(file_path)
                 .map_err(|e| format!("读取文件失败 {file_path}: {e}"))?;
 
             // Append the environment variable line
-            let export_line = format!("\nexport {}={}", conflict.var_name, conflict.var_value);
+            let export_line = format!(
+                "\nexport {}='{}'\n",
+                conflict.var_name,
+                conflict.var_value.replace('\'', "'\"'\"'")
+            );
             content.push_str(&export_line);
 
             // Write back to file
@@ -232,6 +314,58 @@ fn restore_single_env(conflict: &EnvConflict) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn deletion_preserves_other_commands_and_checks_stale_values() {
+        let conflict = EnvConflict {
+            var_name: "ANTHROPIC_API_KEY".into(),
+            var_value: "synthetic-only".into(),
+            source_type: "file".into(),
+            source_path: String::new(),
+        };
+        let original = "# keep\nexport ANTHROPIC_API_KEY='synthetic-only'\nexport OTHER=keep\n";
+        assert_eq!(
+            remove_assignment(original, &conflict).unwrap(),
+            "# keep\nexport OTHER=keep\n"
+        );
+        assert!(remove_assignment("export ANTHROPIC_API_KEY=new-value\n", &conflict).is_err());
+        assert!(remove_assignment(
+            "export ANTHROPIC_API_KEY=synthetic-only; echo keep\n",
+            &conflict
+        )
+        .is_err());
+        assert!(remove_assignment("# no assignment\n", &conflict).is_err());
+    }
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn deletion_rechecks_real_fixture_file_and_process_is_not_fake_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("shell:profile");
+        fs::write(
+            &file,
+            "export ANTHROPIC_API_KEY='synthetic-only'\nexport OTHER=keep\n",
+        )
+        .unwrap();
+        let mut conflict = EnvConflict {
+            var_name: "ANTHROPIC_API_KEY".into(),
+            var_value: "synthetic-only".into(),
+            source_type: "file".into(),
+            source_path: format!("{}:1", file.display()),
+        };
+        delete_single_env(&conflict).unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), "export OTHER=keep\n");
+        conflict.source_type = "system".into();
+        conflict.source_path = "Process Environment".into();
+        assert!(delete_single_env(&conflict).is_err());
+    }
+    #[test]
+    fn old_backups_keep_default_result_fields() {
+        let backup: BackupInfo =
+            serde_json::from_str(r#"{"backupPath":"synthetic","timestamp":"0","conflicts":[]}"#)
+                .unwrap();
+        assert!(!backup.restart_required);
+        assert!(backup.unresolved_vars.is_empty());
+    }
     #[test]
     fn test_backup_dir_creation() {
         let backup_dir = get_backup_dir();

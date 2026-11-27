@@ -16,11 +16,11 @@ function AnimatedSidebar({ children }: { children: ReactNode }) {
       data-exiting={!present}
       aria-hidden={!present || undefined}
       {...(!present ? { inert: "" } : {})}
-      initial={{ clipPath: "inset(0 0 100% 0)", opacity: 0, y: -12 }}
-      animate={{ clipPath: "inset(0 0 0% 0)", opacity: 1, y: 0 }}
-      exit={{ clipPath: "inset(0 0 100% 0)", opacity: 0, y: -12 }}
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -8 }}
       transition={{
-        duration: reduceMotion ? 0 : 0.28,
+        duration: reduceMotion ? 0 : 0.18,
         ease: [0.22, 1, 0.36, 1],
       }}
     >

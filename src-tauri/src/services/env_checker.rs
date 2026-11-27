@@ -103,11 +103,12 @@ fn check_system_env(keywords: &[&str]) -> Result<Vec<EnvConflict>, String> {
 fn check_shell_configs(keywords: &[&str]) -> Result<Vec<EnvConflict>, String> {
     let mut conflicts = Vec::new();
 
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let home = crate::config::get_home_dir().to_string_lossy().into_owned();
     let config_files = vec![
         format!("{}/.bashrc", home),
         format!("{}/.bash_profile", home),
         format!("{}/.zshrc", home),
+        format!("{}/.zshenv", home),
         format!("{}/.zprofile", home),
         format!("{}/.profile", home),
         "/etc/profile".to_string(),
@@ -118,30 +119,14 @@ fn check_shell_configs(keywords: &[&str]) -> Result<Vec<EnvConflict>, String> {
         if let Ok(content) = fs::read_to_string(&file_path) {
             // Parse lines for export statements
             for (line_num, line) in content.lines().enumerate() {
-                let trimmed = line.trim();
-
-                // Match patterns like: export VAR=value or VAR=value
-                if trimmed.starts_with("export ")
-                    || (!trimmed.starts_with('#') && trimmed.contains('='))
-                {
-                    let export_line = trimmed.strip_prefix("export ").unwrap_or(trimmed);
-
-                    if let Some(eq_pos) = export_line.find('=') {
-                        let var_name = export_line[..eq_pos].trim();
-                        let var_value = export_line[eq_pos + 1..].trim();
-
-                        // Check if variable name contains any keyword
-                        if keywords.iter().any(|k| var_name.to_uppercase().contains(k)) {
-                            conflicts.push(EnvConflict {
-                                var_name: var_name.to_string(),
-                                var_value: var_value
-                                    .trim_matches('"')
-                                    .trim_matches('\'')
-                                    .to_string(),
-                                source_type: "file".to_string(),
-                                source_path: format!("{}:{}", file_path, line_num + 1),
-                            });
-                        }
+                if let Some((var_name, var_value)) = parse_assignment(line) {
+                    if keywords.iter().any(|k| var_name.to_uppercase().contains(k)) {
+                        conflicts.push(EnvConflict {
+                            var_name: var_name.to_string(),
+                            var_value: var_value.to_string(),
+                            source_type: "file".into(),
+                            source_path: format!("{}:{}", file_path, line_num + 1),
+                        });
                     }
                 }
             }
@@ -151,10 +136,74 @@ fn check_shell_configs(keywords: &[&str]) -> Result<Vec<EnvConflict>, String> {
     Ok(conflicts)
 }
 
+/// Only standalone literal assignments are automatically editable; never execute shell code.
+#[cfg(not(target_os = "windows"))]
+pub(super) fn parse_assignment(line: &str) -> Option<(&str, &str)> {
+    let line = line.trim();
+    let line = line
+        .strip_prefix("export ")
+        .or_else(|| line.strip_prefix("export\t"))
+        .unwrap_or(line)
+        .trim();
+    let (name, value) = line.split_once('=')?;
+    if name.is_empty()
+        || !name
+            .chars()
+            .enumerate()
+            .all(|(i, c)| c == '_' || c.is_ascii_alphabetic() || (i > 0 && c.is_ascii_digit()))
+    {
+        return None;
+    }
+    let value = value.trim();
+    if value.starts_with('\'') || value.starts_with('"') {
+        let quote = value.chars().next()?;
+        let end = value[1..].find(quote)? + 1;
+        let tail = value[end + 1..].trim();
+        if !tail.is_empty() && !tail.starts_with('#') {
+            return None;
+        }
+        let literal = &value[1..end];
+        if quote == '"' && literal.contains(['$', '`', '\\']) {
+            return None;
+        }
+        Some((name, literal))
+    } else {
+        let value = value.split(" #").next()?.trim_end();
+        if value
+            .chars()
+            .any(|c| c.is_whitespace() || ";&|$`\\()<>".contains(c))
+        {
+            return None;
+        }
+        Some((name, value))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn parses_only_standalone_literals() {
+        assert_eq!(
+            parse_assignment("export\tANTHROPIC_API_KEY='synthetic-only' # keep"),
+            Some(("ANTHROPIC_API_KEY", "synthetic-only"))
+        );
+        assert_eq!(
+            parse_assignment("ANTHROPIC_API_KEY="),
+            Some(("ANTHROPIC_API_KEY", ""))
+        );
+        for line in [
+            "# ANTHROPIC_API_KEY=x",
+            "export ANTHROPIC_API_KEY=x; echo y",
+            "export ANTHROPIC_API_KEY=$(cat secret)",
+            "export ANTHROPIC_API_KEY=\"$SECRET\"",
+            "echo ANTHROPIC_API_KEY=x",
+        ] {
+            assert_eq!(parse_assignment(line), None);
+        }
+    }
     #[test]
     fn test_get_keywords() {
         assert_eq!(get_keywords_for_app("claude"), vec!["ANTHROPIC"]);

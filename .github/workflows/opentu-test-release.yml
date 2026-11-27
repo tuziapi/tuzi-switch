@@ -1,5 +1,5 @@
 name: OpenTu five-platform test installers
-run-name: "OpenTu 1.6.3-beta.6 · ${{ github.sha }}"
+run-name: "OpenTu 1.6.5-beta.1 · ${{ github.sha }}"
 on:
   push:
     branches: [codex/test-opentu-1117]
@@ -33,7 +33,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: python3 scripts/test_prepare_claude_local_node.py
+      - run: python3 scripts/test_publish_opentu_beta.py
       - run: python3 scripts/check-preview-gateway.py
+      - run: pnpm test:claude-local-runtime
       - run: pnpm build:creative
       - run: pnpm typecheck
       - run: pnpm exec vitest run --maxWorkers=2 --minWorkers=1
@@ -123,6 +125,11 @@ jobs:
         run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local,opentu-preview --lib local_ -- --test-threads=1
       - name: Native gateway configuration and rollback
         run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local,opentu-preview --lib claude_desktop_ -- --test-threads=1
+      - name: Native websites, renderer boundaries, compression and canvas connector
+        run: |
+          for suite in embedded_sites renderer_security creative_compression opentu_connector; do
+            cargo test --locked --release --manifest-path src-tauri/Cargo.toml --features claude-desktop-local,opentu-preview --lib "$suite" -- --test-threads=1
+          done
       - name: Build isolated test installer
         env:
           APPLE_SIGNING_IDENTITY: '-'
@@ -132,7 +139,7 @@ jobs:
       - name: Install and cold-start Windows candidate
         if: runner.os == 'Windows'
         shell: pwsh
-        run: scripts/qa/opentu-windows-install-smoke.ps1 -Installer opentu-test-artifacts/OpenTu-Preview-1.6.3-beta.6-windows-x64.exe -Output windows-installed-smoke.json
+        run: scripts/qa/opentu-windows-install-smoke.ps1 -Installer opentu-test-artifacts/OpenTu-Preview-1.6.5-beta.1-windows-x64.exe -Output windows-installed-smoke.json
       - name: Upload Windows installation evidence
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v4

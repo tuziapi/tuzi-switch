@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Tuzi Website Probe",
+  "version": "1.0.0",
+  "identifier": "com.tuziswitch.website-probe",
+  "build": {
+    "frontendDist": "../../../tests/visual/website-native-probe"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Tuzi Website Probe",
+        "width": 1000,
+        "height": 750
+      }
+    ],
+    "security": {
+      "capabilities": []
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "../../icons/icon.png"
+    ]
+  }
+}
