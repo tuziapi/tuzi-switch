@@ -24,6 +24,32 @@
 
 ## 交付状态
 
-待提交、五平台云端构建、公开测试附件及下载页验证。此条将在实际完成后补充准确 SHA、run 和产物；不将启动流程写成发布完成。
+源码 `4128b5c5bed7e3a1c9228bd29a562017a29dc5d6` 已推送测试仓库的 `codex/test-opentu-1117` 与 `main`。首次直连推送遇 TLS 网络错误，复用已有本机代理后成功；没有改全局 Git 或系统代理设置。云端 run `45938099334` 的 verify 已通过：宿主 115 文件 / 962 项、创作 209 文件 / 3,231 项、下载页 19 项、运行时 23 项、构建脚本 23 项、发布脚本 4 项以及宿主类型检查。五平台原生构建进行中，附件和下载页尚未切换。
+
+同提交本机已构建真实公开 preview 身份的 Mac ARM DMG（区别于上轮 acceptance 身份）：
+
+- 文件：`src-tauri/target/release/bundle/dmg/OpenTu 验收版_1.6.5-beta.1_aarch64.dmg`，94,027,534 字节，SHA-256 `406c19eb92240f78418799b6ca25268addded5a12c3d9cd673f74cc4c0f27a65`。这是本机产物，不替代云端公开产物摘要。
+- 只读挂载后验证 `com.tuziswitch.desktop.opentu-preview`、版本 `1.6.5-beta.1`、唯一 `tuzi-opentu-preview` 协议、ad-hoc 签名及 Node JIT entitlement。清空环境仅保留系统 PATH，包内 Node 24.22.3 的脚本、fetch、WebSocket 探针通过。
+- 媒体引擎 SHA `93a29a77d352471bf9db0997937f74237b2000b619dbef6e2dd7db81059cd6c1` 与前轮真实压缩所用引擎一致；资源、许可证和源码归档齐全。
+- 解包至独立产物目录 `tuzi-switch-artifacts/preview-165-20261127/OpenTu 验收版.app` 并启动，进程存在；没有覆盖 Applications 中应用。macOS 捕获报 `SCStreamErrorDomain -3811`，已请求解锁，未将进程存在记为 UI 验收通过。
+- 新 preview 身份未配置画布连接器，stdio 只读探针被拒绝（`-32000`）；没有添加 enabled 文件或修改 Codex 配置。前轮 acceptance 连接器成功证据不移植到此身份。
+
+五平台构建 run `45938099334` 已全部成功，包含全量 verify、五个平台实际 release features 的原生专项、安装包资源检查。Windows 另完成真实静默安装、窗口启动与再次启动；不代表完整跨平台用户界面验收。原生压缩引擎 ignored 项未在这次云端命令执行，前轮本机显式实测证据保留。
+
+五个安装包已逐个下载到本机，再由 `prepare-opentu-beta-assets.py` 统一验证版本、来源提交、run、隔离身份、文件大小、SHA 与必要运行时检查；准备对应提交的源码归档。Mac ARM 云端最终 DMG 另在本机只读挂载，签名、身份、版本、唯一启动协议及清空环境后包内 Node 执行通过。
+
+| 平台 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| macOS ARM64 | 93,931,823 | `0b311328568a7e3884730a024f88b7d6ab026e8a9d6a7a574d6574df029597df` |
+| macOS Intel | 98,306,194 | `18a9dec485c6fec03c8ab6c1cddd41a73f0be49f293894710f668bb16bca8a09` |
+| Windows x64 | 71,938,734 | `f88a3b8e397fe225a17414c4bb27b8787e13e1287e1bd5bd4ead0f4d23c3dfdf` |
+| Linux x64 | 105,514,524 | `33aa05ddb602e79823c790501eb2a02678fedb6d636720331844a85588651f4b` |
+| Linux ARM64 | 104,603,566 | `0f15d39a1a3ef92ce5580446704bb4b3652bd13225fff33fb238a869b1619c5f` |
+
+公开测试附件流程 run `45944194857` 成功。新标签 `opentu-preview-v1.6.5-beta.1` 指向准确构建 SHA；发布为非 draft 的 prerelease，8 个公开附件摘要由发布流程逐一核对。下载后的发布证明与本机已验证清单逐字节一致。稳定 Latest 仍为 `v1.5.4` / ID `433896872`，未修改正式仓库、旧标签或附件。
+
+下载页正按发布证明同步版本、五平台链接及摘要；待 Pages 成功与公网检查后记录最终结果。
+
+Windows 已实际下载并核对安装报告与 EXE 摘要一致，安装、窗口启动、再次启动、证书存储不变均通过。报告的 `productVersion` 文本为基础 Cargo 版本 `1.6.4`：当前 tauri-winres 0.3.5 从 `CARGO_PKG_VERSION` 填充字符串，tauri-build 2.5.6 只按预览配置覆盖数字版本；预览流程有意不修改基础 Cargo/package 版本。该显示差异保留为已知限制，不能用文件属性文本单独识别测试版，应以安装包名、对应 SHA、构建提交和清单为准。未将 Claude 真实对话记为通过。
 
 真实网站账号登录、全部模型效果、跨平台用户实机和正式升级仍按准备报告保留。预览版独立数据目录、无自动更新，Mac ad-hoc 签名未公证。
