@@ -52,6 +52,23 @@ jobs:
           test ! -f packages/download-page/dist/latest.json
       - uses: actions/upload-pages-artifact@v3
         with:
+          name: github-pages-${{ github.run_attempt }}
           path: packages/download-page/dist
+      - name: Wait for this attempt's page artifact to become visible
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGE_ARTIFACT: github-pages-${{ github.run_attempt }}
+        run: |
+          for attempt in $(seq 1 24); do
+            count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --paginate \
+              --jq "[.artifacts[] | select(.name == \"$PAGE_ARTIFACT\" and .expired == false)] | length")
+            if [ "$count" = "1" ]; then exit 0; fi
+            if [ "$count" != "0" ]; then echo 'Unexpected duplicate page artifacts'; exit 1; fi
+            sleep 5
+          done
+          echo 'Page artifact is not yet visible; deployment remains blocked'
+          exit 1
       - uses: actions/deploy-pages@v4
         id: deployment
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
