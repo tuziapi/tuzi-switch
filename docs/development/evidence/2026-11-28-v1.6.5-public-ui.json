@@ -1,0 +1,52 @@
+{
+  "checkedAt": "2026-11-28T06:36:08.842Z",
+  "method": "Actual Chrome UI clicks and DOM/link observations",
+  "url": "https://tuziapi.github.io/tuzi-switch/",
+  "release": "v1.6.5",
+  "pageCommit": "35da3c55a20e5ffa0e1bebc27bd65c5215df521f",
+  "pageSourceCommit": "0e9f6d94cca13ffb0c6b9f7db0cbb9feed482cf8",
+  "choices": [
+    {
+      "option": "Mac ARM64",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.5/tuzi-assistant-macos-arm64.dmg",
+      "status": "passed"
+    },
+    {
+      "option": "Mac Intel",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.5/tuzi-assistant-macos-x64.dmg",
+      "status": "passed"
+    },
+    {
+      "option": "Windows EXE",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.5/tuzi-assistant-windows-x64.exe",
+      "status": "passed"
+    },
+    {
+      "option": "Windows MSI",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.5/tuzi-assistant-windows-x64.msi",
+      "status": "passed"
+    },
+    {
+      "option": "Linux DEB",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.5/tuzi-assistant-linux-x64.deb",
+      "status": "passed"
+    },
+    {
+      "option": "Linux RPM",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.5/tuzi-assistant-linux-x64.rpm",
+      "status": "passed"
+    },
+    {
+      "option": "Linux AppImage",
+      "url": "https://github.com/tuziapi/tuzi-switch/releases/download/v1.6.5/tuzi-assistant-linux-x64.AppImage",
+      "status": "passed"
+    }
+  ],
+  "faqVersion": "v1.6.5",
+  "upgradeGuidance": "Visible: 1.6.2+ in-app update; <=1.6.1 manual install; preview data is separate",
+  "macosInstaller": "install-macos-v1.6.5.sh",
+  "restoredSelection": "Mac ARM64",
+  "limitations": [
+    "UI checks verify selected download links; public-route byte verification is separately recorded."
+  ]
+}
