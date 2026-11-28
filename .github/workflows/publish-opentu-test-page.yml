@@ -36,7 +36,7 @@ jobs:
       - name: Verify actual published beta files and build
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node packages/download-page/scripts/check-preview-publication.mjs
+        run: node packages/download-page/scripts/check-preview-publication.mjs --check-downloads
       - name: Build test page only
         env:
           VITE_RELEASE_REPOSITORY: AiW520/tuzi-switch
