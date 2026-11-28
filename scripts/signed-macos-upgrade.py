@@ -277,6 +277,29 @@ def screenshot(name):
     run(['screencapture','-x',str(output/(name+'.png'))],capture_output=True)
 
 
+def assert_native_titlebar_clearance():
+    # Exercise the actual installed renderer at the production breakpoint.
+    # A previous media rule overrode Mac padding at 1000px despite unit tests.
+    ax('set size of front window of p to {1000, 650}')
+    bounds = list(map(float, ax('return {position of front window of p, size of front window of p}').split(', ')))
+    body = '''repeat with itemRef in (get entire contents of front window of p)
+try
+if role of itemRef is "AXPopUpButton" and name of itemRef is "兔子助手导航" then
+return {position of itemRef, size of itemRef}
+end if
+end try
+end repeat
+return "missing"'''
+    raw = wait_for(lambda: (value if (value := ax(body)) != 'missing' else None), 'Native workspace navigation missing')
+    navigation = list(map(float, raw.split(', ')))
+    leading_space = navigation[0] - bounds[0]
+    assert 900 <= bounds[2] <= 1000, 'Did not exercise the narrow production window'
+    assert leading_space >= 90, 'Workspace navigation overlaps native Mac window controls'
+    assert navigation[0] + navigation[2] <= bounds[0] + bounds[2], 'Workspace navigation clipped'
+    report['nativeTitlebarGeometry'] = {'window': bounds, 'navigation': navigation, 'leadingSpace': leading_space}
+    report['checks']['nativeTitlebarClearance'] = 'passed'
+
+
 creative_title='SYNTHETIC Mac migration '+legacy_version
 
 
@@ -637,6 +660,7 @@ try:
     report['installedTarget']=assert_app(expected_target,TARGET_VERSION)
     wait_for(lambda: any(label in tree() for label in ['Codex', '兔子助手导航']),'Restarted actual app UI missing')
     assert not button(['Got it','我知道了']), 'Welcome dismissal was lost'
+    assert_native_titlebar_clearance()
     screenshot('04-automatically-restarted')
     if legacy_dir:
         assert_creative_preserved(before_upgrade_creative,'signed-upgrade')
