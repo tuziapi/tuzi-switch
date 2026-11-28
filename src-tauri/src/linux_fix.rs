@@ -18,7 +18,7 @@
 
 use std::time::Duration;
 
-use tauri::{PhysicalSize, WebviewWindow};
+use tauri::{PhysicalSize, Window};
 
 /// 在 webview realize 之后的延迟，等 GTK 主循环把 realize 事件处理完。
 /// 200ms 是社区经验值；太短 set_focus 仍会无效，太长会让首屏可交互
@@ -40,7 +40,7 @@ const RECONCILE_WAIT: Duration = Duration::from_millis(500);
 ///
 /// 调用是 fire-and-forget：内部 spawn 一个异步任务在 ~250ms 后完成。
 /// 调用线程立即返回，不阻塞 UI。
-pub(crate) fn nudge_main_window(window: WebviewWindow) {
+pub(crate) fn nudge_main_window(window: Window) {
     // 第一次 set_focus：webview 可能还没 realize，这一次通常是无效的，
     // 但成本极低（线程安全，内部 run_on_main_thread），顺手做掉。
     let _ = window.set_focus();

@@ -17,20 +17,20 @@ import {
   Wrench,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import type { VisibleApps } from "@/types";
 import type { AppId } from "@/lib/api";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { TuziAccountIcon } from "@/components/icons/TuziAccountIcon";
 import { OpentuIcon } from "@/components/icons/OpentuIcon";
 import { cn } from "@/lib/utils";
-import { settingsApi } from "@/lib/api/settings";
 import directSiteIcon from "@/assets/tuzi-direct-rabbit.png";
 import shopIcon from "@/assets/tuzi-shop.png";
 
 export type TuziView =
   | "account"
   | "creative"
+  | "direct"
+  | "shop"
   | "providers"
   | "settings"
   | "prompts"
@@ -135,12 +135,18 @@ export function TuziSidebar({
     >
       <div
         className={cn(
-          "flex items-center px-3",
+          "flex shrink-0 items-center px-3",
           collapsed ? "justify-center" : "justify-between",
         )}
       >
         {!collapsed && (
-          <div className="flex min-w-0 items-center gap-2.5 px-1">
+          <button
+            type="button"
+            aria-label="兔子助手，返回首页"
+            title="返回首页"
+            onClick={() => onNavigate("providers")}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center">
               <TuziAccountIcon size={32} />
             </span>
@@ -150,7 +156,7 @@ export function TuziSidebar({
                 Assistant workspace
               </div>
             </div>
-          </div>
+          </button>
         )}
         <button
           type="button"
@@ -169,7 +175,7 @@ export function TuziSidebar({
                 : "收起侧栏"
           }
           onClick={onToggleCollapsed}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
         >
           {presentation === "menu" ? (
             <ChevronUp className="h-4 w-4" />
@@ -181,7 +187,7 @@ export function TuziSidebar({
         </button>
       </div>
 
-      <div className="mt-5 flex min-h-0 flex-1 flex-col overflow-y-auto px-2">
+      <div className="mt-5 shrink-0 px-2">
         <div className="space-y-1">
           <button
             type="button"
@@ -210,28 +216,25 @@ export function TuziSidebar({
           {[
             {
               label: "直连站",
-              url: "https://web.tu-zi.com/",
+              view: "direct" as const,
               icon: directSiteIcon,
               red: true,
             },
             {
               label: "兔小店",
-              url: "https://store.tu-zi.com/",
+              view: "shop" as const,
               icon: shopIcon,
               red: false,
             },
-          ].map(({ label, url, icon, red }) => (
+          ].map(({ label, view, icon, red }) => (
             <button
-              key={url}
+              key={view}
               type="button"
-              className={itemClass(false)}
-              title={`${label} · 在浏览器中打开`}
+              className={itemClass(currentView === view)}
+              aria-current={currentView === view ? "page" : undefined}
+              title={label}
               aria-label={label}
-              onClick={() =>
-                void settingsApi
-                  .openExternal(url)
-                  .catch(() => toast.error("无法打开浏览器，请稍后重试"))
-              }
+              onClick={() => onNavigate(view)}
             >
               <img
                 src={icon}
@@ -250,6 +253,14 @@ export function TuziSidebar({
               {!collapsed && <span className="truncate">{label}</span>}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2"
+        aria-label="工具与工作区"
+      >
+        <div className="space-y-1">
           {!collapsed && (
             <div className="px-3 pb-1 pt-4 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">
               {t("navigation.tools")}
@@ -452,7 +463,7 @@ export function TuziSidebar({
         )}
       </div>
 
-      <div className="space-y-1 border-t border-border p-2">
+      <div className="shrink-0 space-y-1 border-t border-border p-2">
         <button
           type="button"
           onClick={onOpenSettings}

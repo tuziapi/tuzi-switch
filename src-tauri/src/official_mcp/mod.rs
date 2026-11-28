@@ -465,7 +465,7 @@ pub fn tuzi_mcp_status(
 #[tauri::command]
 pub fn tuzi_mcp_start(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     action: Action,
     connect_local: Option<bool>,
     expected_config_path: Option<String>,

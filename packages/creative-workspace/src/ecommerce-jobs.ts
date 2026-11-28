@@ -1,5 +1,8 @@
 import localforage from "localforage";
 
+const boundedOutputCount = (value: number) =>
+  Number.isFinite(value) ? Math.max(1, Math.min(4, Math.floor(value))) : 1;
+
 export const ECOMMERCE_ITEM_TIMEOUT_MS = 10 * 60 * 1000;
 export type ImageStage =
   | "preparing"
@@ -45,6 +48,9 @@ export type EcommerceBatch = {
   owner: string | null;
   size: string;
   references: File[];
+  /** Optional additions preserve readable v1 history. Legacy references have no inferred roles. */
+  referenceRoles?: Array<"product" | "style">;
+  generationParams?: Record<string, string>;
   items: EcommerceItem[];
 };
 export type ImageProgress = Partial<
@@ -79,6 +85,9 @@ export function planEcommerceImages(input: {
   apparelTypes: string[];
   counts: Record<string, number>;
   prompt: string;
+  outputMode?: "combined" | "separate";
+  outputCount?: number;
+  perOutputCounts?: Record<string, number>;
 }): Array<{ label: string; prompt: string }> {
   let labels: string[];
   if (input.tool === "product-set" && input.structure === "custom") {
@@ -102,7 +111,27 @@ export function planEcommerceImages(input: {
     if (!labels.length) labels.push("首图主视觉");
   } else if (input.tool === "apparel-set") {
     labels = input.apparelTypes.length ? input.apparelTypes : ["白底精修图"];
+  } else if (input.outputMode === "separate") {
+    labels = [
+      ...new Set(
+        input.labels.filter(
+          (label) => !["平台规范适配", "生成多种变体"].includes(label),
+        ),
+      ),
+    ];
+    if (!labels.length) labels = ["商品图片"];
   } else labels = ["商品图片"];
+  // Custom module counts are already expanded, never multiply them again.
+  if (!(input.tool === "product-set" && input.structure === "custom")) {
+    labels = labels.flatMap((label) => {
+      const count = boundedOutputCount(
+        input.perOutputCounts?.[label] ?? input.outputCount ?? 1,
+      );
+      return Array.from({ length: count }, (_, index) =>
+        count === 1 ? label : `${label} · 方案 ${index + 1}`,
+      );
+    });
+  }
   return labels.map((label, i) => ({
     label,
     prompt: `${input.prompt}。本次仅生成一张独立的「${label}」，这是整套第 ${i + 1}/${labels.length} 张。只呈现此模块，不要把整套内容拼接到一张图，不要绘制缩略图列表或编号。保持参考商品的形状、颜色、标识和材质一致，各张保持同一视觉风格。商品事实约束：仅使用用户明确提供的商品事实和原图可见的外观信息。不得推断内衬、鞋底底面等不可见结构，不得虚构材质成分、尺寸、耐用性、舒适度、功效、认证、质保或赠品；缺少依据时省略对应文案、图标和特写。没有明确要求时不得改变商品颜色、数量或磨损状态。${label.includes("对比") ? "对比图专项约束：没有提供真实前后素材和效果依据时，只展示原图中已有颜色或角度的中性并列展示，不使用 Before/After、优劣、改善、升级等暗示，不得把任何一款商品画旧、损坏或贬低。" : ""}${label.includes("角度") ? "多角度图不得凭空设计不可见的底纹、标识或内部结构，只展示有参考依据的视角。" : ""}`,

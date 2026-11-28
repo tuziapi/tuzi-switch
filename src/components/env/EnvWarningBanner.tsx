@@ -18,7 +18,7 @@ import {
 interface EnvWarningBannerProps {
   conflicts: EnvConflict[];
   onDismiss: () => void;
-  onDeleted: () => void;
+  onDeleted: () => void | Promise<void>;
 }
 
 export function EnvWarningBanner({
@@ -61,6 +61,7 @@ export function EnvWarningBanner({
   const handleDelete = async () => {
     setShowConfirmDialog(false);
     setIsDeleting(true);
+    let rechecked = false;
 
     try {
       const conflictsToDelete = conflicts.filter((c) =>
@@ -73,24 +74,43 @@ export function EnvWarningBanner({
       }
 
       const backupInfo = await deleteEnvVars(conflictsToDelete);
+      await onDeleted();
+      rechecked = true;
 
-      toast.success(t("env.delete.success"), {
-        description: t("env.backup.location", {
-          path: backupInfo.backupPath,
-        }),
-        duration: 5000,
-        closeButton: true,
-      });
+      const partial =
+        backupInfo.restartRequired ||
+        (backupInfo.unresolvedVars?.length ?? 0) > 0;
+      const notify = partial ? toast.warning : toast.success;
+      notify(
+        partial
+          ? "已清理可定位的配置来源，仍需处理进程继承变量"
+          : t("env.delete.success"),
+        {
+          description:
+            (partial
+              ? "请完全退出助手，并从不含这些变量的终端或启动器重新打开。未定位来源的变量不会被标为已删除。 "
+              : "") +
+            t("env.backup.location", {
+              path: backupInfo.backupPath,
+            }),
+          duration: 5000,
+          closeButton: true,
+        },
+      );
 
       // 清空选择并通知父组件
       setSelectedConflicts(new Set());
-      onDeleted();
     } catch (error) {
       console.error("删除环境变量失败:", error);
       toast.error(t("env.delete.error"), {
         description: String(error),
       });
     } finally {
+      if (!rechecked) {
+        await Promise.resolve(onDeleted()).catch(() =>
+          toast.error("重新检查环境变量失败，请刷新后确认删除结果"),
+        );
+      }
       setIsDeleting(false);
     }
   };
@@ -102,7 +122,9 @@ export function EnvWarningBanner({
       } else if (conflict.sourcePath.includes("HKEY_LOCAL_MACHINE")) {
         return t("env.source.systemRegistry");
       } else {
-        return t("env.source.systemEnv");
+        return conflict.sourcePath === "Process Environment"
+          ? "当前进程继承（清理启动来源后需重启）"
+          : t("env.source.systemEnv");
       }
     } else {
       return conflict.sourcePath;
@@ -111,7 +133,10 @@ export function EnvWarningBanner({
 
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 z-[100] bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-900 shadow-lg animate-slide-down">
+      <div
+        data-env-warning
+        className="fixed top-0 left-0 right-0 z-[100] bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-900 shadow-lg animate-slide-down"
+      >
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
@@ -196,7 +221,14 @@ export function EnvWarningBanner({
                               {conflict.varName}
                             </label>
                             <p className="text-xs text-muted-foreground mt-1 break-all">
-                              {t("env.field.value")}: {conflict.varValue}
+                              {t("env.field.value")}:{" "}
+                              {/KEY|TOKEN|SECRET|PASSWORD/i.test(
+                                conflict.varName,
+                              )
+                                ? conflict.varValue
+                                  ? "••••••••"
+                                  : "（空值）"
+                                : conflict.varValue}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
                               {t("env.field.source")}:{" "}

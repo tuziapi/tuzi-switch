@@ -277,6 +277,29 @@ def screenshot(name):
     run(['screencapture','-x',str(output/(name+'.png'))],capture_output=True)
 
 
+def assert_native_titlebar_clearance():
+    # Exercise the actual installed renderer at the production breakpoint.
+    # A previous media rule overrode Mac padding at 1000px despite unit tests.
+    ax('set size of front window of p to {1000, 650}')
+    bounds = list(map(float, ax('return {position of front window of p, size of front window of p}').split(', ')))
+    body = '''repeat with itemRef in (get entire contents of front window of p)
+try
+if role of itemRef is "AXPopUpButton" and name of itemRef is "兔子助手导航" then
+return {position of itemRef, size of itemRef}
+end if
+end try
+end repeat
+return "missing"'''
+    raw = wait_for(lambda: (value if (value := ax(body)) != 'missing' else None), 'Native workspace navigation missing')
+    navigation = list(map(float, raw.split(', ')))
+    leading_space = navigation[0] - bounds[0]
+    assert 900 <= bounds[2] <= 1000, 'Did not exercise the narrow production window'
+    assert leading_space >= 90, 'Workspace navigation overlaps native Mac window controls'
+    assert navigation[0] + navigation[2] <= bounds[0] + bounds[2], 'Workspace navigation clipped'
+    report['nativeTitlebarGeometry'] = {'window': bounds, 'navigation': navigation, 'leadingSpace': leading_space}
+    report['checks']['nativeTitlebarClearance'] = 'passed'
+
+
 creative_title='SYNTHETIC Mac migration '+legacy_version
 
 
@@ -327,8 +350,15 @@ def creative_record():
     return matches[0] if matches else None
 
 
-def create_creative_fixture():
+def enter_creative():
+    # New account homes use a dropdown; old releases keep a permanent sidebar.
+    if not button(['opentu 创作']):
+        press_label('兔子助手导航')
     click(['opentu 创作'])
+
+
+def create_creative_fixture():
+    enter_creative()
     click(['我的项目'])
     click(['新建项目'])
     click(['我的项目'])
@@ -373,7 +403,7 @@ def create_creative_fixture():
 
 def assert_creative_preserved(saved, label):
     assert wait_for(creative_record,'Saved creative record missing')==saved, 'Complete serialized project changed during upgrade'
-    click(['opentu 创作'])
+    enter_creative()
     click(['我的项目'])
     press_label(creative_title,prefix=True)
     # Collapsed toolbars intentionally omit the task-queue control. The
@@ -388,7 +418,7 @@ def assert_creative_preserved(saved, label):
 def native_business_attribution(version, configure=False):
     stage('native synthetic generation attribution '+version)
     (lab/'creative-version').write_text(version)
-    click(['opentu 创作'])
+    enter_creative()
     wait_for(lambda: 'text area ' in tree(),'Creative canvas not ready for native attribution')
     if configure:
         click(['创作配置'])
@@ -628,8 +658,9 @@ try:
     assert len(restarted)==1
     pid=restarted[0]; report['restartedPid']=pid
     report['installedTarget']=assert_app(expected_target,TARGET_VERSION)
-    wait_for(lambda: 'Codex' in tree(),'Restarted actual app UI missing')
+    wait_for(lambda: any(label in tree() for label in ['Codex', '兔子助手导航']),'Restarted actual app UI missing')
     assert not button(['Got it','我知道了']), 'Welcome dismissal was lost'
+    assert_native_titlebar_clearance()
     screenshot('04-automatically-restarted')
     if legacy_dir:
         assert_creative_preserved(before_upgrade_creative,'signed-upgrade')

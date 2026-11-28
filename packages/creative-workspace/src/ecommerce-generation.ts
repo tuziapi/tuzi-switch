@@ -24,6 +24,10 @@ import {
   matchesEcommerceModelType,
 } from "./ecommerce-model-capabilities";
 import { isPublicHttpMediaUrl } from "../upstream/packages/drawnix/src/utils/virtual-media-url";
+import {
+  ecommerceViduInput,
+  resolveEcommerceVideoParameters,
+} from "./ecommerce-video-parameters";
 
 export type EcommerceMediaReference = {
   value: string;
@@ -83,7 +87,8 @@ function normalizeImageResult(result: any): string[] {
   if (typeof result?.url === "string" && result.url) return [result.url];
   if (Array.isArray(result?.urls)) {
     return result.urls.filter(
-      (value: unknown): value is string => typeof value === "string" && value,
+      (value: unknown): value is string =>
+        typeof value === "string" && Boolean(value),
     );
   }
   return [];
@@ -96,6 +101,7 @@ export async function generateEcommerceImage(params: {
   referenceImages: string[];
   accountReference?: string;
   count?: number;
+  generationParams?: Record<string, string>;
   signal?: AbortSignal;
   requestId?: string;
   onSubmissionAttempt?: () => void | Promise<void>;
@@ -124,7 +130,7 @@ export async function generateEcommerceImage(params: {
     generationMode: params.referenceImages.length
       ? ("image_edit" as const)
       : ("text_to_image" as const),
-    params: { n: params.count || 1 },
+    params: { ...params.generationParams, n: params.count || 1 },
   };
 
   if (
@@ -161,6 +167,16 @@ export async function generateEcommerceImage(params: {
         image: params.referenceImages,
         size: params.size,
         count: params.count,
+        quality: params.generationParams?.quality as
+          | "1k"
+          | "2k"
+          | "4k"
+          | undefined,
+        thinking: params.generationParams?.thinking as
+          | "minimal"
+          | "medium"
+          | "high"
+          | undefined,
         model,
         modelRef: plan.modelRef,
         signal: params.signal,
@@ -224,6 +240,7 @@ export async function generateEcommerceVideo(params: {
   referenceVideo?: string;
   seconds?: string;
   aspectRatio?: string;
+  generationParams?: Record<string, string>;
   signal?: AbortSignal;
   taskId?: string;
   onSubmitted?: (taskId: string) => Promise<void>;
@@ -239,6 +256,18 @@ export async function generateEcommerceVideo(params: {
   }
   const provider = withAccountReference(plan.provider, params.accountReference);
   const config = getVideoModelConfig(plan.modelRef.modelId as any);
+  const generationParams = resolveEcommerceVideoParameters(
+    plan.modelRef.modelId,
+    params.generationParams,
+  );
+  if (!params.taskId) {
+    const input = ecommerceViduInput(
+      plan.modelRef.modelId,
+      generationParams,
+      params.referenceImages.length,
+    );
+    if (input.error) throw new Error(input.error);
+  }
   if (!matchesEcommerceModelType(plan.modelRef.modelId, "video"))
     throw new Error("所选模型不是视频模型，请在创作配置中选择视频模型。");
   if (
@@ -273,6 +302,7 @@ export async function generateEcommerceVideo(params: {
     ? "adaptive"
     : params.aspectRatio || "16:9";
   const videoParams: Record<string, unknown> = {
+    ...generationParams,
     aspect_ratio: aspectRatio,
     ratio: aspectRatio,
     ...(params.referenceVideo

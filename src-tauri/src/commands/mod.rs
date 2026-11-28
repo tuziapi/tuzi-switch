@@ -72,3 +72,6 @@ pub use usage::*;
 pub use webdav_sync::*;
 pub use workspace::*;
 pub use workbuddy_account::*;
+
+mod embedded_sites;
+pub use embedded_sites::*;

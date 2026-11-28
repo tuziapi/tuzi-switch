@@ -49,7 +49,9 @@ jobs:
           node-version: "24.22.3"
       # Standard-library-only checks; no account, trusted CA, or model call.
       - run: python3 scripts/test_prepare_claude_local_node.py
-      - run: node scripts/test-claude-local-runtime.mjs
+      # The legacy certificate proxy and its runner were removed in beta.4.
+      # Exercise retained runtime helpers; gateway integration is tested below.
+      - run: node --test src-tauri/vendor/claude-local/runtime/tuzi-strict.test.mjs src-tauri/vendor/claude-local/runtime/scripts/patch-dictation-start.test.mjs src-tauri/vendor/claude-local/runtime/scripts/patch-dictation-drain.test.mjs
       - run: python3 scripts/prepare-claude-local-node.py --target ${{ matrix.target }}
       - name: Verify embedded runtime executes on the target host
         run: |

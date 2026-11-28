@@ -23,7 +23,46 @@ const props = {
   onOpenSettings: vi.fn(),
 };
 
-describe("creative assistant dropdown", () => {
+describe("workspace assistant dropdown", () => {
+  it.each(["account", "creative", "direct", "shop"])(
+    "uses full-width dropdown for %s and routes websites locally",
+    (currentView) => {
+      const navigate = vi.fn();
+      render(
+        <TuziNavigation
+          {...props}
+          currentView={currentView}
+          onNavigate={navigate}
+        />,
+      );
+      expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "兔子助手导航" }));
+      fireEvent.click(screen.getByRole("button", { name: "直连站" }));
+      expect(navigate).toHaveBeenCalledWith("direct");
+      fireEvent.click(screen.getByRole("button", { name: "兔子助手导航" }));
+      fireEvent.click(screen.getByRole("button", { name: "兔小店" }));
+      expect(navigate).toHaveBeenCalledWith("shop");
+    },
+  );
+
+  it("separates the account workspace from the assistant tool home", async () => {
+    const navigate = vi.fn();
+    const view = render(<TuziNavigation {...props} onNavigate={navigate} />);
+    fireEvent.click(screen.getByRole("button", { name: "兔子助手导航" }));
+    fireEvent.click(screen.getByRole("button", { name: "兔子助手，返回首页" }));
+    expect(navigate).toHaveBeenCalledWith("providers");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    view.rerender(<TuziNavigation {...props} currentView="providers" collapsed={false} onNavigate={navigate} />);
+    expect(screen.getByRole("complementary", { name: "应用导航" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Codex" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "兔子助手导航" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "navigation.account" }));
+    expect(navigate).toHaveBeenLastCalledWith("account");
+    view.rerender(<TuziNavigation {...props} currentView="account" onNavigate={navigate} />);
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "兔子助手导航" })).toBeVisible();
+  });
+
   it.each([false, true])(
     "preserves the original sidebar preference (%s)",
     (collapsed) => {

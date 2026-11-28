@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
 } from "react";
 import {
   Check,
@@ -15,6 +16,8 @@ import {
   LayoutTemplate,
   LoaderCircle,
   PackageOpen,
+  PanelLeft,
+  GripVertical,
   PanelsTopLeft,
   PlaySquare,
   ScanEye,
@@ -45,6 +48,7 @@ import {
   supportsEcommerceVideoReference,
 } from "./ecommerce-generation";
 import "./ecommerce-workbench.css";
+import { useEcommerceSidebar } from "./useEcommerceSidebar";
 import {
   readEcommerceImage,
   resolveEcommerceAccountReference,
@@ -58,6 +62,18 @@ import { createEcommerceExecutor } from "./ecommerce-executor";
 import { EcommerceBatchPanel } from "./EcommerceBatchPanel";
 import { ecommerceVideos, type VideoExecutor } from "./ecommerce-video-jobs";
 import { getVideoModelConfig } from "../upstream/packages/drawnix/src/constants/video-model-config";
+import {
+  getViduVideoContract,
+  VIDU_MIX_MODEL,
+  VIDU_MIX_RATIOS,
+} from "../upstream/packages/drawnix/src/constants/vidu-video-models";
+import {
+  ecommerceVideoParameters,
+  ecommerceViduInput,
+  resolveEcommerceVideoParameters,
+} from "./ecommerce-video-parameters";
+import { EcommerceVideoParameters } from "./EcommerceVideoParameters";
+import type { ModelConfig } from "../upstream/packages/drawnix/src/constants/model-config";
 import { downloadEcommerceVideo } from "./ecommerce-video-media";
 import { prepareEcommerceImageExport } from "./ecommerce-image-output";
 import { VideoCompressionPanel } from "./VideoCompressionPanel";
@@ -69,7 +85,20 @@ import {
 import {
   readEcommercePreferences,
   saveEcommercePreferences,
+  type CreationPreferences,
 } from "./ecommerce-preferences";
+import {
+  ecommerceImageParameters,
+  resolveEcommerceImageParameters,
+  ecommercePlatformGuidance,
+  referenceRolePrompt,
+  IMAGE_PURPOSES,
+} from "./ecommerce-creation-plan";
+import {
+  ImageParameterFields,
+  OutputCounter,
+  ReferenceUpload,
+} from "./EcommerceCreationControls";
 
 type Category = "product" | "video" | "apparel";
 type ToolId =
@@ -102,6 +131,19 @@ const categories: Array<{
   { id: "apparel", label: "穿戴", icon: Shirt },
   { id: "video", label: "视频", icon: Clapperboard },
 ];
+
+// Only these tools consume additional reference images. Keep drafts per tool.
+const referenceKinds: Partial<Record<ToolId, "viral" | "style" | "person">> = {
+  "viral-replicate": "viral",
+  "product-set": "style",
+  "detail-page": "style",
+  "apparel-set": "person",
+  "model-wear": "person",
+  "pose-change": "person",
+  "ai-wear": "person",
+  "shoe-tryon": "person",
+  "underwear-change": "person",
+};
 
 const tools: Record<Category, Array<{ id: ToolId; label: string }>> = {
   product: [
@@ -834,13 +876,30 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   });
   const [category, setCategory] = useState<Category>("product");
   const [tool, setTool] = useState<ToolId>("product-set");
+  const sidebar = useEcommerceSidebar();
   const [files, setFiles] = useState<File[]>([]);
+  const [referencesByTool, setReferencesByTool] = useState<
+    Partial<Record<ToolId, File[]>>
+  >({});
+  const referenceKind = referenceKinds[tool];
+  const styleFiles = referenceKind ? referencesByTool[tool] || [] : [];
+  const setStyleFiles = (next: File[]) =>
+    setReferencesByTool((current) => ({ ...current, [tool]: next }));
+  const [creation, setCreation] = useState<CreationPreferences>(
+    () =>
+      savedPreferences.creation || {
+        paramsByModel: {},
+        modes: {},
+        counts: {},
+        perOutput: {},
+        purpose: "gallery",
+      },
+  );
   const imageInput = useRef<HTMLInputElement>(null);
   const [referenceVideo, setReferenceVideo] = useState<File | null>(null);
   const [platform, setPlatform] = useState("亚马逊");
   const [market, setMarket] = useState("美国");
   const [language, setLanguage] = useState("英文");
-  const [ratio, setRatio] = useState("1:1");
   const [prompt, setPrompt] = useState(savedPreferences.prompt ?? "");
   const [structure, setStructure] = useState<"smart" | "custom">("smart");
   const [customCounts, setCustomCounts] = useState({
@@ -851,9 +910,6 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   });
   const [activeTemplate, setActiveTemplate] = useState("original");
   const [assistBusy, setAssistBusy] = useState(false);
-  const [apparelTypes, setApparelTypes] = useState(
-    () => new Set(["白底精修图", "3D 立体效果图", "人台图"]),
-  );
   const [videoMode, setVideoMode] = useState("商品替换优先");
   const discoveredImageModels = useSelectableModels("image");
   const discoveredVideoModels = useSelectableModels("video");
@@ -927,6 +983,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const [videoRatio, setVideoRatio] = useState(
     savedPreferences.videoRatio ?? "16:9",
   );
+  // Free text and media URLs stay in this editor session; submitted jobs own a snapshot.
+  const [videoDrafts, setVideoDrafts] = useState<
+    Record<string, Record<string, string>>
+  >({});
   useEffect(() => {
     saveEcommercePreferences({
       selectedModels,
@@ -934,6 +994,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       videoDuration,
       videoSize,
       videoRatio,
+      creation,
       quickSelections: Object.fromEntries(
         Object.entries(quickSelections).map(([id, selected]) => [
           id,
@@ -948,6 +1009,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     videoDuration,
     videoSize,
     videoRatio,
+    creation,
   ]);
   const videoRecords = videoState.jobs.filter((job) => job.tool === tool);
   const videoJob =
@@ -994,7 +1056,21 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     void ecommerceVideos.load();
   }, []);
   useEffect(() => {
-    if (batch) setFiles(batch.references);
+    if (batch) {
+      setFiles(
+        batch.references.filter(
+          (_, index) => batch.referenceRoles?.[index] !== "style",
+        ),
+      );
+      if (referenceKinds[batch.tool as ToolId]) {
+        setReferencesByTool((current) => ({
+          ...current,
+          [batch.tool]: batch.references.filter(
+            (_, index) => batch.referenceRoles?.[index] === "style",
+          ),
+        }));
+      }
+    }
     setActiveResult(0);
   }, [batch?.id]);
   const [activeResult, setActiveResult] = useState(0);
@@ -1048,7 +1124,9 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       : []),
     ...activeModels,
   ];
-  const normalizedModelOptions = modelOptions.length
+  const normalizedModelOptions: Array<
+    Pick<ModelConfig, "id" | "label"> & Partial<ModelConfig>
+  > = modelOptions.length
     ? modelOptions
     : [
         {
@@ -1089,12 +1167,104 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     activeModelType,
     selectedModelRef,
   );
+  const parameterProtocol =
+    selectedInvocationPlan?.binding.requestSchema === "openai.async.image.form"
+      ? "openai.async.image.form"
+      : selectedInvocationPlan?.binding.protocol;
+  const imageParameters = ecommerceImageParameters(
+    selectedModel,
+    parameterProtocol,
+  );
+  const imageParams = resolveEcommerceImageParameters(
+    selectedModel,
+    creation.paramsByModel[selectedModels.image] || {},
+    parameterProtocol,
+  );
+  const platformGuide = ecommercePlatformGuidance(
+    platform,
+    currentTool.media === "video" ? "marketing" : creation.purpose,
+    currentTool.media === "video",
+  );
+  const outputMode = creation.modes[tool] || "combined";
+  const outputCount = creation.counts[tool] || 1;
+  const perOutputCounts = creation.perOutput[tool] || {};
+  const moduleTool = ["product-set", "detail-page", "apparel-set"].includes(
+    tool,
+  );
+  const separateOutputs = moduleTool || outputMode === "separate";
+  const setOutputCount = (count: number) =>
+    setCreation((c) => ({ ...c, counts: { ...c.counts, [tool]: count } }));
+  const setImageParam = (id: string, value: string) =>
+    setCreation((c) => ({
+      ...c,
+      paramsByModel: {
+        ...c.paramsByModel,
+        [selectedModels.image]: {
+          ...imageParams,
+          [id]: value,
+          ...(id === "background" &&
+          value === "transparent" &&
+          imageParams.output_format === "jpeg"
+            ? { output_format: "png" }
+            : {}),
+        },
+      },
+    }));
+  const imageInputError =
+    imageParams.background === "transparent" &&
+    imageParams.output_format === "jpeg"
+      ? "透明背景不能使用 JPEG，请选择 PNG 或 WebP。"
+      : platformGuide.opaque && imageParams.background === "transparent"
+        ? "当前主图方案需要不透明白底，请修改图片背景或图片用途。"
+        : tool === "viral-replicate" && !styleFiles.length
+          ? "请添加一张爆款参考图，用于复刻构图与风格。"
+          : "";
   const videoConfig = getVideoModelConfig(selectedModel as any);
-  const selectedVideoDuration = videoConfig.durationOptions.some(
+  const viduContract = getViduVideoContract(selectedModel);
+  const viduMix = selectedModel.toLowerCase() === VIDU_MIX_MODEL;
+  const videoParameters = ecommerceVideoParameters(selectedModel);
+  const videoParams = resolveEcommerceVideoParameters(selectedModel, {
+    ...creation.paramsByModel[selectedModels.video],
+    ...videoDrafts[selectedModels.video],
+  });
+  const updateVideoParam = (id: string, value: string) => {
+    if (videoParameters.find((p) => p.id === id)?.valueType === "string") {
+      setVideoDrafts((drafts) => ({
+        ...drafts,
+        [selectedModels.video]: {
+          ...drafts[selectedModels.video],
+          [id]: value,
+        },
+      }));
+    } else {
+      setCreation((c) => ({
+        ...c,
+        paramsByModel: {
+          ...c.paramsByModel,
+          [selectedModels.video]: {
+            ...c.paramsByModel[selectedModels.video],
+            [id]: value,
+          },
+        },
+      }));
+    }
+  };
+  const viduInput = ecommerceViduInput(
+    selectedModel,
+    videoParams,
+    files.length,
+  );
+  const videoDurations = viduInput.durations || videoConfig.durationOptions;
+  const maxProductImages =
+    currentTool.media === "video" ? videoConfig.imageUpload.maxCount : 3;
+  const selectedVideoDuration = videoDurations.some(
     (option) => option.value === videoDuration,
   )
     ? videoDuration
-    : videoConfig.defaultDuration;
+    : videoDurations.find((o) => o.value === videoConfig.defaultDuration)
+        ?.value ||
+      videoDurations[0]?.value ||
+      videoConfig.defaultDuration;
   const selectedVideoSize = videoConfig.sizeOptions.some(
     (option) => option.value === videoSize,
   )
@@ -1108,14 +1278,25 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     files.length,
     Boolean(referenceVideo),
   );
-  const effectiveVideoRatio = followsFirstFrame
-    ? "adaptive"
-    : sizeRatio && /^\d+:\d+$/.test(sizeRatio)
-      ? sizeRatio
-      : videoRatio;
-  const videoRatioLabel = followsFirstFrame
-    ? "跟随首帧图片"
-    : effectiveVideoRatio;
+  const effectiveVideoRatio = viduMix
+    ? VIDU_MIX_RATIOS.includes(videoRatio as any)
+      ? videoRatio
+      : "16:9"
+    : viduContract
+      ? "adaptive"
+      : followsFirstFrame
+        ? "adaptive"
+        : sizeRatio && /^\d+:\d+$/.test(sizeRatio)
+          ? sizeRatio
+          : ["16:9", "9:16"].includes(videoRatio)
+            ? videoRatio
+            : "16:9";
+  const videoRatioLabel =
+    viduContract && !viduMix
+      ? "由参考图片和模型决定"
+      : followsFirstFrame
+        ? "跟随首帧图片"
+        : effectiveVideoRatio;
   const videoToolSupported =
     tool === "video-commerce" || tool === "video-replicate";
   const videoInputError = !videoToolSupported
@@ -1132,28 +1313,49 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             ? "本地参考视频请使用 MiniMax-H3 或 Gemini Omni 1.2 Flash。Seedance 目前要求公网视频地址，尚未接入素材上传服务。"
             : files.length > videoConfig.imageUpload.maxCount
               ? `当前模型最多支持 ${videoConfig.imageUpload.maxCount} 张商品图。`
-              : "";
+              : viduInput.error ||
+                (videoConfig.imageUpload.required && !files.length
+                  ? "当前视频模型需要商品参考图。"
+                  : "");
   const templates =
     tool === "product-set" || tool === "detail-page"
       ? previewTemplates[tool]
       : [];
-  const selectedRatio =
-    ECOMMERCE_RATIOS.find((item) => item.id === ratio) ?? ECOMMERCE_RATIOS[3];
   const selectedQuickLabels = quickOptions[tool]
-    .filter((option) => quickSelections[tool].has(option.id))
+    .filter(
+      (option) =>
+        (quickSelections[tool].has(option.id) ||
+          (tool === "detail-page" && option.id === "hero")) &&
+        !["variation", "platform"].includes(option.id),
+    )
     .map((option) => option.label);
   const customTotal = Object.values(customCounts).reduce(
     (sum, count) => sum + count,
     0,
   );
-  const imagePlan = planEcommerceImages({
+  const planInput = {
     tool,
     structure,
     labels: selectedQuickLabels,
-    apparelTypes: Array.from(apparelTypes),
+    apparelTypes: tool === "apparel-set" ? selectedQuickLabels : [],
     counts: customCounts,
-    prompt: `${currentTool.title}。平台：${platform}。市场：${market}。语言：${language}。尺寸：${selectedRatio.size}。${prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放"}。整体要求：${selectedQuickLabels.join("、")}`,
+    prompt: `${currentTool.title}。${platformGuide.prompt}。市场：${market}。语言：${language}。${referenceRolePrompt(files.length, styleFiles.length, category === "apparel")}。${prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放"}。${separateOutputs ? "按本张指定方向处理，其他方向不要混入本张。" : `整体要求：${selectedQuickLabels.join("、")}`}`,
+    outputMode,
+  };
+  const baseImagePlan = planEcommerceImages(planInput);
+  const imagePlan = planEcommerceImages({
+    ...planInput,
+    outputCount: separateOutputs ? 1 : outputCount,
+    perOutputCounts: separateOutputs ? perOutputCounts : {},
   });
+  const outputPlanError =
+    separateOutputs &&
+    !selectedQuickLabels.length &&
+    !(tool === "product-set" && structure === "custom")
+      ? "请至少选择一个作品方向。"
+      : imagePlan.length > 48
+        ? "单组最多生成 48 张，请减少数量。"
+        : "";
   const taskOwner = accountBridge?.state.identity?.userId || null;
   const resumeBatch = async (itemId?: string) => {
     if (!batch) return;
@@ -1172,14 +1374,23 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   const saveImage = async (blob: Blob, name: string) => {
     try {
       if (!batch) throw new Error("请先选择生成记录。");
-      const output = await prepareEcommerceImageExport(blob, batch.size);
+      const output = batch.generationParams
+        ? blob
+        : await prepareEcommerceImageExport(blob, batch.size);
+      const extension =
+        output.type === "image/jpeg"
+          ? "jpg"
+          : output.type === "image/webp"
+            ? "webp"
+            : "png";
+      const outputName = name.replace(/\.[^.]+$/, `.${extension}`);
       if (accountBridge?.imageAction)
-        await accountBridge.imageAction("save", output, name);
+        await accountBridge.imageAction("save", output, outputName);
       else {
         const url = URL.createObjectURL(output);
         const link = document.createElement("a");
         link.href = url;
-        link.download = name;
+        link.download = outputName;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       }
@@ -1254,23 +1465,13 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
         continue;
       next.push(file);
     }
-    if (next.length > 3)
+    if (next.length > maxProductImages)
       notices.push(
-        "最多上传 3 张参考图片，多余图片未添加。可移除已有图片后重新选择。",
+        `当前模型最多上传 ${maxProductImages} 张参考图片，多余图片未添加。可移除已有图片后重新选择。`,
       );
-    setFiles(next.slice(0, 3));
+    setFiles(next.slice(0, maxProductImages));
     setError(notices.join(" "));
   };
-  const toggleSet = (
-    setter: React.Dispatch<React.SetStateAction<Set<string>>>,
-    name: string,
-  ) =>
-    setter((current) => {
-      const next = new Set(current);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
   const toggleQuickOption = (id: string) =>
     setQuickSelections((current) => {
       const nextForTool = new Set(current[tool]);
@@ -1305,59 +1506,24 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       normalizeEcommerceModuleCounts({ ...current, [key]: value || 0 }),
     );
 
-  const buildRequest = () => {
-    const body = new FormData();
-    const isVideo = currentTool.media === "video";
-    body.append("model", selectedModel);
-    body.append("platform", platform);
-    body.append("market", market);
-    body.append("language", language);
-    body.append("aspect_ratio", ratio);
-    body.append("image_size", selectedRatio.size);
-    body.append("quick_options", JSON.stringify(selectedQuickLabels));
-    body.append("module_types", JSON.stringify(selectedQuickLabels));
-    body.append("structure", tool === "product-set" ? structure : "");
-    if (tool === "product-set")
-      body.append("module_counts", JSON.stringify(customCounts));
-    if (tool === "detail-page")
-      body.append(
-        "detail_modules",
-        JSON.stringify(
-          selectedQuickLabels.length ? selectedQuickLabels : ["首屏主视觉"],
-        ),
-      );
-    body.append(
-      "prompt",
-      [
-        currentTool.title,
-        `平台：${platform}`,
-        `市场：${market}`,
-        `语言：${language}`,
-        isVideo
-          ? `视频比例：${videoRatioLabel}；时长：${selectedVideoDuration}秒；尺寸：${selectedVideoSize}`
-          : `比例：${selectedRatio.label}（${selectedRatio.size}）`,
-        prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放",
-        `快捷优化：${selectedQuickLabels.length ? selectedQuickLabels.join("、") : "按默认商业规范处理"}`,
-        `模型：${selectedModel}`,
-        `工具参数：${tool === "product-set" ? `${structure}，白底图${customCounts.whiteBackground}张、场景图${customCounts.scene}张、卖点图${customCounts.sellingPoint}张、其他${customCounts.other}张` : tool === "detail-page" ? `详情模块：${selectedQuickLabels.join("、") || "首屏主视觉"}` : tool === "apparel-set" ? Array.from(apparelTypes).join("、") : tool === "video-replicate" ? videoMode : "按工具默认参数处理"}`,
-        isVideo
-          ? "商品事实约束：只使用用户明确提供的事实；禁止推断或虚构功效、舒适度、耐用性、材质、认证。保持商品几何结构、颜色、标识和数量；未明确要求时不要添加字幕或营销文案。"
-          : "",
-        tool === "video-replicate"
-          ? "参考视频是场景、背景、构图和镜头运动的唯一依据。除用户明确指定的修改外，不得重新布景，不得新增桌布、植物、道具或其他商品，不得添加或删改镜头。白底必须保留白底；单一商品始终只保留一个。相似复刻仅允许微调节奏，不能改变原片场景。未提供替换商品图时保留原商品。"
-          : "",
-      ].join("。"),
-    );
-    body.append("size", selectedRatio.size);
-    body.append("tool", tool);
-    // Tuzi's OpenAI-compatible image edit endpoint accepts repeated `image`
-    // parts. Keep the field aligned with the live API contract so the
-    // workbench request is usable outside the mock transport as well.
-    files.forEach((file) => body.append("image", file, file.name));
-    if (referenceVideo)
-      body.append("reference_video", referenceVideo, referenceVideo.name);
-    return body;
-  };
+  const buildVideoPrompt = () =>
+    [
+      currentTool.title,
+      `平台：${platform}`,
+      `市场：${market}`,
+      `语言：${language}`,
+      `视频比例：${videoRatioLabel}；时长：${selectedVideoDuration}秒；尺寸：${selectedVideoSize}`,
+      prompt.trim() || "保持商品外观、材质和结构准确，画面自然且适合商业投放",
+      `快捷优化：${selectedQuickLabels.length ? selectedQuickLabels.join("、") : "按默认商业规范处理"}`,
+      `模型：${selectedModel}`,
+      tool === "video-replicate" ? videoMode : "",
+      "商品事实约束：只使用用户明确提供的事实；禁止推断或虚构功效、舒适度、耐用性、材质、认证。保持商品几何结构、颜色、标识和数量；未明确要求时不要添加字幕或营销文案。",
+      tool === "video-replicate"
+        ? "参考视频是场景、背景、构图和镜头运动的唯一依据。除用户明确指定的修改外，不得重新布景，不得新增桌布、植物、道具或其他商品，不得添加或删改镜头。白底必须保留白底；单一商品始终只保留一个。相似复刻仅允许微调节奏，不能改变原片场景。未提供替换商品图时保留原商品。"
+        : "",
+    ]
+      .filter(Boolean)
+      .join("。");
 
   const createVideoExecutor = (): VideoExecutor => ({
     async generate(job, signal, onSubmitted, onProgress) {
@@ -1369,17 +1535,16 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       const referenceImages = job.taskId
         ? []
         : await Promise.all(
-            files.map((file) => readEcommerceImage(file, signal)),
+            (job.references || []).map((file) =>
+              readEcommerceImage(file, signal),
+            ),
           );
-      if (
-        !job.taskId &&
-        referenceVideo &&
-        referenceVideo.size > 20 * 1024 * 1024
-      )
+      const sourceVideo = job.referenceVideo;
+      if (!job.taskId && sourceVideo && sourceVideo.size > 20 * 1024 * 1024)
         throw new Error("参考视频超过 20 MB，请选择较短的视频片段。");
       const video =
-        !job.taskId && referenceVideo
-          ? await readEcommerceImage(referenceVideo, signal)
+        !job.taskId && sourceVideo
+          ? await readEcommerceImage(sourceVideo, signal)
           : undefined;
       const urls = await generateEcommerceVideo({
         ...job,
@@ -1403,6 +1568,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
       return;
     }
     if (currentTool.media === "image") {
+      if (imageInputError || outputPlanError) {
+        setError(imageInputError || outputPlanError);
+        return;
+      }
       setError("");
       try {
         const id = await ecommerceJobs.start(
@@ -1411,8 +1580,13 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             tool,
             modelRef: selectedModelRef,
             owner: taskOwner,
-            size: selectedRatio.size,
-            references: files,
+            size: imageParams.size || "auto",
+            generationParams: imageParams,
+            references: [...files, ...styleFiles],
+            referenceRoles: [
+              ...files.map(() => "product" as const),
+              ...styleFiles.map(() => "style" as const),
+            ],
             items: imagePlan,
           },
           createEcommerceExecutor(accountBridge),
@@ -1432,18 +1606,22 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setError("");
     setActiveResult(0);
     try {
-      const requestPrompt = buildRequest().get("prompt")?.toString() || prompt;
+      const requestPrompt = buildVideoPrompt();
       const id = await ecommerceVideos.start(
         {
           tool,
           owner: taskOwner,
           modelRef: selectedModelRef,
-          prompt: requestPrompt,
+          prompt: `${requestPrompt}。${platformGuide.prompt}`,
           size: selectedVideoSize,
           seconds: selectedVideoDuration,
           aspectRatio: effectiveVideoRatio,
+          generationParams: videoParams,
+          references: files,
+          referenceVideo: referenceVideo || undefined,
         },
         createVideoExecutor(),
+        outputCount,
       );
       setSelectedVideoId(id);
     } catch (cause) {
@@ -1474,6 +1652,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
     setError("");
   };
   const changeTool = (next: ToolId) => {
+    if (sidebar.collapsed) sidebar.restore();
     setTool(next);
     setFiles([]);
     setReferenceVideo(null);
@@ -1484,7 +1663,14 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
   };
 
   return (
-    <section className="ecommerce-workbench" aria-label="电商生图工作台">
+    <section
+      className="ecommerce-workbench"
+      ref={sidebar.rootRef}
+      data-sidebar={sidebar.collapsed ? "collapsed" : "open"}
+      data-resizing={sidebar.resizing || undefined}
+      style={{ "--ec-sidebar-width": `${sidebar.width}px` } as CSSProperties}
+      aria-label="电商生图工作台"
+    >
       <header className="ecommerce-workbench__header">
         <nav className="ecommerce-category-tabs" aria-label="工具分类">
           {categories.map(({ id, label, icon: Icon }) => (
@@ -1500,8 +1686,25 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           ))}
         </nav>
       </header>
+      <div className="ec-sidebar-resizer" {...sidebar.separatorProps}>
+        <span className="ec-sidebar-resizer__grip" aria-hidden="true">
+          <GripVertical size={16} />
+        </span>
+      </div>
       <nav className="ecommerce-tool-tabs" aria-label="工具类型">
-        <span className="ecommerce-tool-tabs__label">选择创作任务</span>
+        <div className="ec-sidebar-heading">
+          <span className="ecommerce-tool-tabs__label">选择创作任务</span>
+          <button
+            className="ec-sidebar-mobile-toggle"
+            type="button"
+            aria-label={sidebar.collapsed ? "展开配置侧栏" : "收起配置侧栏"}
+            title={sidebar.collapsed ? "展开配置侧栏" : "收起配置侧栏"}
+            aria-expanded={!sidebar.collapsed}
+            onClick={sidebar.toggle}
+          >
+            <PanelLeft size={18} aria-hidden="true" />
+          </button>
+        </div>
         {tools[category].map(({ id, label }) => {
           const Icon = toolIcons[id] || LayoutTemplate;
           return (
@@ -1509,10 +1712,12 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               key={id}
               className={tool === id ? "is-active" : ""}
               aria-pressed={tool === id}
+              aria-label={label}
+              title={label}
               onClick={() => changeTool(id)}
             >
               <Icon size={17} aria-hidden="true" />
-              {label}
+              <span className="ecommerce-tool-tabs__name">{label}</span>
             </button>
           );
         })}
@@ -1525,6 +1730,30 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
             <div className="ecommerce-workbench__heading">
               <h1>{currentTool.title}</h1>
               <p>{currentTool.description}</p>
+            </div>
+            <div className="ec-plan-overview" aria-label="新任务作品概览">
+              <div>
+                <span>准备生成</span>
+                <strong>
+                  {currentTool.media === "video"
+                    ? `${outputCount} 条视频`
+                    : `${imagePlan.length} 张图片`}
+                </strong>
+                <small>
+                  {selectedModelConfig.label} · {platform}
+                </small>
+              </div>
+              <div className="ec-plan-chips">
+                {(currentTool.media === "video"
+                  ? Array.from(
+                      { length: outputCount },
+                      (_, i) => `视频方案 ${i + 1}`,
+                    )
+                  : imagePlan.map((item) => item.label)
+                ).map((label, i) => (
+                  <span key={`${label}-${i}`}>{label}</span>
+                ))}
+              </div>
             </div>
             {templates.length > 0 && (
               <div className="ecommerce-template-row" aria-label="结果模板预览">
@@ -1566,17 +1795,17 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     className={`ecommerce-preview__empty${files.length ? " ecommerce-preview__empty--add" : ""}`}
                     onClick={() => imageInput.current?.click()}
                     aria-label={
-                      files.length ? "继续添加参考图片" : "上传参考图片"
+                      files.length ? "继续添加商品原图" : "从预览区上传商品原图"
                     }
                   >
                     <ImagePlus size={24} />
                     <span>
-                      {files.length ? "添加参考图片" : "上传参考图片"}
+                      {files.length ? "添加商品原图" : "上传商品原图"}
                     </span>
                     <small>
                       {files.length
-                        ? `${files.length}/3 张`
-                        : "商品原图 · 最多 3 张"}
+                        ? `${files.length}/${maxProductImages} 张`
+                        : `商品原图 · 最多 ${maxProductImages} 张`}
                     </small>
                   </button>
                 )}
@@ -1730,12 +1959,15 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     {videoRecords.map((job) => (
                       <option key={job.id} value={job.id}>
                         {new Date(job.createdAt).toLocaleString()} ·{" "}
+                        {job.label ? `${job.label} · ` : ""}
                         {job.modelRef.modelId} ·{" "}
                         {job.status === "complete"
                           ? "已保存"
-                          : job.status === "waiting"
-                            ? "生成中"
-                            : "待核对"}
+                          : job.status === "pending"
+                            ? "待发送"
+                            : job.status === "waiting"
+                              ? "生成中"
+                              : "待核对"}
                       </option>
                     ))}
                   </select>
@@ -1774,7 +2006,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                 )}
                 {!videoBusy &&
                   videoJob.status !== "complete" &&
-                  (videoJob.taskId || videoJob.resultUrl || videoJob.video) && (
+                  (videoJob.status === "pending" ||
+                    videoJob.taskId ||
+                    videoJob.resultUrl ||
+                    videoJob.video) && (
                     <button
                       type="button"
                       onClick={() =>
@@ -1783,7 +2018,9 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                           .catch((cause) => setError(cause.message))
                       }
                     >
-                      继续获取结果（不重新生成）
+                      {videoJob.status === "pending"
+                        ? "继续生成未发送的视频"
+                        : "继续获取结果（不重新生成）"}
                     </button>
                   )}
                 {!videoBusy &&
@@ -1798,8 +2035,10 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
           </main>
           <aside className="ecommerce-workbench__panel">
             <div className="ecommerce-panel-title">
-              <span>创作设置</span>
-              <small>素材与模型</small>
+              <span>01 · 准备素材</span>
+              <small>
+                {referenceKind ? "商品与参考分开上传" : "保留商品外观与细节"}
+              </small>
             </div>
             <input
               ref={imageInput}
@@ -1807,27 +2046,37 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               accept="image/*"
               multiple
               hidden
-              aria-label="选择参考图片文件"
+              aria-label="选择商品原图文件"
               onChange={selectFiles}
             />
             <button
               type="button"
               className="ecommerce-upload"
               onClick={() => imageInput.current?.click()}
-              disabled={files.length >= 3}
+              disabled={files.length >= maxProductImages}
             >
               <Upload size={18} />
               <span>
                 {files.length
-                  ? `已选择 ${files.length}/3 张参考图片`
-                  : "上传商品原图 / 参考图片"}
+                  ? `已选择 ${files.length}/${maxProductImages} 张商品原图`
+                  : category === "apparel"
+                    ? "上传服装 / 商品原图"
+                    : "上传商品原图"}
               </span>
               <small>
-                {files.length >= 3
-                  ? "移除一张参考图片后可继续添加"
-                  : "点击添加图片，最多 3 张"}
+                {files.length >= maxProductImages
+                  ? "移除一张商品原图后可继续添加"
+                  : `点击添加图片，最多 ${maxProductImages} 张`}
               </small>
             </button>
+            {currentTool.media === "image" && referenceKind && (
+              <ReferenceUpload
+                key={tool}
+                files={styleFiles}
+                onChange={setStyleFiles}
+                kind={referenceKind}
+              />
+            )}
             {currentTool.media === "video" && (
               <label className="ecommerce-upload ecommerce-upload--video">
                 <input
@@ -1901,6 +2150,17 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     : "未找到有效接口绑定，请刷新模型列表或重新保存创作配置"}
               </small>
             </label>
+            {currentTool.media === "image" && (
+              <ImageParameterFields
+                parameters={imageParameters}
+                values={imageParams}
+                onChange={setImageParam}
+              />
+            )}
+            <div className="ec-section-heading">
+              <strong>02 · 使用场景</strong>
+              <small>平台与图片用途</small>
+            </div>
             <div className="ecommerce-fields">
               <label>
                 上架平台
@@ -1937,14 +2197,20 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               </label>
               {currentTool.media === "image" ? (
                 <label>
-                  图片/视频比例
+                  图片用途
                   <select
-                    value={ratio}
-                    onChange={(event) => setRatio(event.target.value)}
+                    value={creation.purpose}
+                    onChange={(event) =>
+                      setCreation((c) => ({
+                        ...c,
+                        purpose: event.target
+                          .value as CreationPreferences["purpose"],
+                      }))
+                    }
                   >
-                    {ECOMMERCE_RATIOS.map((item) => (
+                    {IMAGE_PURPOSES.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.label} · {item.size}
+                        {item.label}
                       </option>
                     ))}
                   </select>
@@ -1958,7 +2224,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                       value={selectedVideoDuration}
                       onChange={(event) => setVideoDuration(event.target.value)}
                     >
-                      {videoConfig.durationOptions.map((option) => (
+                      {videoDurations.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -1984,19 +2250,30 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     <select
                       aria-label="视频比例"
                       disabled={
+                        Boolean(viduContract && !viduMix) ||
                         followsFirstFrame ||
                         Boolean(sizeRatio && /^\d+:\d+$/.test(sizeRatio))
                       }
                       value={effectiveVideoRatio}
                       onChange={(event) => setVideoRatio(event.target.value)}
                     >
-                      {[...new Set(["16:9", "9:16", effectiveVideoRatio])].map(
-                        (value) => (
-                          <option key={value} value={value}>
-                            {value === "adaptive" ? "跟随首帧图片" : value}
-                          </option>
+                      {[
+                        ...new Set(
+                          viduContract && !viduMix
+                            ? ["adaptive"]
+                            : viduMix
+                              ? VIDU_MIX_RATIOS
+                              : ["16:9", "9:16", effectiveVideoRatio],
                         ),
-                      )}
+                      ].map((value) => (
+                        <option key={value} value={value}>
+                          {value === "adaptive"
+                            ? videoRatioLabel
+                            : value === "auto"
+                              ? "自动"
+                              : value}
+                        </option>
+                      ))}
                     </select>
                     {followsFirstFrame && (
                       <small>
@@ -2006,6 +2283,77 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                   </label>
                 </>
               )}
+            </div>
+            {currentTool.media === "video" && (
+              <EcommerceVideoParameters
+                parameters={videoParameters}
+                values={videoParams}
+                onChange={updateVideoParam}
+              />
+            )}
+            <div className="ec-platform-guide">
+              <div>
+                <strong>{platformGuide.label}</strong>
+                <span>建议 {platformGuide.ratio}</span>
+              </div>
+              <p>{platformGuide.guidance}</p>
+              <button
+                type="button"
+                disabled={
+                  currentTool.media === "video" &&
+                  (Boolean(viduContract && !viduMix) ||
+                    followsFirstFrame ||
+                    Boolean(sizeRatio && /^\d+:\d+$/.test(sizeRatio)))
+                }
+                onClick={() => {
+                  if (currentTool.media === "video") {
+                    setVideoRatio(platformGuide.ratio);
+                    return;
+                  }
+                  const sizeOption = imageParameters
+                    .find((p) => p.id === "size")
+                    ?.options?.find(
+                      (o) =>
+                        o.value === platformGuide.ratio.replace(":", "x") ||
+                        (platformGuide.ratio === "1:1" &&
+                          o.value === "1024x1024"),
+                    );
+                  if (!sizeOption) {
+                    setError(
+                      "当前模型没有对应比例选项，请在生成参数中选择可用尺寸。",
+                    );
+                    return;
+                  }
+                  setCreation((c) => ({
+                    ...c,
+                    paramsByModel: {
+                      ...c.paramsByModel,
+                      [selectedModels.image]: {
+                        ...imageParams,
+                        size: sizeOption.value,
+                        ...(platformGuide.opaque &&
+                        imageParameters.some((p) => p.id === "background")
+                          ? { background: "opaque" }
+                          : {}),
+                      },
+                    },
+                  }));
+                  setError("");
+                }}
+              >
+                {currentTool.media === "video" && viduContract && !viduMix
+                  ? "比例由参考图片和模型决定"
+                  : currentTool.media === "video" && followsFirstFrame
+                    ? "比例跟随首帧图片"
+                    : currentTool.media === "video" &&
+                        sizeRatio &&
+                        /^\d+:\d+$/.test(sizeRatio)
+                      ? "比例由视频尺寸决定"
+                      : `应用建议比例${platformGuide.opaque ? "与背景" : ""}`}
+              </button>
+              <small>
+                建议会写入生成要求；上架前仍需按站点与品类检查成图。
+              </small>
             </div>
             <label className="ecommerce-prompt">
               <span className="ecommerce-prompt__label">
@@ -2033,42 +2381,121 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
               />
             </label>
             <div className="ecommerce-modules ecommerce-quick-options">
+              <div className="ec-section-heading">
+                <strong>03 · 生成作品</strong>
+                <small>
+                  {currentTool.media === "video"
+                    ? "每条独立生成"
+                    : "先选方向，再确认数量"}
+                </small>
+              </div>
+              {currentTool.media === "image" && !moduleTool && (
+                <div
+                  className="ec-output-mode"
+                  role="group"
+                  aria-label="出图方式"
+                >
+                  {(
+                    [
+                      ["combined", "合并优化", "所选要求作用于同一张图"],
+                      ["separate", "分别出图", "每个方向生成独立作品"],
+                    ] as const
+                  ).map(([value, label, hint]) => (
+                    <button
+                      type="button"
+                      key={value}
+                      aria-pressed={outputMode === value}
+                      onClick={() =>
+                        setCreation((c) => ({
+                          ...c,
+                          modes: { ...c.modes, [tool]: value },
+                        }))
+                      }
+                    >
+                      <strong>{label}</strong>
+                      <small>{hint}</small>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="ecommerce-modules__title">
                 <span>
-                  <strong>快捷优化项</strong>
-                  <em>选择常用优化方向，可多选</em>
+                  <strong>
+                    {currentTool.media === "video"
+                      ? "视频共同要求"
+                      : separateOutputs
+                        ? "选择作品方向"
+                        : "快捷优化项"}
+                  </strong>
+                  <em>
+                    {separateOutputs && currentTool.media === "image"
+                      ? "各方向分别出图"
+                      : "多选共同生效，不增加数量"}
+                  </em>
                 </span>
                 <button type="button" onClick={restoreQuickDefaults}>
                   恢复推荐
                 </button>
               </div>
               <div className="ecommerce-modules__grid">
-                {quickOptions[tool].map((option) => {
-                  const checked = quickSelections[tool].has(option.id);
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={checked ? "is-selected" : ""}
-                      aria-pressed={checked}
-                      onClick={() => toggleQuickOption(option.id)}
-                    >
-                      <span className="ecommerce-check">
-                        {checked && <Check size={12} />}
-                      </span>
-                      <span>
-                        <strong>{option.label}</strong>
-                        <small>{option.hint}</small>
-                      </span>
-                    </button>
-                  );
-                })}
+                {quickOptions[tool]
+                  .filter(
+                    (option) => !["variation", "platform"].includes(option.id),
+                  )
+                  .map((option) => {
+                    const required =
+                      tool === "detail-page" && option.id === "hero";
+                    const checked =
+                      required || quickSelections[tool].has(option.id);
+                    return (
+                      <div
+                        key={option.id}
+                        className={`ec-direction-row ${checked ? "is-selected" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          className={checked ? "is-selected" : ""}
+                          aria-pressed={checked}
+                          disabled={required}
+                          onClick={() => toggleQuickOption(option.id)}
+                        >
+                          <span className="ecommerce-check">
+                            {checked && <Check size={12} />}
+                          </span>
+                          <span>
+                            <strong>{option.label}</strong>
+                            <small>{option.hint}</small>
+                          </span>
+                        </button>
+                        {checked &&
+                          separateOutputs &&
+                          currentTool.media === "image" &&
+                          !(
+                            tool === "product-set" && structure === "custom"
+                          ) && (
+                            <OutputCounter
+                              label={`${option.label}数量`}
+                              value={perOutputCounts[option.label] || 1}
+                              onChange={(n) =>
+                                setCreation((c) => ({
+                                  ...c,
+                                  perOutput: {
+                                    ...c.perOutput,
+                                    [tool]: {
+                                      ...perOutputCounts,
+                                      [option.label]: n,
+                                    },
+                                  },
+                                }))
+                              }
+                            />
+                          )}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
-            {(tool === "product-set" ||
-              tool === "video-replicate" ||
-              category === "apparel" ||
-              tool === "detail-page") && (
+            {(tool === "product-set" || tool === "video-replicate") && (
               <details className="ecommerce-advanced">
                 <summary>
                   更多设置 <span>按需调整</span>
@@ -2133,42 +2560,6 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     )}
                   </div>
                 )}
-                {tool === "detail-page" && (
-                  <div className="ecommerce-modules ecommerce-detail-modules">
-                    <div className="ecommerce-modules__title">
-                      <span>
-                        <strong>详情页模块</strong>
-                        <em>首屏主视觉为必选</em>
-                      </span>
-                      <button type="button" onClick={restoreQuickDefaults}>
-                        恢复推荐
-                      </button>
-                    </div>
-                    <div className="ecommerce-modules__grid">
-                      {DETAIL_PAGE_MODULES.map((module) => {
-                        const checked = quickSelections[tool].has(module.id);
-                        return (
-                          <button
-                            key={module.id}
-                            type="button"
-                            className={checked ? "is-selected" : ""}
-                            aria-pressed={checked}
-                            disabled={module.required}
-                            onClick={() => toggleQuickOption(module.id)}
-                          >
-                            <span className="ecommerce-check">
-                              {checked && <Check size={12} />}
-                            </span>
-                            <span>
-                              <strong>{module.label}</strong>
-                              <small>{module.hint}</small>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
                 {tool === "video-replicate" && (
                   <div className="ecommerce-choice">
                     <strong>视频复刻模式</strong>
@@ -2190,54 +2581,60 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                     </label>
                   </div>
                 )}
-                {category === "apparel" && (
-                  <div className="ecommerce-modules">
-                    <div className="ecommerce-modules__title">
-                      <strong>生成类型</strong>
-                      <span>可多选</span>
-                    </div>
-                    <div className="ecommerce-modules__grid">
-                      {[
-                        "白底精修图",
-                        "3D 立体效果图",
-                        "人台图",
-                        "细节特写图",
-                        "卖点图",
-                      ].map((name) => (
-                        <button
-                          key={name}
-                          className={
-                            apparelTypes.has(name) ? "is-selected" : ""
-                          }
-                          onClick={() => toggleSet(setApparelTypes, name)}
-                        >
-                          <span className="ecommerce-check">
-                            {apparelTypes.has(name) && <Check size={12} />}
-                          </span>
-                          <span>
-                            <strong>{name}</strong>
-                            <small>
-                              {name === "白底精修图"
-                                ? "正面/背面产品精修"
-                                : name === "人台图"
-                                  ? "使用人台展示服装"
-                                  : "突出产品细节和卖点"}
-                            </small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </details>
             )}
             {currentTool.media === "image" && (
               <div className="ecommerce-plan" aria-label="本次生成计划">
-                <strong>本次生成 {imagePlan.length} 张 · 逐张出图</strong>
-                <p>{imagePlan.map((item) => item.label).join(" · ")}</p>
+                <div className="ec-section-heading">
+                  <strong>本次生成 {imagePlan.length} 张 · 逐张出图</strong>
+                  <span className="ec-total">{imagePlan.length} 张</span>
+                </div>
+                {tool === "product-set" && structure === "custom" ? (
+                  <p>{imagePlan.map((item) => item.label).join(" · ")}</p>
+                ) : separateOutputs ? (
+                  <div className="ec-output-list">
+                    {baseImagePlan.map((item) => (
+                      <div key={item.label}>
+                        <span>{item.label}</span>
+                        <span>× {perOutputCounts[item.label] || 1}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="ec-output-list">
+                    <div>
+                      <span>优化后的图片方案</span>
+                      <OutputCounter
+                        label="图片方案数量"
+                        value={outputCount}
+                        onChange={setOutputCount}
+                      />
+                    </div>
+                  </div>
+                )}
                 <small>每张单独请求和计费，完成后立即显示并保存。</small>
               </div>
             )}
+            {currentTool.media === "video" && (
+              <div className="ecommerce-plan" aria-label="本次视频计划">
+                <div className="ec-section-heading">
+                  <strong>本次生成 {outputCount} 条视频</strong>
+                  <OutputCounter
+                    label="视频方案数量"
+                    value={outputCount}
+                    onChange={setOutputCount}
+                  />
+                </div>
+                <p>全部应用上方要求，逐条生成不同方案。</p>
+                <small>每条单独请求和计费；失败暂停后续任务。</small>
+              </div>
+            )}
+            {currentTool.media === "image" &&
+              (imageInputError || outputPlanError) && (
+                <p className="ecommerce-error" role="status">
+                  {imageInputError || outputPlanError}
+                </p>
+              )}
             {resultKind === "video" && videoInputError && (
               <p className="ecommerce-error" role="status">
                 {videoInputError}
@@ -2255,11 +2652,15 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                 modelSelectionUnavailable ||
                 (currentTool.media === "video" &&
                   (!videoState.ready || Boolean(videoInputError))) ||
-                (currentTool.media === "image" && !jobState.ready) ||
+                (currentTool.media === "image" &&
+                  (!jobState.ready ||
+                    Boolean(imageInputError) ||
+                    Boolean(outputPlanError))) ||
                 (currentTool.media === "image" && !files.length) ||
                 (currentTool.media === "video" &&
                   !files.length &&
-                  !referenceVideo) ||
+                  !referenceVideo &&
+                  !viduContract?.actions.includes("textGenerate")) ||
                 (tool === "product-set" &&
                   structure === "custom" &&
                   customTotal < 1)
@@ -2275,7 +2676,7 @@ export function EcommerceWorkbench({ accountBridge, onOpenCanvas }: Props) {
                 <>
                   <Sparkles size={17} />
                   {currentTool.media === "video"
-                    ? "生成视频"
+                    ? `生成 ${outputCount} 条视频`
                     : `生成 ${imagePlan.length} 张图片`}
                 </>
               )}

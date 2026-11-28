@@ -53,8 +53,11 @@ async function until(fn, description) {
   throw Error(description);
 }
 async function enter(page) {
-  if (!await page.getByRole('navigation', { name: '创作导航' }).isVisible())
+  if (!await page.getByRole('navigation', { name: '创作导航' }).isVisible()) {
+    if (!await page.getByRole('button', { name: 'opentu 创作', exact: true }).isVisible())
+      await page.getByRole('button', { name: '兔子助手导航', exact: true }).click();
     await page.getByRole('button', { name: 'opentu 创作', exact: true }).click();
+  }
   await page.getByRole('navigation', { name: '创作导航' }).waitFor();
 }
 export async function leaveCreative(page) {

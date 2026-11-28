@@ -6,7 +6,7 @@ parser.add_argument('--output', type=pathlib.Path, required=True)
 parser.add_argument('--sha', required=True)
 parser.add_argument('--run', type=int, required=True)
 args=parser.parse_args()
-version='1.6.3-beta.6'
+version='1.6.5-beta.3'
 tag='opentu-preview-v'+version
 repository='AiW520/tuzi-switch'
 platforms={
@@ -39,7 +39,7 @@ for platform,(target,suffix) in platforms.items():
  p=paths[0].parent/name
  assert p.is_file() and not p.is_symlink() and p.stat().st_size==m['bytes'] and digest(p)==m['sha256']
  assert set(['native-runtime-probe','release-native-integration','packaged-node-script-executed']).issubset(m['checks'])
- if platform.startswith('macos-'): assert 'node-jit-entitlement' in m['checks']
+ if platform.startswith('macos-'): assert {'node-jit-entitlement', 'isolated-deep-link'}.issubset(m['checks'])
  shutil.copy2(p,args.output/name)
  manifests.append(m)
  downloads.append({'platform':platform,'file':name,'bytes':m['bytes'],'sha256':m['sha256'],'url':base+name})

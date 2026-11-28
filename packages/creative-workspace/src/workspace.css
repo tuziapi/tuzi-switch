@@ -46,12 +46,71 @@
 .creative-rename-dialog input { width:100%; padding:10px; border:1px solid #ddd6ca; border-radius:6px; background:transparent; color:inherit; }
 .creative-rename-dialog > div { display:flex; justify-content:flex-end; gap:14px; margin-top:20px; }
 .creative-rename-dialog button { background:transparent; border:0; font-size:13px; padding:6px 12px; }
-.creative-mcp-pairing { width:min(560px,92%); max-height:calc(100% - 32px); overflow-y:auto; }
-.creative-mcp-pairing p { color:#6f6b63; font-size:12px; line-height:1.5; margin:0 0 16px; }
-.creative-mcp-pairing label { display:block; color:#6f6b63; font-size:12px; margin-top:10px; }
-.creative-mcp-pairing label input { margin-top:6px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; }
-.creative-mcp-pairing button { display:inline-flex; align-items:center; gap:6px; }
-.creative-root[data-theme=dark] .creative-mcp-pairing p, .creative-root[data-theme=dark] .creative-mcp-pairing label { color:#b4b0a9; }
+/* Connection controls use their own layout, independent of rename dialogs. */
+.creative-project-list-actions > button { display:inline-flex; align-items:center; justify-content:center; gap:8px; flex-shrink:0; white-space:nowrap; min-height:40px; line-height:20px; }
+.creative-project-list-actions > button svg { flex-shrink:0; }
+.creative-project-list-actions .creative-connect-button { padding:9px 14px; border:1px solid #ddd8ce; border-radius:9px; background:#fffefa; color:inherit; font-size:13px; }
+.creative-project-list-actions .creative-connect-button:hover { background:#f0ede6; border-color:#bdb5a7; }
+.creative-project-list-actions > label { min-height:40px; }
+.creative-mcp-pairing { --mcp-border:#e6e2da; --mcp-muted:#706b62; --mcp-soft:#f5f3ee; --mcp-surface:#fffefa; width:min(680px,calc(100% - 32px)); max-height:calc(100% - 32px); display:flex; flex-direction:column; overflow:hidden; background:var(--mcp-surface); border:1px solid var(--mcp-border); border-radius:16px; box-shadow:0 24px 80px #0003; }
+.creative-mcp-pairing p { color:var(--mcp-muted); font-size:12px; line-height:1.7; margin:0; }
+.creative-mcp-header { display:flex; align-items:flex-start; gap:12px; padding:22px 24px 18px; border-bottom:1px solid var(--mcp-border); flex-shrink:0; }
+.creative-mcp-header > div { flex:1; min-width:0; }
+.creative-mcp-header h3 { margin:0 0 5px; font-size:17px; font-weight:600; line-height:1.5; }
+.creative-mcp-icon { display:grid; place-items:center; width:40px; height:40px; flex-shrink:0; border:1px solid var(--mcp-border); border-radius:11px; background:var(--mcp-soft); }
+.creative-mcp-body { padding:20px 24px; overflow-y:auto; min-height:0; overscroll-behavior:contain; }
+.creative-mcp-connect-card { padding:18px; border:1px solid var(--mcp-border); border-radius:12px; background:var(--mcp-soft); }
+.creative-mcp-card-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.creative-mcp-card-heading h4 { font-size:14px; font-weight:600; margin:0; }
+.creative-mcp-badge { padding:3px 8px; border-radius:6px; background:#8881; color:var(--mcp-muted); font-size:11px; white-space:nowrap; }
+.creative-mcp-badge[data-configured=true] { background:#26865d18; color:#29754f; }
+.creative-mcp-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.creative-mcp-connect-card > .creative-mcp-actions { margin-top:16px; }
+.creative-mcp-pairing button { display:inline-flex; align-items:center; justify-content:center; gap:7px; flex-shrink:0; min-height:34px; padding:7px 12px; border:1px solid var(--mcp-border); border-radius:8px; background:var(--mcp-surface); color:inherit; font:inherit; font-size:12px; line-height:18px; white-space:nowrap; transition:background .15s,border-color .15s; }
+.creative-mcp-pairing button svg { flex-shrink:0; }
+.creative-mcp-pairing button:hover:not(:disabled) { background:var(--mcp-soft); border-color:#b7afa1; }
+.creative-mcp-pairing .creative-mcp-primary { background:#282724; border-color:#282724; color:#fff; padding:9px 14px; }
+.creative-mcp-pairing .creative-mcp-primary:hover:not(:disabled) { background:#45423b; }
+.creative-mcp-pairing .creative-mcp-close { padding:6px; min-height:30px; background:transparent; border-color:transparent; }
+.creative-mcp-pairing .creative-mcp-disconnect { background:transparent; color:var(--mcp-muted); }
+.creative-mcp-pairing .creative-mcp-connection-status { display:flex; align-items:flex-start; gap:6px; margin-top:12px; }
+.creative-mcp-connection-status svg { flex-shrink:0; margin-top:3px; }
+.creative-mcp-config-path { margin-top:14px; color:var(--mcp-muted); font-size:11px; }
+.creative-mcp-config-path code { display:block; margin-top:8px; overflow-wrap:anywhere; user-select:text; line-height:1.6; }
+.creative-mcp-pairing summary { cursor:pointer; line-height:1.6; }
+.creative-mcp-pairing summary:focus-visible { outline:2px solid #be8b43; outline-offset:3px; }
+.creative-mcp-manual { border:1px solid var(--mcp-border); border-radius:10px; padding:14px 16px; font-size:12px; }
+.creative-mcp-manual > summary { font-weight:500; }
+.creative-mcp-manual p { margin:12px 0; }
+.creative-mcp-manual label { display:block; color:var(--mcp-muted); font-size:12px; }
+.creative-mcp-manual input { display:block; margin-top:6px; width:100%; padding:10px; border:1px solid var(--mcp-border); border-radius:7px; background:var(--mcp-soft); color:inherit; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
+.creative-mcp-footer { padding:14px 24px; border-top:1px solid var(--mcp-border); flex-shrink:0; background:var(--mcp-surface); }
+.creative-mcp-footer > .creative-mcp-actions { justify-content:flex-end; }
+.creative-mcp-footer .creative-mcp-feedback { margin-bottom:12px; padding:10px 12px; background:var(--mcp-soft); border-radius:8px; overflow-wrap:anywhere; }
+.creative-mcp-footer .creative-mcp-feedback-error { color:#b34638; background:#cc403010; }
+.creative-mcp-pairing .opentu-connection-guide { margin:22px 0; padding-top:0; border-top:0; }
+.creative-mcp-pairing .opentu-connection-guide h4 { font-size:14px; margin-bottom:12px; }
+.creative-mcp-pairing .opentu-connection-guide ol { padding-left:20px; line-height:1.8; color:var(--mcp-muted); }
+.creative-mcp-pairing .opentu-connection-guide li + li { margin-top:8px; }
+.creative-mcp-pairing .opentu-guide-example { padding:14px; border-color:var(--mcp-border); border-radius:10px; background:transparent; }
+.creative-mcp-pairing .opentu-guide-example header { flex-wrap:wrap; gap:8px; }
+.creative-root[data-theme=dark] .creative-connect-button { background:#292925; border-color:#4d4940; }
+.creative-root[data-theme=dark] .creative-connect-button:hover { background:#34342f; border-color:#706b61; }
+.creative-root[data-theme=dark] .creative-mcp-pairing { --mcp-border:#45433c; --mcp-muted:#b4b0a9; --mcp-soft:#302f2a; --mcp-surface:#242420; }
+.creative-root[data-theme=dark] .creative-mcp-primary { background:#e6e4df; color:#252525; border-color:#e6e4df; }
+.creative-root[data-theme=dark] .creative-mcp-primary:hover:not(:disabled) { background:#d4d0c7; }
+.creative-root[data-theme=dark] .creative-mcp-badge[data-configured=true] { color:#8dceab; }
+.creative-root[data-theme=dark] .creative-mcp-feedback-error { color:#f3a296; }
+@media(max-width:560px) {
+  .creative-project-list-actions { justify-content:flex-start; width:100%; gap:8px; }
+  .creative-project-list-actions > label { width:100%; }
+  .creative-project-list-actions input { width:100%; min-width:0; }
+  .creative-mcp-header { padding:16px; gap:10px; }
+  .creative-mcp-header h3 { font-size:15px; }
+  .creative-mcp-icon { display:none; }
+  .creative-mcp-body { padding:16px; }
+  .creative-mcp-footer { padding:12px 16px; }
+}
 .creative-root[data-theme=dark] { background:#20201e; color:#e6e4df; }
 .creative-root[data-theme=dark] .creative-project-card, .creative-root[data-theme=dark] .creative-rename-dialog { background:#292925; border-color:#41403a; color:#e6e4df; }
 .creative-root[data-theme=dark] .creative-primary { background:#e6e4df; color:#252525; }

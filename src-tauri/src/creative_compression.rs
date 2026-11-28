@@ -195,7 +195,7 @@ async fn compress(
 #[tauri::command]
 pub async fn creative_compress_video(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     request: tauri::ipc::Request<'_>,
 ) -> Result<tauri::ipc::Response, String> {
     if window.label() != "main" {
@@ -267,7 +267,7 @@ pub async fn creative_compress_video(
 }
 
 #[tauri::command]
-pub fn creative_cancel_compression(window: tauri::WebviewWindow, id: String) -> Result<(), String> {
+pub fn creative_cancel_compression(window: tauri::Webview, id: String) -> Result<(), String> {
     if window.label() != "main" {
         return Err("仅主窗口可取消压缩".into());
     }

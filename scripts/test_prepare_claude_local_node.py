@@ -1,12 +1,15 @@
 import importlib.util
 import hashlib
 import io
+import json
 import os
 import plistlib
 from pathlib import Path
 import tarfile
 import stat
 import struct
+import subprocess
+import sys
 import warnings
 import zipfile
 import tempfile
@@ -22,6 +25,63 @@ build_spec.loader.exec_module(build_candidate)
 
 
 class NodeArchiveTests(unittest.TestCase):
+    def test_published_preview_deep_link_is_isolated_and_keeps_node_jit(self):
+        for target in ("aarch64-apple-darwin", "x86_64-apple-darwin"):
+            config = build_candidate.build_config(target, True, True)
+            mac = config["bundle"]["macOS"]
+            info = plistlib.loads((build_candidate.ROOT / "src-tauri" / mac["infoPlist"]).read_bytes())
+            schemes = [scheme for entry in info["CFBundleURLTypes"] for scheme in entry["CFBundleURLSchemes"]]
+            self.assertEqual(schemes, ["tuzi-opentu-preview"])
+            self.assertEqual(schemes, config["plugins"]["deep-link"]["desktop"]["schemes"])
+            self.assertTrue(mac["hardenedRuntime"])
+            self.assertEqual(mac["entitlements"], "claude-local.entitlements.plist")
+
+    def test_local_macos_bundle_cannot_register_the_official_deep_link(self):
+        root = build_candidate.ROOT / "src-tauri"
+        acceptance = json.loads((root / "tauri.acceptance.conf.json").read_text(encoding="utf-8"))
+        for config in (acceptance, build_candidate.build_config("aarch64-apple-darwin", local_acceptance=True)):
+            info = plistlib.loads((root / config["bundle"]["macOS"]["infoPlist"]).read_bytes())
+            schemes = [scheme for entry in info["CFBundleURLTypes"] for scheme in entry["CFBundleURLSchemes"]]
+            self.assertEqual(schemes, config["plugins"]["deep-link"]["desktop"]["schemes"])
+            self.assertEqual(schemes, ["tuziswitch-test"])
+        official = plistlib.loads((root / "Info.plist").read_bytes())
+        self.assertEqual(official["CFBundleURLTypes"][0]["CFBundleURLSchemes"], ["tuziswitch"])
+
+    def test_full_local_candidate_keeps_identity_resources_and_node_entitlement(self):
+        for target in stage_node.TARGETS:
+            config = build_candidate.build_config(target, local_acceptance=True)
+            self.assertEqual(config["identifier"], "com.tuziswitch.desktop.acceptance")
+            self.assertFalse(config["bundle"]["createUpdaterArtifacts"])
+            self.assertEqual(config["plugins"]["updater"]["endpoints"], [])
+            self.assertEqual(config["plugins"]["deep-link"]["desktop"]["schemes"], ["tuziswitch-test"])
+            self.assertNotIn("version", config)
+            self.assertTrue(config["bundle"]["externalBin"][0].endswith("/tuzi-claude-node"))
+            self.assertIn("claude-local-runtime/provenance.json", config["bundle"]["resources"].values())
+            window = config["app"]["windows"][0]
+            self.assertEqual(window["titleBarStyle"], "Overlay")
+            self.assertFalse(window["dragDropEnabled"])
+            if "apple" in target:
+                mac = config["bundle"]["macOS"]
+                self.assertEqual(mac["signingIdentity"], "-")
+                self.assertTrue(mac["hardenedRuntime"])
+                self.assertEqual(mac["entitlements"], "claude-local.entitlements.plist")
+        for preview, published in [(True, False), (True, True), (False, True)]:
+            with self.assertRaisesRegex(ValueError, "cannot be combined"):
+                build_candidate.build_config("aarch64-apple-darwin", preview, published, True)
+
+    def test_full_local_build_plan_never_enables_official_profile_or_updater(self):
+        script = str(Path(__file__).with_name("build-claude-local-candidate.py"))
+        output = subprocess.check_output([sys.executable, script, "--local-acceptance", "--dry-run"], text=True)
+        plan = json.loads(output)
+        command = plan["command"]
+        self.assertEqual(command[command.index("--features") + 1], "claude-desktop-local,isolated-profile")
+        self.assertNotIn("--debug", command)
+        self.assertIn("acceptance-candidate.conf.json", command[-1])
+        self.assertFalse(plan["config"]["bundle"]["createUpdaterArtifacts"])
+        for flag in ("--stable-release", "--test-release", "--opentu-preview"):
+            result = subprocess.run([sys.executable, script, "--local-acceptance", flag, "--dry-run"], capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+
     def test_official_build_preserves_identity_and_signed_updates_with_runtime(self):
         channel = {"plugins": {"updater": {"pubkey": "synthetic-public-key", "endpoints": ["https://github.com/tuziapi/tuzi-switch/releases/latest/download/latest.json"]}}}
         for target in stage_node.TARGETS:
@@ -42,7 +102,7 @@ class NodeArchiveTests(unittest.TestCase):
             build_candidate.build_config("x86_64-pc-windows-msvc", False, True)
         for target in stage_node.TARGETS:
             config = build_candidate.build_config(target, True, True)
-            self.assertEqual(config["version"], "1.6.3-beta.6")
+            self.assertEqual(config["version"], "1.6.5-beta.3")
             self.assertEqual(config["mainBinaryName"], "tuzi-opentu-preview")
             self.assertFalse(config["bundle"]["createUpdaterArtifacts"])
             self.assertEqual(config["plugins"]["updater"]["endpoints"], [])

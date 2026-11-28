@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import tempfile
 
-VERSION = '1.6.3-beta.6'
+VERSION = '1.6.5-beta.3'
 TARGETS = {
     'aarch64-apple-darwin': ('macos-arm64', '.dmg'),
     'x86_64-apple-darwin': ('macos-x64', '.dmg'),
@@ -64,11 +64,13 @@ def main():
                 assert info['CFBundleIdentifier'] == 'com.tuziswitch.desktop.opentu-preview'
                 assert info['CFBundleExecutable'] == 'tuzi-opentu-preview'
                 assert info['CFBundleShortVersionString'] == VERSION
+                schemes = [scheme for entry in info.get('CFBundleURLTypes', []) for scheme in entry.get('CFBundleURLSchemes', [])]
+                assert schemes == ['tuzi-opentu-preview'], 'Preview must not register the official deep link'
                 subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
                 node = app / 'Contents/MacOS/tuzi-claude-node'
                 verify_node_entitlements(node)
                 probe_packaged_node(node, provenance['version'])
-                checks += ['dmg-mounted', 'isolated-identity', 'beta-version', 'ad-hoc-signature', 'node-jit-entitlement', 'packaged-node-script-executed']
+                checks += ['dmg-mounted', 'isolated-identity', 'isolated-deep-link', 'beta-version', 'ad-hoc-signature', 'node-jit-entitlement', 'packaged-node-script-executed']
             finally:
                 subprocess.run(['hdiutil', 'detach', mount], check=True)
     elif suffix == '.deb':

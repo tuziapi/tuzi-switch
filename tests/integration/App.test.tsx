@@ -1,7 +1,7 @@
 import { UpdateProvider } from "@/contexts/UpdateContext";
-import { Suspense, type ComponentType } from "react";
+import { Suspense, type ComponentType, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../msw/server";
@@ -33,8 +33,8 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("@/features/creative/CreativeWorkspace", () => ({
-  CreativeWorkspace: ({ active }: { active: boolean }) =>
-    active ? <section data-testid="creative-workspace">Creative workspace</section> : null,
+  CreativeWorkspace: ({ active, navigation }: { active: boolean; navigation?: ReactNode }) =>
+    active ? <section data-testid="creative-workspace">{navigation}Creative workspace</section> : null,
 }));
 
 vi.mock("@/components/providers/ProviderList", () => ({
@@ -156,7 +156,7 @@ vi.mock("@/components/ConfirmDialog", () => ({
 vi.mock("@/components/shell/TuziSidebar", () => ({
   TuziSidebar: ({ activeApp, onSwitchApp, onNavigate, currentView }: any) => (
     <div data-testid="app-switcher">
-      <span>兔子助手</span>
+      <button onClick={() => onNavigate("providers")}>assistant-home</button>
       <button
         onClick={() => onNavigate("account")}
         aria-current={currentView === "account" ? "page" : undefined}
@@ -166,6 +166,8 @@ vi.mock("@/components/shell/TuziSidebar", () => ({
       <span>{activeApp}</span>
       {[
         "creative",
+        "direct",
+        "shop",
         "prompts",
         "skills",
         "sessions",
@@ -329,6 +331,14 @@ vi.mock("@/components/providers/NativeToolPage", () => ({
   ),
 }));
 
+async function openNavigation(firstRun = false) {
+  if (firstRun) {
+    fireEvent.click(await screen.findByRole("button", { name: "firstRunNotice.confirm" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  }
+  fireEvent.click(await screen.findByRole("button", { name: "兔子助手导航" }));
+}
+
 describe("App integration with MSW", () => {
   beforeEach(() => {
     localStorage.removeItem("tuzi-switch-last-app");
@@ -350,11 +360,30 @@ describe("App integration with MSW", () => {
     toastErrorMock.mockReset();
   });
 
+  it("reserves native Mac controls on account and website headers", async () => {
+    const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    try {
+      const { default: App } = await import("@/App");
+      renderApp(App);
+      await openNavigation(true);
+      for (const view of ["account.title", "nav-direct", "nav-shop"]) {
+        fireEvent.click(within(screen.getByRole("dialog")).getByText(view));
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        const header = screen.getByRole("banner").firstElementChild;
+        expect(header).toHaveStyle({ paddingInlineStart: "96px" });
+        await openNavigation();
+      }
+    } finally {
+      platform.mockRestore();
+    }
+  });
+
   it("leaves Escape to the active creative workspace instead of navigating to providers", async () => {
     const { default: App } = await import("@/App");
     renderApp(App);
     fireEvent.click(await screen.findByRole("button", { name: "firstRunNotice.confirm" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await openNavigation();
     fireEvent.click(screen.getByText("nav-creative"));
     expect(await screen.findByTestId("creative-workspace")).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "Escape" });
@@ -362,17 +391,71 @@ describe("App integration with MSW", () => {
     expect(screen.queryByTestId("provider-list")).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["direct", "直连站页面"],
+    ["shop", "兔小店页面"],
+  ])("returns from %s to the existing creative workspace and account home", async (view, label) => {
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    fireEvent.click(await screen.findByRole("button", { name: "firstRunNotice.confirm" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await openNavigation();
+    fireEvent.click(await screen.findByText(`nav-${view}`));
+    expect(await screen.findByRole("region", { name: label })).toBeVisible();
+    expect(screen.getByText("请在兔子助手桌面应用中使用内嵌网站")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "兔子助手导航" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByText("nav-creative"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByTestId("creative-workspace")).toBeVisible();
+    expect(screen.queryByRole("region", { name: label })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "兔子助手导航" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByText("account.title"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("app-switcher")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("creative-workspace")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "兔子助手导航" })).toBeVisible();
+    expect(screen.getByRole("main")).toHaveStyle({ marginLeft: "0px" });
+    await openNavigation();
+    fireEvent.click(screen.getByText("assistant-home"));
+    await waitFor(() => expect(screen.getByTestId("provider-list")).toBeVisible());
+    await waitFor(() => expect(screen.getByTestId("app-switcher")).toBeVisible());
+    expect(screen.getByRole("main")).toHaveStyle({ marginLeft: "228px" });
+  });
+
   it("requires an explicit target when entering a global editor from a native tool", async () => {
     localStorage.setItem("tuzi-switch-last-view", "prompts");
     localStorage.setItem("tuzi-switch-last-app", "codex");
     const { default: App } = await import("@/App");
     renderApp(App);
+    await openNavigation(true);
     fireEvent.click(await screen.findByText("nav-pi"));
     fireEvent.click(screen.getByText("nav-prompts"));
     expect(screen.queryByTestId("prompt-target")).not.toBeInTheDocument();
     expect(
       await screen.findByRole("combobox", { name: "navigation.targetTool" }),
     ).toHaveValue("");
+  });
+
+  it.each([false, true])("preserves the assistant tool and collapsed preference (%s) across account visits", async (collapsed) => {
+    localStorage.setItem("tuzi-switch-last-app", "codex");
+    localStorage.setItem("tuzi-sidebar-collapsed", String(collapsed));
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    await openNavigation(true);
+    fireEvent.click(screen.getByText("assistant-home"));
+    await waitFor(() => expect(screen.getByTestId("provider-list")).toBeVisible());
+    expect(screen.getByTestId("current-provider")).toHaveTextContent("codex-1");
+    expect(screen.getByRole("main")).toHaveStyle({ marginLeft: collapsed ? "68px" : "228px" });
+    fireEvent.click(screen.getByRole("button", { name: "account.title" }));
+    await waitFor(() => expect(screen.queryByTestId("app-switcher")).not.toBeInTheDocument());
+    expect(screen.getByRole("main")).toHaveStyle({ marginLeft: "0px" });
+    expect(screen.getByRole("banner")).toHaveStyle({ left: "0px", top: "0px", height: "44px" });
+    await openNavigation();
+    fireEvent.click(screen.getByText("assistant-home"));
+    await waitFor(() => expect(screen.getByTestId("provider-list")).toBeVisible());
+    expect(screen.getByTestId("current-provider")).toHaveTextContent("codex-1");
+    expect(screen.getByRole("main")).toHaveStyle({ marginLeft: collapsed ? "68px" : "228px" });
+    expect(localStorage.getItem("tuzi-sidebar-collapsed")).toBe(String(collapsed));
   });
 
   it("routes the Agents entry through the real native file API after explicit target selection", async () => {
@@ -399,6 +482,7 @@ describe("App integration with MSW", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
+    await openNavigation();
     fireEvent.click(screen.getByText("nav-pi"));
     fireEvent.click(screen.getByText("nav-agents"));
     expect(reads).toEqual([]);
@@ -415,6 +499,7 @@ describe("App integration with MSW", () => {
     localStorage.setItem("tuzi-switch-last-view", "auth");
     const { default: App } = await import("@/App");
     renderApp(App);
+    await openNavigation(true);
     fireEvent.click(await screen.findByText("nav-auth"));
     expect(await screen.findByTestId("tool-auth-center")).toBeInTheDocument();
     expect(screen.getByText("navigation.authScope")).toBeInTheDocument();
@@ -434,7 +519,7 @@ describe("App integration with MSW", () => {
     async (entry) => {
       const { default: App } = await import("@/App");
       renderApp(App);
-      await screen.findByTestId("app-switcher");
+      await screen.findByRole("button", { name: "兔子助手导航" });
       const notice = await screen.findByRole("button", {
         name: "firstRunNotice.confirm",
       });
@@ -444,6 +529,7 @@ describe("App integration with MSW", () => {
           expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
         );
       }
+      await openNavigation();
       fireEvent.click(screen.getByText(entry));
       fireEvent.click(screen.getByText("nav-skills"));
       expect(
@@ -471,7 +557,7 @@ describe("App integration with MSW", () => {
       localStorage.setItem("tuzi-switch-last-app", "codex");
       const { default: App } = await import("@/App");
       renderApp(App);
-      await screen.findByTestId("app-switcher");
+      await screen.findByRole("button", { name: "兔子助手导航" });
       const notice = await screen.findByRole("button", {
         name: "firstRunNotice.confirm",
       });
@@ -488,10 +574,12 @@ describe("App integration with MSW", () => {
       expect(screen.queryByTestId("provider-list")).not.toBeInTheDocument();
       expect(localStorage.getItem("tuzi-switch-last-app")).toBe("codex");
       expect(screen.getByText("兔子助手")).toBeInTheDocument();
-      expect(screen.getByTestId("app-switcher")).toBeInTheDocument();
+      expect(screen.queryByTestId("app-switcher")).not.toBeInTheDocument();
+      expect(screen.getByRole("main")).toHaveStyle({ marginLeft: "0px" });
       expect(
         screen.queryByRole("button", { name: "account.tools" }),
       ).not.toBeInTheDocument();
+      await openNavigation();
       fireEvent.click(screen.getByText("switch-claude"));
       expect(await screen.findByTestId("provider-list")).toBeInTheDocument();
       fireEvent.click(screen.getByText("switch-openclaw"));
@@ -520,7 +608,7 @@ describe("App integration with MSW", () => {
     );
     const { default: App } = await import("@/App");
     renderApp(App);
-    await screen.findByTestId("app-switcher");
+    await screen.findByRole("button", { name: "兔子助手导航" });
     fireEvent.click(
       await screen.findByRole("button", { name: "firstRunNotice.confirm" }),
     );
@@ -566,14 +654,13 @@ describe("App integration with MSW", () => {
       );
       const { default: App } = await import("@/App");
       renderApp(App);
-      await screen.findByTestId("app-switcher");
+      await screen.findByRole("button", { name: "兔子助手导航" });
       fireEvent.click(
         await screen.findByRole("button", { name: "firstRunNotice.confirm" }),
       );
       await waitFor(() =>
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
       );
-      fireEvent.click(screen.getByRole("button", { name: "account.title" }));
       fireEvent.click(await screen.findByText("configure-synthetic-key"));
       fireEvent.click(await screen.findByText(`prepare-${tool}`));
       expect(await screen.findByTestId("native-page")).toHaveTextContent(tool);
@@ -590,6 +677,7 @@ describe("App integration with MSW", () => {
   it("covers basic provider flows via real hooks", async () => {
     const { default: App } = await import("@/App");
     renderApp(App);
+    await openNavigation(true);
     fireEvent.click(await screen.findByText("switch-claude"));
 
     await waitFor(() =>
@@ -648,6 +736,7 @@ describe("App integration with MSW", () => {
   it("shows toast when auto sync fails in background", async () => {
     const { default: App } = await import("@/App");
     renderApp(App);
+    await openNavigation(true);
     fireEvent.click(await screen.findByText("switch-claude"));
 
     await waitFor(() =>
@@ -677,6 +766,7 @@ describe("App integration with MSW", () => {
 
     const { default: App } = await import("@/App");
     renderApp(App);
+    await openNavigation(true);
     fireEvent.click(await screen.findByText("switch-claude"));
 
     await waitFor(() =>
@@ -721,6 +811,7 @@ describe("App integration with MSW", () => {
     const { default: App } = await import("@/App");
     renderApp(App);
 
+    await openNavigation(true);
     fireEvent.click(screen.getByText("switch-codex"));
     await waitFor(() =>
       expect(screen.getByTestId("provider-list").textContent).toContain(
@@ -764,6 +855,7 @@ describe("App integration with MSW", () => {
     const { default: App } = await import("@/App");
     renderApp(App);
 
+    await openNavigation(true);
     fireEvent.click(screen.getByText("switch-openclaw"));
 
     await waitFor(() =>
@@ -816,6 +908,7 @@ describe("App integration with MSW", () => {
     const { default: App } = await import("@/App");
     renderApp(App);
 
+    await openNavigation(true);
     fireEvent.click(screen.getByText("switch-openclaw"));
 
     await waitFor(() =>

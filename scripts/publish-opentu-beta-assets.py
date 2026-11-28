@@ -7,7 +7,7 @@ import re
 import subprocess
 
 REPO = 'AiW520/tuzi-switch'
-TAG = 'opentu-preview-v1.6.3-beta.6'
+TAG = 'opentu-preview-v1.6.5-beta.3'
 
 def gh(*args):
     return subprocess.check_output(['gh', *args], text=True).strip()
@@ -44,8 +44,8 @@ def create_draft(sha):
     release = json.loads(gh('api', '-X', 'POST', f'repos/{REPO}/releases',
         '-f', f'tag_name={TAG}', '-f', f'target_commitish={sha}',
         '-F', 'draft=true', '-F', 'prerelease=true', '-f', 'make_latest=false',
-        '-f', 'name=OpenTu 1.6.3-beta.6 电商创作测试版',
-        '-F', 'body=@docs/releases/opentu-preview-v1.6.3-beta.6.md'))
+        '-f', 'name=OpenTu 1.6.5-beta.3 集成测试版',
+        '-F', 'body=@docs/releases/opentu-preview-v1.6.5-beta.3.md'))
     draft = select_draft([release])
     assert draft is not None, 'Create response did not identify the expected draft'
     return draft

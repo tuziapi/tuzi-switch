@@ -5,10 +5,21 @@ import { describe, expect, it } from "vitest";
 // Tauri replaces the windows array when applying a platform/build override.
 // Every shipped/test main window must deliver OS file drops to the HTML canvas.
 describe("creative desktop file drop configuration", () => {
+  it.each(["tauri.acceptance.conf.json", "tauri.opentu-preview.conf.json"])("%s keeps the Mac titlebar aligned with production website geometry", (file) => {
+    const mainWindow = (file: string) => JSON.parse(
+      readFileSync(resolve("src-tauri", file), "utf8"),
+    ).app.windows.find((window: { label: string }) => window.label === "main");
+    expect(mainWindow("tauri.conf.json").titleBarStyle).toBe("Overlay");
+    expect(mainWindow(file).titleBarStyle).toBe(
+      mainWindow("tauri.conf.json").titleBarStyle,
+    );
+    expect(mainWindow(file).hiddenTitle).toBe(true);
+  });
   it.each([
     "tauri.conf.json",
     "tauri.windows.conf.json",
     "tauri.acceptance.conf.json",
+    "tauri.opentu-preview.conf.json",
     "tauri.preview.conf.json",
     "tauri.creative-preview.conf.json",
   ])("%s preserves the canvas file-drop event path", (file) => {

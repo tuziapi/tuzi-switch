@@ -57,7 +57,7 @@ fn export_mcp_media(
 #[tauri::command]
 pub async fn creative_export_mcp_media(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     request: tauri::ipc::Request<'_>,
 ) -> Result<McpMediaExport, String> {
     if window.label() != "main" {
@@ -130,7 +130,7 @@ fn copy_video_path(path: &std::path::Path, action: VideoAction) -> Result<(), St
 #[tauri::command]
 pub async fn creative_video_action(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     request: tauri::ipc::Request<'_>,
 ) -> Result<String, String> {
     if window.label() != "main" {
@@ -207,7 +207,7 @@ fn media_extension(bytes: &[u8], kind: &str) -> Result<&'static str, String> {
 #[tauri::command]
 pub async fn creative_save_media(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     request: tauri::ipc::Request<'_>,
 ) -> Result<String, String> {
     if window.label() != "main" {

@@ -13,10 +13,16 @@ export type EcommerceVideoJob = {
   size: string;
   seconds: string;
   aspectRatio: string;
+  /** Optional for legacy records. Only model parameters, never provider credentials. */
+  generationParams?: Record<string, string>;
+  batchId?: string;
+  label?: string;
+  references?: File[];
+  referenceVideo?: File;
   taskId?: string;
   resultUrl?: string;
   video?: Blob;
-  status: "waiting" | "complete" | "interrupted";
+  status: "pending" | "waiting" | "complete" | "interrupted";
   error?: string;
 };
 type Storage = {
@@ -39,6 +45,7 @@ export class EcommerceVideoStore {
   private listeners = new Set<() => void>();
   private controller?: AbortController;
   private loading?: Promise<void>;
+  private stopQueue = false;
   private writes: Promise<unknown> = Promise.resolve();
   private state = {
     ready: false,
@@ -109,34 +116,81 @@ export class EcommerceVideoStore {
   async start(
     input: Omit<EcommerceVideoJob, "version" | "id" | "createdAt" | "status">,
     executor: VideoExecutor,
+    count = 1,
   ) {
     await this.load();
     if (!this.state.ready) throw new Error(this.state.storageError);
     if (this.state.activeId) throw new Error("已有视频任务正在执行。");
-    const job: EcommerceVideoJob = {
+    if (!Number.isInteger(count) || count < 1 || count > 4)
+      throw new Error("请选择 1–4 条视频。");
+    const batchId = crypto.randomUUID();
+    const jobs: EcommerceVideoJob[] = Array.from({ length: count }, (_, i) => ({
       ...input,
+      modelRef: { ...input.modelRef },
+      generationParams: input.generationParams
+        ? { ...input.generationParams }
+        : undefined,
+      references: input.references ? [...input.references] : undefined,
       version: 1,
       id: crypto.randomUUID(),
+      batchId,
+      label: `方案 ${i + 1}/${count}`,
+      prompt:
+        count > 1
+          ? `${input.prompt}。这是同组第 ${i + 1}/${count} 条独立视频，保持商品一致，在允许的创作范围内形成不同方案。`
+          : input.prompt,
       createdAt: Date.now(),
-      status: "waiting",
-    };
-    this.state.jobs.unshift(job);
-    void this.run(job, executor);
-    return job.id;
+      status: "pending",
+    }));
+    this.stopQueue = false;
+    this.state.activeId = jobs[0].id;
+    this.state.jobs.unshift(...jobs);
+    this.emit();
+    try {
+      for (const job of jobs) await this.save(job);
+    } catch (error) {
+      this.state.activeId = "";
+      this.emit();
+      throw error;
+    }
+    void this.runQueue(jobs, executor);
+    return jobs[0].id;
   }
   async resume(id: string, owner: string | null, executor: VideoExecutor) {
     if (this.state.activeId) throw new Error("已有视频任务正在执行。");
     const job = this.state.jobs.find((job) => job.id === id);
     if (!job || job.owner !== owner)
       throw new Error("请切回创建视频时使用的账户。");
-    if (!job.taskId && !job.resultUrl && !job.video)
+    if (job.status !== "pending" && !job.taskId && !job.resultUrl && !job.video)
       throw new Error("未取得任务编号，请先核对调用记录。不会自动重发请求。");
-    void this.run(job, executor);
+    this.stopQueue = false;
+    const pending = job.batchId
+      ? this.state.jobs.filter(
+          (j) =>
+            j.id !== job.id &&
+            j.batchId === job.batchId &&
+            j.status === "pending",
+        )
+      : [];
+    void this.runQueue([job, ...pending], executor);
   }
   pause() {
+    this.stopQueue = true;
     this.controller?.abort(
       new Error("已停止等待，服务端可能仍在生成；可继续查询原任务。"),
     );
+  }
+  private async runQueue(jobs: EcommerceVideoJob[], executor: VideoExecutor) {
+    try {
+      for (const job of jobs) {
+        if (this.stopQueue) break;
+        await this.run(job, executor);
+        if (job.status !== "complete") break;
+      }
+    } finally {
+      this.state.activeId = "";
+      this.emit();
+    }
   }
   private async run(job: EcommerceVideoJob, executor: VideoExecutor) {
     const controller = new AbortController();
@@ -195,7 +249,6 @@ export class EcommerceVideoStore {
     } finally {
       clearTimeout(timer);
       this.controller = undefined;
-      this.state.activeId = "";
       this.emit();
     }
   }

@@ -13,6 +13,7 @@ mod codex_config;
 mod codex_history_migration;
 mod codex_state_db;
 mod commands;
+mod renderer_security;
 mod config;
 mod creative_http;
 mod creative_attribution;
@@ -155,7 +156,7 @@ fn handle_deeplink_url(
 
     if crate::tuzi_account::handle_callback(app, url_str) {
         if focus_main_window {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
@@ -182,7 +183,7 @@ fn handle_deeplink_url(
             }
 
             if focus_main_window {
-                if let Some(window) = app.get_webview_window("main") {
+                if let Some(window) = app.get_window("main") {
                     let _ = window.unminimize();
                     let _ = window.show();
                     let _ = window.set_focus();
@@ -288,7 +289,7 @@ pub fn run() {
             }
 
             // Show and focus window regardless
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
@@ -1179,7 +1180,7 @@ pub fn run() {
             // Linux: 禁用 WebKitGTK 硬件加速，防止 EGL 初始化失败导致白屏
             #[cfg(target_os = "linux")]
             {
-                if let Some(window) = app.get_webview_window("main") {
+                if let Some(window) = app.get_webview("main") {
                     let _ = window.with_webview(|webview| {
                         use webkit2gtk::{WebViewExt, SettingsExt, HardwareAccelerationPolicy};
                         let wk_webview = webview.inner();
@@ -1193,7 +1194,7 @@ pub fn run() {
 
             // 静默启动：根据设置决定是否显示主窗口
             let settings = crate::settings::get_settings();
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 // 在窗口首次显示前同步装饰状态，避免前端加载后再切换导致标题栏闪烁
                 // 仅 Linux 生效：解决 Wayland 下系统窗口按钮不可用的问题
                 #[cfg(target_os = "linux")]
@@ -1224,7 +1225,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(renderer_security::guard(tauri::generate_handler![
             aggregation::aggregation_read,
             aggregation::aggregation_apply,
             native_tools::native_tool_read,
@@ -1302,6 +1303,8 @@ pub fn run() {
             commands::pick_directory,
             commands::open_external,
             commands::open_webview_with_key,
+            commands::sync_embedded_site,
+            commands::embedded_site_action,
             commands::get_init_error,
             commands::get_migration_result,
             commands::get_skills_migration_result,
@@ -1608,7 +1611,7 @@ pub fn run() {
             commands::enter_lightweight_mode,
             commands::exit_lightweight_mode,
             commands::is_lightweight_mode,
-        ]);
+        ]));
 
     let app = builder
         .build(tauri::generate_context!())
@@ -1627,7 +1630,7 @@ pub fn run() {
                     api.prevent_exit();
                     log::warn!("{message}");
                     let _ = app_handle.emit("claude-local-exit-blocked", message);
-                    if let Some(window) = app_handle.get_webview_window("main") {
+                    if let Some(window) = app_handle.get_window("main") {
                         let _ = window.show();
                         let _ = window.set_focus();
                     }
@@ -1676,7 +1679,7 @@ pub fn run() {
             match event {
                 // macOS 在 Dock 图标被点击并重新激活应用时会触发 Reopen 事件，这里手动恢复主窗口
                 RunEvent::Reopen { .. } => {
-                    if let Some(window) = app_handle.get_webview_window("main") {
+                    if let Some(window) = app_handle.get_window("main") {
                         #[cfg(target_os = "windows")]
                         {
                             let _ = window.set_skip_taskbar(false);
@@ -1712,7 +1715,7 @@ pub fn run() {
                             handle_deeplink_url(app_handle, &url_str, true, "RunEvent::Opened");
 
                             // 确保主窗口可见
-                            if let Some(window) = app_handle.get_webview_window("main") {
+                            if let Some(window) = app_handle.get_window("main") {
                                 let _ = window.unminimize();
                                 let _ = window.show();
                                 let _ = window.set_focus();
@@ -2048,6 +2051,11 @@ fn window_state_flags() -> StateFlags {
 /// 当前应用的退出路径会拦截 `ExitRequested` 并最终直接 `std::process::exit(0)`，
 /// 这里需要在真正结束进程前手动落盘，避免 window-state 插件的默认退出钩子被绕过。
 pub fn save_window_state_before_exit(app_handle: &tauri::AppHandle) {
+    // The window-state plugin enumerates single-webview windows. Close only the
+    // remote children at actual shutdown/lightweight entry so it sees main again.
+    for label in ["site-direct", "site-shop"] {
+        if let Some(view) = app_handle.get_webview(label) { let _ = view.close(); }
+    }
     if let Err(err) = app_handle.save_window_state(window_state_flags()) {
         log::error!("退出前保存窗口状态失败: {err}");
     } else {

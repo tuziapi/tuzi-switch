@@ -670,7 +670,7 @@ pub fn handle_tray_menu_event(app: &tauri::AppHandle, event_id: &str) {
 
     match event_id {
         "show_main" => {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 #[cfg(target_os = "windows")]
                 {
                     let _ = window.set_skip_taskbar(false);

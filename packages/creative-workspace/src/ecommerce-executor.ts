@@ -61,6 +61,7 @@ export function createEcommerceExecutor(
           invocationPlan: prepared.plan,
           prompt: item.prompt,
           size: batch.size,
+          generationParams: batch.generationParams,
           count: 1,
           referenceImages: prepared.references,
           accountReference: prepared.accountReference,

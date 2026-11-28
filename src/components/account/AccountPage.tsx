@@ -211,7 +211,6 @@ function AccountPageContent({
               ref={tokenInput}
               id="account-system-token"
               type="password"
-              autoFocus
               autoComplete="off"
               autoCapitalize="none"
               spellCheck={false}

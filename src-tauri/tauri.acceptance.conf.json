@@ -8,6 +8,8 @@
         "label": "main",
         "dragDropEnabled": false,
         "title": "兔子助手 · 集成测试",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
         "width": 1200,
         "height": 800,
         "visible": false
@@ -17,7 +19,8 @@
   "bundle": {
     "createUpdaterArtifacts": false,
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "infoPlist": "Info.acceptance.plist"
     },
     "windows": {
       "wix": {

@@ -63,3 +63,26 @@ if (
 console.log(
   `Verified public beta ${value.version}: five assets, source, immutable tag and successful build ${value.runId}`,
 );
+
+if (process.argv.includes("--check-downloads")) {
+  // No authorization headers: exercise the same public links customers use.
+  // Digest checks above cover the complete files; this only proves reachability.
+  for (const item of value.downloads) {
+    const response = await fetch(item.url, {
+      headers: { Range: "bytes=0-63" },
+      signal: AbortSignal.timeout(60000),
+    });
+    if (
+      response.status !== 206 ||
+      response.headers.get("content-range") !== `bytes 0-63/${item.bytes}`
+    ) {
+      await response.body?.cancel();
+      throw Error(
+        `Public download range failed: ${item.platform}/${response.status}`,
+      );
+    }
+    if ((await response.arrayBuffer()).byteLength !== 64)
+      throw Error(`Incomplete public download range: ${item.platform}`);
+    console.log(`Public download reachable: ${item.platform} (64 bytes)`);
+  }
+}

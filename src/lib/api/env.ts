@@ -39,9 +39,9 @@ export async function restoreEnvBackup(backupPath: string): Promise<void> {
  * 检查所有应用的环境变量冲突
  * @returns 按应用类型分组的环境变量冲突
  */
-export async function checkAllEnvConflicts(): Promise<
-  Record<string, EnvConflict[]>
-> {
+export async function checkAllEnvConflicts(
+  strict = false,
+): Promise<Record<string, EnvConflict[]>> {
   const apps = ["claude", "codex", "gemini"];
   const results: Record<string, EnvConflict[]> = {};
 
@@ -50,6 +50,7 @@ export async function checkAllEnvConflicts(): Promise<
       try {
         results[app] = await checkEnvConflicts(app);
       } catch (error) {
+        if (strict) throw error;
         console.error(`检查 ${app} 环境变量失败:`, error);
         results[app] = [];
       }

@@ -6,7 +6,7 @@ import {
 } from '../upstream/packages/drawnix/src/services/assistant-creation-setup';
 import { AssistantAccountQuickPicker } from './AssistantAccountQuickPicker';
 import ConfigProvider from 'tdesign-react/es/config-provider';
-import { Plus, LayoutGrid, ArrowUpRight, Search, Pencil, Plug, Copy } from 'lucide-react';
+import { Plus, LayoutGrid, ArrowUpRight, Search, Pencil, Plug, Copy, X, RefreshCw, CheckCircle2 } from 'lucide-react';
 import App from '../upstream/apps/web/src/app/app';
 import { workspaceService } from '../upstream/packages/drawnix/src/services/workspace-service';
 import type { BoardMetadata } from '../upstream/packages/drawnix/src/types/workspace.types';
@@ -188,21 +188,32 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
       {quickSetupRequest && <AssistantAccountQuickPicker request={quickSetupRequest} onFallback={fallbackQuickSetup} onComplete={closeQuickSetup} />}
       {settingsOpen && <Suspense fallback={<div className="creative-loading" role="status">正在打开创作配置…</div>}><CreativeSettings onClose={() => onSettingsOpenChange?.(false)} /></Suspense>}
       {renaming && <div className="creative-rename-backdrop"><form role="dialog" aria-modal="true" aria-label="重命名项目" className="creative-rename-dialog" onSubmit={event => { event.preventDefault(); void rename(); }} onKeyDown={event => { if(event.key === 'Escape' && !busy) setRenaming(null); }}><h3>重命名项目</h3><input autoFocus aria-label="项目名称" value={renaming.name} onChange={event => setRenaming({...renaming, name:event.target.value})}/><div><button type="button" disabled={busy} onClick={() => setRenaming(null)}>取消</button><button type="submit" disabled={busy || !renaming.name.trim()}>保存</button></div></form></div>}
-      {pairing && <div className="creative-rename-backdrop"><section role="dialog" aria-modal="true" aria-label="连接 Codex / MCP 客户端" className="creative-rename-dialog creative-mcp-pairing">
-        <h3>连接 Codex / MCP 客户端</h3>
-        <p>连接本机 Codex 后，可调用 OpenTu 创作工具并操作当前画布。只添加 tuzi-opentu 配置，保留其他设置；助手重启后自动重连。</p>
-        {connector && <p style={{fontSize:12, overflowWrap:'anywhere'}}>{connector.scope === 'local' ? '写入本机客户端配置：' : '当前为合成测试环境，仅写隔离配置：'}<br />{connector.configPath}</p>}
-        <div><button type="button" disabled={connectorBusy || !connector?.configPath} onClick={() => void configureConnector(false)}>{connectorBusy ? '正在配置…' : connector?.configured ? '修复本机连接' : '连接本机 Codex'}</button>{connector?.configured && <button type="button" disabled={connectorBusy} onClick={() => void configureConnector(true)}>解除连接</button>}</div>
-        {connector?.configured && <p role="status">{connector.lastToolCallAt ? '本次运行已收到连接器转发的成功工具调用。' : '已配置，等待客户端实际调用。'}</p>}
-        <OpenTuConnectionGuide />
-        <details><summary>其他客户端 / 手动 HTTP 配置</summary>
-          <p>名称填“兔子助手 OpenTu”，类型选“流式 HTTP”。以下手动配置在重启后需要更新；上方 Codex 连接器不需要重新配对。云端客户端需要另行配置 Tunnel。</p>
-          <label>本地 MCP 地址<input readOnly value={pairing.endpoint} /></label>
-          <p>自定义标头名称填 Authorization，值粘贴“复制 Authorization 值”的完整内容。不要把令牌填入“Bearer 令牌环境变量”，也不要发送到聊天中。</p>
-          <div><button type="button" onClick={() => void copyPairing('endpoint')}><Copy size={14} />复制地址</button><button type="button" onClick={() => void copyPairing('token')}>复制配对令牌</button><button type="button" onClick={() => void copyPairing('authorization')}>复制 Authorization 值</button></div>
-        </details>
-        {pairingMessage && <p role="status">{pairingMessage}</p>}{pairingError && <p role="alert">{pairingError}</p>}
-        <div><button type="button" disabled={connectorBusy} onClick={() => void checkPairing()}>检查连接</button><button type="button" disabled={connectorBusy} onClick={() => setPairing(null)}>关闭</button></div>
+      {pairing && <div className="creative-rename-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="creative-mcp-title" className="creative-mcp-pairing">
+        <header className="creative-mcp-header">
+          <span className="creative-mcp-icon"><Plug size={21} /></span>
+          <div><h3 id="creative-mcp-title">连接 Codex / MCP 客户端</h3><p>让客户端使用 OpenTu 创作工具，与你的画布协同工作。</p></div>
+          <button className="creative-mcp-close" type="button" aria-label="关闭连接面板" disabled={connectorBusy} onClick={() => setPairing(null)}><X size={18} /></button>
+        </header>
+        <div className="creative-mcp-body">
+          <section className="creative-mcp-connect-card" aria-label="本机 Codex 连接">
+            <div className="creative-mcp-card-heading"><h4>本机 Codex</h4><span className="creative-mcp-badge" data-configured={!!connector?.configured}>{connector?.configured ? '已配置' : '未配置'}</span></div>
+            <p>添加 tuzi-opentu 配置，保留其他设置；助手重启后自动重连。</p>
+            <div className="creative-mcp-actions"><button className="creative-mcp-primary" type="button" disabled={connectorBusy || !connector?.configPath} onClick={() => void configureConnector(false)}><Plug size={15} />{connectorBusy ? '正在配置…' : connector?.configured ? '修复本机连接' : '连接本机 Codex'}</button>{connector?.configured && <button className="creative-mcp-disconnect" type="button" disabled={connectorBusy} onClick={() => void configureConnector(true)}>解除连接</button>}</div>
+            {connector?.configured && <p className="creative-mcp-connection-status" role="status"><CheckCircle2 size={14} />{connector.lastToolCallAt ? '本次运行已收到连接器转发的成功工具调用。' : '已配置，等待客户端实际调用。'}</p>}
+            {connector && <details className="creative-mcp-config-path"><summary>{connector.scope === 'local' ? '查看本机配置位置' : '查看隔离测试配置位置'}</summary><code>{connector.configPath}</code></details>}
+          </section>
+          <OpenTuConnectionGuide />
+          <details className="creative-mcp-manual"><summary>其他客户端 / 手动 HTTP 配置</summary>
+            <p>名称填“兔子助手 OpenTu”，类型选“流式 HTTP”。以下手动配置在重启后需要更新；上方 Codex 连接器不需要重新配对。云端客户端需要另行配置 Tunnel。</p>
+            <label>本地 MCP 地址<input readOnly value={pairing.endpoint} /></label>
+            <p>自定义标头名称填 Authorization，值粘贴“复制 Authorization 值”的完整内容。不要把令牌填入“Bearer 令牌环境变量”，也不要发送到聊天中。</p>
+            <div className="creative-mcp-actions"><button type="button" onClick={() => void copyPairing('endpoint')}><Copy size={14} />复制地址</button><button type="button" onClick={() => void copyPairing('token')}><Copy size={14} />复制配对令牌</button><button type="button" onClick={() => void copyPairing('authorization')}><Copy size={14} />复制 Authorization 值</button></div>
+          </details>
+        </div>
+        <footer className="creative-mcp-footer">
+          {pairingMessage && <p className="creative-mcp-feedback" role="status">{pairingMessage}</p>}{pairingError && <p className="creative-mcp-feedback creative-mcp-feedback-error" role="alert">{pairingError}</p>}
+          <div className="creative-mcp-actions"><button type="button" disabled={connectorBusy} onClick={() => void checkPairing()}><RefreshCw size={14} />检查连接</button><button type="button" disabled={connectorBusy} onClick={() => setPairing(null)}>关闭</button></div>
+        </footer>
       </section></div>}
       {error && <div role="alert" className="creative-error">{error}</div>}
       {!ready && !error && <div className="creative-loading" role="status">正在读取本地项目…</div>}
@@ -211,11 +222,11 @@ export function CreativeWorkspace({ active = true, page, onPageChange, settingsO
           <h2>我的项目 <small>{boards.length}</small></h2>
           <div className="creative-project-list-actions">
             <label><Search size={15} /><input aria-label="搜索项目" placeholder="搜索项目" value={search} onChange={e => setSearch(e.target.value)} /></label>
-            <button onClick={() => void openPairing()} title="配置 Codex 或其他 MCP 客户端调用 OpenTu"><Plug size={15} />连接 Codex / MCP</button>
+            <button className="creative-connect-button" onClick={() => void openPairing()} title="配置 Codex 或其他 MCP 客户端调用 OpenTu"><Plug size={15} />连接 Codex / MCP</button>
             <button className="creative-primary" disabled={busy} onClick={createBoard}><Plus size={17} />新建项目</button>
           </div>
         </div>
-        {pairingError && <div role="alert" className="creative-error">{pairingError}</div>}
+        {pairingError && !pairing && <div role="alert" className="creative-error">{pairingError}</div>}
         {boards.length === 0 ? <div className="creative-empty"><LayoutGrid size={30} /><h3>从第一个项目开始</h3><p>你的作品保存在当前设备。创建一个空白画布，开始编辑。</p><button onClick={createBoard} disabled={busy}>创建项目 <ArrowUpRight size={15} /></button></div> : <div className="creative-project-grid">{boards.filter(b => b.name.toLowerCase().includes(search.toLowerCase())).sort((a,b) => b.updatedAt-a.updatedAt).map(board => <article className="creative-project-card" key={board.id}><button disabled={busy} onClick={() => openBoard(board.id)} className="creative-project-open"><span className="creative-project-thumbnail"><LayoutGrid size={28}/></span><strong>{board.name}</strong><span>{new Date(board.updatedAt).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></button><button aria-label={`重命名 ${board.name}`} onClick={() => setRenaming({ id: board.id, name: board.name })} className="creative-rename"><Pencil size={14}/></button></article>)}</div>}
       </section>}
       {ready && page === 'ecommerce' && <Suspense fallback={<div className="creative-loading" role="status">正在打开电商生图…</div>}><EcommerceWorkbench accountBridge={accountBridge} onOpenCanvas={() => onPageChange('canvas')} /></Suspense>}

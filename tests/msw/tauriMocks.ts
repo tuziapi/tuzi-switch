@@ -5,6 +5,9 @@ import { server } from "./server";
 const TAURI_ENDPOINT = "http://tauri.local";
 
 vi.mock("@tauri-apps/api/core", () => ({
+  // These HTTP-backed integration tests run in jsdom, without native child views.
+  // Native website lifecycle and IPC are exercised by EmbeddedSite and Rust tests.
+  isTauri: () => false,
   invoke: async (command: string, payload: Record<string, unknown> = {}) => {
     const response = await fetch(`${TAURI_ENDPOINT}/${command}`, {
       method: "POST",
