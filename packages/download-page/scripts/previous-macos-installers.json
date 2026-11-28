@@ -33,5 +33,10 @@
     "tag": "v1.6.3",
     "href": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.3.sh",
     "sha256": "751f67c81c0c5a3de8135216c155f3aadb5e473c37664487da8735d7c08a6be8"
+  },
+  {
+    "tag": "v1.6.4",
+    "href": "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.4.sh",
+    "sha256": "4c77e510261179671a58cbb86ee19c9c98207c08cb576046195affcdd4b8a3de"
   }
 ]

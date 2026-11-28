@@ -1,7 +1,7 @@
-// This installer is intentionally pinned to the verified release v1.6.4.
-export const macosInstallerTag = "v1.6.4";
+// This installer is intentionally pinned to the verified release v1.6.5.
+export const macosInstallerTag = "v1.6.5";
 export const macosInstallerUrl =
-  "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.4.sh";
+  "https://tuziapi.github.io/tuzi-switch/install-macos-v1.6.5.sh";
 
 export function isMacosInstaller(installer, release) {
   return (
