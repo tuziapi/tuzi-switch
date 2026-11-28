@@ -1588,7 +1588,13 @@ function App() {
           <div
             className={`flex h-full items-center justify-between gap-2 ${fullWorkspace && isMac() ? "pl-24 pr-5" : "px-6"} ${primaryWorkspace && useAppWindowControls ? "pr-28" : ""}`}
             {...DRAG_REGION_ATTR}
-            style={{ ...DRAG_REGION_STYLE } as any}
+            style={{
+              ...DRAG_REGION_STYLE,
+              // Native controls must retain their space at narrow breakpoints.
+              paddingInlineStart: fullWorkspace && isMac() ? 96 : undefined,
+              paddingInlineEnd:
+                primaryWorkspace && useAppWindowControls ? 112 : undefined,
+            } as any}
           >
             <div
               className="workspace-header-title flex min-w-0 items-center gap-1"

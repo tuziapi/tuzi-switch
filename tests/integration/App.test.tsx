@@ -360,6 +360,24 @@ describe("App integration with MSW", () => {
     toastErrorMock.mockReset();
   });
 
+  it("reserves native Mac controls on account and website headers", async () => {
+    const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    try {
+      const { default: App } = await import("@/App");
+      renderApp(App);
+      await openNavigation(true);
+      for (const view of ["account.title", "nav-direct", "nav-shop"]) {
+        fireEvent.click(within(screen.getByRole("dialog")).getByText(view));
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        const header = screen.getByRole("banner").firstElementChild;
+        expect(header).toHaveStyle({ paddingInlineStart: "96px" });
+        await openNavigation();
+      }
+    } finally {
+      platform.mockRestore();
+    }
+  });
+
   it("leaves Escape to the active creative workspace instead of navigating to providers", async () => {
     const { default: App } = await import("@/App");
     renderApp(App);
