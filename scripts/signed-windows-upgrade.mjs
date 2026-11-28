@@ -242,7 +242,11 @@ foreach ($program in $programs) {
   }
   async function openUpdateDialogFromCanvas(page) {
     const creative = page.getByRole('button', { name: 'opentu 创作', exact: true });
-    if (await creative.count()) await creative.click();
+    if (!await page.getByRole('navigation', { name: '创作导航' }).isVisible()) {
+      if (!await creative.isVisible())
+        await page.getByRole('button', { name: '兔子助手导航', exact: true }).click();
+      await creative.click();
+    }
     const canvasNotice = page.locator('.canvas-update-notice');
     await canvasNotice.waitFor({ timeout: 90000 });
     const expanded = canvasNotice.getByRole('button', { name: '查看更新', exact: true });

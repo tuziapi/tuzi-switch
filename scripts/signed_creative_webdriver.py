@@ -61,6 +61,8 @@ q.onerror=()=>{c.close();reject(q.error)}}})})().then(done,e=>done({error:String
 
     def enter(self):
         if not self.execute('return Boolean(document.querySelector("nav[aria-label=创作导航]"))'):
+            if not self.execute('return [...document.querySelectorAll("button")].some(e=>e.textContent.trim()==="opentu 创作" && e.getClientRects().length)'):
+                self.action('button', '兔子助手导航')
             self.action('button', 'opentu 创作')
 
     def canvas(self):
