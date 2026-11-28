@@ -1,0 +1,29 @@
+name: Verify published release and download page
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Already published release with reviewed upgrade evidence
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.repository == 'AiW520/tuzi-switch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check exact accepted release and anonymous customer routes
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: node scripts/check-published-release.mjs "$RELEASE_TAG" > public-release-verification.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-release-verification
+          path: public-release-verification.json
+          if-no-files-found: error
